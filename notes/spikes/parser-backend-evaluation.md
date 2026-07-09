@@ -88,3 +88,34 @@ Notes:
 - Oxc dependency tree compiled successfully in the workspace.
 - The parser accepted the current TSX fixture with TypeScript and JSX enabled.
 - This only proves parse acceptance. It does not yet prove that decorators, class declarations, render methods, JSX nodes, or spans are accessible in the shape EdgeZero needs.
+
+
+## Oxc AST inspection
+
+Oxc exposed the facts needed from the current counter fixture:
+
+- class declaration: `Counter`
+- decorators:
+  - `route("/counter")`
+  - `component("x-counter")`
+- class property:
+  - `count = state(0)`
+- methods:
+  - `increment`
+  - `render`
+- render return shape:
+  - `ParenthesizedExpression`
+  - nested `JSXElement`
+- JSX element:
+  - opening name `button`
+  - attribute `onClick`
+  - text child
+  - expression child `{this.count}`
+- spans:
+  - byte-offset spans are present on relevant nodes
+
+Notes:
+
+- Oxc’s AST shape uses helpers such as `statement.as_declaration()`.
+- JSX returned from a parenthesized `return (...)` appears under `ParenthesizedExpression`, so EdgeZero extraction must unwrap expression wrappers before detecting template roots.
+- Decorators are represented as call expressions with identifier callees and literal arguments, which is suitable for extracting `@route(...)` and `@component(...)`.
