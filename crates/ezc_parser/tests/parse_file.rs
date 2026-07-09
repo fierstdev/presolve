@@ -41,6 +41,10 @@ fn parses_counter_fixture() {
     assert_eq!(render.jsx_roots.len(), 1);
     assert_eq!(render.jsx_roots[0].name, "button");
     assert_eq!(render.jsx_roots[0].attributes, vec!["onClick={...}"]);
+    assert_eq!(
+        render.jsx_roots[0].event_handler_refs,
+        vec!["this.increment"]
+    );
     assert_eq!(render.bindings, vec!["this.count"]);
 }
 

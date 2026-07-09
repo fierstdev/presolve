@@ -31,6 +31,7 @@ pub struct RenderModel {
     pub root_element: Option<String>,
     pub attributes: Vec<String>,
     pub bindings: Vec<String>,
+    pub event_handler_refs: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -95,14 +96,17 @@ fn build_component_node(
         .methods
         .iter()
         .find(|method| method.name == "render")
-        .map(|method| RenderModel {
-            root_element: method.jsx_roots.first().map(|jsx| jsx.name.clone()),
-            attributes: method
-                .jsx_roots
-                .first()
-                .map(|jsx| jsx.attributes.clone())
-                .unwrap_or_default(),
-            bindings: method.bindings.clone(),
+        .map(|method| {
+            let root = method.jsx_roots.first();
+
+            RenderModel {
+                root_element: root.map(|jsx| jsx.name.clone()),
+                attributes: root.map(|jsx| jsx.attributes.clone()).unwrap_or_default(),
+                event_handler_refs: root
+                    .map(|jsx| jsx.event_handler_refs.clone())
+                    .unwrap_or_default(),
+                bindings: method.bindings.clone(),
+            }
         });
 
     if render.is_none() {
@@ -110,6 +114,48 @@ fn build_component_node(
             code: "EZC1002".to_string(),
             message: format!("class `{}` is missing render()", class.name),
         });
+    }
+
+    if let Some(render) = &render {
+        let property_names = class
+            .properties
+            .iter()
+            .map(|property| property.name.as_str())
+            .collect::<Vec<_>>();
+
+        let method_names = class
+            .methods
+            .iter()
+            .map(|method| method.name.as_str())
+            .collect::<Vec<_>>();
+
+        for binding in &render.bindings {
+            if let Some(name) = this_member_name(binding) {
+                if !property_names.contains(&name) {
+                    diagnostics.push(ComponentDiagnostic {
+                        code: "EZC1003".to_string(),
+                        message: format!(
+                            "render binding `{binding}` references unknown field `{name}` in class `{}`",
+                            class.name
+                        ),
+                    });
+                }
+            }
+        }
+
+        for handler in &render.event_handler_refs {
+            if let Some(name) = this_member_name(handler) {
+                if !method_names.contains(&name) {
+                    diagnostics.push(ComponentDiagnostic {
+                        code: "EZC1004".to_string(),
+                        message: format!(
+                            "event handler `{handler}` references unknown method `{name}` in class `{}`",
+                            class.name
+                        ),
+                    });
+                }
+            }
+        }
     }
 
     ComponentNode {
@@ -128,4 +174,8 @@ fn decorator_argument(class: &ParsedClass, name: &str) -> Option<String> {
         .iter()
         .find(|decorator| decorator.name == name)
         .and_then(|decorator| decorator.argument.clone())
+}
+
+fn this_member_name(reference: &str) -> Option<&str> {
+    reference.strip_prefix("this.")
 }

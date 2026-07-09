@@ -194,6 +194,13 @@ fn parse_expression_for_jsx(
                 .filter_map(jsx_attribute_name)
                 .collect::<Vec<_>>();
 
+            let event_handler_refs = element
+                .opening_element
+                .attributes
+                .iter()
+                .filter_map(jsx_event_handler_ref)
+                .collect::<Vec<_>>();
+
             for child in &element.children {
                 parse_jsx_child(child, bindings);
             }
@@ -202,6 +209,7 @@ fn parse_expression_for_jsx(
                 name,
                 span: source_span(source, element.span),
                 attributes,
+                event_handler_refs,
             });
         }
         _ => {}
@@ -288,6 +296,50 @@ fn jsx_attribute_name(attribute: &JSXAttributeItem<'_>) -> Option<String> {
     };
 
     Some(format!("{name}{value_suffix}"))
+}
+
+fn jsx_event_handler_ref(attribute: &JSXAttributeItem<'_>) -> Option<String> {
+    let JSXAttributeItem::Attribute(attribute) = attribute else {
+        return None;
+    };
+
+    let attribute_name = match &attribute.name {
+        JSXAttributeName::Identifier(identifier) => identifier.name.as_str(),
+        JSXAttributeName::NamespacedName(_) => return None,
+    };
+
+    if !attribute_name.starts_with("on") {
+        return None;
+    }
+
+    let Some(JSXAttributeValue::ExpressionContainer(container)) = &attribute.value else {
+        return None;
+    };
+
+    jsx_expression_event_handler_ref(&container.expression)
+}
+
+fn jsx_expression_event_handler_ref(expression: &JSXExpression<'_>) -> Option<String> {
+    let expression = expression.as_expression()?;
+    expression_event_handler_ref(expression)
+}
+
+fn expression_event_handler_ref(expression: &Expression<'_>) -> Option<String> {
+    match expression {
+        Expression::ArrowFunctionExpression(arrow) => {
+            for statement in &arrow.body.statements {
+                if let Statement::ExpressionStatement(statement) = statement {
+                    if let Some(reference) = expression_event_handler_ref(&statement.expression) {
+                        return Some(reference);
+                    }
+                }
+            }
+
+            None
+        }
+        Expression::CallExpression(call) => expression_summary(&call.callee),
+        _ => None,
+    }
 }
 
 fn parse_diagnostic(source: &str, diagnostic: &oxc_diagnostics::OxcDiagnostic) -> ParseDiagnostic {

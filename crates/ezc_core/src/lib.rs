@@ -135,5 +135,29 @@ class Counter extends Component {
         assert_eq!(render.root_element.as_deref(), Some("button"));
         assert_eq!(render.attributes, vec!["onClick={...}"]);
         assert_eq!(render.bindings, vec!["this.count"]);
+        assert_eq!(render.event_handler_refs, vec!["this.increment"]);
+    }
+
+    #[test]
+    fn component_graph_reports_semantic_errors() {
+        let source =
+            include_str!("../../../fixtures/0003-semantic-errors/input/BrokenSemantics.tsx");
+
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0003-semantic-errors/input/BrokenSemantics.tsx",
+            source,
+        );
+
+        let graph = build_component_graph(&parsed);
+
+        let codes = graph
+            .diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.code.as_str())
+            .collect::<Vec<_>>();
+
+        assert!(codes.contains(&"EZC1001"));
+        assert!(codes.contains(&"EZC1003"));
+        assert!(codes.contains(&"EZC1004"));
     }
 }

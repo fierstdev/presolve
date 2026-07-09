@@ -221,6 +221,15 @@ fn print_parsed_file(parsed: &ParsedFile) {
                         } else {
                             println!("          attributes: {}", jsx.attributes.join(", "));
                         }
+
+                        if jsx.event_handler_refs.is_empty() {
+                            println!("          event handlers: none");
+                        } else {
+                            println!(
+                                "          event handlers: {}",
+                                jsx.event_handler_refs.join(", ")
+                            );
+                        }
                     }
                 }
 
@@ -297,6 +306,15 @@ fn print_component_graph(path: &PathBuf, graph: &ComponentGraph) {
                     println!("        attributes: none");
                 } else {
                     println!("        attributes: {}", render.attributes.join(", "));
+                }
+
+                if render.event_handler_refs.is_empty() {
+                    println!("        event handlers: none");
+                } else {
+                    println!(
+                        "        event handlers: {}",
+                        render.event_handler_refs.join(", ")
+                    );
                 }
 
                 if render.bindings.is_empty() {
