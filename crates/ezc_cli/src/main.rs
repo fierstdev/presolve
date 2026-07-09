@@ -5,7 +5,7 @@ use std::process;
 
 use ezc_core::{
     build_component_graph, build_template_graph, explain_json, explain_text, generate_static_html,
-    summarize_source, ComponentGraph,
+    summarize_source, AttributeValue, ComponentGraph, TemplateGraph,
 };
 use ezc_parser::{parse_file, ParseSeverity, ParsedFile};
 
@@ -22,6 +22,7 @@ fn main() {
         "explain" => run_explain(args),
         "parse" => run_parse(args),
         "graph" => run_graph(args),
+        "template" => run_template(args),
         "html" => run_html(args),
         _ => {
             eprintln!("unknown command: {command}");
@@ -74,6 +75,26 @@ fn run_graph(mut args: Vec<String>) {
     let graph = build_component_graph(&parsed);
 
     print_component_graph(&path, &graph);
+}
+
+fn run_template(mut args: Vec<String>) {
+    if args.is_empty() {
+        eprintln!("missing file path");
+        print_usage_and_exit();
+    }
+
+    let path = PathBuf::from(args.remove(0));
+
+    let source = fs::read_to_string(&path).unwrap_or_else(|error| {
+        eprintln!("failed to read {}: {error}", path.display());
+        process::exit(1);
+    });
+
+    let parsed = parse_file(&path, &source);
+    let component_graph = build_component_graph(&parsed);
+    let template_graph = build_template_graph(&component_graph);
+
+    print_template_graph(&path, &template_graph);
 }
 
 fn run_html(mut args: Vec<String>) {
@@ -371,6 +392,61 @@ fn print_component_graph(path: &PathBuf, graph: &ComponentGraph) {
     }
 }
 
+fn print_template_graph(path: &PathBuf, graph: &TemplateGraph) {
+    println!("File: {}", path.display());
+
+    println!("TemplateGraph:");
+    println!("  templates:");
+
+    if graph.templates.is_empty() {
+        println!("    none");
+        return;
+    }
+
+    for template in &graph.templates {
+        println!("    template {}", template.component_name);
+
+        match &template.root {
+            Some(root) => {
+                println!("      root: <{}>", root.tag_name);
+
+                println!("      attributes:");
+                if root.attributes.is_empty() {
+                    println!("        none");
+                } else {
+                    for attribute in &root.attributes {
+                        println!(
+                            "        {} = {}",
+                            attribute.name,
+                            format_attribute_value(&attribute.value)
+                        );
+                    }
+                }
+
+                println!("      children:");
+                if root.children.is_empty() {
+                    println!("        none");
+                } else {
+                    for child in &root.children {
+                        println!("        {:?}", child);
+                    }
+                }
+            }
+            None => {
+                println!("      root: none");
+            }
+        }
+    }
+}
+
+fn format_attribute_value(value: &AttributeValue) -> String {
+    match value {
+        AttributeValue::Static(value) => format!("{value:?}"),
+        AttributeValue::EventHandler(handler) => format!("event-handler({handler})"),
+        AttributeValue::BindingList(bindings) => format!("bindings({})", bindings.join(", ")),
+    }
+}
+
 fn diagnostic_severity_label(severity: &ParseSeverity) -> &'static str {
     match severity {
         ParseSeverity::Info => "Info",
@@ -384,6 +460,7 @@ fn print_usage_and_exit() -> ! {
     eprintln!("  ezc_cli explain <file> [--format text|json]");
     eprintln!("  ezc_cli parse <file>");
     eprintln!("  ezc_cli graph <file>");
+    eprintln!("  ezc_cli template <file>");
     eprintln!("  ezc_cli html <file>");
     process::exit(1);
 }

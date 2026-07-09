@@ -1,0 +1,4 @@
+File: fixtures/0002-broken-tsx/input/BrokenCounter.tsx
+TemplateGraph:
+  templates:
+    none
