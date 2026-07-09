@@ -23,7 +23,7 @@ pub use model::{
 pub use summarize::summarize_source;
 pub use template_graph::{
     build_template_graph, AttributeValue, ElementNode, TemplateAttribute, TemplateChild,
-    TemplateGraph, TemplateNode,
+    TemplateGraph, TemplateNode, TemplateNodeId,
 };
 
 #[cfg(test)]
@@ -176,7 +176,7 @@ class Counter extends Component {
     }
 
     #[test]
-    fn generates_static_html_from_component_graph() {
+    fn generates_static_html_from_template_graph() {
         let source = include_str!("../../../fixtures/0001-source-summary/input/Counter.tsx");
 
         let parsed =
@@ -188,7 +188,7 @@ class Counter extends Component {
 
         assert_eq!(
             html,
-            "<button data-ez-event-handler=\"this.increment\" data-ez-bindings=\"this.count\">Count:<!-- binding:this.count --></button>\n"
+            "<button data-ez-node=\"n0\" data-ez-event-handler=\"this.increment\" data-ez-bindings=\"this.count\">Count:<!-- ez-binding:n1:this.count --></button>\n"
         );
     }
 
@@ -209,6 +209,7 @@ class Counter extends Component {
 
         let root = template.root.as_ref().expect("expected template root");
 
+        assert_eq!(root.id.0, "n0");
         assert_eq!(root.tag_name, "button");
 
         assert_eq!(root.attributes.len(), 2);
@@ -228,7 +229,10 @@ class Counter extends Component {
             root.children,
             vec![
                 TemplateChild::Text("Count:".to_string()),
-                TemplateChild::Binding("this.count".to_string()),
+                TemplateChild::Binding {
+                    id: TemplateNodeId("n1".to_string()),
+                    expression: "this.count".to_string(),
+                },
             ]
         );
     }

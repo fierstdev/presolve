@@ -21,6 +21,10 @@ fn generate_element_html(element: &ElementNode) -> String {
     html.push('<');
     html.push_str(&element.tag_name);
 
+    html.push_str(" data-ez-node=\"");
+    html.push_str(&escape_attr(&element.id.0));
+    html.push('"');
+
     for attribute in &element.attributes {
         html.push(' ');
         html.push_str(&attribute.name);
@@ -34,9 +38,11 @@ fn generate_element_html(element: &ElementNode) -> String {
     for child in &element.children {
         match child {
             TemplateChild::Text(text) => html.push_str(&escape_text(text)),
-            TemplateChild::Binding(binding) => {
-                html.push_str("<!-- binding:");
-                html.push_str(&escape_comment(binding));
+            TemplateChild::Binding { id, expression } => {
+                html.push_str("<!-- ez-binding:");
+                html.push_str(&escape_comment(&id.0));
+                html.push(':');
+                html.push_str(&escape_comment(expression));
                 html.push_str(" -->");
             }
             TemplateChild::Element(element) => {

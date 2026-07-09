@@ -5,7 +5,7 @@ use std::process;
 
 use ezc_core::{
     build_component_graph, build_template_graph, explain_json, explain_text, generate_static_html,
-    summarize_source, AttributeValue, ComponentGraph, TemplateGraph,
+    summarize_source, AttributeValue, ComponentGraph, TemplateChild, TemplateGraph,
 };
 use ezc_parser::{parse_file, ParseSeverity, ParsedFile};
 
@@ -408,7 +408,7 @@ fn print_template_graph(path: &PathBuf, graph: &TemplateGraph) {
 
         match &template.root {
             Some(root) => {
-                println!("      root: <{}>", root.tag_name);
+                println!("      root: <{}> id={}", root.tag_name, root.id.0);
 
                 println!("      attributes:");
                 if root.attributes.is_empty() {
@@ -428,12 +428,53 @@ fn print_template_graph(path: &PathBuf, graph: &TemplateGraph) {
                     println!("        none");
                 } else {
                     for child in &root.children {
-                        println!("        {:?}", child);
+                        print_template_child(child, 8);
                     }
                 }
             }
             None => {
                 println!("      root: none");
+            }
+        }
+    }
+}
+
+fn print_template_child(child: &TemplateChild, indent: usize) {
+    let padding = " ".repeat(indent);
+
+    match child {
+        TemplateChild::Text(text) => println!("{padding}Text({text:?})"),
+        TemplateChild::Binding { id, expression } => {
+            println!("{padding}Binding id={} expression={expression:?}", id.0);
+        }
+        TemplateChild::Element(element) => {
+            println!(
+                "{padding}Element <{}> id={}",
+                element.tag_name, element.id.0
+            );
+
+            let child_padding = " ".repeat(indent + 2);
+
+            println!("{child_padding}attributes:");
+            if element.attributes.is_empty() {
+                println!("{child_padding}  none");
+            } else {
+                for attribute in &element.attributes {
+                    println!(
+                        "{child_padding}  {} = {}",
+                        attribute.name,
+                        format_attribute_value(&attribute.value)
+                    );
+                }
+            }
+
+            println!("{child_padding}children:");
+            if element.children.is_empty() {
+                println!("{child_padding}  none");
+            } else {
+                for child in &element.children {
+                    print_template_child(child, indent + 4);
+                }
             }
         }
     }

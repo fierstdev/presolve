@@ -2,14 +2,14 @@ File: fixtures/0004-nested-jsx/input/NestedCounter.tsx
 TemplateGraph:
   templates:
     template NestedCounter
-      root: <section>
+      root: <section> id=n0
       attributes:
         none
       children:
-        Element <button>
+        Element <button> id=n1
           attributes:
             data-ez-event-handler = event-handler(this.increment)
             data-ez-bindings = bindings(this.count)
           children:
             Text("Count:")
-            Binding("this.count")
+            Binding id=n2 expression="this.count"

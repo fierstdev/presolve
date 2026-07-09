@@ -1,5 +1,18 @@
 use crate::component_graph::{ComponentGraph, RenderChild, RenderElement, RenderModel};
 
+#[derive(Debug, Default)]
+struct TemplateIdAllocator {
+    next: usize,
+}
+
+impl TemplateIdAllocator {
+    fn alloc(&mut self) -> TemplateNodeId {
+        let id = TemplateNodeId(format!("n{}", self.next));
+        self.next += 1;
+        id
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TemplateGraph {
     pub templates: Vec<TemplateNode>,
@@ -13,6 +26,7 @@ pub struct TemplateNode {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ElementNode {
+    pub id: TemplateNodeId,
     pub tag_name: String,
     pub attributes: Vec<TemplateAttribute>,
     pub children: Vec<TemplateChild>,
@@ -34,25 +48,37 @@ pub enum AttributeValue {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TemplateChild {
     Text(String),
-    Binding(String),
+    Binding {
+        id: TemplateNodeId,
+        expression: String,
+    },
     Element(ElementNode),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TemplateNodeId(pub String);
+
 pub fn build_template_graph(component_graph: &ComponentGraph) -> TemplateGraph {
+    let mut ids = TemplateIdAllocator::default();
+
     let templates = component_graph
         .components
         .iter()
         .map(|component| TemplateNode {
             component_name: component.class_name.clone(),
-            root: component.render.as_ref().and_then(element_from_render),
+            root: component
+                .render
+                .as_ref()
+                .and_then(|render| element_from_render(render, &mut ids)),
         })
         .collect::<Vec<_>>();
 
     TemplateGraph { templates }
 }
 
-fn element_from_render(render: &RenderModel) -> Option<ElementNode> {
+fn element_from_render(render: &RenderModel, ids: &mut TemplateIdAllocator) -> Option<ElementNode> {
     let tag_name = render.root_element.clone()?;
+    let id = ids.alloc();
 
     let direct_bindings = collect_direct_bindings_from_children(&render.children);
 
@@ -65,18 +91,25 @@ fn element_from_render(render: &RenderModel) -> Option<ElementNode> {
     let children = render
         .children
         .iter()
-        .map(template_child_from_render)
+        .map(|child| template_child_from_render(child, ids))
         .collect::<Vec<_>>();
 
     Some(ElementNode {
+        id,
         tag_name,
         attributes,
         children,
     })
 }
 
-fn element_from_render_element(element: &RenderElement) -> ElementNode {
+fn element_from_render_element(
+    element: &RenderElement,
+    ids: &mut TemplateIdAllocator,
+) -> ElementNode {
+    let id = ids.alloc();
+
     ElementNode {
+        id,
         tag_name: element.tag_name.clone(),
         attributes: template_attributes(
             &element.attributes,
@@ -86,7 +119,7 @@ fn element_from_render_element(element: &RenderElement) -> ElementNode {
         children: element
             .children
             .iter()
-            .map(template_child_from_render)
+            .map(|child| template_child_from_render(child, ids))
             .collect::<Vec<_>>(),
     }
 }
@@ -127,12 +160,15 @@ fn collect_direct_bindings_from_children(children: &[RenderChild]) -> Vec<String
     bindings
 }
 
-fn template_child_from_render(child: &RenderChild) -> TemplateChild {
+fn template_child_from_render(child: &RenderChild, ids: &mut TemplateIdAllocator) -> TemplateChild {
     match child {
         RenderChild::Text(text) => TemplateChild::Text(text.clone()),
-        RenderChild::Binding(binding) => TemplateChild::Binding(binding.clone()),
+        RenderChild::Binding(binding) => TemplateChild::Binding {
+            id: ids.alloc(),
+            expression: binding.clone(),
+        },
         RenderChild::Element(element) => {
-            TemplateChild::Element(element_from_render_element(element))
+            TemplateChild::Element(element_from_render_element(element, ids))
         }
     }
 }
