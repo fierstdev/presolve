@@ -6,8 +6,8 @@ use std::process;
 
 use ezc_core::{
     build_component_graph, build_template_graph, build_template_manifest, explain_json,
-    explain_text, generate_static_html, summarize_source, template_manifest_json, AttributeValue,
-    ComponentGraph, TemplateChild, TemplateGraph,
+    explain_text, generate_standalone_page, generate_static_html, summarize_source,
+    template_manifest_json, AttributeValue, ComponentGraph, TemplateChild, TemplateGraph,
 };
 use ezc_parser::{parse_file, ParseSeverity, ParsedFile};
 
@@ -160,15 +160,18 @@ fn run_build(mut args: Vec<String>) {
     let parsed = parse_file(&input_path, &source);
     let component_graph = build_component_graph(&parsed);
     let template_graph = build_template_graph(&component_graph);
-    let html = generate_static_html(&template_graph);
+    let html_fragment = generate_static_html(&template_graph);
     let manifest = build_template_manifest(&template_graph);
     let manifest_json = template_manifest_json(&manifest);
+    let page_title = page_title_from_graph(&template_graph);
+    let page_html = generate_standalone_page(&page_title, &html_fragment, &manifest);
 
-    write_build_artifacts(&out_dir, &html, &manifest_json).unwrap_or_else(|error| {
+    write_build_artifacts(&out_dir, &page_html, &manifest_json).unwrap_or_else(|error| {
         eprintln!(
             "failed to write build artifacts to {}: {error}",
             out_dir.display()
         );
+
         process::exit(1);
     });
 
@@ -192,6 +195,14 @@ fn run_parse(mut args: Vec<String>) {
     let parsed = parse_file(&path, &source);
 
     print_parsed_file(&parsed);
+}
+
+fn page_title_from_graph(graph: &TemplateGraph) -> String {
+    graph
+        .templates
+        .first()
+        .map(|template| template.component_name.clone())
+        .unwrap_or_else(|| "EdgeZero App".to_string())
 }
 
 fn parse_format(args: &[String]) -> String {

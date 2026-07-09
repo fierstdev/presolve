@@ -8,6 +8,7 @@ pub mod component_graph;
 pub mod explain;
 pub mod html_codegen;
 pub mod model;
+pub mod page_codegen;
 pub mod summarize;
 pub mod template_graph;
 pub mod template_manifest;
@@ -21,6 +22,7 @@ pub use html_codegen::generate_static_html;
 pub use model::{
     ClassSummary, DecoratorSummary, Diagnostic, RenderMethodSummary, Severity, SourceSummary, Span,
 };
+pub use page_codegen::generate_standalone_page;
 pub use summarize::summarize_source;
 pub use template_graph::{
     build_template_graph, AttributeValue, ElementNode, TemplateAttribute, TemplateChild,
@@ -283,5 +285,25 @@ class Counter extends Component {
                 handler: "this.increment".to_string(),
             }]
         );
+    }
+
+    #[test]
+    fn generates_standalone_page_with_embedded_manifest() {
+        let source = include_str!("../../../fixtures/0004-nested-jsx/input/NestedCounter.tsx");
+
+        let parsed =
+            ezc_parser::parse_file("fixtures/0004-nested-jsx/input/NestedCounter.tsx", source);
+
+        let component_graph = build_component_graph(&parsed);
+        let template_graph = build_template_graph(&component_graph);
+        let html = generate_static_html(&template_graph);
+        let manifest = build_template_manifest(&template_graph);
+        let page = generate_standalone_page("NestedCounter", &html, &manifest);
+
+        assert!(page.starts_with("<!doctype html>\n"));
+        assert!(page.contains("<title>NestedCounter</title>"));
+        assert!(page.contains("<section data-ez-node=\"n0\">"));
+        assert!(page.contains("id=\"ez-template-manifest\""));
+        assert!(page.contains("\"name\": \"NestedCounter\""));
     }
 }
