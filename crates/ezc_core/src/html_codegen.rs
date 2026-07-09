@@ -1,11 +1,13 @@
-use crate::component_graph::{ComponentGraph, ComponentNode, RenderChild, RenderModel};
+use crate::template_graph::{
+    AttributeValue, ElementNode, TemplateAttribute, TemplateChild, TemplateGraph,
+};
 
-pub fn generate_static_html(graph: &ComponentGraph) -> String {
+pub fn generate_static_html(template_graph: &TemplateGraph) -> String {
     let mut output = String::new();
 
-    for component in &graph.components {
-        if let Some(html) = generate_component_html(component) {
-            output.push_str(&html);
+    for template in &template_graph.templates {
+        if let Some(root) = &template.root {
+            output.push_str(&generate_element_html(root));
             output.push('\n');
         }
     }
@@ -13,37 +15,26 @@ pub fn generate_static_html(graph: &ComponentGraph) -> String {
     output
 }
 
-fn generate_component_html(component: &ComponentNode) -> Option<String> {
-    let render = component.render.as_ref()?;
-    generate_render_html(render)
-}
-
-fn generate_render_html(render: &RenderModel) -> Option<String> {
-    let root = render.root_element.as_ref()?;
-
+fn generate_element_html(element: &ElementNode) -> String {
     let mut html = String::new();
 
     html.push('<');
-    html.push_str(root);
+    html.push_str(&element.tag_name);
 
-    if !render.event_handler_refs.is_empty() {
-        html.push_str(" data-ez-event-handlers=\"");
-        html.push_str(&escape_attr(&render.event_handler_refs.join(",")));
-        html.push('"');
-    }
-
-    if !render.bindings.is_empty() {
-        html.push_str(" data-ez-bindings=\"");
-        html.push_str(&escape_attr(&render.bindings.join(",")));
+    for attribute in &element.attributes {
+        html.push(' ');
+        html.push_str(&attribute.name);
+        html.push_str("=\"");
+        html.push_str(&escape_attr(&attribute_value_string(attribute)));
         html.push('"');
     }
 
     html.push('>');
 
-    for child in &render.children {
+    for child in &element.children {
         match child {
-            RenderChild::Text(text) => html.push_str(&escape_text(text)),
-            RenderChild::Binding(binding) => {
+            TemplateChild::Text(text) => html.push_str(&escape_text(text)),
+            TemplateChild::Binding(binding) => {
                 html.push_str("<!-- binding:");
                 html.push_str(&escape_comment(binding));
                 html.push_str(" -->");
@@ -52,10 +43,18 @@ fn generate_render_html(render: &RenderModel) -> Option<String> {
     }
 
     html.push_str("</");
-    html.push_str(root);
+    html.push_str(&element.tag_name);
     html.push('>');
 
-    Some(html)
+    html
+}
+
+fn attribute_value_string(attribute: &TemplateAttribute) -> String {
+    match &attribute.value {
+        AttributeValue::Static(value) => value.clone(),
+        AttributeValue::EventHandler(handler) => handler.clone(),
+        AttributeValue::BindingList(bindings) => bindings.join(","),
+    }
 }
 
 fn escape_attr(value: &str) -> String {

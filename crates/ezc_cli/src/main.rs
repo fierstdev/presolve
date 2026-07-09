@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use std::process;
 
 use ezc_core::{
-    build_component_graph, explain_json, explain_text, generate_static_html, summarize_source,
-    ComponentGraph,
+    build_component_graph, build_template_graph, explain_json, explain_text, generate_static_html,
+    summarize_source, ComponentGraph,
 };
 use ezc_parser::{parse_file, ParseSeverity, ParsedFile};
 
@@ -90,8 +90,9 @@ fn run_html(mut args: Vec<String>) {
     });
 
     let parsed = parse_file(&path, &source);
-    let graph = build_component_graph(&parsed);
-    let html = generate_static_html(&graph);
+    let component_graph = build_component_graph(&parsed);
+    let template_graph = build_template_graph(&component_graph);
+    let html = generate_static_html(&template_graph);
 
     print!("{html}");
 }

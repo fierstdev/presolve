@@ -9,6 +9,7 @@ pub mod explain;
 pub mod html_codegen;
 pub mod model;
 pub mod summarize;
+pub mod template_graph;
 
 pub use component_graph::{
     build_component_graph, ComponentDiagnostic, ComponentGraph, ComponentMethod, ComponentNode,
@@ -20,6 +21,10 @@ pub use model::{
     ClassSummary, DecoratorSummary, Diagnostic, RenderMethodSummary, Severity, SourceSummary, Span,
 };
 pub use summarize::summarize_source;
+pub use template_graph::{
+    build_template_graph, AttributeValue, ElementNode, TemplateAttribute, TemplateChild,
+    TemplateGraph, TemplateNode,
+};
 
 #[cfg(test)]
 mod tests {
@@ -177,12 +182,54 @@ class Counter extends Component {
         let parsed =
             ezc_parser::parse_file("fixtures/0001-source-summary/input/Counter.tsx", source);
 
-        let graph = build_component_graph(&parsed);
-        let html = generate_static_html(&graph);
+        let component_graph = build_component_graph(&parsed);
+        let template_graph = build_template_graph(&component_graph);
+        let html = generate_static_html(&template_graph);
 
         assert_eq!(
             html,
-            "<button data-ez-event-handlers=\"this.increment\" data-ez-bindings=\"this.count\">Count:<!-- binding:this.count --></button>\n"
+            "<button data-ez-event-handler=\"this.increment\" data-ez-bindings=\"this.count\">Count:<!-- binding:this.count --></button>\n"
+        );
+    }
+
+    #[test]
+    fn builds_template_graph_from_component_graph() {
+        let source = include_str!("../../../fixtures/0001-source-summary/input/Counter.tsx");
+
+        let parsed =
+            ezc_parser::parse_file("fixtures/0001-source-summary/input/Counter.tsx", source);
+
+        let component_graph = build_component_graph(&parsed);
+        let template_graph = build_template_graph(&component_graph);
+
+        assert_eq!(template_graph.templates.len(), 1);
+
+        let template = &template_graph.templates[0];
+        assert_eq!(template.component_name, "Counter");
+
+        let root = template.root.as_ref().expect("expected template root");
+
+        assert_eq!(root.tag_name, "button");
+
+        assert_eq!(root.attributes.len(), 2);
+        assert_eq!(root.attributes[0].name, "data-ez-event-handler");
+        assert_eq!(
+            root.attributes[0].value,
+            AttributeValue::EventHandler("this.increment".to_string())
+        );
+
+        assert_eq!(root.attributes[1].name, "data-ez-bindings");
+        assert_eq!(
+            root.attributes[1].value,
+            AttributeValue::BindingList(vec!["this.count".to_string()])
+        );
+
+        assert_eq!(
+            root.children,
+            vec![
+                TemplateChild::Text("Count:".to_string()),
+                TemplateChild::Binding("this.count".to_string()),
+            ]
         );
     }
 }
