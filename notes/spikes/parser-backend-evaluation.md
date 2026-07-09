@@ -204,3 +204,20 @@ Follow-up questions:
 - Does Oxc recover better for other kinds of syntax errors?
 - Would Tree-sitter or Biome offer better partial recovery for editor tooling?
 - Should EdgeZero use one parser for compilation and another for editor/lint-style partial analysis?
+
+
+## Diagnostic offset mapping
+
+Added a spike-only `line_column_at` helper to convert byte offsets into line/column positions.
+
+Broken TSX fixture result:
+
+- diagnostic offset: `198`
+- mapped location: `9:16`
+
+This confirms that parser diagnostic byte offsets can be converted into human-facing source locations.
+
+Current limitation:
+
+- the offset is still hardcoded in the spike.
+- the next step is to inspect Oxc’s diagnostic API enough to extract diagnostic labels programmatically instead of relying on `Debug` output.

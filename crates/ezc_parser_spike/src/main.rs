@@ -79,6 +79,16 @@ fn main() {
     let probe = probe_program(&ret.program);
 
     print_probe(&probe);
+
+    if !ret.errors.is_empty() {
+        let offset = 198;
+
+        let (line, column) = line_column_at(&source, offset);
+
+        println!("Diagnostic probe:");
+
+        println!("  offset {offset} -> {line}:{column}");
+    }
 }
 
 fn probe_program(program: &Program<'_>) -> ParserProbe {
@@ -323,6 +333,20 @@ fn jsx_attribute_name(attribute: &JSXAttributeItem<'_>) -> Option<String> {
     };
 
     Some(format!("{name}{value_suffix}"))
+}
+
+fn line_column_at(source: &str, offset: usize) -> (usize, usize) {
+    let clamped = offset.min(source.len());
+
+    let prefix = &source[..clamped];
+
+    let line = prefix.bytes().filter(|byte| *byte == b'\n').count() + 1;
+
+    let column = prefix
+        .rsplit_once('\n')
+        .map_or(prefix.len() + 1, |(_, tail)| tail.len() + 1);
+
+    (line, column)
 }
 
 fn print_probe(probe: &ParserProbe) {
