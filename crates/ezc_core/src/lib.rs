@@ -4,18 +4,19 @@
 //! spans, obvious declarations, and diagnostics. That gives the project a stable
 //! place to learn compiler fundamentals before choosing a real parser backend.
 
+pub mod component_graph;
 pub mod explain;
-
 pub mod model;
-
 pub mod summarize;
 
+pub use component_graph::{
+    build_component_graph, ComponentDiagnostic, ComponentGraph, ComponentMethod, ComponentNode,
+    RenderModel, StateField,
+};
 pub use explain::{explain_json, explain_text};
-
 pub use model::{
     ClassSummary, DecoratorSummary, Diagnostic, RenderMethodSummary, Severity, SourceSummary, Span,
 };
-
 pub use summarize::summarize_source;
 
 #[cfg(test)]
@@ -99,5 +100,40 @@ class Counter extends Component {
             serde_json::from_str(&expected).expect("expected explain JSON fixture is invalid");
 
         assert_eq!(actual_json, expected_json);
+    }
+
+    #[test]
+    fn builds_component_graph_from_parsed_counter() {
+        let source = include_str!("../../../fixtures/0001-source-summary/input/Counter.tsx");
+
+        let parsed =
+            ezc_parser::parse_file("fixtures/0001-source-summary/input/Counter.tsx", source);
+
+        let graph = build_component_graph(&parsed);
+
+        assert!(graph.diagnostics.is_empty());
+
+        let component = graph.components.first().expect("expected component");
+
+        assert_eq!(component.class_name, "Counter");
+        assert_eq!(component.element_name.as_deref(), Some("x-counter"));
+        assert_eq!(component.route_path.as_deref(), Some("/counter"));
+
+        assert_eq!(component.state_fields.len(), 1);
+        assert_eq!(component.state_fields[0].name, "count");
+
+        let method_names = component
+            .methods
+            .iter()
+            .map(|method| method.name.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(method_names, vec!["increment", "render"]);
+
+        let render = component.render.as_ref().expect("expected render model");
+
+        assert_eq!(render.root_element.as_deref(), Some("button"));
+        assert_eq!(render.attributes, vec!["onClick={...}"]);
+        assert_eq!(render.bindings, vec!["this.count"]);
     }
 }

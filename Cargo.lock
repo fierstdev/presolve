@@ -179,6 +179,7 @@ dependencies = [
 name = "ezc_core"
 version = "0.0.0"
 dependencies = [
+ "ezc_parser",
  "serde_json",
 ]
 
