@@ -2,6 +2,7 @@
 members = [
   "crates/ezc_core",
   "crates/ezc_cli",
+  "crates/ezc_parser",
   "crates/ezc_parser_spike",
 ]
 resolver = "2"
