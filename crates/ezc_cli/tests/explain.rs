@@ -12,6 +12,16 @@ fn ezc_cli_bin() -> &'static str {
     env!("CARGO_BIN_EXE_ezc_cli")
 }
 
+fn normalize_html_for_fixture(value: &str) -> String {
+    value
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .replace(" >", ">")
+        .trim()
+        .to_string()
+}
+
 #[test]
 fn explain_command_matches_text_fixture() {
     let repo_root = repo_root();
@@ -206,6 +216,61 @@ fn graph_command_matches_semantic_errors_fixture() {
     let expected =
         std::fs::read_to_string(repo_root.join("fixtures/0003-semantic-errors/expected/graph.txt"))
             .expect("failed to read expected semantic graph fixture");
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn html_command_matches_valid_counter_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["html", "fixtures/0001-source-summary/input/Counter.tsx"])
+        .output()
+        .expect("failed to run ezc_cli html");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+
+    let expected =
+        std::fs::read_to_string(repo_root.join("fixtures/0001-source-summary/expected/html.html"))
+            .expect("failed to read expected html fixture");
+
+    assert_eq!(
+        normalize_html_for_fixture(&actual),
+        normalize_html_for_fixture(&expected)
+    );
+}
+
+#[test]
+fn html_command_matches_broken_tsx_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["html", "fixtures/0002-broken-tsx/input/BrokenCounter.tsx"])
+        .output()
+        .expect("failed to run ezc_cli html");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+
+    let expected =
+        std::fs::read_to_string(repo_root.join("fixtures/0002-broken-tsx/expected/html.html"))
+            .expect("failed to read expected broken html fixture");
 
     assert_eq!(actual, expected);
 }
