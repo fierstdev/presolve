@@ -4,10 +4,54 @@ use std::path::PathBuf;
 
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
-    ClassElement, Declaration, Expression, JSXElementName, MethodDefinitionKind, Program, Statement,
+    Argument, ClassElement, Declaration, Expression, JSXAttributeItem, JSXAttributeName,
+    JSXAttributeValue, JSXChild, JSXElementName, JSXExpression, Program, PropertyKey, Statement,
 };
 use oxc_parser::Parser;
-use oxc_span::{GetSpan, SourceType};
+use oxc_span::{SourceType, Span};
+
+#[derive(Debug, Default)]
+struct ParserProbe {
+    classes: Vec<ClassProbe>,
+}
+
+#[derive(Debug)]
+struct ClassProbe {
+    name: String,
+    span: Span,
+    decorators: Vec<DecoratorProbe>,
+    properties: Vec<PropertyProbe>,
+    methods: Vec<MethodProbe>,
+}
+
+#[derive(Debug)]
+struct DecoratorProbe {
+    name: String,
+    argument: Option<String>,
+    span: Span,
+}
+
+#[derive(Debug)]
+struct PropertyProbe {
+    name: String,
+    initializer: Option<String>,
+    span: Span,
+}
+
+#[derive(Debug)]
+struct MethodProbe {
+    name: String,
+    span: Span,
+    jsx_roots: Vec<JsxElementProbe>,
+    bindings: Vec<String>,
+}
+
+#[derive(Debug)]
+struct JsxElementProbe {
+    name: String,
+    span: Span,
+    attributes: Vec<String>,
+}
 
 fn main() {
     let path = env::args()
@@ -32,144 +76,326 @@ fn main() {
         println!("  {error:?}");
     }
 
-    inspect_program(&ret.program);
+    let probe = probe_program(&ret.program);
+
+    print_probe(&probe);
 }
 
-fn inspect_program(program: &Program<'_>) {
-    println!("Top-level statements: {}", program.body.len());
+fn probe_program(program: &Program<'_>) -> ParserProbe {
+    let mut probe = ParserProbe::default();
 
     for statement in &program.body {
-        inspect_statement(statement);
+        if let Some(declaration) = statement.as_declaration() {
+            if let Some(class_probe) = probe_declaration(declaration) {
+                probe.classes.push(class_probe);
+            }
+        }
+    }
+
+    probe
+}
+
+fn probe_declaration(declaration: &Declaration<'_>) -> Option<ClassProbe> {
+    let Declaration::ClassDeclaration(class) = declaration else {
+        return None;
+    };
+
+    let name = class
+        .id
+        .as_ref()
+        .map(|id| id.name.to_string())
+        .unwrap_or_else(|| "<anonymous>".to_string());
+
+    let decorators = class
+        .decorators
+        .iter()
+        .filter_map(probe_decorator)
+        .collect::<Vec<_>>();
+
+    let mut properties = Vec::new();
+    let mut methods = Vec::new();
+
+    for element in &class.body.body {
+        match element {
+            ClassElement::PropertyDefinition(property) => {
+                if let Some(property_probe) = probe_property(property) {
+                    properties.push(property_probe);
+                }
+            }
+            ClassElement::MethodDefinition(method) => {
+                if let Some(method_probe) = probe_method(method) {
+                    methods.push(method_probe);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Some(ClassProbe {
+        name,
+        span: class.span,
+        decorators,
+        properties,
+        methods,
+    })
+}
+
+fn probe_decorator(decorator: &oxc_ast::ast::Decorator<'_>) -> Option<DecoratorProbe> {
+    let Expression::CallExpression(call) = &decorator.expression else {
+        return None;
+    };
+
+    let Expression::Identifier(callee) = &call.callee else {
+        return None;
+    };
+
+    let argument = call.arguments.first().and_then(argument_string_value);
+
+    Some(DecoratorProbe {
+        name: callee.name.to_string(),
+        argument,
+        span: decorator.span,
+    })
+}
+
+fn argument_string_value(argument: &Argument<'_>) -> Option<String> {
+    match argument {
+        Argument::StringLiteral(literal) => Some(literal.value.to_string()),
+        _ => None,
     }
 }
 
-fn inspect_statement(statement: &Statement<'_>) {
-    if let Some(declaration) = statement.as_declaration() {
-        inspect_declaration(declaration);
+fn probe_property(property: &oxc_ast::ast::PropertyDefinition<'_>) -> Option<PropertyProbe> {
+    let name = property_key_name(&property.key)?;
+
+    let initializer = property.value.as_ref().and_then(expression_summary);
+
+    Some(PropertyProbe {
+        name,
+        initializer,
+        span: property.span,
+    })
+}
+
+fn probe_method(method: &oxc_ast::ast::MethodDefinition<'_>) -> Option<MethodProbe> {
+    let name = property_key_name(&method.key)?;
+
+    let mut jsx_roots = Vec::new();
+    let mut bindings = Vec::new();
+
+    if let Some(body) = &method.value.body {
+        for statement in &body.statements {
+            probe_statement_for_jsx(statement, &mut jsx_roots, &mut bindings);
+        }
+    }
+
+    Some(MethodProbe {
+        name,
+        span: method.span,
+        jsx_roots,
+        bindings,
+    })
+}
+
+fn probe_statement_for_jsx(
+    statement: &Statement<'_>,
+    jsx_roots: &mut Vec<JsxElementProbe>,
+    bindings: &mut Vec<String>,
+) {
+    if let Statement::ReturnStatement(return_statement) = statement {
+        if let Some(argument) = &return_statement.argument {
+            probe_expression_for_jsx(argument, jsx_roots, bindings);
+        }
+    }
+}
+
+fn probe_expression_for_jsx(
+    expression: &Expression<'_>,
+    jsx_roots: &mut Vec<JsxElementProbe>,
+    bindings: &mut Vec<String>,
+) {
+    match expression {
+        Expression::ParenthesizedExpression(parenthesized) => {
+            probe_expression_for_jsx(&parenthesized.expression, jsx_roots, bindings);
+        }
+        Expression::JSXElement(element) => {
+            let name = jsx_element_name(&element.opening_element.name)
+                .unwrap_or_else(|| "<unknown>".to_string());
+
+            let attributes = element
+                .opening_element
+                .attributes
+                .iter()
+                .filter_map(jsx_attribute_name)
+                .collect::<Vec<_>>();
+
+            for child in &element.children {
+                probe_jsx_child(child, bindings);
+            }
+
+            jsx_roots.push(JsxElementProbe {
+                name,
+                span: element.span,
+                attributes,
+            });
+        }
+        _ => {}
+    }
+}
+
+fn probe_jsx_child(child: &JSXChild<'_>, bindings: &mut Vec<String>) {
+    match child {
+        JSXChild::ExpressionContainer(container) => {
+            if let Some(binding) = jsx_expression_summary(&container.expression) {
+                bindings.push(binding);
+            }
+        }
+        JSXChild::Element(element) => {
+            for child in &element.children {
+                probe_jsx_child(child, bindings);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn property_key_name(key: &PropertyKey<'_>) -> Option<String> {
+    match key {
+        PropertyKey::StaticIdentifier(identifier) => Some(identifier.name.to_string()),
+        PropertyKey::PrivateIdentifier(identifier) => Some(format!("#{}", identifier.name)),
+        PropertyKey::StringLiteral(literal) => Some(literal.value.to_string()),
+        PropertyKey::NumericLiteral(literal) => Some(literal.raw.as_ref()?.to_string()),
+        _ => None,
+    }
+}
+
+fn jsx_expression_summary(expression: &JSXExpression<'_>) -> Option<String> {
+    if let Some(expression) = expression.as_expression() {
+        return expression_summary(expression);
+    }
+
+    None
+}
+
+fn expression_summary(expression: &Expression<'_>) -> Option<String> {
+    match expression {
+        Expression::CallExpression(call) => {
+            let callee = expression_summary(&call.callee)?;
+            Some(format!("{callee}(...)"))
+        }
+        Expression::Identifier(identifier) => Some(identifier.name.to_string()),
+        Expression::ThisExpression(_) => Some("this".to_string()),
+        Expression::StaticMemberExpression(member) => {
+            let object = expression_summary(&member.object)?;
+            Some(format!("{object}.{}", member.property.name))
+        }
+        Expression::NumericLiteral(literal) => Some(literal.raw.as_ref()?.to_string()),
+        Expression::StringLiteral(literal) => Some(format!("{:?}", literal.value.as_str())),
+        _ => None,
+    }
+}
+
+fn jsx_element_name(name: &JSXElementName<'_>) -> Option<String> {
+    match name {
+        JSXElementName::Identifier(identifier) => Some(identifier.name.to_string()),
+        JSXElementName::IdentifierReference(identifier) => Some(identifier.name.to_string()),
+        JSXElementName::NamespacedName(namespaced) => Some(format!("{namespaced:?}")),
+        JSXElementName::MemberExpression(member) => Some(format!("{member:?}")),
+        JSXElementName::ThisExpression(_) => Some("this".to_string()),
+    }
+}
+
+fn jsx_attribute_name(attribute: &JSXAttributeItem<'_>) -> Option<String> {
+    let JSXAttributeItem::Attribute(attribute) = attribute else {
+        return None;
+    };
+
+    let name = match &attribute.name {
+        JSXAttributeName::Identifier(identifier) => identifier.name.to_string(),
+        JSXAttributeName::NamespacedName(namespaced) => format!("{namespaced:?}"),
+    };
+
+    let value_suffix = match &attribute.value {
+        Some(JSXAttributeValue::StringLiteral(literal)) => format!("={:?}", literal.value.as_str()),
+        Some(JSXAttributeValue::ExpressionContainer(_)) => "={...}".to_string(),
+        Some(_) => "=<complex>".to_string(),
+        None => String::new(),
+    };
+
+    Some(format!("{name}{value_suffix}"))
+}
+
+fn print_probe(probe: &ParserProbe) {
+    println!("ParserProbe:");
+
+    if probe.classes.is_empty() {
+        println!("  classes: none");
         return;
     }
 
-    println!("Statement: {:?} span={:?}", statement, statement.span());
-}
+    for class in &probe.classes {
+        println!("  class {} span={:?}", class.name, class.span);
 
-fn inspect_declaration(declaration: &Declaration<'_>) {
-    match declaration {
-        Declaration::ClassDeclaration(class) => {
-            let name = class
-                .id
-                .as_ref()
-                .map(|id| id.name.as_str())
-                .unwrap_or("<anonymous>");
-
-            println!("ClassDeclaration: {name} span={:?}", class.span);
-
-            println!("  decorators: {}", class.decorators.len());
+        println!("    decorators:");
+        if class.decorators.is_empty() {
+            println!("      none");
+        } else {
             for decorator in &class.decorators {
-                println!(
-                    "    decorator span={:?} expression={:?}",
-                    decorator.span, decorator.expression
-                );
-            }
-
-            println!("  body elements: {}", class.body.body.len());
-            for element in &class.body.body {
-                inspect_class_element(element);
-            }
-        }
-        other => {
-            println!("Declaration: {:?} span={:?}", other, other.span());
-        }
-    }
-}
-
-fn inspect_class_element(element: &ClassElement<'_>) {
-    match element {
-        ClassElement::MethodDefinition(method) => {
-            let kind = match method.kind {
-                MethodDefinitionKind::Constructor => "constructor",
-                MethodDefinitionKind::Method => "method",
-                MethodDefinitionKind::Get => "get",
-                MethodDefinitionKind::Set => "set",
-            };
-
-            println!(
-                "  MethodDefinition: kind={} span={:?} key={:?}",
-                kind, method.span, method.key
-            );
-
-            if let Some(body) = &method.value.body {
-                for statement in &body.statements {
-                    inspect_method_statement(statement);
+                match &decorator.argument {
+                    Some(argument) => {
+                        println!(
+                            "      @{}({argument:?}) span={:?}",
+                            decorator.name, decorator.span
+                        );
+                    }
+                    None => {
+                        println!("      @{} span={:?}", decorator.name, decorator.span);
+                    }
                 }
             }
         }
-        other => {
-            println!("  ClassElement: {:?} span={:?}", other, other.span());
-        }
-    }
-}
 
-fn inspect_method_statement(statement: &Statement<'_>) {
-    match statement {
-        Statement::ReturnStatement(return_statement) => {
-            println!("    ReturnStatement span={:?}", return_statement.span);
-
-            if let Some(argument) = &return_statement.argument {
-                inspect_expression(argument, 6);
+        println!("    properties:");
+        if class.properties.is_empty() {
+            println!("      none");
+        } else {
+            for property in &class.properties {
+                match &property.initializer {
+                    Some(initializer) => {
+                        println!(
+                            "      {} = {} span={:?}",
+                            property.name, initializer, property.span
+                        );
+                    }
+                    None => {
+                        println!("      {} span={:?}", property.name, property.span);
+                    }
+                }
             }
         }
-        other => {
-            println!("    Statement: {:?} span={:?}", other, other.span());
-        }
-    }
-}
 
-fn inspect_expression(expression: &Expression<'_>, indent: usize) {
-    let pad = " ".repeat(indent);
+        println!("    methods:");
+        if class.methods.is_empty() {
+            println!("      none");
+        } else {
+            for method in &class.methods {
+                println!("      {} span={:?}", method.name, method.span);
 
-    match expression {
-        Expression::ParenthesizedExpression(parenthesized) => {
-            println!("{pad}ParenthesizedExpression span={:?}", parenthesized.span);
-            inspect_expression(&parenthesized.expression, indent + 2);
-        }
-        Expression::JSXElement(element) => {
-            println!("{pad}JSXElement span={:?}", element.span);
-            print_jsx_name(&element.opening_element.name, indent + 2);
+                for jsx in &method.jsx_roots {
+                    println!("        jsx root <{}> span={:?}", jsx.name, jsx.span);
+                    if jsx.attributes.is_empty() {
+                        println!("          attributes: none");
+                    } else {
+                        println!("          attributes: {}", jsx.attributes.join(", "));
+                    }
+                }
 
-            println!(
-                "{pad}  attributes: {}",
-                element.opening_element.attributes.len()
-            );
-
-            println!("{pad}  children: {}", element.children.len());
-        }
-        Expression::JSXFragment(fragment) => {
-            println!("{pad}JSXFragment span={:?}", fragment.span);
-        }
-        other => {
-            println!("{pad}Expression: {:?} span={:?}", other, other.span());
-        }
-    }
-}
-
-fn print_jsx_name(name: &JSXElementName<'_>, indent: usize) {
-    let pad = " ".repeat(indent);
-
-    match name {
-        JSXElementName::Identifier(identifier) => {
-            println!("{pad}JSX name: {}", identifier.name);
-        }
-        JSXElementName::IdentifierReference(identifier) => {
-            println!("{pad}JSX identifier reference: {}", identifier.name);
-        }
-        JSXElementName::NamespacedName(namespaced) => {
-            println!("{pad}JSX namespaced name: {:?}", namespaced);
-        }
-        JSXElementName::MemberExpression(member) => {
-            println!("{pad}JSX member name: {:?}", member);
-        }
-        JSXElementName::ThisExpression(_) => {
-            println!("{pad}JSX this expression");
+                if method.bindings.is_empty() {
+                    println!("        bindings: none");
+                } else {
+                    println!("        bindings: {}", method.bindings.join(", "));
+                }
+            }
         }
     }
 }

@@ -119,3 +119,55 @@ Notes:
 - Oxc’s AST shape uses helpers such as `statement.as_declaration()`.
 - JSX returned from a parenthesized `return (...)` appears under `ParenthesizedExpression`, so EdgeZero extraction must unwrap expression wrappers before detecting template roots.
 - Decorators are represented as call expressions with identifier callees and literal arguments, which is suitable for extracting `@route(...)` and `@component(...)`.
+
+
+## Oxc normalized probe
+
+Created a spike-only `ParserProbe` that maps Oxc AST details into EdgeZero-style facts.
+
+Command:
+
+```sh
+cargo run -p ezc_parser_spike -- fixtures/0001-source-summary/input/Counter.tsx
+```
+
+Result:
+
+- Compiled: yes
+- Parsed fixture: yes
+- Errors: 0
+
+Extracted facts:
+
+- class declaration:
+  - `Counter`
+- decorators:
+  - `@route("/counter")`
+  - `@component("x-counter")`
+- class property:
+  - `count = state(...)`
+- methods:
+  - `increment`
+  - `render`
+- render JSX:
+  - root element: `<button>`
+  - attribute: `onClick={...}`
+  - binding: `this.count`
+- spans:
+  - byte-offset spans are available for class, decorators, properties, methods, and JSX root
+
+Oxc API notes:
+
+- `Statement` uses Oxc’s inherited-variant/accessor pattern. Use `statement.as_declaration()`.
+- `JSXExpression` also uses this accessor pattern. Use `jsx_expression.as_expression()`.
+- JSX returned from `return (...)` appears under `ParenthesizedExpression`, so extraction must unwrap expression wrappers.
+- Decorators are represented as call expressions with identifier callees and literal arguments.
+
+Current limitations:
+
+- only handles simple class declarations
+- only handles simple decorator call expressions
+- only summarizes a few expression types
+- only detects JSX roots returned directly or through parentheses
+- does not yet distinguish event handlers from reactive bindings
+- does not recurse into nested JSX elements as separate roots
