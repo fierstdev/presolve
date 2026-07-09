@@ -39,11 +39,18 @@ pub struct ParsedMethod {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParsedJsxChild {
+    Text(String),
+    Binding(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedJsxElement {
     pub name: String,
     pub span: SourceSpan,
     pub attributes: Vec<String>,
     pub event_handler_refs: Vec<String>,
+    pub children: Vec<ParsedJsxChild>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

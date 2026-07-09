@@ -6,14 +6,16 @@
 
 pub mod component_graph;
 pub mod explain;
+pub mod html_codegen;
 pub mod model;
 pub mod summarize;
 
 pub use component_graph::{
     build_component_graph, ComponentDiagnostic, ComponentGraph, ComponentMethod, ComponentNode,
-    RenderModel, StateField,
+    RenderChild, RenderModel, StateField,
 };
 pub use explain::{explain_json, explain_text};
+pub use html_codegen::generate_static_html;
 pub use model::{
     ClassSummary, DecoratorSummary, Diagnostic, RenderMethodSummary, Severity, SourceSummary, Span,
 };
@@ -136,6 +138,13 @@ class Counter extends Component {
         assert_eq!(render.attributes, vec!["onClick={...}"]);
         assert_eq!(render.bindings, vec!["this.count"]);
         assert_eq!(render.event_handler_refs, vec!["this.increment"]);
+        assert_eq!(
+            render.children,
+            vec![
+                RenderChild::Text("Count:".to_string()),
+                RenderChild::Binding("this.count".to_string()),
+            ]
+        );
     }
 
     #[test]
@@ -159,5 +168,21 @@ class Counter extends Component {
         assert!(codes.contains(&"EZC1001"));
         assert!(codes.contains(&"EZC1003"));
         assert!(codes.contains(&"EZC1004"));
+    }
+
+    #[test]
+    fn generates_static_html_from_component_graph() {
+        let source = include_str!("../../../fixtures/0001-source-summary/input/Counter.tsx");
+
+        let parsed =
+            ezc_parser::parse_file("fixtures/0001-source-summary/input/Counter.tsx", source);
+
+        let graph = build_component_graph(&parsed);
+        let html = generate_static_html(&graph);
+
+        assert_eq!(
+            html,
+            "<button data-ez-event-handlers=\"this.increment\" data-ez-bindings=\"this.count\">Count:<!-- binding:this.count --></button>\n"
+        );
     }
 }

@@ -4,7 +4,8 @@ use std::path::PathBuf;
 use std::process;
 
 use ezc_core::{
-    build_component_graph, explain_json, explain_text, summarize_source, ComponentGraph,
+    build_component_graph, explain_json, explain_text, generate_static_html, summarize_source,
+    ComponentGraph,
 };
 use ezc_parser::{parse_file, ParseSeverity, ParsedFile};
 
@@ -21,6 +22,7 @@ fn main() {
         "explain" => run_explain(args),
         "parse" => run_parse(args),
         "graph" => run_graph(args),
+        "html" => run_html(args),
         _ => {
             eprintln!("unknown command: {command}");
             print_usage_and_exit();
@@ -72,6 +74,26 @@ fn run_graph(mut args: Vec<String>) {
     let graph = build_component_graph(&parsed);
 
     print_component_graph(&path, &graph);
+}
+
+fn run_html(mut args: Vec<String>) {
+    if args.is_empty() {
+        eprintln!("missing file path");
+        print_usage_and_exit();
+    }
+
+    let path = PathBuf::from(args.remove(0));
+
+    let source = fs::read_to_string(&path).unwrap_or_else(|error| {
+        eprintln!("failed to read {}: {error}", path.display());
+        process::exit(1);
+    });
+
+    let parsed = parse_file(&path, &source);
+    let graph = build_component_graph(&parsed);
+    let html = generate_static_html(&graph);
+
+    print!("{html}");
 }
 
 fn run_parse(mut args: Vec<String>) {
@@ -230,6 +252,15 @@ fn print_parsed_file(parsed: &ParsedFile) {
                                 jsx.event_handler_refs.join(", ")
                             );
                         }
+
+                        if jsx.children.is_empty() {
+                            println!("          children: none");
+                        } else {
+                            println!("          children:");
+                            for child in &jsx.children {
+                                println!("            {:?}", child);
+                            }
+                        }
                     }
                 }
 
@@ -317,6 +348,15 @@ fn print_component_graph(path: &PathBuf, graph: &ComponentGraph) {
                     );
                 }
 
+                if render.children.is_empty() {
+                    println!("        children: none");
+                } else {
+                    println!("        children:");
+                    for child in &render.children {
+                        println!("          {:?}", child);
+                    }
+                }
+
                 if render.bindings.is_empty() {
                     println!("        bindings: none");
                 } else {
@@ -343,5 +383,6 @@ fn print_usage_and_exit() -> ! {
     eprintln!("  ezc_cli explain <file> [--format text|json]");
     eprintln!("  ezc_cli parse <file>");
     eprintln!("  ezc_cli graph <file>");
+    eprintln!("  ezc_cli html <file>");
     process::exit(1);
 }

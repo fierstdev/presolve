@@ -1,4 +1,4 @@
-use ezc_parser::{parse_file, ParseSeverity};
+use ezc_parser::{parse_file, ParseSeverity, ParsedJsxChild};
 
 #[test]
 fn parses_counter_fixture() {
@@ -44,6 +44,13 @@ fn parses_counter_fixture() {
     assert_eq!(
         render.jsx_roots[0].event_handler_refs,
         vec!["this.increment"]
+    );
+    assert_eq!(
+        render.jsx_roots[0].children,
+        vec![
+            ParsedJsxChild::Text("Count:".to_string()),
+            ParsedJsxChild::Binding("this.count".to_string()),
+        ]
     );
     assert_eq!(render.bindings, vec!["this.count"]);
 }

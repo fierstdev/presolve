@@ -11,7 +11,7 @@ use oxc_span::{SourceType, Span};
 
 use crate::model::{
     ParseDiagnostic, ParseLabel, ParseSeverity, ParsedClass, ParsedDecorator, ParsedFile,
-    ParsedJsxElement, ParsedMethod, ParsedProperty, SourceSpan,
+    ParsedJsxChild, ParsedJsxElement, ParsedMethod, ParsedProperty, SourceSpan,
 };
 
 pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
@@ -201,6 +201,12 @@ fn parse_expression_for_jsx(
                 .filter_map(jsx_event_handler_ref)
                 .collect::<Vec<_>>();
 
+            let children = element
+                .children
+                .iter()
+                .filter_map(parsed_jsx_child)
+                .collect::<Vec<_>>();
+
             for child in &element.children {
                 parse_jsx_child(child, bindings);
             }
@@ -210,6 +216,7 @@ fn parse_expression_for_jsx(
                 span: source_span(source, element.span),
                 attributes,
                 event_handler_refs,
+                children,
             });
         }
         _ => {}
@@ -230,6 +237,28 @@ fn parse_jsx_child(child: &JSXChild<'_>, bindings: &mut Vec<String>) {
         }
         _ => {}
     }
+}
+
+fn parsed_jsx_child(child: &JSXChild<'_>) -> Option<ParsedJsxChild> {
+    match child {
+        JSXChild::Text(text) => {
+            let normalized = normalize_jsx_text(&text.value);
+
+            if normalized.is_empty() {
+                None
+            } else {
+                Some(ParsedJsxChild::Text(normalized))
+            }
+        }
+        JSXChild::ExpressionContainer(container) => {
+            jsx_expression_summary(&container.expression).map(ParsedJsxChild::Binding)
+        }
+        _ => None,
+    }
+}
+
+fn normalize_jsx_text(value: &str) -> String {
+    value.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn property_key_name(key: &PropertyKey<'_>) -> Option<String> {

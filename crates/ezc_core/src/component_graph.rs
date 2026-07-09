@@ -1,4 +1,4 @@
-use ezc_parser::{ParsedClass, ParsedFile};
+use ezc_parser::{ParsedClass, ParsedFile, ParsedJsxChild};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentGraph {
@@ -27,11 +27,18 @@ pub struct ComponentMethod {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RenderChild {
+    Text(String),
+    Binding(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RenderModel {
     pub root_element: Option<String>,
     pub attributes: Vec<String>,
     pub bindings: Vec<String>,
     pub event_handler_refs: Vec<String>,
+    pub children: Vec<RenderChild>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -105,6 +112,14 @@ fn build_component_node(
                 event_handler_refs: root
                     .map(|jsx| jsx.event_handler_refs.clone())
                     .unwrap_or_default(),
+                children: root
+                    .map(|jsx| {
+                        jsx.children
+                            .iter()
+                            .map(render_child_from_parsed)
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default(),
                 bindings: method.bindings.clone(),
             }
         });
@@ -174,6 +189,13 @@ fn decorator_argument(class: &ParsedClass, name: &str) -> Option<String> {
         .iter()
         .find(|decorator| decorator.name == name)
         .and_then(|decorator| decorator.argument.clone())
+}
+
+fn render_child_from_parsed(child: &ParsedJsxChild) -> RenderChild {
+    match child {
+        ParsedJsxChild::Text(text) => RenderChild::Text(text.clone()),
+        ParsedJsxChild::Binding(binding) => RenderChild::Binding(binding.clone()),
+    }
 }
 
 fn this_member_name(reference: &str) -> Option<&str> {

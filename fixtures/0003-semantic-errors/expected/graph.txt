@@ -16,4 +16,7 @@ ComponentGraph:
         root: <button>
         attributes: onClick={...}
         event handlers: this.increment
+        children:
+          Text("Count:")
+          Binding("this.missingCount")
         bindings: this.missingCount

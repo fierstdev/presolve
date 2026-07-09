@@ -15,4 +15,7 @@ ComponentGraph:
         root: <button>
         attributes: onClick={...}
         event handlers: this.increment
+        children:
+          Text("Count:")
+          Binding("this.count")
         bindings: this.count
