@@ -424,3 +424,56 @@ fn manifest_command_matches_nested_jsx_fixture() {
 
     assert_json_eq(&actual, &expected);
 }
+
+#[test]
+fn build_command_writes_html_and_manifest_artifacts() {
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-test-output/nested-counter");
+
+    if out_dir.exists() {
+        std::fs::remove_dir_all(&out_dir).expect("failed to clean previous test output");
+    }
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0004-nested-jsx/input/NestedCounter.tsx",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("test output path was not valid UTF-8"),
+        ])
+        .output()
+        .expect("failed to run ezc_cli build");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    assert!(stdout.contains("index.html"));
+    assert!(stdout.contains("template.manifest.json"));
+
+    let actual_html =
+        std::fs::read_to_string(out_dir.join("index.html")).expect("failed to read built HTML");
+    let expected_html =
+        std::fs::read_to_string(repo_root.join("fixtures/0004-nested-jsx/expected/html.html"))
+            .expect("failed to read expected nested HTML");
+
+    assert_eq!(
+        normalize_html_for_fixture(&actual_html),
+        normalize_html_for_fixture(&expected_html)
+    );
+
+    let actual_manifest = std::fs::read_to_string(out_dir.join("template.manifest.json"))
+        .expect("failed to read built manifest");
+    let expected_manifest =
+        std::fs::read_to_string(repo_root.join("fixtures/0004-nested-jsx/expected/manifest.json"))
+            .expect("failed to read expected nested manifest");
+
+    assert_json_eq(&actual_manifest, &expected_manifest);
+}

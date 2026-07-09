@@ -1,5 +1,6 @@
 use std::env;
 use std::fs;
+use std::io;
 use std::path::PathBuf;
 use std::process;
 
@@ -26,6 +27,7 @@ fn main() {
         "template" => run_template(args),
         "html" => run_html(args),
         "manifest" => run_manifest(args),
+        "build" => run_build(args),
         _ => {
             eprintln!("unknown command: {command}");
             print_usage_and_exit();
@@ -141,6 +143,39 @@ fn run_manifest(mut args: Vec<String>) {
     println!("{}", template_manifest_json(&manifest));
 }
 
+fn run_build(mut args: Vec<String>) {
+    if args.is_empty() {
+        eprintln!("missing file path");
+        print_usage_and_exit();
+    }
+
+    let input_path = PathBuf::from(args.remove(0));
+    let out_dir = parse_out_dir(&args);
+
+    let source = fs::read_to_string(&input_path).unwrap_or_else(|error| {
+        eprintln!("failed to read {}: {error}", input_path.display());
+        process::exit(1);
+    });
+
+    let parsed = parse_file(&input_path, &source);
+    let component_graph = build_component_graph(&parsed);
+    let template_graph = build_template_graph(&component_graph);
+    let html = generate_static_html(&template_graph);
+    let manifest = build_template_manifest(&template_graph);
+    let manifest_json = template_manifest_json(&manifest);
+
+    write_build_artifacts(&out_dir, &html, &manifest_json).unwrap_or_else(|error| {
+        eprintln!(
+            "failed to write build artifacts to {}: {error}",
+            out_dir.display()
+        );
+        process::exit(1);
+    });
+
+    println!("Wrote {}", out_dir.join("index.html").display());
+    println!("Wrote {}", out_dir.join("template.manifest.json").display());
+}
+
 fn run_parse(mut args: Vec<String>) {
     if args.is_empty() {
         eprintln!("missing file path");
@@ -182,6 +217,31 @@ fn parse_format(args: &[String]) -> String {
     }
 
     format
+}
+
+fn parse_out_dir(args: &[String]) -> PathBuf {
+    let mut out_dir = None;
+
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--out" => {
+                let Some(value) = args.get(index + 1) else {
+                    eprintln!("missing value for --out");
+                    process::exit(1);
+                };
+
+                out_dir = Some(PathBuf::from(value));
+                index += 2;
+            }
+            unknown => {
+                eprintln!("unknown option: {unknown}");
+                process::exit(1);
+            }
+        }
+    }
+
+    out_dir.unwrap_or_else(|| PathBuf::from("dist"))
 }
 
 fn print_parsed_file(parsed: &ParsedFile) {
@@ -519,6 +579,15 @@ fn diagnostic_severity_label(severity: &ParseSeverity) -> &'static str {
     }
 }
 
+fn write_build_artifacts(out_dir: &PathBuf, html: &str, manifest_json: &str) -> io::Result<()> {
+    fs::create_dir_all(out_dir)?;
+
+    fs::write(out_dir.join("index.html"), html)?;
+    fs::write(out_dir.join("template.manifest.json"), manifest_json)?;
+
+    Ok(())
+}
+
 fn print_usage_and_exit() -> ! {
     eprintln!("usage:");
     eprintln!("  ezc_cli explain <file> [--format text|json]");
@@ -527,5 +596,6 @@ fn print_usage_and_exit() -> ! {
     eprintln!("  ezc_cli template <file>");
     eprintln!("  ezc_cli html <file>");
     eprintln!("  ezc_cli manifest <file>");
+    eprintln!("  ezc_cli build <file> [--out dir]");
     process::exit(1);
 }
