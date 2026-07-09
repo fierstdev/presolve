@@ -426,7 +426,7 @@ fn manifest_command_matches_nested_jsx_fixture() {
 }
 
 #[test]
-fn build_command_writes_html_and_manifest_artifacts() {
+fn build_command_writes_page_manifest_and_runtime_artifacts() {
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-test-output/nested-counter");
 
@@ -457,6 +457,7 @@ fn build_command_writes_html_and_manifest_artifacts() {
     let stdout = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
     assert!(stdout.contains("index.html"));
     assert!(stdout.contains("template.manifest.json"));
+    assert!(stdout.contains("runtime.js"));
 
     let actual_html =
         std::fs::read_to_string(out_dir.join("index.html")).expect("failed to read built HTML");
@@ -468,6 +469,7 @@ fn build_command_writes_html_and_manifest_artifacts() {
     assert!(actual_html.contains("<!-- ez-binding:n2:this.count -->"));
     assert!(actual_html.contains("id=\"ez-template-manifest\""));
     assert!(actual_html.contains("\"name\": \"NestedCounter\""));
+    assert!(actual_html.contains("<script src=\"./runtime.js\" defer></script>"));
 
     let actual_manifest = std::fs::read_to_string(out_dir.join("template.manifest.json"))
         .expect("failed to read built manifest");
@@ -476,4 +478,14 @@ fn build_command_writes_html_and_manifest_artifacts() {
             .expect("failed to read expected nested manifest");
 
     assert_json_eq(&actual_manifest, &expected_manifest);
+
+    let actual_runtime =
+        std::fs::read_to_string(out_dir.join("runtime.js")).expect("failed to read built runtime");
+
+    assert!(actual_runtime.contains("ez-template-manifest"));
+    assert!(actual_runtime.contains("data-ez-node"));
+    assert!(actual_runtime.contains("ez-binding:"));
+    assert!(actual_runtime.contains("dataset.ezRuntime"));
+    assert!(actual_runtime.contains("edgezero:ready"));
+    assert!(actual_runtime.contains("window.__EDGEZERO__"));
 }

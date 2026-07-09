@@ -34,6 +34,7 @@ pub fn generate_standalone_page(
     }
 
     output.push_str("    </script>\n");
+    output.push_str("    <script src=\"./runtime.js\" defer></script>\n");
     output.push_str("  </body>\n");
     output.push_str("</html>\n");
 

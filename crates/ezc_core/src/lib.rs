@@ -9,6 +9,7 @@ pub mod explain;
 pub mod html_codegen;
 pub mod model;
 pub mod page_codegen;
+pub mod runtime_codegen;
 pub mod summarize;
 pub mod template_graph;
 pub mod template_manifest;
@@ -23,6 +24,7 @@ pub use model::{
     ClassSummary, DecoratorSummary, Diagnostic, RenderMethodSummary, Severity, SourceSummary, Span,
 };
 pub use page_codegen::generate_standalone_page;
+pub use runtime_codegen::generate_runtime_stub;
 pub use summarize::summarize_source;
 pub use template_graph::{
     build_template_graph, AttributeValue, ElementNode, TemplateAttribute, TemplateChild,
@@ -305,5 +307,6 @@ class Counter extends Component {
         assert!(page.contains("<section data-ez-node=\"n0\">"));
         assert!(page.contains("id=\"ez-template-manifest\""));
         assert!(page.contains("\"name\": \"NestedCounter\""));
+        assert!(page.contains("<script src=\"./runtime.js\" defer></script>"));
     }
 }

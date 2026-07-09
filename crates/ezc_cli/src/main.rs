@@ -6,8 +6,9 @@ use std::process;
 
 use ezc_core::{
     build_component_graph, build_template_graph, build_template_manifest, explain_json,
-    explain_text, generate_standalone_page, generate_static_html, summarize_source,
-    template_manifest_json, AttributeValue, ComponentGraph, TemplateChild, TemplateGraph,
+    explain_text, generate_runtime_stub, generate_standalone_page, generate_static_html,
+    summarize_source, template_manifest_json, AttributeValue, ComponentGraph, TemplateChild,
+    TemplateGraph,
 };
 use ezc_parser::{parse_file, ParseSeverity, ParsedFile};
 
@@ -165,18 +166,22 @@ fn run_build(mut args: Vec<String>) {
     let manifest_json = template_manifest_json(&manifest);
     let page_title = page_title_from_graph(&template_graph);
     let page_html = generate_standalone_page(&page_title, &html_fragment, &manifest);
+    let runtime_js = generate_runtime_stub();
 
-    write_build_artifacts(&out_dir, &page_html, &manifest_json).unwrap_or_else(|error| {
-        eprintln!(
-            "failed to write build artifacts to {}: {error}",
-            out_dir.display()
-        );
+    write_build_artifacts(&out_dir, &page_html, &manifest_json, &runtime_js).unwrap_or_else(
+        |error| {
+            eprintln!(
+                "failed to write build artifacts to {}: {error}",
+                out_dir.display()
+            );
 
-        process::exit(1);
-    });
+            process::exit(1);
+        },
+    );
 
     println!("Wrote {}", out_dir.join("index.html").display());
     println!("Wrote {}", out_dir.join("template.manifest.json").display());
+    println!("Wrote {}", out_dir.join("runtime.js").display());
 }
 
 fn run_parse(mut args: Vec<String>) {
@@ -590,11 +595,19 @@ fn diagnostic_severity_label(severity: &ParseSeverity) -> &'static str {
     }
 }
 
-fn write_build_artifacts(out_dir: &PathBuf, html: &str, manifest_json: &str) -> io::Result<()> {
+fn write_build_artifacts(
+    out_dir: &PathBuf,
+    html: &str,
+    manifest_json: &str,
+    runtime_js: &str,
+) -> io::Result<()> {
     fs::create_dir_all(out_dir)?;
 
     fs::write(out_dir.join("index.html"), html)?;
+
     fs::write(out_dir.join("template.manifest.json"), manifest_json)?;
+
+    fs::write(out_dir.join("runtime.js"), runtime_js)?;
 
     Ok(())
 }
