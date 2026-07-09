@@ -10,6 +10,7 @@ pub mod html_codegen;
 pub mod model;
 pub mod summarize;
 pub mod template_graph;
+pub mod template_manifest;
 
 pub use component_graph::{
     build_component_graph, ComponentDiagnostic, ComponentGraph, ComponentMethod, ComponentNode,
@@ -24,6 +25,10 @@ pub use summarize::summarize_source;
 pub use template_graph::{
     build_template_graph, AttributeValue, ElementNode, TemplateAttribute, TemplateChild,
     TemplateGraph, TemplateNode, TemplateNodeId,
+};
+pub use template_manifest::{
+    build_template_manifest, template_manifest_json, ManifestComponent, ManifestEvent,
+    ManifestNode, ManifestTemplate, TemplateManifest,
 };
 
 #[cfg(test)]
@@ -234,6 +239,49 @@ class Counter extends Component {
                     expression: "this.count".to_string(),
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn builds_template_manifest_for_nested_jsx() {
+        let source = include_str!("../../../fixtures/0004-nested-jsx/input/NestedCounter.tsx");
+
+        let parsed =
+            ezc_parser::parse_file("fixtures/0004-nested-jsx/input/NestedCounter.tsx", source);
+
+        let component_graph = build_component_graph(&parsed);
+        let template_graph = build_template_graph(&component_graph);
+        let manifest = build_template_manifest(&template_graph);
+
+        assert_eq!(manifest.components.len(), 1);
+
+        let component = &manifest.components[0];
+        assert_eq!(component.name, "NestedCounter");
+
+        assert_eq!(
+            component.template.nodes,
+            vec![
+                ManifestNode::Element {
+                    id: "n0".to_string(),
+                    tag: "section".to_string(),
+                },
+                ManifestNode::Element {
+                    id: "n1".to_string(),
+                    tag: "button".to_string(),
+                },
+                ManifestNode::Binding {
+                    id: "n2".to_string(),
+                    expression: "this.count".to_string(),
+                },
+            ]
+        );
+
+        assert_eq!(
+            component.template.events,
+            vec![ManifestEvent {
+                node: "n1".to_string(),
+                handler: "this.increment".to_string(),
+            }]
         );
     }
 }

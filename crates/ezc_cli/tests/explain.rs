@@ -330,3 +330,97 @@ fn template_command_matches_broken_tsx_fixture() {
 
     assert_eq!(actual, expected);
 }
+
+fn assert_json_eq(actual: &str, expected: &str) {
+    let actual: serde_json::Value =
+        serde_json::from_str(actual).expect("actual output was not valid JSON");
+    let expected: serde_json::Value =
+        serde_json::from_str(expected).expect("expected fixture was not valid JSON");
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn manifest_command_matches_valid_counter_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["manifest", "fixtures/0001-source-summary/input/Counter.tsx"])
+        .output()
+        .expect("failed to run ezc_cli manifest");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0001-source-summary/expected/manifest.json"),
+    )
+    .expect("failed to read expected manifest fixture");
+
+    assert_json_eq(&actual, &expected);
+}
+
+#[test]
+fn manifest_command_matches_broken_tsx_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "manifest",
+            "fixtures/0002-broken-tsx/input/BrokenCounter.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli manifest");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+
+    let expected =
+        std::fs::read_to_string(repo_root.join("fixtures/0002-broken-tsx/expected/manifest.json"))
+            .expect("failed to read expected broken manifest fixture");
+
+    assert_json_eq(&actual, &expected);
+}
+
+#[test]
+fn manifest_command_matches_nested_jsx_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "manifest",
+            "fixtures/0004-nested-jsx/input/NestedCounter.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli manifest");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+
+    let expected =
+        std::fs::read_to_string(repo_root.join("fixtures/0004-nested-jsx/expected/manifest.json"))
+            .expect("failed to read expected nested manifest fixture");
+
+    assert_json_eq(&actual, &expected);
+}

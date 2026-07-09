@@ -4,8 +4,9 @@ use std::path::PathBuf;
 use std::process;
 
 use ezc_core::{
-    build_component_graph, build_template_graph, explain_json, explain_text, generate_static_html,
-    summarize_source, AttributeValue, ComponentGraph, TemplateChild, TemplateGraph,
+    build_component_graph, build_template_graph, build_template_manifest, explain_json,
+    explain_text, generate_static_html, summarize_source, template_manifest_json, AttributeValue,
+    ComponentGraph, TemplateChild, TemplateGraph,
 };
 use ezc_parser::{parse_file, ParseSeverity, ParsedFile};
 
@@ -24,6 +25,7 @@ fn main() {
         "graph" => run_graph(args),
         "template" => run_template(args),
         "html" => run_html(args),
+        "manifest" => run_manifest(args),
         _ => {
             eprintln!("unknown command: {command}");
             print_usage_and_exit();
@@ -116,6 +118,27 @@ fn run_html(mut args: Vec<String>) {
     let html = generate_static_html(&template_graph);
 
     print!("{html}");
+}
+
+fn run_manifest(mut args: Vec<String>) {
+    if args.is_empty() {
+        eprintln!("missing file path");
+        print_usage_and_exit();
+    }
+
+    let path = PathBuf::from(args.remove(0));
+
+    let source = fs::read_to_string(&path).unwrap_or_else(|error| {
+        eprintln!("failed to read {}: {error}", path.display());
+        process::exit(1);
+    });
+
+    let parsed = parse_file(&path, &source);
+    let component_graph = build_component_graph(&parsed);
+    let template_graph = build_template_graph(&component_graph);
+    let manifest = build_template_manifest(&template_graph);
+
+    println!("{}", template_manifest_json(&manifest));
 }
 
 fn run_parse(mut args: Vec<String>) {
@@ -503,5 +526,6 @@ fn print_usage_and_exit() -> ! {
     eprintln!("  ezc_cli graph <file>");
     eprintln!("  ezc_cli template <file>");
     eprintln!("  ezc_cli html <file>");
+    eprintln!("  ezc_cli manifest <file>");
     process::exit(1);
 }
