@@ -1,0 +1,7 @@
+File: fixtures/0002-broken-tsx/input/BrokenCounter.tsx
+Diagnostics:
+  Error: Unexpected token
+    at 9:16 span=198..199
+
+Classes:
+  none

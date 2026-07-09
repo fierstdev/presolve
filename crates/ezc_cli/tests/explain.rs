@@ -78,7 +78,7 @@ fn explain_command_matches_json_fixture() {
 }
 
 #[test]
-fn parse_command_reports_valid_counter_fixture() {
+fn parse_command_matches_valid_counter_fixture() {
     let repo_root = repo_root();
 
     let output = Command::new(ezc_cli_bin())
@@ -96,20 +96,15 @@ fn parse_command_reports_valid_counter_fixture() {
 
     let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
 
-    assert!(actual.contains("File: fixtures/0001-source-summary/input/Counter.tsx"));
-    assert!(actual.contains("Diagnostics:\n  none"));
-    assert!(actual.contains("class Counter at 1:1"));
-    assert!(actual.contains("@route(\"/counter\") at 1:1"));
-    assert!(actual.contains("@component(\"x-counter\") at 2:1"));
-    assert!(actual.contains("count = state(...)"));
-    assert!(actual.contains("render at 10:3"));
-    assert!(actual.contains("jsx root <button>"));
-    assert!(actual.contains("attributes: onClick={...}"));
-    assert!(actual.contains("bindings: this.count"));
+    let expected =
+        std::fs::read_to_string(repo_root.join("fixtures/0001-source-summary/expected/parse.txt"))
+            .expect("failed to read expected parse fixture");
+
+    assert_eq!(actual, expected);
 }
 
 #[test]
-fn parse_command_reports_broken_tsx_diagnostic() {
+fn parse_command_matches_broken_tsx_fixture() {
     let repo_root = repo_root();
 
     let output = Command::new(ezc_cli_bin())
@@ -127,8 +122,9 @@ fn parse_command_reports_broken_tsx_diagnostic() {
 
     let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
 
-    assert!(actual.contains("File: fixtures/0002-broken-tsx/input/BrokenCounter.tsx"));
-    assert!(actual.contains("Error: Unexpected token"));
-    assert!(actual.contains("at 9:16 span=198..199"));
-    assert!(actual.contains("Classes:\n  none"));
+    let expected =
+        std::fs::read_to_string(repo_root.join("fixtures/0002-broken-tsx/expected/parse.txt"))
+            .expect("failed to read expected broken parse fixture");
+
+    assert_eq!(actual, expected);
 }
