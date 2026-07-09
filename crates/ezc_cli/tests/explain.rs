@@ -76,3 +76,59 @@ fn explain_command_matches_json_fixture() {
 
     assert_eq!(actual_json, expected_json);
 }
+
+#[test]
+fn parse_command_reports_valid_counter_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["parse", "fixtures/0001-source-summary/input/Counter.tsx"])
+        .output()
+        .expect("failed to run ezc_cli parse");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+
+    assert!(actual.contains("File: fixtures/0001-source-summary/input/Counter.tsx"));
+    assert!(actual.contains("Diagnostics:\n  none"));
+    assert!(actual.contains("class Counter at 1:1"));
+    assert!(actual.contains("@route(\"/counter\") at 1:1"));
+    assert!(actual.contains("@component(\"x-counter\") at 2:1"));
+    assert!(actual.contains("count = state(...)"));
+    assert!(actual.contains("render at 10:3"));
+    assert!(actual.contains("jsx root <button>"));
+    assert!(actual.contains("attributes: onClick={...}"));
+    assert!(actual.contains("bindings: this.count"));
+}
+
+#[test]
+fn parse_command_reports_broken_tsx_diagnostic() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["parse", "fixtures/0002-broken-tsx/input/BrokenCounter.tsx"])
+        .output()
+        .expect("failed to run ezc_cli parse");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+
+    assert!(actual.contains("File: fixtures/0002-broken-tsx/input/BrokenCounter.tsx"));
+    assert!(actual.contains("Error: Unexpected token"));
+    assert!(actual.contains("at 9:16 span=198..199"));
+    assert!(actual.contains("Classes:\n  none"));
+}

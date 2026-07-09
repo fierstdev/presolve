@@ -171,6 +171,7 @@ name = "ezc_cli"
 version = "0.0.0"
 dependencies = [
  "ezc_core",
+ "ezc_parser",
  "serde_json",
 ]
 
