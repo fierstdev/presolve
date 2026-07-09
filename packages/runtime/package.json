@@ -1,0 +1,14 @@
+{
+  "name": "@edgezero/runtime",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit || true",
+    "test": "echo \"runtime tests not implemented yet\""
+  },
+  "devDependencies": {}
+}

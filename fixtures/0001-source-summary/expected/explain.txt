@@ -1,0 +1,20 @@
+File: fixtures/0001-source-summary/input/Counter.tsx
+Bytes: <environment-dependent>
+Lines: <environment-dependent>
+Characters: <environment-dependent>
+TSX-like syntax: yes
+
+Components:
+  @component("x-counter")
+
+Routes:
+  @route("/counter")
+
+Classes:
+  class Counter
+
+Render methods:
+  render()
+
+Diagnostics:
+  none expected for this fixture

@@ -1,0 +1,8 @@
+{
+  "name": "edgezero-counter-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "echo \"counter example tests not implemented yet\""
+  }
+}
