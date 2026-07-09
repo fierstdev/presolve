@@ -184,40 +184,13 @@ fn parse_expression_for_jsx(
             parse_expression_for_jsx(&parenthesized.expression, source, jsx_roots, bindings);
         }
         Expression::JSXElement(element) => {
-            let name = jsx_element_name(&element.opening_element.name)
-                .unwrap_or_else(|| "<unknown>".to_string());
-
-            let attributes = element
-                .opening_element
-                .attributes
-                .iter()
-                .filter_map(jsx_attribute_name)
-                .collect::<Vec<_>>();
-
-            let event_handler_refs = element
-                .opening_element
-                .attributes
-                .iter()
-                .filter_map(jsx_event_handler_ref)
-                .collect::<Vec<_>>();
-
-            let children = element
-                .children
-                .iter()
-                .filter_map(parsed_jsx_child)
-                .collect::<Vec<_>>();
-
             for child in &element.children {
                 parse_jsx_child(child, bindings);
             }
 
-            jsx_roots.push(ParsedJsxElement {
-                name,
-                span: source_span(source, element.span),
-                attributes,
-                event_handler_refs,
-                children,
-            });
+            if let Some(element) = parsed_jsx_element(element, source) {
+                jsx_roots.push(element);
+            }
         }
         _ => {}
     }
@@ -239,7 +212,7 @@ fn parse_jsx_child(child: &JSXChild<'_>, bindings: &mut Vec<String>) {
     }
 }
 
-fn parsed_jsx_child(child: &JSXChild<'_>) -> Option<ParsedJsxChild> {
+fn parsed_jsx_child(child: &JSXChild<'_>, source: &str) -> Option<ParsedJsxChild> {
     match child {
         JSXChild::Text(text) => {
             let normalized = normalize_jsx_text(&text.value);
@@ -253,8 +226,47 @@ fn parsed_jsx_child(child: &JSXChild<'_>) -> Option<ParsedJsxChild> {
         JSXChild::ExpressionContainer(container) => {
             jsx_expression_summary(&container.expression).map(ParsedJsxChild::Binding)
         }
+        JSXChild::Element(element) => {
+            parsed_jsx_element(element, source).map(ParsedJsxChild::Element)
+        }
         _ => None,
     }
+}
+
+fn parsed_jsx_element(
+    element: &oxc_ast::ast::JSXElement<'_>,
+    source: &str,
+) -> Option<ParsedJsxElement> {
+    let name =
+        jsx_element_name(&element.opening_element.name).unwrap_or_else(|| "<unknown>".to_string());
+
+    let attributes = element
+        .opening_element
+        .attributes
+        .iter()
+        .filter_map(jsx_attribute_name)
+        .collect::<Vec<_>>();
+
+    let event_handler_refs = element
+        .opening_element
+        .attributes
+        .iter()
+        .filter_map(jsx_event_handler_ref)
+        .collect::<Vec<_>>();
+
+    let children = element
+        .children
+        .iter()
+        .filter_map(|child| parsed_jsx_child(child, source))
+        .collect::<Vec<_>>();
+
+    Some(ParsedJsxElement {
+        name,
+        span: source_span(source, element.span),
+        attributes,
+        event_handler_refs,
+        children,
+    })
 }
 
 fn normalize_jsx_text(value: &str) -> String {

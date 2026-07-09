@@ -1,4 +1,4 @@
-use crate::component_graph::{ComponentGraph, RenderChild, RenderModel};
+use crate::component_graph::{ComponentGraph, RenderChild, RenderElement, RenderModel};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TemplateGraph {
@@ -35,6 +35,7 @@ pub enum AttributeValue {
 pub enum TemplateChild {
     Text(String),
     Binding(String),
+    Element(ElementNode),
 }
 
 pub fn build_template_graph(component_graph: &ComponentGraph) -> TemplateGraph {
@@ -53,21 +54,11 @@ pub fn build_template_graph(component_graph: &ComponentGraph) -> TemplateGraph {
 fn element_from_render(render: &RenderModel) -> Option<ElementNode> {
     let tag_name = render.root_element.clone()?;
 
-    let mut attributes = Vec::new();
-
-    for event_handler in &render.event_handler_refs {
-        attributes.push(TemplateAttribute {
-            name: "data-ez-event-handler".to_string(),
-            value: AttributeValue::EventHandler(event_handler.clone()),
-        });
-    }
-
-    if !render.bindings.is_empty() {
-        attributes.push(TemplateAttribute {
-            name: "data-ez-bindings".to_string(),
-            value: AttributeValue::BindingList(render.bindings.clone()),
-        });
-    }
+    let attributes = template_attributes(
+        &render.attributes,
+        &render.event_handler_refs,
+        &render.bindings,
+    );
 
     let children = render
         .children
@@ -82,9 +73,70 @@ fn element_from_render(render: &RenderModel) -> Option<ElementNode> {
     })
 }
 
+fn element_from_render_element(element: &RenderElement) -> ElementNode {
+    ElementNode {
+        tag_name: element.tag_name.clone(),
+
+        attributes: template_attributes(
+            &element.attributes,
+            &element.event_handler_refs,
+            &collect_bindings_from_children(&element.children),
+        ),
+
+        children: element
+            .children
+            .iter()
+            .map(template_child_from_render)
+            .collect::<Vec<_>>(),
+    }
+}
+
+fn template_attributes(
+    _attributes: &[String],
+    event_handler_refs: &[String],
+    bindings: &[String],
+) -> Vec<TemplateAttribute> {
+    let mut attributes = Vec::new();
+
+    for event_handler in event_handler_refs {
+        attributes.push(TemplateAttribute {
+            name: "data-ez-event-handler".to_string(),
+            value: AttributeValue::EventHandler(event_handler.clone()),
+        });
+    }
+
+    if !bindings.is_empty() {
+        attributes.push(TemplateAttribute {
+            name: "data-ez-bindings".to_string(),
+            value: AttributeValue::BindingList(bindings.to_vec()),
+        });
+    }
+
+    attributes
+}
+
+fn collect_bindings_from_children(children: &[RenderChild]) -> Vec<String> {
+    let mut bindings = Vec::new();
+
+    for child in children {
+        match child {
+            RenderChild::Binding(binding) => bindings.push(binding.clone()),
+            RenderChild::Element(element) => {
+                bindings.extend(collect_bindings_from_children(&element.children));
+            }
+            RenderChild::Text(_) => {}
+        }
+    }
+
+    bindings
+}
+
 fn template_child_from_render(child: &RenderChild) -> TemplateChild {
     match child {
         RenderChild::Text(text) => TemplateChild::Text(text.clone()),
         RenderChild::Binding(binding) => TemplateChild::Binding(binding.clone()),
+        RenderChild::Element(element) => {
+            TemplateChild::Element(element_from_render_element(element))
+        }
     }
 }

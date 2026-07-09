@@ -39,6 +39,9 @@ fn generate_element_html(element: &ElementNode) -> String {
                 html.push_str(&escape_comment(binding));
                 html.push_str(" -->");
             }
+            TemplateChild::Element(element) => {
+                html.push_str(&generate_element_html(element));
+            }
         }
     }
 

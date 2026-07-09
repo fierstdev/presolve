@@ -74,3 +74,44 @@ fn reports_broken_tsx_diagnostic() {
     assert_eq!(diagnostic.labels[0].span.line, 9);
     assert_eq!(diagnostic.labels[0].span.column, 16);
 }
+
+#[test]
+fn parses_nested_jsx_fixture() {
+    let source = include_str!("../../../fixtures/0004-nested-jsx/input/NestedCounter.tsx");
+
+    let parsed = parse_file("fixtures/0004-nested-jsx/input/NestedCounter.tsx", source);
+
+    assert!(parsed.diagnostics.is_empty());
+
+    let class = parsed.classes.first().expect("expected class");
+    assert_eq!(class.name, "NestedCounter");
+
+    let render = class
+        .methods
+        .iter()
+        .find(|method| method.name == "render")
+        .expect("expected render method");
+
+    assert_eq!(render.jsx_roots.len(), 1);
+
+    let section = &render.jsx_roots[0];
+    assert_eq!(section.name, "section");
+
+    assert_eq!(section.children.len(), 1);
+
+    let ParsedJsxChild::Element(button) = &section.children[0] else {
+        panic!("expected nested button element");
+    };
+
+    assert_eq!(button.name, "button");
+    assert_eq!(button.attributes, vec!["onClick={...}"]);
+    assert_eq!(button.event_handler_refs, vec!["this.increment"]);
+
+    assert_eq!(
+        button.children,
+        vec![
+            ParsedJsxChild::Text("Count:".to_string()),
+            ParsedJsxChild::Binding("this.count".to_string()),
+        ]
+    );
+}

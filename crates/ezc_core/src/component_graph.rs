@@ -30,6 +30,15 @@ pub struct ComponentMethod {
 pub enum RenderChild {
     Text(String),
     Binding(String),
+    Element(RenderElement),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenderElement {
+    pub tag_name: String,
+    pub attributes: Vec<String>,
+    pub event_handler_refs: Vec<String>,
+    pub children: Vec<RenderChild>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -195,6 +204,16 @@ fn render_child_from_parsed(child: &ParsedJsxChild) -> RenderChild {
     match child {
         ParsedJsxChild::Text(text) => RenderChild::Text(text.clone()),
         ParsedJsxChild::Binding(binding) => RenderChild::Binding(binding.clone()),
+        ParsedJsxChild::Element(element) => RenderChild::Element(RenderElement {
+            tag_name: element.name.clone(),
+            attributes: element.attributes.clone(),
+            event_handler_refs: element.event_handler_refs.clone(),
+            children: element
+                .children
+                .iter()
+                .map(render_child_from_parsed)
+                .collect::<Vec<_>>(),
+        }),
     }
 }
 

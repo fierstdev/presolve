@@ -42,6 +42,7 @@ pub struct ParsedMethod {
 pub enum ParsedJsxChild {
     Text(String),
     Binding(String),
+    Element(ParsedJsxElement),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
