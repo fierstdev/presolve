@@ -1,0 +1,17 @@
+File: fixtures/0001-source-summary/input/Counter.tsx
+ComponentGraph:
+  diagnostics:
+    none
+  components:
+    component Counter
+      element: x-counter
+      route: /counter
+      state:
+        count
+      methods:
+        increment
+        render
+      render:
+        root: <button>
+        attributes: onClick={...}
+        bindings: this.count

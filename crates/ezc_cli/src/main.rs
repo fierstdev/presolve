@@ -3,7 +3,9 @@ use std::fs;
 use std::path::PathBuf;
 use std::process;
 
-use ezc_core::{explain_json, explain_text, summarize_source};
+use ezc_core::{
+    build_component_graph, explain_json, explain_text, summarize_source, ComponentGraph,
+};
 use ezc_parser::{parse_file, ParseSeverity, ParsedFile};
 
 fn main() {
@@ -18,6 +20,7 @@ fn main() {
     match command.as_str() {
         "explain" => run_explain(args),
         "parse" => run_parse(args),
+        "graph" => run_graph(args),
         _ => {
             eprintln!("unknown command: {command}");
             print_usage_and_exit();
@@ -50,6 +53,25 @@ fn run_explain(mut args: Vec<String>) {
             process::exit(1);
         }
     }
+}
+
+fn run_graph(mut args: Vec<String>) {
+    if args.is_empty() {
+        eprintln!("missing file path");
+        print_usage_and_exit();
+    }
+
+    let path = PathBuf::from(args.remove(0));
+
+    let source = fs::read_to_string(&path).unwrap_or_else(|error| {
+        eprintln!("failed to read {}: {error}", path.display());
+        process::exit(1);
+    });
+
+    let parsed = parse_file(&path, &source);
+    let graph = build_component_graph(&parsed);
+
+    print_component_graph(&path, &graph);
 }
 
 fn run_parse(mut args: Vec<String>) {
@@ -212,6 +234,84 @@ fn print_parsed_file(parsed: &ParsedFile) {
     }
 }
 
+fn print_component_graph(path: &PathBuf, graph: &ComponentGraph) {
+    println!("File: {}", path.display());
+
+    println!("ComponentGraph:");
+
+    println!("  diagnostics:");
+    if graph.diagnostics.is_empty() {
+        println!("    none");
+    } else {
+        for diagnostic in &graph.diagnostics {
+            println!("    {}: {}", diagnostic.code, diagnostic.message);
+        }
+    }
+
+    println!("  components:");
+    if graph.components.is_empty() {
+        println!("    none");
+        return;
+    }
+
+    for component in &graph.components {
+        println!("    component {}", component.class_name);
+
+        match &component.element_name {
+            Some(element_name) => println!("      element: {element_name}"),
+            None => println!("      element: <missing>"),
+        }
+
+        match &component.route_path {
+            Some(route_path) => println!("      route: {route_path}"),
+            None => println!("      route: none"),
+        }
+
+        println!("      state:");
+        if component.state_fields.is_empty() {
+            println!("        none");
+        } else {
+            for state in &component.state_fields {
+                println!("        {}", state.name);
+            }
+        }
+
+        println!("      methods:");
+        if component.methods.is_empty() {
+            println!("        none");
+        } else {
+            for method in &component.methods {
+                println!("        {}", method.name);
+            }
+        }
+
+        println!("      render:");
+        match &component.render {
+            Some(render) => {
+                match &render.root_element {
+                    Some(root) => println!("        root: <{root}>"),
+                    None => println!("        root: none"),
+                }
+
+                if render.attributes.is_empty() {
+                    println!("        attributes: none");
+                } else {
+                    println!("        attributes: {}", render.attributes.join(", "));
+                }
+
+                if render.bindings.is_empty() {
+                    println!("        bindings: none");
+                } else {
+                    println!("        bindings: {}", render.bindings.join(", "));
+                }
+            }
+            None => {
+                println!("        none");
+            }
+        }
+    }
+}
+
 fn diagnostic_severity_label(severity: &ParseSeverity) -> &'static str {
     match severity {
         ParseSeverity::Info => "Info",
@@ -224,5 +324,6 @@ fn print_usage_and_exit() -> ! {
     eprintln!("usage:");
     eprintln!("  ezc_cli explain <file> [--format text|json]");
     eprintln!("  ezc_cli parse <file>");
+    eprintln!("  ezc_cli graph <file>");
     process::exit(1);
 }

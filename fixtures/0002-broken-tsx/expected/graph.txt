@@ -1,0 +1,6 @@
+File: fixtures/0002-broken-tsx/input/BrokenCounter.tsx
+ComponentGraph:
+  diagnostics:
+    none
+  components:
+    none
