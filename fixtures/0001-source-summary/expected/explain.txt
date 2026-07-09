@@ -1,20 +1,20 @@
 File: fixtures/0001-source-summary/input/Counter.tsx
-Bytes: <environment-dependent>
-Lines: <environment-dependent>
-Characters: <environment-dependent>
+Bytes: 271
+Lines: 17
+Characters: 271
 TSX-like syntax: yes
 
 Components:
-  @component("x-counter")
+  @component("x-counter") at 2:1
 
 Routes:
-  @route("/counter")
+  @route("/counter") at 1:1
 
 Classes:
-  class Counter
+  class Counter at 3:1
 
 Render methods:
-  render()
+  render() at 10:3
 
 Diagnostics:
-  none expected for this fixture
+  none

@@ -84,7 +84,8 @@ pub fn summarize_source(path: impl AsRef<Path>, source: &str) -> SourceSummary {
     let route_decorators = find_string_decorators(source, "route");
     let class_declarations = find_class_declarations(source);
     let render_methods = find_render_methods(source);
-    let has_tsx_like_syntax = source.contains("<") && source.contains(">") && source.contains("render");
+    let has_tsx_like_syntax =
+        source.contains("<") && source.contains(">") && source.contains("render");
 
     if component_decorators.is_empty() {
         diagnostics.push(Diagnostic {
@@ -134,7 +135,11 @@ pub fn explain_text(summary: &SourceSummary) -> String {
     let _ = writeln!(output, "Bytes: {}", summary.byte_len);
     let _ = writeln!(output, "Lines: {}", summary.line_count);
     let _ = writeln!(output, "Characters: {}", summary.char_count);
-    let _ = writeln!(output, "TSX-like syntax: {}", yes_no(summary.has_tsx_like_syntax));
+    let _ = writeln!(
+        output,
+        "TSX-like syntax: {}",
+        yes_no(summary.has_tsx_like_syntax)
+    );
 
     let _ = writeln!(output, "\nComponents:");
     if summary.component_decorators.is_empty() {
@@ -182,7 +187,11 @@ pub fn explain_text(summary: &SourceSummary) -> String {
         let _ = writeln!(output, "  none");
     } else {
         for method in &summary.render_methods {
-            let _ = writeln!(output, "  render() at {}:{}", method.span.line, method.span.column);
+            let _ = writeln!(
+                output,
+                "  render() at {}:{}",
+                method.span.line, method.span.column
+            );
         }
     }
 
@@ -207,22 +216,54 @@ pub fn explain_json(summary: &SourceSummary) -> String {
     // once the schema is stable enough to deserve a dependency.
     let mut output = String::new();
     let _ = writeln!(output, "{{");
-    let _ = writeln!(output, "  \"path\": {},", json_string(&summary.path.display().to_string()));
+    let _ = writeln!(
+        output,
+        "  \"path\": {},",
+        json_string(&summary.path.display().to_string())
+    );
     let _ = writeln!(output, "  \"byteLen\": {},", summary.byte_len);
     let _ = writeln!(output, "  \"lineCount\": {},", summary.line_count);
     let _ = writeln!(output, "  \"charCount\": {},", summary.char_count);
-    let _ = writeln!(output, "  \"hasTsxLikeSyntax\": {},", summary.has_tsx_like_syntax);
-    let _ = writeln!(output, "  \"componentDecorators\": [{}],", decorators_json(&summary.component_decorators));
-    let _ = writeln!(output, "  \"routeDecorators\": [{}],", decorators_json(&summary.route_decorators));
-    let _ = writeln!(output, "  \"classDeclarations\": [{}],", classes_json(&summary.class_declarations));
-    let _ = writeln!(output, "  \"renderMethods\": [{}],", render_methods_json(&summary.render_methods));
-    let _ = writeln!(output, "  \"diagnostics\": [{}]", diagnostics_json(&summary.diagnostics));
+    let _ = writeln!(
+        output,
+        "  \"hasTsxLikeSyntax\": {},",
+        summary.has_tsx_like_syntax
+    );
+    let _ = writeln!(
+        output,
+        "  \"componentDecorators\": [{}],",
+        decorators_json(&summary.component_decorators)
+    );
+    let _ = writeln!(
+        output,
+        "  \"routeDecorators\": [{}],",
+        decorators_json(&summary.route_decorators)
+    );
+    let _ = writeln!(
+        output,
+        "  \"classDeclarations\": [{}],",
+        classes_json(&summary.class_declarations)
+    );
+    let _ = writeln!(
+        output,
+        "  \"renderMethods\": [{}],",
+        render_methods_json(&summary.render_methods)
+    );
+    let _ = writeln!(
+        output,
+        "  \"diagnostics\": [{}]",
+        diagnostics_json(&summary.diagnostics)
+    );
     let _ = writeln!(output, "}}");
     output
 }
 
 fn yes_no(value: bool) -> &'static str {
-    if value { "yes" } else { "no" }
+    if value {
+        "yes"
+    } else {
+        "no"
+    }
 }
 
 fn find_string_decorators(source: &str, name: &str) -> Vec<DecoratorSummary> {
@@ -236,7 +277,9 @@ fn find_string_decorators(source: &str, name: &str) -> Vec<DecoratorSummary> {
         let argument = extract_first_string_argument(&source[argument_start..]);
         let end = source[argument_start..]
             .find(')')
-            .map_or(argument_start, |relative_end| argument_start + relative_end + 1);
+            .map_or(argument_start, |relative_end| {
+                argument_start + relative_end + 1
+            });
 
         items.push(DecoratorSummary {
             name: name.to_string(),
@@ -311,7 +354,12 @@ fn span_at(source: &str, start: usize, end: usize) -> Span {
         .rsplit_once('\n')
         .map_or(prefix.len() + 1, |(_, tail)| tail.len() + 1);
 
-    Span { start, end, line, column }
+    Span {
+        start,
+        end,
+        line,
+        column,
+    }
 }
 
 fn decorators_json(items: &[DecoratorSummary]) -> String {
@@ -321,7 +369,9 @@ fn decorators_json(items: &[DecoratorSummary]) -> String {
             format!(
                 "{{\"name\":{},\"argument\":{},\"span\":{}}}",
                 json_string(&item.name),
-                item.argument.as_ref().map_or("null".to_string(), |value| json_string(value)),
+                item.argument
+                    .as_ref()
+                    .map_or("null".to_string(), |value| json_string(value)),
                 span_json(item.span)
             )
         })
@@ -415,7 +465,10 @@ class Counter extends Component {
         let summary = summarize_source("Counter.tsx", source);
 
         assert_eq!(summary.component_decorators.len(), 1);
-        assert_eq!(summary.component_decorators[0].argument.as_deref(), Some("x-counter"));
+        assert_eq!(
+            summary.component_decorators[0].argument.as_deref(),
+            Some("x-counter")
+        );
         assert_eq!(summary.class_declarations.len(), 1);
         assert_eq!(summary.class_declarations[0].name, "Counter");
         assert_eq!(summary.render_methods.len(), 1);
@@ -425,6 +478,29 @@ class Counter extends Component {
     #[test]
     fn emits_diagnostics_for_empty_source() {
         let summary = summarize_source("Empty.tsx", "");
-        assert!(summary.diagnostics.iter().any(|diagnostic| diagnostic.code == "EZ0001"));
+        assert!(summary
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "EZ0001"));
+    }
+
+    #[test]
+    fn fixture_0001_source_summary_explain_text_matches_expected() {
+        let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("fixtures/0001-source-summary");
+
+        let input_path = fixture_root.join("input/Counter.tsx");
+        let expected_path = fixture_root.join("expected/explain.txt");
+
+        let source = std::fs::read_to_string(&input_path).expect("failed to read fixture input");
+        let expected = std::fs::read_to_string(&expected_path)
+            .expect("failed to read expected explain output");
+
+        let summary = summarize_source("fixtures/0001-source-summary/input/Counter.tsx", &source);
+
+        let actual = explain_text(&summary);
+
+        assert_eq!(actual, expected);
     }
 }
