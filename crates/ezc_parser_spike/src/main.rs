@@ -81,13 +81,7 @@ fn main() {
     print_probe(&probe);
 
     if !ret.errors.is_empty() {
-        let offset = 198;
-
-        let (line, column) = line_column_at(&source, offset);
-
-        println!("Diagnostic probe:");
-
-        println!("  offset {offset} -> {line}:{column}");
+        print_diagnostic_probe(&source, &ret.errors);
     }
 }
 
@@ -347,6 +341,29 @@ fn line_column_at(source: &str, offset: usize) -> (usize, usize) {
         .map_or(prefix.len() + 1, |(_, tail)| tail.len() + 1);
 
     (line, column)
+}
+
+fn print_diagnostic_probe(source: &str, errors: &[oxc_diagnostics::OxcDiagnostic]) {
+    println!("Diagnostic probe:");
+
+    for error in errors {
+        println!("  message: {}", error.message);
+        println!("  severity: {:?}", error.severity);
+
+        match &error.labels {
+            Some(labels) if !labels.is_empty() => {
+                for label in labels {
+                    let offset = label.offset();
+                    let length = label.len();
+                    let (line, column) = line_column_at(source, offset);
+                    println!("  label: offset={offset} length={length} location={line}:{column}");
+                }
+            }
+            _ => {
+                println!("  labels: none");
+            }
+        }
+    }
 }
 
 fn print_probe(probe: &ParserProbe) {

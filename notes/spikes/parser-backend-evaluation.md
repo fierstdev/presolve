@@ -221,3 +221,24 @@ Current limitation:
 
 - the offset is still hardcoded in the spike.
 - the next step is to inspect Oxc’s diagnostic API enough to extract diagnostic labels programmatically instead of relying on `Debug` output.
+
+
+## Oxc diagnostic extraction
+
+Replaced the hardcoded diagnostic offset probe with programmatic extraction from `OxcDiagnostic`.
+
+The spike now extracts:
+
+- diagnostic message
+- severity
+- label offset
+- label length
+- line/column location derived from the source text
+
+Broken TSX result:
+
+- message: `Unexpected token`
+- severity: `Error`
+- label: `offset=198 length=1 location=9:16`
+
+This confirms that Oxc diagnostics can be adapted into EdgeZero-owned diagnostics without relying only on debug output.
