@@ -171,3 +171,36 @@ Current limitations:
 - only detects JSX roots returned directly or through parentheses
 - does not yet distinguish event handlers from reactive bindings
 - does not recurse into nested JSX elements as separate roots
+
+
+## Oxc broken TSX diagnostic test
+
+Fixture: `fixtures/0002-broken-tsx/input/BrokenCounter.tsx`
+
+Command: `cargo run -p ezc_parser_spike -- fixtures/0002-broken-tsx/input/BrokenCounter.tsx`
+
+Result:
+
+- Compiled: yes
+- Parser returned errors: yes
+- Error count: 1
+- Error message: `Unexpected token`
+- Diagnostic span:
+  - offset: 198
+  - length: 1
+- Process panicked: no
+- Probe extraction:
+  - `classes: none`
+
+Interpretation:
+
+Oxc returns structured diagnostics for malformed TSX and does not panic. The diagnostic includes a source span.
+
+For this malformed fixture, the current probe does not recover a class declaration. This may be acceptable for build-time compilation, but it is a risk for future editor tooling and live semantic inspection.
+
+Follow-up questions:
+
+- Can diagnostic spans be converted cleanly into line/column locations?
+- Does Oxc recover better for other kinds of syntax errors?
+- Would Tree-sitter or Biome offer better partial recovery for editor tooling?
+- Should EdgeZero use one parser for compilation and another for editor/lint-style partial analysis?
