@@ -67,3 +67,24 @@ At the end of the spike, produce:
 - one fallback parser
 - risks
 - follow-up ADR draft
+
+
+## Oxc first run
+
+Command:
+
+```sh
+cargo run -p ezc_parser_spike -- fixtures/0001-source-summary/input/Counter.tsx
+```
+
+Result:
+
+- Compiled: yes
+- Parsed fixture: yes
+- Errors: 0
+
+Notes:
+
+- Oxc dependency tree compiled successfully in the workspace.
+- The parser accepted the current TSX fixture with TypeScript and JSX enabled.
+- This only proves parse acceptance. It does not yet prove that decorators, class declarations, render methods, JSX nodes, or spans are accessible in the shape EdgeZero needs.
