@@ -54,10 +54,12 @@ pub fn build_template_graph(component_graph: &ComponentGraph) -> TemplateGraph {
 fn element_from_render(render: &RenderModel) -> Option<ElementNode> {
     let tag_name = render.root_element.clone()?;
 
+    let direct_bindings = collect_direct_bindings_from_children(&render.children);
+
     let attributes = template_attributes(
         &render.attributes,
         &render.event_handler_refs,
-        &render.bindings,
+        &direct_bindings,
     );
 
     let children = render
@@ -76,13 +78,11 @@ fn element_from_render(render: &RenderModel) -> Option<ElementNode> {
 fn element_from_render_element(element: &RenderElement) -> ElementNode {
     ElementNode {
         tag_name: element.tag_name.clone(),
-
         attributes: template_attributes(
             &element.attributes,
             &element.event_handler_refs,
-            &collect_bindings_from_children(&element.children),
+            &collect_direct_bindings_from_children(&element.children),
         ),
-
         children: element
             .children
             .iter()
@@ -115,16 +115,12 @@ fn template_attributes(
     attributes
 }
 
-fn collect_bindings_from_children(children: &[RenderChild]) -> Vec<String> {
+fn collect_direct_bindings_from_children(children: &[RenderChild]) -> Vec<String> {
     let mut bindings = Vec::new();
 
     for child in children {
-        match child {
-            RenderChild::Binding(binding) => bindings.push(binding.clone()),
-            RenderChild::Element(element) => {
-                bindings.extend(collect_bindings_from_children(&element.children));
-            }
-            RenderChild::Text(_) => {}
+        if let RenderChild::Binding(binding) = child {
+            bindings.push(binding.clone());
         }
     }
 
