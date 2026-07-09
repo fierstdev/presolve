@@ -503,4 +503,29 @@ class Counter extends Component {
 
         assert_eq!(actual, expected);
     }
+
+    #[test]
+    fn fixture_0001_source_summary_explain_json_matches_expected() {
+        let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("fixtures/0001-source-summary");
+
+        let input_path = fixture_root.join("input/Counter.tsx");
+        let expected_path = fixture_root.join("expected/explain.json");
+
+        let source = std::fs::read_to_string(&input_path).expect("failed to read fixture input");
+        let expected = std::fs::read_to_string(&expected_path)
+            .expect("failed to read expected JSON explain output");
+
+        let summary = summarize_source("fixtures/0001-source-summary/input/Counter.tsx", &source);
+
+        let actual = explain_json(&summary);
+
+        let actual_json: serde_json::Value =
+            serde_json::from_str(&actual).expect("actual explain JSON is invalid");
+        let expected_json: serde_json::Value =
+            serde_json::from_str(&expected).expect("expected explain JSON fixture is invalid");
+
+        assert_eq!(actual_json, expected_json);
+    }
 }
