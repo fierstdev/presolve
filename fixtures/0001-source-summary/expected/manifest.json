@@ -22,7 +22,8 @@
             "handler": "this.increment"
           }
         ]
-      }
+      },
+      "actions": []
     }
   ]
 }

@@ -27,7 +27,14 @@
             "handler": "this.increment"
           }
         ]
-      }
+      },
+      "actions": [
+        {
+          "method": "increment",
+          "operation": "increment",
+          "field": "count"
+        }
+      ]
     }
   ]
 }

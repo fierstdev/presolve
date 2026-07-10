@@ -1,4 +1,4 @@
-use ezc_parser::{parse_file, ParseSeverity, ParsedJsxChild};
+use ezc_parser::{parse_file, ParseSeverity, ParsedJsxChild, ParsedStateOperation};
 
 #[test]
 fn parses_counter_fixture() {
@@ -57,6 +57,14 @@ fn parses_counter_fixture() {
         ]
     );
     assert_eq!(render.bindings, vec!["this.count"]);
+
+    let increment = class
+        .methods
+        .iter()
+        .find(|method| method.name == "increment")
+        .expect("expected increment method");
+
+    assert!(increment.state_updates.is_empty());
 }
 
 #[test]
@@ -89,6 +97,19 @@ fn parses_nested_jsx_fixture() {
 
     let class = parsed.classes.first().expect("expected class");
     assert_eq!(class.name, "NestedCounter");
+
+    let increment = class
+        .methods
+        .iter()
+        .find(|method| method.name == "increment")
+        .expect("expected increment method");
+
+    assert_eq!(increment.state_updates.len(), 1);
+    assert_eq!(increment.state_updates[0].field, "count");
+    assert_eq!(
+        increment.state_updates[0].operation,
+        ParsedStateOperation::Increment
+    );
 
     let render = class
         .methods

@@ -15,8 +15,8 @@ pub mod template_graph;
 pub mod template_manifest;
 
 pub use component_graph::{
-    build_component_graph, ComponentDiagnostic, ComponentGraph, ComponentMethod, ComponentNode,
-    RenderChild, RenderModel, StateField,
+    build_component_graph, ComponentAction, ComponentDiagnostic, ComponentGraph, ComponentMethod,
+    ComponentNode, RenderChild, RenderModel, StateField, StateOperation,
 };
 pub use explain::{explain_json, explain_text};
 pub use html_codegen::generate_static_html;
@@ -31,8 +31,8 @@ pub use template_graph::{
     TemplateGraph, TemplateNode, TemplateNodeId,
 };
 pub use template_manifest::{
-    build_template_manifest, template_manifest_json, ManifestComponent, ManifestEvent,
-    ManifestNode, ManifestTemplate, TemplateManifest,
+    build_template_manifest, template_manifest_json, ManifestAction, ManifestComponent,
+    ManifestEvent, ManifestNode, ManifestOperation, ManifestTemplate, TemplateManifest,
 };
 
 #[cfg(test)]
@@ -149,6 +149,7 @@ class Counter extends Component {
             .collect::<Vec<_>>();
 
         assert_eq!(method_names, vec!["increment", "render"]);
+        assert!(component.actions.is_empty());
 
         let render = component.render.as_ref().expect("expected render model");
 
@@ -186,6 +187,26 @@ class Counter extends Component {
         assert!(codes.contains(&"EZC1001"));
         assert!(codes.contains(&"EZC1003"));
         assert!(codes.contains(&"EZC1004"));
+    }
+
+    #[test]
+    fn builds_increment_action_from_parsed_method_update() {
+        let source = include_str!("../../../fixtures/0004-nested-jsx/input/NestedCounter.tsx");
+
+        let parsed =
+            ezc_parser::parse_file("fixtures/0004-nested-jsx/input/NestedCounter.tsx", source);
+
+        let graph = build_component_graph(&parsed);
+        let component = graph.components.first().expect("expected component");
+
+        assert_eq!(
+            component.actions,
+            vec![ComponentAction {
+                method: "increment".to_string(),
+                operation: StateOperation::Increment,
+                field: "count".to_string(),
+            }]
+        );
     }
 
     #[test]
@@ -260,7 +281,7 @@ class Counter extends Component {
 
         let component_graph = build_component_graph(&parsed);
         let template_graph = build_template_graph(&component_graph);
-        let manifest = build_template_manifest(&template_graph);
+        let manifest = build_template_manifest(&component_graph, &template_graph);
 
         assert_eq!(manifest.components.len(), 1);
 
@@ -293,6 +314,15 @@ class Counter extends Component {
                 handler: "this.increment".to_string(),
             }]
         );
+
+        assert_eq!(
+            component.actions,
+            vec![ManifestAction {
+                method: "increment".to_string(),
+                operation: ManifestOperation::Increment,
+                field: "count".to_string(),
+            }]
+        );
     }
 
     #[test]
@@ -305,7 +335,7 @@ class Counter extends Component {
         let component_graph = build_component_graph(&parsed);
         let template_graph = build_template_graph(&component_graph);
         let html = generate_static_html(&template_graph);
-        let manifest = build_template_manifest(&template_graph);
+        let manifest = build_template_manifest(&component_graph, &template_graph);
         let page = generate_standalone_page("NestedCounter", &html, &manifest);
 
         assert!(page.starts_with("<!doctype html>\n"));

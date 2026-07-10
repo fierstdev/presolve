@@ -37,6 +37,18 @@ pub struct ParsedMethod {
     pub span: SourceSpan,
     pub jsx_roots: Vec<ParsedJsxElement>,
     pub bindings: Vec<String>,
+    pub state_updates: Vec<ParsedStateUpdate>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedStateUpdate {
+    pub field: String,
+    pub operation: ParsedStateOperation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParsedStateOperation {
+    Increment,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

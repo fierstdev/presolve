@@ -3,7 +3,8 @@ use std::path::{Path, PathBuf};
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
     Argument, ClassElement, Declaration, Expression, JSXAttributeItem, JSXAttributeName,
-    JSXAttributeValue, JSXChild, JSXElementName, JSXExpression, Program, PropertyKey, Statement,
+    JSXAttributeValue, JSXChild, JSXElementName, JSXExpression, Program, PropertyKey,
+    SimpleAssignmentTarget, Statement,
 };
 use oxc_diagnostics::Severity as OxcSeverity;
 use oxc_parser::Parser;
@@ -11,7 +12,8 @@ use oxc_span::{SourceType, Span};
 
 use crate::model::{
     ParseDiagnostic, ParseLabel, ParseSeverity, ParsedClass, ParsedDecorator, ParsedFile,
-    ParsedJsxChild, ParsedJsxElement, ParsedMethod, ParsedProperty, SourceSpan,
+    ParsedJsxChild, ParsedJsxElement, ParsedMethod, ParsedProperty, ParsedStateOperation,
+    ParsedStateUpdate, SourceSpan,
 };
 
 pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
@@ -148,10 +150,14 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
 
     let mut jsx_roots = Vec::new();
     let mut bindings = Vec::new();
+    let mut state_updates = Vec::new();
 
     if let Some(body) = &method.value.body {
         for statement in &body.statements {
             parse_statement_for_jsx(statement, source, &mut jsx_roots, &mut bindings);
+            if let Some(update) = parsed_state_update(statement) {
+                state_updates.push(update);
+            }
         }
     }
 
@@ -160,7 +166,41 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
         span: source_span(source, method.span),
         jsx_roots,
         bindings,
+        state_updates,
     })
+}
+
+fn parsed_state_update(statement: &Statement<'_>) -> Option<ParsedStateUpdate> {
+    let Statement::ExpressionStatement(statement) = statement else {
+        return None;
+    };
+
+    let Expression::UpdateExpression(update) = &statement.expression else {
+        return None;
+    };
+
+    if update.operator.as_str() != "++" {
+        return None;
+    }
+
+    let field = this_assignment_target_field(&update.argument)?;
+
+    Some(ParsedStateUpdate {
+        field,
+        operation: ParsedStateOperation::Increment,
+    })
+}
+
+fn this_assignment_target_field(target: &SimpleAssignmentTarget<'_>) -> Option<String> {
+    let SimpleAssignmentTarget::StaticMemberExpression(member) = target else {
+        return None;
+    };
+
+    let Expression::ThisExpression(_) = &member.object else {
+        return None;
+    };
+
+    Some(member.property.name.to_string())
 }
 
 fn parse_statement_for_jsx(

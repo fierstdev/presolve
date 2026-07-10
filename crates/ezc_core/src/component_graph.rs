@@ -1,4 +1,4 @@
-use ezc_parser::{ParsedClass, ParsedFile, ParsedJsxChild};
+use ezc_parser::{ParsedClass, ParsedFile, ParsedJsxChild, ParsedStateOperation};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentGraph {
@@ -13,6 +13,7 @@ pub struct ComponentNode {
     pub route_path: Option<String>,
     pub state_fields: Vec<StateField>,
     pub methods: Vec<ComponentMethod>,
+    pub actions: Vec<ComponentAction>,
     pub render: Option<RenderModel>,
 }
 
@@ -25,6 +26,18 @@ pub struct StateField {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentMethod {
     pub name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ComponentAction {
+    pub method: String,
+    pub operation: StateOperation,
+    pub field: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StateOperation {
+    Increment,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -110,6 +123,18 @@ fn build_component_node(
         })
         .collect::<Vec<_>>();
 
+    let actions = class
+        .methods
+        .iter()
+        .flat_map(|method| {
+            method.state_updates.iter().map(|update| ComponentAction {
+                method: method.name.clone(),
+                operation: state_operation_from_parsed(&update.operation),
+                field: update.field.clone(),
+            })
+        })
+        .collect::<Vec<_>>();
+
     let render = class
         .methods
         .iter()
@@ -190,7 +215,14 @@ fn build_component_node(
         route_path,
         state_fields,
         methods,
+        actions,
         render,
+    }
+}
+
+fn state_operation_from_parsed(operation: &ParsedStateOperation) -> StateOperation {
+    match operation {
+        ParsedStateOperation::Increment => StateOperation::Increment,
     }
 }
 

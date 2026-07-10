@@ -1,5 +1,6 @@
 use serde::Serialize;
 
+use crate::component_graph::{ComponentGraph, ComponentNode, StateOperation};
 use crate::template_graph::{
     AttributeValue, ElementNode, TemplateChild, TemplateGraph, TemplateNode,
 };
@@ -13,6 +14,7 @@ pub struct TemplateManifest {
 pub struct ManifestComponent {
     pub name: String,
     pub template: ManifestTemplate,
+    pub actions: Vec<ManifestAction>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -41,12 +43,28 @@ pub struct ManifestEvent {
     pub handler: String,
 }
 
-pub fn build_template_manifest(template_graph: &TemplateGraph) -> TemplateManifest {
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ManifestAction {
+    pub method: String,
+    pub operation: ManifestOperation,
+    pub field: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub enum ManifestOperation {
+    #[serde(rename = "increment")]
+    Increment,
+}
+
+pub fn build_template_manifest(
+    component_graph: &ComponentGraph,
+    template_graph: &TemplateGraph,
+) -> TemplateManifest {
     TemplateManifest {
         components: template_graph
             .templates
             .iter()
-            .map(manifest_component)
+            .map(|template| manifest_component(component_graph, template))
             .collect::<Vec<_>>(),
     }
 }
@@ -55,7 +73,10 @@ pub fn template_manifest_json(manifest: &TemplateManifest) -> String {
     serde_json::to_string_pretty(manifest).expect("template manifest should serialize")
 }
 
-fn manifest_component(template: &TemplateNode) -> ManifestComponent {
+fn manifest_component(
+    component_graph: &ComponentGraph,
+    template: &TemplateNode,
+) -> ManifestComponent {
     let mut nodes = Vec::new();
     let mut events = Vec::new();
 
@@ -63,9 +84,35 @@ fn manifest_component(template: &TemplateNode) -> ManifestComponent {
         collect_element(root, &mut nodes, &mut events);
     }
 
+    let actions = component_graph
+        .components
+        .iter()
+        .find(|component| component.class_name == template.component_name)
+        .map(manifest_actions)
+        .unwrap_or_default();
+
     ManifestComponent {
         name: template.component_name.clone(),
         template: ManifestTemplate { nodes, events },
+        actions,
+    }
+}
+
+fn manifest_actions(component: &ComponentNode) -> Vec<ManifestAction> {
+    component
+        .actions
+        .iter()
+        .map(|action| ManifestAction {
+            method: action.method.clone(),
+            operation: manifest_operation(&action.operation),
+            field: action.field.clone(),
+        })
+        .collect()
+}
+
+fn manifest_operation(operation: &StateOperation) -> ManifestOperation {
+    match operation {
+        StateOperation::Increment => ManifestOperation::Increment,
     }
 }
 

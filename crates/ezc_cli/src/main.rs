@@ -7,8 +7,8 @@ use std::process;
 use ezc_core::{
     build_component_graph, build_template_graph, build_template_manifest, explain_json,
     explain_text, generate_runtime_stub, generate_standalone_page, generate_static_html,
-    summarize_source, template_manifest_json, AttributeValue, ComponentGraph, TemplateChild,
-    TemplateGraph,
+    summarize_source, template_manifest_json, AttributeValue, ComponentGraph, StateOperation,
+    TemplateChild, TemplateGraph,
 };
 use ezc_parser::{parse_file, ParseSeverity, ParsedFile};
 
@@ -139,7 +139,7 @@ fn run_manifest(mut args: Vec<String>) {
     let parsed = parse_file(&path, &source);
     let component_graph = build_component_graph(&parsed);
     let template_graph = build_template_graph(&component_graph);
-    let manifest = build_template_manifest(&template_graph);
+    let manifest = build_template_manifest(&component_graph, &template_graph);
 
     println!("{}", template_manifest_json(&manifest));
 }
@@ -162,7 +162,7 @@ fn run_build(mut args: Vec<String>) {
     let component_graph = build_component_graph(&parsed);
     let template_graph = build_template_graph(&component_graph);
     let html_fragment = generate_static_html(&template_graph);
-    let manifest = build_template_manifest(&template_graph);
+    let manifest = build_template_manifest(&component_graph, &template_graph);
     let manifest_json = template_manifest_json(&manifest);
     let page_title = page_title_from_graph(&template_graph);
     let page_html = generate_standalone_page(&page_title, &html_fragment, &manifest);
@@ -446,6 +446,18 @@ fn print_component_graph(path: &PathBuf, graph: &ComponentGraph) {
             }
         }
 
+        if !component.actions.is_empty() {
+            println!("      actions:");
+            for action in &component.actions {
+                println!(
+                    "        {}: {} {}",
+                    action.method,
+                    format_state_operation(&action.operation),
+                    action.field
+                );
+            }
+        }
+
         println!("      render:");
         match &component.render {
             Some(render) => {
@@ -488,6 +500,12 @@ fn print_component_graph(path: &PathBuf, graph: &ComponentGraph) {
                 println!("        none");
             }
         }
+    }
+}
+
+fn format_state_operation(operation: &StateOperation) -> &'static str {
+    match operation {
+        StateOperation::Increment => "increment",
     }
 }
 
