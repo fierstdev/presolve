@@ -316,6 +316,61 @@ class Counter extends Component {
     }
 
     #[test]
+    fn preserves_string_state_literals_in_template_outputs() {
+        let source = include_str!("../../../fixtures/0006-string-state/input/StringGreeting.tsx");
+
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0006-string-state/input/StringGreeting.tsx",
+            source,
+        );
+
+        let component_graph = build_component_graph(&parsed);
+        let component = component_graph
+            .components
+            .first()
+            .expect("expected component");
+
+        assert_eq!(
+            component.state_fields[0].initial_value.as_deref(),
+            Some("Austin & <Zero>")
+        );
+
+        let template_graph = build_template_graph(&component_graph);
+        let html = generate_static_html(&template_graph);
+
+        assert_eq!(
+            html,
+            "<p data-ez-node=\"n0\" data-ez-bindings=\"this.name\">Name:<!-- ez-binding:n1:this.name -->Austin &amp; &lt;Zero&gt;</p>\n"
+        );
+
+        let manifest = build_template_manifest(&component_graph, &template_graph);
+
+        assert_eq!(
+            manifest.components[0].template.nodes,
+            vec![
+                ManifestNode::Element {
+                    id: "n0".to_string(),
+                    tag: "p".to_string(),
+                },
+                ManifestNode::Binding {
+                    id: "n1".to_string(),
+                    expression: "this.name".to_string(),
+                    initial_value: Some("Austin & <Zero>".to_string()),
+                }
+            ]
+        );
+
+        let manifest_json = template_manifest_json(&manifest);
+        let manifest_value: serde_json::Value =
+            serde_json::from_str(&manifest_json).expect("manifest JSON should parse");
+
+        assert_eq!(
+            manifest_value["components"][0]["template"]["nodes"][1]["initial_value"],
+            serde_json::json!("Austin & <Zero>")
+        );
+    }
+
+    #[test]
     fn builds_template_graph_from_component_graph() {
         let source = include_str!("../../../fixtures/0001-source-summary/input/Counter.tsx");
 

@@ -116,6 +116,77 @@ fn double_binding_counter_increments_in_a_real_browser() {
     );
 }
 
+#[test]
+fn string_state_initializes_in_a_real_browser() {
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/string-greeting");
+
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean previous browser test output");
+    }
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0006-string-state/input/StringGreeting.tsx",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("browser test output path was not valid UTF-8"),
+        ])
+        .output()
+        .expect("failed to run ezc_cli build");
+
+    assert!(
+        output.status.success(),
+        "expected build to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    write_string_probe_page(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile dir");
+    let user_data_dir = format!(
+        "--user-data-dir={}",
+        profile_dir
+            .to_str()
+            .expect("Chrome profile path was not valid UTF-8")
+    );
+    let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
+
+    let output = run_chrome_with_timeout(
+        chrome,
+        &[
+            "--headless=new",
+            "--disable-gpu",
+            "--no-first-run",
+            "--disable-background-networking",
+            "--virtual-time-budget=5000",
+            "--dump-dom",
+            &user_data_dir,
+            &probe_url,
+        ],
+        Duration::from_secs(5),
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    server.stop();
+
+    assert!(
+        stdout.contains("EDGEZERO_STRING_BROWSER_TEST_PASS"),
+        "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 fn write_probe_page(out_dir: &Path) {
     let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
     let probe = index.replace(
@@ -204,6 +275,76 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
   document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  console.error(error);
+});
+</script>
+</body>"#,
+    );
+
+    fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
+}
+
+fn write_string_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
+    let probe = index.replace(
+        "</body>",
+        r#"<script>
+const fail = (message) => {
+  throw new Error(message);
+};
+
+const edgezeroConsoleErrors = [];
+const originalConsoleError = console.error.bind(console);
+console.error = (...args) => {
+  const message = args.map((arg) => {
+    if (arg instanceof Error) return arg.message;
+    if (typeof arg === "string") return arg;
+    return JSON.stringify(arg);
+  }).join(" ");
+
+  edgezeroConsoleErrors.push(message);
+  originalConsoleError(...args);
+};
+
+const waitFor = (predicate, label) => new Promise((resolve, reject) => {
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    if (predicate()) {
+      resolve();
+      return;
+    }
+
+    if (Date.now() > deadline) {
+      reject(new Error(`Timed out waiting for ${label}`));
+      return;
+    }
+
+    setTimeout(tick, 20);
+  };
+
+  tick();
+});
+
+(async () => {
+  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+
+  if (!document.body.textContent.includes("Name:Austin & <Zero>")) {
+    fail("string binding text was not rendered");
+  }
+
+  if (window.__EDGEZERO__.components[0].state.name !== "Austin & <Zero>") {
+    fail("debug state did not preserve string value");
+  }
+
+  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
+    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  }
+
+  document.body.dataset.browserTest = "pass";
+  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_STRING_BROWSER_TEST_PASS</div>");
+})().catch((error) => {
+  document.body.dataset.browserTest = "fail";
+  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_STRING_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>

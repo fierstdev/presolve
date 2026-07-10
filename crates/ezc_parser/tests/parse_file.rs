@@ -73,6 +73,30 @@ fn parses_counter_fixture() {
 }
 
 #[test]
+fn parses_string_state_literal_without_source_quotes() {
+    let source = include_str!("../../../fixtures/0006-string-state/input/StringGreeting.tsx");
+
+    let parsed = parse_file(
+        "fixtures/0006-string-state/input/StringGreeting.tsx",
+        source,
+    );
+
+    assert!(parsed.diagnostics.is_empty());
+
+    let class = parsed.classes.first().expect("expected class");
+    assert_eq!(class.properties.len(), 1);
+    assert_eq!(class.properties[0].name, "name");
+    assert_eq!(
+        class.properties[0].initializer.as_deref(),
+        Some("state(...)")
+    );
+    assert_eq!(
+        class.properties[0].state_initial_value.as_deref(),
+        Some("Austin & <Zero>")
+    );
+}
+
+#[test]
 fn reports_broken_tsx_diagnostic() {
     let source = include_str!("../../../fixtures/0002-broken-tsx/input/BrokenCounter.tsx");
 

@@ -236,7 +236,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       }
 
       if (node.initial_value !== null && component.state[field] === undefined) {
-        component.state[field] = Number(node.initial_value);
+        component.state[field] = node.initial_value;
       }
 
       const anchor = bindingAnchors.get(node.id);
@@ -436,6 +436,8 @@ mod tests {
         assert!(runtime.contains("readField"));
         assert!(runtime.contains("writeField"));
         assert!(runtime.contains("notifyField"));
+        assert!(runtime.contains("component.state[field] = node.initial_value"));
+        assert!(!runtime.contains("component.state[field] = Number(node.initial_value)"));
         assert!(runtime.contains("installDelegatedEventListeners"));
         assert!(runtime.contains("document.addEventListener(eventType"));
         assert!(!runtime.contains("element.addEventListener(\"click\""));

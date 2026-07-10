@@ -371,6 +371,7 @@ fn state_initial_value(expression: &Expression<'_>) -> Option<String> {
 fn state_argument_literal(argument: &Argument<'_>) -> Option<String> {
     match argument {
         Argument::NumericLiteral(literal) => literal.raw.as_ref().map(ToString::to_string),
+        Argument::StringLiteral(literal) => Some(literal.value.to_string()),
         _ => None,
     }
 }

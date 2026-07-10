@@ -3,51 +3,55 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: test: add browser runtime e2e suite
+* Latest commit: feat: support string state literals
 * Working tree: clean after committing this slice
-* Date: 2026-07-09 18:58:19 PDT
+* Date: 2026-07-09 19:05:54 PDT
 
 Last completed slice
 
-* Slice: 6D-E - Add the first browser e2e suite as a permanent gate
-* Summary: The real-browser runtime probe is now a permanent test and CI gate instead of an ignored manual check.
-* Key files: crates/ezc_cli/tests/runtime_browser.rs, e2e/browser/README.md, package.json, justfile, .github/workflows/ci.yml
-* New behavior: `cargo test --workspace` now runs the Chrome-backed browser runtime test by default. The probe builds the double-binding counter fixture, serves it locally, opens Chrome, clicks delegated nested targets, verifies shared binding updates, checks runtime debug store maps, and fails on unexpected `[EdgeZero]` console errors.
-* Tests added or changed: promoted `double_binding_counter_increments_in_a_real_browser` out of `#[ignore]`, added `pnpm test:e2e` and `pnpm test:e2e:headed` aliases, added `just e2e` and `just e2e-headed` targets, and added CI jobs for workspace tests plus explicit browser e2e.
-* Fixtures added or changed: None
+* Slice: 6E-A - String literals
+* Summary: State initializers now accept string literals and preserve the semantic value through parser, component graph, template graph, HTML, manifest JSON, and browser runtime initialization.
+* Key files: crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/runtime_codegen.rs, crates/ezc_core/src/lib.rs, crates/ezc_cli/tests/explain.rs, crates/ezc_cli/tests/runtime_browser.rs
+* New behavior: `state("Austin & <Zero>")` records `Austin & <Zero>` without source quotes, static HTML escapes it as text, manifest JSON emits it as a JSON string, and `window.__EDGEZERO__` initializes runtime state with the string instead of `Number(...)`.
+* Tests added or changed: parser string literal assertion, core HTML/manifest assertions, CLI html/template/manifest fixture assertions, runtime-codegen assertion, and browser e2e string-state boot probe.
+* Fixtures added or changed: fixtures/0006-string-state/input/StringGreeting.tsx plus expected HTML, template, and manifest outputs
 
 Current in-progress slice
 
-* Slice: 6E-A - String literals
+* Slice: 6E-B - Boolean literals
 * Status: Not started
 * Completed: None
-* Remaining: Support `state("Austin")` while preserving the semantic string value, escaping HTML text correctly, serializing manifest values as JSON strings, and initializing browser runtime state from typed string values.
+* Remaining: Support `state(true)` and `state(false)`, preserve boolean type in compiler models and manifest, define text rendering as `true` / `false`, and add static plus browser coverage.
 
 Verification
 
 * cargo fmt --all --check: pass
+* cargo test -p ezc_parser: pass
+* cargo test -p ezc_core: pass
+* cargo test -p ezc_cli --test explain: pass
+* cargo test -p ezc_cli --test runtime_browser -- --nocapture: pass
 * cargo test --workspace: pass
 * pnpm test:e2e: pass
-* pnpm test:e2e:headed: pass
 * just e2e: not run locally because `just` is not installed in this shell
 * Known failures: `cargo clippy --workspace --all-targets -- -D warnings` still fails on pre-existing warnings outside this slice, so the new CI workflow intentionally does not add a clippy gate yet.
 
 Architecture decisions made
 
-* Decision: Keep the first browser e2e suite as a Rust integration harness instead of introducing Playwright now.
-* Reason: The existing harness already performs deterministic fixture builds, static serving, Chrome execution, DOM assertions, and runtime console failure capture without adding JavaScript test dependencies.
-* Tradeoff: `test:e2e:headed` currently aliases the same deterministic Chrome dump-DOM harness rather than an interactive headed runner.
-* Follow-up: If future UI coverage needs richer browser interaction or screenshots, replace or supplement the harness with a DevTools or Playwright runner.
+* Decision: Keep 6E-A on the existing `Option<String>` initial-value path and defer the compiler-owned typed serializable value enum to 6E-D.
+* Reason: The 6E-A requirement is string literal support, and the existing manifest field already serializes string values as JSON strings.
+* Tradeoff: Numeric initial state now enters the browser store as the manifest string until numeric actions coerce with `Number(...)`; visible rendering and increment behavior remain covered.
+* Follow-up: Slice 6E-D should replace this temporary scalar path with a typed `SerializableValue` model before arrays and objects.
 
 Known limitations
 
 * Item: Only `this.<field>++` is recognized as an action. `this.count += 1`, decrement, assignment, and multi-step plans are intentionally deferred.
-* Item: The browser runtime supports only delegated click events, increment actions, numeric state, and binding callback text updates.
+* Item: The browser runtime supports only delegated click events, increment actions, numeric/string initial state, and binding callback text updates.
+* Item: Boolean and null state literals are still unsupported until 6E-B and 6E-C.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 
 Exact next step
 
-Start Slice 6E-A by replacing the numeric-only state initial value path with enough typed value handling to preserve string literals from parser model through component graph, manifest JSON, HTML binding rendering, and runtime initialization.
+Start Slice 6E-B by teaching the parser to capture boolean `state(...)` arguments, choosing the minimal typed representation needed before 6E-D, and adding a boolean fixture that asserts HTML text renders as `true` / `false` and manifest/runtime preserve booleans.
 
 Useful commands
 

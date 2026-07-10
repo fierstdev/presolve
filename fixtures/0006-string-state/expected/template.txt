@@ -1,0 +1,10 @@
+File: fixtures/0006-string-state/input/StringGreeting.tsx
+TemplateGraph:
+  templates:
+    template StringGreeting
+      root: <p> id=n0
+      attributes:
+        data-ez-bindings = bindings(this.name)
+      children:
+        Text("Name:")
+        Binding id=n1 expression="this.name" initial=Some("Austin & <Zero>")

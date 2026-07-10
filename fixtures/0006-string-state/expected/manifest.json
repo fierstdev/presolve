@@ -1,0 +1,24 @@
+{
+  "components": [
+    {
+      "name": "StringGreeting",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "p"
+          },
+          {
+            "kind": "binding",
+            "id": "n1",
+            "expression": "this.name",
+            "initial_value": "Austin & <Zero>"
+          }
+        ],
+        "events": []
+      },
+      "actions": []
+    }
+  ]
+}
