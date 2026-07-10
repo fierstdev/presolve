@@ -63,6 +63,7 @@ pub struct ComponentAction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StateOperation {
     Increment,
+    Decrement,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -289,6 +290,7 @@ fn collect_render_event_diagnostics(
 fn state_operation_from_parsed(operation: &ParsedStateOperation) -> StateOperation {
     match operation {
         ParsedStateOperation::Increment => StateOperation::Increment,
+        ParsedStateOperation::Decrement => StateOperation::Decrement,
     }
 }
 

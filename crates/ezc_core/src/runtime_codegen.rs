@@ -272,7 +272,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   }
 
   function executeAction(store, component, action) {
-    if (action.operation !== "increment") {
+    if (action.operation !== "increment" && action.operation !== "decrement") {
       console.error(
         "[EdgeZero] EZR_UNSUPPORTED_ACTION",
         action
@@ -290,7 +290,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       return;
     }
 
-    writeField(store, component, action.field, current + 1);
+    const next = action.operation === "increment" ? current + 1 : current - 1;
+    writeField(store, component, action.field, next);
   }
 
   function registerComponentEvents(store, component) {
@@ -448,7 +449,8 @@ mod tests {
         assert!(runtime.contains("installDelegatedEventListeners"));
         assert!(runtime.contains("document.addEventListener(eventType"));
         assert!(!runtime.contains("element.addEventListener(\"click\""));
-        assert!(runtime.contains("action.operation !== \"increment\""));
+        assert!(runtime.contains("action.operation !== \"decrement\""));
+        assert!(runtime.contains("current - 1"));
         assert!(runtime.contains("dataset.ezRuntime"));
         assert!(runtime.contains("edgezero:ready"));
         assert!(runtime.contains("window.__EDGEZERO__"));

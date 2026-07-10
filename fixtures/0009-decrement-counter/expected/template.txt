@@ -1,0 +1,11 @@
+File: fixtures/0009-decrement-counter/input/DecrementCounter.tsx
+TemplateGraph:
+  templates:
+    template DecrementCounter
+      root: <button> id=n0
+      attributes:
+        data-ez-on-click = event-handler(click -> this.decrement)
+        data-ez-bindings = bindings(this.count)
+      children:
+        Text("Count:")
+        Binding id=n1 expression="this.count" initial=Some("2")

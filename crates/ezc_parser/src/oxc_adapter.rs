@@ -179,16 +179,15 @@ fn parsed_state_update(statement: &Statement<'_>) -> Option<ParsedStateUpdate> {
         return None;
     };
 
-    if update.operator.as_str() != "++" {
-        return None;
-    }
+    let operation = match update.operator.as_str() {
+        "++" => ParsedStateOperation::Increment,
+        "--" => ParsedStateOperation::Decrement,
+        _ => return None,
+    };
 
     let field = this_assignment_target_field(&update.argument)?;
 
-    Some(ParsedStateUpdate {
-        field,
-        operation: ParsedStateOperation::Increment,
-    })
+    Some(ParsedStateUpdate { field, operation })
 }
 
 fn this_assignment_target_field(target: &SimpleAssignmentTarget<'_>) -> Option<String> {

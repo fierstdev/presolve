@@ -139,6 +139,42 @@ fn parses_null_state_literal() {
 }
 
 #[test]
+fn parses_decrement_state_update() {
+    let source = r#"
+@component("x-decrement-counter")
+class DecrementCounter extends Component {
+  count = state(2);
+
+  decrement() {
+    this.count--;
+  }
+
+  render() {
+    return <button onClick={() => this.decrement()}>Count: {this.count}</button>;
+  }
+}
+"#;
+
+    let parsed = parse_file("DecrementCounter.tsx", source);
+
+    assert!(parsed.diagnostics.is_empty());
+
+    let class = parsed.classes.first().expect("expected class");
+    let decrement = class
+        .methods
+        .iter()
+        .find(|method| method.name == "decrement")
+        .expect("expected decrement method");
+
+    assert_eq!(decrement.state_updates.len(), 1);
+    assert_eq!(decrement.state_updates[0].field, "count");
+    assert_eq!(
+        decrement.state_updates[0].operation,
+        ParsedStateOperation::Decrement
+    );
+}
+
+#[test]
 fn reports_broken_tsx_diagnostic() {
     let source = include_str!("../../../fixtures/0002-broken-tsx/input/BrokenCounter.tsx");
 

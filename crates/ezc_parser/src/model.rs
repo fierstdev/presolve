@@ -57,6 +57,7 @@ pub struct ParsedStateUpdate {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParsedStateOperation {
     Increment,
+    Decrement,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -529,6 +529,7 @@ fn print_component_graph(path: &Path, graph: &ComponentGraph) {
 fn format_state_operation(operation: &StateOperation) -> &'static str {
     match operation {
         StateOperation::Increment => "increment",
+        StateOperation::Decrement => "decrement",
     }
 }
 

@@ -340,6 +340,39 @@ fn html_command_matches_null_state_fixture() {
 }
 
 #[test]
+fn html_command_matches_decrement_counter_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "html",
+            "fixtures/0009-decrement-counter/input/DecrementCounter.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli html");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0009-decrement-counter/expected/html.html"),
+    )
+    .expect("failed to read expected decrement html fixture");
+
+    assert_eq!(
+        normalize_html_for_fixture(&actual),
+        normalize_html_for_fixture(&expected)
+    );
+}
+
+#[test]
 fn html_command_matches_broken_tsx_fixture() {
     let repo_root = repo_root();
 
@@ -476,6 +509,36 @@ fn template_command_matches_null_state_fixture() {
     let expected =
         std::fs::read_to_string(repo_root.join("fixtures/0008-null-state/expected/template.txt"))
             .expect("failed to read expected null template fixture");
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn template_command_matches_decrement_counter_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "template",
+            "fixtures/0009-decrement-counter/input/DecrementCounter.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli template");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0009-decrement-counter/expected/template.txt"),
+    )
+    .expect("failed to read expected decrement template fixture");
 
     assert_eq!(actual, expected);
 }
@@ -690,6 +753,40 @@ fn manifest_command_matches_null_state_fixture() {
             .expect("failed to read expected null manifest fixture");
 
     assert_json_eq(&actual, &expected);
+}
+
+#[test]
+fn manifest_command_matches_decrement_counter_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "manifest",
+            "fixtures/0009-decrement-counter/input/DecrementCounter.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli manifest");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0009-decrement-counter/expected/manifest.json"),
+    )
+    .expect("failed to read expected decrement manifest fixture");
+
+    let actual_json: serde_json::Value =
+        serde_json::from_str(&actual).expect("actual manifest JSON was invalid");
+    let expected_json: serde_json::Value =
+        serde_json::from_str(&expected).expect("expected manifest JSON was invalid");
+
+    assert_eq!(actual_json, expected_json);
 }
 
 #[test]

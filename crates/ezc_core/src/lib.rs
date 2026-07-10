@@ -300,6 +300,29 @@ class Counter extends Component {
     }
 
     #[test]
+    fn builds_decrement_action_from_parsed_method_update() {
+        let source =
+            include_str!("../../../fixtures/0009-decrement-counter/input/DecrementCounter.tsx");
+
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0009-decrement-counter/input/DecrementCounter.tsx",
+            source,
+        );
+
+        let graph = build_component_graph(&parsed);
+        let component = graph.components.first().expect("expected component");
+
+        assert_eq!(
+            component.actions,
+            vec![ComponentAction {
+                method: "decrement".to_string(),
+                operation: StateOperation::Decrement,
+                field: "count".to_string(),
+            }]
+        );
+    }
+
+    #[test]
     fn generates_static_html_from_template_graph() {
         let source = include_str!("../../../fixtures/0001-source-summary/input/Counter.tsx");
 
@@ -598,6 +621,39 @@ class Counter extends Component {
                 operation: ManifestOperation::Increment,
                 field: "count".to_string(),
             }]
+        );
+    }
+
+    #[test]
+    fn builds_template_manifest_for_decrement_action() {
+        let source =
+            include_str!("../../../fixtures/0009-decrement-counter/input/DecrementCounter.tsx");
+
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0009-decrement-counter/input/DecrementCounter.tsx",
+            source,
+        );
+
+        let component_graph = build_component_graph(&parsed);
+        let template_graph = build_template_graph(&component_graph);
+        let manifest = build_template_manifest(&component_graph, &template_graph);
+
+        assert_eq!(
+            manifest.components[0].actions,
+            vec![ManifestAction {
+                method: "decrement".to_string(),
+                operation: ManifestOperation::Decrement,
+                field: "count".to_string(),
+            }]
+        );
+
+        let manifest_json = template_manifest_json(&manifest);
+        let manifest_value: serde_json::Value =
+            serde_json::from_str(&manifest_json).expect("manifest JSON should parse");
+
+        assert_eq!(
+            manifest_value["components"][0]["actions"][0]["operation"],
+            serde_json::json!("decrement")
         );
     }
 

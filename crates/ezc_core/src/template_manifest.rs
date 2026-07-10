@@ -55,6 +55,9 @@ pub struct ManifestAction {
 pub enum ManifestOperation {
     #[serde(rename = "increment")]
     Increment,
+
+    #[serde(rename = "decrement")]
+    Decrement,
 }
 
 #[must_use]
@@ -121,6 +124,7 @@ fn manifest_actions(component: &ComponentNode) -> Vec<ManifestAction> {
 fn manifest_operation(operation: &StateOperation) -> ManifestOperation {
     match operation {
         StateOperation::Increment => ManifestOperation::Increment,
+        StateOperation::Decrement => ManifestOperation::Decrement,
     }
 }
 
