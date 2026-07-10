@@ -652,3 +652,44 @@ fn parses_jsx_logical_and_conditional_rendering() {
     };
     assert_eq!(when_true.name, "span");
 }
+
+#[test]
+fn parses_keyed_jsx_list_rendering() {
+    let source = include_str!("../../../fixtures/0019-keyed-list-semantics/input/KeyedList.tsx");
+
+    let parsed = parse_file(
+        "fixtures/0019-keyed-list-semantics/input/KeyedList.tsx",
+        source,
+    );
+
+    assert!(parsed.diagnostics.is_empty());
+
+    let class = parsed.classes.first().expect("expected class");
+    let render = class
+        .methods
+        .iter()
+        .find(|method| method.name == "render")
+        .expect("expected render method");
+
+    assert_eq!(render.bindings, vec!["this.items"]);
+
+    let ParsedJsxNode::Element(list_root) = &render.jsx_roots[0] else {
+        panic!("expected list root");
+    };
+
+    let ParsedJsxChild::List(list) = &list_root.children[0] else {
+        panic!("expected keyed list child");
+    };
+
+    assert_eq!(list.iterable, "this.items");
+    assert_eq!(list.item_variable, "item");
+    assert_eq!(list.index_variable.as_deref(), Some("index"));
+    assert_eq!(list.key_expression, "item.id");
+    assert_eq!(list.span.line, 9);
+    assert_eq!(list.span.column, 10);
+
+    let ParsedJsxNode::Element(item_template) = &list.item_template else {
+        panic!("expected list item element");
+    };
+    assert_eq!(item_template.name, "li");
+}

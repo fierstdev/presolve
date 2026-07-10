@@ -1,6 +1,7 @@
 use crate::component_graph::{
     ComponentGraph, RenderAttribute, RenderAttributeValue, RenderChild, RenderConditional,
-    RenderElement, RenderEventHandler, RenderFragment, RenderModel, SerializableValue, StateField,
+    RenderElement, RenderEventHandler, RenderFragment, RenderList, RenderModel, SerializableValue,
+    StateField,
 };
 use ezc_parser::SourceSpan;
 
@@ -83,6 +84,7 @@ pub enum TemplateChild {
     Element(ElementNode),
     Fragment(FragmentNode),
     Conditional(ConditionalNode),
+    List(ListNode),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -95,6 +97,17 @@ pub struct ConditionalNode {
     pub span: SourceSpan,
     pub when_true: Vec<TemplateChild>,
     pub when_false: Vec<TemplateChild>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ListNode {
+    pub id: TemplateNodeId,
+    pub iterable: String,
+    pub item_variable: String,
+    pub index_variable: Option<String>,
+    pub key_expression: String,
+    pub span: SourceSpan,
+    pub item_template: Vec<TemplateChild>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -283,6 +296,7 @@ fn collect_direct_bindings_from_children(children: &[RenderChild]) -> Vec<String
             RenderChild::Conditional(conditional) => {
                 bindings.push(conditional.condition.clone());
             }
+            RenderChild::List(list) => bindings.push(list.iterable.clone()),
             RenderChild::Element(_) | RenderChild::Text { .. } => {}
         }
     }
@@ -317,6 +331,29 @@ fn template_child_from_render(
         RenderChild::Conditional(conditional) => TemplateChild::Conditional(
             conditional_from_render_conditional(conditional, state_fields, ids),
         ),
+        RenderChild::List(list) => {
+            TemplateChild::List(list_from_render_list(list, state_fields, ids))
+        }
+    }
+}
+
+fn list_from_render_list(
+    list: &RenderList,
+    state_fields: &[StateField],
+    ids: &mut TemplateIdAllocator,
+) -> ListNode {
+    ListNode {
+        id: ids.alloc(),
+        iterable: list.iterable.clone(),
+        item_variable: list.item_variable.clone(),
+        index_variable: list.index_variable.clone(),
+        key_expression: list.key_expression.clone(),
+        span: list.span,
+        item_template: list
+            .item_template
+            .iter()
+            .map(|child| template_child_from_render(child, state_fields, ids))
+            .collect(),
     }
 }
 

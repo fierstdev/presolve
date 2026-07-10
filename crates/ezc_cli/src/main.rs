@@ -637,6 +637,14 @@ fn format_parsed_child(child: &ParsedJsxChild) -> String {
             conditional.condition,
             format_line_column_span(&conditional.span)
         ),
+        ParsedJsxChild::List(list) => format!(
+            "List(iterable={:?}, item={:?}, index={:?}, key={:?}) {}",
+            list.iterable,
+            list.item_variable,
+            list.index_variable,
+            list.key_expression,
+            format_line_column_span(&list.span)
+        ),
     }
 }
 
@@ -660,6 +668,14 @@ fn format_render_child(child: &ezc_core::RenderChild) -> String {
             "Conditional({:?}) {}",
             conditional.condition,
             format_line_column_span(&conditional.span)
+        ),
+        ezc_core::RenderChild::List(list) => format!(
+            "List(iterable={:?}, item={:?}, index={:?}, key={:?}) {}",
+            list.iterable,
+            list.item_variable,
+            list.index_variable,
+            list.key_expression,
+            format_line_column_span(&list.span)
         ),
     }
 }
@@ -836,6 +852,30 @@ fn print_template_child(path: &Path, child: &TemplateChild, indent: usize) {
                     print_template_child(path, child, indent + 4);
                 }
             }
+        }
+        TemplateChild::List(list) => print_template_list(path, list, indent),
+    }
+}
+
+fn print_template_list(path: &Path, list: &ezc_core::ListNode, indent: usize) {
+    let padding = " ".repeat(indent);
+    println!(
+        "{padding}List id={} iterable={:?} item={:?} index={:?} key={:?} {}",
+        list.id.0,
+        list.iterable,
+        list.item_variable,
+        list.index_variable,
+        list.key_expression,
+        format_source_span(path, &list.span)
+    );
+
+    let child_padding = " ".repeat(indent + 2);
+    println!("{child_padding}item template:");
+    if list.item_template.is_empty() {
+        println!("{child_padding}  none");
+    } else {
+        for child in &list.item_template {
+            print_template_child(path, child, indent + 4);
         }
     }
 }

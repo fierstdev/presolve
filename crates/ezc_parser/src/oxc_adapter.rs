@@ -2,9 +2,9 @@ use std::path::{Path, PathBuf};
 
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
-    Argument, AssignmentTarget, ClassElement, Declaration, Expression, JSXAttributeItem,
-    JSXAttributeName, JSXAttributeValue, JSXChild, JSXElementName, JSXExpression, JSXFragment,
-    Program, PropertyKey, SimpleAssignmentTarget, Statement,
+    Argument, AssignmentTarget, BindingPatternKind, ClassElement, Declaration, Expression,
+    JSXAttributeItem, JSXAttributeName, JSXAttributeValue, JSXChild, JSXElementName, JSXExpression,
+    JSXFragment, Program, PropertyKey, SimpleAssignmentTarget, Statement,
 };
 use oxc_diagnostics::Severity as OxcSeverity;
 use oxc_parser::Parser;
@@ -13,8 +13,8 @@ use oxc_span::{SourceType, Span};
 use crate::model::{
     ParseDiagnostic, ParseLabel, ParseSeverity, ParsedClass, ParsedDecorator, ParsedEventHandler,
     ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional,
-    ParsedJsxElement, ParsedJsxFragment, ParsedJsxNode, ParsedMethod, ParsedProperty,
-    ParsedSerializableValue, ParsedStateOperation, ParsedStateUpdate, SourceSpan,
+    ParsedJsxElement, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedMethod,
+    ParsedProperty, ParsedSerializableValue, ParsedStateOperation, ParsedStateUpdate, SourceSpan,
 };
 
 pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
@@ -347,6 +347,12 @@ fn parsed_jsx_expression_child(
 ) -> Option<ParsedJsxChild> {
     let expression = expression.as_expression()?;
 
+    if let Expression::CallExpression(call) = expression {
+        if let Some(list) = parsed_jsx_list(call, source) {
+            return Some(ParsedJsxChild::List(list));
+        }
+    }
+
     if let Expression::ConditionalExpression(conditional) = expression {
         return parsed_jsx_conditional(conditional, source).map(ParsedJsxChild::Conditional);
     }
@@ -356,6 +362,68 @@ fn parsed_jsx_expression_child(
     }
 
     expression_summary(expression).map(|expression| ParsedJsxChild::Binding { expression, span })
+}
+
+fn parsed_jsx_list(call: &oxc_ast::ast::CallExpression<'_>, source: &str) -> Option<ParsedJsxList> {
+    let Expression::StaticMemberExpression(member) = &call.callee else {
+        return None;
+    };
+
+    if member.property.name != "map" || call.arguments.len() != 1 {
+        return None;
+    }
+
+    let iterable = expression_summary(&member.object)?;
+    let Argument::ArrowFunctionExpression(callback) = &call.arguments[0] else {
+        return None;
+    };
+
+    if callback.params.rest.is_some() || !(1..=2).contains(&callback.params.items.len()) {
+        return None;
+    }
+
+    let item_variable = binding_identifier_name(&callback.params.items[0].pattern.kind)?;
+    let index_variable = match callback.params.items.get(1) {
+        Some(parameter) => Some(binding_identifier_name(&parameter.pattern.kind)?),
+        None => None,
+    };
+    let item_template = parsed_jsx_node_from_expression(callback.get_expression()?, source)?;
+    let key_expression = key_expression_from_jsx_node(&item_template)?;
+
+    Some(ParsedJsxList {
+        iterable,
+        item_variable,
+        index_variable,
+        key_expression,
+        span: source_span(source, call.span),
+        item_template,
+    })
+}
+
+fn binding_identifier_name(pattern: &BindingPatternKind<'_>) -> Option<String> {
+    let BindingPatternKind::BindingIdentifier(identifier) = pattern else {
+        return None;
+    };
+
+    Some(identifier.name.to_string())
+}
+
+fn key_expression_from_jsx_node(node: &ParsedJsxNode) -> Option<String> {
+    let ParsedJsxNode::Element(element) = node else {
+        return None;
+    };
+
+    element.attributes.iter().find_map(|attribute| {
+        if attribute.name != "key" {
+            return None;
+        }
+
+        let ParsedJsxAttributeValue::Expression(Some(expression)) = &attribute.value else {
+            return None;
+        };
+
+        Some(expression.clone())
+    })
 }
 
 fn parsed_jsx_conditional(
@@ -513,7 +581,25 @@ fn jsx_expression_binding_summary(expression: &JSXExpression<'_>) -> Option<Stri
         }
     }
 
+    if let Expression::CallExpression(call) = expression {
+        if let Some(iterable) = list_iterable_dependency(call) {
+            return Some(iterable);
+        }
+    }
+
     expression_summary(expression)
+}
+
+fn list_iterable_dependency(call: &oxc_ast::ast::CallExpression<'_>) -> Option<String> {
+    let Expression::StaticMemberExpression(member) = &call.callee else {
+        return None;
+    };
+
+    if member.property.name != "map" {
+        return None;
+    }
+
+    expression_summary(&member.object)
 }
 
 fn expression_summary(expression: &Expression<'_>) -> Option<String> {

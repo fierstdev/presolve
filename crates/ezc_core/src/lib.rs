@@ -17,7 +17,7 @@ pub mod template_manifest;
 pub use component_graph::{
     build_component_graph, ComponentAction, ComponentDiagnostic, ComponentGraph, ComponentMethod,
     ComponentNode, RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler,
-    RenderFragment, RenderModel, SerializableValue, StateField, StateOperation,
+    RenderFragment, RenderList, RenderModel, SerializableValue, StateField, StateOperation,
 };
 pub use explain::{explain_json, explain_text};
 pub use html_codegen::generate_static_html;
@@ -28,7 +28,7 @@ pub use page_codegen::generate_standalone_page;
 pub use runtime_codegen::generate_runtime_stub;
 pub use summarize::summarize_source;
 pub use template_graph::{
-    build_template_graph, AttributeValue, ConditionalNode, ElementNode, FragmentNode,
+    build_template_graph, AttributeValue, ConditionalNode, ElementNode, FragmentNode, ListNode,
     TemplateAttribute, TemplateChild, TemplateGraph, TemplateNode, TemplateNodeId,
 };
 pub use template_manifest::{
@@ -1136,6 +1136,59 @@ class BadAttrs extends Component {
                 when_true_html: "<span data-ez-node=\"n4\">On</span>".to_string(),
                 when_false_html: String::new(),
             }
+        );
+    }
+
+    #[test]
+    fn builds_keyed_list_semantics_without_static_initial_rendering() {
+        let source =
+            include_str!("../../../fixtures/0019-keyed-list-semantics/input/KeyedList.tsx");
+
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0019-keyed-list-semantics/input/KeyedList.tsx",
+            source,
+        );
+
+        let component_graph = build_component_graph(&parsed);
+        assert!(component_graph.diagnostics.is_empty());
+
+        let template_graph = build_template_graph(&component_graph);
+        let root = template_graph.templates[0]
+            .root
+            .as_ref()
+            .expect("expected root element");
+
+        assert_eq!(root.id.0, "n0");
+        assert_eq!(root.attributes[0].name, "data-ez-bindings");
+
+        let TemplateChild::List(list) = &root.children[0] else {
+            panic!("expected keyed list child");
+        };
+
+        assert_eq!(list.id.0, "n1");
+        assert_eq!(list.iterable, "this.items");
+        assert_eq!(list.item_variable, "item");
+        assert_eq!(list.index_variable.as_deref(), Some("index"));
+        assert_eq!(list.key_expression, "item.id");
+
+        let TemplateChild::Element(item_template) = &list.item_template[0] else {
+            panic!("expected list item element");
+        };
+        assert_eq!(item_template.id.0, "n2");
+        assert_eq!(item_template.tag_name, "li");
+
+        assert_eq!(
+            generate_static_html(&template_graph),
+            "<ul data-ez-node=\"n0\" data-ez-bindings=\"this.items\"></ul>\n"
+        );
+
+        let manifest = build_template_manifest(&component_graph, &template_graph);
+        assert_eq!(
+            manifest.components[0].template.nodes,
+            vec![ManifestNode::Element {
+                id: "n0".to_string(),
+                tag: "ul".to_string(),
+            }]
         );
     }
 

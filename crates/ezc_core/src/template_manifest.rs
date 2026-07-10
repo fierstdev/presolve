@@ -246,7 +246,7 @@ fn collect_child(
     events: &mut Vec<ManifestEvent>,
 ) {
     match child {
-        TemplateChild::Text { .. } => {}
+        TemplateChild::Text { .. } | TemplateChild::List(_) => {}
         TemplateChild::Binding {
             id,
             expression,

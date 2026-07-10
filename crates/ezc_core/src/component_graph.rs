@@ -2,7 +2,7 @@ use serde::Serialize;
 
 use ezc_parser::{
     ParsedClass, ParsedEventHandler, ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue,
-    ParsedJsxChild, ParsedJsxConditional, ParsedJsxFragment, ParsedJsxNode,
+    ParsedJsxChild, ParsedJsxConditional, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode,
     ParsedSerializableValue, ParsedStateOperation, SourceSpan,
 };
 
@@ -84,6 +84,7 @@ pub enum RenderChild {
     Element(RenderElement),
     Fragment(RenderFragment),
     Conditional(RenderConditional),
+    List(RenderList),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -107,6 +108,16 @@ pub struct RenderConditional {
     pub span: SourceSpan,
     pub when_true: Vec<RenderChild>,
     pub when_false: Vec<RenderChild>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenderList {
+    pub iterable: String,
+    pub item_variable: String,
+    pub index_variable: Option<String>,
+    pub key_expression: String,
+    pub span: SourceSpan,
+    pub item_template: Vec<RenderChild>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -428,6 +439,18 @@ fn render_child_from_parsed(child: &ParsedJsxChild) -> RenderChild {
         ParsedJsxChild::Conditional(conditional) => {
             RenderChild::Conditional(render_conditional_from_parsed(conditional))
         }
+        ParsedJsxChild::List(list) => RenderChild::List(render_list_from_parsed(list)),
+    }
+}
+
+fn render_list_from_parsed(list: &ParsedJsxList) -> RenderList {
+    RenderList {
+        iterable: list.iterable.clone(),
+        item_variable: list.item_variable.clone(),
+        index_variable: list.index_variable.clone(),
+        key_expression: list.key_expression.clone(),
+        span: list.span,
+        item_template: render_children_from_parsed_node(&list.item_template),
     }
 }
 
@@ -550,6 +573,11 @@ fn collect_child_event_handlers<'a>(
                 collect_child_event_handlers(child, event_handlers);
             }
         }
+        RenderChild::List(list) => {
+            for child in &list.item_template {
+                collect_child_event_handlers(child, event_handlers);
+            }
+        }
         RenderChild::Text { .. } | RenderChild::Binding { .. } => {}
     }
 }
@@ -626,6 +654,11 @@ fn collect_child_attribute_diagnostics(
                 collect_child_attribute_diagnostics(child, state_fields, class_name, diagnostics);
             }
         }
+        RenderChild::List(list) => {
+            for child in &list.item_template {
+                collect_child_attribute_diagnostics(child, state_fields, class_name, diagnostics);
+            }
+        }
         RenderChild::Text { .. } | RenderChild::Binding { .. } => {}
     }
 }
@@ -654,6 +687,7 @@ fn collect_attribute_diagnostics_for_attributes(
         }
 
         match &attribute.value {
+            RenderAttributeValue::Expression(_) if attribute.name == "key" => {}
             RenderAttributeValue::Expression(expression)
                 if !is_event_attribute(&attribute.name) =>
             {
@@ -727,6 +761,11 @@ fn collect_duplicate_child_event_diagnostics(
                 collect_duplicate_child_event_diagnostics(child, class_name, diagnostics);
             }
             for child in &conditional.when_false {
+                collect_duplicate_child_event_diagnostics(child, class_name, diagnostics);
+            }
+        }
+        RenderChild::List(list) => {
+            for child in &list.item_template {
                 collect_duplicate_child_event_diagnostics(child, class_name, diagnostics);
             }
         }

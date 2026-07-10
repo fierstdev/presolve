@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: support conditional rendering
+* Latest commit: compiler: represent keyed list semantics
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 12:28:11 PDT
+* Date: 2026-07-10 12:39:21 PDT
 
 Last completed slice
 
-* Slice: 7E - Conditional rendering
-* Summary: Added compiler-owned conditional render nodes, stable conditional boundary IDs, static initial branch emission, manifest branch snippets, and runtime range replacement for supported boolean state conditions.
-* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/html_codegen.rs, crates/ezc_core/src/template_manifest.rs, crates/ezc_core/src/runtime_codegen.rs
-* New behavior: JSX ternaries like `{this.enabled ? <span>On</span> : <span>Off</span>}` and logical-and shorthand like `{this.enabled && <span>On</span>}` compile into conditional template nodes. Static HTML emits the initial branch from serializable state, and the runtime swaps only the anchored branch range when the backing boolean state changes.
-* Tests added or changed: parser conditional assertions, core template/manifest assertions, CLI html/template/manifest fixture checks, and real-browser probes for ternary branch switching and logical-and empty-branch switching.
-* Fixtures added or changed: fixtures/0017-conditional-rendering, fixtures/0018-logical-and-conditional
+* Slice: 7F-A - List semantic model
+* Summary: Added compiler-owned keyed-list nodes that preserve the iterable dependency, item variable, optional index variable, key expression, source span, and item template.
+* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/html_codegen.rs, crates/ezc_core/src/template_manifest.rs
+* New behavior: Expression-bodied JSX maps such as `{this.items.map((item, index) => <li key={item.id}>{index}: {item.label}</li>)}` compile into first-class list nodes. The list iterable is recorded as a parent binding dependency, and `key` is treated as structural list metadata rather than an unsupported ordinary JSX attribute.
+* Tests added or changed: parser list assertions, core parser-to-template assertions including intentionally empty static list output, and CLI parse/graph/template golden checks.
+* Fixtures added or changed: fixtures/0019-keyed-list-semantics
 
 Current in-progress slice
 
 * Slice: 7F - Lists and keys
-* Status: Not started
-* Completed: None
-* Remaining: Start with 7F-A list semantic model for a constrained keyed list form.
+* Status: In progress
+* Completed: 7F-A - List semantic model
+* Remaining: Start 7F-B static initial list rendering after extending `SerializableValue` with arrays.
 
 Verification
 
@@ -43,11 +43,16 @@ Architecture decisions made
 * Tradeoff: Runtime manifests serialize branch HTML snippets for this first slice instead of recursively hydrating dynamic bindings/events inside branch snippets.
 * Decision: Logical-and shorthand reuses the same conditional model with an empty false branch.
 * Reason: It keeps ternary and shorthand update behavior identical once the branch anchor path is stable.
+* Decision: Keyed list nodes are represented before arrays, static list HTML, manifest serialization, or runtime reconciliation.
+* Reason: The compiler needs a stable semantic contract for list identity before committing to array values or DOM update behavior.
+* Tradeoff: List item templates are visible in parser/component/template tooling, but they intentionally emit no initial DOM content or runtime manifest records yet.
 
 Known limitations
 
 * Item: Conditional rendering only supports simple `this.<stateField>` conditions with JSX element or fragment branches.
 * Item: Conditional branch snippets are replaced as static HTML. Bindings, events, and nested dynamic behavior inside swapped-in branch snippets are not re-registered yet.
+* Item: Keyed lists currently accept only `iterable.map((item, index?) => <element key={expression}>...</element>)` with identifier parameters and an expression-bodied callback. Diagnostics for missing or unstable keys are deferred to 7F-D.
+* Item: List nodes have no static array rendering, runtime manifest representation, or reconciliation behavior until `SerializableValue` supports arrays and later 7F slices add keyed updates.
 * Item: Only `this.<field>++`, `this.<field>--`, `this.<field> += <literal>`, `this.<field> -= <literal>`, `this.<field> = <literal>`, and `this.<field> = !this.<field>` are recognized as action steps.
 * Item: The browser runtime supports only delegated click events, ordered closed action steps, numeric/string/boolean/null initial state, binding callback text/attribute updates, and conditional branch replacement.
 * Item: Static and `this.<stateField>` dynamic JSX attributes are preserved, but `className`/`htmlFor` normalization policy is still intentionally undecided.
@@ -61,7 +66,7 @@ Known limitations
 
 Exact next step
 
-Start Slice 7F-A by representing a constrained keyed list form in parser/render/template semantics: iterable dependency, item variable, optional index variable, key expression, and item template. Do not implement static array rendering until `SerializableValue` supports arrays.
+Start Slice 7F-B by extending `ParsedSerializableValue` and `SerializableValue` with constrained serializable arrays, then render the initial keyed-list contents from a list node without adding runtime reconciliation yet.
 
 Useful commands
 
@@ -85,6 +90,7 @@ Useful commands
 * `cargo run -p ezc_cli -- build fixtures/0016-fragments/input/FragmentPanel.tsx --out target/ezc-manual/fragments`
 * `cargo run -p ezc_cli -- build fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx --out target/ezc-manual/conditional-rendering`
 * `cargo run -p ezc_cli -- build fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx --out target/ezc-manual/logical-and-conditional`
+* `cargo run -p ezc_cli -- template fixtures/0019-keyed-list-semantics/input/KeyedList.tsx`
 * `cargo run -p ezc_cli -- build fixtures/0004-nested-jsx/input/NestedCounter.tsx --out target/ezc-manual/runtime-contract`
 
 Changed but uncommitted files

@@ -77,6 +77,7 @@ pub enum ParsedJsxChild {
     Element(ParsedJsxElement),
     Fragment(ParsedJsxFragment),
     Conditional(ParsedJsxConditional),
+    List(ParsedJsxList),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -106,6 +107,16 @@ pub struct ParsedJsxConditional {
     pub span: SourceSpan,
     pub when_true: ParsedJsxNode,
     pub when_false: Option<ParsedJsxNode>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedJsxList {
+    pub iterable: String,
+    pub item_variable: String,
+    pub index_variable: Option<String>,
+    pub key_expression: String,
+    pub span: SourceSpan,
+    pub item_template: ParsedJsxNode,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

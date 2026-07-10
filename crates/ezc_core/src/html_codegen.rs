@@ -91,6 +91,7 @@ fn generate_child_html(child: &TemplateChild) -> String {
         TemplateChild::Element(element) => generate_element_html(element),
         TemplateChild::Fragment(fragment) => generate_fragment_html(fragment),
         TemplateChild::Conditional(conditional) => generate_conditional_html(conditional),
+        TemplateChild::List(_) => String::new(),
     }
 }
 
