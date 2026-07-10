@@ -7,7 +7,7 @@ use std::process;
 use ezc_core::{
     build_component_graph, build_template_graph, build_template_manifest, explain_json,
     explain_text, generate_runtime_stub, generate_standalone_page, generate_static_html,
-    summarize_source, template_manifest_json, AttributeValue, ComponentGraph, StateInitialValue,
+    summarize_source, template_manifest_json, AttributeValue, ComponentGraph, SerializableValue,
     StateOperation, TemplateChild, TemplateGraph,
 };
 use ezc_parser::{parse_file, ParseSeverity, ParsedFile};
@@ -583,7 +583,7 @@ fn print_template_child(child: &TemplateChild, indent: usize) {
             println!(
                 "{padding}Binding id={} expression={expression:?} initial={}",
                 id.0,
-                format_state_initial_value(initial_value.as_ref())
+                format_serializable_value(initial_value.as_ref())
             );
         }
         TemplateChild::Element(element) => {
@@ -619,13 +619,13 @@ fn print_template_child(child: &TemplateChild, indent: usize) {
     }
 }
 
-fn format_state_initial_value(value: Option<&StateInitialValue>) -> String {
+fn format_serializable_value(value: Option<&SerializableValue>) -> String {
     match value {
-        Some(StateInitialValue::Null) => "Some(null)".to_string(),
-        Some(StateInitialValue::Number(value) | StateInitialValue::String(value)) => {
+        Some(SerializableValue::Null) => "Some(null)".to_string(),
+        Some(SerializableValue::Number(value) | SerializableValue::String(value)) => {
             format!("Some({value:?})")
         }
-        Some(StateInitialValue::Boolean(value)) => format!("Some({value})"),
+        Some(SerializableValue::Boolean(value)) => format!("Some({value})"),
         None => "None".to_string(),
     }
 }

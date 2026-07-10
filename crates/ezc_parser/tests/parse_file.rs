@@ -1,5 +1,5 @@
 use ezc_parser::{
-    parse_file, ParseSeverity, ParsedEventHandler, ParsedJsxChild, ParsedStateInitialValue,
+    parse_file, ParseSeverity, ParsedEventHandler, ParsedJsxChild, ParsedSerializableValue,
     ParsedStateOperation,
 };
 
@@ -28,7 +28,7 @@ fn parses_counter_fixture() {
     );
     assert_eq!(
         class.properties[0].state_initial_value,
-        Some(ParsedStateInitialValue::Number("0".to_string()))
+        Some(ParsedSerializableValue::Number("0".to_string()))
     );
 
     let method_names = class
@@ -93,7 +93,7 @@ fn parses_string_state_literal_without_source_quotes() {
     );
     assert_eq!(
         class.properties[0].state_initial_value,
-        Some(ParsedStateInitialValue::String(
+        Some(ParsedSerializableValue::String(
             "Austin & <Zero>".to_string()
         ))
     );
@@ -112,12 +112,12 @@ fn parses_boolean_state_literals() {
     assert_eq!(class.properties[0].name, "enabled");
     assert_eq!(
         class.properties[0].state_initial_value,
-        Some(ParsedStateInitialValue::Boolean(true))
+        Some(ParsedSerializableValue::Boolean(true))
     );
     assert_eq!(class.properties[1].name, "disabled");
     assert_eq!(
         class.properties[1].state_initial_value,
-        Some(ParsedStateInitialValue::Boolean(false))
+        Some(ParsedSerializableValue::Boolean(false))
     );
 }
 
@@ -134,7 +134,7 @@ fn parses_null_state_literal() {
     assert_eq!(class.properties[0].name, "selection");
     assert_eq!(
         class.properties[0].state_initial_value,
-        Some(ParsedStateInitialValue::Null)
+        Some(ParsedSerializableValue::Null)
     );
 }
 

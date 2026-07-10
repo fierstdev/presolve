@@ -16,7 +16,7 @@ pub mod template_manifest;
 
 pub use component_graph::{
     build_component_graph, ComponentAction, ComponentDiagnostic, ComponentGraph, ComponentMethod,
-    ComponentNode, RenderChild, RenderEventHandler, RenderModel, StateField, StateInitialValue,
+    ComponentNode, RenderChild, RenderEventHandler, RenderModel, SerializableValue, StateField,
     StateOperation,
 };
 pub use explain::{explain_json, explain_text};
@@ -140,7 +140,7 @@ class Counter extends Component {
         assert_eq!(component.state_fields[0].name, "count");
         assert_eq!(
             component.state_fields[0].initial_value,
-            Some(StateInitialValue::Number("0".to_string()))
+            Some(SerializableValue::Number("0".to_string()))
         );
 
         let method_names = component
@@ -333,7 +333,7 @@ class Counter extends Component {
 
         assert_eq!(
             component.state_fields[0].initial_value,
-            Some(StateInitialValue::String("Austin & <Zero>".to_string()))
+            Some(SerializableValue::String("Austin & <Zero>".to_string()))
         );
 
         let template_graph = build_template_graph(&component_graph);
@@ -356,7 +356,7 @@ class Counter extends Component {
                 ManifestNode::Binding {
                     id: "n1".to_string(),
                     expression: "this.name".to_string(),
-                    initial_value: Some(StateInitialValue::String("Austin & <Zero>".to_string())),
+                    initial_value: Some(SerializableValue::String("Austin & <Zero>".to_string())),
                 }
             ]
         );
@@ -386,11 +386,11 @@ class Counter extends Component {
 
         assert_eq!(
             component.state_fields[0].initial_value,
-            Some(StateInitialValue::Boolean(true))
+            Some(SerializableValue::Boolean(true))
         );
         assert_eq!(
             component.state_fields[1].initial_value,
-            Some(StateInitialValue::Boolean(false))
+            Some(SerializableValue::Boolean(false))
         );
 
         let template_graph = build_template_graph(&component_graph);
@@ -417,7 +417,7 @@ class Counter extends Component {
                 ManifestNode::Binding {
                     id: "n2".to_string(),
                     expression: "this.enabled".to_string(),
-                    initial_value: Some(StateInitialValue::Boolean(true)),
+                    initial_value: Some(SerializableValue::Boolean(true)),
                 },
                 ManifestNode::Element {
                     id: "n3".to_string(),
@@ -426,7 +426,7 @@ class Counter extends Component {
                 ManifestNode::Binding {
                     id: "n4".to_string(),
                     expression: "this.disabled".to_string(),
-                    initial_value: Some(StateInitialValue::Boolean(false)),
+                    initial_value: Some(SerializableValue::Boolean(false)),
                 }
             ]
         );
@@ -460,7 +460,7 @@ class Counter extends Component {
 
         assert_eq!(
             component.state_fields[0].initial_value,
-            Some(StateInitialValue::Null)
+            Some(SerializableValue::Null)
         );
 
         let template_graph = build_template_graph(&component_graph);
@@ -483,7 +483,7 @@ class Counter extends Component {
                 ManifestNode::Binding {
                     id: "n1".to_string(),
                     expression: "this.selection".to_string(),
-                    initial_value: Some(StateInitialValue::Null),
+                    initial_value: Some(SerializableValue::Null),
                 }
             ]
         );
@@ -541,7 +541,7 @@ class Counter extends Component {
                 TemplateChild::Binding {
                     id: TemplateNodeId("n1".to_string()),
                     expression: "this.count".to_string(),
-                    initial_value: Some(StateInitialValue::Number("0".to_string())),
+                    initial_value: Some(SerializableValue::Number("0".to_string())),
                 },
             ]
         );
@@ -577,7 +577,7 @@ class Counter extends Component {
                 ManifestNode::Binding {
                     id: "n2".to_string(),
                     expression: "this.count".to_string(),
-                    initial_value: Some(StateInitialValue::Number("0".to_string())),
+                    initial_value: Some(SerializableValue::Number("0".to_string())),
                 }
             ]
         );

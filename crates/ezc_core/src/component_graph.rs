@@ -1,7 +1,7 @@
 use serde::Serialize;
 
 use ezc_parser::{
-    ParsedClass, ParsedEventHandler, ParsedFile, ParsedJsxChild, ParsedStateInitialValue,
+    ParsedClass, ParsedEventHandler, ParsedFile, ParsedJsxChild, ParsedSerializableValue,
     ParsedStateOperation,
 };
 
@@ -25,19 +25,19 @@ pub struct ComponentNode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StateField {
     pub name: String,
-    pub initial_value: Option<StateInitialValue>,
+    pub initial_value: Option<SerializableValue>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(untagged)]
-pub enum StateInitialValue {
+pub enum SerializableValue {
     Null,
     Number(String),
     String(String),
     Boolean(bool),
 }
 
-impl StateInitialValue {
+impl SerializableValue {
     pub fn render_text(&self) -> String {
         match self {
             Self::Null => String::new(),
@@ -144,7 +144,7 @@ fn build_component_node(
             initial_value: property
                 .state_initial_value
                 .as_ref()
-                .map(state_initial_value_from_parsed),
+                .map(serializable_value_from_parsed),
         })
         .collect::<Vec<_>>();
 
@@ -276,12 +276,12 @@ fn state_operation_from_parsed(operation: &ParsedStateOperation) -> StateOperati
     }
 }
 
-fn state_initial_value_from_parsed(value: &ParsedStateInitialValue) -> StateInitialValue {
+fn serializable_value_from_parsed(value: &ParsedSerializableValue) -> SerializableValue {
     match value {
-        ParsedStateInitialValue::Null => StateInitialValue::Null,
-        ParsedStateInitialValue::Number(value) => StateInitialValue::Number(value.clone()),
-        ParsedStateInitialValue::String(value) => StateInitialValue::String(value.clone()),
-        ParsedStateInitialValue::Boolean(value) => StateInitialValue::Boolean(*value),
+        ParsedSerializableValue::Null => SerializableValue::Null,
+        ParsedSerializableValue::Number(value) => SerializableValue::Number(value.clone()),
+        ParsedSerializableValue::String(value) => SerializableValue::String(value.clone()),
+        ParsedSerializableValue::Boolean(value) => SerializableValue::Boolean(*value),
     }
 }
 

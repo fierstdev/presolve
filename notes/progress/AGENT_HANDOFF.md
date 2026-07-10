@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: ci: allow Chrome e2e on GitHub runners
+* Latest commit: compiler: stabilize serializable value model
 * Working tree: clean after committing this slice
-* Date: 2026-07-09 19:26:45 PDT
+* Date: 2026-07-09 19:31:32 PDT
 
 Last completed slice
 
-* Slice: CI repair after 6E-C
-* Summary: GitHub Actions Chrome e2e failed because hosted runners report `No usable sandbox!`; the browser harness now adds CI-only Chrome sandbox flags.
-* Key files: crates/ezc_cli/tests/runtime_browser.rs
-* New behavior: Chrome browser probes use shared launch argument construction and add `--no-sandbox` plus `--disable-dev-shm-usage` only when `CI` is present.
-* Tests added or changed: no new tests; the existing browser suite was run locally with and without `CI=true`.
+* Slice: 6E-D - Typed serializable value model
+* Summary: Renamed/refined the temporary initial-state scalar types into the roadmap's serializable value model.
+* Key files: crates/ezc_parser/src/model.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/template_manifest.rs, crates/ezc_cli/src/main.rs
+* New behavior: Parser state initializers now expose `ParsedSerializableValue`, and core/template/manifest/HTML/CLI paths use `SerializableValue { Null, Boolean(bool), Number(String), String(String) }`.
+* Tests added or changed: existing parser, core, CLI fixture, and browser tests now assert the stabilized type names without fixture output churn.
 * Fixtures added or changed: None
 
 Current in-progress slice
 
-* Slice: 6E-D - Typed serializable value model
+* Slice: 6F-A - Decrement mutation operation
 * Status: Not started
 * Completed: None
-* Remaining: Rename/refine the temporary initial-state scalar type into the roadmap's compiler-owned `SerializableValue { Null, Boolean(bool), Number(String), String(String) }` model and ensure parser, manifest, HTML, and browser tests continue to assert end-to-end type retention.
+* Remaining: Recognize `this.<field>--`, add `StateOperation::Decrement`, serialize the operation through the manifest, and execute it in the browser runtime.
 
 Verification
 
@@ -38,22 +38,22 @@ Verification
 
 Architecture decisions made
 
-* Decision: Add Chrome `--no-sandbox` only under `CI`.
-* Reason: GitHub runners need the flag for the installed Chrome binary, while local browser tests should keep stricter default sandbox behavior where available.
-* Tradeoff: The GitHub hosted environment still needs a push to confirm the repair end to end.
-* Follow-up: If hosted CI still fails, inspect the next logs before changing runtime behavior; the compiler/browser probes passed locally.
+* Decision: Keep the parser type named `ParsedSerializableValue` and the compiler-owned type named `SerializableValue`.
+* Reason: The parser still reports parsed source facts, while core owns the compiler/runtime value contract that flows into templates, manifests, HTML, and browser initialization.
+* Tradeoff: Number literals still serialize with the existing raw-string representation until a later value-model decision changes numeric manifest semantics.
+* Follow-up: Use `SerializableValue` for typed operands introduced by later mutation slices instead of adding operation-specific scalar types.
 
 Known limitations
 
 * Item: Only `this.<field>++` is recognized as an action. `this.count += 1`, decrement, assignment, and multi-step plans are intentionally deferred.
 * Item: The browser runtime supports only delegated click events, increment actions, numeric/string/boolean/null initial state, and binding callback text updates.
-* Item: The serializable value model is still scalar-only until later array/object slices.
+* Item: The serializable value model is still primitive-only until later array/object slices.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 
 Exact next step
 
-Start Slice 6E-D by renaming/refining `ParsedStateInitialValue` and `StateInitialValue` toward a compiler-owned `SerializableValue` model, preserving the current JSON semantics for null/boolean/number/string fixtures and keeping the browser gate green.
+Start Slice 6F-A by adding decrement support for `this.<field>--`: parser extraction, component action conversion, manifest serialization, runtime execution, fixture coverage, and a browser assertion.
 
 Useful commands
 
