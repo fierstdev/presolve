@@ -31,6 +31,7 @@ pub struct StateField {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(untagged)]
 pub enum StateInitialValue {
+    Null,
     Number(String),
     String(String),
     Boolean(bool),
@@ -39,6 +40,7 @@ pub enum StateInitialValue {
 impl StateInitialValue {
     pub fn render_text(&self) -> String {
         match self {
+            Self::Null => String::new(),
             Self::Number(value) | Self::String(value) => value.clone(),
             Self::Boolean(value) => value.to_string(),
         }
@@ -276,6 +278,7 @@ fn state_operation_from_parsed(operation: &ParsedStateOperation) -> StateOperati
 
 fn state_initial_value_from_parsed(value: &ParsedStateInitialValue) -> StateInitialValue {
     match value {
+        ParsedStateInitialValue::Null => StateInitialValue::Null,
         ParsedStateInitialValue::Number(value) => StateInitialValue::Number(value.clone()),
         ParsedStateInitialValue::String(value) => StateInitialValue::String(value.clone()),
         ParsedStateInitialValue::Boolean(value) => StateInitialValue::Boolean(*value),

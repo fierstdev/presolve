@@ -1,0 +1,10 @@
+File: fixtures/0008-null-state/input/NullSelection.tsx
+TemplateGraph:
+  templates:
+    template NullSelection
+      root: <p> id=n0
+      attributes:
+        data-ez-bindings = bindings(this.selection)
+      children:
+        Text("Selection:")
+        Binding id=n1 expression="this.selection" initial=Some(null)

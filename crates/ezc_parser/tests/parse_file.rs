@@ -122,6 +122,23 @@ fn parses_boolean_state_literals() {
 }
 
 #[test]
+fn parses_null_state_literal() {
+    let source = include_str!("../../../fixtures/0008-null-state/input/NullSelection.tsx");
+
+    let parsed = parse_file("fixtures/0008-null-state/input/NullSelection.tsx", source);
+
+    assert!(parsed.diagnostics.is_empty());
+
+    let class = parsed.classes.first().expect("expected class");
+    assert_eq!(class.properties.len(), 1);
+    assert_eq!(class.properties[0].name, "selection");
+    assert_eq!(
+        class.properties[0].state_initial_value,
+        Some(ParsedStateInitialValue::Null)
+    );
+}
+
+#[test]
 fn reports_broken_tsx_diagnostic() {
     let source = include_str!("../../../fixtures/0002-broken-tsx/input/BrokenCounter.tsx");
 

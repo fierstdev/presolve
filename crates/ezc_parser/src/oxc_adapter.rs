@@ -370,6 +370,7 @@ fn state_initial_value(expression: &Expression<'_>) -> Option<ParsedStateInitial
 
 fn state_argument_literal(argument: &Argument<'_>) -> Option<ParsedStateInitialValue> {
     match argument {
+        Argument::NullLiteral(_) => Some(ParsedStateInitialValue::Null),
         Argument::NumericLiteral(literal) => literal
             .raw
             .as_ref()

@@ -446,6 +446,59 @@ class Counter extends Component {
     }
 
     #[test]
+    fn preserves_null_state_literals_in_template_outputs() {
+        let source = include_str!("../../../fixtures/0008-null-state/input/NullSelection.tsx");
+
+        let parsed =
+            ezc_parser::parse_file("fixtures/0008-null-state/input/NullSelection.tsx", source);
+
+        let component_graph = build_component_graph(&parsed);
+        let component = component_graph
+            .components
+            .first()
+            .expect("expected component");
+
+        assert_eq!(
+            component.state_fields[0].initial_value,
+            Some(StateInitialValue::Null)
+        );
+
+        let template_graph = build_template_graph(&component_graph);
+        let html = generate_static_html(&template_graph);
+
+        assert_eq!(
+            html,
+            "<p data-ez-node=\"n0\" data-ez-bindings=\"this.selection\">Selection:<!-- ez-binding:n1:this.selection --></p>\n"
+        );
+
+        let manifest = build_template_manifest(&component_graph, &template_graph);
+
+        assert_eq!(
+            manifest.components[0].template.nodes,
+            vec![
+                ManifestNode::Element {
+                    id: "n0".to_string(),
+                    tag: "p".to_string(),
+                },
+                ManifestNode::Binding {
+                    id: "n1".to_string(),
+                    expression: "this.selection".to_string(),
+                    initial_value: Some(StateInitialValue::Null),
+                }
+            ]
+        );
+
+        let manifest_json = template_manifest_json(&manifest);
+        let manifest_value: serde_json::Value =
+            serde_json::from_str(&manifest_json).expect("manifest JSON should parse");
+
+        assert_eq!(
+            manifest_value["components"][0]["template"]["nodes"][1]["initial_value"],
+            serde_json::Value::Null
+        );
+    }
+
+    #[test]
     fn builds_template_graph_from_component_graph() {
         let source = include_str!("../../../fixtures/0001-source-summary/input/Counter.tsx");
 

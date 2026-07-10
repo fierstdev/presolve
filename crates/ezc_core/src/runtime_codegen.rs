@@ -104,6 +104,10 @@ const RUNTIME_STUB: &str = r#"(() => {
     return `${componentName}:${method}`;
   }
 
+  function formatBindingValue(value) {
+    return value === null ? "" : String(value);
+  }
+
   function createRuntimeStore(elementsByNode) {
     return {
       components: new Map(),
@@ -235,7 +239,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         continue;
       }
 
-      if (node.initial_value !== null && component.state[field] === undefined) {
+      if (component.state[field] === undefined) {
         component.state[field] = node.initial_value;
       }
 
@@ -260,7 +264,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       }
 
       registerBinding(store, component, field, (value) => {
-        textNode.textContent = String(value);
+        textNode.textContent = formatBindingValue(value);
       });
     }
 
@@ -436,6 +440,8 @@ mod tests {
         assert!(runtime.contains("readField"));
         assert!(runtime.contains("writeField"));
         assert!(runtime.contains("notifyField"));
+        assert!(runtime.contains("formatBindingValue"));
+        assert!(runtime.contains("value === null ? \"\" : String(value)"));
         assert!(runtime.contains("component.state[field] = node.initial_value"));
         assert!(!runtime.contains("component.state[field] = Number(node.initial_value)"));
         assert!(runtime.contains("installDelegatedEventListeners"));

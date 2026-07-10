@@ -33,6 +33,7 @@ pub struct ParsedProperty {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParsedStateInitialValue {
+    Null,
     Number(String),
     String(String),
     Boolean(bool),

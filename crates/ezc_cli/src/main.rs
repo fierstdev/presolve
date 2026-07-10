@@ -621,6 +621,7 @@ fn print_template_child(child: &TemplateChild, indent: usize) {
 
 fn format_state_initial_value(value: Option<&StateInitialValue>) -> String {
     match value {
+        Some(StateInitialValue::Null) => "Some(null)".to_string(),
         Some(StateInitialValue::Number(value) | StateInitialValue::String(value)) => {
             format!("Some({value:?})")
         }
