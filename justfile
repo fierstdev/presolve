@@ -1,4 +1,4 @@
-# Install `just` later if desired. These commands are intentionally simple.
+# Repository task recipes. These commands are intentionally simple.
 
 check:
     cargo fmt --all --check

@@ -420,6 +420,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 })();
 "#;
 
+#[must_use]
 pub fn generate_runtime_stub() -> String {
     RUNTIME_STUB.to_string()
 }

@@ -1,5 +1,6 @@
 use crate::template_manifest::{template_manifest_json, TemplateManifest};
 
+#[must_use]
 pub fn generate_standalone_page(
     title: &str,
     body_html: &str,

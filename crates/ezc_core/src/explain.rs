@@ -4,6 +4,7 @@ use crate::model::{
     ClassSummary, DecoratorSummary, Diagnostic, RenderMethodSummary, Severity, SourceSummary, Span,
 };
 
+#[must_use]
 pub fn explain_text(summary: &SourceSummary) -> String {
     let mut output = String::new();
 
@@ -87,6 +88,7 @@ pub fn explain_text(summary: &SourceSummary) -> String {
     output
 }
 
+#[must_use]
 pub fn explain_json(summary: &SourceSummary) -> String {
     // Manual JSON keeps the first slice dependency-free. Replace this with serde
     // once the schema is stable enough to deserve a dependency.

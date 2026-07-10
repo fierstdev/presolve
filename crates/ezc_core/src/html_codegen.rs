@@ -2,6 +2,7 @@ use crate::template_graph::{
     AttributeValue, ElementNode, TemplateAttribute, TemplateChild, TemplateGraph,
 };
 
+#[must_use]
 pub fn generate_static_html(template_graph: &TemplateGraph) -> String {
     let mut output = String::new();
 

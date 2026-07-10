@@ -1,7 +1,7 @@
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::rc::Rc;
 
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
@@ -79,7 +79,7 @@ fn main() {
 }
 
 fn run_swc(path: &Path, source: &str) {
-    let source_map = Arc::new(SourceMap::default());
+    let source_map = Rc::new(SourceMap::default());
     let file = source_map.new_source_file(
         FileName::Real(path.to_path_buf()).into(),
         source.to_string(),

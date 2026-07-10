@@ -1,7 +1,7 @@
 use std::env;
 use std::fs;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process;
 
 use ezc_core::{
@@ -10,7 +10,7 @@ use ezc_core::{
     summarize_source, template_manifest_json, AttributeValue, ComponentGraph, SerializableValue,
     StateOperation, TemplateChild, TemplateGraph,
 };
-use ezc_parser::{parse_file, ParseSeverity, ParsedFile};
+use ezc_parser::{parse_file, ParseSeverity, ParsedClass, ParsedFile, ParsedMethod};
 
 fn main() {
     let mut args = env::args().skip(1).collect::<Vec<_>>();
@@ -203,11 +203,10 @@ fn run_parse(mut args: Vec<String>) {
 }
 
 fn page_title_from_graph(graph: &TemplateGraph) -> String {
-    graph
-        .templates
-        .first()
-        .map(|template| template.component_name.clone())
-        .unwrap_or_else(|| "EdgeZero App".to_string())
+    graph.templates.first().map_or_else(
+        || "EdgeZero App".to_string(),
+        |template| template.component_name.clone(),
+    )
 }
 
 fn parse_format(args: &[String]) -> String {
@@ -222,7 +221,7 @@ fn parse_format(args: &[String]) -> String {
                     process::exit(1);
                 };
 
-                format = value.clone();
+                format.clone_from(value);
                 index += 2;
             }
             unknown => {
@@ -262,7 +261,11 @@ fn parse_out_dir(args: &[String]) -> PathBuf {
 
 fn print_parsed_file(parsed: &ParsedFile) {
     println!("File: {}", parsed.path.display());
+    print_parse_diagnostics(parsed);
+    print_parsed_classes(parsed);
+}
 
+fn print_parse_diagnostics(parsed: &ParsedFile) {
     println!("Diagnostics:");
     if parsed.diagnostics.is_empty() {
         println!("  none");
@@ -282,7 +285,9 @@ fn print_parsed_file(parsed: &ParsedFile) {
             }
         }
     }
+}
 
+fn print_parsed_classes(parsed: &ParsedFile) {
     println!();
     println!("Classes:");
     if parsed.classes.is_empty() {
@@ -291,111 +296,129 @@ fn print_parsed_file(parsed: &ParsedFile) {
     }
 
     for class in &parsed.classes {
-        println!(
-            "  class {} at {}:{}",
-            class.name, class.span.line, class.span.column
-        );
+        print_parsed_class(class);
+    }
+}
 
-        println!("    decorators:");
-        if class.decorators.is_empty() {
-            println!("      none");
-        } else {
-            for decorator in &class.decorators {
-                match &decorator.argument {
-                    Some(argument) => {
-                        println!(
-                            "      @{}({argument:?}) at {}:{}",
-                            decorator.name, decorator.span.line, decorator.span.column
-                        );
-                    }
-                    None => {
-                        println!(
-                            "      @{} at {}:{}",
-                            decorator.name, decorator.span.line, decorator.span.column
-                        );
-                    }
+fn print_parsed_class(class: &ParsedClass) {
+    println!(
+        "  class {} at {}:{}",
+        class.name, class.span.line, class.span.column
+    );
+
+    print_parsed_decorators(class);
+    print_parsed_properties(class);
+    print_parsed_methods(&class.methods);
+}
+
+fn print_parsed_decorators(class: &ParsedClass) {
+    println!("    decorators:");
+    if class.decorators.is_empty() {
+        println!("      none");
+    } else {
+        for decorator in &class.decorators {
+            match &decorator.argument {
+                Some(argument) => {
+                    println!(
+                        "      @{}({argument:?}) at {}:{}",
+                        decorator.name, decorator.span.line, decorator.span.column
+                    );
                 }
-            }
-        }
-
-        println!("    properties:");
-        if class.properties.is_empty() {
-            println!("      none");
-        } else {
-            for property in &class.properties {
-                match &property.initializer {
-                    Some(initializer) => {
-                        println!(
-                            "      {} = {} at {}:{}",
-                            property.name, initializer, property.span.line, property.span.column
-                        );
-                    }
-                    None => {
-                        println!(
-                            "      {} at {}:{}",
-                            property.name, property.span.line, property.span.column
-                        );
-                    }
-                }
-            }
-        }
-
-        println!("    methods:");
-        if class.methods.is_empty() {
-            println!("      none");
-        } else {
-            for method in &class.methods {
-                println!(
-                    "      {} at {}:{}",
-                    method.name, method.span.line, method.span.column
-                );
-
-                if method.jsx_roots.is_empty() {
-                    println!("        jsx roots: none");
-                } else {
-                    for jsx in &method.jsx_roots {
-                        println!(
-                            "        jsx root <{}> at {}:{}",
-                            jsx.name, jsx.span.line, jsx.span.column
-                        );
-
-                        if jsx.attributes.is_empty() {
-                            println!("          attributes: none");
-                        } else {
-                            println!("          attributes: {}", jsx.attributes.join(", "));
-                        }
-
-                        if jsx.event_handlers.is_empty() {
-                            println!("          event handlers: none");
-                        } else {
-                            println!(
-                                "          event handlers: {}",
-                                format_parsed_event_handlers(&jsx.event_handlers).join(", ")
-                            );
-                        }
-
-                        if jsx.children.is_empty() {
-                            println!("          children: none");
-                        } else {
-                            println!("          children:");
-                            for child in &jsx.children {
-                                println!("            {:?}", child);
-                            }
-                        }
-                    }
-                }
-
-                if method.bindings.is_empty() {
-                    println!("        bindings: none");
-                } else {
-                    println!("        bindings: {}", method.bindings.join(", "));
+                None => {
+                    println!(
+                        "      @{} at {}:{}",
+                        decorator.name, decorator.span.line, decorator.span.column
+                    );
                 }
             }
         }
     }
 }
 
-fn print_component_graph(path: &PathBuf, graph: &ComponentGraph) {
+fn print_parsed_properties(class: &ParsedClass) {
+    println!("    properties:");
+    if class.properties.is_empty() {
+        println!("      none");
+    } else {
+        for property in &class.properties {
+            match &property.initializer {
+                Some(initializer) => {
+                    println!(
+                        "      {} = {} at {}:{}",
+                        property.name, initializer, property.span.line, property.span.column
+                    );
+                }
+                None => {
+                    println!(
+                        "      {} at {}:{}",
+                        property.name, property.span.line, property.span.column
+                    );
+                }
+            }
+        }
+    }
+}
+
+fn print_parsed_methods(methods: &[ParsedMethod]) {
+    println!("    methods:");
+    if methods.is_empty() {
+        println!("      none");
+    } else {
+        for method in methods {
+            print_parsed_method(method);
+        }
+    }
+}
+
+fn print_parsed_method(method: &ParsedMethod) {
+    println!(
+        "      {} at {}:{}",
+        method.name, method.span.line, method.span.column
+    );
+
+    if method.jsx_roots.is_empty() {
+        println!("        jsx roots: none");
+    } else {
+        for jsx in &method.jsx_roots {
+            println!(
+                "        jsx root <{}> at {}:{}",
+                jsx.name, jsx.span.line, jsx.span.column
+            );
+
+            if jsx.attributes.is_empty() {
+                println!("          attributes: none");
+            } else {
+                println!("          attributes: {}", jsx.attributes.join(", "));
+            }
+
+            if jsx.event_handlers.is_empty() {
+                println!("          event handlers: none");
+            } else {
+                println!(
+                    "          event handlers: {}",
+                    format_parsed_event_handlers(&jsx.event_handlers).join(", ")
+                );
+            }
+
+            if jsx.children.is_empty() {
+                println!("          children: none");
+            } else {
+                println!("          children:");
+                for child in &jsx.children {
+                    println!("            {child:?}");
+                }
+            }
+        }
+    }
+
+    if method.bindings.is_empty() {
+        println!("        bindings: none");
+    } else {
+        println!("        bindings: {}", method.bindings.join(", "));
+    }
+}
+
+fn print_component_graph(path: &Path, graph: &ComponentGraph) {
     println!("File: {}", path.display());
 
     println!("ComponentGraph:");
@@ -486,7 +509,7 @@ fn print_component_graph(path: &PathBuf, graph: &ComponentGraph) {
                 } else {
                     println!("        children:");
                     for child in &render.children {
-                        println!("          {:?}", child);
+                        println!("          {child:?}");
                     }
                 }
 
@@ -523,7 +546,7 @@ fn format_render_event_handlers(event_handlers: &[ezc_core::RenderEventHandler])
         .collect()
 }
 
-fn print_template_graph(path: &PathBuf, graph: &TemplateGraph) {
+fn print_template_graph(path: &Path, graph: &TemplateGraph) {
     println!("File: {}", path.display());
 
     println!("TemplateGraph:");

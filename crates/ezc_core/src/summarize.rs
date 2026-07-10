@@ -27,7 +27,7 @@ pub fn summarize_source(path: impl AsRef<Path>, source: &str) -> SourceSummary {
     let class_declarations = find_class_declarations(source);
     let render_methods = find_render_methods(source);
     let has_tsx_like_syntax =
-        source.contains("<") && source.contains(">") && source.contains("render");
+        source.contains('<') && source.contains('>') && source.contains("render");
 
     if component_decorators.is_empty() {
         diagnostics.push(Diagnostic {

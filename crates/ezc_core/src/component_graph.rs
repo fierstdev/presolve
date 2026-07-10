@@ -38,6 +38,7 @@ pub enum SerializableValue {
 }
 
 impl SerializableValue {
+    #[must_use]
     pub fn render_text(&self) -> String {
         match self {
             Self::Null => String::new(),
@@ -100,6 +101,7 @@ pub struct ComponentDiagnostic {
     pub message: String,
 }
 
+#[must_use]
 pub fn build_component_graph(parsed: &ParsedFile) -> ComponentGraph {
     let mut components = Vec::new();
     let mut diagnostics = Vec::new();
@@ -206,56 +208,8 @@ fn build_component_node(
     }
 
     if let Some(render) = &render {
-        let property_names = class
-            .properties
-            .iter()
-            .map(|property| property.name.as_str())
-            .collect::<Vec<_>>();
-
-        let method_names = class
-            .methods
-            .iter()
-            .map(|method| method.name.as_str())
-            .collect::<Vec<_>>();
-
-        for binding in &render.bindings {
-            if let Some(name) = this_member_name(binding) {
-                if !property_names.contains(&name) {
-                    diagnostics.push(ComponentDiagnostic {
-                        code: "EZC1003".to_string(),
-                        message: format!(
-                            "render binding `{binding}` references unknown field `{name}` in class `{}`",
-                            class.name
-                        ),
-                    });
-                }
-            }
-        }
-
-        for event_handler in render_event_handlers(render) {
-            if event_handler.event != "click" {
-                diagnostics.push(ComponentDiagnostic {
-                    code: "EZC1005".to_string(),
-                    message: format!(
-                        "event `{}` is not supported yet in class `{}`",
-                        event_handler.event, class.name
-                    ),
-                });
-            }
-
-            if let Some(name) = this_member_name(&event_handler.handler) {
-                if !method_names.contains(&name) {
-                    diagnostics.push(ComponentDiagnostic {
-                        code: "EZC1004".to_string(),
-                        message: format!(
-                            "event handler `{}` references unknown method `{name}` in class `{}`",
-                            event_handler.handler, class.name
-                        ),
-                    });
-                }
-            }
-        }
-
+        collect_render_binding_diagnostics(class, render, diagnostics);
+        collect_render_event_diagnostics(class, render, diagnostics);
         collect_duplicate_event_diagnostics(render, &class.name, diagnostics);
     }
 
@@ -267,6 +221,68 @@ fn build_component_node(
         methods,
         actions,
         render,
+    }
+}
+
+fn collect_render_binding_diagnostics(
+    class: &ParsedClass,
+    render: &RenderModel,
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+) {
+    let property_names = class
+        .properties
+        .iter()
+        .map(|property| property.name.as_str())
+        .collect::<Vec<_>>();
+
+    for binding in &render.bindings {
+        if let Some(name) = this_member_name(binding) {
+            if !property_names.contains(&name) {
+                diagnostics.push(ComponentDiagnostic {
+                    code: "EZC1003".to_string(),
+                    message: format!(
+                        "render binding `{binding}` references unknown field `{name}` in class `{}`",
+                        class.name
+                    ),
+                });
+            }
+        }
+    }
+}
+
+fn collect_render_event_diagnostics(
+    class: &ParsedClass,
+    render: &RenderModel,
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+) {
+    let method_names = class
+        .methods
+        .iter()
+        .map(|method| method.name.as_str())
+        .collect::<Vec<_>>();
+
+    for event_handler in render_event_handlers(render) {
+        if event_handler.event != "click" {
+            diagnostics.push(ComponentDiagnostic {
+                code: "EZC1005".to_string(),
+                message: format!(
+                    "event `{}` is not supported yet in class `{}`",
+                    event_handler.event, class.name
+                ),
+            });
+        }
+
+        if let Some(name) = this_member_name(&event_handler.handler) {
+            if !method_names.contains(&name) {
+                diagnostics.push(ComponentDiagnostic {
+                    code: "EZC1004".to_string(),
+                    message: format!(
+                        "event handler `{}` references unknown method `{name}` in class `{}`",
+                        event_handler.handler, class.name
+                    ),
+                });
+            }
+        }
     }
 }
 

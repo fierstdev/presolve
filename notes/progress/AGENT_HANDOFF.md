@@ -3,17 +3,17 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: stabilize serializable value model
+* Latest commit: chore: clear verification gates
 * Working tree: clean after committing this slice
-* Date: 2026-07-09 19:31:32 PDT
+* Date: 2026-07-09 19:42:36 PDT
 
 Last completed slice
 
-* Slice: 6E-D - Typed serializable value model
-* Summary: Renamed/refined the temporary initial-state scalar types into the roadmap's serializable value model.
-* Key files: crates/ezc_parser/src/model.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/template_manifest.rs, crates/ezc_cli/src/main.rs
-* New behavior: Parser state initializers now expose `ParsedSerializableValue`, and core/template/manifest/HTML/CLI paths use `SerializableValue { Null, Boolean(bool), Number(String), String(String) }`.
-* Tests added or changed: existing parser, core, CLI fixture, and browser tests now assert the stabilized type names without fixture output churn.
+* Slice: Verification cleanup after 6E-D
+* Summary: Cleared the stale local verification exceptions for `just e2e` and clippy with warnings-as-errors.
+* Key files: crates/ezc_cli/src/main.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_manifest.rs, crates/ezc_parser_spike/src/main.rs, justfile
+* New behavior: `cargo clippy --workspace --all-targets -- -D warnings` passes, and `just e2e` was run directly through the repository recipe.
+* Tests added or changed: no fixture behavior changed; helper refactors and clippy annotations only.
 * Fixtures added or changed: None
 
 Current in-progress slice
@@ -31,17 +31,17 @@ Verification
 * cargo test -p ezc_cli --test explain: pass
 * cargo test -p ezc_cli --test runtime_browser -- --nocapture: pass
 * CI=true cargo test -p ezc_cli --test runtime_browser -- --nocapture: pass
+* cargo clippy --workspace --all-targets -- -D warnings: pass
 * cargo test --workspace: pass
 * pnpm test:e2e: pass
-* just e2e: not run locally because `just` is not installed in this shell
-* Known failures: `cargo clippy --workspace --all-targets -- -D warnings` still fails on pre-existing warnings outside this slice, so the new CI workflow intentionally does not add a clippy gate yet.
+* just e2e: pass
 
 Architecture decisions made
 
-* Decision: Keep the parser type named `ParsedSerializableValue` and the compiler-owned type named `SerializableValue`.
-* Reason: The parser still reports parsed source facts, while core owns the compiler/runtime value contract that flows into templates, manifests, HTML, and browser initialization.
-* Tradeoff: Number literals still serialize with the existing raw-string representation until a later value-model decision changes numeric manifest semantics.
-* Follow-up: Use `SerializableValue` for typed operands introduced by later mutation slices instead of adding operation-specific scalar types.
+* Decision: Keep browser e2e gates sequential when running multiple commands locally.
+* Reason: The browser tests use deterministic Chrome profile directories under `target/ezc-browser-test`, and parallel browser-suite invocations can contend on Chrome `SingletonLock` files.
+* Tradeoff: Sequential verification is a little slower but avoids false failures unrelated to compiler/runtime behavior.
+* Follow-up: If parallel browser-suite execution becomes necessary, make the profile root unique per process.
 
 Known limitations
 
@@ -62,7 +62,9 @@ Useful commands
 * `cargo test -p ezc_core`
 * `cargo test -p ezc_cli`
 * `cargo test -p ezc_cli --test runtime_browser -- --nocapture`
+* `cargo clippy --workspace --all-targets -- -D warnings`
 * `pnpm test:e2e`
+* `just e2e`
 * `cargo test --workspace`
 * `cargo run -p ezc_cli -- build fixtures/0005-double-binding-counter/input/DoubleBindingCounter.tsx --out target/ezc-manual/double-binding-counter`
 

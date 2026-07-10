@@ -57,6 +57,7 @@ pub enum ManifestOperation {
     Increment,
 }
 
+#[must_use]
 pub fn build_template_manifest(
     component_graph: &ComponentGraph,
     template_graph: &TemplateGraph,
@@ -70,6 +71,12 @@ pub fn build_template_manifest(
     }
 }
 
+/// Serialize a template manifest as pretty JSON.
+///
+/// # Panics
+///
+/// Panics if serde cannot serialize the compiler-owned manifest model.
+#[must_use]
 pub fn template_manifest_json(manifest: &TemplateManifest) -> String {
     serde_json::to_string_pretty(manifest).expect("template manifest should serialize")
 }

@@ -62,6 +62,7 @@ pub enum TemplateChild {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TemplateNodeId(pub String);
 
+#[must_use]
 pub fn build_template_graph(component_graph: &ComponentGraph) -> TemplateGraph {
     let mut ids = TemplateIdAllocator::default();
 

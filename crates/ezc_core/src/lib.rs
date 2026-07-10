@@ -1,4 +1,4 @@
-//! Core compiler data structures for the first EdgeZero learning slice.
+//! Core compiler data structures for the first `EdgeZero` learning slice.
 //!
 //! This crate deliberately does **not** parse TSX yet. It records a source summary,
 //! spans, obvious declarations, and diagnostics. That gives the project a stable
