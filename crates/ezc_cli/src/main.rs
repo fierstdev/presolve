@@ -365,12 +365,12 @@ fn print_parsed_file(parsed: &ParsedFile) {
                             println!("          attributes: {}", jsx.attributes.join(", "));
                         }
 
-                        if jsx.event_handler_refs.is_empty() {
+                        if jsx.event_handlers.is_empty() {
                             println!("          event handlers: none");
                         } else {
                             println!(
                                 "          event handlers: {}",
-                                jsx.event_handler_refs.join(", ")
+                                format_parsed_event_handlers(&jsx.event_handlers).join(", ")
                             );
                         }
 
@@ -472,12 +472,12 @@ fn print_component_graph(path: &PathBuf, graph: &ComponentGraph) {
                     println!("        attributes: {}", render.attributes.join(", "));
                 }
 
-                if render.event_handler_refs.is_empty() {
+                if render.event_handlers.is_empty() {
                     println!("        event handlers: none");
                 } else {
                     println!(
                         "        event handlers: {}",
-                        render.event_handler_refs.join(", ")
+                        format_render_event_handlers(&render.event_handlers).join(", ")
                     );
                 }
 
@@ -507,6 +507,20 @@ fn format_state_operation(operation: &StateOperation) -> &'static str {
     match operation {
         StateOperation::Increment => "increment",
     }
+}
+
+fn format_parsed_event_handlers(event_handlers: &[ezc_parser::ParsedEventHandler]) -> Vec<String> {
+    event_handlers
+        .iter()
+        .map(|event_handler| format!("{} -> {}", event_handler.event, event_handler.handler))
+        .collect()
+}
+
+fn format_render_event_handlers(event_handlers: &[ezc_core::RenderEventHandler]) -> Vec<String> {
+    event_handlers
+        .iter()
+        .map(|event_handler| format!("{} -> {}", event_handler.event, event_handler.handler))
+        .collect()
 }
 
 fn print_template_graph(path: &PathBuf, graph: &TemplateGraph) {
@@ -607,7 +621,9 @@ fn print_template_child(child: &TemplateChild, indent: usize) {
 fn format_attribute_value(value: &AttributeValue) -> String {
     match value {
         AttributeValue::Static(value) => format!("{value:?}"),
-        AttributeValue::EventHandler(handler) => format!("event-handler({handler})"),
+        AttributeValue::EventHandler { event, handler } => {
+            format!("event-handler({event} -> {handler})")
+        }
         AttributeValue::BindingList(bindings) => format!("bindings({})", bindings.join(", ")),
     }
 }

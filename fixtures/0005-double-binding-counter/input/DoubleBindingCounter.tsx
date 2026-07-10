@@ -7,11 +7,17 @@ class DoubleBindingCounter extends Component {
     this.count++;
   }
 
+  incrementAgain() {
+    this.count++;
+  }
+
   render() {
     return (
       <section>
         <button onClick={() => this.increment()}>
-          Count: {this.count}
+          <span>Count: {this.count}</span>
+        </button>
+        <button onClick={() => this.incrementAgain()}>
           Mirror: {this.count}
         </button>
       </section>

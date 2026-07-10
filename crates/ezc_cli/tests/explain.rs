@@ -490,7 +490,9 @@ fn build_command_writes_page_manifest_and_runtime_artifacts() {
     assert!(actual_runtime.contains("readField"));
     assert!(actual_runtime.contains("writeField"));
     assert!(actual_runtime.contains("notifyField"));
-    assert!(actual_runtime.contains("addEventListener(\"click\""));
+    assert!(actual_runtime.contains("installDelegatedEventListeners"));
+    assert!(actual_runtime.contains("document.addEventListener(eventType"));
+    assert!(!actual_runtime.contains("element.addEventListener(\"click\""));
     assert!(actual_runtime.contains("action.operation !== \"increment\""));
     assert!(actual_runtime.contains("dataset.ezRuntime"));
     assert!(actual_runtime.contains("edgezero:ready"));

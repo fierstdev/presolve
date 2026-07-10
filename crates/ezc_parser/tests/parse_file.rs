@@ -1,4 +1,6 @@
-use ezc_parser::{parse_file, ParseSeverity, ParsedJsxChild, ParsedStateOperation};
+use ezc_parser::{
+    parse_file, ParseSeverity, ParsedEventHandler, ParsedJsxChild, ParsedStateOperation,
+};
 
 #[test]
 fn parses_counter_fixture() {
@@ -46,8 +48,11 @@ fn parses_counter_fixture() {
     assert_eq!(render.jsx_roots[0].name, "button");
     assert_eq!(render.jsx_roots[0].attributes, vec!["onClick={...}"]);
     assert_eq!(
-        render.jsx_roots[0].event_handler_refs,
-        vec!["this.increment"]
+        render.jsx_roots[0].event_handlers,
+        vec![ParsedEventHandler {
+            event: "click".to_string(),
+            handler: "this.increment".to_string(),
+        }]
     );
     assert_eq!(
         render.jsx_roots[0].children,
@@ -130,7 +135,13 @@ fn parses_nested_jsx_fixture() {
 
     assert_eq!(button.name, "button");
     assert_eq!(button.attributes, vec!["onClick={...}"]);
-    assert_eq!(button.event_handler_refs, vec!["this.increment"]);
+    assert_eq!(
+        button.event_handlers,
+        vec![ParsedEventHandler {
+            event: "click".to_string(),
+            handler: "this.increment".to_string(),
+        }]
+    );
 
     assert_eq!(
         button.children,

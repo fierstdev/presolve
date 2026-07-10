@@ -109,6 +109,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       components: new Map(),
       bindingsByField: new Map(),
       actionsByMethod: new Map(),
+      eventsByType: new Map(),
       elementsByNode
     };
   }
@@ -172,6 +173,45 @@ const RUNTIME_STUB: &str = r#"(() => {
         action
       );
     }
+  }
+
+  function registerEvent(store, component, event) {
+    if (event.event !== "click") {
+      console.error(
+        "[EdgeZero] EZR_UNSUPPORTED_EVENT",
+        event
+      );
+      return;
+    }
+
+    const method = normalizeHandlerReference(event.handler);
+    const action = store.actionsByMethod.get(
+      componentMethodKey(component.name, method)
+    );
+
+    if (action === undefined) {
+      console.error(
+        "[EdgeZero] EZR_MISSING_ACTION",
+        event
+      );
+      return;
+    }
+
+    const eventsByNode = store.eventsByType.get(event.event) ?? new Map();
+
+    if (eventsByNode.has(event.node)) {
+      console.error(
+        "[EdgeZero] EZR_DUPLICATE_EVENT",
+        event
+      );
+      return;
+    }
+
+    eventsByNode.set(event.node, {
+      component,
+      action
+    });
+    store.eventsByType.set(event.event, eventsByNode);
   }
 
   function initializeComponentRuntime(store, manifestComponent, bindingAnchors) {
@@ -249,33 +289,52 @@ const RUNTIME_STUB: &str = r#"(() => {
     writeField(store, component, action.field, current + 1);
   }
 
-  function attachEventListeners(store, component) {
+  function registerComponentEvents(store, component) {
     for (const event of component.manifest.template?.events ?? []) {
-      const element = store.elementsByNode.get(event.node);
+      registerEvent(store, component, event);
+    }
+  }
 
-      if (element === undefined) {
-        console.error(
-          "[EdgeZero] EZR_MISSING_EVENT_ANCHOR",
-          event
-        );
-        continue;
+  function delegatedEventRecord(store, eventType, target) {
+    const eventsByNode = store.eventsByType.get(eventType);
+
+    if (eventsByNode === undefined) {
+      return null;
+    }
+
+    let current = target instanceof Element ? target : target?.parentElement;
+
+    while (current !== null && current !== undefined) {
+      const nodeId = current.dataset?.ezNode;
+
+      if (nodeId !== undefined) {
+        const record = eventsByNode.get(nodeId);
+
+        if (record !== undefined) {
+          return record;
+        }
       }
 
-      const method = normalizeHandlerReference(event.handler);
-      const action = store.actionsByMethod.get(
-        componentMethodKey(component.name, method)
-      );
+      current = current.parentElement;
+    }
 
-      if (action === undefined) {
-        console.error(
-          "[EdgeZero] EZR_MISSING_ACTION",
-          event
-        );
-        continue;
-      }
+    return null;
+  }
 
-      element.addEventListener("click", () => {
-        executeAction(store, component, action);
+  function dispatchDelegatedEvent(store, event) {
+    const record = delegatedEventRecord(store, event.type, event.target);
+
+    if (record === null) {
+      return;
+    }
+
+    executeAction(store, record.component, record.action);
+  }
+
+  function installDelegatedEventListeners(store) {
+    for (const eventType of store.eventsByType.keys()) {
+      document.addEventListener(eventType, (event) => {
+        dispatchDelegatedEvent(store, event);
       });
     }
   }
@@ -303,8 +362,10 @@ const RUNTIME_STUB: &str = r#"(() => {
         manifestComponent,
         bindingAnchors
       );
-      attachEventListeners(store, component);
+      registerComponentEvents(store, component);
     }
+
+    installDelegatedEventListeners(store);
 
     return {
       manifest,
@@ -375,7 +436,9 @@ mod tests {
         assert!(runtime.contains("readField"));
         assert!(runtime.contains("writeField"));
         assert!(runtime.contains("notifyField"));
-        assert!(runtime.contains("addEventListener(\"click\""));
+        assert!(runtime.contains("installDelegatedEventListeners"));
+        assert!(runtime.contains("document.addEventListener(eventType"));
+        assert!(!runtime.contains("element.addEventListener(\"click\""));
         assert!(runtime.contains("action.operation !== \"increment\""));
         assert!(runtime.contains("dataset.ezRuntime"));
         assert!(runtime.contains("edgezero:ready"));

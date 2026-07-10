@@ -24,6 +24,7 @@
         "events": [
           {
             "node": "n1",
+            "event": "click",
             "handler": "this.increment"
           }
         ]

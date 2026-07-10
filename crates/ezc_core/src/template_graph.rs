@@ -1,4 +1,6 @@
-use crate::component_graph::{ComponentGraph, RenderChild, RenderElement, RenderModel, StateField};
+use crate::component_graph::{
+    ComponentGraph, RenderChild, RenderElement, RenderEventHandler, RenderModel, StateField,
+};
 
 #[derive(Debug, Default)]
 struct TemplateIdAllocator {
@@ -41,7 +43,7 @@ pub struct TemplateAttribute {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AttributeValue {
     Static(String),
-    EventHandler(String),
+    EventHandler { event: String, handler: String },
     BindingList(Vec<String>),
 }
 
@@ -87,11 +89,8 @@ fn element_from_render(
 
     let direct_bindings = collect_direct_bindings_from_children(&render.children);
 
-    let attributes = template_attributes(
-        &render.attributes,
-        &render.event_handler_refs,
-        &direct_bindings,
-    );
+    let attributes =
+        template_attributes(&render.attributes, &render.event_handlers, &direct_bindings);
 
     let children = render
         .children
@@ -119,7 +118,7 @@ fn element_from_render_element(
         tag_name: element.tag_name.clone(),
         attributes: template_attributes(
             &element.attributes,
-            &element.event_handler_refs,
+            &element.event_handlers,
             &collect_direct_bindings_from_children(&element.children),
         ),
         children: element
@@ -132,15 +131,18 @@ fn element_from_render_element(
 
 fn template_attributes(
     _attributes: &[String],
-    event_handler_refs: &[String],
+    event_handlers: &[RenderEventHandler],
     bindings: &[String],
 ) -> Vec<TemplateAttribute> {
     let mut attributes = Vec::new();
 
-    for event_handler in event_handler_refs {
+    for event_handler in event_handlers {
         attributes.push(TemplateAttribute {
-            name: "data-ez-event-handler".to_string(),
-            value: AttributeValue::EventHandler(event_handler.clone()),
+            name: format!("data-ez-on-{}", event_handler.event),
+            value: AttributeValue::EventHandler {
+                event: event_handler.event.clone(),
+                handler: event_handler.handler.clone(),
+            },
         });
     }
 

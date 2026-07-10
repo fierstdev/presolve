@@ -63,8 +63,14 @@ pub struct ParsedJsxElement {
     pub name: String,
     pub span: SourceSpan,
     pub attributes: Vec<String>,
-    pub event_handler_refs: Vec<String>,
+    pub event_handlers: Vec<ParsedEventHandler>,
     pub children: Vec<ParsedJsxChild>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedEventHandler {
+    pub event: String,
+    pub handler: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

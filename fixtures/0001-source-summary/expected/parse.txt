@@ -16,7 +16,7 @@ Classes:
       render at 10:3
         jsx root <button> at 12:7
           attributes: onClick={...}
-          event handlers: this.increment
+          event handlers: click -> this.increment
           children:
             Text("Count:")
             Binding("this.count")

@@ -40,6 +40,7 @@ pub enum ManifestNode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ManifestEvent {
     pub node: String,
+    pub event: String,
     pub handler: String,
 }
 
@@ -127,9 +128,10 @@ fn collect_element(
     });
 
     for attribute in &element.attributes {
-        if let AttributeValue::EventHandler(handler) = &attribute.value {
+        if let AttributeValue::EventHandler { event, handler } = &attribute.value {
             events.push(ManifestEvent {
                 node: element.id.0.clone(),
+                event: event.clone(),
                 handler: handler.clone(),
             });
         }

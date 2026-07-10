@@ -138,16 +138,18 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 (async () => {
   await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
 
-  const button = document.querySelector("button");
-  if (button === null) fail("button not found");
+  const buttons = document.querySelectorAll("button");
+  const countTarget = document.querySelector("button span");
+  if (buttons.length !== 2) fail("expected two buttons");
+  if (countTarget === null) fail("nested click target not found");
   if (!document.body.textContent.includes("Count:0")) fail("initial count was not 0");
   if (!document.body.textContent.includes("Mirror:0")) fail("initial mirror was not 0");
 
-  button.click();
+  countTarget.click();
   await waitFor(() => document.body.textContent.includes("Count:1"), "count 1");
   if (!document.body.textContent.includes("Mirror:1")) fail("mirror was not 1");
 
-  button.click();
+  buttons[1].click();
   await waitFor(() => document.body.textContent.includes("Count:2"), "count 2");
   if (!document.body.textContent.includes("Mirror:2")) fail("mirror was not 2");
 

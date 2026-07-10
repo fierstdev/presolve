@@ -1,4 +1,6 @@
-use ezc_parser::{ParsedClass, ParsedFile, ParsedJsxChild, ParsedStateOperation};
+use ezc_parser::{
+    ParsedClass, ParsedEventHandler, ParsedFile, ParsedJsxChild, ParsedStateOperation,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentGraph {
@@ -51,8 +53,14 @@ pub enum RenderChild {
 pub struct RenderElement {
     pub tag_name: String,
     pub attributes: Vec<String>,
-    pub event_handler_refs: Vec<String>,
+    pub event_handlers: Vec<RenderEventHandler>,
     pub children: Vec<RenderChild>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenderEventHandler {
+    pub event: String,
+    pub handler: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -60,7 +68,7 @@ pub struct RenderModel {
     pub root_element: Option<String>,
     pub attributes: Vec<String>,
     pub bindings: Vec<String>,
-    pub event_handler_refs: Vec<String>,
+    pub event_handlers: Vec<RenderEventHandler>,
     pub children: Vec<RenderChild>,
 }
 
@@ -145,8 +153,13 @@ fn build_component_node(
             RenderModel {
                 root_element: root.map(|jsx| jsx.name.clone()),
                 attributes: root.map(|jsx| jsx.attributes.clone()).unwrap_or_default(),
-                event_handler_refs: root
-                    .map(|jsx| jsx.event_handler_refs.clone())
+                event_handlers: root
+                    .map(|jsx| {
+                        jsx.event_handlers
+                            .iter()
+                            .map(render_event_handler_from_parsed)
+                            .collect::<Vec<_>>()
+                    })
                     .unwrap_or_default(),
                 children: root
                     .map(|jsx| {
@@ -194,19 +207,31 @@ fn build_component_node(
             }
         }
 
-        for handler in &render.event_handler_refs {
-            if let Some(name) = this_member_name(handler) {
+        for event_handler in render_event_handlers(render) {
+            if event_handler.event != "click" {
+                diagnostics.push(ComponentDiagnostic {
+                    code: "EZC1005".to_string(),
+                    message: format!(
+                        "event `{}` is not supported yet in class `{}`",
+                        event_handler.event, class.name
+                    ),
+                });
+            }
+
+            if let Some(name) = this_member_name(&event_handler.handler) {
                 if !method_names.contains(&name) {
                     diagnostics.push(ComponentDiagnostic {
                         code: "EZC1004".to_string(),
                         message: format!(
-                            "event handler `{handler}` references unknown method `{name}` in class `{}`",
-                            class.name
+                            "event handler `{}` references unknown method `{name}` in class `{}`",
+                            event_handler.handler, class.name
                         ),
                     });
                 }
             }
         }
+
+        collect_duplicate_event_diagnostics(render, &class.name, diagnostics);
     }
 
     ComponentNode {
@@ -241,13 +266,95 @@ fn render_child_from_parsed(child: &ParsedJsxChild) -> RenderChild {
         ParsedJsxChild::Element(element) => RenderChild::Element(RenderElement {
             tag_name: element.name.clone(),
             attributes: element.attributes.clone(),
-            event_handler_refs: element.event_handler_refs.clone(),
+            event_handlers: element
+                .event_handlers
+                .iter()
+                .map(render_event_handler_from_parsed)
+                .collect(),
             children: element
                 .children
                 .iter()
                 .map(render_child_from_parsed)
                 .collect::<Vec<_>>(),
         }),
+    }
+}
+
+fn render_event_handler_from_parsed(event_handler: &ParsedEventHandler) -> RenderEventHandler {
+    RenderEventHandler {
+        event: event_handler.event.clone(),
+        handler: event_handler.handler.clone(),
+    }
+}
+
+fn render_event_handlers(render: &RenderModel) -> Vec<&RenderEventHandler> {
+    let mut event_handlers = render.event_handlers.iter().collect::<Vec<_>>();
+
+    for child in &render.children {
+        collect_child_event_handlers(child, &mut event_handlers);
+    }
+
+    event_handlers
+}
+
+fn collect_child_event_handlers<'a>(
+    child: &'a RenderChild,
+    event_handlers: &mut Vec<&'a RenderEventHandler>,
+) {
+    if let RenderChild::Element(element) = child {
+        event_handlers.extend(element.event_handlers.iter());
+
+        for child in &element.children {
+            collect_child_event_handlers(child, event_handlers);
+        }
+    }
+}
+
+fn collect_duplicate_event_diagnostics(
+    render: &RenderModel,
+    class_name: &str,
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+) {
+    collect_duplicate_events_for_handlers(&render.event_handlers, class_name, diagnostics);
+
+    for child in &render.children {
+        collect_duplicate_child_event_diagnostics(child, class_name, diagnostics);
+    }
+}
+
+fn collect_duplicate_child_event_diagnostics(
+    child: &RenderChild,
+    class_name: &str,
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+) {
+    if let RenderChild::Element(element) = child {
+        collect_duplicate_events_for_handlers(&element.event_handlers, class_name, diagnostics);
+
+        for child in &element.children {
+            collect_duplicate_child_event_diagnostics(child, class_name, diagnostics);
+        }
+    }
+}
+
+fn collect_duplicate_events_for_handlers(
+    event_handlers: &[RenderEventHandler],
+    class_name: &str,
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+) {
+    let mut seen = Vec::<&str>::new();
+
+    for event_handler in event_handlers {
+        if seen.contains(&event_handler.event.as_str()) {
+            diagnostics.push(ComponentDiagnostic {
+                code: "EZC1006".to_string(),
+                message: format!(
+                    "event `{}` is declared more than once on the same element in class `{}`",
+                    event_handler.event, class_name
+                ),
+            });
+        } else {
+            seen.push(&event_handler.event);
+        }
     }
 }
 

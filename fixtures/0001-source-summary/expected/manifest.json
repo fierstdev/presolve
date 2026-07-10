@@ -19,6 +19,7 @@
         "events": [
           {
             "node": "n0",
+            "event": "click",
             "handler": "this.increment"
           }
         ]

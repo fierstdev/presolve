@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: refactor: add explicit browser state store
+* Latest commit: feat: delegate runtime events by template node id
 * Working tree: clean after committing this slice
-* Date: 2026-07-09 18:42:07 PDT
+* Date: 2026-07-09 18:50:33 PDT
 
 Last completed slice
 
-* Slice: 6D-C - Introduce an explicit runtime state store
-* Summary: Runtime mutation now flows through a store with component, binding, action, and element maps plus `readField`, `writeField`, and `notifyField` helpers.
-* Key files: crates/ezc_core/src/runtime_codegen.rs, crates/ezc_cli/tests/explain.rs, crates/ezc_cli/tests/runtime_browser.rs
-* New behavior: Two bindings to the same state field update together after clicks, and `window.__EDGEZERO__.store` exposes live runtime maps for debugging.
-* Tests added or changed: crates/ezc_core/src/runtime_codegen.rs runtime string assertions, crates/ezc_cli/tests/explain.rs build artifact assertions, crates/ezc_cli/tests/runtime_browser.rs double-binding real-browser probe
-* Fixtures added or changed: fixtures/0005-double-binding-counter/input/DoubleBindingCounter.tsx
+* Slice: 6D-D - Switch to delegated events
+* Summary: Event semantics now carry explicit event types, manifest events include `event`, and runtime dispatch uses one delegated document listener per event type.
+* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/template_manifest.rs, crates/ezc_core/src/runtime_codegen.rs
+* New behavior: JSX `onClick` is represented as event type `click`; browser clicks on nested targets walk up `data-ez-node` ancestors and dispatch through manifest event/action indexes without per-node listeners.
+* Tests added or changed: parser event assertions, component graph event/diagnostic assertions, runtime string assertions, CLI fixture expectations, ignored Chrome browser probe for nested target plus two button handlers
+* Fixtures added or changed: event schema updates in fixtures/0001-source-summary, fixtures/0003-semantic-errors, fixtures/0004-nested-jsx, and expanded fixtures/0005-double-binding-counter/input/DoubleBindingCounter.tsx
 
 Current in-progress slice
 
-* Slice: 6D-D - Switch to delegated events
+* Slice: 6D-E - Add the first browser e2e suite as a permanent gate
 * Status: Not started
 * Completed: None
-* Remaining: Extend manifest events with explicit event type, preserve JSX event names as event types, update template graph/manifest schema, install one document-level listener per event type, dispatch through template node IDs, and add nested-target/two-button event tests.
+* Remaining: Promote browser behavior testing from the ignored Rust integration probe into a reproducible local and CI e2e gate with deterministic build setup, static serving, scripts/just target, and unexpected runtime-console failure handling.
 
 Verification
 
@@ -32,20 +32,20 @@ Verification
 
 Architecture decisions made
 
-* Decision: Expose the internal runtime store under `window.__EDGEZERO__.store` while also preserving the existing `window.__EDGEZERO__.components` debug view.
-* Reason: Slice 6D-C requires inspectable store maps, and the existing components array is already used by the browser probe as a stable debug convenience.
-* Tradeoff: The debug surface is richer than the minimum runtime needs, but it remains generated runtime state rather than source-derived behavior.
-* Follow-up: Runtime contract versioning and diagnostics in Slice 6G should decide which debug fields are durable.
+* Decision: Keep event type as a compiler-owned string at this stage and reject unsupported events with diagnostics.
+* Reason: The roadmap only requires `click` now, but the manifest/runtime boundary needs the explicit event field before delegation and future event growth.
+* Tradeoff: The model is still narrow and string-based rather than a broader event enum or schema-versioned contract.
+* Follow-up: Runtime contract versioning in Slice 6G should stabilize event schema expectations.
 
 Known limitations
 
 * Item: Only `this.<field>++` is recognized as an action. `this.count += 1`, decrement, assignment, and multi-step plans are intentionally deferred.
-* Item: The browser runtime supports only per-node click listeners, increment actions, numeric state, and binding callback text updates.
+* Item: The browser runtime supports only delegated click events, increment actions, numeric state, and binding callback text updates.
 * Item: Browser e2e coverage is present but ignored by default until the dedicated e2e gate slice.
 
 Exact next step
 
-Start Slice 6D-D by adding event type semantics end to end. Begin in parser/template semantics by preserving `onClick` as `click`, then emit manifest events with `{ node, event, handler }` and update the runtime to install one delegated document-level click listener that resolves the nearest `data-ez-node`.
+Start Slice 6D-E by turning the existing ignored `crates/ezc_cli/tests/runtime_browser.rs` behavior into a permanent browser e2e gate. Decide whether to keep the Rust harness as the official gate or introduce the roadmap-preferred Playwright package, then add the local command/just target and CI path without weakening the current Chrome probe assertions.
 
 Useful commands
 

@@ -4,7 +4,7 @@ TemplateGraph:
     template Counter
       root: <button> id=n0
       attributes:
-        data-ez-event-handler = event-handler(this.increment)
+        data-ez-on-click = event-handler(click -> this.increment)
         data-ez-bindings = bindings(this.count)
       children:
         Text("Count:")

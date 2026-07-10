@@ -69,7 +69,7 @@ fn generate_element_html(element: &ElementNode) -> String {
 fn attribute_value_string(attribute: &TemplateAttribute) -> String {
     match &attribute.value {
         AttributeValue::Static(value) => value.clone(),
-        AttributeValue::EventHandler(handler) => handler.clone(),
+        AttributeValue::EventHandler { handler, .. } => handler.clone(),
         AttributeValue::BindingList(bindings) => bindings.join(","),
     }
 }

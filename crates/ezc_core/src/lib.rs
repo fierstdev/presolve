@@ -16,7 +16,7 @@ pub mod template_manifest;
 
 pub use component_graph::{
     build_component_graph, ComponentAction, ComponentDiagnostic, ComponentGraph, ComponentMethod,
-    ComponentNode, RenderChild, RenderModel, StateField, StateOperation,
+    ComponentNode, RenderChild, RenderEventHandler, RenderModel, StateField, StateOperation,
 };
 pub use explain::{explain_json, explain_text};
 pub use html_codegen::generate_static_html;
@@ -156,7 +156,13 @@ class Counter extends Component {
         assert_eq!(render.root_element.as_deref(), Some("button"));
         assert_eq!(render.attributes, vec!["onClick={...}"]);
         assert_eq!(render.bindings, vec!["this.count"]);
-        assert_eq!(render.event_handler_refs, vec!["this.increment"]);
+        assert_eq!(
+            render.event_handlers,
+            vec![RenderEventHandler {
+                event: "click".to_string(),
+                handler: "this.increment".to_string(),
+            }]
+        );
         assert_eq!(
             render.children,
             vec![
@@ -187,6 +193,89 @@ class Counter extends Component {
         assert!(codes.contains(&"EZC1001"));
         assert!(codes.contains(&"EZC1003"));
         assert!(codes.contains(&"EZC1004"));
+    }
+
+    #[test]
+    fn component_graph_reports_unsupported_event_errors() {
+        let source = r#"
+@component("x-counter")
+class Counter extends Component {
+  count = state(0);
+
+  increment() {
+    this.count++;
+  }
+
+  render() {
+    return <button onMouseover={() => this.increment()}>Count: {this.count}</button>;
+  }
+}
+"#;
+
+        let parsed = ezc_parser::parse_file("UnsupportedEvent.tsx", source);
+
+        let graph = build_component_graph(&parsed);
+
+        assert!(graph
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "EZC1005"));
+    }
+
+    #[test]
+    fn component_graph_reports_duplicate_event_errors() {
+        let parsed = ezc_parser::ParsedFile {
+            path: "DuplicateEvent.tsx".into(),
+            diagnostics: Vec::new(),
+            classes: vec![ezc_parser::ParsedClass {
+                name: "DuplicateEvent".to_string(),
+                span: test_span(),
+                decorators: vec![ezc_parser::ParsedDecorator {
+                    name: "component".to_string(),
+                    argument: Some("x-duplicate-event".to_string()),
+                    span: test_span(),
+                }],
+                properties: Vec::new(),
+                methods: vec![ezc_parser::ParsedMethod {
+                    name: "render".to_string(),
+                    span: test_span(),
+                    jsx_roots: vec![ezc_parser::ParsedJsxElement {
+                        name: "button".to_string(),
+                        span: test_span(),
+                        attributes: Vec::new(),
+                        event_handlers: vec![
+                            ezc_parser::ParsedEventHandler {
+                                event: "click".to_string(),
+                                handler: "this.render".to_string(),
+                            },
+                            ezc_parser::ParsedEventHandler {
+                                event: "click".to_string(),
+                                handler: "this.render".to_string(),
+                            },
+                        ],
+                        children: Vec::new(),
+                    }],
+                    bindings: Vec::new(),
+                    state_updates: Vec::new(),
+                }],
+            }],
+        };
+
+        let graph = build_component_graph(&parsed);
+
+        assert!(graph
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "EZC1006"));
+    }
+
+    fn test_span() -> ezc_parser::SourceSpan {
+        ezc_parser::SourceSpan {
+            start: 0,
+            end: 0,
+            line: 1,
+            column: 1,
+        }
     }
 
     #[test]
@@ -222,7 +311,7 @@ class Counter extends Component {
 
         assert_eq!(
             html,
-            "<button data-ez-node=\"n0\" data-ez-event-handler=\"this.increment\" data-ez-bindings=\"this.count\">Count:<!-- ez-binding:n1:this.count -->0</button>\n"
+            "<button data-ez-node=\"n0\" data-ez-on-click=\"this.increment\" data-ez-bindings=\"this.count\">Count:<!-- ez-binding:n1:this.count -->0</button>\n"
         );
     }
 
@@ -247,10 +336,13 @@ class Counter extends Component {
         assert_eq!(root.tag_name, "button");
 
         assert_eq!(root.attributes.len(), 2);
-        assert_eq!(root.attributes[0].name, "data-ez-event-handler");
+        assert_eq!(root.attributes[0].name, "data-ez-on-click");
         assert_eq!(
             root.attributes[0].value,
-            AttributeValue::EventHandler("this.increment".to_string())
+            AttributeValue::EventHandler {
+                event: "click".to_string(),
+                handler: "this.increment".to_string(),
+            }
         );
 
         assert_eq!(root.attributes[1].name, "data-ez-bindings");
@@ -311,6 +403,7 @@ class Counter extends Component {
             component.template.events,
             vec![ManifestEvent {
                 node: "n1".to_string(),
+                event: "click".to_string(),
                 handler: "this.increment".to_string(),
             }]
         );

@@ -11,9 +11,9 @@ use oxc_parser::Parser;
 use oxc_span::{SourceType, Span};
 
 use crate::model::{
-    ParseDiagnostic, ParseLabel, ParseSeverity, ParsedClass, ParsedDecorator, ParsedFile,
-    ParsedJsxChild, ParsedJsxElement, ParsedMethod, ParsedProperty, ParsedStateOperation,
-    ParsedStateUpdate, SourceSpan,
+    ParseDiagnostic, ParseLabel, ParseSeverity, ParsedClass, ParsedDecorator, ParsedEventHandler,
+    ParsedFile, ParsedJsxChild, ParsedJsxElement, ParsedMethod, ParsedProperty,
+    ParsedStateOperation, ParsedStateUpdate, SourceSpan,
 };
 
 pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
@@ -290,11 +290,11 @@ fn parsed_jsx_element(
         .filter_map(jsx_attribute_name)
         .collect::<Vec<_>>();
 
-    let event_handler_refs = element
+    let event_handlers = element
         .opening_element
         .attributes
         .iter()
-        .filter_map(jsx_event_handler_ref)
+        .filter_map(jsx_event_handler)
         .collect::<Vec<_>>();
 
     let children = element
@@ -307,7 +307,7 @@ fn parsed_jsx_element(
         name,
         span: source_span(source, element.span),
         attributes,
-        event_handler_refs,
+        event_handlers,
         children,
     })
 }
@@ -405,7 +405,7 @@ fn jsx_attribute_name(attribute: &JSXAttributeItem<'_>) -> Option<String> {
     Some(format!("{name}{value_suffix}"))
 }
 
-fn jsx_event_handler_ref(attribute: &JSXAttributeItem<'_>) -> Option<String> {
+fn jsx_event_handler(attribute: &JSXAttributeItem<'_>) -> Option<ParsedEventHandler> {
     let JSXAttributeItem::Attribute(attribute) = attribute else {
         return None;
     };
@@ -415,15 +415,29 @@ fn jsx_event_handler_ref(attribute: &JSXAttributeItem<'_>) -> Option<String> {
         JSXAttributeName::NamespacedName(_) => return None,
     };
 
-    if !attribute_name.starts_with("on") {
-        return None;
-    }
+    let event = jsx_event_type(attribute_name)?;
 
     let Some(JSXAttributeValue::ExpressionContainer(container)) = &attribute.value else {
         return None;
     };
 
-    jsx_expression_event_handler_ref(&container.expression)
+    let handler = jsx_expression_event_handler_ref(&container.expression)?;
+
+    Some(ParsedEventHandler { event, handler })
+}
+
+fn jsx_event_type(attribute_name: &str) -> Option<String> {
+    let name = attribute_name.strip_prefix("on")?;
+
+    if name.is_empty() {
+        return None;
+    }
+
+    let mut chars = name.chars();
+    let first = chars.next()?.to_ascii_lowercase();
+    let rest = chars.collect::<String>();
+
+    Some(format!("{first}{rest}"))
 }
 
 fn jsx_expression_event_handler_ref(expression: &JSXExpression<'_>) -> Option<String> {
