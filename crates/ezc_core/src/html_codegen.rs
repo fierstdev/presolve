@@ -1,6 +1,7 @@
 use crate::component_graph::SerializableValue;
 use crate::template_graph::{
-    AttributeValue, ElementNode, FragmentNode, TemplateAttribute, TemplateChild, TemplateGraph,
+    AttributeValue, ConditionalNode, ElementNode, FragmentNode, TemplateAttribute, TemplateChild,
+    TemplateGraph,
 };
 
 #[must_use]
@@ -21,9 +22,13 @@ pub fn generate_static_html(template_graph: &TemplateGraph) -> String {
 }
 
 fn generate_fragment_html(fragment: &FragmentNode) -> String {
+    generate_children_html(&fragment.children)
+}
+
+pub(crate) fn generate_children_html(children: &[TemplateChild]) -> String {
     let mut html = String::new();
 
-    for child in &fragment.children {
+    for child in children {
         html.push_str(&generate_child_html(child));
     }
 
@@ -85,7 +90,30 @@ fn generate_child_html(child: &TemplateChild) -> String {
         }
         TemplateChild::Element(element) => generate_element_html(element),
         TemplateChild::Fragment(fragment) => generate_fragment_html(fragment),
+        TemplateChild::Conditional(conditional) => generate_conditional_html(conditional),
     }
+}
+
+fn generate_conditional_html(conditional: &ConditionalNode) -> String {
+    let mut html = String::new();
+
+    html.push_str("<!-- ez-conditional-start:");
+    html.push_str(&escape_comment(&conditional.start_id.0));
+    html.push(':');
+    html.push_str(&escape_comment(&conditional.condition));
+    html.push_str(" -->");
+
+    let children = match conditional.initial_value {
+        Some(SerializableValue::Boolean(true)) => &conditional.when_true,
+        _ => &conditional.when_false,
+    };
+
+    html.push_str(&generate_children_html(children));
+    html.push_str("<!-- ez-conditional-end:");
+    html.push_str(&escape_comment(&conditional.end_id.0));
+    html.push_str(" -->");
+
+    html
 }
 
 fn generate_attribute_html(attribute: &TemplateAttribute) -> Option<String> {

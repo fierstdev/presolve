@@ -3,8 +3,8 @@ mod oxc_adapter;
 
 pub use model::{
     ParseDiagnostic, ParseLabel, ParseSeverity, ParsedClass, ParsedDecorator, ParsedEventHandler,
-    ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxElement,
-    ParsedJsxFragment, ParsedJsxNode, ParsedMethod, ParsedProperty, ParsedSerializableValue,
-    ParsedStateOperation, ParsedStateUpdate, SourceSpan,
+    ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional,
+    ParsedJsxElement, ParsedJsxFragment, ParsedJsxNode, ParsedMethod, ParsedProperty,
+    ParsedSerializableValue, ParsedStateOperation, ParsedStateUpdate, SourceSpan,
 };
 pub use oxc_adapter::parse_file;

@@ -1,6 +1,6 @@
 use crate::component_graph::{
-    ComponentGraph, RenderAttribute, RenderAttributeValue, RenderChild, RenderElement,
-    RenderEventHandler, RenderFragment, RenderModel, SerializableValue, StateField,
+    ComponentGraph, RenderAttribute, RenderAttributeValue, RenderChild, RenderConditional,
+    RenderElement, RenderEventHandler, RenderFragment, RenderModel, SerializableValue, StateField,
 };
 use ezc_parser::SourceSpan;
 
@@ -82,6 +82,19 @@ pub enum TemplateChild {
     },
     Element(ElementNode),
     Fragment(FragmentNode),
+    Conditional(ConditionalNode),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConditionalNode {
+    pub id: TemplateNodeId,
+    pub start_id: TemplateNodeId,
+    pub end_id: TemplateNodeId,
+    pub condition: String,
+    pub initial_value: Option<SerializableValue>,
+    pub span: SourceSpan,
+    pub when_true: Vec<TemplateChild>,
+    pub when_false: Vec<TemplateChild>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -267,6 +280,9 @@ fn collect_direct_bindings_from_children(children: &[RenderChild]) -> Vec<String
             RenderChild::Fragment(fragment) => {
                 bindings.extend(collect_direct_bindings_from_children(&fragment.children));
             }
+            RenderChild::Conditional(conditional) => {
+                bindings.push(conditional.condition.clone());
+            }
             RenderChild::Element(_) | RenderChild::Text { .. } => {}
         }
     }
@@ -298,6 +314,34 @@ fn template_child_from_render(
         RenderChild::Fragment(fragment) => {
             TemplateChild::Fragment(fragment_from_render_fragment(fragment, state_fields, ids))
         }
+        RenderChild::Conditional(conditional) => TemplateChild::Conditional(
+            conditional_from_render_conditional(conditional, state_fields, ids),
+        ),
+    }
+}
+
+fn conditional_from_render_conditional(
+    conditional: &RenderConditional,
+    state_fields: &[StateField],
+    ids: &mut TemplateIdAllocator,
+) -> ConditionalNode {
+    ConditionalNode {
+        id: ids.alloc(),
+        start_id: ids.alloc(),
+        end_id: ids.alloc(),
+        condition: conditional.condition.clone(),
+        initial_value: binding_initial_value(&conditional.condition, state_fields),
+        span: conditional.span,
+        when_true: conditional
+            .when_true
+            .iter()
+            .map(|child| template_child_from_render(child, state_fields, ids))
+            .collect(),
+        when_false: conditional
+            .when_false
+            .iter()
+            .map(|child| template_child_from_render(child, state_fields, ids))
+            .collect(),
     }
 }
 

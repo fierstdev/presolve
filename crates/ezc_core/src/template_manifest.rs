@@ -1,8 +1,10 @@
 use serde::Serialize;
 
 use crate::component_graph::{ComponentGraph, ComponentNode, SerializableValue, StateOperation};
+use crate::html_codegen::generate_children_html;
 use crate::template_graph::{
-    AttributeValue, ElementNode, FragmentNode, TemplateChild, TemplateGraph, TemplateNode,
+    AttributeValue, ConditionalNode, ElementNode, FragmentNode, TemplateChild, TemplateGraph,
+    TemplateNode,
 };
 
 pub const TEMPLATE_MANIFEST_SCHEMA_VERSION: u32 = 1;
@@ -43,6 +45,17 @@ pub enum ManifestNode {
         element: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         attribute: Option<String>,
+    },
+
+    #[serde(rename = "conditional")]
+    Conditional {
+        id: String,
+        start: String,
+        end: String,
+        condition: String,
+        initial_value: Option<SerializableValue>,
+        when_true_html: String,
+        when_false_html: String,
     },
 }
 
@@ -251,5 +264,18 @@ fn collect_child(
         }
         TemplateChild::Element(element) => collect_element(element, nodes, events),
         TemplateChild::Fragment(fragment) => collect_fragment(fragment, nodes, events),
+        TemplateChild::Conditional(conditional) => collect_conditional(conditional, nodes),
     }
+}
+
+fn collect_conditional(conditional: &ConditionalNode, nodes: &mut Vec<ManifestNode>) {
+    nodes.push(ManifestNode::Conditional {
+        id: conditional.id.0.clone(),
+        start: conditional.start_id.0.clone(),
+        end: conditional.end_id.0.clone(),
+        condition: conditional.condition.clone(),
+        initial_value: conditional.initial_value.clone(),
+        when_true_html: generate_children_html(&conditional.when_true),
+        when_false_html: generate_children_html(&conditional.when_false),
+    });
 }

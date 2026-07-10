@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "components": [
+    {
+      "name": "LogicalAndStatus",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "button"
+          },
+          {
+            "kind": "conditional",
+            "id": "n1",
+            "start": "n2",
+            "end": "n3",
+            "condition": "this.enabled",
+            "initial_value": true,
+            "when_true_html": "<span data-ez-node=\"n4\">On</span>",
+            "when_false_html": ""
+          }
+        ],
+        "events": [
+          {
+            "node": "n0",
+            "event": "click",
+            "handler": "this.toggle"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "method": "toggle",
+          "operation": "toggle",
+          "field": "enabled"
+        }
+      ]
+    }
+  ]
+}

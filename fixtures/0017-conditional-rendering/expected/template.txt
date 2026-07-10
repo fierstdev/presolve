@@ -1,0 +1,22 @@
+File: fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx
+TemplateGraph:
+  templates:
+    template ConditionalStatus
+      root: <button> id=n0 @ fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx:12:7 span=219..333
+      attributes:
+        data-ez-on-click = event-handler(click -> this.toggle) @ fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx:12:15 span=227..256
+        data-ez-bindings = bindings(this.enabled) @ generated
+      children:
+        Conditional id=n1 start=n2 end=n3 condition="this.enabled" initial=Some(true) @ fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx:13:10 span=267..316
+          true:
+            Element <span> id=n4 @ fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx:13:25 span=282..297
+              attributes:
+                none
+              children:
+                Text("On") @ fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx:13:31 span=288..290
+          false:
+            Element <span> id=n5 @ fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx:13:43 span=300..316
+              attributes:
+                none
+              children:
+                Text("Off") @ fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx:13:49 span=306..309

@@ -28,8 +28,8 @@ pub use page_codegen::generate_standalone_page;
 pub use runtime_codegen::generate_runtime_stub;
 pub use summarize::summarize_source;
 pub use template_graph::{
-    build_template_graph, AttributeValue, ElementNode, FragmentNode, TemplateAttribute,
-    TemplateChild, TemplateGraph, TemplateNode, TemplateNodeId,
+    build_template_graph, AttributeValue, ConditionalNode, ElementNode, FragmentNode,
+    TemplateAttribute, TemplateChild, TemplateGraph, TemplateNode, TemplateNodeId,
 };
 pub use template_manifest::{
     build_template_manifest, template_manifest_json, ManifestAction, ManifestBindingTarget,
@@ -1019,6 +1019,123 @@ class BadAttrs extends Component {
                     tag: "span".to_string(),
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn builds_conditional_template_boundaries_and_manifest_branch_html() {
+        let source = include_str!(
+            "../../../fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx"
+        );
+
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx",
+            source,
+        );
+
+        let component_graph = build_component_graph(&parsed);
+        assert!(component_graph.diagnostics.is_empty());
+
+        let template_graph = build_template_graph(&component_graph);
+        let root = template_graph.templates[0]
+            .root
+            .as_ref()
+            .expect("expected root element");
+
+        assert_eq!(root.id.0, "n0");
+        assert_eq!(root.attributes[1].name, "data-ez-bindings");
+
+        let TemplateChild::Conditional(conditional) = &root.children[0] else {
+            panic!("expected conditional child");
+        };
+
+        assert_eq!(conditional.id.0, "n1");
+        assert_eq!(conditional.start_id.0, "n2");
+        assert_eq!(conditional.end_id.0, "n3");
+        assert_eq!(conditional.condition, "this.enabled");
+        assert_eq!(
+            conditional.initial_value,
+            Some(SerializableValue::Boolean(true))
+        );
+
+        let TemplateChild::Element(when_true) = &conditional.when_true[0] else {
+            panic!("expected true branch element");
+        };
+        assert_eq!(when_true.id.0, "n4");
+        assert_eq!(when_true.tag_name, "span");
+
+        let TemplateChild::Element(when_false) = &conditional.when_false[0] else {
+            panic!("expected false branch element");
+        };
+        assert_eq!(when_false.id.0, "n5");
+        assert_eq!(when_false.tag_name, "span");
+
+        let html = generate_static_html(&template_graph);
+        assert_eq!(
+            html,
+            "<button data-ez-node=\"n0\" data-ez-on-click=\"this.toggle\" data-ez-bindings=\"this.enabled\"><!-- ez-conditional-start:n2:this.enabled --><span data-ez-node=\"n4\">On</span><!-- ez-conditional-end:n3 --></button>\n"
+        );
+
+        let manifest = build_template_manifest(&component_graph, &template_graph);
+        assert_eq!(
+            manifest.components[0].template.nodes,
+            vec![
+                ManifestNode::Element {
+                    id: "n0".to_string(),
+                    tag: "button".to_string(),
+                },
+                ManifestNode::Conditional {
+                    id: "n1".to_string(),
+                    start: "n2".to_string(),
+                    end: "n3".to_string(),
+                    condition: "this.enabled".to_string(),
+                    initial_value: Some(SerializableValue::Boolean(true)),
+                    when_true_html: "<span data-ez-node=\"n4\">On</span>".to_string(),
+                    when_false_html: "<span data-ez-node=\"n5\">Off</span>".to_string(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn builds_logical_and_conditional_with_empty_false_branch() {
+        let source = include_str!(
+            "../../../fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx"
+        );
+
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx",
+            source,
+        );
+
+        let component_graph = build_component_graph(&parsed);
+        assert!(component_graph.diagnostics.is_empty());
+
+        let template_graph = build_template_graph(&component_graph);
+        let root = template_graph.templates[0]
+            .root
+            .as_ref()
+            .expect("expected root element");
+
+        let TemplateChild::Conditional(conditional) = &root.children[0] else {
+            panic!("expected conditional child");
+        };
+
+        assert_eq!(conditional.when_true.len(), 1);
+        assert!(conditional.when_false.is_empty());
+
+        let manifest = build_template_manifest(&component_graph, &template_graph);
+        assert_eq!(
+            manifest.components[0].template.nodes[1],
+            ManifestNode::Conditional {
+                id: "n1".to_string(),
+                start: "n2".to_string(),
+                end: "n3".to_string(),
+                condition: "this.enabled".to_string(),
+                initial_value: Some(SerializableValue::Boolean(true)),
+                when_true_html: "<span data-ez-node=\"n4\">On</span>".to_string(),
+                when_false_html: String::new(),
+            }
         );
     }
 

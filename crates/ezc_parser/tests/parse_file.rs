@@ -564,3 +564,91 @@ fn parses_jsx_fragments() {
     assert_eq!(expression, "this.label");
     assert_eq!(render.bindings, vec!["this.label"]);
 }
+
+#[test]
+fn parses_jsx_conditional_rendering() {
+    let source =
+        include_str!("../../../fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx");
+
+    let parsed = parse_file(
+        "fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx",
+        source,
+    );
+
+    assert!(parsed.diagnostics.is_empty());
+
+    let class = parsed.classes.first().expect("expected class");
+    let render = class
+        .methods
+        .iter()
+        .find(|method| method.name == "render")
+        .expect("expected render method");
+
+    assert_eq!(render.bindings, vec!["this.enabled"]);
+
+    let ParsedJsxNode::Element(button) = &render.jsx_roots[0] else {
+        panic!("expected button root");
+    };
+
+    assert_eq!(button.children.len(), 1);
+
+    let ParsedJsxChild::Conditional(conditional) = &button.children[0] else {
+        panic!("expected conditional child");
+    };
+
+    assert_eq!(conditional.condition, "this.enabled");
+    assert_eq!(conditional.span.line, 13);
+    assert_eq!(conditional.span.column, 10);
+
+    let ParsedJsxNode::Element(when_true) = &conditional.when_true else {
+        panic!("expected true branch element");
+    };
+    assert_eq!(when_true.name, "span");
+
+    let ParsedJsxNode::Element(when_false) = conditional
+        .when_false
+        .as_ref()
+        .expect("expected false branch")
+    else {
+        panic!("expected false branch element");
+    };
+    assert_eq!(when_false.name, "span");
+}
+
+#[test]
+fn parses_jsx_logical_and_conditional_rendering() {
+    let source =
+        include_str!("../../../fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx");
+
+    let parsed = parse_file(
+        "fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx",
+        source,
+    );
+
+    assert!(parsed.diagnostics.is_empty());
+
+    let class = parsed.classes.first().expect("expected class");
+    let render = class
+        .methods
+        .iter()
+        .find(|method| method.name == "render")
+        .expect("expected render method");
+
+    assert_eq!(render.bindings, vec!["this.enabled"]);
+
+    let ParsedJsxNode::Element(button) = &render.jsx_roots[0] else {
+        panic!("expected button root");
+    };
+
+    let ParsedJsxChild::Conditional(conditional) = &button.children[0] else {
+        panic!("expected conditional child");
+    };
+
+    assert_eq!(conditional.condition, "this.enabled");
+    assert!(conditional.when_false.is_none());
+
+    let ParsedJsxNode::Element(when_true) = &conditional.when_true else {
+        panic!("expected true branch element");
+    };
+    assert_eq!(when_true.name, "span");
+}

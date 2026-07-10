@@ -12,9 +12,9 @@ use oxc_span::{SourceType, Span};
 
 use crate::model::{
     ParseDiagnostic, ParseLabel, ParseSeverity, ParsedClass, ParsedDecorator, ParsedEventHandler,
-    ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxElement,
-    ParsedJsxFragment, ParsedJsxNode, ParsedMethod, ParsedProperty, ParsedSerializableValue,
-    ParsedStateOperation, ParsedStateUpdate, SourceSpan,
+    ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional,
+    ParsedJsxElement, ParsedJsxFragment, ParsedJsxNode, ParsedMethod, ParsedProperty,
+    ParsedSerializableValue, ParsedStateOperation, ParsedStateUpdate, SourceSpan,
 };
 
 pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
@@ -293,7 +293,7 @@ fn parse_expression_for_jsx(
 fn parse_jsx_child(child: &JSXChild<'_>, bindings: &mut Vec<String>) {
     match child {
         JSXChild::ExpressionContainer(container) => {
-            if let Some(binding) = jsx_expression_summary(&container.expression) {
+            if let Some(binding) = jsx_expression_binding_summary(&container.expression) {
                 bindings.push(binding);
             }
         }
@@ -325,15 +325,86 @@ fn parsed_jsx_child(child: &JSXChild<'_>, source: &str) -> Option<ParsedJsxChild
                 })
             }
         }
-        JSXChild::ExpressionContainer(container) => jsx_expression_summary(&container.expression)
-            .map(|expression| ParsedJsxChild::Binding {
-                expression,
-                span: source_span(source, container.span),
-            }),
+        JSXChild::ExpressionContainer(container) => parsed_jsx_expression_child(
+            &container.expression,
+            source,
+            source_span(source, container.span),
+        ),
         JSXChild::Element(element) => {
             parsed_jsx_element(element, source).map(ParsedJsxChild::Element)
         }
         JSXChild::Fragment(fragment) => Some(ParsedJsxChild::Fragment(parsed_jsx_fragment(
+            fragment, source,
+        ))),
+        _ => None,
+    }
+}
+
+fn parsed_jsx_expression_child(
+    expression: &JSXExpression<'_>,
+    source: &str,
+    span: SourceSpan,
+) -> Option<ParsedJsxChild> {
+    let expression = expression.as_expression()?;
+
+    if let Expression::ConditionalExpression(conditional) = expression {
+        return parsed_jsx_conditional(conditional, source).map(ParsedJsxChild::Conditional);
+    }
+
+    if let Expression::LogicalExpression(logical) = expression {
+        return parsed_jsx_logical_and(logical, source).map(ParsedJsxChild::Conditional);
+    }
+
+    expression_summary(expression).map(|expression| ParsedJsxChild::Binding { expression, span })
+}
+
+fn parsed_jsx_conditional(
+    conditional: &oxc_ast::ast::ConditionalExpression<'_>,
+    source: &str,
+) -> Option<ParsedJsxConditional> {
+    let condition = expression_summary(&conditional.test)?;
+    let when_true = parsed_jsx_node_from_expression(&conditional.consequent, source)?;
+    let when_false = parsed_jsx_node_from_expression(&conditional.alternate, source)?;
+
+    Some(ParsedJsxConditional {
+        condition,
+        span: source_span(source, conditional.span),
+        when_true,
+        when_false: Some(when_false),
+    })
+}
+
+fn parsed_jsx_logical_and(
+    logical: &oxc_ast::ast::LogicalExpression<'_>,
+    source: &str,
+) -> Option<ParsedJsxConditional> {
+    if logical.operator.as_str() != "&&" {
+        return None;
+    }
+
+    let condition = expression_summary(&logical.left)?;
+    let when_true = parsed_jsx_node_from_expression(&logical.right, source)?;
+
+    Some(ParsedJsxConditional {
+        condition,
+        span: source_span(source, logical.span),
+        when_true,
+        when_false: None,
+    })
+}
+
+fn parsed_jsx_node_from_expression(
+    expression: &Expression<'_>,
+    source: &str,
+) -> Option<ParsedJsxNode> {
+    match expression {
+        Expression::ParenthesizedExpression(parenthesized) => {
+            parsed_jsx_node_from_expression(&parenthesized.expression, source)
+        }
+        Expression::JSXElement(element) => {
+            parsed_jsx_element(element, source).map(ParsedJsxNode::Element)
+        }
+        Expression::JSXFragment(fragment) => Some(ParsedJsxNode::Fragment(parsed_jsx_fragment(
             fragment, source,
         ))),
         _ => None,
@@ -427,6 +498,22 @@ fn jsx_expression_summary(expression: &JSXExpression<'_>) -> Option<String> {
     }
 
     None
+}
+
+fn jsx_expression_binding_summary(expression: &JSXExpression<'_>) -> Option<String> {
+    let expression = expression.as_expression()?;
+
+    if let Expression::ConditionalExpression(conditional) = expression {
+        return expression_summary(&conditional.test);
+    }
+
+    if let Expression::LogicalExpression(logical) = expression {
+        if logical.operator.as_str() == "&&" {
+            return expression_summary(&logical.left);
+        }
+    }
+
+    expression_summary(expression)
 }
 
 fn expression_summary(expression: &Expression<'_>) -> Option<String> {

@@ -2,8 +2,8 @@ use serde::Serialize;
 
 use ezc_parser::{
     ParsedClass, ParsedEventHandler, ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue,
-    ParsedJsxChild, ParsedJsxFragment, ParsedJsxNode, ParsedSerializableValue,
-    ParsedStateOperation, SourceSpan,
+    ParsedJsxChild, ParsedJsxConditional, ParsedJsxFragment, ParsedJsxNode,
+    ParsedSerializableValue, ParsedStateOperation, SourceSpan,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -83,6 +83,7 @@ pub enum RenderChild {
     },
     Element(RenderElement),
     Fragment(RenderFragment),
+    Conditional(RenderConditional),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -98,6 +99,14 @@ pub struct RenderElement {
 pub struct RenderFragment {
     pub span: SourceSpan,
     pub children: Vec<RenderChild>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenderConditional {
+    pub condition: String,
+    pub span: SourceSpan,
+    pub when_true: Vec<RenderChild>,
+    pub when_false: Vec<RenderChild>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -416,6 +425,51 @@ fn render_child_from_parsed(child: &ParsedJsxChild) -> RenderChild {
         ParsedJsxChild::Fragment(fragment) => {
             RenderChild::Fragment(render_fragment_from_parsed(fragment))
         }
+        ParsedJsxChild::Conditional(conditional) => {
+            RenderChild::Conditional(render_conditional_from_parsed(conditional))
+        }
+    }
+}
+
+fn render_conditional_from_parsed(conditional: &ParsedJsxConditional) -> RenderConditional {
+    RenderConditional {
+        condition: conditional.condition.clone(),
+        span: conditional.span,
+        when_true: render_children_from_parsed_node(&conditional.when_true),
+        when_false: conditional
+            .when_false
+            .as_ref()
+            .map(render_children_from_parsed_node)
+            .unwrap_or_default(),
+    }
+}
+
+fn render_children_from_parsed_node(node: &ParsedJsxNode) -> Vec<RenderChild> {
+    match node {
+        ParsedJsxNode::Element(element) => vec![RenderChild::Element(RenderElement {
+            tag_name: element.name.clone(),
+            span: element.span,
+            attributes: element
+                .attributes
+                .iter()
+                .map(render_attribute_from_parsed)
+                .collect(),
+            event_handlers: element
+                .event_handlers
+                .iter()
+                .map(render_event_handler_from_parsed)
+                .collect(),
+            children: element
+                .children
+                .iter()
+                .map(render_child_from_parsed)
+                .collect::<Vec<_>>(),
+        })],
+        ParsedJsxNode::Fragment(fragment) => fragment
+            .children
+            .iter()
+            .map(render_child_from_parsed)
+            .collect(),
     }
 }
 
@@ -488,6 +542,14 @@ fn collect_child_event_handlers<'a>(
                 collect_child_event_handlers(child, event_handlers);
             }
         }
+        RenderChild::Conditional(conditional) => {
+            for child in &conditional.when_true {
+                collect_child_event_handlers(child, event_handlers);
+            }
+            for child in &conditional.when_false {
+                collect_child_event_handlers(child, event_handlers);
+            }
+        }
         RenderChild::Text { .. } | RenderChild::Binding { .. } => {}
     }
 }
@@ -553,6 +615,14 @@ fn collect_child_attribute_diagnostics(
         }
         RenderChild::Fragment(fragment) => {
             for child in &fragment.children {
+                collect_child_attribute_diagnostics(child, state_fields, class_name, diagnostics);
+            }
+        }
+        RenderChild::Conditional(conditional) => {
+            for child in &conditional.when_true {
+                collect_child_attribute_diagnostics(child, state_fields, class_name, diagnostics);
+            }
+            for child in &conditional.when_false {
                 collect_child_attribute_diagnostics(child, state_fields, class_name, diagnostics);
             }
         }
@@ -649,6 +719,14 @@ fn collect_duplicate_child_event_diagnostics(
         }
         RenderChild::Fragment(fragment) => {
             for child in &fragment.children {
+                collect_duplicate_child_event_diagnostics(child, class_name, diagnostics);
+            }
+        }
+        RenderChild::Conditional(conditional) => {
+            for child in &conditional.when_true {
+                collect_duplicate_child_event_diagnostics(child, class_name, diagnostics);
+            }
+            for child in &conditional.when_false {
                 collect_duplicate_child_event_diagnostics(child, class_name, diagnostics);
             }
         }

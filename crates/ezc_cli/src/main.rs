@@ -632,6 +632,11 @@ fn format_parsed_child(child: &ParsedJsxChild) -> String {
         ParsedJsxChild::Fragment(fragment) => {
             format!("Fragment <> {}", format_line_column_span(&fragment.span))
         }
+        ParsedJsxChild::Conditional(conditional) => format!(
+            "Conditional({:?}) {}",
+            conditional.condition,
+            format_line_column_span(&conditional.span)
+        ),
     }
 }
 
@@ -651,6 +656,11 @@ fn format_render_child(child: &ezc_core::RenderChild) -> String {
         ezc_core::RenderChild::Fragment(fragment) => {
             format!("Fragment <> {}", format_line_column_span(&fragment.span))
         }
+        ezc_core::RenderChild::Conditional(conditional) => format!(
+            "Conditional({:?}) {}",
+            conditional.condition,
+            format_line_column_span(&conditional.span)
+        ),
     }
 }
 
@@ -793,6 +803,36 @@ fn print_template_child(path: &Path, child: &TemplateChild, indent: usize) {
                 println!("{child_padding}  none");
             } else {
                 for child in &fragment.children {
+                    print_template_child(path, child, indent + 4);
+                }
+            }
+        }
+        TemplateChild::Conditional(conditional) => {
+            println!(
+                "{padding}Conditional id={} start={} end={} condition={:?} initial={} {}",
+                conditional.id.0,
+                conditional.start_id.0,
+                conditional.end_id.0,
+                conditional.condition,
+                format_serializable_value(conditional.initial_value.as_ref()),
+                format_source_span(path, &conditional.span)
+            );
+
+            let child_padding = " ".repeat(indent + 2);
+            println!("{child_padding}true:");
+            if conditional.when_true.is_empty() {
+                println!("{child_padding}  none");
+            } else {
+                for child in &conditional.when_true {
+                    print_template_child(path, child, indent + 4);
+                }
+            }
+
+            println!("{child_padding}false:");
+            if conditional.when_false.is_empty() {
+                println!("{child_padding}  none");
+            } else {
+                for child in &conditional.when_false {
                     print_template_child(path, child, indent + 4);
                 }
             }

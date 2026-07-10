@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: support jsx fragments
+* Latest commit: compiler: support conditional rendering
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 11:38:36 PDT
+* Date: 2026-07-10 12:28:11 PDT
 
 Last completed slice
 
-* Slice: 7D - JSX fragments
-* Summary: Added parser/render/template fragment nodes, fragment-root support, wrapperless static HTML generation, and transparent manifest traversal.
-* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/html_codegen.rs, crates/ezc_core/src/template_manifest.rs
-* New behavior: Fragment roots and nested fragments preserve compiler IDs/spans in development output while emitting only their sibling children in HTML and omitting fragment nodes from runtime manifests.
-* Tests added or changed: parser fragment assertions, core wrapperless HTML/transparent manifest assertions, CLI html/template/manifest fixture checks, and a real-browser fragment sibling identity probe.
-* Fixtures added or changed: fixtures/0016-fragments
+* Slice: 7E - Conditional rendering
+* Summary: Added compiler-owned conditional render nodes, stable conditional boundary IDs, static initial branch emission, manifest branch snippets, and runtime range replacement for supported boolean state conditions.
+* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/html_codegen.rs, crates/ezc_core/src/template_manifest.rs, crates/ezc_core/src/runtime_codegen.rs
+* New behavior: JSX ternaries like `{this.enabled ? <span>On</span> : <span>Off</span>}` and logical-and shorthand like `{this.enabled && <span>On</span>}` compile into conditional template nodes. Static HTML emits the initial branch from serializable state, and the runtime swaps only the anchored branch range when the backing boolean state changes.
+* Tests added or changed: parser conditional assertions, core template/manifest assertions, CLI html/template/manifest fixture checks, and real-browser probes for ternary branch switching and logical-and empty-branch switching.
+* Fixtures added or changed: fixtures/0017-conditional-rendering, fixtures/0018-logical-and-conditional
 
 Current in-progress slice
 
-* Slice: 7E - Conditional rendering
+* Slice: 7F - Lists and keys
 * Status: Not started
 * Completed: None
-* Remaining: Support one narrow conditional rendering form first, preserving branch template identity and defining runtime update behavior.
+* Remaining: Start with 7F-A list semantic model for a constrained keyed list form.
 
 Verification
 
@@ -38,15 +38,18 @@ Verification
 
 Architecture decisions made
 
-* Decision: 7D models fragments explicitly in parser/render/template graphs but keeps them transparent in static HTML and runtime manifest output.
-* Reason: Explicit fragment nodes preserve source spans and compiler identity for tooling while avoiding artificial wrapper DOM elements.
-* Tradeoff: Fragment IDs currently exist only in compiler/template output; runtime manifests contain the fragment children and their element/binding IDs.
-* Follow-up: 7E should preserve this fragment handling when conditional branches contain fragment or sibling children.
+* Decision: Conditional nodes are first-class parser/render/template children with a conditional node ID plus separate start/end boundary IDs.
+* Reason: The compiler needs stable branch identity for tooling and runtime updates, while the DOM needs comment anchors that can bound branch replacement without a wrapper element.
+* Tradeoff: Runtime manifests serialize branch HTML snippets for this first slice instead of recursively hydrating dynamic bindings/events inside branch snippets.
+* Decision: Logical-and shorthand reuses the same conditional model with an empty false branch.
+* Reason: It keeps ternary and shorthand update behavior identical once the branch anchor path is stable.
 
 Known limitations
 
+* Item: Conditional rendering only supports simple `this.<stateField>` conditions with JSX element or fragment branches.
+* Item: Conditional branch snippets are replaced as static HTML. Bindings, events, and nested dynamic behavior inside swapped-in branch snippets are not re-registered yet.
 * Item: Only `this.<field>++`, `this.<field>--`, `this.<field> += <literal>`, `this.<field> -= <literal>`, `this.<field> = <literal>`, and `this.<field> = !this.<field>` are recognized as action steps.
-* Item: The browser runtime supports only delegated click events, ordered closed action steps, numeric/string/boolean/null initial state, and binding callback text updates.
+* Item: The browser runtime supports only delegated click events, ordered closed action steps, numeric/string/boolean/null initial state, binding callback text/attribute updates, and conditional branch replacement.
 * Item: Static and `this.<stateField>` dynamic JSX attributes are preserved, but `className`/`htmlFor` normalization policy is still intentionally undecided.
 * Item: Dynamic attributes are limited to primitive state-field bindings; arbitrary expressions, method calls, spread attributes, arrays, and objects are not emitted yet.
 * Item: The serializable value model is still primitive-only until later array/object slices.
@@ -58,7 +61,7 @@ Known limitations
 
 Exact next step
 
-Start Slice 7E by parsing a single supported conditional expression shape and deciding how branch nodes appear in template graph, static HTML, and runtime update plans.
+Start Slice 7F-A by representing a constrained keyed list form in parser/render/template semantics: iterable dependency, item variable, optional index variable, key expression, and item template. Do not implement static array rendering until `SerializableValue` supports arrays.
 
 Useful commands
 
@@ -80,6 +83,8 @@ Useful commands
 * `cargo run -p ezc_cli -- build fixtures/0014-static-attributes/input/StaticAttributePanel.tsx --out target/ezc-manual/static-attributes`
 * `cargo run -p ezc_cli -- build fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx --out target/ezc-manual/dynamic-attributes`
 * `cargo run -p ezc_cli -- build fixtures/0016-fragments/input/FragmentPanel.tsx --out target/ezc-manual/fragments`
+* `cargo run -p ezc_cli -- build fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx --out target/ezc-manual/conditional-rendering`
+* `cargo run -p ezc_cli -- build fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx --out target/ezc-manual/logical-and-conditional`
 * `cargo run -p ezc_cli -- build fixtures/0004-nested-jsx/input/NestedCounter.tsx --out target/ezc-manual/runtime-contract`
 
 Changed but uncommitted files

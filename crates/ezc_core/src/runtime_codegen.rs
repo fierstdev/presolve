@@ -105,6 +105,43 @@ const RUNTIME_STUB: &str = r#"(() => {
     return anchors;
   }
 
+  function collectConditionalAnchors() {
+    const starts = new Map();
+    const ends = new Map();
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_COMMENT
+    );
+
+    while (walker.nextNode()) {
+      const value = (walker.currentNode.nodeValue ?? "").trim();
+      const startMatch = /^ez-conditional-start:([^:]+):(.*)$/.exec(value);
+
+      if (startMatch !== null) {
+        starts.set(startMatch[1], {
+          id: startMatch[1],
+          condition: startMatch[2],
+          marker: walker.currentNode
+        });
+        continue;
+      }
+
+      const endMatch = /^ez-conditional-end:([^:]+)$/.exec(value);
+
+      if (endMatch !== null) {
+        ends.set(endMatch[1], {
+          id: endMatch[1],
+          marker: walker.currentNode
+        });
+      }
+    }
+
+    return {
+      starts,
+      ends
+    };
+  }
+
   function collectElementAnchors() {
     const elementsByNode = new Map();
 
@@ -115,7 +152,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     return elementsByNode;
   }
 
-  function collectMissingAnchors(manifest, bindingAnchors, elementsByNode) {
+  function collectMissingAnchors(
+    manifest,
+    bindingAnchors,
+    conditionalAnchors,
+    elementsByNode
+  ) {
     const missing = [];
 
     for (const component of manifest.components ?? []) {
@@ -142,6 +184,26 @@ const RUNTIME_STUB: &str = r#"(() => {
             kind: node.kind,
             code: "EZR_MISSING_BINDING_ANCHOR"
           });
+        }
+
+        if (node.kind === "conditional") {
+          if (!conditionalAnchors.starts.has(node.start)) {
+            missing.push({
+              component: component.name,
+              id: node.start,
+              kind: node.kind,
+              code: "EZR_MISSING_CONDITIONAL_ANCHOR"
+            });
+          }
+
+          if (!conditionalAnchors.ends.has(node.end)) {
+            missing.push({
+              component: component.name,
+              id: node.end,
+              kind: node.kind,
+              code: "EZR_MISSING_CONDITIONAL_ANCHOR"
+            });
+          }
         }
       }
     }
@@ -239,6 +301,35 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (isPropertyAttribute(normalizedAttribute) && normalizedAttribute in element) {
       element[normalizedAttribute] = text;
     }
+  }
+
+  function replaceConditionalBranch(store, startMarker, endMarker, html) {
+    if (
+      startMarker.parentNode === null ||
+      endMarker.parentNode === null ||
+      startMarker.parentNode !== endMarker.parentNode
+    ) {
+      reportDiagnostic(
+        store.diagnostics,
+        "EZR_MISSING_CONDITIONAL_ANCHOR",
+        "Conditional anchor range was not contiguous in one parent",
+        {}
+      );
+      return;
+    }
+
+    let current = startMarker.nextSibling;
+
+    while (current !== null && current !== endMarker) {
+      const next = current.nextSibling;
+      current.remove();
+      current = next;
+    }
+
+    const template = document.createElement("template");
+    template.innerHTML = String(html ?? "");
+    endMarker.parentNode.insertBefore(template.content, endMarker);
+    store.elementsByNode = collectElementAnchors();
   }
 
   function createRuntimeStore(elementsByNode, diagnostics) {
@@ -364,7 +455,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     store.eventsByType.set(event.event, eventsByNode);
   }
 
-  function initializeComponentRuntime(store, manifestComponent, bindingAnchors) {
+  function initializeComponentRuntime(
+    store,
+    manifestComponent,
+    bindingAnchors,
+    conditionalAnchors
+  ) {
     const component = {
       name: manifestComponent.name,
       manifest: manifestComponent,
@@ -375,6 +471,35 @@ const RUNTIME_STUB: &str = r#"(() => {
     registerActions(store, component, manifestComponent);
 
     for (const node of manifestComponent.template?.nodes ?? []) {
+      if (node.kind === "conditional") {
+        const field = fieldNameFromThisMember(node.condition);
+
+        if (field === null) {
+          continue;
+        }
+
+        if (component.state[field] === undefined) {
+          component.state[field] = node.initial_value;
+        }
+
+        const start = conditionalAnchors.starts.get(node.start);
+        const end = conditionalAnchors.ends.get(node.end);
+
+        if (start === undefined || end === undefined) {
+          continue;
+        }
+
+        registerBinding(store, component, field, (value) => {
+          replaceConditionalBranch(
+            store,
+            start.marker,
+            end.marker,
+            value === true ? node.when_true_html : node.when_false_html
+          );
+        });
+        continue;
+      }
+
       if (node.kind !== "binding") {
         continue;
       }
@@ -601,11 +726,13 @@ const RUNTIME_STUB: &str = r#"(() => {
 
   function initializeRuntime(manifest, diagnostics) {
     const bindingAnchors = collectBindingAnchors();
+    const conditionalAnchors = collectConditionalAnchors();
     const elementsByNode = collectElementAnchors();
     const store = createRuntimeStore(elementsByNode, diagnostics);
     const missingAnchors = collectMissingAnchors(
       manifest,
       bindingAnchors,
+      conditionalAnchors,
       elementsByNode
     );
 
@@ -615,7 +742,9 @@ const RUNTIME_STUB: &str = r#"(() => {
         anchor.code,
         anchor.kind === "element"
           ? "Manifest element anchor was not found in the rendered DOM"
-          : "Manifest binding anchor was not found in the rendered DOM",
+          : anchor.kind === "conditional"
+            ? "Manifest conditional anchor was not found in the rendered DOM"
+            : "Manifest binding anchor was not found in the rendered DOM",
         anchor
       );
     }
@@ -624,7 +753,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       const component = initializeComponentRuntime(
         store,
         manifestComponent,
-        bindingAnchors
+        bindingAnchors,
+        conditionalAnchors
       );
       registerComponentEvents(store, component);
     }
