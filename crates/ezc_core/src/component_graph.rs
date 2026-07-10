@@ -66,6 +66,7 @@ pub enum StateOperation {
     Decrement,
     AddAssign(SerializableValue),
     SubtractAssign(SerializableValue),
+    Assign(SerializableValue),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -298,6 +299,9 @@ fn state_operation_from_parsed(operation: &ParsedStateOperation) -> StateOperati
         }
         ParsedStateOperation::SubtractAssign(value) => {
             StateOperation::SubtractAssign(serializable_value_from_parsed(value))
+        }
+        ParsedStateOperation::Assign(value) => {
+            StateOperation::Assign(serializable_value_from_parsed(value))
         }
     }
 }

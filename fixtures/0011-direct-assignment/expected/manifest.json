@@ -1,0 +1,37 @@
+{
+  "components": [
+    {
+      "name": "ResetCounter",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "button"
+          },
+          {
+            "kind": "binding",
+            "id": "n1",
+            "expression": "this.count",
+            "initial_value": "5"
+          }
+        ],
+        "events": [
+          {
+            "node": "n0",
+            "event": "click",
+            "handler": "this.reset"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "method": "reset",
+          "operation": "assign",
+          "field": "count",
+          "operand": "0"
+        }
+      ]
+    }
+  ]
+}

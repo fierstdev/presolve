@@ -204,6 +204,7 @@ fn parsed_assignment_state_update(
     let operation = match assignment.operator.as_str() {
         "+=" => ParsedStateOperation::AddAssign(operand),
         "-=" => ParsedStateOperation::SubtractAssign(operand),
+        "=" => ParsedStateOperation::Assign(operand),
         _ => return None,
     };
 

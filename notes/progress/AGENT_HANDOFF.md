@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: support add/subtract assignment actions
+* Latest commit: compiler: support direct assignment actions
 * Working tree: clean after committing this slice
-* Date: 2026-07-09 21:40:33 PDT
+* Date: 2026-07-09 21:46:48 PDT
 
 Last completed slice
 
-* Slice: 6F-B - Add-assign and subtract-assign literal operations
-* Summary: Added support for `this.<field> += <literal>` and `this.<field> -= <literal>` through parser extraction, typed compiler operations, manifest operands, and browser runtime execution.
+* Slice: 6F-C - Direct literal assignment
+* Summary: Added support for `this.<field> = <literal>` through parser extraction, typed compiler operations, manifest operands, and browser runtime execution.
 * Key files: crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_manifest.rs, crates/ezc_core/src/runtime_codegen.rs, crates/ezc_cli/tests/runtime_browser.rs
-* New behavior: Add/subtract assignment actions serialize as `"add_assign"` / `"subtract_assign"` with typed `operand`; runtime applies the numeric operand through the existing delegated event path.
-* Tests added or changed: parser add/subtract extraction, core action/manifest assertions, CLI fixture tests, and a real-browser add/subtract probe.
-* Fixtures added or changed: fixtures/0010-add-subtract-assign plus updated fixtures/0001-source-summary manifest/graph now that `this.count += 1` is supported.
+* New behavior: Direct assignment actions serialize as `"assign"` with typed `operand`; runtime writes the operand through the existing delegated event path.
+* Tests added or changed: parser assignment extraction, core action/manifest assertions, CLI fixture tests, and a real-browser reset probe.
+* Fixtures added or changed: fixtures/0011-direct-assignment
 
 Current in-progress slice
 
-* Slice: 6F-C - Direct literal assignment
+* Slice: 6F-D - Boolean toggle pattern
 * Status: Not started
 * Completed: None
-* Remaining: Recognize `this.<field> = <literal>`, preserve the assigned value as a typed literal, serialize it through the manifest, and execute it in the browser runtime.
+* Remaining: Recognize `this.<field> = !this.<field>`, serialize a closed boolean-toggle operation, and execute it in the browser runtime.
 
 Verification
 
@@ -38,22 +38,22 @@ Verification
 
 Architecture decisions made
 
-* Decision: Model `+=` and `-=` as closed typed operations carrying `SerializableValue` operands, serialized as an optional manifest `operand`.
-* Reason: 6F-B needs typed literal retention without opening arbitrary expression evaluation.
-* Tradeoff: Runtime execution currently treats operands numerically and reports non-numeric operands as runtime errors.
-* Follow-up: Reuse the same typed operand path for direct literal assignment in 6F-C.
+* Decision: Reuse the typed manifest `operand` path for direct assignment and write the operand as-is at runtime.
+* Reason: 6F-C should preserve literal values without introducing arbitrary expression evaluation.
+* Tradeoff: Numeric assignments currently write the manifest's raw number string because `SerializableValue::Number(String)` serializes as a JSON string.
+* Follow-up: Treat any numeric manifest representation change as a later value-model decision, not part of 6F-D.
 
 Known limitations
 
-* Item: Only `this.<field>++`, `this.<field>--`, `this.<field> += <literal>`, and `this.<field> -= <literal>` are recognized as actions. Direct assignment, boolean toggle, and multi-step plans are intentionally deferred.
-* Item: The browser runtime supports only delegated click events, increment/decrement/add-assign/subtract-assign actions, numeric/string/boolean/null initial state, and binding callback text updates.
+* Item: Only `this.<field>++`, `this.<field>--`, `this.<field> += <literal>`, `this.<field> -= <literal>`, and `this.<field> = <literal>` are recognized as actions. Boolean toggle and multi-step plans are intentionally deferred.
+* Item: The browser runtime supports only delegated click events, increment/decrement/add-assign/subtract-assign/direct-assignment actions, numeric/string/boolean/null initial state, and binding callback text updates.
 * Item: The serializable value model is still primitive-only until later array/object slices.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 
 Exact next step
 
-Start Slice 6F-C by adding direct literal assignment for `this.<field> = <literal>`, including typed assigned values in parser/core/manifest models and browser behavior.
+Start Slice 6F-D by adding boolean toggle support for `this.<field> = !this.<field>`, including parser/core/manifest models and browser behavior.
 
 Useful commands
 
@@ -69,6 +69,7 @@ Useful commands
 * `cargo run -p ezc_cli -- build fixtures/0005-double-binding-counter/input/DoubleBindingCounter.tsx --out target/ezc-manual/double-binding-counter`
 * `cargo run -p ezc_cli -- build fixtures/0009-decrement-counter/input/DecrementCounter.tsx --out target/ezc-manual/decrement-counter`
 * `cargo run -p ezc_cli -- build fixtures/0010-add-subtract-assign/input/StepCounter.tsx --out target/ezc-manual/step-counter`
+* `cargo run -p ezc_cli -- build fixtures/0011-direct-assignment/input/ResetCounter.tsx --out target/ezc-manual/reset-counter`
 
 Changed but uncommitted files
 

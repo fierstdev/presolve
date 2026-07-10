@@ -232,6 +232,42 @@ class StepCounter extends Component {
 }
 
 #[test]
+fn parses_direct_literal_assignment_state_update() {
+    let source = r#"
+@component("x-reset-counter")
+class ResetCounter extends Component {
+  count = state(5);
+
+  reset() {
+    this.count = 0;
+  }
+
+  render() {
+    return <button onClick={() => this.reset()}>Count: {this.count}</button>;
+  }
+}
+"#;
+
+    let parsed = parse_file("ResetCounter.tsx", source);
+
+    assert!(parsed.diagnostics.is_empty());
+
+    let class = parsed.classes.first().expect("expected class");
+    let reset = class
+        .methods
+        .iter()
+        .find(|method| method.name == "reset")
+        .expect("expected reset method");
+
+    assert_eq!(reset.state_updates.len(), 1);
+    assert_eq!(reset.state_updates[0].field, "count");
+    assert_eq!(
+        reset.state_updates[0].operation,
+        ParsedStateOperation::Assign(ParsedSerializableValue::Number("0".to_string()))
+    );
+}
+
+#[test]
 fn reports_broken_tsx_diagnostic() {
     let source = include_str!("../../../fixtures/0002-broken-tsx/input/BrokenCounter.tsx");
 

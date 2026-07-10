@@ -302,12 +302,18 @@ const RUNTIME_STUB: &str = r#"(() => {
       action.operation !== "increment" &&
       action.operation !== "decrement" &&
       action.operation !== "add_assign" &&
-      action.operation !== "subtract_assign"
+      action.operation !== "subtract_assign" &&
+      action.operation !== "assign"
     ) {
       console.error(
         "[EdgeZero] EZR_UNSUPPORTED_ACTION",
         action
       );
+      return;
+    }
+
+    if (action.operation === "assign") {
+      writeField(store, component, action.field, action.operand);
       return;
     }
 
@@ -486,7 +492,8 @@ mod tests {
         assert!(runtime.contains("installDelegatedEventListeners"));
         assert!(runtime.contains("document.addEventListener(eventType"));
         assert!(!runtime.contains("element.addEventListener(\"click\""));
-        assert!(runtime.contains("action.operation !== \"subtract_assign\""));
+        assert!(runtime.contains("action.operation !== \"assign\""));
+        assert!(runtime.contains("action.operation === \"assign\""));
         assert!(runtime.contains("EZR_NON_NUMERIC_OPERAND"));
         assert!(runtime.contains("current + delta"));
         assert!(runtime.contains("dataset.ezRuntime"));
