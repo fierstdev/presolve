@@ -22,9 +22,19 @@ fn ezc_cli_bin() -> PathBuf {
 }
 
 fn chrome_bin() -> Option<PathBuf> {
+    if let Some(path) = std::env::var_os("EDGEZERO_CHROME") {
+        let path = PathBuf::from(path);
+
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+
     let candidates = [
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/opt/google/chrome/chrome",
         "/usr/bin/google-chrome",
+        "/usr/bin/google-chrome-stable",
         "/usr/bin/chromium",
         "/usr/bin/chromium-browser",
     ];
@@ -36,7 +46,6 @@ fn chrome_bin() -> Option<PathBuf> {
 }
 
 #[test]
-#[ignore = "requires a local headless Chrome browser"]
 fn double_binding_counter_increments_in_a_real_browser() {
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/double-binding-counter");
@@ -116,6 +125,19 @@ const fail = (message) => {
   throw new Error(message);
 };
 
+const edgezeroConsoleErrors = [];
+const originalConsoleError = console.error.bind(console);
+console.error = (...args) => {
+  const message = args.map((arg) => {
+    if (arg instanceof Error) return arg.message;
+    if (typeof arg === "string") return arg;
+    return JSON.stringify(arg);
+  }).join(" ");
+
+  edgezeroConsoleErrors.push(message);
+  originalConsoleError(...args);
+};
+
 const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   const deadline = Date.now() + 3000;
   const tick = () => {
@@ -163,6 +185,10 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 
   if (window.__EDGEZERO__.components[0].state.count !== 2) {
     fail("debug state did not update to 2");
+  }
+
+  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
+    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
   }
 
   if (!(window.__EDGEZERO__.store.components instanceof Map)) {

@@ -3,57 +3,60 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: feat: delegate runtime events by template node id
+* Latest commit: test: add browser runtime e2e suite
 * Working tree: clean after committing this slice
-* Date: 2026-07-09 18:50:33 PDT
+* Date: 2026-07-09 18:58:19 PDT
 
 Last completed slice
 
-* Slice: 6D-D - Switch to delegated events
-* Summary: Event semantics now carry explicit event types, manifest events include `event`, and runtime dispatch uses one delegated document listener per event type.
-* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/template_manifest.rs, crates/ezc_core/src/runtime_codegen.rs
-* New behavior: JSX `onClick` is represented as event type `click`; browser clicks on nested targets walk up `data-ez-node` ancestors and dispatch through manifest event/action indexes without per-node listeners.
-* Tests added or changed: parser event assertions, component graph event/diagnostic assertions, runtime string assertions, CLI fixture expectations, ignored Chrome browser probe for nested target plus two button handlers
-* Fixtures added or changed: event schema updates in fixtures/0001-source-summary, fixtures/0003-semantic-errors, fixtures/0004-nested-jsx, and expanded fixtures/0005-double-binding-counter/input/DoubleBindingCounter.tsx
+* Slice: 6D-E - Add the first browser e2e suite as a permanent gate
+* Summary: The real-browser runtime probe is now a permanent test and CI gate instead of an ignored manual check.
+* Key files: crates/ezc_cli/tests/runtime_browser.rs, e2e/browser/README.md, package.json, justfile, .github/workflows/ci.yml
+* New behavior: `cargo test --workspace` now runs the Chrome-backed browser runtime test by default. The probe builds the double-binding counter fixture, serves it locally, opens Chrome, clicks delegated nested targets, verifies shared binding updates, checks runtime debug store maps, and fails on unexpected `[EdgeZero]` console errors.
+* Tests added or changed: promoted `double_binding_counter_increments_in_a_real_browser` out of `#[ignore]`, added `pnpm test:e2e` and `pnpm test:e2e:headed` aliases, added `just e2e` and `just e2e-headed` targets, and added CI jobs for workspace tests plus explicit browser e2e.
+* Fixtures added or changed: None
 
 Current in-progress slice
 
-* Slice: 6D-E - Add the first browser e2e suite as a permanent gate
+* Slice: 6E-A - String literals
 * Status: Not started
 * Completed: None
-* Remaining: Promote browser behavior testing from the ignored Rust integration probe into a reproducible local and CI e2e gate with deterministic build setup, static serving, scripts/just target, and unexpected runtime-console failure handling.
+* Remaining: Support `state("Austin")` while preserving the semantic string value, escaping HTML text correctly, serializing manifest values as JSON strings, and initializing browser runtime state from typed string values.
 
 Verification
 
-* cargo fmt --check: pass
+* cargo fmt --all --check: pass
 * cargo test --workspace: pass
-* Other tests: `cargo test -p ezc_core`, `cargo test -p ezc_cli`, and `cargo test -p ezc_cli --test runtime_browser -- --ignored --nocapture` passed before the full workspace gate.
-* Known failures: None
+* pnpm test:e2e: pass
+* pnpm test:e2e:headed: pass
+* just e2e: not run locally because `just` is not installed in this shell
+* Known failures: `cargo clippy --workspace --all-targets -- -D warnings` still fails on pre-existing warnings outside this slice, so the new CI workflow intentionally does not add a clippy gate yet.
 
 Architecture decisions made
 
-* Decision: Keep event type as a compiler-owned string at this stage and reject unsupported events with diagnostics.
-* Reason: The roadmap only requires `click` now, but the manifest/runtime boundary needs the explicit event field before delegation and future event growth.
-* Tradeoff: The model is still narrow and string-based rather than a broader event enum or schema-versioned contract.
-* Follow-up: Runtime contract versioning in Slice 6G should stabilize event schema expectations.
+* Decision: Keep the first browser e2e suite as a Rust integration harness instead of introducing Playwright now.
+* Reason: The existing harness already performs deterministic fixture builds, static serving, Chrome execution, DOM assertions, and runtime console failure capture without adding JavaScript test dependencies.
+* Tradeoff: `test:e2e:headed` currently aliases the same deterministic Chrome dump-DOM harness rather than an interactive headed runner.
+* Follow-up: If future UI coverage needs richer browser interaction or screenshots, replace or supplement the harness with a DevTools or Playwright runner.
 
 Known limitations
 
 * Item: Only `this.<field>++` is recognized as an action. `this.count += 1`, decrement, assignment, and multi-step plans are intentionally deferred.
 * Item: The browser runtime supports only delegated click events, increment actions, numeric state, and binding callback text updates.
-* Item: Browser e2e coverage is present but ignored by default until the dedicated e2e gate slice.
+* Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 
 Exact next step
 
-Start Slice 6D-E by turning the existing ignored `crates/ezc_cli/tests/runtime_browser.rs` behavior into a permanent browser e2e gate. Decide whether to keep the Rust harness as the official gate or introduce the roadmap-preferred Playwright package, then add the local command/just target and CI path without weakening the current Chrome probe assertions.
+Start Slice 6E-A by replacing the numeric-only state initial value path with enough typed value handling to preserve string literals from parser model through component graph, manifest JSON, HTML binding rendering, and runtime initialization.
 
 Useful commands
 
-* `cargo fmt --check`
+* `cargo fmt --all --check`
 * `cargo test -p ezc_parser`
 * `cargo test -p ezc_core`
 * `cargo test -p ezc_cli`
-* `cargo test -p ezc_cli --test runtime_browser -- --ignored --nocapture`
+* `cargo test -p ezc_cli --test runtime_browser -- --nocapture`
+* `pnpm test:e2e`
 * `cargo test --workspace`
 * `cargo run -p ezc_cli -- build fixtures/0005-double-binding-counter/input/DoubleBindingCounter.tsx --out target/ezc-manual/double-binding-counter`
 
