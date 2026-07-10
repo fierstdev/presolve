@@ -7,10 +7,13 @@ use std::process;
 use ezc_core::{
     build_component_graph, build_template_graph, build_template_manifest, explain_json,
     explain_text, generate_runtime_stub, generate_standalone_page, generate_static_html,
-    summarize_source, template_manifest_json, AttributeValue, ComponentGraph, SerializableValue,
-    StateOperation, TemplateChild, TemplateGraph,
+    summarize_source, template_manifest_json, AttributeValue, ComponentGraph, RenderAttribute,
+    RenderAttributeValue, SerializableValue, StateOperation, TemplateChild, TemplateGraph,
 };
-use ezc_parser::{parse_file, ParseSeverity, ParsedClass, ParsedFile, ParsedMethod};
+use ezc_parser::{
+    parse_file, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
+    ParsedJsxAttributeValue, ParsedMethod,
+};
 
 fn main() {
     let mut args = env::args().skip(1).collect::<Vec<_>>();
@@ -388,7 +391,14 @@ fn print_parsed_method(method: &ParsedMethod) {
             if jsx.attributes.is_empty() {
                 println!("          attributes: none");
             } else {
-                println!("          attributes: {}", jsx.attributes.join(", "));
+                println!(
+                    "          attributes: {}",
+                    jsx.attributes
+                        .iter()
+                        .map(format_parsed_attribute)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
             }
 
             if jsx.event_handlers.is_empty() {
@@ -492,7 +502,15 @@ fn print_component_graph(path: &Path, graph: &ComponentGraph) {
                 if render.attributes.is_empty() {
                     println!("        attributes: none");
                 } else {
-                    println!("        attributes: {}", render.attributes.join(", "));
+                    println!(
+                        "        attributes: {}",
+                        render
+                            .attributes
+                            .iter()
+                            .map(format_render_attribute)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    );
                 }
 
                 if render.event_handlers.is_empty() {
@@ -660,11 +678,32 @@ fn format_serializable_value(value: Option<&SerializableValue>) -> String {
 
 fn format_attribute_value(value: &AttributeValue) -> String {
     match value {
+        AttributeValue::Boolean => "boolean".to_string(),
         AttributeValue::Static(value) => format!("{value:?}"),
         AttributeValue::EventHandler { event, handler } => {
             format!("event-handler({event} -> {handler})")
         }
         AttributeValue::BindingList(bindings) => format!("bindings({})", bindings.join(", ")),
+    }
+}
+
+fn format_parsed_attribute(attribute: &ParsedJsxAttribute) -> String {
+    match &attribute.value {
+        ParsedJsxAttributeValue::Boolean => attribute.name.clone(),
+        ParsedJsxAttributeValue::Static(value) => format!("{}={value:?}", attribute.name),
+        ParsedJsxAttributeValue::Expression(_) => format!("{}={{...}}", attribute.name),
+        ParsedJsxAttributeValue::Spread(_) => "{...}".to_string(),
+        ParsedJsxAttributeValue::Unsupported => format!("{}=<complex>", attribute.name),
+    }
+}
+
+fn format_render_attribute(attribute: &RenderAttribute) -> String {
+    match &attribute.value {
+        RenderAttributeValue::Boolean => attribute.name.clone(),
+        RenderAttributeValue::Static(value) => format!("{}={value:?}", attribute.name),
+        RenderAttributeValue::Expression(_) => format!("{}={{...}}", attribute.name),
+        RenderAttributeValue::Spread(_) => "{...}".to_string(),
+        RenderAttributeValue::Unsupported => format!("{}=<complex>", attribute.name),
     }
 }
 

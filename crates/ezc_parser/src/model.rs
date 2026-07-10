@@ -75,9 +75,25 @@ pub enum ParsedJsxChild {
 pub struct ParsedJsxElement {
     pub name: String,
     pub span: SourceSpan,
-    pub attributes: Vec<String>,
+    pub attributes: Vec<ParsedJsxAttribute>,
     pub event_handlers: Vec<ParsedEventHandler>,
     pub children: Vec<ParsedJsxChild>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedJsxAttribute {
+    pub name: String,
+    pub value: ParsedJsxAttributeValue,
+    pub span: SourceSpan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParsedJsxAttributeValue {
+    Boolean,
+    Static(String),
+    Expression(Option<String>),
+    Spread(Option<String>),
+    Unsupported,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

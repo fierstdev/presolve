@@ -1,6 +1,6 @@
 use ezc_parser::{
-    parse_file, ParseSeverity, ParsedEventHandler, ParsedJsxChild, ParsedSerializableValue,
-    ParsedStateOperation,
+    parse_file, ParseSeverity, ParsedEventHandler, ParsedJsxAttributeValue, ParsedJsxChild,
+    ParsedSerializableValue, ParsedStateOperation,
 };
 
 #[test]
@@ -47,7 +47,12 @@ fn parses_counter_fixture() {
 
     assert_eq!(render.jsx_roots.len(), 1);
     assert_eq!(render.jsx_roots[0].name, "button");
-    assert_eq!(render.jsx_roots[0].attributes, vec!["onClick={...}"]);
+    assert_eq!(render.jsx_roots[0].attributes.len(), 1);
+    assert_eq!(render.jsx_roots[0].attributes[0].name, "onClick");
+    assert!(matches!(
+        render.jsx_roots[0].attributes[0].value,
+        ParsedJsxAttributeValue::Expression(_)
+    ));
     assert_eq!(
         render.jsx_roots[0].event_handlers,
         vec![ParsedEventHandler {
@@ -352,6 +357,61 @@ fn parses_multi_step_state_updates_in_source_order() {
 }
 
 #[test]
+fn parses_jsx_attributes_as_structured_values() {
+    let source = r#"
+@component("x-attrs")
+class Attrs extends Component {
+  disabled = state(false);
+
+  render() {
+    return <button type="button" disabled data-mode="safe" title={this.disabled} {...props}>Go</button>;
+  }
+}
+"#;
+
+    let parsed = parse_file("Attrs.tsx", source);
+
+    assert!(parsed.diagnostics.is_empty());
+
+    let class = parsed.classes.first().expect("expected class");
+    let render = class
+        .methods
+        .iter()
+        .find(|method| method.name == "render")
+        .expect("expected render method");
+    let root = render.jsx_roots.first().expect("expected JSX root");
+
+    assert_eq!(root.attributes.len(), 5);
+
+    assert_eq!(root.attributes[0].name, "type");
+    assert_eq!(
+        root.attributes[0].value,
+        ParsedJsxAttributeValue::Static("button".to_string())
+    );
+
+    assert_eq!(root.attributes[1].name, "disabled");
+    assert_eq!(root.attributes[1].value, ParsedJsxAttributeValue::Boolean);
+
+    assert_eq!(root.attributes[2].name, "data-mode");
+    assert_eq!(
+        root.attributes[2].value,
+        ParsedJsxAttributeValue::Static("safe".to_string())
+    );
+
+    assert_eq!(root.attributes[3].name, "title");
+    assert_eq!(
+        root.attributes[3].value,
+        ParsedJsxAttributeValue::Expression(Some("this.disabled".to_string()))
+    );
+
+    assert_eq!(root.attributes[4].name, "{...}");
+    assert_eq!(
+        root.attributes[4].value,
+        ParsedJsxAttributeValue::Spread(Some("props".to_string()))
+    );
+}
+
+#[test]
 fn reports_broken_tsx_diagnostic() {
     let source = include_str!("../../../fixtures/0002-broken-tsx/input/BrokenCounter.tsx");
 
@@ -413,7 +473,12 @@ fn parses_nested_jsx_fixture() {
     };
 
     assert_eq!(button.name, "button");
-    assert_eq!(button.attributes, vec!["onClick={...}"]);
+    assert_eq!(button.attributes.len(), 1);
+    assert_eq!(button.attributes[0].name, "onClick");
+    assert!(matches!(
+        button.attributes[0].value,
+        ParsedJsxAttributeValue::Expression(_)
+    ));
     assert_eq!(
         button.event_handlers,
         vec![ParsedEventHandler {

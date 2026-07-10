@@ -1,8 +1,8 @@
 use serde::Serialize;
 
 use ezc_parser::{
-    ParsedClass, ParsedEventHandler, ParsedFile, ParsedJsxChild, ParsedSerializableValue,
-    ParsedStateOperation,
+    ParsedClass, ParsedEventHandler, ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue,
+    ParsedJsxChild, ParsedSerializableValue, ParsedStateOperation,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -80,9 +80,24 @@ pub enum RenderChild {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RenderElement {
     pub tag_name: String,
-    pub attributes: Vec<String>,
+    pub attributes: Vec<RenderAttribute>,
     pub event_handlers: Vec<RenderEventHandler>,
     pub children: Vec<RenderChild>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenderAttribute {
+    pub name: String,
+    pub value: RenderAttributeValue,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RenderAttributeValue {
+    Boolean,
+    Static(String),
+    Expression(Option<String>),
+    Spread(Option<String>),
+    Unsupported,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -94,7 +109,7 @@ pub struct RenderEventHandler {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RenderModel {
     pub root_element: Option<String>,
-    pub attributes: Vec<String>,
+    pub attributes: Vec<RenderAttribute>,
     pub bindings: Vec<String>,
     pub event_handlers: Vec<RenderEventHandler>,
     pub children: Vec<RenderChild>,
@@ -184,7 +199,14 @@ fn build_component_node(
 
             RenderModel {
                 root_element: root.map(|jsx| jsx.name.clone()),
-                attributes: root.map(|jsx| jsx.attributes.clone()).unwrap_or_default(),
+                attributes: root
+                    .map(|jsx| {
+                        jsx.attributes
+                            .iter()
+                            .map(render_attribute_from_parsed)
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default(),
                 event_handlers: root
                     .map(|jsx| {
                         jsx.event_handlers
@@ -216,6 +238,7 @@ fn build_component_node(
         collect_render_binding_diagnostics(class, render, diagnostics);
         collect_render_event_diagnostics(class, render, diagnostics);
         collect_duplicate_event_diagnostics(render, &class.name, diagnostics);
+        collect_render_attribute_diagnostics(render, &class.name, diagnostics);
     }
 
     ComponentNode {
@@ -331,7 +354,11 @@ fn render_child_from_parsed(child: &ParsedJsxChild) -> RenderChild {
         ParsedJsxChild::Binding(binding) => RenderChild::Binding(binding.clone()),
         ParsedJsxChild::Element(element) => RenderChild::Element(RenderElement {
             tag_name: element.name.clone(),
-            attributes: element.attributes.clone(),
+            attributes: element
+                .attributes
+                .iter()
+                .map(render_attribute_from_parsed)
+                .collect(),
             event_handlers: element
                 .event_handlers
                 .iter()
@@ -343,6 +370,23 @@ fn render_child_from_parsed(child: &ParsedJsxChild) -> RenderChild {
                 .map(render_child_from_parsed)
                 .collect::<Vec<_>>(),
         }),
+    }
+}
+
+fn render_attribute_from_parsed(attribute: &ParsedJsxAttribute) -> RenderAttribute {
+    RenderAttribute {
+        name: attribute.name.clone(),
+        value: match &attribute.value {
+            ParsedJsxAttributeValue::Boolean => RenderAttributeValue::Boolean,
+            ParsedJsxAttributeValue::Static(value) => RenderAttributeValue::Static(value.clone()),
+            ParsedJsxAttributeValue::Expression(expression) => {
+                RenderAttributeValue::Expression(expression.clone())
+            }
+            ParsedJsxAttributeValue::Spread(expression) => {
+                RenderAttributeValue::Spread(expression.clone())
+            }
+            ParsedJsxAttributeValue::Unsupported => RenderAttributeValue::Unsupported,
+        },
     }
 }
 
@@ -386,6 +430,92 @@ fn collect_duplicate_event_diagnostics(
     for child in &render.children {
         collect_duplicate_child_event_diagnostics(child, class_name, diagnostics);
     }
+}
+
+fn collect_render_attribute_diagnostics(
+    render: &RenderModel,
+    class_name: &str,
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+) {
+    collect_attribute_diagnostics_for_attributes(&render.attributes, class_name, diagnostics);
+
+    for child in &render.children {
+        collect_child_attribute_diagnostics(child, class_name, diagnostics);
+    }
+}
+
+fn collect_child_attribute_diagnostics(
+    child: &RenderChild,
+    class_name: &str,
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+) {
+    if let RenderChild::Element(element) = child {
+        collect_attribute_diagnostics_for_attributes(&element.attributes, class_name, diagnostics);
+
+        for child in &element.children {
+            collect_child_attribute_diagnostics(child, class_name, diagnostics);
+        }
+    }
+}
+
+fn collect_attribute_diagnostics_for_attributes(
+    attributes: &[RenderAttribute],
+    class_name: &str,
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+) {
+    let mut seen = Vec::<&str>::new();
+
+    for attribute in attributes {
+        if !attribute.name.starts_with("on") {
+            if seen.contains(&attribute.name.as_str()) {
+                diagnostics.push(ComponentDiagnostic {
+                    code: "EZC1007".to_string(),
+                    message: format!(
+                        "attribute `{}` is declared more than once on the same element in class `{}`",
+                        attribute.name, class_name
+                    ),
+                });
+            } else if attribute.name != "{...}" {
+                seen.push(&attribute.name);
+            }
+        }
+
+        match &attribute.value {
+            RenderAttributeValue::Expression(_) if !is_event_attribute(&attribute.name) => {
+                diagnostics.push(ComponentDiagnostic {
+                    code: "EZC1008".to_string(),
+                    message: format!(
+                        "attribute `{}` uses an expression value, which is not supported yet in class `{}`",
+                        attribute.name, class_name
+                    ),
+                });
+            }
+            RenderAttributeValue::Spread(_) => {
+                diagnostics.push(ComponentDiagnostic {
+                    code: "EZC1009".to_string(),
+                    message: format!(
+                        "JSX spread attributes are not supported yet in class `{class_name}`"
+                    ),
+                });
+            }
+            RenderAttributeValue::Unsupported if !is_event_attribute(&attribute.name) => {
+                diagnostics.push(ComponentDiagnostic {
+                    code: "EZC1010".to_string(),
+                    message: format!(
+                        "attribute `{}` uses an unsupported JSX value in class `{}`",
+                        attribute.name, class_name
+                    ),
+                });
+            }
+            _ => {}
+        }
+    }
+}
+
+fn is_event_attribute(name: &str) -> bool {
+    name.strip_prefix("on")
+        .and_then(|event| event.chars().next())
+        .is_some_and(char::is_uppercase)
 }
 
 fn collect_duplicate_child_event_diagnostics(

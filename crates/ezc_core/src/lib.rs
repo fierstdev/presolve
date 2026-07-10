@@ -16,8 +16,8 @@ pub mod template_manifest;
 
 pub use component_graph::{
     build_component_graph, ComponentAction, ComponentDiagnostic, ComponentGraph, ComponentMethod,
-    ComponentNode, RenderChild, RenderEventHandler, RenderModel, SerializableValue, StateField,
-    StateOperation,
+    ComponentNode, RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler,
+    RenderModel, SerializableValue, StateField, StateOperation,
 };
 pub use explain::{explain_json, explain_text};
 pub use html_codegen::generate_static_html;
@@ -163,7 +163,12 @@ class Counter extends Component {
         let render = component.render.as_ref().expect("expected render model");
 
         assert_eq!(render.root_element.as_deref(), Some("button"));
-        assert_eq!(render.attributes, vec!["onClick={...}"]);
+        assert_eq!(render.attributes.len(), 1);
+        assert_eq!(render.attributes[0].name, "onClick");
+        assert!(matches!(
+            render.attributes[0].value,
+            RenderAttributeValue::Expression(_)
+        ));
         assert_eq!(render.bindings, vec!["this.count"]);
         assert_eq!(
             render.event_handlers,
@@ -524,6 +529,95 @@ class Counter extends Component {
             manifest_value["components"][0]["template"]["nodes"][1]["initial_value"],
             serde_json::json!("Austin & <Zero>")
         );
+    }
+
+    #[test]
+    fn preserves_static_jsx_attributes_in_template_outputs() {
+        let source =
+            include_str!("../../../fixtures/0014-static-attributes/input/StaticAttributePanel.tsx");
+
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0014-static-attributes/input/StaticAttributePanel.tsx",
+            source,
+        );
+
+        let component_graph = build_component_graph(&parsed);
+        assert!(component_graph.diagnostics.is_empty());
+
+        let template_graph = build_template_graph(&component_graph);
+        let root = template_graph.templates[0]
+            .root
+            .as_ref()
+            .expect("expected root");
+
+        assert_eq!(root.attributes.len(), 3);
+        assert_eq!(root.attributes[0].name, "id");
+        assert_eq!(
+            root.attributes[0].value,
+            AttributeValue::Static("panel-root".to_string())
+        );
+        assert_eq!(root.attributes[1].name, "aria-label");
+        assert_eq!(
+            root.attributes[1].value,
+            AttributeValue::Static("Status \"Panel\"".to_string())
+        );
+        assert_eq!(root.attributes[2].name, "hidden");
+        assert_eq!(root.attributes[2].value, AttributeValue::Boolean);
+
+        let TemplateChild::Element(button) = &root.children[0] else {
+            panic!("expected button child");
+        };
+
+        assert_eq!(button.attributes.len(), 4);
+        assert_eq!(button.attributes[0].name, "type");
+        assert_eq!(
+            button.attributes[0].value,
+            AttributeValue::Static("button".to_string())
+        );
+        assert_eq!(button.attributes[1].name, "data-mode");
+        assert_eq!(
+            button.attributes[1].value,
+            AttributeValue::Static("safe & sound".to_string())
+        );
+        assert_eq!(button.attributes[2].name, "title");
+        assert_eq!(
+            button.attributes[2].value,
+            AttributeValue::Static("Use <carefully>".to_string())
+        );
+        assert_eq!(button.attributes[3].name, "data-ez-bindings");
+
+        let html = generate_static_html(&template_graph);
+
+        assert_eq!(
+            html,
+            "<section data-ez-node=\"n0\" id=\"panel-root\" aria-label=\"Status &quot;Panel&quot;\" hidden><button data-ez-node=\"n1\" type=\"button\" data-mode=\"safe &amp; sound\" title=\"Use &lt;carefully&gt;\" data-ez-bindings=\"this.label\">Label:<!-- ez-binding:n2:this.label -->Ready</button></section>\n"
+        );
+    }
+
+    #[test]
+    fn reports_static_attribute_semantic_errors() {
+        let source = r#"
+@component("x-bad-attrs")
+class BadAttrs extends Component {
+  disabled = state(false);
+
+  render() {
+    return <button type="button" type="submit" title={this.disabled} {...props}>Go</button>;
+  }
+}
+"#;
+
+        let parsed = ezc_parser::parse_file("BadAttrs.tsx", source);
+        let graph = build_component_graph(&parsed);
+        let codes = graph
+            .diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.code.as_str())
+            .collect::<Vec<_>>();
+
+        assert!(codes.contains(&"EZC1007"));
+        assert!(codes.contains(&"EZC1008"));
+        assert!(codes.contains(&"EZC1009"));
     }
 
     #[test]

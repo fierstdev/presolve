@@ -1,0 +1,19 @@
+File: fixtures/0014-static-attributes/input/StaticAttributePanel.tsx
+TemplateGraph:
+  templates:
+    template StaticAttributePanel
+      root: <section> id=n0
+      attributes:
+        id = "panel-root"
+        aria-label = "Status \"Panel\""
+        hidden = boolean
+      children:
+        Element <button> id=n1
+          attributes:
+            type = "button"
+            data-mode = "safe & sound"
+            title = "Use <carefully>"
+            data-ez-bindings = bindings(this.label)
+          children:
+            Text("Label:")
+            Binding id=n2 expression="this.label" initial=Some("Ready")

@@ -29,9 +29,12 @@ fn generate_element_html(element: &ElementNode) -> String {
     for attribute in &element.attributes {
         html.push(' ');
         html.push_str(&attribute.name);
-        html.push_str("=\"");
-        html.push_str(&escape_attr(&attribute_value_string(attribute)));
-        html.push('"');
+
+        if !matches!(attribute.value, AttributeValue::Boolean) {
+            html.push_str("=\"");
+            html.push_str(&escape_attr(&attribute_value_string(attribute)));
+            html.push('"');
+        }
     }
 
     html.push('>');
@@ -69,6 +72,7 @@ fn generate_element_html(element: &ElementNode) -> String {
 
 fn attribute_value_string(attribute: &TemplateAttribute) -> String {
     match &attribute.value {
+        AttributeValue::Boolean => String::new(),
         AttributeValue::Static(value) => value.clone(),
         AttributeValue::EventHandler { handler, .. } => handler.clone(),
         AttributeValue::BindingList(bindings) => bindings.join(","),

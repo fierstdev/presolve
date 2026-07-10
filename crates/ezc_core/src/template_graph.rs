@@ -1,6 +1,6 @@
 use crate::component_graph::{
-    ComponentGraph, RenderChild, RenderElement, RenderEventHandler, RenderModel, SerializableValue,
-    StateField,
+    ComponentGraph, RenderAttribute, RenderAttributeValue, RenderChild, RenderElement,
+    RenderEventHandler, RenderModel, SerializableValue, StateField,
 };
 
 #[derive(Debug, Default)]
@@ -43,6 +43,7 @@ pub struct TemplateAttribute {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AttributeValue {
+    Boolean,
     Static(String),
     EventHandler { event: String, handler: String },
     BindingList(Vec<String>),
@@ -132,11 +133,29 @@ fn element_from_render_element(
 }
 
 fn template_attributes(
-    _attributes: &[String],
+    static_attributes: &[RenderAttribute],
     event_handlers: &[RenderEventHandler],
     bindings: &[String],
 ) -> Vec<TemplateAttribute> {
     let mut attributes = Vec::new();
+
+    for attribute in static_attributes {
+        match &attribute.value {
+            RenderAttributeValue::Boolean if !is_event_attribute(&attribute.name) => {
+                attributes.push(TemplateAttribute {
+                    name: attribute.name.clone(),
+                    value: AttributeValue::Boolean,
+                });
+            }
+            RenderAttributeValue::Static(value) if !is_event_attribute(&attribute.name) => {
+                attributes.push(TemplateAttribute {
+                    name: attribute.name.clone(),
+                    value: AttributeValue::Static(value.clone()),
+                });
+            }
+            _ => {}
+        }
+    }
 
     for event_handler in event_handlers {
         attributes.push(TemplateAttribute {
@@ -156,6 +175,12 @@ fn template_attributes(
     }
 
     attributes
+}
+
+fn is_event_attribute(name: &str) -> bool {
+    name.strip_prefix("on")
+        .and_then(|event| event.chars().next())
+        .is_some_and(char::is_uppercase)
 }
 
 fn collect_direct_bindings_from_children(children: &[RenderChild]) -> Vec<String> {

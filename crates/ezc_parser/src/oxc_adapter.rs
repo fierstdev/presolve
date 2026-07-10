@@ -12,8 +12,9 @@ use oxc_span::{SourceType, Span};
 
 use crate::model::{
     ParseDiagnostic, ParseLabel, ParseSeverity, ParsedClass, ParsedDecorator, ParsedEventHandler,
-    ParsedFile, ParsedJsxChild, ParsedJsxElement, ParsedMethod, ParsedProperty,
-    ParsedSerializableValue, ParsedStateOperation, ParsedStateUpdate, SourceSpan,
+    ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxElement,
+    ParsedMethod, ParsedProperty, ParsedSerializableValue, ParsedStateOperation, ParsedStateUpdate,
+    SourceSpan,
 };
 
 pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
@@ -328,7 +329,7 @@ fn parsed_jsx_element(
         .opening_element
         .attributes
         .iter()
-        .filter_map(jsx_attribute_name)
+        .map(|attribute| parsed_jsx_attribute(attribute, source))
         .collect::<Vec<_>>();
 
     let event_handlers = element
@@ -479,24 +480,46 @@ fn jsx_element_name(name: &JSXElementName<'_>) -> Option<String> {
     }
 }
 
-fn jsx_attribute_name(attribute: &JSXAttributeItem<'_>) -> Option<String> {
-    let JSXAttributeItem::Attribute(attribute) = attribute else {
-        return None;
-    };
+fn parsed_jsx_attribute(attribute: &JSXAttributeItem<'_>, source: &str) -> ParsedJsxAttribute {
+    match attribute {
+        JSXAttributeItem::Attribute(attribute) => {
+            let name = jsx_attribute_name(&attribute.name);
+            let value = match &attribute.value {
+                Some(JSXAttributeValue::StringLiteral(literal)) => {
+                    ParsedJsxAttributeValue::Static(literal.value.to_string())
+                }
+                Some(JSXAttributeValue::ExpressionContainer(container)) => {
+                    ParsedJsxAttributeValue::Expression(jsx_expression_summary(
+                        &container.expression,
+                    ))
+                }
+                Some(JSXAttributeValue::Element(_)) | Some(JSXAttributeValue::Fragment(_)) => {
+                    ParsedJsxAttributeValue::Unsupported
+                }
+                None => ParsedJsxAttributeValue::Boolean,
+            };
 
-    let name = match &attribute.name {
+            ParsedJsxAttribute {
+                name,
+                value,
+                span: source_span(source, attribute.span),
+            }
+        }
+        JSXAttributeItem::SpreadAttribute(spread) => ParsedJsxAttribute {
+            name: "{...}".to_string(),
+            value: ParsedJsxAttributeValue::Spread(expression_summary(&spread.argument)),
+            span: source_span(source, spread.span),
+        },
+    }
+}
+
+fn jsx_attribute_name(name: &JSXAttributeName<'_>) -> String {
+    match name {
         JSXAttributeName::Identifier(identifier) => identifier.name.to_string(),
-        JSXAttributeName::NamespacedName(namespaced) => format!("{namespaced:?}"),
-    };
-
-    let value_suffix = match &attribute.value {
-        Some(JSXAttributeValue::StringLiteral(literal)) => format!("={:?}", literal.value.as_str()),
-        Some(JSXAttributeValue::ExpressionContainer(_)) => "={...}".to_string(),
-        Some(_) => "=<complex>".to_string(),
-        None => String::new(),
-    };
-
-    Some(format!("{name}{value_suffix}"))
+        JSXAttributeName::NamespacedName(namespaced) => {
+            format!("{}:{}", namespaced.namespace.name, namespaced.name.name)
+        }
+    }
 }
 
 fn jsx_event_handler(attribute: &JSXAttributeItem<'_>) -> Option<ParsedEventHandler> {
@@ -523,7 +546,7 @@ fn jsx_event_handler(attribute: &JSXAttributeItem<'_>) -> Option<ParsedEventHand
 fn jsx_event_type(attribute_name: &str) -> Option<String> {
     let name = attribute_name.strip_prefix("on")?;
 
-    if name.is_empty() {
+    if !name.chars().next().is_some_and(char::is_uppercase) {
         return None;
     }
 

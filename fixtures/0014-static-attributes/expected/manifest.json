@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "components": [
+    {
+      "name": "StaticAttributePanel",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "section"
+          },
+          {
+            "kind": "element",
+            "id": "n1",
+            "tag": "button"
+          },
+          {
+            "kind": "binding",
+            "id": "n2",
+            "expression": "this.label",
+            "initial_value": "Ready"
+          }
+        ],
+        "events": []
+      },
+      "actions": []
+    }
+  ]
+}

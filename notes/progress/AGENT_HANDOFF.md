@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: runtime: version manifest contract
+* Latest commit: compiler: preserve static jsx attributes
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 06:37:16 PDT
+* Date: 2026-07-10 06:54:57 PDT
 
 Last completed slice
 
-* Slice: 6G - Runtime contract versioning and diagnostics
-* Summary: Added manifest schema versioning, runtime version exposure, schema compatibility checks, stable runtime diagnostic codes, and fatal boot diagnostics.
-* Key files: crates/ezc_core/src/template_manifest.rs, crates/ezc_core/src/runtime_codegen.rs, crates/ezc_cli/tests/runtime_browser.rs, docs/runtime-contract.md
-* New behavior: Manifests serialize with `"schema_version": 1`; runtime exposes `runtime_version`, `supported_schema_version`, and `diagnostics` in `window.__EDGEZERO__`; missing/invalid/future manifests fail closed with `data-ez-runtime="error"`.
-* Tests added or changed: manifest schema assertions, fixture manifest updates, runtime string assertions, valid-boot diagnostics assertions, and real-browser fatal diagnostic probes.
-* Fixtures added or changed: all `fixtures/*/expected/manifest.json` files now include `schema_version`.
+* Slice: 7A - Preserve static JSX attributes
+* Summary: Replaced JSX attribute string summaries with structured parser/render attributes and preserved ordinary static/boolean attributes in template graph and static HTML output.
+* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/html_codegen.rs
+* New behavior: String literal attributes and boolean presence attributes emit in source order before compiler-owned `data-ez-*` attributes; expression/spread/complex attribute values remain unsupported with diagnostics.
+* Tests added or changed: parser structured attribute assertions, core static HTML/template assertions, duplicate/expression/spread diagnostics, and CLI fixture checks.
+* Fixtures added or changed: fixtures/0014-static-attributes
 
 Current in-progress slice
 
-* Slice: 7A - Preserve static JSX attributes
+* Slice: 7B - Dynamic attribute bindings
 * Status: Not started
 * Completed: None
-* Remaining: Replace parser attribute summaries with structured attributes, preserve ordinary static attributes through graph/HTML output, and add duplicate/static attribute diagnostics.
+* Remaining: Support expression-backed attributes such as `disabled={this.disabled}` and `title={this.label}`, add manifest binding target metadata, and define runtime update behavior by attribute category.
 
 Verification
 
@@ -38,15 +38,17 @@ Verification
 
 Architecture decisions made
 
-* Decision: Manifest schema compatibility is exact-match only for now: runtime accepts `schema_version === 1` and rejects missing, older, or future schemas.
-* Reason: There is no migration layer yet, so exact matching is clearer than silently accepting unknown manifests.
-* Tradeoff: Older manifests without `schema_version` now fail at runtime until rebuilt with the current compiler.
-* Follow-up: Slice 7A should preserve this manifest contract while adding structured static attribute data where needed.
+* Decision: 7A only emits string literal and boolean presence attributes as static HTML attributes.
+* Reason: Expression-backed attributes need binding target metadata and runtime update rules, which belong to 7B.
+* Tradeoff: Expression, spread, and complex JSX attribute values are parsed structurally but currently diagnosed as unsupported and omitted from static output.
+* Follow-up: 7B should reuse `RenderAttributeValue::Expression` as the entry point for dynamic attribute bindings.
 
 Known limitations
 
 * Item: Only `this.<field>++`, `this.<field>--`, `this.<field> += <literal>`, `this.<field> -= <literal>`, `this.<field> = <literal>`, and `this.<field> = !this.<field>` are recognized as action steps.
 * Item: The browser runtime supports only delegated click events, ordered closed action steps, numeric/string/boolean/null initial state, and binding callback text updates.
+* Item: Static JSX attributes are preserved, but `className`/`htmlFor` normalization policy is still intentionally undecided.
+* Item: Dynamic expression attributes and spread attributes are not emitted yet.
 * Item: The serializable value model is still primitive-only until later array/object slices.
 * Item: Runtime schema compatibility is exact-match only; no backward/forward manifest migration exists yet.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
@@ -54,7 +56,7 @@ Known limitations
 
 Exact next step
 
-Start Slice 7A by replacing parser attribute string summaries with structured static JSX attributes and preserving ordinary attributes in generated HTML.
+Start Slice 7B by turning supported `RenderAttributeValue::Expression(Some("this.<field>"))` attributes into attribute binding records and runtime update plans.
 
 Useful commands
 
@@ -73,6 +75,7 @@ Useful commands
 * `cargo run -p ezc_cli -- build fixtures/0011-direct-assignment/input/ResetCounter.tsx --out target/ezc-manual/reset-counter`
 * `cargo run -p ezc_cli -- build fixtures/0012-boolean-toggle/input/ToggleFlag.tsx --out target/ezc-manual/toggle-flag`
 * `cargo run -p ezc_cli -- build fixtures/0013-multi-step-action/input/BatchActionCounter.tsx --out target/ezc-manual/batch-action-counter`
+* `cargo run -p ezc_cli -- build fixtures/0014-static-attributes/input/StaticAttributePanel.tsx --out target/ezc-manual/static-attributes`
 * `cargo run -p ezc_cli -- build fixtures/0004-nested-jsx/input/NestedCounter.tsx --out target/ezc-manual/runtime-contract`
 
 Changed but uncommitted files
