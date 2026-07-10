@@ -1,0 +1,13 @@
+File: fixtures/0013-multi-step-action/input/BatchActionCounter.tsx
+TemplateGraph:
+  templates:
+    template BatchActionCounter
+      root: <button> id=n0
+      attributes:
+        data-ez-on-click = event-handler(click -> this.apply)
+        data-ez-bindings = bindings(this.count, this.enabled)
+      children:
+        Text("Count:")
+        Binding id=n1 expression="this.count" initial=Some("1")
+        Text("Enabled:")
+        Binding id=n2 expression="this.enabled" initial=Some(false)

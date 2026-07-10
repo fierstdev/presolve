@@ -304,6 +304,54 @@ class ToggleFlag extends Component {
 }
 
 #[test]
+fn parses_multi_step_state_updates_in_source_order() {
+    let source =
+        include_str!("../../../fixtures/0013-multi-step-action/input/BatchActionCounter.tsx");
+
+    let parsed = parse_file(
+        "fixtures/0013-multi-step-action/input/BatchActionCounter.tsx",
+        source,
+    );
+
+    assert!(parsed.diagnostics.is_empty());
+
+    let class = parsed.classes.first().expect("expected class");
+    let apply = class
+        .methods
+        .iter()
+        .find(|method| method.name == "apply")
+        .expect("expected apply method");
+
+    assert_eq!(apply.state_updates.len(), 5);
+
+    assert_eq!(apply.state_updates[0].field, "count");
+    assert_eq!(
+        apply.state_updates[0].operation,
+        ParsedStateOperation::AddAssign(ParsedSerializableValue::Number("2".to_string()))
+    );
+    assert_eq!(apply.state_updates[1].field, "count");
+    assert_eq!(
+        apply.state_updates[1].operation,
+        ParsedStateOperation::Decrement
+    );
+    assert_eq!(apply.state_updates[2].field, "count");
+    assert_eq!(
+        apply.state_updates[2].operation,
+        ParsedStateOperation::Assign(ParsedSerializableValue::Number("8".to_string()))
+    );
+    assert_eq!(apply.state_updates[3].field, "count");
+    assert_eq!(
+        apply.state_updates[3].operation,
+        ParsedStateOperation::Increment
+    );
+    assert_eq!(apply.state_updates[4].field, "enabled");
+    assert_eq!(
+        apply.state_updates[4].operation,
+        ParsedStateOperation::Toggle
+    );
+}
+
+#[test]
 fn reports_broken_tsx_diagnostic() {
     let source = include_str!("../../../fixtures/0002-broken-tsx/input/BrokenCounter.tsx");
 

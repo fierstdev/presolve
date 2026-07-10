@@ -90,7 +90,9 @@ const RUNTIME_STUB: &str = r#"(() => {
     const actionsByMethod = new Map();
 
     for (const action of component.actions ?? []) {
-      actionsByMethod.set(action.method, action);
+      const actions = actionsByMethod.get(action.method) ?? [];
+      actions.push(action);
+      actionsByMethod.set(action.method, actions);
     }
 
     return actionsByMethod;
@@ -171,10 +173,10 @@ const RUNTIME_STUB: &str = r#"(() => {
   function registerActions(store, component, manifestComponent) {
     const actionsByMethod = buildActionsByMethod(manifestComponent);
 
-    for (const [method, action] of actionsByMethod) {
+    for (const [method, actions] of actionsByMethod) {
       store.actionsByMethod.set(
         componentMethodKey(component.name, method),
-        action
+        actions
       );
     }
   }
@@ -189,11 +191,11 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
 
     const method = normalizeHandlerReference(event.handler);
-    const action = store.actionsByMethod.get(
+    const actions = store.actionsByMethod.get(
       componentMethodKey(component.name, method)
     );
 
-    if (action === undefined) {
+    if (actions === undefined) {
       console.error(
         "[EdgeZero] EZR_MISSING_ACTION",
         event
@@ -213,7 +215,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
     eventsByNode.set(event.node, {
       component,
-      action
+      actions
     });
     store.eventsByType.set(event.event, eventsByNode);
   }
@@ -352,6 +354,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     writeField(store, component, action.field, current + delta);
   }
 
+  function executeActions(store, component, actions) {
+    for (const action of actions) {
+      executeAction(store, component, action);
+    }
+  }
+
   function registerComponentEvents(store, component) {
     for (const event of component.manifest.template?.events ?? []) {
       registerEvent(store, component, event);
@@ -391,7 +399,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       return;
     }
 
-    executeAction(store, record.component, record.action);
+    executeActions(store, record.component, record.actions);
   }
 
   function installDelegatedEventListeners(store) {
@@ -501,6 +509,9 @@ mod tests {
         assert!(runtime.contains("writeField"));
         assert!(runtime.contains("notifyField"));
         assert!(runtime.contains("actionDelta"));
+        assert!(runtime.contains("const actions = actionsByMethod.get(action.method) ?? []"));
+        assert!(runtime.contains("actions.push(action)"));
+        assert!(runtime.contains("executeActions"));
         assert!(runtime.contains("formatBindingValue"));
         assert!(runtime.contains("value === null ? \"\" : String(value)"));
         assert!(runtime.contains("component.state[field] = node.initial_value"));

@@ -1,0 +1,64 @@
+{
+  "components": [
+    {
+      "name": "BatchActionCounter",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "button"
+          },
+          {
+            "kind": "binding",
+            "id": "n1",
+            "expression": "this.count",
+            "initial_value": "1"
+          },
+          {
+            "kind": "binding",
+            "id": "n2",
+            "expression": "this.enabled",
+            "initial_value": false
+          }
+        ],
+        "events": [
+          {
+            "node": "n0",
+            "event": "click",
+            "handler": "this.apply"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "method": "apply",
+          "operation": "add_assign",
+          "field": "count",
+          "operand": "2"
+        },
+        {
+          "method": "apply",
+          "operation": "decrement",
+          "field": "count"
+        },
+        {
+          "method": "apply",
+          "operation": "assign",
+          "field": "count",
+          "operand": "8"
+        },
+        {
+          "method": "apply",
+          "operation": "increment",
+          "field": "count"
+        },
+        {
+          "method": "apply",
+          "operation": "toggle",
+          "field": "enabled"
+        }
+      ]
+    }
+  ]
+}

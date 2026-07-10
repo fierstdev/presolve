@@ -407,6 +407,53 @@ class Counter extends Component {
     }
 
     #[test]
+    fn builds_multi_step_actions_from_parsed_method_updates_in_source_order() {
+        let source =
+            include_str!("../../../fixtures/0013-multi-step-action/input/BatchActionCounter.tsx");
+
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0013-multi-step-action/input/BatchActionCounter.tsx",
+            source,
+        );
+
+        let graph = build_component_graph(&parsed);
+        let component = graph.components.first().expect("expected component");
+
+        assert_eq!(
+            component.actions,
+            vec![
+                ComponentAction {
+                    method: "apply".to_string(),
+                    operation: StateOperation::AddAssign(SerializableValue::Number(
+                        "2".to_string()
+                    )),
+                    field: "count".to_string(),
+                },
+                ComponentAction {
+                    method: "apply".to_string(),
+                    operation: StateOperation::Decrement,
+                    field: "count".to_string(),
+                },
+                ComponentAction {
+                    method: "apply".to_string(),
+                    operation: StateOperation::Assign(SerializableValue::Number("8".to_string())),
+                    field: "count".to_string(),
+                },
+                ComponentAction {
+                    method: "apply".to_string(),
+                    operation: StateOperation::Increment,
+                    field: "count".to_string(),
+                },
+                ComponentAction {
+                    method: "apply".to_string(),
+                    operation: StateOperation::Toggle,
+                    field: "enabled".to_string(),
+                }
+            ]
+        );
+    }
+
+    #[test]
     fn generates_static_html_from_template_graph() {
         let source = include_str!("../../../fixtures/0001-source-summary/input/Counter.tsx");
 
@@ -867,6 +914,78 @@ class Counter extends Component {
         assert!(manifest_value["components"][0]["actions"][0]
             .get("operand")
             .is_none());
+    }
+
+    #[test]
+    fn builds_template_manifest_for_multi_step_action_in_source_order() {
+        let source =
+            include_str!("../../../fixtures/0013-multi-step-action/input/BatchActionCounter.tsx");
+
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0013-multi-step-action/input/BatchActionCounter.tsx",
+            source,
+        );
+
+        let component_graph = build_component_graph(&parsed);
+        let template_graph = build_template_graph(&component_graph);
+        let manifest = build_template_manifest(&component_graph, &template_graph);
+
+        assert_eq!(
+            manifest.components[0].actions,
+            vec![
+                ManifestAction {
+                    method: "apply".to_string(),
+                    operation: ManifestOperation::AddAssign,
+                    field: "count".to_string(),
+                    operand: Some(SerializableValue::Number("2".to_string())),
+                },
+                ManifestAction {
+                    method: "apply".to_string(),
+                    operation: ManifestOperation::Decrement,
+                    field: "count".to_string(),
+                    operand: None,
+                },
+                ManifestAction {
+                    method: "apply".to_string(),
+                    operation: ManifestOperation::Assign,
+                    field: "count".to_string(),
+                    operand: Some(SerializableValue::Number("8".to_string())),
+                },
+                ManifestAction {
+                    method: "apply".to_string(),
+                    operation: ManifestOperation::Increment,
+                    field: "count".to_string(),
+                    operand: None,
+                },
+                ManifestAction {
+                    method: "apply".to_string(),
+                    operation: ManifestOperation::Toggle,
+                    field: "enabled".to_string(),
+                    operand: None,
+                }
+            ]
+        );
+
+        let manifest_json = template_manifest_json(&manifest);
+        let manifest_value: serde_json::Value =
+            serde_json::from_str(&manifest_json).expect("manifest JSON should parse");
+
+        let actions = manifest_value["components"][0]["actions"]
+            .as_array()
+            .expect("manifest actions should be an array");
+
+        assert_eq!(
+            actions
+                .iter()
+                .map(|action| action["operation"].as_str().expect("operation is a string"))
+                .collect::<Vec<_>>(),
+            vec!["add_assign", "decrement", "assign", "increment", "toggle"]
+        );
+        assert_eq!(actions[0]["method"], serde_json::json!("apply"));
+        assert_eq!(actions[4]["method"], serde_json::json!("apply"));
+        assert!(actions[1].get("operand").is_none());
+        assert!(actions[3].get("operand").is_none());
+        assert!(actions[4].get("operand").is_none());
     }
 
     #[test]

@@ -468,6 +468,39 @@ fn html_command_matches_boolean_toggle_fixture() {
 }
 
 #[test]
+fn html_command_matches_multi_step_action_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "html",
+            "fixtures/0013-multi-step-action/input/BatchActionCounter.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli html");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0013-multi-step-action/expected/html.html"),
+    )
+    .expect("failed to read expected multi-step action html fixture");
+
+    assert_eq!(
+        normalize_html_for_fixture(&actual),
+        normalize_html_for_fixture(&expected)
+    );
+}
+
+#[test]
 fn html_command_matches_broken_tsx_fixture() {
     let repo_root = repo_root();
 
@@ -724,6 +757,36 @@ fn template_command_matches_boolean_toggle_fixture() {
         repo_root.join("fixtures/0012-boolean-toggle/expected/template.txt"),
     )
     .expect("failed to read expected boolean toggle template fixture");
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn template_command_matches_multi_step_action_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "template",
+            "fixtures/0013-multi-step-action/input/BatchActionCounter.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli template");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0013-multi-step-action/expected/template.txt"),
+    )
+    .expect("failed to read expected multi-step action template fixture");
 
     assert_eq!(actual, expected);
 }
@@ -1067,6 +1130,40 @@ fn manifest_command_matches_boolean_toggle_fixture() {
         repo_root.join("fixtures/0012-boolean-toggle/expected/manifest.json"),
     )
     .expect("failed to read expected boolean toggle manifest fixture");
+
+    let actual_json: serde_json::Value =
+        serde_json::from_str(&actual).expect("actual manifest JSON was invalid");
+    let expected_json: serde_json::Value =
+        serde_json::from_str(&expected).expect("expected manifest JSON was invalid");
+
+    assert_eq!(actual_json, expected_json);
+}
+
+#[test]
+fn manifest_command_matches_multi_step_action_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "manifest",
+            "fixtures/0013-multi-step-action/input/BatchActionCounter.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli manifest");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0013-multi-step-action/expected/manifest.json"),
+    )
+    .expect("failed to read expected multi-step action manifest fixture");
 
     let actual_json: serde_json::Value =
         serde_json::from_str(&actual).expect("actual manifest JSON was invalid");
