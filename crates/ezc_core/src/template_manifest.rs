@@ -1,10 +1,10 @@
 use serde::Serialize;
 
 use crate::component_graph::{ComponentGraph, ComponentNode, SerializableValue, StateOperation};
-use crate::html_codegen::generate_children_html;
+use crate::html_codegen::{generate_children_html, generate_list_item_template_html};
 use crate::template_graph::{
-    AttributeValue, ConditionalNode, ElementNode, FragmentNode, TemplateChild, TemplateGraph,
-    TemplateNode,
+    AttributeValue, ConditionalNode, ElementNode, FragmentNode, ListNode, TemplateChild,
+    TemplateGraph, TemplateNode,
 };
 
 pub const TEMPLATE_MANIFEST_SCHEMA_VERSION: u32 = 1;
@@ -56,6 +56,20 @@ pub enum ManifestNode {
         initial_value: Option<SerializableValue>,
         when_true_html: String,
         when_false_html: String,
+    },
+
+    #[serde(rename = "list")]
+    List {
+        id: String,
+        start: String,
+        end: String,
+        iterable: String,
+        initial_value: Option<SerializableValue>,
+        item_variable: String,
+        index_variable: Option<String>,
+        key_expression: String,
+        item_root: String,
+        item_template_html: String,
     },
 }
 
@@ -246,7 +260,7 @@ fn collect_child(
     events: &mut Vec<ManifestEvent>,
 ) {
     match child {
-        TemplateChild::Text { .. } | TemplateChild::List(_) => {}
+        TemplateChild::Text { .. } => {}
         TemplateChild::Binding {
             id,
             expression,
@@ -265,7 +279,27 @@ fn collect_child(
         TemplateChild::Element(element) => collect_element(element, nodes, events),
         TemplateChild::Fragment(fragment) => collect_fragment(fragment, nodes, events),
         TemplateChild::Conditional(conditional) => collect_conditional(conditional, nodes),
+        TemplateChild::List(list) => collect_list(list, nodes),
     }
+}
+
+fn collect_list(list: &ListNode, nodes: &mut Vec<ManifestNode>) {
+    let Some(TemplateChild::Element(item_root)) = list.item_template.first() else {
+        return;
+    };
+
+    nodes.push(ManifestNode::List {
+        id: list.id.0.clone(),
+        start: list.start_id.0.clone(),
+        end: list.end_id.0.clone(),
+        iterable: list.iterable.clone(),
+        initial_value: list.initial_value.clone(),
+        item_variable: list.item_variable.clone(),
+        index_variable: list.index_variable.clone(),
+        key_expression: list.key_expression.clone(),
+        item_root: item_root.id.0.clone(),
+        item_template_html: generate_list_item_template_html(list),
+    });
 }
 
 fn collect_conditional(conditional: &ConditionalNode, nodes: &mut Vec<ManifestNode>) {

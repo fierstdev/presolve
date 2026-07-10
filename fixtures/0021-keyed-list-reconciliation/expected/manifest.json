@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "components": [
+    {
+      "name": "KeyedListReconciliation",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "section"
+          },
+          {
+            "kind": "element",
+            "id": "n1",
+            "tag": "button"
+          },
+          {
+            "kind": "element",
+            "id": "n2",
+            "tag": "button"
+          },
+          {
+            "kind": "element",
+            "id": "n3",
+            "tag": "ol"
+          },
+          {
+            "kind": "list",
+            "id": "n4",
+            "start": "n5",
+            "end": "n6",
+            "iterable": "this.labels",
+            "initial_value": [
+              "North",
+              "South"
+            ],
+            "item_variable": "label",
+            "index_variable": "index",
+            "key_expression": "label",
+            "item_root": "n7",
+            "item_template_html": "<li data-ez-node=\"n7:__ez_list_key__\" data-ez-bindings=\"index,label\"><!-- ez-binding:n8:__ez_list_key__:index -->__ez_list_index__:<!-- ez-binding:n9:__ez_list_key__:label -->__ez_list_item__</li>"
+          }
+        ],
+        "events": [
+          {
+            "node": "n1",
+            "event": "click",
+            "handler": "this.reconcile"
+          },
+          {
+            "node": "n2",
+            "event": "click",
+            "handler": "this.trim"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "method": "reconcile",
+          "operation": "assign",
+          "field": "labels",
+          "operand": [
+            "South",
+            "East",
+            "North"
+          ]
+        },
+        {
+          "method": "trim",
+          "operation": "assign",
+          "field": "labels",
+          "operand": [
+            "East"
+          ]
+        }
+      ]
+    }
+  ]
+}

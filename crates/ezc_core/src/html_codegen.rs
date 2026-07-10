@@ -6,10 +6,15 @@ use crate::template_graph::{
 
 struct ListRenderScope<'a> {
     item_variable: &'a str,
-    item: &'a SerializableValue,
+    item: Option<&'a SerializableValue>,
     index_variable: Option<&'a str>,
-    index: usize,
+    index: Option<usize>,
+    instance_key: &'a str,
 }
+
+const LIST_INDEX_TOKEN: &str = "__ez_list_index__";
+const LIST_ITEM_TOKEN: &str = "__ez_list_item__";
+const LIST_KEY_TOKEN: &str = "__ez_list_key__";
 
 #[must_use]
 pub fn generate_static_html(template_graph: &TemplateGraph) -> String {
@@ -143,27 +148,53 @@ fn generate_conditional_html(
 }
 
 fn generate_list_html(list: &ListNode) -> String {
-    let Some(SerializableValue::Array(items)) = &list.initial_value else {
-        return String::new();
-    };
+    let mut html = String::new();
+    html.push_str("<!-- ez-list-start:");
+    html.push_str(&escape_comment(&list.start_id.0));
+    html.push(':');
+    html.push_str(&escape_comment(&list.iterable));
+    html.push_str(" -->");
 
-    items
-        .iter()
-        .enumerate()
-        .map(|(index, item)| {
+    if let Some(SerializableValue::Array(items)) = &list.initial_value {
+        for (index, item) in items.iter().enumerate() {
+            let instance_key = list_instance_key(list, item, index);
             let scope = ListRenderScope {
                 item_variable: &list.item_variable,
-                item,
+                item: Some(item),
                 index_variable: list.index_variable.as_deref(),
-                index,
+                index: Some(index),
+                instance_key: &instance_key,
             };
-            generate_children_html_with_scope(&list.item_template, Some(&scope))
-        })
-        .collect()
+            html.push_str(&generate_children_html_with_scope(
+                &list.item_template,
+                Some(&scope),
+            ));
+        }
+    }
+
+    html.push_str("<!-- ez-list-end:");
+    html.push_str(&escape_comment(&list.end_id.0));
+    html.push_str(" -->");
+    html
+}
+
+pub(crate) fn generate_list_item_template_html(list: &ListNode) -> String {
+    let scope = ListRenderScope {
+        item_variable: &list.item_variable,
+        item: None,
+        index_variable: list.index_variable.as_deref(),
+        index: None,
+        instance_key: LIST_KEY_TOKEN,
+    };
+
+    generate_children_html_with_scope(&list.item_template, Some(&scope))
 }
 
 fn node_id_for_scope(id: &str, scope: Option<&ListRenderScope<'_>>) -> String {
-    scope.map_or_else(|| id.to_string(), |scope| format!("{id}:{}", scope.index))
+    scope.map_or_else(
+        || id.to_string(),
+        |scope| format!("{id}:{}", scope.instance_key),
+    )
 }
 
 fn binding_render_text(
@@ -173,14 +204,40 @@ fn binding_render_text(
 ) -> String {
     if let Some(scope) = scope {
         if expression == scope.item_variable {
-            return scope.item.render_text();
+            return scope.item.map_or_else(
+                || LIST_ITEM_TOKEN.to_string(),
+                SerializableValue::render_text,
+            );
         }
         if scope.index_variable == Some(expression) {
-            return scope.index.to_string();
+            return scope
+                .index
+                .map_or_else(|| LIST_INDEX_TOKEN.to_string(), |index| index.to_string());
         }
     }
 
     initial_value.map_or_else(String::new, SerializableValue::render_text)
+}
+
+fn list_instance_key(list: &ListNode, item: &SerializableValue, index: usize) -> String {
+    if list.key_expression == list.item_variable {
+        return serializable_list_key(item).unwrap_or_else(|| index.to_string());
+    }
+
+    if list.index_variable.as_deref() == Some(list.key_expression.as_str()) {
+        return index.to_string();
+    }
+
+    index.to_string()
+}
+
+fn serializable_list_key(value: &SerializableValue) -> Option<String> {
+    match value {
+        SerializableValue::Null => Some("null".to_string()),
+        SerializableValue::Number(value) | SerializableValue::String(value) => Some(value.clone()),
+        SerializableValue::Boolean(value) => Some(value.to_string()),
+        SerializableValue::Array(_) => None,
+    }
 }
 
 fn generate_attribute_html(attribute: &TemplateAttribute) -> Option<String> {

@@ -860,10 +860,13 @@ fn print_template_child(path: &Path, child: &TemplateChild, indent: usize) {
 fn print_template_list(path: &Path, list: &ezc_core::ListNode, indent: usize) {
     let padding = " ".repeat(indent);
     println!(
-        "{padding}List id={} iterable={:?} item={:?} index={:?} key={:?} {}",
-        list.id.0,
-        list.iterable,
-        list.item_variable,
+                "{padding}List id={} start={} end={} iterable={:?} initial={} item={:?} index={:?} key={:?} {}",
+                list.id.0,
+                list.start_id.0,
+                list.end_id.0,
+                list.iterable,
+                format_serializable_value(list.initial_value.as_ref()),
+                list.item_variable,
         list.index_variable,
         list.key_expression,
         format_source_span(path, &list.span)

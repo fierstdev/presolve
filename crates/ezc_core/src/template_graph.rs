@@ -102,6 +102,8 @@ pub struct ConditionalNode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ListNode {
     pub id: TemplateNodeId,
+    pub start_id: TemplateNodeId,
+    pub end_id: TemplateNodeId,
     pub iterable: String,
     pub initial_value: Option<SerializableValue>,
     pub item_variable: String,
@@ -345,6 +347,8 @@ fn list_from_render_list(
 ) -> ListNode {
     ListNode {
         id: ids.alloc(),
+        start_id: ids.alloc(),
+        end_id: ids.alloc(),
         iterable: list.iterable.clone(),
         initial_value: binding_initial_value(&list.iterable, state_fields),
         item_variable: list.item_variable.clone(),

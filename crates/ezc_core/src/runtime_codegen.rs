@@ -142,6 +142,43 @@ const RUNTIME_STUB: &str = r#"(() => {
     };
   }
 
+  function collectListAnchors() {
+    const starts = new Map();
+    const ends = new Map();
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_COMMENT
+    );
+
+    while (walker.nextNode()) {
+      const value = (walker.currentNode.nodeValue ?? "").trim();
+      const startMatch = /^ez-list-start:([^:]+):(.*)$/.exec(value);
+
+      if (startMatch !== null) {
+        starts.set(startMatch[1], {
+          id: startMatch[1],
+          iterable: startMatch[2],
+          marker: walker.currentNode
+        });
+        continue;
+      }
+
+      const endMatch = /^ez-list-end:([^:]+)$/.exec(value);
+
+      if (endMatch !== null) {
+        ends.set(endMatch[1], {
+          id: endMatch[1],
+          marker: walker.currentNode
+        });
+      }
+    }
+
+    return {
+      starts,
+      ends
+    };
+  }
+
   function collectElementAnchors() {
     const elementsByNode = new Map();
 
@@ -156,6 +193,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     manifest,
     bindingAnchors,
     conditionalAnchors,
+    listAnchors,
     elementsByNode
   ) {
     const missing = [];
@@ -202,6 +240,26 @@ const RUNTIME_STUB: &str = r#"(() => {
               id: node.end,
               kind: node.kind,
               code: "EZR_MISSING_CONDITIONAL_ANCHOR"
+            });
+          }
+        }
+
+        if (node.kind === "list") {
+          if (!listAnchors.starts.has(node.start)) {
+            missing.push({
+              component: component.name,
+              id: node.start,
+              kind: node.kind,
+              code: "EZR_MISSING_LIST_ANCHOR"
+            });
+          }
+
+          if (!listAnchors.ends.has(node.end)) {
+            missing.push({
+              component: component.name,
+              id: node.end,
+              kind: node.kind,
+              code: "EZR_MISSING_LIST_ANCHOR"
             });
           }
         }
@@ -332,6 +390,137 @@ const RUNTIME_STUB: &str = r#"(() => {
     store.elementsByNode = collectElementAnchors();
   }
 
+  function listItems(value) {
+    return Array.isArray(value) ? value : [];
+  }
+
+  function normalizeListKey(value) {
+    return String(value).replaceAll("--", "—");
+  }
+
+  function listItemKey(node, item, index) {
+    if (node.key_expression === node.item_variable) {
+      return Array.isArray(item) ? String(index) : normalizeListKey(item);
+    }
+
+    if (node.index_variable === node.key_expression) {
+      return String(index);
+    }
+
+    return String(index);
+  }
+
+  function escapeHtmlText(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;");
+  }
+
+  function escapeHtmlAttribute(value) {
+    return escapeHtmlText(value).replaceAll('"', "&quot;");
+  }
+
+  function renderListItemHtml(node, item, index, key) {
+    return String(node.item_template_html ?? "")
+      .replaceAll("__ez_list_key__", escapeHtmlAttribute(key))
+      .replaceAll("__ez_list_item__", escapeHtmlText(formatBindingValue(item)))
+      .replaceAll("__ez_list_index__", String(index));
+  }
+
+  function initialListInstances(store, node, items) {
+    const instances = new Map();
+
+    for (const [index, item] of items.entries()) {
+      const key = listItemKey(node, item, index);
+      const element = store.elementsByNode.get(`${node.item_root}:${key}`);
+
+      if (element !== undefined) {
+        instances.set(key, { element, item, index });
+      }
+    }
+
+    return instances;
+  }
+
+  function reconcileKeyedList(store, node, startMarker, endMarker, instances, value) {
+    if (
+      startMarker.parentNode === null ||
+      endMarker.parentNode === null ||
+      startMarker.parentNode !== endMarker.parentNode
+    ) {
+      reportDiagnostic(
+        store.diagnostics,
+        "EZR_MISSING_LIST_ANCHOR",
+        "List anchor range was not contiguous in one parent",
+        {}
+      );
+      return instances;
+    }
+
+    const parent = startMarker.parentNode;
+    const nextInstances = new Map();
+    const ordered = [];
+
+    for (const [index, item] of listItems(value).entries()) {
+      const key = listItemKey(node, item, index);
+
+      if (nextInstances.has(key)) {
+        reportDiagnostic(
+          store.diagnostics,
+          "EZR_DUPLICATE_LIST_KEY",
+          "List update produced a duplicate key",
+          { id: node.id, key }
+        );
+        continue;
+      }
+
+      let instance = instances.get(key);
+
+      if (instance === undefined) {
+        const template = document.createElement("template");
+        template.innerHTML = renderListItemHtml(node, item, index, key);
+        const element = template.content.firstElementChild;
+
+        if (element === null) {
+          reportDiagnostic(
+            store.diagnostics,
+            "EZR_INVALID_LIST_TEMPLATE",
+            "List item template did not produce a root element",
+            node
+          );
+          continue;
+        }
+
+        parent.insertBefore(element, endMarker);
+        instance = { element, item, index };
+      }
+
+      instance.item = item;
+      instance.index = index;
+      nextInstances.set(key, instance);
+      ordered.push(instance);
+    }
+
+    for (const [key, instance] of instances) {
+      if (!nextInstances.has(key)) {
+        instance.element.remove();
+      }
+    }
+
+    let cursor = startMarker.nextSibling;
+
+    for (const instance of ordered) {
+      if (instance.element !== cursor) {
+        parent.insertBefore(instance.element, cursor);
+      }
+      cursor = instance.element.nextSibling;
+    }
+
+    store.elementsByNode = collectElementAnchors();
+    return nextInstances;
+  }
+
   function createRuntimeStore(elementsByNode, diagnostics) {
     return {
       components: new Map(),
@@ -459,7 +648,8 @@ const RUNTIME_STUB: &str = r#"(() => {
     store,
     manifestComponent,
     bindingAnchors,
-    conditionalAnchors
+    conditionalAnchors,
+    listAnchors
   ) {
     const component = {
       name: manifestComponent.name,
@@ -471,6 +661,42 @@ const RUNTIME_STUB: &str = r#"(() => {
     registerActions(store, component, manifestComponent);
 
     for (const node of manifestComponent.template?.nodes ?? []) {
+      if (node.kind === "list") {
+        const field = fieldNameFromThisMember(node.iterable);
+
+        if (field === null) {
+          continue;
+        }
+
+        if (component.state[field] === undefined) {
+          component.state[field] = node.initial_value;
+        }
+
+        const start = listAnchors.starts.get(node.start);
+        const end = listAnchors.ends.get(node.end);
+
+        if (start === undefined || end === undefined) {
+          continue;
+        }
+
+        let instances = initialListInstances(
+          store,
+          node,
+          listItems(component.state[field])
+        );
+        registerBinding(store, component, field, (value) => {
+          instances = reconcileKeyedList(
+            store,
+            node,
+            start.marker,
+            end.marker,
+            instances,
+            value
+          );
+        });
+        continue;
+      }
+
       if (node.kind === "conditional") {
         const field = fieldNameFromThisMember(node.condition);
 
@@ -727,12 +953,14 @@ const RUNTIME_STUB: &str = r#"(() => {
   function initializeRuntime(manifest, diagnostics) {
     const bindingAnchors = collectBindingAnchors();
     const conditionalAnchors = collectConditionalAnchors();
+    const listAnchors = collectListAnchors();
     const elementsByNode = collectElementAnchors();
     const store = createRuntimeStore(elementsByNode, diagnostics);
     const missingAnchors = collectMissingAnchors(
       manifest,
       bindingAnchors,
       conditionalAnchors,
+      listAnchors,
       elementsByNode
     );
 
@@ -744,6 +972,8 @@ const RUNTIME_STUB: &str = r#"(() => {
           ? "Manifest element anchor was not found in the rendered DOM"
           : anchor.kind === "conditional"
             ? "Manifest conditional anchor was not found in the rendered DOM"
+            : anchor.kind === "list"
+              ? "Manifest list anchor was not found in the rendered DOM"
             : "Manifest binding anchor was not found in the rendered DOM",
         anchor
       );
@@ -754,7 +984,8 @@ const RUNTIME_STUB: &str = r#"(() => {
         store,
         manifestComponent,
         bindingAnchors,
-        conditionalAnchors
+        conditionalAnchors,
+        listAnchors
       );
       registerComponentEvents(store, component);
     }

@@ -6,12 +6,12 @@ TemplateGraph:
       attributes:
         data-ez-bindings = bindings(this.labels) @ generated
       children:
-        List id=n1 iterable="this.labels" item="label" index=Some("index") key="label" @ fixtures/0020-static-keyed-list/input/StaticKeyedList.tsx:9:10 span=190..262
+        List id=n1 start=n2 end=n3 iterable="this.labels" initial=Some([String("North"), String("South")]) item="label" index=Some("index") key="label" @ fixtures/0020-static-keyed-list/input/StaticKeyedList.tsx:9:10 span=190..262
           item template:
-            Element <li> id=n2 @ fixtures/0020-static-keyed-list/input/StaticKeyedList.tsx:9:44 span=224..261
+            Element <li> id=n4 @ fixtures/0020-static-keyed-list/input/StaticKeyedList.tsx:9:44 span=224..261
               attributes:
                 data-ez-bindings = bindings(index, label) @ generated
               children:
-                Binding id=n3 expression="index" initial=None @ fixtures/0020-static-keyed-list/input/StaticKeyedList.tsx:9:60 span=240..247
+                Binding id=n5 expression="index" initial=None @ fixtures/0020-static-keyed-list/input/StaticKeyedList.tsx:9:60 span=240..247
                 Text(":") @ fixtures/0020-static-keyed-list/input/StaticKeyedList.tsx:9:67 span=247..248
-                Binding id=n4 expression="label" initial=None @ fixtures/0020-static-keyed-list/input/StaticKeyedList.tsx:9:69 span=249..256
+                Binding id=n6 expression="label" initial=None @ fixtures/0020-static-keyed-list/input/StaticKeyedList.tsx:9:69 span=249..256

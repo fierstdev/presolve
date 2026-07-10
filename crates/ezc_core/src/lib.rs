@@ -1166,6 +1166,8 @@ class BadAttrs extends Component {
         };
 
         assert_eq!(list.id.0, "n1");
+        assert_eq!(list.start_id.0, "n2");
+        assert_eq!(list.end_id.0, "n3");
         assert_eq!(list.iterable, "this.items");
         assert_eq!(
             list.initial_value,
@@ -1178,21 +1180,35 @@ class BadAttrs extends Component {
         let TemplateChild::Element(item_template) = &list.item_template[0] else {
             panic!("expected list item element");
         };
-        assert_eq!(item_template.id.0, "n2");
+        assert_eq!(item_template.id.0, "n4");
         assert_eq!(item_template.tag_name, "li");
 
         assert_eq!(
             generate_static_html(&template_graph),
-            "<ul data-ez-node=\"n0\" data-ez-bindings=\"this.items\"></ul>\n"
+            "<ul data-ez-node=\"n0\" data-ez-bindings=\"this.items\"><!-- ez-list-start:n2:this.items --><!-- ez-list-end:n3 --></ul>\n"
         );
 
         let manifest = build_template_manifest(&component_graph, &template_graph);
         assert_eq!(
             manifest.components[0].template.nodes,
-            vec![ManifestNode::Element {
-                id: "n0".to_string(),
-                tag: "ul".to_string(),
-            }]
+            vec![
+                ManifestNode::Element {
+                    id: "n0".to_string(),
+                    tag: "ul".to_string(),
+                },
+                ManifestNode::List {
+                    id: "n1".to_string(),
+                    start: "n2".to_string(),
+                    end: "n3".to_string(),
+                    iterable: "this.items".to_string(),
+                    initial_value: Some(SerializableValue::Array(Vec::new())),
+                    item_variable: "item".to_string(),
+                    index_variable: Some("index".to_string()),
+                    key_expression: "item.id".to_string(),
+                    item_root: "n4".to_string(),
+                    item_template_html: "<li data-ez-node=\"n4:__ez_list_key__\" data-ez-bindings=\"index,item.label\"><!-- ez-binding:n5:__ez_list_key__:index -->__ez_list_index__:<!-- ez-binding:n6:__ez_list_key__:item.label --></li>".to_string(),
+                },
+            ]
         );
     }
 
@@ -1227,16 +1243,33 @@ class BadAttrs extends Component {
 
         assert_eq!(
             generate_static_html(&template_graph),
-            "<ol data-ez-node=\"n0\" data-ez-bindings=\"this.labels\"><li data-ez-node=\"n2:0\" data-ez-bindings=\"index,label\"><!-- ez-binding:n3:0:index -->0:<!-- ez-binding:n4:0:label -->North</li><li data-ez-node=\"n2:1\" data-ez-bindings=\"index,label\"><!-- ez-binding:n3:1:index -->1:<!-- ez-binding:n4:1:label -->South</li></ol>\n"
+            "<ol data-ez-node=\"n0\" data-ez-bindings=\"this.labels\"><!-- ez-list-start:n2:this.labels --><li data-ez-node=\"n4:North\" data-ez-bindings=\"index,label\"><!-- ez-binding:n5:North:index -->0:<!-- ez-binding:n6:North:label -->North</li><li data-ez-node=\"n4:South\" data-ez-bindings=\"index,label\"><!-- ez-binding:n5:South:index -->1:<!-- ez-binding:n6:South:label -->South</li><!-- ez-list-end:n3 --></ol>\n"
         );
 
         let manifest = build_template_manifest(&component_graph, &template_graph);
         assert_eq!(
             manifest.components[0].template.nodes,
-            vec![ManifestNode::Element {
-                id: "n0".to_string(),
-                tag: "ol".to_string(),
-            }]
+            vec![
+                ManifestNode::Element {
+                    id: "n0".to_string(),
+                    tag: "ol".to_string(),
+                },
+                ManifestNode::List {
+                    id: "n1".to_string(),
+                    start: "n2".to_string(),
+                    end: "n3".to_string(),
+                    iterable: "this.labels".to_string(),
+                    initial_value: Some(SerializableValue::Array(vec![
+                        SerializableValue::String("North".to_string()),
+                        SerializableValue::String("South".to_string()),
+                    ])),
+                    item_variable: "label".to_string(),
+                    index_variable: Some("index".to_string()),
+                    key_expression: "label".to_string(),
+                    item_root: "n4".to_string(),
+                    item_template_html: "<li data-ez-node=\"n4:__ez_list_key__\" data-ez-bindings=\"index,label\"><!-- ez-binding:n5:__ez_list_key__:index -->__ez_list_index__:<!-- ez-binding:n6:__ez_list_key__:label -->__ez_list_item__</li>".to_string(),
+                },
+            ]
         );
     }
 

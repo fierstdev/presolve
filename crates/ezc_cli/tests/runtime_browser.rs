@@ -648,6 +648,63 @@ fn logical_and_conditional_switches_to_empty_branch_in_a_real_browser() {
 }
 
 #[test]
+fn keyed_lists_reconcile_in_a_real_browser() {
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/keyed-list-reconciliation");
+
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean previous browser test output");
+    }
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0021-keyed-list-reconciliation/input/KeyedListReconciliation.tsx",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("browser test output path was not valid UTF-8"),
+        ])
+        .output()
+        .expect("failed to run ezc_cli build");
+
+    assert!(
+        output.status.success(),
+        "expected build to succeed\\nstatus: {}\\nstderr:\\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    write_keyed_list_reconciliation_probe_page(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile dir");
+    let user_data_dir = format!(
+        "--user-data-dir={}",
+        profile_dir
+            .to_str()
+            .expect("Chrome profile path was not valid UTF-8")
+    );
+    let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
+
+    let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    server.stop();
+
+    assert!(
+        stdout.contains("EDGEZERO_KEYED_LIST_BROWSER_TEST_PASS"),
+        "browser probe did not pass\\nstatus: {}\\nstdout:\\n{}\\nstderr:\\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn runtime_contract_diagnostics_report_manifest_boot_failures_in_a_real_browser() {
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/runtime-contract");
@@ -1711,6 +1768,132 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
   document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_CONDITIONAL_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  console.error(error);
+});
+</script>
+</body>"#,
+    );
+
+    fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
+}
+
+#[allow(clippy::too_many_lines)]
+fn write_keyed_list_reconciliation_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
+    let probe = index.replace(
+        "</body>",
+        r#"<script>
+const fail = (message) => {
+  throw new Error(message);
+};
+
+const edgezeroConsoleErrors = [];
+const originalConsoleError = console.error.bind(console);
+console.error = (...args) => {
+  const message = args.map((arg) => {
+    if (arg instanceof Error) return arg.message;
+    if (typeof arg === "string") return arg;
+    return JSON.stringify(arg);
+  }).join(" ");
+
+  edgezeroConsoleErrors.push(message);
+  originalConsoleError(...args);
+};
+
+const waitFor = (predicate, label) => new Promise((resolve, reject) => {
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    if (predicate()) {
+      resolve();
+      return;
+    }
+
+    if (Date.now() > deadline) {
+      reject(new Error(`Timed out waiting for ${label}`));
+      return;
+    }
+
+    setTimeout(tick, 20);
+  };
+
+  tick();
+});
+
+const listLabels = () => [...document.querySelectorAll("ol li")].map((item) => item.textContent);
+
+(async () => {
+  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+
+  const buttons = document.querySelectorAll("button");
+  if (buttons.length !== 2) fail("expected list reconciliation controls");
+
+  if (JSON.stringify(listLabels()) !== JSON.stringify(["0:North", "1:South"])) {
+    fail(`initial list contents were unexpected: ${listLabels().join(" | ")}`);
+  }
+
+  const north = document.querySelector("[data-ez-node='n7:North']");
+  const south = document.querySelector("[data-ez-node='n7:South']");
+  if (north === null || south === null) fail("initial keyed list nodes were not found");
+
+  const listNode = window.__EDGEZERO__.manifest.components[0].template.nodes.find(
+    (node) => node.kind === "list"
+  );
+  if (
+    listNode === undefined ||
+    listNode.start !== "n5" ||
+    listNode.end !== "n6" ||
+    listNode.item_root !== "n7"
+  ) {
+    fail("list manifest node did not expose stable anchors and item root");
+  }
+
+  buttons[0].click();
+  await waitFor(
+    () => JSON.stringify(listLabels()) === JSON.stringify(["0:South", "1:East", "2:North"]),
+    "reconciled list"
+  );
+
+  if (document.querySelector("[data-ez-node='n7:North']") !== north) {
+    fail("North node was recreated instead of retained during movement");
+  }
+  if (document.querySelector("[data-ez-node='n7:South']") !== south) {
+    fail("South node was recreated instead of retained during movement");
+  }
+  const east = document.querySelector("[data-ez-node='n7:East']");
+  if (east === null) {
+    fail("East node was not inserted during reconciliation");
+  }
+  if (window.__EDGEZERO__.store.elementsByNode.get("n7:North") !== north) {
+    fail("runtime element index did not retain the North node");
+  }
+  if (JSON.stringify(window.__EDGEZERO__.components[0].state.labels) !== JSON.stringify(["South", "East", "North"])) {
+    fail("debug state did not retain the reconciled array");
+  }
+
+  buttons[1].click();
+  await waitFor(
+    () => JSON.stringify(listLabels()) === JSON.stringify(["0:East"]),
+    "trimmed list"
+  );
+
+  if (document.querySelector("[data-ez-node='n7:East']") !== east) {
+    fail("East node was recreated instead of retained during deletion");
+  }
+  if (document.querySelector("[data-ez-node='n7:North']") !== null || document.querySelector("[data-ez-node='n7:South']") !== null) {
+    fail("stale keyed list nodes were not removed during deletion");
+  }
+  if (JSON.stringify(window.__EDGEZERO__.components[0].state.labels) !== JSON.stringify(["East"])) {
+    fail("debug state did not retain the trimmed array");
+  }
+  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
+    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  }
+
+  document.body.dataset.browserTest = "pass";
+  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_KEYED_LIST_BROWSER_TEST_PASS</div>");
+})().catch((error) => {
+  document.body.dataset.browserTest = "fail";
+  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_KEYED_LIST_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
