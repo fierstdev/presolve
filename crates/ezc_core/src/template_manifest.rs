@@ -28,7 +28,11 @@ pub enum ManifestNode {
     Element { id: String, tag: String },
 
     #[serde(rename = "binding")]
-    Binding { id: String, expression: String },
+    Binding {
+        id: String,
+        expression: String,
+        initial_value: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -87,10 +91,15 @@ fn collect_element(
     for child in &element.children {
         match child {
             TemplateChild::Text(_) => {}
-            TemplateChild::Binding { id, expression } => {
+            TemplateChild::Binding {
+                id,
+                expression,
+                initial_value,
+            } => {
                 nodes.push(ManifestNode::Binding {
                     id: id.0.clone(),
                     expression: expression.clone(),
+                    initial_value: initial_value.clone(),
                 });
             }
             TemplateChild::Element(element) => collect_element(element, nodes, events),

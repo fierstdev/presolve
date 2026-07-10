@@ -133,9 +133,12 @@ fn parse_property(
 
     let initializer = property.value.as_ref().and_then(expression_summary);
 
+    let state_initial_value = property.value.as_ref().and_then(state_initial_value);
+
     Some(ParsedProperty {
         name,
         initializer,
+        state_initial_value,
         span: source_span(source, property.span),
     })
 }
@@ -305,6 +308,29 @@ fn expression_summary(expression: &Expression<'_>) -> Option<String> {
         }
         Expression::NumericLiteral(literal) => Some(literal.raw.as_ref()?.to_string()),
         Expression::StringLiteral(literal) => Some(format!("{:?}", literal.value.as_str())),
+        _ => None,
+    }
+}
+
+fn state_initial_value(expression: &Expression<'_>) -> Option<String> {
+    let Expression::CallExpression(call) = expression else {
+        return None;
+    };
+
+    let Expression::Identifier(callee) = &call.callee else {
+        return None;
+    };
+
+    if callee.name != "state" {
+        return None;
+    }
+
+    call.arguments.first().and_then(state_argument_literal)
+}
+
+fn state_argument_literal(argument: &Argument<'_>) -> Option<String> {
+    match argument {
+        Argument::NumericLiteral(literal) => literal.raw.as_ref().map(ToString::to_string),
         _ => None,
     }
 }

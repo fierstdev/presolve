@@ -19,6 +19,7 @@ pub struct ComponentNode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StateField {
     pub name: String,
+    pub initial_value: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -97,6 +98,7 @@ fn build_component_node(
         .filter(|property| property.initializer.as_deref() == Some("state(...)"))
         .map(|property| StateField {
             name: property.name.clone(),
+            initial_value: property.state_initial_value.clone(),
         })
         .collect::<Vec<_>>();
 

@@ -1,4 +1,4 @@
-use crate::component_graph::{ComponentGraph, RenderChild, RenderElement, RenderModel};
+use crate::component_graph::{ComponentGraph, RenderChild, RenderElement, RenderModel, StateField};
 
 #[derive(Debug, Default)]
 struct TemplateIdAllocator {
@@ -51,6 +51,7 @@ pub enum TemplateChild {
     Binding {
         id: TemplateNodeId,
         expression: String,
+        initial_value: Option<String>,
     },
     Element(ElementNode),
 }
@@ -69,14 +70,18 @@ pub fn build_template_graph(component_graph: &ComponentGraph) -> TemplateGraph {
             root: component
                 .render
                 .as_ref()
-                .and_then(|render| element_from_render(render, &mut ids)),
+                .and_then(|render| element_from_render(render, &component.state_fields, &mut ids)),
         })
         .collect::<Vec<_>>();
 
     TemplateGraph { templates }
 }
 
-fn element_from_render(render: &RenderModel, ids: &mut TemplateIdAllocator) -> Option<ElementNode> {
+fn element_from_render(
+    render: &RenderModel,
+    state_fields: &[StateField],
+    ids: &mut TemplateIdAllocator,
+) -> Option<ElementNode> {
     let tag_name = render.root_element.clone()?;
     let id = ids.alloc();
 
@@ -91,7 +96,7 @@ fn element_from_render(render: &RenderModel, ids: &mut TemplateIdAllocator) -> O
     let children = render
         .children
         .iter()
-        .map(|child| template_child_from_render(child, ids))
+        .map(|child| template_child_from_render(child, state_fields, ids))
         .collect::<Vec<_>>();
 
     Some(ElementNode {
@@ -104,6 +109,7 @@ fn element_from_render(render: &RenderModel, ids: &mut TemplateIdAllocator) -> O
 
 fn element_from_render_element(
     element: &RenderElement,
+    state_fields: &[StateField],
     ids: &mut TemplateIdAllocator,
 ) -> ElementNode {
     let id = ids.alloc();
@@ -119,7 +125,7 @@ fn element_from_render_element(
         children: element
             .children
             .iter()
-            .map(|child| template_child_from_render(child, ids))
+            .map(|child| template_child_from_render(child, state_fields, ids))
             .collect::<Vec<_>>(),
     }
 }
@@ -160,15 +166,31 @@ fn collect_direct_bindings_from_children(children: &[RenderChild]) -> Vec<String
     bindings
 }
 
-fn template_child_from_render(child: &RenderChild, ids: &mut TemplateIdAllocator) -> TemplateChild {
+fn template_child_from_render(
+    child: &RenderChild,
+    state_fields: &[StateField],
+    ids: &mut TemplateIdAllocator,
+) -> TemplateChild {
     match child {
         RenderChild::Text(text) => TemplateChild::Text(text.clone()),
+
         RenderChild::Binding(binding) => TemplateChild::Binding {
             id: ids.alloc(),
             expression: binding.clone(),
+            initial_value: binding_initial_value(binding, state_fields),
         },
+
         RenderChild::Element(element) => {
-            TemplateChild::Element(element_from_render_element(element, ids))
+            TemplateChild::Element(element_from_render_element(element, state_fields, ids))
         }
     }
+}
+
+fn binding_initial_value(expression: &str, state_fields: &[StateField]) -> Option<String> {
+    let field_name = expression.strip_prefix("this.")?;
+
+    state_fields
+        .iter()
+        .find(|field| field.name == field_name)
+        .and_then(|field| field.initial_value.clone())
 }

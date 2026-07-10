@@ -12,7 +12,8 @@
           {
             "kind": "binding",
             "id": "n1",
-            "expression": "this.count"
+            "expression": "this.count",
+            "initial_value": "0"
           }
         ],
         "events": [

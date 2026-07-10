@@ -543,8 +543,15 @@ fn print_template_child(child: &TemplateChild, indent: usize) {
 
     match child {
         TemplateChild::Text(text) => println!("{padding}Text({text:?})"),
-        TemplateChild::Binding { id, expression } => {
-            println!("{padding}Binding id={} expression={expression:?}", id.0);
+        TemplateChild::Binding {
+            id,
+            expression,
+            initial_value,
+        } => {
+            println!(
+                "{padding}Binding id={} expression={expression:?} initial={initial_value:?}",
+                id.0
+            );
         }
         TemplateChild::Element(element) => {
             println!(

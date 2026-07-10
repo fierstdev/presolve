@@ -137,6 +137,10 @@ class Counter extends Component {
 
         assert_eq!(component.state_fields.len(), 1);
         assert_eq!(component.state_fields[0].name, "count");
+        assert_eq!(
+            component.state_fields[0].initial_value.as_deref(),
+            Some("0")
+        );
 
         let method_names = component
             .methods
@@ -197,7 +201,7 @@ class Counter extends Component {
 
         assert_eq!(
             html,
-            "<button data-ez-node=\"n0\" data-ez-event-handler=\"this.increment\" data-ez-bindings=\"this.count\">Count:<!-- ez-binding:n1:this.count --></button>\n"
+            "<button data-ez-node=\"n0\" data-ez-event-handler=\"this.increment\" data-ez-bindings=\"this.count\">Count:<!-- ez-binding:n1:this.count -->0</button>\n"
         );
     }
 
@@ -241,6 +245,7 @@ class Counter extends Component {
                 TemplateChild::Binding {
                     id: TemplateNodeId("n1".to_string()),
                     expression: "this.count".to_string(),
+                    initial_value: Some("0".to_string()),
                 },
             ]
         );
@@ -276,7 +281,8 @@ class Counter extends Component {
                 ManifestNode::Binding {
                     id: "n2".to_string(),
                     expression: "this.count".to_string(),
-                },
+                    initial_value: Some("0".to_string()),
+                }
             ]
         );
 

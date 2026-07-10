@@ -23,6 +23,10 @@ fn parses_counter_fixture() {
         class.properties[0].initializer.as_deref(),
         Some("state(...)")
     );
+    assert_eq!(
+        class.properties[0].state_initial_value.as_deref(),
+        Some("0")
+    );
 
     let method_names = class
         .methods

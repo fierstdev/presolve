@@ -27,6 +27,7 @@ pub struct ParsedDecorator {
 pub struct ParsedProperty {
     pub name: String,
     pub initializer: Option<String>,
+    pub state_initial_value: Option<String>,
     pub span: SourceSpan,
 }
 

@@ -8,4 +8,4 @@ TemplateGraph:
         data-ez-bindings = bindings(this.count)
       children:
         Text("Count:")
-        Binding id=n1 expression="this.count"
+        Binding id=n1 expression="this.count" initial=Some("0")
