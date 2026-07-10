@@ -37,6 +37,7 @@ pub enum ParsedSerializableValue {
     Number(String),
     String(String),
     Boolean(bool),
+    Array(Vec<ParsedSerializableValue>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

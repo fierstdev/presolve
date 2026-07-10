@@ -637,19 +637,7 @@ fn state_initial_value(expression: &Expression<'_>) -> Option<ParsedSerializable
 }
 
 fn state_argument_literal(argument: &Argument<'_>) -> Option<ParsedSerializableValue> {
-    match argument {
-        Argument::NullLiteral(_) => Some(ParsedSerializableValue::Null),
-        Argument::NumericLiteral(literal) => literal
-            .raw
-            .as_ref()
-            .map(ToString::to_string)
-            .map(ParsedSerializableValue::Number),
-        Argument::StringLiteral(literal) => {
-            Some(ParsedSerializableValue::String(literal.value.to_string()))
-        }
-        Argument::BooleanLiteral(literal) => Some(ParsedSerializableValue::Boolean(literal.value)),
-        _ => None,
-    }
+    serializable_value_from_expression(argument.as_expression()?)
 }
 
 fn serializable_value_from_expression(
@@ -668,6 +656,12 @@ fn serializable_value_from_expression(
         Expression::BooleanLiteral(literal) => {
             Some(ParsedSerializableValue::Boolean(literal.value))
         }
+        Expression::ArrayExpression(array) => array
+            .elements
+            .iter()
+            .map(|element| serializable_value_from_expression(element.as_expression()?))
+            .collect::<Option<Vec<_>>>()
+            .map(ParsedSerializableValue::Array),
         _ => None,
     }
 }

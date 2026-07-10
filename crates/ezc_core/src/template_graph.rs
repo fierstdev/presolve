@@ -103,6 +103,7 @@ pub struct ConditionalNode {
 pub struct ListNode {
     pub id: TemplateNodeId,
     pub iterable: String,
+    pub initial_value: Option<SerializableValue>,
     pub item_variable: String,
     pub index_variable: Option<String>,
     pub key_expression: String,
@@ -345,6 +346,7 @@ fn list_from_render_list(
     ListNode {
         id: ids.alloc(),
         iterable: list.iterable.clone(),
+        initial_value: binding_initial_value(&list.iterable, state_fields),
         item_variable: list.item_variable.clone(),
         index_variable: list.index_variable.clone(),
         key_expression: list.key_expression.clone(),

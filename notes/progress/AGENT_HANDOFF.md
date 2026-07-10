@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: represent keyed list semantics
+* Latest commit: compiler: render static keyed lists
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 12:39:21 PDT
+* Date: 2026-07-10 12:47:41 PDT
 
 Last completed slice
 
-* Slice: 7F-A - List semantic model
-* Summary: Added compiler-owned keyed-list nodes that preserve the iterable dependency, item variable, optional index variable, key expression, source span, and item template.
-* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/html_codegen.rs, crates/ezc_core/src/template_manifest.rs
-* New behavior: Expression-bodied JSX maps such as `{this.items.map((item, index) => <li key={item.id}>{index}: {item.label}</li>)}` compile into first-class list nodes. The list iterable is recorded as a parent binding dependency, and `key` is treated as structural list metadata rather than an unsupported ordinary JSX attribute.
-* Tests added or changed: parser list assertions, core parser-to-template assertions including intentionally empty static list output, and CLI parse/graph/template golden checks.
-* Fixtures added or changed: fixtures/0019-keyed-list-semantics
+* Slice: 7F-B - Static initial list rendering
+* Summary: Added recursive serializable array values and static expansion of keyed list item templates from initial array state.
+* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/html_codegen.rs
+* New behavior: `state(["North", "South"])` supplies a keyed `.map` list at compile time. Item and optional index bindings resolve in initial HTML, and generated element/binding IDs receive deterministic `:<index>` suffixes for each expanded item instance.
+* Tests added or changed: parser array assertions, core template/static-HTML/manifest-boundary assertions, and CLI html/template golden checks.
+* Fixtures added or changed: fixtures/0020-static-keyed-list
 
 Current in-progress slice
 
 * Slice: 7F - Lists and keys
 * Status: In progress
-* Completed: 7F-A - List semantic model
-* Remaining: Start 7F-B static initial list rendering after extending `SerializableValue` with arrays.
+* Completed: 7F-A - List semantic model; 7F-B - Static initial list rendering
+* Remaining: Start 7F-C keyed reconciliation plan.
 
 Verification
 
@@ -46,13 +46,17 @@ Architecture decisions made
 * Decision: Keyed list nodes are represented before arrays, static list HTML, manifest serialization, or runtime reconciliation.
 * Reason: The compiler needs a stable semantic contract for list identity before committing to array values or DOM update behavior.
 * Tradeoff: List item templates are visible in parser/component/template tooling, but they intentionally emit no initial DOM content or runtime manifest records yet.
+* Decision: Serializable arrays may contain serializable primitives or nested arrays, but static list item binding resolution is limited to the exact item variable and optional index variable.
+* Reason: It enables initial list rendering without introducing object-value semantics or arbitrary expression evaluation.
+* Tradeoff: Object entries and member expressions such as `item.id` remain semantic metadata only; their initial values are not rendered in 7F-B.
 
 Known limitations
 
 * Item: Conditional rendering only supports simple `this.<stateField>` conditions with JSX element or fragment branches.
 * Item: Conditional branch snippets are replaced as static HTML. Bindings, events, and nested dynamic behavior inside swapped-in branch snippets are not re-registered yet.
 * Item: Keyed lists currently accept only `iterable.map((item, index?) => <element key={expression}>...</element>)` with identifier parameters and an expression-bodied callback. Diagnostics for missing or unstable keys are deferred to 7F-D.
-* Item: List nodes have no static array rendering, runtime manifest representation, or reconciliation behavior until `SerializableValue` supports arrays and later 7F slices add keyed updates.
+* Item: Static keyed-list output supports array state, direct item bindings, and optional index bindings, but has no runtime manifest representation or reconciliation behavior.
+* Item: Static list item node and binding IDs use a deterministic `:<index>` suffix. Key-derived retained-node identity, movement, insertion, and deletion are deferred to 7F-C.
 * Item: Only `this.<field>++`, `this.<field>--`, `this.<field> += <literal>`, `this.<field> -= <literal>`, `this.<field> = <literal>`, and `this.<field> = !this.<field>` are recognized as action steps.
 * Item: The browser runtime supports only delegated click events, ordered closed action steps, numeric/string/boolean/null initial state, binding callback text/attribute updates, and conditional branch replacement.
 * Item: Static and `this.<stateField>` dynamic JSX attributes are preserved, but `className`/`htmlFor` normalization policy is still intentionally undecided.
@@ -66,7 +70,7 @@ Known limitations
 
 Exact next step
 
-Start Slice 7F-B by extending `ParsedSerializableValue` and `SerializableValue` with constrained serializable arrays, then render the initial keyed-list contents from a list node without adding runtime reconciliation yet.
+Start Slice 7F-C by defining runtime list anchors and manifest records, then implement keyed reconciliation for insertion, deletion, movement, and retained-node reuse.
 
 Useful commands
 
@@ -91,6 +95,7 @@ Useful commands
 * `cargo run -p ezc_cli -- build fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx --out target/ezc-manual/conditional-rendering`
 * `cargo run -p ezc_cli -- build fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx --out target/ezc-manual/logical-and-conditional`
 * `cargo run -p ezc_cli -- template fixtures/0019-keyed-list-semantics/input/KeyedList.tsx`
+* `cargo run -p ezc_cli -- html fixtures/0020-static-keyed-list/input/StaticKeyedList.tsx`
 * `cargo run -p ezc_cli -- build fixtures/0004-nested-jsx/input/NestedCounter.tsx --out target/ezc-manual/runtime-contract`
 
 Changed but uncommitted files

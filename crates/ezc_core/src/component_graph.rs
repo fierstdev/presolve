@@ -36,15 +36,16 @@ pub enum SerializableValue {
     Number(String),
     String(String),
     Boolean(bool),
+    Array(Vec<SerializableValue>),
 }
 
 impl SerializableValue {
     #[must_use]
     pub fn render_text(&self) -> String {
         match self {
-            Self::Null => String::new(),
             Self::Number(value) | Self::String(value) => value.clone(),
             Self::Boolean(value) => value.to_string(),
+            Self::Null | Self::Array(_) => String::new(),
         }
     }
 }
@@ -393,6 +394,9 @@ fn serializable_value_from_parsed(value: &ParsedSerializableValue) -> Serializab
         ParsedSerializableValue::Number(value) => SerializableValue::Number(value.clone()),
         ParsedSerializableValue::String(value) => SerializableValue::String(value.clone()),
         ParsedSerializableValue::Boolean(value) => SerializableValue::Boolean(*value),
+        ParsedSerializableValue::Array(values) => {
+            SerializableValue::Array(values.iter().map(serializable_value_from_parsed).collect())
+        }
     }
 }
 

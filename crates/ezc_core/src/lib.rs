@@ -1140,7 +1140,7 @@ class BadAttrs extends Component {
     }
 
     #[test]
-    fn builds_keyed_list_semantics_without_static_initial_rendering() {
+    fn builds_empty_keyed_list_from_a_serializable_array() {
         let source =
             include_str!("../../../fixtures/0019-keyed-list-semantics/input/KeyedList.tsx");
 
@@ -1167,6 +1167,10 @@ class BadAttrs extends Component {
 
         assert_eq!(list.id.0, "n1");
         assert_eq!(list.iterable, "this.items");
+        assert_eq!(
+            list.initial_value,
+            Some(SerializableValue::Array(Vec::new()))
+        );
         assert_eq!(list.item_variable, "item");
         assert_eq!(list.index_variable.as_deref(), Some("index"));
         assert_eq!(list.key_expression, "item.id");
@@ -1188,6 +1192,50 @@ class BadAttrs extends Component {
             vec![ManifestNode::Element {
                 id: "n0".to_string(),
                 tag: "ul".to_string(),
+            }]
+        );
+    }
+
+    #[test]
+    fn renders_initial_keyed_list_items_from_a_serializable_array() {
+        let source =
+            include_str!("../../../fixtures/0020-static-keyed-list/input/StaticKeyedList.tsx");
+
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0020-static-keyed-list/input/StaticKeyedList.tsx",
+            source,
+        );
+        let component_graph = build_component_graph(&parsed);
+        assert!(component_graph.diagnostics.is_empty());
+
+        let template_graph = build_template_graph(&component_graph);
+        let root = template_graph.templates[0]
+            .root
+            .as_ref()
+            .expect("expected root element");
+        let TemplateChild::List(list) = &root.children[0] else {
+            panic!("expected keyed list child");
+        };
+
+        assert_eq!(
+            list.initial_value,
+            Some(SerializableValue::Array(vec![
+                SerializableValue::String("North".to_string()),
+                SerializableValue::String("South".to_string()),
+            ]))
+        );
+
+        assert_eq!(
+            generate_static_html(&template_graph),
+            "<ol data-ez-node=\"n0\" data-ez-bindings=\"this.labels\"><li data-ez-node=\"n2:0\" data-ez-bindings=\"index,label\"><!-- ez-binding:n3:0:index -->0:<!-- ez-binding:n4:0:label -->North</li><li data-ez-node=\"n2:1\" data-ez-bindings=\"index,label\"><!-- ez-binding:n3:1:index -->1:<!-- ez-binding:n4:1:label -->South</li></ol>\n"
+        );
+
+        let manifest = build_template_manifest(&component_graph, &template_graph);
+        assert_eq!(
+            manifest.components[0].template.nodes,
+            vec![ManifestNode::Element {
+                id: "n0".to_string(),
+                tag: "ol".to_string(),
             }]
         );
     }

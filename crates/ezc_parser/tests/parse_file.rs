@@ -693,3 +693,24 @@ fn parses_keyed_jsx_list_rendering() {
     };
     assert_eq!(item_template.name, "li");
 }
+
+#[test]
+fn parses_serializable_array_state_for_static_keyed_list() {
+    let source = include_str!("../../../fixtures/0020-static-keyed-list/input/StaticKeyedList.tsx");
+
+    let parsed = parse_file(
+        "fixtures/0020-static-keyed-list/input/StaticKeyedList.tsx",
+        source,
+    );
+
+    assert!(parsed.diagnostics.is_empty());
+
+    let class = parsed.classes.first().expect("expected class");
+    assert_eq!(
+        class.properties[0].state_initial_value,
+        Some(ParsedSerializableValue::Array(vec![
+            ParsedSerializableValue::String("North".to_string()),
+            ParsedSerializableValue::String("South".to_string()),
+        ]))
+    );
+}

@@ -912,6 +912,7 @@ fn format_serializable_value(value: Option<&SerializableValue>) -> String {
             format!("Some({value:?})")
         }
         Some(SerializableValue::Boolean(value)) => format!("Some({value})"),
+        Some(SerializableValue::Array(values)) => format!("Some({values:?})"),
         None => "None".to_string(),
     }
 }
