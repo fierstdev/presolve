@@ -5,8 +5,11 @@ use crate::template_graph::{
     AttributeValue, ElementNode, TemplateChild, TemplateGraph, TemplateNode,
 };
 
+pub const TEMPLATE_MANIFEST_SCHEMA_VERSION: u32 = 1;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct TemplateManifest {
+    pub schema_version: u32,
     pub components: Vec<ManifestComponent>,
 }
 
@@ -80,6 +83,7 @@ pub fn build_template_manifest(
     template_graph: &TemplateGraph,
 ) -> TemplateManifest {
     TemplateManifest {
+        schema_version: TEMPLATE_MANIFEST_SCHEMA_VERSION,
         components: template_graph
             .templates
             .iter()

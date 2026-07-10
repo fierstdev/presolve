@@ -416,6 +416,94 @@ fn multi_step_action_runs_all_steps_in_a_real_browser() {
 }
 
 #[test]
+fn runtime_contract_diagnostics_report_manifest_boot_failures_in_a_real_browser() {
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/runtime-contract");
+
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean previous browser test output");
+    }
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0004-nested-jsx/input/NestedCounter.tsx",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("browser test output path was not valid UTF-8"),
+        ])
+        .output()
+        .expect("failed to run ezc_cli build");
+
+    assert!(
+        output.status.success(),
+        "expected build to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let probes = [
+        (
+            "missing-manifest.html",
+            None,
+            "EZR_MISSING_MANIFEST",
+            "EDGEZERO_MISSING_MANIFEST_DIAGNOSTIC_PASS",
+        ),
+        (
+            "invalid-json.html",
+            Some("{"),
+            "EZR_INVALID_MANIFEST_JSON",
+            "EDGEZERO_INVALID_JSON_DIAGNOSTIC_PASS",
+        ),
+        (
+            "unsupported-schema.html",
+            Some(r#"{"schema_version":999,"components":[]}"#),
+            "EZR_UNSUPPORTED_SCHEMA",
+            "EDGEZERO_UNSUPPORTED_SCHEMA_DIAGNOSTIC_PASS",
+        ),
+    ];
+
+    for (index, (file_name, manifest_json, expected_code, pass_marker)) in probes.iter().enumerate()
+    {
+        write_runtime_contract_probe_page(
+            &out_dir,
+            file_name,
+            *manifest_json,
+            expected_code,
+            pass_marker,
+        );
+
+        let server = StaticServer::start(out_dir.clone());
+        let chrome = chrome_bin().expect("headless Chrome was not found");
+        let profile_dir = out_dir.join(format!("chrome-profile-{index}"));
+        fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile dir");
+        let user_data_dir = format!(
+            "--user-data-dir={}",
+            profile_dir
+                .to_str()
+                .expect("Chrome profile path was not valid UTF-8")
+        );
+        let probe_url = format!("http://127.0.0.1:{}/{}", server.port, file_name);
+
+        let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        server.stop();
+
+        assert!(
+            stdout.contains(pass_marker),
+            "browser probe did not pass for {file_name}\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+            output.status,
+            stdout,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[test]
 fn string_state_initializes_in_a_real_browser() {
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/string-greeting");
@@ -654,6 +742,18 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 
   if (!Array.isArray(window.__EDGEZERO__.missingAnchors) || window.__EDGEZERO__.missingAnchors.length !== 0) {
     fail("missing anchors were present");
+  }
+
+  if (!Array.isArray(window.__EDGEZERO__.diagnostics) || window.__EDGEZERO__.diagnostics.length !== 0) {
+    fail("unexpected diagnostics were present");
+  }
+
+  if (window.__EDGEZERO__.runtime_version !== "0.0.0") {
+    fail("runtime version was not exposed");
+  }
+
+  if (window.__EDGEZERO__.supported_schema_version !== 1) {
+    fail("supported schema version was not exposed");
   }
 
   if (window.__EDGEZERO__.components[0].state.count !== 2) {
@@ -1098,6 +1198,61 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     );
 
     fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
+}
+
+fn write_runtime_contract_probe_page(
+    out_dir: &Path,
+    file_name: &str,
+    manifest_json: Option<&str>,
+    expected_code: &str,
+    pass_marker: &str,
+) {
+    let mut page = String::new();
+
+    page.push_str("<!doctype html>\n<html lang=\"en\">\n<body>\n");
+
+    if let Some(manifest_json) = manifest_json {
+        page.push_str("<script type=\"application/json\" id=\"ez-template-manifest\">\n");
+        page.push_str(manifest_json);
+        page.push_str("\n</script>\n");
+    }
+
+    page.push_str("<script src=\"./runtime.js\"></script>\n");
+    page.push_str("<script>\n");
+    page.push_str("const fail = (message) => { throw new Error(message); };\n");
+    page.push_str("const waitFor = (predicate, label) => new Promise((resolve, reject) => {\n");
+    page.push_str("  const deadline = Date.now() + 3000;\n");
+    page.push_str("  const tick = () => {\n");
+    page.push_str("    if (predicate()) { resolve(); return; }\n");
+    page.push_str("    if (Date.now() > deadline) { reject(new Error(`Timed out waiting for ${label}`)); return; }\n");
+    page.push_str("    setTimeout(tick, 20);\n");
+    page.push_str("  };\n");
+    page.push_str("  tick();\n");
+    page.push_str("});\n");
+    page.push_str("(async () => {\n");
+    page.push_str("  await waitFor(() => document.documentElement.dataset.ezRuntime === \"error\" && window.__EDGEZERO__, \"runtime error\");\n");
+    page.push_str("  if (window.__EDGEZERO__.runtime_version !== \"0.0.0\") fail(\"runtime version was not exposed\");\n");
+    page.push_str("  if (window.__EDGEZERO__.supported_schema_version !== 1) fail(\"supported schema version was not exposed\");\n");
+    page.push_str("  const diagnostics = window.__EDGEZERO__.diagnostics;\n");
+    page.push_str("  if (!Array.isArray(diagnostics) || diagnostics.length === 0) fail(\"diagnostics were not exposed\");\n");
+    page.push_str("  if (diagnostics[0].code !== \"");
+    page.push_str(expected_code);
+    page.push_str("\") fail(`expected ");
+    page.push_str(expected_code);
+    page.push_str(" but saw ${diagnostics[0].code}`);\n");
+    page.push_str("  if (diagnostics[0].fatal !== true) fail(\"diagnostic was not fatal\");\n");
+    page.push_str("  document.body.dataset.browserTest = \"pass\";\n");
+    page.push_str("  document.body.insertAdjacentHTML(\"beforeend\", \"<div>");
+    page.push_str(pass_marker);
+    page.push_str("</div>\");\n");
+    page.push_str("})().catch((error) => {\n");
+    page.push_str("  document.body.dataset.browserTest = \"fail\";\n");
+    page.push_str("  document.body.insertAdjacentHTML(\"beforeend\", `<div>EDGEZERO_RUNTIME_CONTRACT_DIAGNOSTIC_FAIL: ${error.message}</div>`);\n");
+    page.push_str("  console.error(error);\n");
+    page.push_str("});\n");
+    page.push_str("</script>\n</body>\n</html>\n");
+
+    fs::write(out_dir.join(file_name), page).expect("failed to write browser probe page");
 }
 
 fn write_string_probe_page(out_dir: &Path) {

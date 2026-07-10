@@ -1231,6 +1231,11 @@ fn build_command_writes_page_manifest_and_runtime_artifacts() {
         std::fs::read_to_string(out_dir.join("runtime.js")).expect("failed to read built runtime");
 
     assert!(actual_runtime.contains("ez-template-manifest"));
+    assert!(actual_runtime.contains("SUPPORTED_SCHEMA_VERSION = 1"));
+    assert!(actual_runtime.contains("RUNTIME_VERSION = \"0.0.0\""));
+    assert!(actual_runtime.contains("validateManifestSchema"));
+    assert!(actual_runtime.contains("EZR_UNSUPPORTED_SCHEMA"));
+    assert!(actual_runtime.contains("diagnostics"));
     assert!(actual_runtime.contains("data-ez-node"));
     assert!(actual_runtime.contains("ez-binding:"));
     assert!(actual_runtime.contains("normalizeHandlerReference"));

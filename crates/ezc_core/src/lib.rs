@@ -34,6 +34,7 @@ pub use template_graph::{
 pub use template_manifest::{
     build_template_manifest, template_manifest_json, ManifestAction, ManifestComponent,
     ManifestEvent, ManifestNode, ManifestOperation, ManifestTemplate, TemplateManifest,
+    TEMPLATE_MANIFEST_SCHEMA_VERSION,
 };
 
 #[cfg(test)]
@@ -712,6 +713,7 @@ class Counter extends Component {
         let template_graph = build_template_graph(&component_graph);
         let manifest = build_template_manifest(&component_graph, &template_graph);
 
+        assert_eq!(manifest.schema_version, TEMPLATE_MANIFEST_SCHEMA_VERSION);
         assert_eq!(manifest.components.len(), 1);
 
         let component = &manifest.components[0];
@@ -753,6 +755,15 @@ class Counter extends Component {
                 field: "count".to_string(),
                 operand: None,
             }]
+        );
+
+        let manifest_json = template_manifest_json(&manifest);
+        let manifest_value: serde_json::Value =
+            serde_json::from_str(&manifest_json).expect("manifest JSON should parse");
+
+        assert_eq!(
+            manifest_value["schema_version"],
+            serde_json::json!(TEMPLATE_MANIFEST_SCHEMA_VERSION)
         );
     }
 

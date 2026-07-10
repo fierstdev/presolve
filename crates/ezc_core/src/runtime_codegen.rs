@@ -2,17 +2,75 @@ const RUNTIME_STUB: &str = r#"(() => {
   "use strict";
 
   const MANIFEST_ELEMENT_ID = "ez-template-manifest";
+  const RUNTIME_VERSION = "0.0.0";
+  const SUPPORTED_SCHEMA_VERSION = 1;
 
-  function readManifest() {
+  class EdgeZeroBootError extends Error {
+    constructor(code) {
+      super(code);
+      this.name = "EdgeZeroBootError";
+      this.code = code;
+    }
+  }
+
+  function createDiagnostic(code, message, detail, fatal = false) {
+    return {
+      code,
+      message,
+      detail,
+      fatal
+    };
+  }
+
+  function reportDiagnostic(diagnostics, code, message, detail, fatal = false) {
+    const diagnostic = createDiagnostic(code, message, detail, fatal);
+    diagnostics.push(diagnostic);
+    console.error(`[EdgeZero] ${code}`, diagnostic);
+    return diagnostic;
+  }
+
+  function readManifest(diagnostics) {
     const element = document.getElementById(MANIFEST_ELEMENT_ID);
 
     if (!(element instanceof HTMLScriptElement)) {
-      throw new Error(
-        `Missing template manifest script #${MANIFEST_ELEMENT_ID}`
+      reportDiagnostic(
+        diagnostics,
+        "EZR_MISSING_MANIFEST",
+        `Missing template manifest script #${MANIFEST_ELEMENT_ID}`,
+        { manifestElementId: MANIFEST_ELEMENT_ID },
+        true
       );
+      throw new EdgeZeroBootError("EZR_MISSING_MANIFEST");
     }
 
-    return JSON.parse(element.textContent ?? "");
+    try {
+      return JSON.parse(element.textContent ?? "");
+    } catch (error) {
+      reportDiagnostic(
+        diagnostics,
+        "EZR_INVALID_MANIFEST_JSON",
+        "Template manifest JSON could not be parsed",
+        { message: error instanceof Error ? error.message : String(error) },
+        true
+      );
+      throw new EdgeZeroBootError("EZR_INVALID_MANIFEST_JSON");
+    }
+  }
+
+  function validateManifestSchema(manifest, diagnostics) {
+    if (manifest?.schema_version !== SUPPORTED_SCHEMA_VERSION) {
+      reportDiagnostic(
+        diagnostics,
+        "EZR_UNSUPPORTED_SCHEMA",
+        `Unsupported template manifest schema version ${String(manifest?.schema_version)}`,
+        {
+          schema_version: manifest?.schema_version,
+          supported_schema_version: SUPPORTED_SCHEMA_VERSION
+        },
+        true
+      );
+      throw new EdgeZeroBootError("EZR_UNSUPPORTED_SCHEMA");
+    }
   }
 
   function normalizeHandlerReference(reference) {
@@ -65,8 +123,10 @@ const RUNTIME_STUB: &str = r#"(() => {
         if (node.kind === "element") {
           if (!elementsByNode.has(node.id)) {
             missing.push({
+              component: component.name,
               id: node.id,
-              kind: node.kind
+              kind: node.kind,
+              code: "EZR_MISSING_ELEMENT_ANCHOR"
             });
           }
         }
@@ -76,8 +136,10 @@ const RUNTIME_STUB: &str = r#"(() => {
           !bindingAnchors.has(node.id)
         ) {
           missing.push({
+            component: component.name,
             id: node.id,
-            kind: node.kind
+            kind: node.kind,
+            code: "EZR_MISSING_BINDING_ANCHOR"
           });
         }
       }
@@ -110,20 +172,23 @@ const RUNTIME_STUB: &str = r#"(() => {
     return value === null ? "" : String(value);
   }
 
-  function createRuntimeStore(elementsByNode) {
+  function createRuntimeStore(elementsByNode, diagnostics) {
     return {
       components: new Map(),
       bindingsByField: new Map(),
       actionsByMethod: new Map(),
       eventsByType: new Map(),
-      elementsByNode
+      elementsByNode,
+      diagnostics
     };
   }
 
-  function readField(component, field) {
+  function readField(store, component, field) {
     if (!(field in component.state)) {
-      console.error(
-        "[EdgeZero] EZR_MISSING_FIELD",
+      reportDiagnostic(
+        store.diagnostics,
+        "EZR_INVALID_STATE_OPERATION",
+        "Action referenced a missing state field",
         { component: component.name, field }
       );
       return undefined;
@@ -134,8 +199,10 @@ const RUNTIME_STUB: &str = r#"(() => {
 
   function writeField(store, component, field, value) {
     if (!(field in component.state)) {
-      console.error(
-        "[EdgeZero] EZR_MISSING_FIELD",
+      reportDiagnostic(
+        store.diagnostics,
+        "EZR_INVALID_STATE_OPERATION",
+        "Action referenced a missing state field",
         { component: component.name, field }
       );
       return;
@@ -151,8 +218,10 @@ const RUNTIME_STUB: &str = r#"(() => {
     );
 
     if (bindings === undefined) {
-      console.error(
-        "[EdgeZero] EZR_MISSING_BINDING",
+      reportDiagnostic(
+        store.diagnostics,
+        "EZR_MISSING_BINDING_ANCHOR",
+        "State field has no registered binding anchor",
         { component: component.name, field }
       );
       return;
@@ -183,8 +252,10 @@ const RUNTIME_STUB: &str = r#"(() => {
 
   function registerEvent(store, component, event) {
     if (event.event !== "click") {
-      console.error(
-        "[EdgeZero] EZR_UNSUPPORTED_EVENT",
+      reportDiagnostic(
+        store.diagnostics,
+        "EZR_UNRESOLVED_EVENT",
+        "Unsupported event type in template manifest",
         event
       );
       return;
@@ -196,8 +267,10 @@ const RUNTIME_STUB: &str = r#"(() => {
     );
 
     if (actions === undefined) {
-      console.error(
-        "[EdgeZero] EZR_MISSING_ACTION",
+      reportDiagnostic(
+        store.diagnostics,
+        "EZR_UNRESOLVED_ACTION",
+        "Event handler did not resolve to a compiler action",
         event
       );
       return;
@@ -206,8 +279,10 @@ const RUNTIME_STUB: &str = r#"(() => {
     const eventsByNode = store.eventsByType.get(event.event) ?? new Map();
 
     if (eventsByNode.has(event.node)) {
-      console.error(
-        "[EdgeZero] EZR_DUPLICATE_EVENT",
+      reportDiagnostic(
+        store.diagnostics,
+        "EZR_UNRESOLVED_EVENT",
+        "Duplicate event registration for template node",
         event
       );
       return;
@@ -248,18 +323,16 @@ const RUNTIME_STUB: &str = r#"(() => {
       const anchor = bindingAnchors.get(node.id);
 
       if (anchor === undefined) {
-        console.error(
-          "[EdgeZero] EZR_MISSING_BINDING_ANCHOR",
-          node
-        );
         continue;
       }
 
       const textNode = anchor.marker.nextSibling;
 
       if (!(textNode instanceof Text)) {
-        console.error(
-          "[EdgeZero] EZR_MISSING_BINDING_TEXT",
+        reportDiagnostic(
+          store.diagnostics,
+          "EZR_MISSING_BINDING_ANCHOR",
+          "Binding anchor was not followed by a text node",
           node
         );
         continue;
@@ -273,7 +346,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     return component;
   }
 
-  function actionDelta(action) {
+  function actionDelta(store, action) {
     if (action.operation === "increment") {
       return 1;
     }
@@ -286,8 +359,10 @@ const RUNTIME_STUB: &str = r#"(() => {
       const operand = Number(action.operand);
 
       if (Number.isNaN(operand)) {
-        console.error(
-          "[EdgeZero] EZR_NON_NUMERIC_OPERAND",
+        reportDiagnostic(
+          store.diagnostics,
+          "EZR_INVALID_STATE_OPERATION",
+          "Numeric state operation had a non-numeric operand",
           action
         );
         return null;
@@ -308,19 +383,23 @@ const RUNTIME_STUB: &str = r#"(() => {
       action.operation !== "assign" &&
       action.operation !== "toggle"
     ) {
-      console.error(
-        "[EdgeZero] EZR_UNSUPPORTED_ACTION",
+      reportDiagnostic(
+        store.diagnostics,
+        "EZR_INVALID_STATE_OPERATION",
+        "Action used an unsupported state operation",
         action
       );
       return;
     }
 
     if (action.operation === "toggle") {
-      const current = readField(component, action.field);
+      const current = readField(store, component, action.field);
 
       if (typeof current !== "boolean") {
-        console.error(
-          "[EdgeZero] EZR_NON_BOOLEAN_FIELD",
+        reportDiagnostic(
+          store.diagnostics,
+          "EZR_INVALID_STATE_OPERATION",
+          "Toggle action requires a boolean state field",
           action
         );
         return;
@@ -335,17 +414,19 @@ const RUNTIME_STUB: &str = r#"(() => {
       return;
     }
 
-    const current = Number(readField(component, action.field));
+    const current = Number(readField(store, component, action.field));
 
     if (Number.isNaN(current)) {
-      console.error(
-        "[EdgeZero] EZR_NON_NUMERIC_FIELD",
+      reportDiagnostic(
+        store.diagnostics,
+        "EZR_INVALID_STATE_OPERATION",
+        "Numeric state operation requires a numeric state field",
         action
       );
       return;
     }
 
-    const delta = actionDelta(action);
+    const delta = actionDelta(store, action);
 
     if (delta === null) {
       return;
@@ -417,15 +498,44 @@ const RUNTIME_STUB: &str = r#"(() => {
     }));
   }
 
-  function initializeRuntime(manifest) {
+  function runtimeState({
+    manifest = null,
+    missingAnchors = [],
+    store = null,
+    components = [],
+    diagnostics
+  }) {
+    return {
+      runtime_version: RUNTIME_VERSION,
+      supported_schema_version: SUPPORTED_SCHEMA_VERSION,
+      manifest,
+      missingAnchors,
+      diagnostics,
+      store,
+      components
+    };
+  }
+
+  function initializeRuntime(manifest, diagnostics) {
     const bindingAnchors = collectBindingAnchors();
     const elementsByNode = collectElementAnchors();
-    const store = createRuntimeStore(elementsByNode);
+    const store = createRuntimeStore(elementsByNode, diagnostics);
     const missingAnchors = collectMissingAnchors(
       manifest,
       bindingAnchors,
       elementsByNode
     );
+
+    for (const anchor of missingAnchors) {
+      reportDiagnostic(
+        diagnostics,
+        anchor.code,
+        anchor.kind === "element"
+          ? "Manifest element anchor was not found in the rendered DOM"
+          : "Manifest binding anchor was not found in the rendered DOM",
+        anchor
+      );
+    }
 
     for (const manifestComponent of manifest.components ?? []) {
       const component = initializeComponentRuntime(
@@ -438,42 +548,57 @@ const RUNTIME_STUB: &str = r#"(() => {
 
     installDelegatedEventListeners(store);
 
-    return {
+    return runtimeState({
       manifest,
       missingAnchors,
+      diagnostics,
       store,
       components: debugComponents(store)
-    };
+    });
   }
 
   function boot() {
+    const diagnostics = [];
+
     try {
-      const manifest = readManifest();
-      const runtimeState = initializeRuntime(manifest);
-      const status = runtimeState.missingAnchors.length === 0 ? "ready" : "error";
+      const manifest = readManifest(diagnostics);
+      validateManifestSchema(manifest, diagnostics);
+
+      const state = initializeRuntime(manifest, diagnostics);
+      const status = state.diagnostics.some((diagnostic) => diagnostic.fatal)
+        || state.missingAnchors.length > 0
+        ? "error"
+        : "ready";
 
       document.documentElement.dataset.ezRuntime = status;
-      window.__EDGEZERO__ = runtimeState;
+      window.__EDGEZERO__ = state;
 
       document.dispatchEvent(
         new CustomEvent("edgezero:ready", {
-          detail: runtimeState
+          detail: state
+        })
+      );
+    } catch (error) {
+      document.documentElement.dataset.ezRuntime = "error";
+      window.__EDGEZERO__ = runtimeState({
+        diagnostics
+      });
+
+      document.dispatchEvent(
+        new CustomEvent("edgezero:ready", {
+          detail: window.__EDGEZERO__
         })
       );
 
-      if (runtimeState.missingAnchors.length > 0) {
-        console.error(
-          "[EdgeZero] Missing template anchors",
-          runtimeState.missingAnchors
+      if (!(error instanceof EdgeZeroBootError)) {
+        reportDiagnostic(
+          diagnostics,
+          "EZR_RUNTIME_BOOT_FAILED",
+          "Runtime boot failed",
+          { message: error instanceof Error ? error.message : String(error) },
+          true
         );
       }
-    } catch (error) {
-      document.documentElement.dataset.ezRuntime = "error";
-
-      console.error(
-        "[EdgeZero] Runtime boot failed",
-        error
-      );
     }
   }
 
@@ -501,8 +626,15 @@ mod tests {
         let runtime = generate_runtime_stub();
 
         assert!(runtime.contains("ez-template-manifest"));
+        assert!(runtime.contains("RUNTIME_VERSION = \"0.0.0\""));
+        assert!(runtime.contains("SUPPORTED_SCHEMA_VERSION = 1"));
+        assert!(runtime.contains("EZR_MISSING_MANIFEST"));
+        assert!(runtime.contains("EZR_INVALID_MANIFEST_JSON"));
+        assert!(runtime.contains("EZR_UNSUPPORTED_SCHEMA"));
         assert!(runtime.contains("data-ez-node"));
         assert!(runtime.contains("ez-binding:"));
+        assert!(runtime.contains("reportDiagnostic"));
+        assert!(runtime.contains("validateManifestSchema"));
         assert!(runtime.contains("normalizeHandlerReference"));
         assert!(runtime.contains("createRuntimeStore"));
         assert!(runtime.contains("readField"));
@@ -522,11 +654,16 @@ mod tests {
         assert!(runtime.contains("action.operation !== \"toggle\""));
         assert!(runtime.contains("action.operation === \"assign\""));
         assert!(runtime.contains("action.operation === \"toggle\""));
-        assert!(runtime.contains("EZR_NON_BOOLEAN_FIELD"));
-        assert!(runtime.contains("EZR_NON_NUMERIC_OPERAND"));
+        assert!(runtime.contains("EZR_MISSING_ELEMENT_ANCHOR"));
+        assert!(runtime.contains("EZR_MISSING_BINDING_ANCHOR"));
+        assert!(runtime.contains("EZR_UNRESOLVED_EVENT"));
+        assert!(runtime.contains("EZR_UNRESOLVED_ACTION"));
+        assert!(runtime.contains("EZR_INVALID_STATE_OPERATION"));
         assert!(runtime.contains("current + delta"));
         assert!(runtime.contains("dataset.ezRuntime"));
         assert!(runtime.contains("edgezero:ready"));
+        assert!(runtime.contains("runtime_version"));
+        assert!(runtime.contains("diagnostics"));
         assert!(runtime.contains("window.__EDGEZERO__"));
     }
 }
