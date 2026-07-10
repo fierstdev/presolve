@@ -2,7 +2,7 @@ use serde::Serialize;
 
 use ezc_parser::{
     ParsedClass, ParsedEventHandler, ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue,
-    ParsedJsxChild, ParsedSerializableValue, ParsedStateOperation,
+    ParsedJsxChild, ParsedSerializableValue, ParsedStateOperation, SourceSpan,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -72,14 +72,21 @@ pub enum StateOperation {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RenderChild {
-    Text(String),
-    Binding(String),
+    Text {
+        value: String,
+        span: SourceSpan,
+    },
+    Binding {
+        expression: String,
+        span: SourceSpan,
+    },
     Element(RenderElement),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RenderElement {
     pub tag_name: String,
+    pub span: SourceSpan,
     pub attributes: Vec<RenderAttribute>,
     pub event_handlers: Vec<RenderEventHandler>,
     pub children: Vec<RenderChild>,
@@ -89,6 +96,7 @@ pub struct RenderElement {
 pub struct RenderAttribute {
     pub name: String,
     pub value: RenderAttributeValue,
+    pub span: SourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -104,11 +112,13 @@ pub enum RenderAttributeValue {
 pub struct RenderEventHandler {
     pub event: String,
     pub handler: String,
+    pub span: SourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RenderModel {
     pub root_element: Option<String>,
+    pub root_span: Option<SourceSpan>,
     pub attributes: Vec<RenderAttribute>,
     pub bindings: Vec<String>,
     pub event_handlers: Vec<RenderEventHandler>,
@@ -199,6 +209,7 @@ fn build_component_node(
 
             RenderModel {
                 root_element: root.map(|jsx| jsx.name.clone()),
+                root_span: root.map(|jsx| jsx.span),
                 attributes: root
                     .map(|jsx| {
                         jsx.attributes
@@ -350,10 +361,17 @@ fn decorator_argument(class: &ParsedClass, name: &str) -> Option<String> {
 
 fn render_child_from_parsed(child: &ParsedJsxChild) -> RenderChild {
     match child {
-        ParsedJsxChild::Text(text) => RenderChild::Text(text.clone()),
-        ParsedJsxChild::Binding(binding) => RenderChild::Binding(binding.clone()),
+        ParsedJsxChild::Text { value, span } => RenderChild::Text {
+            value: value.clone(),
+            span: *span,
+        },
+        ParsedJsxChild::Binding { expression, span } => RenderChild::Binding {
+            expression: expression.clone(),
+            span: *span,
+        },
         ParsedJsxChild::Element(element) => RenderChild::Element(RenderElement {
             tag_name: element.name.clone(),
+            span: element.span,
             attributes: element
                 .attributes
                 .iter()
@@ -387,6 +405,7 @@ fn render_attribute_from_parsed(attribute: &ParsedJsxAttribute) -> RenderAttribu
             }
             ParsedJsxAttributeValue::Unsupported => RenderAttributeValue::Unsupported,
         },
+        span: attribute.span,
     }
 }
 
@@ -394,6 +413,7 @@ fn render_event_handler_from_parsed(event_handler: &ParsedEventHandler) -> Rende
     RenderEventHandler {
         event: event_handler.event.clone(),
         handler: event_handler.handler.clone(),
+        span: event_handler.span,
     }
 }
 

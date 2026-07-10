@@ -195,6 +195,7 @@ fn collect_element(
                 id,
                 expression,
                 initial_value,
+                ..
             } => {
                 nodes.push(ManifestNode::Binding {
                     id: id.0.clone(),
@@ -211,11 +212,12 @@ fn collect_element(
 
     for child in &element.children {
         match child {
-            TemplateChild::Text(_) => {}
+            TemplateChild::Text { .. } => {}
             TemplateChild::Binding {
                 id,
                 expression,
                 initial_value,
+                ..
             } => {
                 nodes.push(ManifestNode::Binding {
                     id: id.0.clone(),

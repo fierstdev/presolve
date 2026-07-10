@@ -2,12 +2,12 @@ File: fixtures/0013-multi-step-action/input/BatchActionCounter.tsx
 TemplateGraph:
   templates:
     template BatchActionCounter
-      root: <button> id=n0
+      root: <button> id=n0 @ fixtures/0013-multi-step-action/input/BatchActionCounter.tsx:17:7 span=321..426
       attributes:
-        data-ez-on-click = event-handler(click -> this.apply)
-        data-ez-bindings = bindings(this.count, this.enabled)
+        data-ez-on-click = event-handler(click -> this.apply) @ fixtures/0013-multi-step-action/input/BatchActionCounter.tsx:17:15 span=329..357
+        data-ez-bindings = bindings(this.count, this.enabled) @ generated
       children:
-        Text("Count:")
-        Binding id=n1 expression="this.count" initial=Some("1")
-        Text("Enabled:")
-        Binding id=n2 expression="this.enabled" initial=Some(false)
+        Text("Count:") @ fixtures/0013-multi-step-action/input/BatchActionCounter.tsx:18:9 span=367..373
+        Binding id=n1 expression="this.count" initial=Some("1") @ fixtures/0013-multi-step-action/input/BatchActionCounter.tsx:18:16 span=374..386
+        Text("Enabled:") @ fixtures/0013-multi-step-action/input/BatchActionCounter.tsx:18:29 span=387..395
+        Binding id=n2 expression="this.enabled" initial=Some(false) @ fixtures/0013-multi-step-action/input/BatchActionCounter.tsx:18:38 span=396..410

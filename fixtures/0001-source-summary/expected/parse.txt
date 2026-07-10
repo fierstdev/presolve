@@ -18,6 +18,6 @@ Classes:
           attributes: onClick={...}
           event handlers: click -> this.increment
           children:
-            Text("Count:")
-            Binding("this.count")
+            Text("Count:") @ 13:9 span=222..228
+            Binding("this.count") @ 13:16 span=229..241
         bindings: this.count

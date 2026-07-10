@@ -38,11 +38,12 @@ fn generate_element_html(element: &ElementNode) -> String {
 
     for child in &element.children {
         match child {
-            TemplateChild::Text(text) => html.push_str(&escape_text(text)),
+            TemplateChild::Text { value, .. } => html.push_str(&escape_text(value)),
             TemplateChild::Binding {
                 id,
                 expression,
                 initial_value,
+                ..
             } => {
                 html.push_str("<!-- ez-binding:");
                 html.push_str(&escape_comment(&id.0));

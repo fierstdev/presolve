@@ -305,12 +305,17 @@ fn parsed_jsx_child(child: &JSXChild<'_>, source: &str) -> Option<ParsedJsxChild
             if normalized.is_empty() {
                 None
             } else {
-                Some(ParsedJsxChild::Text(normalized))
+                Some(ParsedJsxChild::Text {
+                    value: normalized,
+                    span: jsx_text_value_span(source, text.value.as_str(), text.span),
+                })
             }
         }
-        JSXChild::ExpressionContainer(container) => {
-            jsx_expression_summary(&container.expression).map(ParsedJsxChild::Binding)
-        }
+        JSXChild::ExpressionContainer(container) => jsx_expression_summary(&container.expression)
+            .map(|expression| ParsedJsxChild::Binding {
+                expression,
+                span: source_span(source, container.span),
+            }),
         JSXChild::Element(element) => {
             parsed_jsx_element(element, source).map(ParsedJsxChild::Element)
         }
@@ -336,7 +341,7 @@ fn parsed_jsx_element(
         .opening_element
         .attributes
         .iter()
-        .filter_map(jsx_event_handler)
+        .filter_map(|attribute| jsx_event_handler(attribute, source))
         .collect::<Vec<_>>();
 
     let children = element
@@ -356,6 +361,26 @@ fn parsed_jsx_element(
 
 fn normalize_jsx_text(value: &str) -> String {
     value.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn jsx_text_value_span(source: &str, value: &str, span: Span) -> SourceSpan {
+    let leading_whitespace = value
+        .char_indices()
+        .find(|(_, character)| !character.is_whitespace())
+        .map_or(value.len(), |(index, _)| index);
+    let trailing_whitespace = value
+        .char_indices()
+        .rev()
+        .find(|(_, character)| !character.is_whitespace())
+        .map_or(value.len(), |(index, character)| {
+            index + character.len_utf8()
+        });
+
+    source_span_from_offsets(
+        source,
+        span.start as usize + leading_whitespace,
+        span.start as usize + trailing_whitespace,
+    )
 }
 
 fn property_key_name(key: &PropertyKey<'_>) -> Option<String> {
@@ -522,7 +547,7 @@ fn jsx_attribute_name(name: &JSXAttributeName<'_>) -> String {
     }
 }
 
-fn jsx_event_handler(attribute: &JSXAttributeItem<'_>) -> Option<ParsedEventHandler> {
+fn jsx_event_handler(attribute: &JSXAttributeItem<'_>, source: &str) -> Option<ParsedEventHandler> {
     let JSXAttributeItem::Attribute(attribute) = attribute else {
         return None;
     };
@@ -540,7 +565,11 @@ fn jsx_event_handler(attribute: &JSXAttributeItem<'_>) -> Option<ParsedEventHand
 
     let handler = jsx_expression_event_handler_ref(&container.expression)?;
 
-    Some(ParsedEventHandler { event, handler })
+    Some(ParsedEventHandler {
+        event,
+        handler,
+        span: source_span(source, attribute.span),
+    })
 }
 
 fn jsx_event_type(attribute_name: &str) -> Option<String> {

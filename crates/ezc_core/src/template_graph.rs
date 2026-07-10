@@ -2,6 +2,7 @@ use crate::component_graph::{
     ComponentGraph, RenderAttribute, RenderAttributeValue, RenderChild, RenderElement,
     RenderEventHandler, RenderModel, SerializableValue, StateField,
 };
+use ezc_parser::SourceSpan;
 
 #[derive(Debug, Default)]
 struct TemplateIdAllocator {
@@ -31,6 +32,7 @@ pub struct TemplateNode {
 pub struct ElementNode {
     pub id: TemplateNodeId,
     pub tag_name: String,
+    pub span: SourceSpan,
     pub attributes: Vec<TemplateAttribute>,
     pub children: Vec<TemplateChild>,
 }
@@ -39,6 +41,7 @@ pub struct ElementNode {
 pub struct TemplateAttribute {
     pub name: String,
     pub value: AttributeValue,
+    pub span: Option<SourceSpan>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,11 +62,15 @@ pub enum AttributeValue {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TemplateChild {
-    Text(String),
+    Text {
+        value: String,
+        span: SourceSpan,
+    },
     Binding {
         id: TemplateNodeId,
         expression: String,
         initial_value: Option<SerializableValue>,
+        span: SourceSpan,
     },
     Element(ElementNode),
 }
@@ -96,6 +103,7 @@ fn element_from_render(
     ids: &mut TemplateIdAllocator,
 ) -> Option<ElementNode> {
     let tag_name = render.root_element.clone()?;
+    let span = render.root_span?;
     let id = ids.alloc();
 
     let direct_bindings = collect_direct_bindings_from_children(&render.children);
@@ -117,6 +125,7 @@ fn element_from_render(
     Some(ElementNode {
         id,
         tag_name,
+        span,
         attributes,
         children,
     })
@@ -132,6 +141,7 @@ fn element_from_render_element(
     ElementNode {
         id,
         tag_name: element.tag_name.clone(),
+        span: element.span,
         attributes: template_attributes(
             &element.attributes,
             &element.event_handlers,
@@ -162,12 +172,14 @@ fn template_attributes(
                 attributes.push(TemplateAttribute {
                     name: attribute.name.clone(),
                     value: AttributeValue::Boolean,
+                    span: Some(attribute.span),
                 });
             }
             RenderAttributeValue::Static(value) if !is_event_attribute(&attribute.name) => {
                 attributes.push(TemplateAttribute {
                     name: attribute.name.clone(),
                     value: AttributeValue::Static(value.clone()),
+                    span: Some(attribute.span),
                 });
             }
             RenderAttributeValue::Expression(Some(expression))
@@ -181,6 +193,7 @@ fn template_attributes(
                         expression: expression.clone(),
                         initial_value: binding_initial_value(expression, state_fields),
                     },
+                    span: Some(attribute.span),
                 });
             }
             _ => {}
@@ -194,6 +207,7 @@ fn template_attributes(
                 event: event_handler.event.clone(),
                 handler: event_handler.handler.clone(),
             },
+            span: Some(event_handler.span),
         });
     }
 
@@ -201,6 +215,7 @@ fn template_attributes(
         attributes.push(TemplateAttribute {
             name: "data-ez-bindings".to_string(),
             value: AttributeValue::BindingList(bindings.to_vec()),
+            span: None,
         });
     }
 
@@ -217,8 +232,8 @@ fn collect_direct_bindings_from_children(children: &[RenderChild]) -> Vec<String
     let mut bindings = Vec::new();
 
     for child in children {
-        if let RenderChild::Binding(binding) = child {
-            bindings.push(binding.clone());
+        if let RenderChild::Binding { expression, .. } = child {
+            bindings.push(expression.clone());
         }
     }
 
@@ -231,12 +246,16 @@ fn template_child_from_render(
     ids: &mut TemplateIdAllocator,
 ) -> TemplateChild {
     match child {
-        RenderChild::Text(text) => TemplateChild::Text(text.clone()),
+        RenderChild::Text { value, span } => TemplateChild::Text {
+            value: value.clone(),
+            span: *span,
+        },
 
-        RenderChild::Binding(binding) => TemplateChild::Binding {
+        RenderChild::Binding { expression, span } => TemplateChild::Binding {
             id: ids.alloc(),
-            expression: binding.clone(),
-            initial_value: binding_initial_value(binding, state_fields),
+            expression: expression.clone(),
+            initial_value: binding_initial_value(expression, state_fields),
+            span: *span,
         },
 
         RenderChild::Element(element) => {

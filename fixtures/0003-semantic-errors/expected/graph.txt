@@ -17,6 +17,6 @@ ComponentGraph:
         attributes: onClick={...}
         event handlers: click -> this.increment
         children:
-          Text("Count:")
-          Binding("this.missingCount")
+          Text("Count:") @ 8:9 span=172..178
+          Binding("this.missingCount") @ 8:16 span=179..198
         bindings: this.missingCount

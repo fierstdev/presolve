@@ -170,20 +170,28 @@ class Counter extends Component {
             RenderAttributeValue::Expression(_)
         ));
         assert_eq!(render.bindings, vec!["this.count"]);
-        assert_eq!(
-            render.event_handlers,
-            vec![RenderEventHandler {
-                event: "click".to_string(),
-                handler: "this.increment".to_string(),
-            }]
-        );
-        assert_eq!(
-            render.children,
-            vec![
-                RenderChild::Text("Count:".to_string()),
-                RenderChild::Binding("this.count".to_string()),
-            ]
-        );
+        assert_eq!(render.root_span.expect("expected root span").line, 12);
+        assert_eq!(render.root_span.expect("expected root span").column, 7);
+        assert_eq!(render.event_handlers.len(), 1);
+        assert_eq!(render.event_handlers[0].event, "click");
+        assert_eq!(render.event_handlers[0].handler, "this.increment");
+        assert_eq!(render.event_handlers[0].span.line, 12);
+        assert_eq!(render.event_handlers[0].span.column, 15);
+        assert_eq!(render.children.len(), 2);
+
+        let RenderChild::Text { value, span } = &render.children[0] else {
+            panic!("expected text child");
+        };
+        assert_eq!(value, "Count:");
+        assert_eq!(span.line, 13);
+        assert_eq!(span.column, 9);
+
+        let RenderChild::Binding { expression, span } = &render.children[1] else {
+            panic!("expected binding child");
+        };
+        assert_eq!(expression, "this.count");
+        assert_eq!(span.line, 13);
+        assert_eq!(span.column, 16);
     }
 
     #[test]
@@ -261,10 +269,12 @@ class Counter extends Component {
                             ezc_parser::ParsedEventHandler {
                                 event: "click".to_string(),
                                 handler: "this.render".to_string(),
+                                span: test_span(),
                             },
                             ezc_parser::ParsedEventHandler {
                                 event: "click".to_string(),
                                 handler: "this.render".to_string(),
+                                span: test_span(),
                             },
                         ],
                         children: Vec::new(),
@@ -825,9 +835,19 @@ class BadAttrs extends Component {
 
         assert_eq!(root.id.0, "n0");
         assert_eq!(root.tag_name, "button");
+        assert_eq!(root.span.line, 12);
+        assert_eq!(root.span.column, 7);
 
         assert_eq!(root.attributes.len(), 2);
         assert_eq!(root.attributes[0].name, "data-ez-on-click");
+        assert_eq!(
+            root.attributes[0].span.expect("expected event span").line,
+            12
+        );
+        assert_eq!(
+            root.attributes[0].span.expect("expected event span").column,
+            15
+        );
         assert_eq!(
             root.attributes[0].value,
             AttributeValue::EventHandler {
@@ -837,22 +857,95 @@ class BadAttrs extends Component {
         );
 
         assert_eq!(root.attributes[1].name, "data-ez-bindings");
+        assert_eq!(root.attributes[1].span, None);
         assert_eq!(
             root.attributes[1].value,
             AttributeValue::BindingList(vec!["this.count".to_string()])
         );
 
+        assert_eq!(root.children.len(), 2);
+        let TemplateChild::Text { value, span } = &root.children[0] else {
+            panic!("expected text child");
+        };
+        assert_eq!(value, "Count:");
+        assert_eq!(span.line, 13);
+        assert_eq!(span.column, 9);
+
+        let TemplateChild::Binding {
+            id,
+            expression,
+            initial_value,
+            span,
+        } = &root.children[1]
+        else {
+            panic!("expected binding child");
+        };
+        assert_eq!(id.0, "n1");
+        assert_eq!(expression, "this.count");
         assert_eq!(
-            root.children,
-            vec![
-                TemplateChild::Text("Count:".to_string()),
-                TemplateChild::Binding {
-                    id: TemplateNodeId("n1".to_string()),
-                    expression: "this.count".to_string(),
-                    initial_value: Some(SerializableValue::Number("0".to_string())),
-                },
-            ]
+            initial_value,
+            &Some(SerializableValue::Number("0".to_string()))
         );
+        assert_eq!(span.line, 13);
+        assert_eq!(span.column, 16);
+    }
+
+    #[test]
+    fn carries_source_spans_into_nested_template_nodes() {
+        let source = include_str!("../../../fixtures/0004-nested-jsx/input/NestedCounter.tsx");
+
+        let parsed =
+            ezc_parser::parse_file("fixtures/0004-nested-jsx/input/NestedCounter.tsx", source);
+
+        let component_graph = build_component_graph(&parsed);
+        let template_graph = build_template_graph(&component_graph);
+        let root = template_graph.templates[0]
+            .root
+            .as_ref()
+            .expect("expected root");
+
+        assert_eq!(root.tag_name, "section");
+        assert_eq!(root.span.line, 12);
+        assert_eq!(root.span.column, 7);
+
+        let TemplateChild::Element(button) = &root.children[0] else {
+            panic!("expected nested button");
+        };
+
+        assert_eq!(button.tag_name, "button");
+        assert_eq!(button.span.line, 13);
+        assert_eq!(button.span.column, 9);
+        assert_eq!(button.attributes[0].name, "data-ez-on-click");
+        assert_eq!(
+            button.attributes[0].span.expect("expected event span").line,
+            13
+        );
+        assert_eq!(
+            button.attributes[0]
+                .span
+                .expect("expected event span")
+                .column,
+            17
+        );
+        assert_eq!(button.attributes[1].name, "data-ez-bindings");
+        assert_eq!(button.attributes[1].span, None);
+
+        let TemplateChild::Text { value, span } = &button.children[0] else {
+            panic!("expected nested text");
+        };
+        assert_eq!(value, "Count:");
+        assert_eq!(span.line, 13);
+        assert_eq!(span.column, 50);
+
+        let TemplateChild::Binding {
+            expression, span, ..
+        } = &button.children[1]
+        else {
+            panic!("expected nested binding");
+        };
+        assert_eq!(expression, "this.count");
+        assert_eq!(span.line, 13);
+        assert_eq!(span.column, 57);
     }
 
     #[test]

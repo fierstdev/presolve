@@ -2,21 +2,21 @@ File: fixtures/0010-add-subtract-assign/input/StepCounter.tsx
 TemplateGraph:
   templates:
     template StepCounter
-      root: <section> id=n0
+      root: <section> id=n0 @ fixtures/0010-add-subtract-assign/input/StepCounter.tsx:16:7 span=229..453
       attributes:
         none
       children:
-        Element <button> id=n1
+        Element <button> id=n1 @ fixtures/0010-add-subtract-assign/input/StepCounter.tsx:17:9 span=247..331
           attributes:
-            data-ez-on-click = event-handler(click -> this.addTwo)
-            data-ez-bindings = bindings(this.count)
+            data-ez-on-click = event-handler(click -> this.addTwo) @ fixtures/0010-add-subtract-assign/input/StepCounter.tsx:17:17 span=255..284
+            data-ez-bindings = bindings(this.count) @ generated
           children:
-            Text("Add:")
-            Binding id=n2 expression="this.count" initial=Some("4")
-        Element <button> id=n3
+            Text("Add:") @ fixtures/0010-add-subtract-assign/input/StepCounter.tsx:18:11 span=296..300
+            Binding id=n2 expression="this.count" initial=Some("4") @ fixtures/0010-add-subtract-assign/input/StepCounter.tsx:18:16 span=301..313
+        Element <button> id=n3 @ fixtures/0010-add-subtract-assign/input/StepCounter.tsx:20:9 span=340..436
           attributes:
-            data-ez-on-click = event-handler(click -> this.subtractThree)
-            data-ez-bindings = bindings(this.count)
+            data-ez-on-click = event-handler(click -> this.subtractThree) @ fixtures/0010-add-subtract-assign/input/StepCounter.tsx:20:17 span=348..384
+            data-ez-bindings = bindings(this.count) @ generated
           children:
-            Text("Subtract:")
-            Binding id=n4 expression="this.count" initial=Some("4")
+            Text("Subtract:") @ fixtures/0010-add-subtract-assign/input/StepCounter.tsx:21:11 span=396..405
+            Binding id=n4 expression="this.count" initial=Some("4") @ fixtures/0010-add-subtract-assign/input/StepCounter.tsx:21:21 span=406..418

@@ -2,18 +2,18 @@ File: fixtures/0014-static-attributes/input/StaticAttributePanel.tsx
 TemplateGraph:
   templates:
     template StaticAttributePanel
-      root: <section> id=n0
+      root: <section> id=n0 @ fixtures/0014-static-attributes/input/StaticAttributePanel.tsx:8:7 span=174..379
       attributes:
-        id = "panel-root"
-        aria-label = "Status \"Panel\""
-        hidden = boolean
+        id = "panel-root" @ fixtures/0014-static-attributes/input/StaticAttributePanel.tsx:8:16 span=183..198
+        aria-label = "Status \"Panel\"" @ fixtures/0014-static-attributes/input/StaticAttributePanel.tsx:8:32 span=199..226
+        hidden = boolean @ fixtures/0014-static-attributes/input/StaticAttributePanel.tsx:8:60 span=227..233
       children:
-        Element <button> id=n1
+        Element <button> id=n1 @ fixtures/0014-static-attributes/input/StaticAttributePanel.tsx:9:9 span=243..362
           attributes:
-            type = "button"
-            data-mode = "safe & sound"
-            title = "Use <carefully>"
-            data-ez-bindings = bindings(this.label)
+            type = "button" @ fixtures/0014-static-attributes/input/StaticAttributePanel.tsx:9:17 span=251..264
+            data-mode = "safe & sound" @ fixtures/0014-static-attributes/input/StaticAttributePanel.tsx:9:31 span=265..289
+            title = "Use <carefully>" @ fixtures/0014-static-attributes/input/StaticAttributePanel.tsx:9:56 span=290..313
+            data-ez-bindings = bindings(this.label) @ generated
           children:
-            Text("Label:")
-            Binding id=n2 expression="this.label" initial=Some("Ready")
+            Text("Label:") @ fixtures/0014-static-attributes/input/StaticAttributePanel.tsx:10:11 span=325..331
+            Binding id=n2 expression="this.label" initial=Some("Ready") @ fixtures/0014-static-attributes/input/StaticAttributePanel.tsx:10:18 span=332..344

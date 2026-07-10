@@ -12,7 +12,7 @@ use ezc_core::{
 };
 use ezc_parser::{
     parse_file, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
-    ParsedJsxAttributeValue, ParsedMethod,
+    ParsedJsxAttributeValue, ParsedJsxChild, ParsedMethod, SourceSpan,
 };
 
 fn main() {
@@ -415,7 +415,7 @@ fn print_parsed_method(method: &ParsedMethod) {
             } else {
                 println!("          children:");
                 for child in &jsx.children {
-                    println!("            {child:?}");
+                    println!("            {}", format_parsed_child(child));
                 }
             }
         }
@@ -527,7 +527,7 @@ fn print_component_graph(path: &Path, graph: &ComponentGraph) {
                 } else {
                     println!("        children:");
                     for child in &render.children {
-                        println!("          {child:?}");
+                        println!("          {}", format_render_child(child));
                     }
                 }
 
@@ -569,6 +569,38 @@ fn format_render_event_handlers(event_handlers: &[ezc_core::RenderEventHandler])
         .collect()
 }
 
+fn format_parsed_child(child: &ParsedJsxChild) -> String {
+    match child {
+        ParsedJsxChild::Text { value, span } => {
+            format!("Text({value:?}) {}", format_line_column_span(span))
+        }
+        ParsedJsxChild::Binding { expression, span } => {
+            format!("Binding({expression:?}) {}", format_line_column_span(span))
+        }
+        ParsedJsxChild::Element(element) => format!(
+            "Element <{}> {}",
+            element.name,
+            format_line_column_span(&element.span)
+        ),
+    }
+}
+
+fn format_render_child(child: &ezc_core::RenderChild) -> String {
+    match child {
+        ezc_core::RenderChild::Text { value, span } => {
+            format!("Text({value:?}) {}", format_line_column_span(span))
+        }
+        ezc_core::RenderChild::Binding { expression, span } => {
+            format!("Binding({expression:?}) {}", format_line_column_span(span))
+        }
+        ezc_core::RenderChild::Element(element) => format!(
+            "Element <{}> {}",
+            element.tag_name,
+            format_line_column_span(&element.span)
+        ),
+    }
+}
+
 fn print_template_graph(path: &Path, graph: &TemplateGraph) {
     println!("File: {}", path.display());
 
@@ -585,7 +617,12 @@ fn print_template_graph(path: &Path, graph: &TemplateGraph) {
 
         match &template.root {
             Some(root) => {
-                println!("      root: <{}> id={}", root.tag_name, root.id.0);
+                println!(
+                    "      root: <{}> id={} {}",
+                    root.tag_name,
+                    root.id.0,
+                    format_source_span(path, &root.span)
+                );
 
                 println!("      attributes:");
                 if root.attributes.is_empty() {
@@ -593,9 +630,10 @@ fn print_template_graph(path: &Path, graph: &TemplateGraph) {
                 } else {
                     for attribute in &root.attributes {
                         println!(
-                            "        {} = {}",
+                            "        {} = {} {}",
                             attribute.name,
-                            format_attribute_value(&attribute.value)
+                            format_attribute_value(&attribute.value),
+                            format_optional_source_span(path, attribute.span.as_ref())
                         );
                     }
                 }
@@ -605,7 +643,7 @@ fn print_template_graph(path: &Path, graph: &TemplateGraph) {
                     println!("        none");
                 } else {
                     for child in &root.children {
-                        print_template_child(child, 8);
+                        print_template_child(path, child, 8);
                     }
                 }
             }
@@ -616,26 +654,35 @@ fn print_template_graph(path: &Path, graph: &TemplateGraph) {
     }
 }
 
-fn print_template_child(child: &TemplateChild, indent: usize) {
+fn print_template_child(path: &Path, child: &TemplateChild, indent: usize) {
     let padding = " ".repeat(indent);
 
     match child {
-        TemplateChild::Text(text) => println!("{padding}Text({text:?})"),
+        TemplateChild::Text { value, span } => {
+            println!(
+                "{padding}Text({value:?}) {}",
+                format_source_span(path, span)
+            );
+        }
         TemplateChild::Binding {
             id,
             expression,
             initial_value,
+            span,
         } => {
             println!(
-                "{padding}Binding id={} expression={expression:?} initial={}",
+                "{padding}Binding id={} expression={expression:?} initial={} {}",
                 id.0,
-                format_serializable_value(initial_value.as_ref())
+                format_serializable_value(initial_value.as_ref()),
+                format_source_span(path, span)
             );
         }
         TemplateChild::Element(element) => {
             println!(
-                "{padding}Element <{}> id={}",
-                element.tag_name, element.id.0
+                "{padding}Element <{}> id={} {}",
+                element.tag_name,
+                element.id.0,
+                format_source_span(path, &element.span)
             );
 
             let child_padding = " ".repeat(indent + 2);
@@ -646,9 +693,10 @@ fn print_template_child(child: &TemplateChild, indent: usize) {
             } else {
                 for attribute in &element.attributes {
                     println!(
-                        "{child_padding}  {} = {}",
+                        "{child_padding}  {} = {} {}",
                         attribute.name,
-                        format_attribute_value(&attribute.value)
+                        format_attribute_value(&attribute.value),
+                        format_optional_source_span(path, attribute.span.as_ref())
                     );
                 }
             }
@@ -658,11 +706,36 @@ fn print_template_child(child: &TemplateChild, indent: usize) {
                 println!("{child_padding}  none");
             } else {
                 for child in &element.children {
-                    print_template_child(child, indent + 4);
+                    print_template_child(path, child, indent + 4);
                 }
             }
         }
     }
+}
+
+fn format_source_span(path: &Path, span: &SourceSpan) -> String {
+    format!(
+        "@ {}:{}:{} span={}..{}",
+        path.display(),
+        span.line,
+        span.column,
+        span.start,
+        span.end
+    )
+}
+
+fn format_line_column_span(span: &SourceSpan) -> String {
+    format!(
+        "@ {}:{} span={}..{}",
+        span.line, span.column, span.start, span.end
+    )
+}
+
+fn format_optional_source_span(path: &Path, span: Option<&SourceSpan>) -> String {
+    span.map_or_else(
+        || "@ generated".to_string(),
+        |span| format_source_span(path, span),
+    )
 }
 
 fn format_serializable_value(value: Option<&SerializableValue>) -> String {

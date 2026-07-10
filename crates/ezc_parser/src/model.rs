@@ -66,8 +66,14 @@ pub enum ParsedStateOperation {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParsedJsxChild {
-    Text(String),
-    Binding(String),
+    Text {
+        value: String,
+        span: SourceSpan,
+    },
+    Binding {
+        expression: String,
+        span: SourceSpan,
+    },
     Element(ParsedJsxElement),
 }
 
@@ -100,6 +106,7 @@ pub enum ParsedJsxAttributeValue {
 pub struct ParsedEventHandler {
     pub event: String,
     pub handler: String,
+    pub span: SourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: support dynamic attribute bindings
+* Latest commit: compiler: carry template source spans
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 07:10:59 PDT
+* Date: 2026-07-10 11:15:48 PDT
 
 Last completed slice
 
-* Slice: 7B - Dynamic attribute bindings
-* Summary: Promoted supported `this.<stateField>` JSX expression attributes into template binding nodes with initial values, manifest target metadata, and runtime attribute/property update callbacks.
-* Key files: crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/template_manifest.rs, crates/ezc_core/src/html_codegen.rs, crates/ezc_core/src/runtime_codegen.rs, crates/ezc_cli/tests/runtime_browser.rs
-* New behavior: Attributes such as `disabled={this.disabled}` and `title={this.label}` emit attribute binding records, hydrate from component state, and update the existing DOM element when state changes.
-* Tests added or changed: core template/manifest assertions, CLI fixture checks, runtime smoke string checks, and a real-browser probe that verifies boolean/property and string attribute updates.
-* Fixtures added or changed: fixtures/0015-dynamic-attributes
+* Slice: 7C - Source spans on template nodes and edges
+* Summary: Added source spans to JSX text and binding children, event handlers, render elements/attributes/events, template elements/attributes/children, and CLI parse/graph/template output.
+* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_cli/src/main.rs
+* New behavior: Parse, graph, and template output can identify line/column plus byte range for template nodes and source-owned edges; compiler-generated `data-ez-bindings` attributes are explicitly marked `@ generated`.
+* Tests added or changed: parser span assertions for text/binding/event children, core nested template span assertions, and regenerated parse/graph/template fixtures with source locations.
+* Fixtures added or changed: template expected outputs across existing fixtures, plus parse/graph expected output for source-summary and semantic-error fixtures
 
 Current in-progress slice
 
-* Slice: 7C - Source spans on template nodes and edges
+* Slice: 7D - JSX fragments
 * Status: Not started
 * Completed: None
-* Remaining: Carry source spans through template nodes and binding/event edges so later diagnostics and tooling can point back to exact JSX source locations.
+* Remaining: Add parser-owned fragment support, preserve sibling fragment structure without an artificial wrapper, and decide the fragment/runtime identity strategy.
 
 Verification
 
@@ -38,10 +38,10 @@ Verification
 
 Architecture decisions made
 
-* Decision: 7B supports only dynamic attribute expressions of the form `this.<stateField>`.
-* Reason: Those expressions map directly to the existing primitive state store, static initial rendering path, and binding callback runtime.
-* Tradeoff: Other expression forms and spread attributes remain diagnostics instead of introducing partial JavaScript expression evaluation.
-* Follow-up: 7C should add source spans before broadening diagnostics/tooling around attribute binding edges.
+* Decision: 7C keeps source spans out of the runtime manifest and exposes them through compiler/parser/template development output instead.
+* Reason: Runtime behavior does not need source locations yet, while diagnostics and explain-style commands need precise line/column and byte ranges.
+* Tradeoff: The manifest schema stays stable, but development tooling must read compiler graph/template output rather than runtime JSON for source locations.
+* Follow-up: 7D should preserve spans while introducing fragment children or fragment roots.
 
 Known limitations
 
@@ -51,12 +51,13 @@ Known limitations
 * Item: Dynamic attributes are limited to primitive state-field bindings; arbitrary expressions, method calls, spread attributes, arrays, and objects are not emitted yet.
 * Item: The serializable value model is still primitive-only until later array/object slices.
 * Item: Runtime schema compatibility is exact-match only; no backward/forward manifest migration exists yet.
+* Item: Source spans are available on parser/render/template structures and CLI development output, but runtime manifests intentionally omit source metadata for now.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 
 Exact next step
 
-Start Slice 7C by threading parser/source span information into template nodes and binding/event metadata without changing runtime behavior.
+Start Slice 7D by adding a parser-owned JSX fragment model and deciding whether templates represent fragments as child lists or explicit fragment nodes.
 
 Useful commands
 

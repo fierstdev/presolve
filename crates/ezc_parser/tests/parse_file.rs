@@ -1,6 +1,6 @@
 use ezc_parser::{
-    parse_file, ParseSeverity, ParsedEventHandler, ParsedJsxAttributeValue, ParsedJsxChild,
-    ParsedSerializableValue, ParsedStateOperation,
+    parse_file, ParseSeverity, ParsedJsxAttributeValue, ParsedJsxChild, ParsedSerializableValue,
+    ParsedStateOperation,
 };
 
 #[test]
@@ -53,20 +53,29 @@ fn parses_counter_fixture() {
         render.jsx_roots[0].attributes[0].value,
         ParsedJsxAttributeValue::Expression(_)
     ));
+    assert_eq!(render.jsx_roots[0].event_handlers.len(), 1);
+    assert_eq!(render.jsx_roots[0].event_handlers[0].event, "click");
     assert_eq!(
-        render.jsx_roots[0].event_handlers,
-        vec![ParsedEventHandler {
-            event: "click".to_string(),
-            handler: "this.increment".to_string(),
-        }]
+        render.jsx_roots[0].event_handlers[0].handler,
+        "this.increment"
     );
-    assert_eq!(
-        render.jsx_roots[0].children,
-        vec![
-            ParsedJsxChild::Text("Count:".to_string()),
-            ParsedJsxChild::Binding("this.count".to_string()),
-        ]
-    );
+    assert_eq!(render.jsx_roots[0].event_handlers[0].span.line, 12);
+    assert_eq!(render.jsx_roots[0].event_handlers[0].span.column, 15);
+
+    assert_eq!(render.jsx_roots[0].children.len(), 2);
+    let ParsedJsxChild::Text { value, span } = &render.jsx_roots[0].children[0] else {
+        panic!("expected text child");
+    };
+    assert_eq!(value, "Count:");
+    assert_eq!(span.line, 13);
+    assert_eq!(span.column, 9);
+
+    let ParsedJsxChild::Binding { expression, span } = &render.jsx_roots[0].children[1] else {
+        panic!("expected binding child");
+    };
+    assert_eq!(expression, "this.count");
+    assert_eq!(span.line, 13);
+    assert_eq!(span.column, 16);
     assert_eq!(render.bindings, vec!["this.count"]);
 
     let increment = class
@@ -479,19 +488,24 @@ fn parses_nested_jsx_fixture() {
         button.attributes[0].value,
         ParsedJsxAttributeValue::Expression(_)
     ));
-    assert_eq!(
-        button.event_handlers,
-        vec![ParsedEventHandler {
-            event: "click".to_string(),
-            handler: "this.increment".to_string(),
-        }]
-    );
+    assert_eq!(button.event_handlers.len(), 1);
+    assert_eq!(button.event_handlers[0].event, "click");
+    assert_eq!(button.event_handlers[0].handler, "this.increment");
+    assert_eq!(button.event_handlers[0].span.line, 13);
+    assert_eq!(button.event_handlers[0].span.column, 17);
 
-    assert_eq!(
-        button.children,
-        vec![
-            ParsedJsxChild::Text("Count:".to_string()),
-            ParsedJsxChild::Binding("this.count".to_string()),
-        ]
-    );
+    assert_eq!(button.children.len(), 2);
+    let ParsedJsxChild::Text { value, span } = &button.children[0] else {
+        panic!("expected nested text child");
+    };
+    assert_eq!(value, "Count:");
+    assert_eq!(span.line, 13);
+    assert_eq!(span.column, 50);
+
+    let ParsedJsxChild::Binding { expression, span } = &button.children[1] else {
+        panic!("expected nested binding child");
+    };
+    assert_eq!(expression, "this.count");
+    assert_eq!(span.line, 13);
+    assert_eq!(span.column, 57);
 }
