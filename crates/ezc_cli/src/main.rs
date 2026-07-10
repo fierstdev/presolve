@@ -7,8 +7,8 @@ use std::process;
 use ezc_core::{
     build_component_graph, build_template_graph, build_template_manifest, explain_json,
     explain_text, generate_runtime_stub, generate_standalone_page, generate_static_html,
-    summarize_source, template_manifest_json, AttributeValue, ComponentGraph, StateOperation,
-    TemplateChild, TemplateGraph,
+    summarize_source, template_manifest_json, AttributeValue, ComponentGraph, StateInitialValue,
+    StateOperation, TemplateChild, TemplateGraph,
 };
 use ezc_parser::{parse_file, ParseSeverity, ParsedFile};
 
@@ -581,8 +581,9 @@ fn print_template_child(child: &TemplateChild, indent: usize) {
             initial_value,
         } => {
             println!(
-                "{padding}Binding id={} expression={expression:?} initial={initial_value:?}",
-                id.0
+                "{padding}Binding id={} expression={expression:?} initial={}",
+                id.0,
+                format_state_initial_value(initial_value.as_ref())
             );
         }
         TemplateChild::Element(element) => {
@@ -615,6 +616,16 @@ fn print_template_child(child: &TemplateChild, indent: usize) {
                 }
             }
         }
+    }
+}
+
+fn format_state_initial_value(value: Option<&StateInitialValue>) -> String {
+    match value {
+        Some(StateInitialValue::Number(value) | StateInitialValue::String(value)) => {
+            format!("Some({value:?})")
+        }
+        Some(StateInitialValue::Boolean(value)) => format!("Some({value})"),
+        None => "None".to_string(),
     }
 }
 

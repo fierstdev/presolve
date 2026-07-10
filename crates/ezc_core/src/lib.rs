@@ -16,7 +16,8 @@ pub mod template_manifest;
 
 pub use component_graph::{
     build_component_graph, ComponentAction, ComponentDiagnostic, ComponentGraph, ComponentMethod,
-    ComponentNode, RenderChild, RenderEventHandler, RenderModel, StateField, StateOperation,
+    ComponentNode, RenderChild, RenderEventHandler, RenderModel, StateField, StateInitialValue,
+    StateOperation,
 };
 pub use explain::{explain_json, explain_text};
 pub use html_codegen::generate_static_html;
@@ -138,8 +139,8 @@ class Counter extends Component {
         assert_eq!(component.state_fields.len(), 1);
         assert_eq!(component.state_fields[0].name, "count");
         assert_eq!(
-            component.state_fields[0].initial_value.as_deref(),
-            Some("0")
+            component.state_fields[0].initial_value,
+            Some(StateInitialValue::Number("0".to_string()))
         );
 
         let method_names = component
@@ -331,8 +332,8 @@ class Counter extends Component {
             .expect("expected component");
 
         assert_eq!(
-            component.state_fields[0].initial_value.as_deref(),
-            Some("Austin & <Zero>")
+            component.state_fields[0].initial_value,
+            Some(StateInitialValue::String("Austin & <Zero>".to_string()))
         );
 
         let template_graph = build_template_graph(&component_graph);
@@ -355,7 +356,7 @@ class Counter extends Component {
                 ManifestNode::Binding {
                     id: "n1".to_string(),
                     expression: "this.name".to_string(),
-                    initial_value: Some("Austin & <Zero>".to_string()),
+                    initial_value: Some(StateInitialValue::String("Austin & <Zero>".to_string())),
                 }
             ]
         );
@@ -367,6 +368,80 @@ class Counter extends Component {
         assert_eq!(
             manifest_value["components"][0]["template"]["nodes"][1]["initial_value"],
             serde_json::json!("Austin & <Zero>")
+        );
+    }
+
+    #[test]
+    fn preserves_boolean_state_literals_in_template_outputs() {
+        let source = include_str!("../../../fixtures/0007-boolean-state/input/BooleanFlags.tsx");
+
+        let parsed =
+            ezc_parser::parse_file("fixtures/0007-boolean-state/input/BooleanFlags.tsx", source);
+
+        let component_graph = build_component_graph(&parsed);
+        let component = component_graph
+            .components
+            .first()
+            .expect("expected component");
+
+        assert_eq!(
+            component.state_fields[0].initial_value,
+            Some(StateInitialValue::Boolean(true))
+        );
+        assert_eq!(
+            component.state_fields[1].initial_value,
+            Some(StateInitialValue::Boolean(false))
+        );
+
+        let template_graph = build_template_graph(&component_graph);
+        let html = generate_static_html(&template_graph);
+
+        assert_eq!(
+            html,
+            "<section data-ez-node=\"n0\"><p data-ez-node=\"n1\" data-ez-bindings=\"this.enabled\">Enabled:<!-- ez-binding:n2:this.enabled -->true</p><p data-ez-node=\"n3\" data-ez-bindings=\"this.disabled\">Disabled:<!-- ez-binding:n4:this.disabled -->false</p></section>\n"
+        );
+
+        let manifest = build_template_manifest(&component_graph, &template_graph);
+
+        assert_eq!(
+            manifest.components[0].template.nodes,
+            vec![
+                ManifestNode::Element {
+                    id: "n0".to_string(),
+                    tag: "section".to_string(),
+                },
+                ManifestNode::Element {
+                    id: "n1".to_string(),
+                    tag: "p".to_string(),
+                },
+                ManifestNode::Binding {
+                    id: "n2".to_string(),
+                    expression: "this.enabled".to_string(),
+                    initial_value: Some(StateInitialValue::Boolean(true)),
+                },
+                ManifestNode::Element {
+                    id: "n3".to_string(),
+                    tag: "p".to_string(),
+                },
+                ManifestNode::Binding {
+                    id: "n4".to_string(),
+                    expression: "this.disabled".to_string(),
+                    initial_value: Some(StateInitialValue::Boolean(false)),
+                }
+            ]
+        );
+
+        let manifest_json = template_manifest_json(&manifest);
+        let manifest_value: serde_json::Value =
+            serde_json::from_str(&manifest_json).expect("manifest JSON should parse");
+
+        assert_eq!(
+            manifest_value["components"][0]["template"]["nodes"][2]["initial_value"],
+            serde_json::json!(true)
+        );
+        assert_eq!(
+            manifest_value["components"][0]["template"]["nodes"][4]["initial_value"],
+            serde_json::json!(false)
         );
     }
 
@@ -413,7 +488,7 @@ class Counter extends Component {
                 TemplateChild::Binding {
                     id: TemplateNodeId("n1".to_string()),
                     expression: "this.count".to_string(),
-                    initial_value: Some("0".to_string()),
+                    initial_value: Some(StateInitialValue::Number("0".to_string())),
                 },
             ]
         );
@@ -449,7 +524,7 @@ class Counter extends Component {
                 ManifestNode::Binding {
                     id: "n2".to_string(),
                     expression: "this.count".to_string(),
-                    initial_value: Some("0".to_string()),
+                    initial_value: Some(StateInitialValue::Number("0".to_string())),
                 }
             ]
         );

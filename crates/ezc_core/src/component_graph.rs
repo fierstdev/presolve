@@ -1,5 +1,8 @@
+use serde::Serialize;
+
 use ezc_parser::{
-    ParsedClass, ParsedEventHandler, ParsedFile, ParsedJsxChild, ParsedStateOperation,
+    ParsedClass, ParsedEventHandler, ParsedFile, ParsedJsxChild, ParsedStateInitialValue,
+    ParsedStateOperation,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,7 +25,24 @@ pub struct ComponentNode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StateField {
     pub name: String,
-    pub initial_value: Option<String>,
+    pub initial_value: Option<StateInitialValue>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(untagged)]
+pub enum StateInitialValue {
+    Number(String),
+    String(String),
+    Boolean(bool),
+}
+
+impl StateInitialValue {
+    pub fn render_text(&self) -> String {
+        match self {
+            Self::Number(value) | Self::String(value) => value.clone(),
+            Self::Boolean(value) => value.to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -119,7 +139,10 @@ fn build_component_node(
         .filter(|property| property.initializer.as_deref() == Some("state(...)"))
         .map(|property| StateField {
             name: property.name.clone(),
-            initial_value: property.state_initial_value.clone(),
+            initial_value: property
+                .state_initial_value
+                .as_ref()
+                .map(state_initial_value_from_parsed),
         })
         .collect::<Vec<_>>();
 
@@ -248,6 +271,14 @@ fn build_component_node(
 fn state_operation_from_parsed(operation: &ParsedStateOperation) -> StateOperation {
     match operation {
         ParsedStateOperation::Increment => StateOperation::Increment,
+    }
+}
+
+fn state_initial_value_from_parsed(value: &ParsedStateInitialValue) -> StateInitialValue {
+    match value {
+        ParsedStateInitialValue::Number(value) => StateInitialValue::Number(value.clone()),
+        ParsedStateInitialValue::String(value) => StateInitialValue::String(value.clone()),
+        ParsedStateInitialValue::Boolean(value) => StateInitialValue::Boolean(*value),
     }
 }
 

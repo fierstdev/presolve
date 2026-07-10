@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use crate::component_graph::{ComponentGraph, ComponentNode, StateOperation};
+use crate::component_graph::{ComponentGraph, ComponentNode, StateInitialValue, StateOperation};
 use crate::template_graph::{
     AttributeValue, ElementNode, TemplateChild, TemplateGraph, TemplateNode,
 };
@@ -33,7 +33,7 @@ pub enum ManifestNode {
     Binding {
         id: String,
         expression: String,
-        initial_value: Option<String>,
+        initial_value: Option<StateInitialValue>,
     },
 }
 

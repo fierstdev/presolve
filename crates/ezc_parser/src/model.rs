@@ -27,8 +27,15 @@ pub struct ParsedDecorator {
 pub struct ParsedProperty {
     pub name: String,
     pub initializer: Option<String>,
-    pub state_initial_value: Option<String>,
+    pub state_initial_value: Option<ParsedStateInitialValue>,
     pub span: SourceSpan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParsedStateInitialValue {
+    Number(String),
+    String(String),
+    Boolean(bool),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

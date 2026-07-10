@@ -13,7 +13,7 @@ use oxc_span::{SourceType, Span};
 use crate::model::{
     ParseDiagnostic, ParseLabel, ParseSeverity, ParsedClass, ParsedDecorator, ParsedEventHandler,
     ParsedFile, ParsedJsxChild, ParsedJsxElement, ParsedMethod, ParsedProperty,
-    ParsedStateOperation, ParsedStateUpdate, SourceSpan,
+    ParsedStateInitialValue, ParsedStateOperation, ParsedStateUpdate, SourceSpan,
 };
 
 pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
@@ -352,7 +352,7 @@ fn expression_summary(expression: &Expression<'_>) -> Option<String> {
     }
 }
 
-fn state_initial_value(expression: &Expression<'_>) -> Option<String> {
+fn state_initial_value(expression: &Expression<'_>) -> Option<ParsedStateInitialValue> {
     let Expression::CallExpression(call) = expression else {
         return None;
     };
@@ -368,10 +368,17 @@ fn state_initial_value(expression: &Expression<'_>) -> Option<String> {
     call.arguments.first().and_then(state_argument_literal)
 }
 
-fn state_argument_literal(argument: &Argument<'_>) -> Option<String> {
+fn state_argument_literal(argument: &Argument<'_>) -> Option<ParsedStateInitialValue> {
     match argument {
-        Argument::NumericLiteral(literal) => literal.raw.as_ref().map(ToString::to_string),
-        Argument::StringLiteral(literal) => Some(literal.value.to_string()),
+        Argument::NumericLiteral(literal) => literal
+            .raw
+            .as_ref()
+            .map(ToString::to_string)
+            .map(ParsedStateInitialValue::Number),
+        Argument::StringLiteral(literal) => {
+            Some(ParsedStateInitialValue::String(literal.value.to_string()))
+        }
+        Argument::BooleanLiteral(literal) => Some(ParsedStateInitialValue::Boolean(literal.value)),
         _ => None,
     }
 }

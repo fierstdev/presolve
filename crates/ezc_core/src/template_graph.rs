@@ -1,5 +1,6 @@
 use crate::component_graph::{
     ComponentGraph, RenderChild, RenderElement, RenderEventHandler, RenderModel, StateField,
+    StateInitialValue,
 };
 
 #[derive(Debug, Default)]
@@ -53,7 +54,7 @@ pub enum TemplateChild {
     Binding {
         id: TemplateNodeId,
         expression: String,
-        initial_value: Option<String>,
+        initial_value: Option<StateInitialValue>,
     },
     Element(ElementNode),
 }
@@ -188,7 +189,10 @@ fn template_child_from_render(
     }
 }
 
-fn binding_initial_value(expression: &str, state_fields: &[StateField]) -> Option<String> {
+fn binding_initial_value(
+    expression: &str,
+    state_fields: &[StateField],
+) -> Option<StateInitialValue> {
     let field_name = expression.strip_prefix("this.")?;
 
     state_fields

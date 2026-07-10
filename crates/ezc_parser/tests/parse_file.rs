@@ -1,5 +1,6 @@
 use ezc_parser::{
-    parse_file, ParseSeverity, ParsedEventHandler, ParsedJsxChild, ParsedStateOperation,
+    parse_file, ParseSeverity, ParsedEventHandler, ParsedJsxChild, ParsedStateInitialValue,
+    ParsedStateOperation,
 };
 
 #[test]
@@ -26,8 +27,8 @@ fn parses_counter_fixture() {
         Some("state(...)")
     );
     assert_eq!(
-        class.properties[0].state_initial_value.as_deref(),
-        Some("0")
+        class.properties[0].state_initial_value,
+        Some(ParsedStateInitialValue::Number("0".to_string()))
     );
 
     let method_names = class
@@ -91,8 +92,32 @@ fn parses_string_state_literal_without_source_quotes() {
         Some("state(...)")
     );
     assert_eq!(
-        class.properties[0].state_initial_value.as_deref(),
-        Some("Austin & <Zero>")
+        class.properties[0].state_initial_value,
+        Some(ParsedStateInitialValue::String(
+            "Austin & <Zero>".to_string()
+        ))
+    );
+}
+
+#[test]
+fn parses_boolean_state_literals() {
+    let source = include_str!("../../../fixtures/0007-boolean-state/input/BooleanFlags.tsx");
+
+    let parsed = parse_file("fixtures/0007-boolean-state/input/BooleanFlags.tsx", source);
+
+    assert!(parsed.diagnostics.is_empty());
+
+    let class = parsed.classes.first().expect("expected class");
+    assert_eq!(class.properties.len(), 2);
+    assert_eq!(class.properties[0].name, "enabled");
+    assert_eq!(
+        class.properties[0].state_initial_value,
+        Some(ParsedStateInitialValue::Boolean(true))
+    );
+    assert_eq!(class.properties[1].name, "disabled");
+    assert_eq!(
+        class.properties[1].state_initial_value,
+        Some(ParsedStateInitialValue::Boolean(false))
     );
 }
 

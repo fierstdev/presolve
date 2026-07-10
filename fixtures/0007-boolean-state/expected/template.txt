@@ -1,0 +1,20 @@
+File: fixtures/0007-boolean-state/input/BooleanFlags.tsx
+TemplateGraph:
+  templates:
+    template BooleanFlags
+      root: <section> id=n0
+      attributes:
+        none
+      children:
+        Element <p> id=n1
+          attributes:
+            data-ez-bindings = bindings(this.enabled)
+          children:
+            Text("Enabled:")
+            Binding id=n2 expression="this.enabled" initial=Some(true)
+        Element <p> id=n3
+          attributes:
+            data-ez-bindings = bindings(this.disabled)
+          children:
+            Text("Disabled:")
+            Binding id=n4 expression="this.disabled" initial=Some(false)

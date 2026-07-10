@@ -1,0 +1,40 @@
+{
+  "components": [
+    {
+      "name": "BooleanFlags",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "section"
+          },
+          {
+            "kind": "element",
+            "id": "n1",
+            "tag": "p"
+          },
+          {
+            "kind": "binding",
+            "id": "n2",
+            "expression": "this.enabled",
+            "initial_value": true
+          },
+          {
+            "kind": "element",
+            "id": "n3",
+            "tag": "p"
+          },
+          {
+            "kind": "binding",
+            "id": "n4",
+            "expression": "this.disabled",
+            "initial_value": false
+          }
+        ],
+        "events": []
+      },
+      "actions": []
+    }
+  ]
+}

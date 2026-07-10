@@ -50,7 +50,7 @@ fn generate_element_html(element: &ElementNode) -> String {
                 html.push_str(" -->");
 
                 if let Some(initial_value) = initial_value {
-                    html.push_str(&escape_text(initial_value));
+                    html.push_str(&escape_text(&initial_value.render_text()));
                 }
             }
             TemplateChild::Element(element) => {
