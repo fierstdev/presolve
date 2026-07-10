@@ -45,6 +45,28 @@ fn chrome_bin() -> Option<PathBuf> {
         .find(|path| path.is_file())
 }
 
+fn run_chrome_probe(chrome: PathBuf, user_data_dir: &str, probe_url: &str) -> Output {
+    let mut args = vec![
+        "--headless=new".to_string(),
+        "--disable-gpu".to_string(),
+        "--no-first-run".to_string(),
+        "--disable-background-networking".to_string(),
+        "--virtual-time-budget=5000".to_string(),
+        "--dump-dom".to_string(),
+    ];
+
+    if std::env::var_os("CI").is_some() {
+        args.push("--no-sandbox".to_string());
+        args.push("--disable-dev-shm-usage".to_string());
+    }
+
+    args.push(user_data_dir.to_string());
+    args.push(probe_url.to_string());
+
+    let arg_refs = args.iter().map(String::as_str).collect::<Vec<_>>();
+    run_chrome_with_timeout(chrome, &arg_refs, Duration::from_secs(5))
+}
+
 #[test]
 fn double_binding_counter_increments_in_a_real_browser() {
     let repo_root = repo_root();
@@ -88,20 +110,7 @@ fn double_binding_counter_increments_in_a_real_browser() {
     );
     let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
 
-    let output = run_chrome_with_timeout(
-        chrome,
-        &[
-            "--headless=new",
-            "--disable-gpu",
-            "--no-first-run",
-            "--disable-background-networking",
-            "--virtual-time-budget=5000",
-            "--dump-dom",
-            &user_data_dir,
-            &probe_url,
-        ],
-        Duration::from_secs(5),
-    );
+    let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
 
     let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -159,20 +168,7 @@ fn string_state_initializes_in_a_real_browser() {
     );
     let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
 
-    let output = run_chrome_with_timeout(
-        chrome,
-        &[
-            "--headless=new",
-            "--disable-gpu",
-            "--no-first-run",
-            "--disable-background-networking",
-            "--virtual-time-budget=5000",
-            "--dump-dom",
-            &user_data_dir,
-            &probe_url,
-        ],
-        Duration::from_secs(5),
-    );
+    let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
 
     let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -230,20 +226,7 @@ fn boolean_state_initializes_in_a_real_browser() {
     );
     let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
 
-    let output = run_chrome_with_timeout(
-        chrome,
-        &[
-            "--headless=new",
-            "--disable-gpu",
-            "--no-first-run",
-            "--disable-background-networking",
-            "--virtual-time-budget=5000",
-            "--dump-dom",
-            &user_data_dir,
-            &probe_url,
-        ],
-        Duration::from_secs(5),
-    );
+    let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
 
     let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -301,20 +284,7 @@ fn null_state_initializes_in_a_real_browser() {
     );
     let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
 
-    let output = run_chrome_with_timeout(
-        chrome,
-        &[
-            "--headless=new",
-            "--disable-gpu",
-            "--no-first-run",
-            "--disable-background-networking",
-            "--virtual-time-budget=5000",
-            "--dump-dom",
-            &user_data_dir,
-            &probe_url,
-        ],
-        Duration::from_secs(5),
-    );
+    let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
 
     let stdout = String::from_utf8_lossy(&output.stdout);
 
