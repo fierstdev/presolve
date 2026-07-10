@@ -1,7 +1,15 @@
 use ezc_parser::{
-    parse_file, ParseSeverity, ParsedJsxAttributeValue, ParsedJsxChild, ParsedSerializableValue,
-    ParsedStateOperation,
+    parse_file, ParseSeverity, ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxElement,
+    ParsedJsxNode, ParsedSerializableValue, ParsedStateOperation,
 };
+
+fn jsx_root_element(root: &ParsedJsxNode) -> &ParsedJsxElement {
+    let ParsedJsxNode::Element(element) = root else {
+        panic!("expected JSX element root");
+    };
+
+    element
+}
 
 #[test]
 fn parses_counter_fixture() {
@@ -46,31 +54,29 @@ fn parses_counter_fixture() {
         .expect("expected render method");
 
     assert_eq!(render.jsx_roots.len(), 1);
-    assert_eq!(render.jsx_roots[0].name, "button");
-    assert_eq!(render.jsx_roots[0].attributes.len(), 1);
-    assert_eq!(render.jsx_roots[0].attributes[0].name, "onClick");
+    let root = jsx_root_element(&render.jsx_roots[0]);
+    assert_eq!(root.name, "button");
+    assert_eq!(root.attributes.len(), 1);
+    assert_eq!(root.attributes[0].name, "onClick");
     assert!(matches!(
-        render.jsx_roots[0].attributes[0].value,
+        root.attributes[0].value,
         ParsedJsxAttributeValue::Expression(_)
     ));
-    assert_eq!(render.jsx_roots[0].event_handlers.len(), 1);
-    assert_eq!(render.jsx_roots[0].event_handlers[0].event, "click");
-    assert_eq!(
-        render.jsx_roots[0].event_handlers[0].handler,
-        "this.increment"
-    );
-    assert_eq!(render.jsx_roots[0].event_handlers[0].span.line, 12);
-    assert_eq!(render.jsx_roots[0].event_handlers[0].span.column, 15);
+    assert_eq!(root.event_handlers.len(), 1);
+    assert_eq!(root.event_handlers[0].event, "click");
+    assert_eq!(root.event_handlers[0].handler, "this.increment");
+    assert_eq!(root.event_handlers[0].span.line, 12);
+    assert_eq!(root.event_handlers[0].span.column, 15);
 
-    assert_eq!(render.jsx_roots[0].children.len(), 2);
-    let ParsedJsxChild::Text { value, span } = &render.jsx_roots[0].children[0] else {
+    assert_eq!(root.children.len(), 2);
+    let ParsedJsxChild::Text { value, span } = &root.children[0] else {
         panic!("expected text child");
     };
     assert_eq!(value, "Count:");
     assert_eq!(span.line, 13);
     assert_eq!(span.column, 9);
 
-    let ParsedJsxChild::Binding { expression, span } = &render.jsx_roots[0].children[1] else {
+    let ParsedJsxChild::Binding { expression, span } = &root.children[1] else {
         panic!("expected binding child");
     };
     assert_eq!(expression, "this.count");
@@ -388,7 +394,7 @@ class Attrs extends Component {
         .iter()
         .find(|method| method.name == "render")
         .expect("expected render method");
-    let root = render.jsx_roots.first().expect("expected JSX root");
+    let root = jsx_root_element(render.jsx_roots.first().expect("expected JSX root"));
 
     assert_eq!(root.attributes.len(), 5);
 
@@ -472,7 +478,7 @@ fn parses_nested_jsx_fixture() {
 
     assert_eq!(render.jsx_roots.len(), 1);
 
-    let section = &render.jsx_roots[0];
+    let section = jsx_root_element(&render.jsx_roots[0]);
     assert_eq!(section.name, "section");
 
     assert_eq!(section.children.len(), 1);
@@ -508,4 +514,53 @@ fn parses_nested_jsx_fixture() {
     assert_eq!(expression, "this.count");
     assert_eq!(span.line, 13);
     assert_eq!(span.column, 57);
+}
+
+#[test]
+fn parses_jsx_fragments() {
+    let source = include_str!("../../../fixtures/0016-fragments/input/FragmentPanel.tsx");
+
+    let parsed = parse_file("fixtures/0016-fragments/input/FragmentPanel.tsx", source);
+
+    assert!(parsed.diagnostics.is_empty());
+
+    let class = parsed.classes.first().expect("expected class");
+    let render = class
+        .methods
+        .iter()
+        .find(|method| method.name == "render")
+        .expect("expected render method");
+
+    assert_eq!(render.jsx_roots.len(), 1);
+
+    let ParsedJsxNode::Fragment(root) = &render.jsx_roots[0] else {
+        panic!("expected fragment root");
+    };
+
+    assert_eq!(root.span.line, 8);
+    assert_eq!(root.span.column, 7);
+    assert_eq!(root.children.len(), 2);
+
+    let ParsedJsxChild::Element(heading) = &root.children[0] else {
+        panic!("expected heading child");
+    };
+    assert_eq!(heading.name, "h1");
+
+    let ParsedJsxChild::Fragment(nested) = &root.children[1] else {
+        panic!("expected nested fragment child");
+    };
+    assert_eq!(nested.span.line, 10);
+    assert_eq!(nested.children.len(), 2);
+
+    let ParsedJsxChild::Element(paragraph) = &nested.children[0] else {
+        panic!("expected paragraph child");
+    };
+    assert_eq!(paragraph.name, "p");
+    assert_eq!(paragraph.children.len(), 2);
+
+    let ParsedJsxChild::Binding { expression, .. } = &paragraph.children[1] else {
+        panic!("expected paragraph binding");
+    };
+    assert_eq!(expression, "this.label");
+    assert_eq!(render.bindings, vec!["this.label"]);
 }

@@ -43,7 +43,7 @@ pub enum ParsedSerializableValue {
 pub struct ParsedMethod {
     pub name: String,
     pub span: SourceSpan,
-    pub jsx_roots: Vec<ParsedJsxElement>,
+    pub jsx_roots: Vec<ParsedJsxNode>,
     pub bindings: Vec<String>,
     pub state_updates: Vec<ParsedStateUpdate>,
 }
@@ -75,6 +75,13 @@ pub enum ParsedJsxChild {
         span: SourceSpan,
     },
     Element(ParsedJsxElement),
+    Fragment(ParsedJsxFragment),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParsedJsxNode {
+    Element(ParsedJsxElement),
+    Fragment(ParsedJsxFragment),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -83,6 +90,12 @@ pub struct ParsedJsxElement {
     pub span: SourceSpan,
     pub attributes: Vec<ParsedJsxAttribute>,
     pub event_handlers: Vec<ParsedEventHandler>,
+    pub children: Vec<ParsedJsxChild>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedJsxFragment {
+    pub span: SourceSpan,
     pub children: Vec<ParsedJsxChild>,
 }
 

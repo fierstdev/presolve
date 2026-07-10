@@ -12,7 +12,7 @@ use ezc_core::{
 };
 use ezc_parser::{
     parse_file, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
-    ParsedJsxAttributeValue, ParsedJsxChild, ParsedMethod, SourceSpan,
+    ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxNode, ParsedMethod, SourceSpan,
 };
 
 fn main() {
@@ -383,41 +383,7 @@ fn print_parsed_method(method: &ParsedMethod) {
         println!("        jsx roots: none");
     } else {
         for jsx in &method.jsx_roots {
-            println!(
-                "        jsx root <{}> at {}:{}",
-                jsx.name, jsx.span.line, jsx.span.column
-            );
-
-            if jsx.attributes.is_empty() {
-                println!("          attributes: none");
-            } else {
-                println!(
-                    "          attributes: {}",
-                    jsx.attributes
-                        .iter()
-                        .map(format_parsed_attribute)
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                );
-            }
-
-            if jsx.event_handlers.is_empty() {
-                println!("          event handlers: none");
-            } else {
-                println!(
-                    "          event handlers: {}",
-                    format_parsed_event_handlers(&jsx.event_handlers).join(", ")
-                );
-            }
-
-            if jsx.children.is_empty() {
-                println!("          children: none");
-            } else {
-                println!("          children:");
-                for child in &jsx.children {
-                    println!("            {}", format_parsed_child(child));
-                }
-            }
+            print_parsed_jsx_root(jsx);
         }
     }
 
@@ -425,6 +391,67 @@ fn print_parsed_method(method: &ParsedMethod) {
         println!("        bindings: none");
     } else {
         println!("        bindings: {}", method.bindings.join(", "));
+    }
+}
+
+fn print_parsed_jsx_root(root: &ParsedJsxNode) {
+    match root {
+        ParsedJsxNode::Element(element) => {
+            println!(
+                "        jsx root <{}> at {}:{}",
+                element.name, element.span.line, element.span.column
+            );
+            print_parsed_jsx_element_details(element, 10);
+        }
+        ParsedJsxNode::Fragment(fragment) => {
+            println!(
+                "        jsx root <> at {}:{}",
+                fragment.span.line, fragment.span.column
+            );
+            print_parsed_jsx_children(&fragment.children, 10);
+        }
+    }
+}
+
+fn print_parsed_jsx_element_details(element: &ezc_parser::ParsedJsxElement, indent: usize) {
+    let padding = " ".repeat(indent);
+
+    if element.attributes.is_empty() {
+        println!("{padding}attributes: none");
+    } else {
+        println!(
+            "{padding}attributes: {}",
+            element
+                .attributes
+                .iter()
+                .map(format_parsed_attribute)
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+
+    if element.event_handlers.is_empty() {
+        println!("{padding}event handlers: none");
+    } else {
+        println!(
+            "{padding}event handlers: {}",
+            format_parsed_event_handlers(&element.event_handlers).join(", ")
+        );
+    }
+
+    print_parsed_jsx_children(&element.children, indent);
+}
+
+fn print_parsed_jsx_children(children: &[ParsedJsxChild], indent: usize) {
+    let padding = " ".repeat(indent);
+
+    if children.is_empty() {
+        println!("{padding}children: none");
+    } else {
+        println!("{padding}children:");
+        for child in children {
+            println!("{padding}  {}", format_parsed_child(child));
+        }
     }
 }
 
@@ -494,41 +521,37 @@ fn print_component_graph(path: &Path, graph: &ComponentGraph) {
         println!("      render:");
         match &component.render {
             Some(render) => {
-                match &render.root_element {
-                    Some(root) => println!("        root: <{root}>"),
-                    None => println!("        root: none"),
-                }
+                print_render_root(render);
 
-                if render.attributes.is_empty() {
+                if let Some(fragment) = &render.root_fragment {
                     println!("        attributes: none");
-                } else {
-                    println!(
-                        "        attributes: {}",
-                        render
-                            .attributes
-                            .iter()
-                            .map(format_render_attribute)
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    );
-                }
-
-                if render.event_handlers.is_empty() {
                     println!("        event handlers: none");
+                    print_render_children(&fragment.children, 8);
                 } else {
-                    println!(
-                        "        event handlers: {}",
-                        format_render_event_handlers(&render.event_handlers).join(", ")
-                    );
-                }
-
-                if render.children.is_empty() {
-                    println!("        children: none");
-                } else {
-                    println!("        children:");
-                    for child in &render.children {
-                        println!("          {}", format_render_child(child));
+                    if render.attributes.is_empty() {
+                        println!("        attributes: none");
+                    } else {
+                        println!(
+                            "        attributes: {}",
+                            render
+                                .attributes
+                                .iter()
+                                .map(format_render_attribute)
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        );
                     }
+
+                    if render.event_handlers.is_empty() {
+                        println!("        event handlers: none");
+                    } else {
+                        println!(
+                            "        event handlers: {}",
+                            format_render_event_handlers(&render.event_handlers).join(", ")
+                        );
+                    }
+
+                    print_render_children(&render.children, 8);
                 }
 
                 if render.bindings.is_empty() {
@@ -541,6 +564,30 @@ fn print_component_graph(path: &Path, graph: &ComponentGraph) {
                 println!("        none");
             }
         }
+    }
+}
+
+fn print_render_children(children: &[ezc_core::RenderChild], indent: usize) {
+    let padding = " ".repeat(indent);
+
+    if children.is_empty() {
+        println!("{padding}children: none");
+    } else {
+        println!("{padding}children:");
+        for child in children {
+            println!("{padding}  {}", format_render_child(child));
+        }
+    }
+}
+
+fn print_render_root(render: &ezc_core::RenderModel) {
+    match (&render.root_element, &render.root_fragment) {
+        (Some(root), _) => println!("        root: <{root}>"),
+        (None, Some(fragment)) => println!(
+            "        root: <> {}",
+            format_line_column_span(&fragment.span)
+        ),
+        (None, None) => println!("        root: none"),
     }
 }
 
@@ -582,6 +629,9 @@ fn format_parsed_child(child: &ParsedJsxChild) -> String {
             element.name,
             format_line_column_span(&element.span)
         ),
+        ParsedJsxChild::Fragment(fragment) => {
+            format!("Fragment <> {}", format_line_column_span(&fragment.span))
+        }
     }
 }
 
@@ -598,6 +648,9 @@ fn format_render_child(child: &ezc_core::RenderChild) -> String {
             element.tag_name,
             format_line_column_span(&element.span)
         ),
+        ezc_core::RenderChild::Fragment(fragment) => {
+            format!("Fragment <> {}", format_line_column_span(&fragment.span))
+        }
     }
 }
 
@@ -648,7 +701,24 @@ fn print_template_graph(path: &Path, graph: &TemplateGraph) {
                 }
             }
             None => {
-                println!("      root: none");
+                if let Some(fragment) = &template.root_fragment {
+                    println!(
+                        "      root: <> id={} {}",
+                        fragment.id.0,
+                        format_source_span(path, &fragment.span)
+                    );
+
+                    println!("      children:");
+                    if fragment.children.is_empty() {
+                        println!("        none");
+                    } else {
+                        for child in &fragment.children {
+                            print_template_child(path, child, 8);
+                        }
+                    }
+                } else {
+                    println!("      root: none");
+                }
             }
         }
     }
@@ -706,6 +776,23 @@ fn print_template_child(path: &Path, child: &TemplateChild, indent: usize) {
                 println!("{child_padding}  none");
             } else {
                 for child in &element.children {
+                    print_template_child(path, child, indent + 4);
+                }
+            }
+        }
+        TemplateChild::Fragment(fragment) => {
+            println!(
+                "{padding}Fragment <> id={} {}",
+                fragment.id.0,
+                format_source_span(path, &fragment.span)
+            );
+
+            let child_padding = " ".repeat(indent + 2);
+            println!("{child_padding}children:");
+            if fragment.children.is_empty() {
+                println!("{child_padding}  none");
+            } else {
+                for child in &fragment.children {
                     print_template_child(path, child, indent + 4);
                 }
             }

@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
     Argument, AssignmentTarget, ClassElement, Declaration, Expression, JSXAttributeItem,
-    JSXAttributeName, JSXAttributeValue, JSXChild, JSXElementName, JSXExpression, Program,
-    PropertyKey, SimpleAssignmentTarget, Statement,
+    JSXAttributeName, JSXAttributeValue, JSXChild, JSXElementName, JSXExpression, JSXFragment,
+    Program, PropertyKey, SimpleAssignmentTarget, Statement,
 };
 use oxc_diagnostics::Severity as OxcSeverity;
 use oxc_parser::Parser;
@@ -13,8 +13,8 @@ use oxc_span::{SourceType, Span};
 use crate::model::{
     ParseDiagnostic, ParseLabel, ParseSeverity, ParsedClass, ParsedDecorator, ParsedEventHandler,
     ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxElement,
-    ParsedMethod, ParsedProperty, ParsedSerializableValue, ParsedStateOperation, ParsedStateUpdate,
-    SourceSpan,
+    ParsedJsxFragment, ParsedJsxNode, ParsedMethod, ParsedProperty, ParsedSerializableValue,
+    ParsedStateOperation, ParsedStateUpdate, SourceSpan,
 };
 
 pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
@@ -248,7 +248,7 @@ fn this_assignment_target_field_from_assignment_target(
 fn parse_statement_for_jsx(
     statement: &Statement<'_>,
     source: &str,
-    jsx_roots: &mut Vec<ParsedJsxElement>,
+    jsx_roots: &mut Vec<ParsedJsxNode>,
     bindings: &mut Vec<String>,
 ) {
     if let Statement::ReturnStatement(return_statement) = statement {
@@ -261,7 +261,7 @@ fn parse_statement_for_jsx(
 fn parse_expression_for_jsx(
     expression: &Expression<'_>,
     source: &str,
-    jsx_roots: &mut Vec<ParsedJsxElement>,
+    jsx_roots: &mut Vec<ParsedJsxNode>,
     bindings: &mut Vec<String>,
 ) {
     match expression {
@@ -274,8 +274,17 @@ fn parse_expression_for_jsx(
             }
 
             if let Some(element) = parsed_jsx_element(element, source) {
-                jsx_roots.push(element);
+                jsx_roots.push(ParsedJsxNode::Element(element));
             }
+        }
+        Expression::JSXFragment(fragment) => {
+            for child in &fragment.children {
+                parse_jsx_child(child, bindings);
+            }
+
+            jsx_roots.push(ParsedJsxNode::Fragment(parsed_jsx_fragment(
+                fragment, source,
+            )));
         }
         _ => {}
     }
@@ -290,6 +299,11 @@ fn parse_jsx_child(child: &JSXChild<'_>, bindings: &mut Vec<String>) {
         }
         JSXChild::Element(element) => {
             for child in &element.children {
+                parse_jsx_child(child, bindings);
+            }
+        }
+        JSXChild::Fragment(fragment) => {
+            for child in &fragment.children {
                 parse_jsx_child(child, bindings);
             }
         }
@@ -319,7 +333,21 @@ fn parsed_jsx_child(child: &JSXChild<'_>, source: &str) -> Option<ParsedJsxChild
         JSXChild::Element(element) => {
             parsed_jsx_element(element, source).map(ParsedJsxChild::Element)
         }
+        JSXChild::Fragment(fragment) => Some(ParsedJsxChild::Fragment(parsed_jsx_fragment(
+            fragment, source,
+        ))),
         _ => None,
+    }
+}
+
+fn parsed_jsx_fragment(fragment: &JSXFragment<'_>, source: &str) -> ParsedJsxFragment {
+    ParsedJsxFragment {
+        span: source_span(source, fragment.span),
+        children: fragment
+            .children
+            .iter()
+            .filter_map(|child| parsed_jsx_child(child, source))
+            .collect(),
     }
 }
 

@@ -1,6 +1,6 @@
 use crate::component_graph::{
     ComponentGraph, RenderAttribute, RenderAttributeValue, RenderChild, RenderElement,
-    RenderEventHandler, RenderModel, SerializableValue, StateField,
+    RenderEventHandler, RenderFragment, RenderModel, SerializableValue, StateField,
 };
 use ezc_parser::SourceSpan;
 
@@ -26,6 +26,7 @@ pub struct TemplateGraph {
 pub struct TemplateNode {
     pub component_name: String,
     pub root: Option<ElementNode>,
+    pub root_fragment: Option<FragmentNode>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,6 +35,13 @@ pub struct ElementNode {
     pub tag_name: String,
     pub span: SourceSpan,
     pub attributes: Vec<TemplateAttribute>,
+    pub children: Vec<TemplateChild>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FragmentNode {
+    pub id: TemplateNodeId,
+    pub span: SourceSpan,
     pub children: Vec<TemplateChild>,
 }
 
@@ -73,6 +81,7 @@ pub enum TemplateChild {
         span: SourceSpan,
     },
     Element(ElementNode),
+    Fragment(FragmentNode),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -91,6 +100,11 @@ pub fn build_template_graph(component_graph: &ComponentGraph) -> TemplateGraph {
                 .render
                 .as_ref()
                 .and_then(|render| element_from_render(render, &component.state_fields, &mut ids)),
+            root_fragment: component.render.as_ref().and_then(|render| {
+                render.root_fragment.as_ref().map(|fragment| {
+                    fragment_from_render_fragment(fragment, &component.state_fields, &mut ids)
+                })
+            }),
         })
         .collect::<Vec<_>>();
 
@@ -154,6 +168,22 @@ fn element_from_render_element(
             .iter()
             .map(|child| template_child_from_render(child, state_fields, ids))
             .collect::<Vec<_>>(),
+    }
+}
+
+fn fragment_from_render_fragment(
+    fragment: &RenderFragment,
+    state_fields: &[StateField],
+    ids: &mut TemplateIdAllocator,
+) -> FragmentNode {
+    FragmentNode {
+        id: ids.alloc(),
+        span: fragment.span,
+        children: fragment
+            .children
+            .iter()
+            .map(|child| template_child_from_render(child, state_fields, ids))
+            .collect(),
     }
 }
 
@@ -232,8 +262,12 @@ fn collect_direct_bindings_from_children(children: &[RenderChild]) -> Vec<String
     let mut bindings = Vec::new();
 
     for child in children {
-        if let RenderChild::Binding { expression, .. } = child {
-            bindings.push(expression.clone());
+        match child {
+            RenderChild::Binding { expression, .. } => bindings.push(expression.clone()),
+            RenderChild::Fragment(fragment) => {
+                bindings.extend(collect_direct_bindings_from_children(&fragment.children));
+            }
+            RenderChild::Element(_) | RenderChild::Text { .. } => {}
         }
     }
 
@@ -260,6 +294,9 @@ fn template_child_from_render(
 
         RenderChild::Element(element) => {
             TemplateChild::Element(element_from_render_element(element, state_fields, ids))
+        }
+        RenderChild::Fragment(fragment) => {
+            TemplateChild::Fragment(fragment_from_render_fragment(fragment, state_fields, ids))
         }
     }
 }

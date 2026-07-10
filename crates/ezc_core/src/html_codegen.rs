@@ -1,6 +1,6 @@
 use crate::component_graph::SerializableValue;
 use crate::template_graph::{
-    AttributeValue, ElementNode, TemplateAttribute, TemplateChild, TemplateGraph,
+    AttributeValue, ElementNode, FragmentNode, TemplateAttribute, TemplateChild, TemplateGraph,
 };
 
 #[must_use]
@@ -11,10 +11,23 @@ pub fn generate_static_html(template_graph: &TemplateGraph) -> String {
         if let Some(root) = &template.root {
             output.push_str(&generate_element_html(root));
             output.push('\n');
+        } else if let Some(fragment) = &template.root_fragment {
+            output.push_str(&generate_fragment_html(fragment));
+            output.push('\n');
         }
     }
 
     output
+}
+
+fn generate_fragment_html(fragment: &FragmentNode) -> String {
+    let mut html = String::new();
+
+    for child in &fragment.children {
+        html.push_str(&generate_child_html(child));
+    }
+
+    html
 }
 
 fn generate_element_html(element: &ElementNode) -> String {
@@ -37,28 +50,7 @@ fn generate_element_html(element: &ElementNode) -> String {
     html.push('>');
 
     for child in &element.children {
-        match child {
-            TemplateChild::Text { value, .. } => html.push_str(&escape_text(value)),
-            TemplateChild::Binding {
-                id,
-                expression,
-                initial_value,
-                ..
-            } => {
-                html.push_str("<!-- ez-binding:");
-                html.push_str(&escape_comment(&id.0));
-                html.push(':');
-                html.push_str(&escape_comment(expression));
-                html.push_str(" -->");
-
-                if let Some(initial_value) = initial_value {
-                    html.push_str(&escape_text(&initial_value.render_text()));
-                }
-            }
-            TemplateChild::Element(element) => {
-                html.push_str(&generate_element_html(element));
-            }
-        }
+        html.push_str(&generate_child_html(child));
     }
 
     html.push_str("</");
@@ -66,6 +58,34 @@ fn generate_element_html(element: &ElementNode) -> String {
     html.push('>');
 
     html
+}
+
+fn generate_child_html(child: &TemplateChild) -> String {
+    match child {
+        TemplateChild::Text { value, .. } => escape_text(value),
+        TemplateChild::Binding {
+            id,
+            expression,
+            initial_value,
+            ..
+        } => {
+            let mut html = String::new();
+
+            html.push_str("<!-- ez-binding:");
+            html.push_str(&escape_comment(&id.0));
+            html.push(':');
+            html.push_str(&escape_comment(expression));
+            html.push_str(" -->");
+
+            if let Some(initial_value) = initial_value {
+                html.push_str(&escape_text(&initial_value.render_text()));
+            }
+
+            html
+        }
+        TemplateChild::Element(element) => generate_element_html(element),
+        TemplateChild::Fragment(fragment) => generate_fragment_html(fragment),
+    }
 }
 
 fn generate_attribute_html(attribute: &TemplateAttribute) -> Option<String> {

@@ -2,7 +2,7 @@ use serde::Serialize;
 
 use crate::component_graph::{ComponentGraph, ComponentNode, SerializableValue, StateOperation};
 use crate::template_graph::{
-    AttributeValue, ElementNode, TemplateChild, TemplateGraph, TemplateNode,
+    AttributeValue, ElementNode, FragmentNode, TemplateChild, TemplateGraph, TemplateNode,
 };
 
 pub const TEMPLATE_MANIFEST_SCHEMA_VERSION: u32 = 1;
@@ -123,6 +123,8 @@ fn manifest_component(
 
     if let Some(root) = &template.root {
         collect_element(root, &mut nodes, &mut events);
+    } else if let Some(fragment) = &template.root_fragment {
+        collect_fragment(fragment, &mut nodes, &mut events);
     }
 
     let actions = component_graph
@@ -136,6 +138,16 @@ fn manifest_component(
         name: template.component_name.clone(),
         template: ManifestTemplate { nodes, events },
         actions,
+    }
+}
+
+fn collect_fragment(
+    fragment: &FragmentNode,
+    nodes: &mut Vec<ManifestNode>,
+    events: &mut Vec<ManifestEvent>,
+) {
+    for child in &fragment.children {
+        collect_child(child, nodes, events);
     }
 }
 
@@ -211,24 +223,33 @@ fn collect_element(
     }
 
     for child in &element.children {
-        match child {
-            TemplateChild::Text { .. } => {}
-            TemplateChild::Binding {
-                id,
-                expression,
-                initial_value,
-                ..
-            } => {
-                nodes.push(ManifestNode::Binding {
-                    id: id.0.clone(),
-                    expression: expression.clone(),
-                    initial_value: initial_value.clone(),
-                    target: None,
-                    element: None,
-                    attribute: None,
-                });
-            }
-            TemplateChild::Element(element) => collect_element(element, nodes, events),
+        collect_child(child, nodes, events);
+    }
+}
+
+fn collect_child(
+    child: &TemplateChild,
+    nodes: &mut Vec<ManifestNode>,
+    events: &mut Vec<ManifestEvent>,
+) {
+    match child {
+        TemplateChild::Text { .. } => {}
+        TemplateChild::Binding {
+            id,
+            expression,
+            initial_value,
+            ..
+        } => {
+            nodes.push(ManifestNode::Binding {
+                id: id.0.clone(),
+                expression: expression.clone(),
+                initial_value: initial_value.clone(),
+                target: None,
+                element: None,
+                attribute: None,
+            });
         }
+        TemplateChild::Element(element) => collect_element(element, nodes, events),
+        TemplateChild::Fragment(fragment) => collect_fragment(fragment, nodes, events),
     }
 }

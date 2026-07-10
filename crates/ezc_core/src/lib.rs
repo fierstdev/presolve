@@ -17,7 +17,7 @@ pub mod template_manifest;
 pub use component_graph::{
     build_component_graph, ComponentAction, ComponentDiagnostic, ComponentGraph, ComponentMethod,
     ComponentNode, RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler,
-    RenderModel, SerializableValue, StateField, StateOperation,
+    RenderFragment, RenderModel, SerializableValue, StateField, StateOperation,
 };
 pub use explain::{explain_json, explain_text};
 pub use html_codegen::generate_static_html;
@@ -28,8 +28,8 @@ pub use page_codegen::generate_standalone_page;
 pub use runtime_codegen::generate_runtime_stub;
 pub use summarize::summarize_source;
 pub use template_graph::{
-    build_template_graph, AttributeValue, ElementNode, TemplateAttribute, TemplateChild,
-    TemplateGraph, TemplateNode, TemplateNodeId,
+    build_template_graph, AttributeValue, ElementNode, FragmentNode, TemplateAttribute,
+    TemplateChild, TemplateGraph, TemplateNode, TemplateNodeId,
 };
 pub use template_manifest::{
     build_template_manifest, template_manifest_json, ManifestAction, ManifestBindingTarget,
@@ -261,24 +261,26 @@ class Counter extends Component {
                 methods: vec![ezc_parser::ParsedMethod {
                     name: "render".to_string(),
                     span: test_span(),
-                    jsx_roots: vec![ezc_parser::ParsedJsxElement {
-                        name: "button".to_string(),
-                        span: test_span(),
-                        attributes: Vec::new(),
-                        event_handlers: vec![
-                            ezc_parser::ParsedEventHandler {
-                                event: "click".to_string(),
-                                handler: "this.render".to_string(),
-                                span: test_span(),
-                            },
-                            ezc_parser::ParsedEventHandler {
-                                event: "click".to_string(),
-                                handler: "this.render".to_string(),
-                                span: test_span(),
-                            },
-                        ],
-                        children: Vec::new(),
-                    }],
+                    jsx_roots: vec![ezc_parser::ParsedJsxNode::Element(
+                        ezc_parser::ParsedJsxElement {
+                            name: "button".to_string(),
+                            span: test_span(),
+                            attributes: Vec::new(),
+                            event_handlers: vec![
+                                ezc_parser::ParsedEventHandler {
+                                    event: "click".to_string(),
+                                    handler: "this.render".to_string(),
+                                    span: test_span(),
+                                },
+                                ezc_parser::ParsedEventHandler {
+                                    event: "click".to_string(),
+                                    handler: "this.render".to_string(),
+                                    span: test_span(),
+                                },
+                            ],
+                            children: Vec::new(),
+                        },
+                    )],
                     bindings: Vec::new(),
                     state_updates: Vec::new(),
                 }],
@@ -946,6 +948,78 @@ class BadAttrs extends Component {
         assert_eq!(expression, "this.count");
         assert_eq!(span.line, 13);
         assert_eq!(span.column, 57);
+    }
+
+    #[test]
+    fn preserves_fragment_siblings_without_wrapper_elements() {
+        let source = include_str!("../../../fixtures/0016-fragments/input/FragmentPanel.tsx");
+
+        let parsed =
+            ezc_parser::parse_file("fixtures/0016-fragments/input/FragmentPanel.tsx", source);
+
+        let component_graph = build_component_graph(&parsed);
+        assert!(component_graph.diagnostics.is_empty());
+
+        let template_graph = build_template_graph(&component_graph);
+        let template = &template_graph.templates[0];
+        let fragment = template
+            .root_fragment
+            .as_ref()
+            .expect("expected fragment root");
+
+        assert!(template.root.is_none());
+        assert_eq!(fragment.id.0, "n0");
+        assert_eq!(fragment.children.len(), 2);
+
+        let TemplateChild::Element(heading) = &fragment.children[0] else {
+            panic!("expected heading child");
+        };
+        assert_eq!(heading.id.0, "n1");
+        assert_eq!(heading.tag_name, "h1");
+
+        let TemplateChild::Fragment(nested) = &fragment.children[1] else {
+            panic!("expected nested fragment child");
+        };
+        assert_eq!(nested.id.0, "n2");
+
+        let TemplateChild::Element(paragraph) = &nested.children[0] else {
+            panic!("expected paragraph child");
+        };
+        assert_eq!(paragraph.id.0, "n3");
+        assert_eq!(paragraph.tag_name, "p");
+
+        let html = generate_static_html(&template_graph);
+        assert_eq!(
+            html,
+            "<h1 data-ez-node=\"n1\">Title</h1><p data-ez-node=\"n3\" data-ez-bindings=\"this.label\">Status:<!-- ez-binding:n4:this.label -->Ready</p><span data-ez-node=\"n5\">Done</span>\n"
+        );
+
+        let manifest = build_template_manifest(&component_graph, &template_graph);
+        assert_eq!(
+            manifest.components[0].template.nodes,
+            vec![
+                ManifestNode::Element {
+                    id: "n1".to_string(),
+                    tag: "h1".to_string(),
+                },
+                ManifestNode::Element {
+                    id: "n3".to_string(),
+                    tag: "p".to_string(),
+                },
+                ManifestNode::Binding {
+                    id: "n4".to_string(),
+                    expression: "this.label".to_string(),
+                    initial_value: Some(SerializableValue::String("Ready".to_string())),
+                    target: None,
+                    element: None,
+                    attribute: None,
+                },
+                ManifestNode::Element {
+                    id: "n5".to_string(),
+                    tag: "span".to_string(),
+                },
+            ]
+        );
     }
 
     #[test]

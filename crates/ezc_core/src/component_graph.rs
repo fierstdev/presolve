@@ -2,7 +2,8 @@ use serde::Serialize;
 
 use ezc_parser::{
     ParsedClass, ParsedEventHandler, ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue,
-    ParsedJsxChild, ParsedSerializableValue, ParsedStateOperation, SourceSpan,
+    ParsedJsxChild, ParsedJsxFragment, ParsedJsxNode, ParsedSerializableValue,
+    ParsedStateOperation, SourceSpan,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -81,6 +82,7 @@ pub enum RenderChild {
         span: SourceSpan,
     },
     Element(RenderElement),
+    Fragment(RenderFragment),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -89,6 +91,12 @@ pub struct RenderElement {
     pub span: SourceSpan,
     pub attributes: Vec<RenderAttribute>,
     pub event_handlers: Vec<RenderEventHandler>,
+    pub children: Vec<RenderChild>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenderFragment {
+    pub span: SourceSpan,
     pub children: Vec<RenderChild>,
 }
 
@@ -119,6 +127,7 @@ pub struct RenderEventHandler {
 pub struct RenderModel {
     pub root_element: Option<String>,
     pub root_span: Option<SourceSpan>,
+    pub root_fragment: Option<RenderFragment>,
     pub attributes: Vec<RenderAttribute>,
     pub bindings: Vec<String>,
     pub event_handlers: Vec<RenderEventHandler>,
@@ -204,39 +213,7 @@ fn build_component_node(
         .methods
         .iter()
         .find(|method| method.name == "render")
-        .map(|method| {
-            let root = method.jsx_roots.first();
-
-            RenderModel {
-                root_element: root.map(|jsx| jsx.name.clone()),
-                root_span: root.map(|jsx| jsx.span),
-                attributes: root
-                    .map(|jsx| {
-                        jsx.attributes
-                            .iter()
-                            .map(render_attribute_from_parsed)
-                            .collect::<Vec<_>>()
-                    })
-                    .unwrap_or_default(),
-                event_handlers: root
-                    .map(|jsx| {
-                        jsx.event_handlers
-                            .iter()
-                            .map(render_event_handler_from_parsed)
-                            .collect::<Vec<_>>()
-                    })
-                    .unwrap_or_default(),
-                children: root
-                    .map(|jsx| {
-                        jsx.children
-                            .iter()
-                            .map(render_child_from_parsed)
-                            .collect::<Vec<_>>()
-                    })
-                    .unwrap_or_default(),
-                bindings: method.bindings.clone(),
-            }
-        });
+        .map(render_model_from_parsed_method);
 
     if render.is_none() {
         diagnostics.push(ComponentDiagnostic {
@@ -260,6 +237,54 @@ fn build_component_node(
         methods,
         actions,
         render,
+    }
+}
+
+fn render_model_from_parsed_method(method: &ezc_parser::ParsedMethod) -> RenderModel {
+    let root = method.jsx_roots.first();
+    let root_element = root.and_then(parsed_root_element);
+    let root_fragment = root.and_then(parsed_root_fragment);
+
+    RenderModel {
+        root_element: root_element.map(|element| element.name.clone()),
+        root_span: root_element.map(|element| element.span),
+        root_fragment: root_fragment.map(render_fragment_from_parsed),
+        attributes: root_element.map_or_else(Vec::new, |element| {
+            element
+                .attributes
+                .iter()
+                .map(render_attribute_from_parsed)
+                .collect()
+        }),
+        event_handlers: root_element.map_or_else(Vec::new, |element| {
+            element
+                .event_handlers
+                .iter()
+                .map(render_event_handler_from_parsed)
+                .collect()
+        }),
+        children: root_element.map_or_else(Vec::new, |element| {
+            element
+                .children
+                .iter()
+                .map(render_child_from_parsed)
+                .collect()
+        }),
+        bindings: method.bindings.clone(),
+    }
+}
+
+fn parsed_root_element(root: &ParsedJsxNode) -> Option<&ezc_parser::ParsedJsxElement> {
+    match root {
+        ParsedJsxNode::Element(element) => Some(element),
+        ParsedJsxNode::Fragment(_) => None,
+    }
+}
+
+fn parsed_root_fragment(root: &ParsedJsxNode) -> Option<&ParsedJsxFragment> {
+    match root {
+        ParsedJsxNode::Element(_) => None,
+        ParsedJsxNode::Fragment(fragment) => Some(fragment),
     }
 }
 
@@ -388,6 +413,20 @@ fn render_child_from_parsed(child: &ParsedJsxChild) -> RenderChild {
                 .map(render_child_from_parsed)
                 .collect::<Vec<_>>(),
         }),
+        ParsedJsxChild::Fragment(fragment) => {
+            RenderChild::Fragment(render_fragment_from_parsed(fragment))
+        }
+    }
+}
+
+fn render_fragment_from_parsed(fragment: &ParsedJsxFragment) -> RenderFragment {
+    RenderFragment {
+        span: fragment.span,
+        children: fragment
+            .children
+            .iter()
+            .map(render_child_from_parsed)
+            .collect(),
     }
 }
 
@@ -423,6 +462,11 @@ fn render_event_handlers(render: &RenderModel) -> Vec<&RenderEventHandler> {
     for child in &render.children {
         collect_child_event_handlers(child, &mut event_handlers);
     }
+    if let Some(fragment) = &render.root_fragment {
+        for child in &fragment.children {
+            collect_child_event_handlers(child, &mut event_handlers);
+        }
+    }
 
     event_handlers
 }
@@ -431,12 +475,20 @@ fn collect_child_event_handlers<'a>(
     child: &'a RenderChild,
     event_handlers: &mut Vec<&'a RenderEventHandler>,
 ) {
-    if let RenderChild::Element(element) = child {
-        event_handlers.extend(element.event_handlers.iter());
+    match child {
+        RenderChild::Element(element) => {
+            event_handlers.extend(element.event_handlers.iter());
 
-        for child in &element.children {
-            collect_child_event_handlers(child, event_handlers);
+            for child in &element.children {
+                collect_child_event_handlers(child, event_handlers);
+            }
         }
+        RenderChild::Fragment(fragment) => {
+            for child in &fragment.children {
+                collect_child_event_handlers(child, event_handlers);
+            }
+        }
+        RenderChild::Text { .. } | RenderChild::Binding { .. } => {}
     }
 }
 
@@ -449,6 +501,11 @@ fn collect_duplicate_event_diagnostics(
 
     for child in &render.children {
         collect_duplicate_child_event_diagnostics(child, class_name, diagnostics);
+    }
+    if let Some(fragment) = &render.root_fragment {
+        for child in &fragment.children {
+            collect_duplicate_child_event_diagnostics(child, class_name, diagnostics);
+        }
     }
 }
 
@@ -468,6 +525,11 @@ fn collect_render_attribute_diagnostics(
     for child in &render.children {
         collect_child_attribute_diagnostics(child, state_fields, class_name, diagnostics);
     }
+    if let Some(fragment) = &render.root_fragment {
+        for child in &fragment.children {
+            collect_child_attribute_diagnostics(child, state_fields, class_name, diagnostics);
+        }
+    }
 }
 
 fn collect_child_attribute_diagnostics(
@@ -476,17 +538,25 @@ fn collect_child_attribute_diagnostics(
     class_name: &str,
     diagnostics: &mut Vec<ComponentDiagnostic>,
 ) {
-    if let RenderChild::Element(element) = child {
-        collect_attribute_diagnostics_for_attributes(
-            &element.attributes,
-            state_fields,
-            class_name,
-            diagnostics,
-        );
+    match child {
+        RenderChild::Element(element) => {
+            collect_attribute_diagnostics_for_attributes(
+                &element.attributes,
+                state_fields,
+                class_name,
+                diagnostics,
+            );
 
-        for child in &element.children {
-            collect_child_attribute_diagnostics(child, state_fields, class_name, diagnostics);
+            for child in &element.children {
+                collect_child_attribute_diagnostics(child, state_fields, class_name, diagnostics);
+            }
         }
+        RenderChild::Fragment(fragment) => {
+            for child in &fragment.children {
+                collect_child_attribute_diagnostics(child, state_fields, class_name, diagnostics);
+            }
+        }
+        RenderChild::Text { .. } | RenderChild::Binding { .. } => {}
     }
 }
 
@@ -569,12 +639,20 @@ fn collect_duplicate_child_event_diagnostics(
     class_name: &str,
     diagnostics: &mut Vec<ComponentDiagnostic>,
 ) {
-    if let RenderChild::Element(element) = child {
-        collect_duplicate_events_for_handlers(&element.event_handlers, class_name, diagnostics);
+    match child {
+        RenderChild::Element(element) => {
+            collect_duplicate_events_for_handlers(&element.event_handlers, class_name, diagnostics);
 
-        for child in &element.children {
-            collect_duplicate_child_event_diagnostics(child, class_name, diagnostics);
+            for child in &element.children {
+                collect_duplicate_child_event_diagnostics(child, class_name, diagnostics);
+            }
         }
+        RenderChild::Fragment(fragment) => {
+            for child in &fragment.children {
+                collect_duplicate_child_event_diagnostics(child, class_name, diagnostics);
+            }
+        }
+        RenderChild::Text { .. } | RenderChild::Binding { .. } => {}
     }
 }
 

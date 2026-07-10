@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "components": [
+    {
+      "name": "FragmentPanel",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n1",
+            "tag": "h1"
+          },
+          {
+            "kind": "element",
+            "id": "n3",
+            "tag": "p"
+          },
+          {
+            "kind": "binding",
+            "id": "n4",
+            "expression": "this.label",
+            "initial_value": "Ready"
+          },
+          {
+            "kind": "element",
+            "id": "n5",
+            "tag": "span"
+          }
+        ],
+        "events": []
+      },
+      "actions": []
+    }
+  ]
+}

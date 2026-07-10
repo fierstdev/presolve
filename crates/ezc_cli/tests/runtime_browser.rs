@@ -474,6 +474,64 @@ fn dynamic_attributes_update_in_a_real_browser() {
 }
 
 #[test]
+fn fragments_preserve_sibling_identity_in_a_real_browser() {
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/fragments");
+
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean previous browser test output");
+    }
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0016-fragments/input/FragmentPanel.tsx",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("browser test output path was not valid UTF-8"),
+        ])
+        .output()
+        .expect("failed to run ezc_cli build");
+
+    assert!(
+        output.status.success(),
+        "expected build to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    write_fragments_probe_page(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile dir");
+    let user_data_dir = format!(
+        "--user-data-dir={}",
+        profile_dir
+            .to_str()
+            .expect("Chrome profile path was not valid UTF-8")
+    );
+    let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
+
+    let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    server.stop();
+
+    assert!(
+        stdout.contains("EDGEZERO_FRAGMENTS_BROWSER_TEST_PASS"),
+        "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn runtime_contract_diagnostics_report_manifest_boot_failures_in_a_real_browser() {
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/runtime-contract");
@@ -1342,6 +1400,99 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
   document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_DYNAMIC_ATTRIBUTES_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  console.error(error);
+});
+</script>
+</body>"#,
+    );
+
+    fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
+}
+
+fn write_fragments_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
+    let probe = index.replace(
+        "</body>",
+        r#"<script>
+const fail = (message) => {
+  throw new Error(message);
+};
+
+const edgezeroConsoleErrors = [];
+const originalConsoleError = console.error.bind(console);
+console.error = (...args) => {
+  const message = args.map((arg) => {
+    if (arg instanceof Error) return arg.message;
+    if (typeof arg === "string") return arg;
+    return JSON.stringify(arg);
+  }).join(" ");
+
+  edgezeroConsoleErrors.push(message);
+  originalConsoleError(...args);
+};
+
+const waitFor = (predicate, label) => new Promise((resolve, reject) => {
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    if (predicate()) {
+      resolve();
+      return;
+    }
+
+    if (Date.now() > deadline) {
+      reject(new Error(`Timed out waiting for ${label}`));
+      return;
+    }
+
+    setTimeout(tick, 20);
+  };
+
+  tick();
+});
+
+(async () => {
+  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+
+  const elements = Array.from(document.body.children)
+    .filter((element) => ["H1", "P", "SPAN"].includes(element.tagName));
+  const tags = elements.map((element) => element.tagName.toLowerCase());
+  if (JSON.stringify(tags) !== JSON.stringify(["h1", "p", "span"])) {
+    fail(`fragment siblings did not render in order: ${tags.join(",")}`);
+  }
+
+  if (document.querySelector("[data-ez-node='n0'], [data-ez-node='n2']") !== null) {
+    fail("fragment IDs should not render as wrapper DOM nodes");
+  }
+
+  const h1 = document.querySelector("h1");
+  const paragraph = document.querySelector("p");
+  const span = document.querySelector("span");
+  if (h1?.dataset.ezNode !== "n1") fail("heading node identity was not preserved");
+  if (paragraph?.dataset.ezNode !== "n3") fail("paragraph node identity was not preserved");
+  if (span?.dataset.ezNode !== "n5") fail("span node identity was not preserved");
+  if (!document.body.textContent.includes("TitleStatus:ReadyDone")) {
+    fail("fragment text content did not render expected sibling output");
+  }
+
+  const nodes = window.__EDGEZERO__.manifest.components[0].template.nodes;
+  const nodeIds = nodes.map((node) => node.id);
+  if (JSON.stringify(nodeIds) !== JSON.stringify(["n1", "n3", "n4", "n5"])) {
+    fail(`fragment manifest should omit fragment nodes: ${nodeIds.join(",")}`);
+  }
+
+  if (window.__EDGEZERO__.components[0].state.label !== "Ready") {
+    fail("fragment component state did not initialize");
+  }
+
+  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
+    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  }
+
+  document.body.dataset.browserTest = "pass";
+  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_FRAGMENTS_BROWSER_TEST_PASS</div>");
+})().catch((error) => {
+  document.body.dataset.browserTest = "fail";
+  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_FRAGMENTS_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>

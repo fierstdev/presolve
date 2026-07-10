@@ -1,0 +1,24 @@
+File: fixtures/0016-fragments/input/FragmentPanel.tsx
+TemplateGraph:
+  templates:
+    template FragmentPanel
+      root: <> id=n0 @ fixtures/0016-fragments/input/FragmentPanel.tsx:8:7 span=151..275
+      children:
+        Element <h1> id=n1 @ fixtures/0016-fragments/input/FragmentPanel.tsx:9:9 span=162..176
+          attributes:
+            none
+          children:
+            Text("Title") @ fixtures/0016-fragments/input/FragmentPanel.tsx:9:13 span=166..171
+        Fragment <> id=n2 @ fixtures/0016-fragments/input/FragmentPanel.tsx:10:9 span=185..265
+          children:
+            Element <p> id=n3 @ fixtures/0016-fragments/input/FragmentPanel.tsx:11:11 span=198..225
+              attributes:
+                data-ez-bindings = bindings(this.label) @ generated
+              children:
+                Text("Status:") @ fixtures/0016-fragments/input/FragmentPanel.tsx:11:14 span=201..208
+                Binding id=n4 expression="this.label" initial=Some("Ready") @ fixtures/0016-fragments/input/FragmentPanel.tsx:11:22 span=209..221
+            Element <span> id=n5 @ fixtures/0016-fragments/input/FragmentPanel.tsx:12:11 span=236..253
+              attributes:
+                none
+              children:
+                Text("Done") @ fixtures/0016-fragments/input/FragmentPanel.tsx:12:17 span=242..246
