@@ -1,6 +1,7 @@
 use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
@@ -9,6 +10,10 @@ use oxc_ast::ast::{
 };
 use oxc_parser::Parser;
 use oxc_span::{SourceType, Span};
+
+use swc_common::{FileName, SourceMap};
+use swc_ecma_ast::{Decl, ModuleDecl, ModuleItem, Stmt};
+use swc_ecma_parser::{lexer::Lexer, Parser as SwcParser, StringInput, Syntax, TsSyntax};
 
 #[derive(Debug, Default)]
 struct ParserProbe {
@@ -54,20 +59,85 @@ struct JsxElementProbe {
 }
 
 fn main() {
-    let path = env::args()
-        .nth(1)
+    let mut args = env::args().skip(1).collect::<Vec<_>>();
+
+    let use_swc = args.iter().any(|arg| arg == "--swc");
+    args.retain(|arg| arg != "--swc");
+
+    let path = args
+        .first()
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("fixtures/0001-source-summary/input/Counter.tsx"));
 
     let source = fs::read_to_string(&path).expect("failed to read source file");
 
-    let source_type = SourceType::from_path(&path)
+    if use_swc {
+        run_swc(&path, &source);
+    } else {
+        run_oxc(&path, &source);
+    }
+}
+
+fn run_swc(path: &Path, source: &str) {
+    let source_map = Arc::new(SourceMap::default());
+    let file = source_map.new_source_file(
+        FileName::Real(path.to_path_buf()).into(),
+        source.to_string(),
+    );
+
+    let lexer = Lexer::new(
+        Syntax::Typescript(TsSyntax {
+            tsx: true,
+            decorators: true,
+            ..Default::default()
+        }),
+        Default::default(),
+        StringInput::from(&*file),
+        None,
+    );
+
+    let mut parser = SwcParser::new_from(lexer);
+
+    match parser.parse_module() {
+        Ok(module) => {
+            println!("File: {}", path.display());
+            println!("SWC parsed module.");
+            println!("Top-level items: {}", module.body.len());
+
+            for item in &module.body {
+                match item {
+                    ModuleItem::Stmt(Stmt::Decl(Decl::Class(class_decl))) => {
+                        println!(
+                            "ClassDeclaration: {} span={:?}",
+                            class_decl.ident.sym, class_decl.class.span
+                        );
+                        println!("  decorators: {}", class_decl.class.decorators.len());
+                        println!("  body elements: {}", class_decl.class.body.len());
+                    }
+                    ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(export_decl)) => {
+                        println!("ExportDecl span={:?}", export_decl.span);
+                    }
+                    other => {
+                        println!("ModuleItem: {:?}", other);
+                    }
+                }
+            }
+        }
+        Err(error) => {
+            println!("File: {}", path.display());
+            println!("SWC parse error: {error:?}");
+        }
+    }
+}
+
+fn run_oxc(path: &Path, source: &str) {
+    let source_type = SourceType::from_path(path)
         .unwrap_or_default()
         .with_typescript(true)
         .with_jsx(true);
 
     let allocator = Allocator::default();
-    let ret = Parser::new(&allocator, &source, source_type).parse();
+    let ret = Parser::new(&allocator, source, source_type).parse();
 
     println!("File: {}", path.display());
     println!("Errors: {}", ret.errors.len());
@@ -81,7 +151,7 @@ fn main() {
     print_probe(&probe);
 
     if !ret.errors.is_empty() {
-        print_diagnostic_probe(&source, &ret.errors);
+        print_diagnostic_probe(source, &ret.errors);
     }
 }
 

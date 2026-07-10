@@ -242,3 +242,43 @@ Broken TSX result:
 - label: `offset=198 length=1 location=9:16`
 
 This confirms that Oxc diagnostics can be adapted into EdgeZero-owned diagnostics without relying only on debug output.
+
+
+## SWC valid fixture baseline
+
+Command: `cargo run -p ezc_parser_spike -- --swc fixtures/0001-source-summary/input/Counter.tsx`
+
+Result:
+
+- Compiled: yes
+- Parsed fixture: yes
+- Top-level items: 1
+- Class declaration: `Counter`
+- Decorators: 2
+- Class body elements: 3
+- Span output: available as SWC byte positions, displayed as `1..271`
+
+Interpretation:
+
+SWC is a viable fallback parser candidate for valid TSX parsing. The first baseline confirms that SWC can parse the same counter fixture and expose class-level facts.
+
+Compared with the current Oxc spike, SWC has not yet been mapped into a normalized `ParserProbe`. Oxc currently has stronger evidence because the spike already extracts EdgeZero-style facts from Oxc.
+
+
+## SWC broken fixture baseline
+
+Command: `cargo run -p ezc_parser_spike -- --swc fixtures/0002-broken-tsx/input/BrokenCounter.tsx`
+
+Result:
+
+- Compiled: yes
+- Parser returned error: yes
+- Process panicked: no
+- Error output: `Unexpected { got: "{", expected: "jsx identifier" }`
+- Span output: `199..200`
+
+Interpretation:
+
+SWC reports a useful parse error for the malformed TSX fixture and does not panic. The debug output is more specific than Oxc’s basic `Unexpected token` message for this fixture.
+
+Compared with Oxc, SWC has not yet been adapted into a normalized diagnostic model or `ParserProbe`. Oxc currently remains ahead for EdgeZero integration evidence because the spike has already extracted class, decorator, property, method, JSX, binding, and diagnostic label facts from Oxc.
