@@ -534,6 +534,39 @@ fn html_command_matches_static_attributes_fixture() {
 }
 
 #[test]
+fn html_command_matches_dynamic_attributes_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "html",
+            "fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli html");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0015-dynamic-attributes/expected/html.html"),
+    )
+    .expect("failed to read expected dynamic attributes html fixture");
+
+    assert_eq!(
+        normalize_html_for_fixture(&actual),
+        normalize_html_for_fixture(&expected)
+    );
+}
+
+#[test]
 fn html_command_matches_broken_tsx_fixture() {
     let repo_root = repo_root();
 
@@ -850,6 +883,36 @@ fn template_command_matches_static_attributes_fixture() {
         repo_root.join("fixtures/0014-static-attributes/expected/template.txt"),
     )
     .expect("failed to read expected static attributes template fixture");
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn template_command_matches_dynamic_attributes_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "template",
+            "fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli template");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0015-dynamic-attributes/expected/template.txt"),
+    )
+    .expect("failed to read expected dynamic attributes template fixture");
 
     assert_eq!(actual, expected);
 }
@@ -1261,6 +1324,40 @@ fn manifest_command_matches_static_attributes_fixture() {
         repo_root.join("fixtures/0014-static-attributes/expected/manifest.json"),
     )
     .expect("failed to read expected static attributes manifest fixture");
+
+    let actual_json: serde_json::Value =
+        serde_json::from_str(&actual).expect("actual manifest JSON was invalid");
+    let expected_json: serde_json::Value =
+        serde_json::from_str(&expected).expect("expected manifest JSON was invalid");
+
+    assert_eq!(actual_json, expected_json);
+}
+
+#[test]
+fn manifest_command_matches_dynamic_attributes_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "manifest",
+            "fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli manifest");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0015-dynamic-attributes/expected/manifest.json"),
+    )
+    .expect("failed to read expected dynamic attributes manifest fixture");
 
     let actual_json: serde_json::Value =
         serde_json::from_str(&actual).expect("actual manifest JSON was invalid");

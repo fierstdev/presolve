@@ -680,6 +680,15 @@ fn format_attribute_value(value: &AttributeValue) -> String {
     match value {
         AttributeValue::Boolean => "boolean".to_string(),
         AttributeValue::Static(value) => format!("{value:?}"),
+        AttributeValue::Binding {
+            id,
+            expression,
+            initial_value,
+        } => format!(
+            "binding(id={} expression={expression:?} initial={})",
+            id.0,
+            format_serializable_value(initial_value.as_ref())
+        ),
         AttributeValue::EventHandler { event, handler } => {
             format!("event-handler({event} -> {handler})")
         }

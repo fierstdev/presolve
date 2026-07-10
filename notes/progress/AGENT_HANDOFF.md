@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: preserve static jsx attributes
+* Latest commit: compiler: support dynamic attribute bindings
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 06:54:57 PDT
+* Date: 2026-07-10 07:10:59 PDT
 
 Last completed slice
 
-* Slice: 7A - Preserve static JSX attributes
-* Summary: Replaced JSX attribute string summaries with structured parser/render attributes and preserved ordinary static/boolean attributes in template graph and static HTML output.
-* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/html_codegen.rs
-* New behavior: String literal attributes and boolean presence attributes emit in source order before compiler-owned `data-ez-*` attributes; expression/spread/complex attribute values remain unsupported with diagnostics.
-* Tests added or changed: parser structured attribute assertions, core static HTML/template assertions, duplicate/expression/spread diagnostics, and CLI fixture checks.
-* Fixtures added or changed: fixtures/0014-static-attributes
+* Slice: 7B - Dynamic attribute bindings
+* Summary: Promoted supported `this.<stateField>` JSX expression attributes into template binding nodes with initial values, manifest target metadata, and runtime attribute/property update callbacks.
+* Key files: crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/template_manifest.rs, crates/ezc_core/src/html_codegen.rs, crates/ezc_core/src/runtime_codegen.rs, crates/ezc_cli/tests/runtime_browser.rs
+* New behavior: Attributes such as `disabled={this.disabled}` and `title={this.label}` emit attribute binding records, hydrate from component state, and update the existing DOM element when state changes.
+* Tests added or changed: core template/manifest assertions, CLI fixture checks, runtime smoke string checks, and a real-browser probe that verifies boolean/property and string attribute updates.
+* Fixtures added or changed: fixtures/0015-dynamic-attributes
 
 Current in-progress slice
 
-* Slice: 7B - Dynamic attribute bindings
+* Slice: 7C - Source spans on template nodes and edges
 * Status: Not started
 * Completed: None
-* Remaining: Support expression-backed attributes such as `disabled={this.disabled}` and `title={this.label}`, add manifest binding target metadata, and define runtime update behavior by attribute category.
+* Remaining: Carry source spans through template nodes and binding/event edges so later diagnostics and tooling can point back to exact JSX source locations.
 
 Verification
 
@@ -38,17 +38,17 @@ Verification
 
 Architecture decisions made
 
-* Decision: 7A only emits string literal and boolean presence attributes as static HTML attributes.
-* Reason: Expression-backed attributes need binding target metadata and runtime update rules, which belong to 7B.
-* Tradeoff: Expression, spread, and complex JSX attribute values are parsed structurally but currently diagnosed as unsupported and omitted from static output.
-* Follow-up: 7B should reuse `RenderAttributeValue::Expression` as the entry point for dynamic attribute bindings.
+* Decision: 7B supports only dynamic attribute expressions of the form `this.<stateField>`.
+* Reason: Those expressions map directly to the existing primitive state store, static initial rendering path, and binding callback runtime.
+* Tradeoff: Other expression forms and spread attributes remain diagnostics instead of introducing partial JavaScript expression evaluation.
+* Follow-up: 7C should add source spans before broadening diagnostics/tooling around attribute binding edges.
 
 Known limitations
 
 * Item: Only `this.<field>++`, `this.<field>--`, `this.<field> += <literal>`, `this.<field> -= <literal>`, `this.<field> = <literal>`, and `this.<field> = !this.<field>` are recognized as action steps.
 * Item: The browser runtime supports only delegated click events, ordered closed action steps, numeric/string/boolean/null initial state, and binding callback text updates.
-* Item: Static JSX attributes are preserved, but `className`/`htmlFor` normalization policy is still intentionally undecided.
-* Item: Dynamic expression attributes and spread attributes are not emitted yet.
+* Item: Static and `this.<stateField>` dynamic JSX attributes are preserved, but `className`/`htmlFor` normalization policy is still intentionally undecided.
+* Item: Dynamic attributes are limited to primitive state-field bindings; arbitrary expressions, method calls, spread attributes, arrays, and objects are not emitted yet.
 * Item: The serializable value model is still primitive-only until later array/object slices.
 * Item: Runtime schema compatibility is exact-match only; no backward/forward manifest migration exists yet.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
@@ -56,7 +56,7 @@ Known limitations
 
 Exact next step
 
-Start Slice 7B by turning supported `RenderAttributeValue::Expression(Some("this.<field>"))` attributes into attribute binding records and runtime update plans.
+Start Slice 7C by threading parser/source span information into template nodes and binding/event metadata without changing runtime behavior.
 
 Useful commands
 
@@ -76,6 +76,7 @@ Useful commands
 * `cargo run -p ezc_cli -- build fixtures/0012-boolean-toggle/input/ToggleFlag.tsx --out target/ezc-manual/toggle-flag`
 * `cargo run -p ezc_cli -- build fixtures/0013-multi-step-action/input/BatchActionCounter.tsx --out target/ezc-manual/batch-action-counter`
 * `cargo run -p ezc_cli -- build fixtures/0014-static-attributes/input/StaticAttributePanel.tsx --out target/ezc-manual/static-attributes`
+* `cargo run -p ezc_cli -- build fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx --out target/ezc-manual/dynamic-attributes`
 * `cargo run -p ezc_cli -- build fixtures/0004-nested-jsx/input/NestedCounter.tsx --out target/ezc-manual/runtime-contract`
 
 Changed but uncommitted files

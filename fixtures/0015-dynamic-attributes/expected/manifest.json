@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "components": [
+    {
+      "name": "DynamicAttributeButton",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "button"
+          },
+          {
+            "kind": "binding",
+            "id": "n1",
+            "expression": "this.disabled",
+            "initial_value": false,
+            "target": "attribute",
+            "element": "n0",
+            "attribute": "disabled"
+          },
+          {
+            "kind": "binding",
+            "id": "n2",
+            "expression": "this.label",
+            "initial_value": "Ready",
+            "target": "attribute",
+            "element": "n0",
+            "attribute": "title"
+          },
+          {
+            "kind": "binding",
+            "id": "n3",
+            "expression": "this.label",
+            "initial_value": "Ready"
+          }
+        ],
+        "events": [
+          {
+            "node": "n0",
+            "event": "click",
+            "handler": "this.lock"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "method": "lock",
+          "operation": "toggle",
+          "field": "disabled"
+        },
+        {
+          "method": "lock",
+          "operation": "assign",
+          "field": "label",
+          "operand": "Locked"
+        }
+      ]
+    }
+  ]
+}

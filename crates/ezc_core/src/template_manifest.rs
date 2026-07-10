@@ -37,7 +37,19 @@ pub enum ManifestNode {
         id: String,
         expression: String,
         initial_value: Option<SerializableValue>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        target: Option<ManifestBindingTarget>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        element: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        attribute: Option<String>,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub enum ManifestBindingTarget {
+    #[serde(rename = "attribute")]
+    Attribute,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -171,12 +183,29 @@ fn collect_element(
     });
 
     for attribute in &element.attributes {
-        if let AttributeValue::EventHandler { event, handler } = &attribute.value {
-            events.push(ManifestEvent {
-                node: element.id.0.clone(),
-                event: event.clone(),
-                handler: handler.clone(),
-            });
+        match &attribute.value {
+            AttributeValue::EventHandler { event, handler } => {
+                events.push(ManifestEvent {
+                    node: element.id.0.clone(),
+                    event: event.clone(),
+                    handler: handler.clone(),
+                });
+            }
+            AttributeValue::Binding {
+                id,
+                expression,
+                initial_value,
+            } => {
+                nodes.push(ManifestNode::Binding {
+                    id: id.0.clone(),
+                    expression: expression.clone(),
+                    initial_value: initial_value.clone(),
+                    target: Some(ManifestBindingTarget::Attribute),
+                    element: Some(element.id.0.clone()),
+                    attribute: Some(attribute.name.clone()),
+                });
+            }
+            _ => {}
         }
     }
 
@@ -192,6 +221,9 @@ fn collect_element(
                     id: id.0.clone(),
                     expression: expression.clone(),
                     initial_value: initial_value.clone(),
+                    target: None,
+                    element: None,
+                    attribute: None,
                 });
             }
             TemplateChild::Element(element) => collect_element(element, nodes, events),

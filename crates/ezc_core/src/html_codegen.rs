@@ -1,3 +1,4 @@
+use crate::component_graph::SerializableValue;
 use crate::template_graph::{
     AttributeValue, ElementNode, TemplateAttribute, TemplateChild, TemplateGraph,
 };
@@ -27,13 +28,9 @@ fn generate_element_html(element: &ElementNode) -> String {
     html.push('"');
 
     for attribute in &element.attributes {
-        html.push(' ');
-        html.push_str(&attribute.name);
-
-        if !matches!(attribute.value, AttributeValue::Boolean) {
-            html.push_str("=\"");
-            html.push_str(&escape_attr(&attribute_value_string(attribute)));
-            html.push('"');
+        if let Some(attribute_html) = generate_attribute_html(attribute) {
+            html.push(' ');
+            html.push_str(&attribute_html);
         }
     }
 
@@ -70,13 +67,67 @@ fn generate_element_html(element: &ElementNode) -> String {
     html
 }
 
+fn generate_attribute_html(attribute: &TemplateAttribute) -> Option<String> {
+    match &attribute.value {
+        AttributeValue::Boolean => Some(attribute.name.clone()),
+        AttributeValue::Binding { initial_value, .. }
+            if is_boolean_attribute(&attribute.name)
+                && initial_value
+                    .as_ref()
+                    .is_none_or(|value| value.render_text() != "true") =>
+        {
+            None
+        }
+        _ => {
+            let mut html = String::new();
+            html.push_str(&attribute.name);
+            html.push_str("=\"");
+            html.push_str(&escape_attr(&attribute_value_string(attribute)));
+            html.push('"');
+            Some(html)
+        }
+    }
+}
+
 fn attribute_value_string(attribute: &TemplateAttribute) -> String {
     match &attribute.value {
         AttributeValue::Boolean => String::new(),
         AttributeValue::Static(value) => value.clone(),
+        AttributeValue::Binding { initial_value, .. } => initial_value
+            .as_ref()
+            .map(SerializableValue::render_text)
+            .unwrap_or_default(),
         AttributeValue::EventHandler { handler, .. } => handler.clone(),
         AttributeValue::BindingList(bindings) => bindings.join(","),
     }
+}
+
+fn is_boolean_attribute(name: &str) -> bool {
+    matches!(
+        name,
+        "allowfullscreen"
+            | "async"
+            | "autofocus"
+            | "autoplay"
+            | "checked"
+            | "controls"
+            | "default"
+            | "defer"
+            | "disabled"
+            | "formnovalidate"
+            | "hidden"
+            | "inert"
+            | "loop"
+            | "multiple"
+            | "muted"
+            | "nomodule"
+            | "novalidate"
+            | "open"
+            | "readonly"
+            | "required"
+            | "reversed"
+            | "selected"
+    )
 }
 
 fn escape_attr(value: &str) -> String {

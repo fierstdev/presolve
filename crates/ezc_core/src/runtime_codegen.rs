@@ -133,6 +133,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
         if (
           node.kind === "binding" &&
+          node.target !== "attribute" &&
           !bindingAnchors.has(node.id)
         ) {
           missing.push({
@@ -170,6 +171,74 @@ const RUNTIME_STUB: &str = r#"(() => {
 
   function formatBindingValue(value) {
     return value === null ? "" : String(value);
+  }
+
+  function isBooleanAttribute(attribute) {
+    return new Set([
+      "allowfullscreen",
+      "async",
+      "autofocus",
+      "autoplay",
+      "checked",
+      "controls",
+      "default",
+      "defer",
+      "disabled",
+      "formnovalidate",
+      "hidden",
+      "inert",
+      "loop",
+      "multiple",
+      "muted",
+      "nomodule",
+      "novalidate",
+      "open",
+      "readonly",
+      "required",
+      "reversed",
+      "selected"
+    ]).has(String(attribute).toLowerCase());
+  }
+
+  function isPropertyAttribute(attribute) {
+    return new Set([
+      "checked",
+      "disabled",
+      "selected",
+      "value"
+    ]).has(String(attribute).toLowerCase());
+  }
+
+  function updateAttributeBinding(element, attribute, value) {
+    const normalizedAttribute = String(attribute);
+
+    if (isBooleanAttribute(normalizedAttribute)) {
+      const enabled = Boolean(value);
+      element.toggleAttribute(normalizedAttribute, enabled);
+
+      if (isPropertyAttribute(normalizedAttribute) && normalizedAttribute in element) {
+        element[normalizedAttribute] = enabled;
+      }
+
+      return;
+    }
+
+    if (value === null || value === undefined) {
+      element.removeAttribute(normalizedAttribute);
+
+      if (isPropertyAttribute(normalizedAttribute) && normalizedAttribute in element) {
+        element[normalizedAttribute] = "";
+      }
+
+      return;
+    }
+
+    const text = formatBindingValue(value);
+    element.setAttribute(normalizedAttribute, text);
+
+    if (isPropertyAttribute(normalizedAttribute) && normalizedAttribute in element) {
+      element[normalizedAttribute] = text;
+    }
   }
 
   function createRuntimeStore(elementsByNode, diagnostics) {
@@ -318,6 +387,20 @@ const RUNTIME_STUB: &str = r#"(() => {
 
       if (component.state[field] === undefined) {
         component.state[field] = node.initial_value;
+      }
+
+      if (node.target === "attribute") {
+        const element = store.elementsByNode.get(node.element);
+
+        if (element === undefined) {
+          continue;
+        }
+
+        updateAttributeBinding(element, node.attribute, component.state[field]);
+        registerBinding(store, component, field, (value) => {
+          updateAttributeBinding(element, node.attribute, value);
+        });
+        continue;
       }
 
       const anchor = bindingAnchors.get(node.id);
@@ -641,6 +724,9 @@ mod tests {
         assert!(runtime.contains("writeField"));
         assert!(runtime.contains("notifyField"));
         assert!(runtime.contains("actionDelta"));
+        assert!(runtime.contains("isBooleanAttribute"));
+        assert!(runtime.contains("isPropertyAttribute"));
+        assert!(runtime.contains("updateAttributeBinding"));
         assert!(runtime.contains("const actions = actionsByMethod.get(action.method) ?? []"));
         assert!(runtime.contains("actions.push(action)"));
         assert!(runtime.contains("executeActions"));

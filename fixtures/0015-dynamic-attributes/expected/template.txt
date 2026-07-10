@@ -1,0 +1,13 @@
+File: fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx
+TemplateGraph:
+  templates:
+    template DynamicAttributeButton
+      root: <button> id=n0
+      attributes:
+        disabled = binding(id=n1 expression="this.disabled" initial=Some(false))
+        title = binding(id=n2 expression="this.label" initial=Some("Ready"))
+        data-ez-on-click = event-handler(click -> this.lock)
+        data-ez-bindings = bindings(this.label)
+      children:
+        Text("Status:")
+        Binding id=n3 expression="this.label" initial=Some("Ready")

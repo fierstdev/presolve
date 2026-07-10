@@ -416,6 +416,64 @@ fn multi_step_action_runs_all_steps_in_a_real_browser() {
 }
 
 #[test]
+fn dynamic_attributes_update_in_a_real_browser() {
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/dynamic-attributes");
+
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean previous browser test output");
+    }
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("browser test output path was not valid UTF-8"),
+        ])
+        .output()
+        .expect("failed to run ezc_cli build");
+
+    assert!(
+        output.status.success(),
+        "expected build to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    write_dynamic_attributes_probe_page(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile dir");
+    let user_data_dir = format!(
+        "--user-data-dir={}",
+        profile_dir
+            .to_str()
+            .expect("Chrome profile path was not valid UTF-8")
+    );
+    let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
+
+    let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    server.stop();
+
+    assert!(
+        stdout.contains("EDGEZERO_DYNAMIC_ATTRIBUTES_BROWSER_TEST_PASS"),
+        "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn runtime_contract_diagnostics_report_manifest_boot_failures_in_a_real_browser() {
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/runtime-contract");
@@ -1191,6 +1249,99 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
   document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_MULTI_STEP_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  console.error(error);
+});
+</script>
+</body>"#,
+    );
+
+    fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
+}
+
+fn write_dynamic_attributes_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
+    let probe = index.replace(
+        "</body>",
+        r#"<script>
+const fail = (message) => {
+  throw new Error(message);
+};
+
+const edgezeroConsoleErrors = [];
+const originalConsoleError = console.error.bind(console);
+console.error = (...args) => {
+  const message = args.map((arg) => {
+    if (arg instanceof Error) return arg.message;
+    if (typeof arg === "string") return arg;
+    return JSON.stringify(arg);
+  }).join(" ");
+
+  edgezeroConsoleErrors.push(message);
+  originalConsoleError(...args);
+};
+
+const waitFor = (predicate, label) => new Promise((resolve, reject) => {
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    if (predicate()) {
+      resolve();
+      return;
+    }
+
+    if (Date.now() > deadline) {
+      reject(new Error(`Timed out waiting for ${label}`));
+      return;
+    }
+
+    setTimeout(tick, 20);
+  };
+
+  tick();
+});
+
+(async () => {
+  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+
+  const button = document.querySelector("button");
+  if (button === null) fail("dynamic attribute button was not found");
+  if (button.hasAttribute("disabled")) fail("disabled attribute should be omitted initially");
+  if (button.disabled !== false) fail("disabled property should be false initially");
+  if (button.getAttribute("title") !== "Ready") fail("title attribute was not initialized");
+  if (!document.body.textContent.includes("Status:Ready")) fail("initial status text was not Ready");
+
+  const nodes = window.__EDGEZERO__.manifest.components[0].template.nodes;
+  const disabledBinding = nodes.find((node) => node.attribute === "disabled");
+  const titleBinding = nodes.find((node) => node.attribute === "title");
+  if (disabledBinding?.target !== "attribute" || disabledBinding?.element !== "n0") {
+    fail("disabled binding target metadata was not emitted");
+  }
+  if (titleBinding?.target !== "attribute" || titleBinding?.element !== "n0") {
+    fail("title binding target metadata was not emitted");
+  }
+
+  button.click();
+  await waitFor(
+    () => button.disabled === true &&
+      button.hasAttribute("disabled") &&
+      button.getAttribute("title") === "Locked" &&
+      document.body.textContent.includes("Status:Locked"),
+    "dynamic attributes locked"
+  );
+
+  const state = window.__EDGEZERO__.components[0].state;
+  if (state.disabled !== true || state.label !== "Locked") {
+    fail(`debug state did not reflect dynamic attribute update: ${JSON.stringify(state)}`);
+  }
+
+  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
+    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  }
+
+  document.body.dataset.browserTest = "pass";
+  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_DYNAMIC_ATTRIBUTES_BROWSER_TEST_PASS</div>");
+})().catch((error) => {
+  document.body.dataset.browserTest = "fail";
+  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_DYNAMIC_ATTRIBUTES_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>

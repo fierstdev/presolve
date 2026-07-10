@@ -32,9 +32,9 @@ pub use template_graph::{
     TemplateGraph, TemplateNode, TemplateNodeId,
 };
 pub use template_manifest::{
-    build_template_manifest, template_manifest_json, ManifestAction, ManifestComponent,
-    ManifestEvent, ManifestNode, ManifestOperation, ManifestTemplate, TemplateManifest,
-    TEMPLATE_MANIFEST_SCHEMA_VERSION,
+    build_template_manifest, template_manifest_json, ManifestAction, ManifestBindingTarget,
+    ManifestComponent, ManifestEvent, ManifestNode, ManifestOperation, ManifestTemplate,
+    TemplateManifest, TEMPLATE_MANIFEST_SCHEMA_VERSION,
 };
 
 #[cfg(test)]
@@ -517,6 +517,9 @@ class Counter extends Component {
                     id: "n1".to_string(),
                     expression: "this.name".to_string(),
                     initial_value: Some(SerializableValue::String("Austin & <Zero>".to_string())),
+                    target: None,
+                    element: None,
+                    attribute: None,
                 }
             ]
         );
@@ -602,7 +605,7 @@ class BadAttrs extends Component {
   disabled = state(false);
 
   render() {
-    return <button type="button" type="submit" title={this.disabled} {...props}>Go</button>;
+    return <button type="button" type="submit" title={label} {...props}>Go</button>;
   }
 }
 "#;
@@ -618,6 +621,53 @@ class BadAttrs extends Component {
         assert!(codes.contains(&"EZC1007"));
         assert!(codes.contains(&"EZC1008"));
         assert!(codes.contains(&"EZC1009"));
+    }
+
+    #[test]
+    fn builds_dynamic_attribute_bindings_in_template_outputs() {
+        let source = include_str!(
+            "../../../fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx"
+        );
+
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx",
+            source,
+        );
+
+        let component_graph = build_component_graph(&parsed);
+        assert!(component_graph.diagnostics.is_empty());
+
+        let template_graph = build_template_graph(&component_graph);
+        let root = template_graph.templates[0]
+            .root
+            .as_ref()
+            .expect("expected root");
+
+        assert_eq!(root.attributes[0].name, "disabled");
+        assert_eq!(
+            root.attributes[0].value,
+            AttributeValue::Binding {
+                id: TemplateNodeId("n1".to_string()),
+                expression: "this.disabled".to_string(),
+                initial_value: Some(SerializableValue::Boolean(false)),
+            }
+        );
+        assert_eq!(root.attributes[1].name, "title");
+        assert_eq!(
+            root.attributes[1].value,
+            AttributeValue::Binding {
+                id: TemplateNodeId("n2".to_string()),
+                expression: "this.label".to_string(),
+                initial_value: Some(SerializableValue::String("Ready".to_string())),
+            }
+        );
+
+        let html = generate_static_html(&template_graph);
+
+        assert_eq!(
+            html,
+            "<button data-ez-node=\"n0\" title=\"Ready\" data-ez-on-click=\"this.lock\" data-ez-bindings=\"this.label\">Status:<!-- ez-binding:n3:this.label -->Ready</button>\n"
+        );
     }
 
     #[test]
@@ -667,6 +717,9 @@ class BadAttrs extends Component {
                     id: "n2".to_string(),
                     expression: "this.enabled".to_string(),
                     initial_value: Some(SerializableValue::Boolean(true)),
+                    target: None,
+                    element: None,
+                    attribute: None,
                 },
                 ManifestNode::Element {
                     id: "n3".to_string(),
@@ -676,6 +729,9 @@ class BadAttrs extends Component {
                     id: "n4".to_string(),
                     expression: "this.disabled".to_string(),
                     initial_value: Some(SerializableValue::Boolean(false)),
+                    target: None,
+                    element: None,
+                    attribute: None,
                 }
             ]
         );
@@ -733,6 +789,9 @@ class BadAttrs extends Component {
                     id: "n1".to_string(),
                     expression: "this.selection".to_string(),
                     initial_value: Some(SerializableValue::Null),
+                    target: None,
+                    element: None,
+                    attribute: None,
                 }
             ]
         );
@@ -828,6 +887,9 @@ class BadAttrs extends Component {
                     id: "n2".to_string(),
                     expression: "this.count".to_string(),
                     initial_value: Some(SerializableValue::Number("0".to_string())),
+                    target: None,
+                    element: None,
+                    attribute: None,
                 }
             ]
         );
@@ -1091,6 +1153,52 @@ class BadAttrs extends Component {
         assert!(actions[1].get("operand").is_none());
         assert!(actions[3].get("operand").is_none());
         assert!(actions[4].get("operand").is_none());
+    }
+
+    #[test]
+    fn builds_template_manifest_for_dynamic_attribute_bindings() {
+        let source = include_str!(
+            "../../../fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx"
+        );
+
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx",
+            source,
+        );
+
+        let component_graph = build_component_graph(&parsed);
+        let template_graph = build_template_graph(&component_graph);
+        let manifest = build_template_manifest(&component_graph, &template_graph);
+        let manifest_json = template_manifest_json(&manifest);
+        let manifest_value: serde_json::Value =
+            serde_json::from_str(&manifest_json).expect("manifest JSON should parse");
+
+        assert_eq!(
+            manifest.components[0].template.nodes[1],
+            ManifestNode::Binding {
+                id: "n1".to_string(),
+                expression: "this.disabled".to_string(),
+                initial_value: Some(SerializableValue::Boolean(false)),
+                target: Some(ManifestBindingTarget::Attribute),
+                element: Some("n0".to_string()),
+                attribute: Some("disabled".to_string()),
+            }
+        );
+        assert_eq!(
+            manifest_value["components"][0]["template"]["nodes"][1]["target"],
+            serde_json::json!("attribute")
+        );
+        assert_eq!(
+            manifest_value["components"][0]["template"]["nodes"][1]["element"],
+            serde_json::json!("n0")
+        );
+        assert_eq!(
+            manifest_value["components"][0]["template"]["nodes"][1]["attribute"],
+            serde_json::json!("disabled")
+        );
+        assert!(manifest_value["components"][0]["template"]["nodes"][3]
+            .get("target")
+            .is_none());
     }
 
     #[test]

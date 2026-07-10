@@ -45,7 +45,15 @@ pub struct TemplateAttribute {
 pub enum AttributeValue {
     Boolean,
     Static(String),
-    EventHandler { event: String, handler: String },
+    Binding {
+        id: TemplateNodeId,
+        expression: String,
+        initial_value: Option<SerializableValue>,
+    },
+    EventHandler {
+        event: String,
+        handler: String,
+    },
     BindingList(Vec<String>),
 }
 
@@ -92,8 +100,13 @@ fn element_from_render(
 
     let direct_bindings = collect_direct_bindings_from_children(&render.children);
 
-    let attributes =
-        template_attributes(&render.attributes, &render.event_handlers, &direct_bindings);
+    let attributes = template_attributes(
+        &render.attributes,
+        &render.event_handlers,
+        &direct_bindings,
+        state_fields,
+        ids,
+    );
 
     let children = render
         .children
@@ -123,6 +136,8 @@ fn element_from_render_element(
             &element.attributes,
             &element.event_handlers,
             &collect_direct_bindings_from_children(&element.children),
+            state_fields,
+            ids,
         ),
         children: element
             .children
@@ -136,6 +151,8 @@ fn template_attributes(
     static_attributes: &[RenderAttribute],
     event_handlers: &[RenderEventHandler],
     bindings: &[String],
+    state_fields: &[StateField],
+    ids: &mut TemplateIdAllocator,
 ) -> Vec<TemplateAttribute> {
     let mut attributes = Vec::new();
 
@@ -151,6 +168,19 @@ fn template_attributes(
                 attributes.push(TemplateAttribute {
                     name: attribute.name.clone(),
                     value: AttributeValue::Static(value.clone()),
+                });
+            }
+            RenderAttributeValue::Expression(Some(expression))
+                if !is_event_attribute(&attribute.name)
+                    && expression.strip_prefix("this.").is_some() =>
+            {
+                attributes.push(TemplateAttribute {
+                    name: attribute.name.clone(),
+                    value: AttributeValue::Binding {
+                        id: ids.alloc(),
+                        expression: expression.clone(),
+                        initial_value: binding_initial_value(expression, state_fields),
+                    },
                 });
             }
             _ => {}

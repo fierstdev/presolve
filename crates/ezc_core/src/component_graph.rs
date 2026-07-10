@@ -238,7 +238,7 @@ fn build_component_node(
         collect_render_binding_diagnostics(class, render, diagnostics);
         collect_render_event_diagnostics(class, render, diagnostics);
         collect_duplicate_event_diagnostics(render, &class.name, diagnostics);
-        collect_render_attribute_diagnostics(render, &class.name, diagnostics);
+        collect_render_attribute_diagnostics(render, &state_fields, &class.name, diagnostics);
     }
 
     ComponentNode {
@@ -434,32 +434,45 @@ fn collect_duplicate_event_diagnostics(
 
 fn collect_render_attribute_diagnostics(
     render: &RenderModel,
+    state_fields: &[StateField],
     class_name: &str,
     diagnostics: &mut Vec<ComponentDiagnostic>,
 ) {
-    collect_attribute_diagnostics_for_attributes(&render.attributes, class_name, diagnostics);
+    collect_attribute_diagnostics_for_attributes(
+        &render.attributes,
+        state_fields,
+        class_name,
+        diagnostics,
+    );
 
     for child in &render.children {
-        collect_child_attribute_diagnostics(child, class_name, diagnostics);
+        collect_child_attribute_diagnostics(child, state_fields, class_name, diagnostics);
     }
 }
 
 fn collect_child_attribute_diagnostics(
     child: &RenderChild,
+    state_fields: &[StateField],
     class_name: &str,
     diagnostics: &mut Vec<ComponentDiagnostic>,
 ) {
     if let RenderChild::Element(element) = child {
-        collect_attribute_diagnostics_for_attributes(&element.attributes, class_name, diagnostics);
+        collect_attribute_diagnostics_for_attributes(
+            &element.attributes,
+            state_fields,
+            class_name,
+            diagnostics,
+        );
 
         for child in &element.children {
-            collect_child_attribute_diagnostics(child, class_name, diagnostics);
+            collect_child_attribute_diagnostics(child, state_fields, class_name, diagnostics);
         }
     }
 }
 
 fn collect_attribute_diagnostics_for_attributes(
     attributes: &[RenderAttribute],
+    state_fields: &[StateField],
     class_name: &str,
     diagnostics: &mut Vec<ComponentDiagnostic>,
 ) {
@@ -481,14 +494,27 @@ fn collect_attribute_diagnostics_for_attributes(
         }
 
         match &attribute.value {
-            RenderAttributeValue::Expression(_) if !is_event_attribute(&attribute.name) => {
-                diagnostics.push(ComponentDiagnostic {
-                    code: "EZC1008".to_string(),
-                    message: format!(
-                        "attribute `{}` uses an expression value, which is not supported yet in class `{}`",
-                        attribute.name, class_name
-                    ),
-                });
+            RenderAttributeValue::Expression(expression)
+                if !is_event_attribute(&attribute.name) =>
+            {
+                match expression.as_deref().and_then(this_member_name) {
+                    Some(field_name)
+                        if state_fields.iter().any(|field| field.name == field_name) => {}
+                    Some(field_name) => diagnostics.push(ComponentDiagnostic {
+                        code: "EZC1003".to_string(),
+                        message: format!(
+                            "attribute binding `{}` references unknown state field `{field_name}` in class `{}`",
+                            attribute.name, class_name
+                        ),
+                    }),
+                    None => diagnostics.push(ComponentDiagnostic {
+                        code: "EZC1008".to_string(),
+                        message: format!(
+                            "attribute `{}` uses an unsupported expression value in class `{}`",
+                            attribute.name, class_name
+                        ),
+                    }),
+                }
             }
             RenderAttributeValue::Spread(_) => {
                 diagnostics.push(ComponentDiagnostic {
