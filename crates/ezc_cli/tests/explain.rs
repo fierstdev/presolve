@@ -485,6 +485,9 @@ fn build_command_writes_page_manifest_and_runtime_artifacts() {
     assert!(actual_runtime.contains("ez-template-manifest"));
     assert!(actual_runtime.contains("data-ez-node"));
     assert!(actual_runtime.contains("ez-binding:"));
+    assert!(actual_runtime.contains("normalizeHandlerReference"));
+    assert!(actual_runtime.contains("addEventListener(\"click\""));
+    assert!(actual_runtime.contains("action.operation !== \"increment\""));
     assert!(actual_runtime.contains("dataset.ezRuntime"));
     assert!(actual_runtime.contains("edgezero:ready"));
     assert!(actual_runtime.contains("window.__EDGEZERO__"));

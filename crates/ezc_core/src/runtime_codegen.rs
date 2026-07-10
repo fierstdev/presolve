@@ -15,8 +15,17 @@ const RUNTIME_STUB: &str = r#"(() => {
     return JSON.parse(element.textContent ?? "");
   }
 
-  function collectBindingAnchorIds() {
-    const ids = new Set();
+  function normalizeHandlerReference(reference) {
+    return String(reference ?? "").replace(/^this\./, "");
+  }
+
+  function fieldNameFromThisMember(expression) {
+    const match = /^this\.([A-Za-z_$][\w$]*)$/.exec(String(expression ?? ""));
+    return match === null ? null : match[1];
+  }
+
+  function collectBindingAnchors() {
+    const anchors = new Map();
     const walker = document.createTreeWalker(
       document.body,
       NodeFilter.SHOW_COMMENT
@@ -24,26 +33,37 @@ const RUNTIME_STUB: &str = r#"(() => {
 
     while (walker.nextNode()) {
       const value = (walker.currentNode.nodeValue ?? "").trim();
-      const match = /^ez-binding:([^:]+):/.exec(value);
+      const match = /^ez-binding:([^:]+):(.*)$/.exec(value);
 
       if (match !== null) {
-        ids.add(match[1]);
+        anchors.set(match[1], {
+          id: match[1],
+          expression: match[2],
+          marker: walker.currentNode
+        });
       }
     }
 
-    return ids;
+    return anchors;
   }
 
-  function collectMissingAnchors(manifest) {
+  function collectElementAnchors() {
+    const elementsByNode = new Map();
+
+    for (const element of document.querySelectorAll("[data-ez-node]")) {
+      elementsByNode.set(element.dataset.ezNode, element);
+    }
+
+    return elementsByNode;
+  }
+
+  function collectMissingAnchors(manifest, bindingAnchors, elementsByNode) {
     const missing = [];
-    const bindingAnchorIds = collectBindingAnchorIds();
 
     for (const component of manifest.components ?? []) {
       for (const node of component.template?.nodes ?? []) {
         if (node.kind === "element") {
-          const selector = `[data-ez-node="${node.id}"]`;
-
-          if (document.querySelector(selector) === null) {
+          if (!elementsByNode.has(node.id)) {
             missing.push({
               id: node.id,
               kind: node.kind
@@ -53,7 +73,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
         if (
           node.kind === "binding" &&
-          !bindingAnchorIds.has(node.id)
+          !bindingAnchors.has(node.id)
         ) {
           missing.push({
             id: node.id,
@@ -66,16 +86,184 @@ const RUNTIME_STUB: &str = r#"(() => {
     return missing;
   }
 
+  function buildActionsByMethod(component) {
+    const actionsByMethod = new Map();
+
+    for (const action of component.actions ?? []) {
+      actionsByMethod.set(action.method, action);
+    }
+
+    return actionsByMethod;
+  }
+
+  function initializeComponentRuntime(component, bindingAnchors, elementsByNode) {
+    const state = {};
+    const bindingsByField = new Map();
+    const actionsByMethod = buildActionsByMethod(component);
+
+    for (const node of component.template?.nodes ?? []) {
+      if (node.kind !== "binding") {
+        continue;
+      }
+
+      const field = fieldNameFromThisMember(node.expression);
+
+      if (field === null) {
+        continue;
+      }
+
+      if (node.initial_value !== null && state[field] === undefined) {
+        state[field] = Number(node.initial_value);
+      }
+
+      const anchor = bindingAnchors.get(node.id);
+
+      if (anchor === undefined) {
+        console.error(
+          "[EdgeZero] Missing binding anchor",
+          node
+        );
+        continue;
+      }
+
+      const textNode = anchor.marker.nextSibling;
+
+      if (!(textNode instanceof Text)) {
+        console.error(
+          "[EdgeZero] Missing binding text node",
+          node
+        );
+        continue;
+      }
+
+      const bindings = bindingsByField.get(field) ?? [];
+      bindings.push({
+        node,
+        textNode
+      });
+      bindingsByField.set(field, bindings);
+    }
+
+    return {
+      component,
+      state,
+      actionsByMethod,
+      bindingsByField,
+      elementsByNode
+    };
+  }
+
+  function updateFieldBindings(runtimeComponent, field) {
+    const bindings = runtimeComponent.bindingsByField.get(field);
+
+    if (bindings === undefined) {
+      console.error(
+        "[EdgeZero] Missing binding for field",
+        field
+      );
+      return;
+    }
+
+    for (const binding of bindings) {
+      binding.textNode.textContent = String(runtimeComponent.state[field]);
+    }
+  }
+
+  function executeAction(runtimeComponent, action) {
+    if (action.operation !== "increment") {
+      console.error(
+        "[EdgeZero] Unsupported action operation",
+        action
+      );
+      return;
+    }
+
+    if (!(action.field in runtimeComponent.state)) {
+      console.error(
+        "[EdgeZero] Missing state field",
+        action
+      );
+      return;
+    }
+
+    const current = Number(runtimeComponent.state[action.field]);
+
+    if (Number.isNaN(current)) {
+      console.error(
+        "[EdgeZero] State field is not numeric",
+        action
+      );
+      return;
+    }
+
+    runtimeComponent.state[action.field] = current + 1;
+    updateFieldBindings(runtimeComponent, action.field);
+  }
+
+  function attachEventListeners(runtimeComponent) {
+    for (const event of runtimeComponent.component.template?.events ?? []) {
+      const element = runtimeComponent.elementsByNode.get(event.node);
+
+      if (element === undefined) {
+        console.error(
+          "[EdgeZero] Missing event anchor",
+          event
+        );
+        continue;
+      }
+
+      const method = normalizeHandlerReference(event.handler);
+      const action = runtimeComponent.actionsByMethod.get(method);
+
+      if (action === undefined) {
+        console.error(
+          "[EdgeZero] Missing action for handler",
+          event
+        );
+        continue;
+      }
+
+      element.addEventListener("click", () => {
+        executeAction(runtimeComponent, action);
+      });
+    }
+  }
+
+  function initializeRuntime(manifest) {
+    const bindingAnchors = collectBindingAnchors();
+    const elementsByNode = collectElementAnchors();
+    const missingAnchors = collectMissingAnchors(
+      manifest,
+      bindingAnchors,
+      elementsByNode
+    );
+    const components = [];
+
+    for (const component of manifest.components ?? []) {
+      const runtimeComponent = initializeComponentRuntime(
+        component,
+        bindingAnchors,
+        elementsByNode
+      );
+      attachEventListeners(runtimeComponent);
+      components.push({
+        name: component.name,
+        state: runtimeComponent.state
+      });
+    }
+
+    return {
+      manifest,
+      missingAnchors,
+      components
+    };
+  }
+
   function boot() {
     try {
       const manifest = readManifest();
-      const missingAnchors = collectMissingAnchors(manifest);
-      const status = missingAnchors.length === 0 ? "ready" : "error";
-
-      const runtimeState = {
-        manifest,
-        missingAnchors
-      };
+      const runtimeState = initializeRuntime(manifest);
+      const status = runtimeState.missingAnchors.length === 0 ? "ready" : "error";
 
       document.documentElement.dataset.ezRuntime = status;
       window.__EDGEZERO__ = runtimeState;
@@ -86,10 +274,10 @@ const RUNTIME_STUB: &str = r#"(() => {
         })
       );
 
-      if (missingAnchors.length > 0) {
+      if (runtimeState.missingAnchors.length > 0) {
         console.error(
           "[EdgeZero] Missing template anchors",
-          missingAnchors
+          runtimeState.missingAnchors
         );
       }
     } catch (error) {
@@ -127,6 +315,9 @@ mod tests {
         assert!(runtime.contains("ez-template-manifest"));
         assert!(runtime.contains("data-ez-node"));
         assert!(runtime.contains("ez-binding:"));
+        assert!(runtime.contains("normalizeHandlerReference"));
+        assert!(runtime.contains("addEventListener(\"click\""));
+        assert!(runtime.contains("action.operation !== \"increment\""));
         assert!(runtime.contains("dataset.ezRuntime"));
         assert!(runtime.contains("edgezero:ready"));
         assert!(runtime.contains("window.__EDGEZERO__"));
