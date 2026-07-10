@@ -268,6 +268,42 @@ class ResetCounter extends Component {
 }
 
 #[test]
+fn parses_boolean_toggle_state_update() {
+    let source = r#"
+@component("x-toggle-flag")
+class ToggleFlag extends Component {
+  enabled = state(false);
+
+  toggle() {
+    this.enabled = !this.enabled;
+  }
+
+  render() {
+    return <button onClick={() => this.toggle()}>Enabled: {this.enabled}</button>;
+  }
+}
+"#;
+
+    let parsed = parse_file("ToggleFlag.tsx", source);
+
+    assert!(parsed.diagnostics.is_empty());
+
+    let class = parsed.classes.first().expect("expected class");
+    let toggle = class
+        .methods
+        .iter()
+        .find(|method| method.name == "toggle")
+        .expect("expected toggle method");
+
+    assert_eq!(toggle.state_updates.len(), 1);
+    assert_eq!(toggle.state_updates[0].field, "enabled");
+    assert_eq!(
+        toggle.state_updates[0].operation,
+        ParsedStateOperation::Toggle
+    );
+}
+
+#[test]
 fn reports_broken_tsx_diagnostic() {
     let source = include_str!("../../../fixtures/0002-broken-tsx/input/BrokenCounter.tsx");
 

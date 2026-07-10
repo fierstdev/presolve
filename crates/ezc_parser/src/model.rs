@@ -61,6 +61,7 @@ pub enum ParsedStateOperation {
     AddAssign(ParsedSerializableValue),
     SubtractAssign(ParsedSerializableValue),
     Assign(ParsedSerializableValue),
+    Toggle,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

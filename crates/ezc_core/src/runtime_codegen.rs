@@ -303,12 +303,28 @@ const RUNTIME_STUB: &str = r#"(() => {
       action.operation !== "decrement" &&
       action.operation !== "add_assign" &&
       action.operation !== "subtract_assign" &&
-      action.operation !== "assign"
+      action.operation !== "assign" &&
+      action.operation !== "toggle"
     ) {
       console.error(
         "[EdgeZero] EZR_UNSUPPORTED_ACTION",
         action
       );
+      return;
+    }
+
+    if (action.operation === "toggle") {
+      const current = readField(component, action.field);
+
+      if (typeof current !== "boolean") {
+        console.error(
+          "[EdgeZero] EZR_NON_BOOLEAN_FIELD",
+          action
+        );
+        return;
+      }
+
+      writeField(store, component, action.field, !current);
       return;
     }
 
@@ -492,8 +508,10 @@ mod tests {
         assert!(runtime.contains("installDelegatedEventListeners"));
         assert!(runtime.contains("document.addEventListener(eventType"));
         assert!(!runtime.contains("element.addEventListener(\"click\""));
-        assert!(runtime.contains("action.operation !== \"assign\""));
+        assert!(runtime.contains("action.operation !== \"toggle\""));
         assert!(runtime.contains("action.operation === \"assign\""));
+        assert!(runtime.contains("action.operation === \"toggle\""));
+        assert!(runtime.contains("EZR_NON_BOOLEAN_FIELD"));
         assert!(runtime.contains("EZR_NON_NUMERIC_OPERAND"));
         assert!(runtime.contains("current + delta"));
         assert!(runtime.contains("dataset.ezRuntime"));

@@ -533,6 +533,7 @@ fn format_state_operation(operation: &StateOperation) -> &'static str {
         StateOperation::AddAssign(_) => "add-assign",
         StateOperation::SubtractAssign(_) => "subtract-assign",
         StateOperation::Assign(_) => "assign",
+        StateOperation::Toggle => "toggle",
     }
 }
 

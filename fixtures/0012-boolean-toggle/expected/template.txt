@@ -1,0 +1,11 @@
+File: fixtures/0012-boolean-toggle/input/ToggleFlag.tsx
+TemplateGraph:
+  templates:
+    template ToggleFlag
+      root: <button> id=n0
+      attributes:
+        data-ez-on-click = event-handler(click -> this.toggle)
+        data-ez-bindings = bindings(this.enabled)
+      children:
+        Text("Enabled:")
+        Binding id=n1 expression="this.enabled" initial=Some(false)

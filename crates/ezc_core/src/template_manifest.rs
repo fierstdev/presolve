@@ -69,6 +69,9 @@ pub enum ManifestOperation {
 
     #[serde(rename = "assign")]
     Assign,
+
+    #[serde(rename = "toggle")]
+    Toggle,
 }
 
 #[must_use]
@@ -140,12 +143,13 @@ fn manifest_operation(operation: &StateOperation) -> ManifestOperation {
         StateOperation::AddAssign(_) => ManifestOperation::AddAssign,
         StateOperation::SubtractAssign(_) => ManifestOperation::SubtractAssign,
         StateOperation::Assign(_) => ManifestOperation::Assign,
+        StateOperation::Toggle => ManifestOperation::Toggle,
     }
 }
 
 fn manifest_operand(operation: &StateOperation) -> Option<SerializableValue> {
     match operation {
-        StateOperation::Increment | StateOperation::Decrement => None,
+        StateOperation::Increment | StateOperation::Decrement | StateOperation::Toggle => None,
         StateOperation::AddAssign(value)
         | StateOperation::SubtractAssign(value)
         | StateOperation::Assign(value) => Some(value.clone()),

@@ -199,16 +199,21 @@ fn parsed_update_state_update(
 fn parsed_assignment_state_update(
     assignment: &oxc_ast::ast::AssignmentExpression<'_>,
 ) -> Option<ParsedStateUpdate> {
-    let operand = serializable_value_from_expression(&assignment.right)?;
+    let field = this_assignment_target_field_from_assignment_target(&assignment.left)?;
 
     let operation = match assignment.operator.as_str() {
-        "+=" => ParsedStateOperation::AddAssign(operand),
-        "-=" => ParsedStateOperation::SubtractAssign(operand),
-        "=" => ParsedStateOperation::Assign(operand),
+        "+=" => {
+            ParsedStateOperation::AddAssign(serializable_value_from_expression(&assignment.right)?)
+        }
+        "-=" => ParsedStateOperation::SubtractAssign(serializable_value_from_expression(
+            &assignment.right,
+        )?),
+        "=" if toggled_this_field(&assignment.right).as_deref() == Some(field.as_str()) => {
+            ParsedStateOperation::Toggle
+        }
+        "=" => ParsedStateOperation::Assign(serializable_value_from_expression(&assignment.right)?),
         _ => return None,
     };
-
-    let field = this_assignment_target_field_from_assignment_target(&assignment.left)?;
 
     Some(ParsedStateUpdate { field, operation })
 }
@@ -438,6 +443,30 @@ fn serializable_value_from_expression(
         }
         _ => None,
     }
+}
+
+fn toggled_this_field(expression: &Expression<'_>) -> Option<String> {
+    let Expression::UnaryExpression(unary) = expression else {
+        return None;
+    };
+
+    if unary.operator.as_str() != "!" {
+        return None;
+    }
+
+    this_member_expression_field(&unary.argument)
+}
+
+fn this_member_expression_field(expression: &Expression<'_>) -> Option<String> {
+    let Expression::StaticMemberExpression(member) = expression else {
+        return None;
+    };
+
+    let Expression::ThisExpression(_) = &member.object else {
+        return None;
+    };
+
+    Some(member.property.name.to_string())
 }
 
 fn jsx_element_name(name: &JSXElementName<'_>) -> Option<String> {
