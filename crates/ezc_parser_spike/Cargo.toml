@@ -1,0 +1,15 @@
+[package]
+name = "ezc_parser_spike"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+oxc_allocator = "0.87"
+oxc_ast = "0.87"
+oxc_parser = "0.87"
+oxc_span = "0.87"
+oxc_diagnostics = "0.87"
+swc_common = "14"
+swc_ecma_ast = "15"
+swc_ecma_parser = "24"

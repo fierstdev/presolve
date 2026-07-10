@@ -1,0 +1,33 @@
+{
+  "components": [
+    {
+      "name": "NestedCounter",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "section"
+          },
+          {
+            "kind": "element",
+            "id": "n1",
+            "tag": "button"
+          },
+          {
+            "kind": "binding",
+            "id": "n2",
+            "expression": "this.count",
+            "initial_value": "0"
+          }
+        ],
+        "events": [
+          {
+            "node": "n1",
+            "handler": "this.increment"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "components": [
+    {
+      "name": "Counter",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "button"
+          },
+          {
+            "kind": "binding",
+            "id": "n1",
+            "expression": "this.count",
+            "initial_value": "0"
+          }
+        ],
+        "events": [
+          {
+            "node": "n0",
+            "handler": "this.increment"
+          }
+        ]
+      }
+    }
+  ]
+}

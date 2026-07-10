@@ -1,0 +1,12 @@
+[package]
+name = "ezc_parser"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+oxc_allocator = "0.87"
+oxc_ast = "0.87"
+oxc_diagnostics = "0.87"
+oxc_parser = "0.87"
+oxc_span = "0.87"

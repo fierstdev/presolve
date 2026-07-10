@@ -1,0 +1,11 @@
+File: fixtures/0001-source-summary/input/Counter.tsx
+TemplateGraph:
+  templates:
+    template Counter
+      root: <button> id=n0
+      attributes:
+        data-ez-event-handler = event-handler(this.increment)
+        data-ez-bindings = bindings(this.count)
+      children:
+        Text("Count:")
+        Binding id=n1 expression="this.count" initial=Some("0")
