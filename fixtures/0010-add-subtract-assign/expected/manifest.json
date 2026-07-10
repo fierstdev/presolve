@@ -1,0 +1,64 @@
+{
+  "components": [
+    {
+      "name": "StepCounter",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "section"
+          },
+          {
+            "kind": "element",
+            "id": "n1",
+            "tag": "button"
+          },
+          {
+            "kind": "binding",
+            "id": "n2",
+            "expression": "this.count",
+            "initial_value": "4"
+          },
+          {
+            "kind": "element",
+            "id": "n3",
+            "tag": "button"
+          },
+          {
+            "kind": "binding",
+            "id": "n4",
+            "expression": "this.count",
+            "initial_value": "4"
+          }
+        ],
+        "events": [
+          {
+            "node": "n1",
+            "event": "click",
+            "handler": "this.addTwo"
+          },
+          {
+            "node": "n3",
+            "event": "click",
+            "handler": "this.subtractThree"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "method": "addTwo",
+          "operation": "add_assign",
+          "field": "count",
+          "operand": "2"
+        },
+        {
+          "method": "subtractThree",
+          "operation": "subtract_assign",
+          "field": "count",
+          "operand": "3"
+        }
+      ]
+    }
+  ]
+}

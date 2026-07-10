@@ -2,9 +2,9 @@ use std::path::{Path, PathBuf};
 
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
-    Argument, ClassElement, Declaration, Expression, JSXAttributeItem, JSXAttributeName,
-    JSXAttributeValue, JSXChild, JSXElementName, JSXExpression, Program, PropertyKey,
-    SimpleAssignmentTarget, Statement,
+    Argument, AssignmentTarget, ClassElement, Declaration, Expression, JSXAttributeItem,
+    JSXAttributeName, JSXAttributeValue, JSXChild, JSXElementName, JSXExpression, Program,
+    PropertyKey, SimpleAssignmentTarget, Statement,
 };
 use oxc_diagnostics::Severity as OxcSeverity;
 use oxc_parser::Parser;
@@ -175,10 +175,16 @@ fn parsed_state_update(statement: &Statement<'_>) -> Option<ParsedStateUpdate> {
         return None;
     };
 
-    let Expression::UpdateExpression(update) = &statement.expression else {
-        return None;
-    };
+    match &statement.expression {
+        Expression::UpdateExpression(update) => parsed_update_state_update(update),
+        Expression::AssignmentExpression(assignment) => parsed_assignment_state_update(assignment),
+        _ => None,
+    }
+}
 
+fn parsed_update_state_update(
+    update: &oxc_ast::ast::UpdateExpression<'_>,
+) -> Option<ParsedStateUpdate> {
     let operation = match update.operator.as_str() {
         "++" => ParsedStateOperation::Increment,
         "--" => ParsedStateOperation::Decrement,
@@ -190,8 +196,38 @@ fn parsed_state_update(statement: &Statement<'_>) -> Option<ParsedStateUpdate> {
     Some(ParsedStateUpdate { field, operation })
 }
 
+fn parsed_assignment_state_update(
+    assignment: &oxc_ast::ast::AssignmentExpression<'_>,
+) -> Option<ParsedStateUpdate> {
+    let operand = serializable_value_from_expression(&assignment.right)?;
+
+    let operation = match assignment.operator.as_str() {
+        "+=" => ParsedStateOperation::AddAssign(operand),
+        "-=" => ParsedStateOperation::SubtractAssign(operand),
+        _ => return None,
+    };
+
+    let field = this_assignment_target_field_from_assignment_target(&assignment.left)?;
+
+    Some(ParsedStateUpdate { field, operation })
+}
+
 fn this_assignment_target_field(target: &SimpleAssignmentTarget<'_>) -> Option<String> {
     let SimpleAssignmentTarget::StaticMemberExpression(member) = target else {
+        return None;
+    };
+
+    let Expression::ThisExpression(_) = &member.object else {
+        return None;
+    };
+
+    Some(member.property.name.to_string())
+}
+
+fn this_assignment_target_field_from_assignment_target(
+    target: &AssignmentTarget<'_>,
+) -> Option<String> {
+    let AssignmentTarget::StaticMemberExpression(member) = target else {
         return None;
     };
 
@@ -379,6 +415,26 @@ fn state_argument_literal(argument: &Argument<'_>) -> Option<ParsedSerializableV
             Some(ParsedSerializableValue::String(literal.value.to_string()))
         }
         Argument::BooleanLiteral(literal) => Some(ParsedSerializableValue::Boolean(literal.value)),
+        _ => None,
+    }
+}
+
+fn serializable_value_from_expression(
+    expression: &Expression<'_>,
+) -> Option<ParsedSerializableValue> {
+    match expression {
+        Expression::NullLiteral(_) => Some(ParsedSerializableValue::Null),
+        Expression::NumericLiteral(literal) => literal
+            .raw
+            .as_ref()
+            .map(ToString::to_string)
+            .map(ParsedSerializableValue::Number),
+        Expression::StringLiteral(literal) => {
+            Some(ParsedSerializableValue::String(literal.value.to_string()))
+        }
+        Expression::BooleanLiteral(literal) => {
+            Some(ParsedSerializableValue::Boolean(literal.value))
+        }
         _ => None,
     }
 }

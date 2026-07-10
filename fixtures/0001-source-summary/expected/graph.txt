@@ -11,6 +11,8 @@ ComponentGraph:
       methods:
         increment
         render
+      actions:
+        increment: add-assign count
       render:
         root: <button>
         attributes: onClick={...}

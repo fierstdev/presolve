@@ -150,7 +150,14 @@ class Counter extends Component {
             .collect::<Vec<_>>();
 
         assert_eq!(method_names, vec!["increment", "render"]);
-        assert!(component.actions.is_empty());
+        assert_eq!(
+            component.actions,
+            vec![ComponentAction {
+                method: "increment".to_string(),
+                operation: StateOperation::AddAssign(SerializableValue::Number("1".to_string())),
+                field: "count".to_string(),
+            }]
+        );
 
         let render = component.render.as_ref().expect("expected render model");
 
@@ -319,6 +326,40 @@ class Counter extends Component {
                 operation: StateOperation::Decrement,
                 field: "count".to_string(),
             }]
+        );
+    }
+
+    #[test]
+    fn builds_add_and_subtract_assign_actions_from_parsed_method_updates() {
+        let source =
+            include_str!("../../../fixtures/0010-add-subtract-assign/input/StepCounter.tsx");
+
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0010-add-subtract-assign/input/StepCounter.tsx",
+            source,
+        );
+
+        let graph = build_component_graph(&parsed);
+        let component = graph.components.first().expect("expected component");
+
+        assert_eq!(
+            component.actions,
+            vec![
+                ComponentAction {
+                    method: "addTwo".to_string(),
+                    operation: StateOperation::AddAssign(SerializableValue::Number(
+                        "2".to_string()
+                    )),
+                    field: "count".to_string(),
+                },
+                ComponentAction {
+                    method: "subtractThree".to_string(),
+                    operation: StateOperation::SubtractAssign(SerializableValue::Number(
+                        "3".to_string()
+                    )),
+                    field: "count".to_string(),
+                }
+            ]
         );
     }
 
@@ -620,6 +661,7 @@ class Counter extends Component {
                 method: "increment".to_string(),
                 operation: ManifestOperation::Increment,
                 field: "count".to_string(),
+                operand: None,
             }]
         );
     }
@@ -644,6 +686,7 @@ class Counter extends Component {
                 method: "decrement".to_string(),
                 operation: ManifestOperation::Decrement,
                 field: "count".to_string(),
+                operand: None,
             }]
         );
 
@@ -654,6 +697,60 @@ class Counter extends Component {
         assert_eq!(
             manifest_value["components"][0]["actions"][0]["operation"],
             serde_json::json!("decrement")
+        );
+    }
+
+    #[test]
+    fn builds_template_manifest_for_add_and_subtract_assign_actions() {
+        let source =
+            include_str!("../../../fixtures/0010-add-subtract-assign/input/StepCounter.tsx");
+
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0010-add-subtract-assign/input/StepCounter.tsx",
+            source,
+        );
+
+        let component_graph = build_component_graph(&parsed);
+        let template_graph = build_template_graph(&component_graph);
+        let manifest = build_template_manifest(&component_graph, &template_graph);
+
+        assert_eq!(
+            manifest.components[0].actions,
+            vec![
+                ManifestAction {
+                    method: "addTwo".to_string(),
+                    operation: ManifestOperation::AddAssign,
+                    field: "count".to_string(),
+                    operand: Some(SerializableValue::Number("2".to_string())),
+                },
+                ManifestAction {
+                    method: "subtractThree".to_string(),
+                    operation: ManifestOperation::SubtractAssign,
+                    field: "count".to_string(),
+                    operand: Some(SerializableValue::Number("3".to_string())),
+                }
+            ]
+        );
+
+        let manifest_json = template_manifest_json(&manifest);
+        let manifest_value: serde_json::Value =
+            serde_json::from_str(&manifest_json).expect("manifest JSON should parse");
+
+        assert_eq!(
+            manifest_value["components"][0]["actions"][0]["operation"],
+            serde_json::json!("add_assign")
+        );
+        assert_eq!(
+            manifest_value["components"][0]["actions"][0]["operand"],
+            serde_json::json!("2")
+        );
+        assert_eq!(
+            manifest_value["components"][0]["actions"][1]["operation"],
+            serde_json::json!("subtract_assign")
+        );
+        assert_eq!(
+            manifest_value["components"][0]["actions"][1]["operand"],
+            serde_json::json!("3")
         );
     }
 

@@ -64,6 +64,8 @@ pub struct ComponentAction {
 pub enum StateOperation {
     Increment,
     Decrement,
+    AddAssign(SerializableValue),
+    SubtractAssign(SerializableValue),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -291,6 +293,12 @@ fn state_operation_from_parsed(operation: &ParsedStateOperation) -> StateOperati
     match operation {
         ParsedStateOperation::Increment => StateOperation::Increment,
         ParsedStateOperation::Decrement => StateOperation::Decrement,
+        ParsedStateOperation::AddAssign(value) => {
+            StateOperation::AddAssign(serializable_value_from_parsed(value))
+        }
+        ParsedStateOperation::SubtractAssign(value) => {
+            StateOperation::SubtractAssign(serializable_value_from_parsed(value))
+        }
     }
 }
 

@@ -70,7 +70,12 @@ fn parses_counter_fixture() {
         .find(|method| method.name == "increment")
         .expect("expected increment method");
 
-    assert!(increment.state_updates.is_empty());
+    assert_eq!(increment.state_updates.len(), 1);
+    assert_eq!(increment.state_updates[0].field, "count");
+    assert_eq!(
+        increment.state_updates[0].operation,
+        ParsedStateOperation::AddAssign(ParsedSerializableValue::Number("1".to_string()))
+    );
 }
 
 #[test]
@@ -171,6 +176,58 @@ class DecrementCounter extends Component {
     assert_eq!(
         decrement.state_updates[0].operation,
         ParsedStateOperation::Decrement
+    );
+}
+
+#[test]
+fn parses_add_and_subtract_assign_state_updates() {
+    let source = r#"
+@component("x-step-counter")
+class StepCounter extends Component {
+  count = state(4);
+
+  addTwo() {
+    this.count += 2;
+  }
+
+  subtractThree() {
+    this.count -= 3;
+  }
+
+  render() {
+    return <button onClick={() => this.addTwo()}>Count: {this.count}</button>;
+  }
+}
+"#;
+
+    let parsed = parse_file("StepCounter.tsx", source);
+
+    assert!(parsed.diagnostics.is_empty());
+
+    let class = parsed.classes.first().expect("expected class");
+    let add_two = class
+        .methods
+        .iter()
+        .find(|method| method.name == "addTwo")
+        .expect("expected addTwo method");
+    let subtract_three = class
+        .methods
+        .iter()
+        .find(|method| method.name == "subtractThree")
+        .expect("expected subtractThree method");
+
+    assert_eq!(add_two.state_updates.len(), 1);
+    assert_eq!(add_two.state_updates[0].field, "count");
+    assert_eq!(
+        add_two.state_updates[0].operation,
+        ParsedStateOperation::AddAssign(ParsedSerializableValue::Number("2".to_string()))
+    );
+
+    assert_eq!(subtract_three.state_updates.len(), 1);
+    assert_eq!(subtract_three.state_updates[0].field, "count");
+    assert_eq!(
+        subtract_three.state_updates[0].operation,
+        ParsedStateOperation::SubtractAssign(ParsedSerializableValue::Number("3".to_string()))
     );
 }
 

@@ -530,6 +530,8 @@ fn format_state_operation(operation: &StateOperation) -> &'static str {
     match operation {
         StateOperation::Increment => "increment",
         StateOperation::Decrement => "decrement",
+        StateOperation::AddAssign(_) => "add-assign",
+        StateOperation::SubtractAssign(_) => "subtract-assign",
     }
 }
 

@@ -49,6 +49,8 @@ pub struct ManifestAction {
     pub method: String,
     pub operation: ManifestOperation,
     pub field: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operand: Option<SerializableValue>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -58,6 +60,12 @@ pub enum ManifestOperation {
 
     #[serde(rename = "decrement")]
     Decrement,
+
+    #[serde(rename = "add_assign")]
+    AddAssign,
+
+    #[serde(rename = "subtract_assign")]
+    SubtractAssign,
 }
 
 #[must_use]
@@ -117,6 +125,7 @@ fn manifest_actions(component: &ComponentNode) -> Vec<ManifestAction> {
             method: action.method.clone(),
             operation: manifest_operation(&action.operation),
             field: action.field.clone(),
+            operand: manifest_operand(&action.operation),
         })
         .collect()
 }
@@ -125,6 +134,17 @@ fn manifest_operation(operation: &StateOperation) -> ManifestOperation {
     match operation {
         StateOperation::Increment => ManifestOperation::Increment,
         StateOperation::Decrement => ManifestOperation::Decrement,
+        StateOperation::AddAssign(_) => ManifestOperation::AddAssign,
+        StateOperation::SubtractAssign(_) => ManifestOperation::SubtractAssign,
+    }
+}
+
+fn manifest_operand(operation: &StateOperation) -> Option<SerializableValue> {
+    match operation {
+        StateOperation::Increment | StateOperation::Decrement => None,
+        StateOperation::AddAssign(value) | StateOperation::SubtractAssign(value) => {
+            Some(value.clone())
+        }
     }
 }
 

@@ -271,8 +271,39 @@ const RUNTIME_STUB: &str = r#"(() => {
     return component;
   }
 
+  function actionDelta(action) {
+    if (action.operation === "increment") {
+      return 1;
+    }
+
+    if (action.operation === "decrement") {
+      return -1;
+    }
+
+    if (action.operation === "add_assign" || action.operation === "subtract_assign") {
+      const operand = Number(action.operand);
+
+      if (Number.isNaN(operand)) {
+        console.error(
+          "[EdgeZero] EZR_NON_NUMERIC_OPERAND",
+          action
+        );
+        return null;
+      }
+
+      return action.operation === "add_assign" ? operand : -operand;
+    }
+
+    return null;
+  }
+
   function executeAction(store, component, action) {
-    if (action.operation !== "increment" && action.operation !== "decrement") {
+    if (
+      action.operation !== "increment" &&
+      action.operation !== "decrement" &&
+      action.operation !== "add_assign" &&
+      action.operation !== "subtract_assign"
+    ) {
       console.error(
         "[EdgeZero] EZR_UNSUPPORTED_ACTION",
         action
@@ -290,8 +321,13 @@ const RUNTIME_STUB: &str = r#"(() => {
       return;
     }
 
-    const next = action.operation === "increment" ? current + 1 : current - 1;
-    writeField(store, component, action.field, next);
+    const delta = actionDelta(action);
+
+    if (delta === null) {
+      return;
+    }
+
+    writeField(store, component, action.field, current + delta);
   }
 
   function registerComponentEvents(store, component) {
@@ -442,6 +478,7 @@ mod tests {
         assert!(runtime.contains("readField"));
         assert!(runtime.contains("writeField"));
         assert!(runtime.contains("notifyField"));
+        assert!(runtime.contains("actionDelta"));
         assert!(runtime.contains("formatBindingValue"));
         assert!(runtime.contains("value === null ? \"\" : String(value)"));
         assert!(runtime.contains("component.state[field] = node.initial_value"));
@@ -449,8 +486,9 @@ mod tests {
         assert!(runtime.contains("installDelegatedEventListeners"));
         assert!(runtime.contains("document.addEventListener(eventType"));
         assert!(!runtime.contains("element.addEventListener(\"click\""));
-        assert!(runtime.contains("action.operation !== \"decrement\""));
-        assert!(runtime.contains("current - 1"));
+        assert!(runtime.contains("action.operation !== \"subtract_assign\""));
+        assert!(runtime.contains("EZR_NON_NUMERIC_OPERAND"));
+        assert!(runtime.contains("current + delta"));
         assert!(runtime.contains("dataset.ezRuntime"));
         assert!(runtime.contains("edgezero:ready"));
         assert!(runtime.contains("window.__EDGEZERO__"));

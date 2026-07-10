@@ -1,0 +1,22 @@
+File: fixtures/0010-add-subtract-assign/input/StepCounter.tsx
+TemplateGraph:
+  templates:
+    template StepCounter
+      root: <section> id=n0
+      attributes:
+        none
+      children:
+        Element <button> id=n1
+          attributes:
+            data-ez-on-click = event-handler(click -> this.addTwo)
+            data-ez-bindings = bindings(this.count)
+          children:
+            Text("Add:")
+            Binding id=n2 expression="this.count" initial=Some("4")
+        Element <button> id=n3
+          attributes:
+            data-ez-on-click = event-handler(click -> this.subtractThree)
+            data-ez-bindings = bindings(this.count)
+          children:
+            Text("Subtract:")
+            Binding id=n4 expression="this.count" initial=Some("4")

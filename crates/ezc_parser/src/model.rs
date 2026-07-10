@@ -58,6 +58,8 @@ pub struct ParsedStateUpdate {
 pub enum ParsedStateOperation {
     Increment,
     Decrement,
+    AddAssign(ParsedSerializableValue),
+    SubtractAssign(ParsedSerializableValue),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

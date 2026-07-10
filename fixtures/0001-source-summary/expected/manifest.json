@@ -24,7 +24,14 @@
           }
         ]
       },
-      "actions": []
+      "actions": [
+        {
+          "method": "increment",
+          "operation": "add_assign",
+          "field": "count",
+          "operand": "1"
+        }
+      ]
     }
   ]
 }
