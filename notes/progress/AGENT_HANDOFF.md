@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: feat: execute increment actions in browser runtime
+* Latest commit: refactor: add explicit browser state store
 * Working tree: clean after committing this slice
-* Date: 2026-07-09 18:27:01 PDT
+* Date: 2026-07-09 18:42:07 PDT
 
 Last completed slice
 
-* Slice: 6D-B - Wire manifest events to manifest actions
-* Summary: The emitted browser runtime now executes manifest increment actions from click events and updates matching binding text nodes without browser-side source parsing.
+* Slice: 6D-C - Introduce an explicit runtime state store
+* Summary: Runtime mutation now flows through a store with component, binding, action, and element maps plus `readField`, `writeField`, and `notifyField` helpers.
 * Key files: crates/ezc_core/src/runtime_codegen.rs, crates/ezc_cli/tests/explain.rs, crates/ezc_cli/tests/runtime_browser.rs
-* New behavior: A generated nested counter renders `Count:0`; clicking its manifest-wired button increments the binding to `Count:1` and `Count:2`, while `window.__EDGEZERO__.components[0].state.count` tracks the numeric state.
-* Tests added or changed: crates/ezc_core/src/runtime_codegen.rs runtime string assertions, crates/ezc_cli/tests/explain.rs build artifact assertions, crates/ezc_cli/tests/runtime_browser.rs ignored real-browser integration test
-* Fixtures added or changed: None
+* New behavior: Two bindings to the same state field update together after clicks, and `window.__EDGEZERO__.store` exposes live runtime maps for debugging.
+* Tests added or changed: crates/ezc_core/src/runtime_codegen.rs runtime string assertions, crates/ezc_cli/tests/explain.rs build artifact assertions, crates/ezc_cli/tests/runtime_browser.rs double-binding real-browser probe
+* Fixtures added or changed: fixtures/0005-double-binding-counter/input/DoubleBindingCounter.tsx
 
 Current in-progress slice
 
-* Slice: 6D-C - Introduce an explicit runtime state store
+* Slice: 6D-D - Switch to delegated events
 * Status: Not started
 * Completed: None
-* Remaining: Replace the current ad hoc runtime component objects with a small state-store abstraction, add read/write/notify helpers, register bindings by field, route action execution through the store, preserve debug state, and add the two-bindings browser coverage requested by the roadmap.
+* Remaining: Extend manifest events with explicit event type, preserve JSX event names as event types, update template graph/manifest schema, install one document-level listener per event type, dispatch through template node IDs, and add nested-target/two-button event tests.
 
 Verification
 
@@ -32,20 +32,20 @@ Verification
 
 Architecture decisions made
 
-* Decision: Keep the browser test as an ignored explicit integration test for this slice.
-* Reason: Slice 6D-B needs real-browser evidence, but Slice 6D-E is responsible for making browser e2e a permanent local and CI gate.
-* Tradeoff: `cargo test --workspace` remains stable and fast, while browser coverage must be run explicitly until 6D-E.
-* Follow-up: Slice 6D-E should promote browser e2e into a regular command and CI job.
+* Decision: Expose the internal runtime store under `window.__EDGEZERO__.store` while also preserving the existing `window.__EDGEZERO__.components` debug view.
+* Reason: Slice 6D-C requires inspectable store maps, and the existing components array is already used by the browser probe as a stable debug convenience.
+* Tradeoff: The debug surface is richer than the minimum runtime needs, but it remains generated runtime state rather than source-derived behavior.
+* Follow-up: Runtime contract versioning and diagnostics in Slice 6G should decide which debug fields are durable.
 
 Known limitations
 
 * Item: Only `this.<field>++` is recognized as an action. `this.count += 1`, decrement, assignment, and multi-step plans are intentionally deferred.
-* Item: The browser runtime supports only per-node click listeners, increment actions, numeric state, and direct binding text-node updates.
+* Item: The browser runtime supports only per-node click listeners, increment actions, numeric state, and binding callback text updates.
 * Item: Browser e2e coverage is present but ignored by default until the dedicated e2e gate slice.
 
 Exact next step
 
-Start Slice 6D-C by refactoring `crates/ezc_core/src/runtime_codegen.rs` so runtime state flows through explicit helper functions for reading fields, writing fields, and notifying bindings. Add a fixture or browser probe case with two bindings to the same state field and prove both update after clicks.
+Start Slice 6D-D by adding event type semantics end to end. Begin in parser/template semantics by preserving `onClick` as `click`, then emit manifest events with `{ node, event, handler }` and update the runtime to install one delegated document-level click listener that resolves the nearest `data-ez-node`.
 
 Useful commands
 
@@ -55,7 +55,7 @@ Useful commands
 * `cargo test -p ezc_cli`
 * `cargo test -p ezc_cli --test runtime_browser -- --ignored --nocapture`
 * `cargo test --workspace`
-* `cargo run -p ezc_cli -- build fixtures/0004-nested-jsx/input/NestedCounter.tsx --out target/ezc-manual/nested-counter`
+* `cargo run -p ezc_cli -- build fixtures/0005-double-binding-counter/input/DoubleBindingCounter.tsx --out target/ezc-manual/double-binding-counter`
 
 Changed but uncommitted files
 

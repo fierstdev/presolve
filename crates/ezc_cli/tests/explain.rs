@@ -486,6 +486,10 @@ fn build_command_writes_page_manifest_and_runtime_artifacts() {
     assert!(actual_runtime.contains("data-ez-node"));
     assert!(actual_runtime.contains("ez-binding:"));
     assert!(actual_runtime.contains("normalizeHandlerReference"));
+    assert!(actual_runtime.contains("createRuntimeStore"));
+    assert!(actual_runtime.contains("readField"));
+    assert!(actual_runtime.contains("writeField"));
+    assert!(actual_runtime.contains("notifyField"));
     assert!(actual_runtime.contains("addEventListener(\"click\""));
     assert!(actual_runtime.contains("action.operation !== \"increment\""));
     assert!(actual_runtime.contains("dataset.ezRuntime"));

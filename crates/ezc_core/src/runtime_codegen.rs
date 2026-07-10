@@ -96,12 +96,95 @@ const RUNTIME_STUB: &str = r#"(() => {
     return actionsByMethod;
   }
 
-  function initializeComponentRuntime(component, bindingAnchors, elementsByNode) {
-    const state = {};
-    const bindingsByField = new Map();
-    const actionsByMethod = buildActionsByMethod(component);
+  function componentFieldKey(componentName, field) {
+    return `${componentName}:${field}`;
+  }
 
-    for (const node of component.template?.nodes ?? []) {
+  function componentMethodKey(componentName, method) {
+    return `${componentName}:${method}`;
+  }
+
+  function createRuntimeStore(elementsByNode) {
+    return {
+      components: new Map(),
+      bindingsByField: new Map(),
+      actionsByMethod: new Map(),
+      elementsByNode
+    };
+  }
+
+  function readField(component, field) {
+    if (!(field in component.state)) {
+      console.error(
+        "[EdgeZero] EZR_MISSING_FIELD",
+        { component: component.name, field }
+      );
+      return undefined;
+    }
+
+    return component.state[field];
+  }
+
+  function writeField(store, component, field, value) {
+    if (!(field in component.state)) {
+      console.error(
+        "[EdgeZero] EZR_MISSING_FIELD",
+        { component: component.name, field }
+      );
+      return;
+    }
+
+    component.state[field] = value;
+    notifyField(store, component, field);
+  }
+
+  function notifyField(store, component, field) {
+    const bindings = store.bindingsByField.get(
+      componentFieldKey(component.name, field)
+    );
+
+    if (bindings === undefined) {
+      console.error(
+        "[EdgeZero] EZR_MISSING_BINDING",
+        { component: component.name, field }
+      );
+      return;
+    }
+
+    for (const updateBinding of bindings) {
+      updateBinding(component.state[field]);
+    }
+  }
+
+  function registerBinding(store, component, field, updateBinding) {
+    const key = componentFieldKey(component.name, field);
+    const bindings = store.bindingsByField.get(key) ?? [];
+    bindings.push(updateBinding);
+    store.bindingsByField.set(key, bindings);
+  }
+
+  function registerActions(store, component, manifestComponent) {
+    const actionsByMethod = buildActionsByMethod(manifestComponent);
+
+    for (const [method, action] of actionsByMethod) {
+      store.actionsByMethod.set(
+        componentMethodKey(component.name, method),
+        action
+      );
+    }
+  }
+
+  function initializeComponentRuntime(store, manifestComponent, bindingAnchors) {
+    const component = {
+      name: manifestComponent.name,
+      manifest: manifestComponent,
+      state: {}
+    };
+
+    store.components.set(component.name, component);
+    registerActions(store, component, manifestComponent);
+
+    for (const node of manifestComponent.template?.nodes ?? []) {
       if (node.kind !== "binding") {
         continue;
       }
@@ -112,15 +195,15 @@ const RUNTIME_STUB: &str = r#"(() => {
         continue;
       }
 
-      if (node.initial_value !== null && state[field] === undefined) {
-        state[field] = Number(node.initial_value);
+      if (node.initial_value !== null && component.state[field] === undefined) {
+        component.state[field] = Number(node.initial_value);
       }
 
       const anchor = bindingAnchors.get(node.id);
 
       if (anchor === undefined) {
         console.error(
-          "[EdgeZero] Missing binding anchor",
+          "[EdgeZero] EZR_MISSING_BINDING_ANCHOR",
           node
         );
         continue;
@@ -130,132 +213,104 @@ const RUNTIME_STUB: &str = r#"(() => {
 
       if (!(textNode instanceof Text)) {
         console.error(
-          "[EdgeZero] Missing binding text node",
+          "[EdgeZero] EZR_MISSING_BINDING_TEXT",
           node
         );
         continue;
       }
 
-      const bindings = bindingsByField.get(field) ?? [];
-      bindings.push({
-        node,
-        textNode
+      registerBinding(store, component, field, (value) => {
+        textNode.textContent = String(value);
       });
-      bindingsByField.set(field, bindings);
     }
 
-    return {
-      component,
-      state,
-      actionsByMethod,
-      bindingsByField,
-      elementsByNode
-    };
+    return component;
   }
 
-  function updateFieldBindings(runtimeComponent, field) {
-    const bindings = runtimeComponent.bindingsByField.get(field);
-
-    if (bindings === undefined) {
-      console.error(
-        "[EdgeZero] Missing binding for field",
-        field
-      );
-      return;
-    }
-
-    for (const binding of bindings) {
-      binding.textNode.textContent = String(runtimeComponent.state[field]);
-    }
-  }
-
-  function executeAction(runtimeComponent, action) {
+  function executeAction(store, component, action) {
     if (action.operation !== "increment") {
       console.error(
-        "[EdgeZero] Unsupported action operation",
+        "[EdgeZero] EZR_UNSUPPORTED_ACTION",
         action
       );
       return;
     }
 
-    if (!(action.field in runtimeComponent.state)) {
-      console.error(
-        "[EdgeZero] Missing state field",
-        action
-      );
-      return;
-    }
-
-    const current = Number(runtimeComponent.state[action.field]);
+    const current = Number(readField(component, action.field));
 
     if (Number.isNaN(current)) {
       console.error(
-        "[EdgeZero] State field is not numeric",
+        "[EdgeZero] EZR_NON_NUMERIC_FIELD",
         action
       );
       return;
     }
 
-    runtimeComponent.state[action.field] = current + 1;
-    updateFieldBindings(runtimeComponent, action.field);
+    writeField(store, component, action.field, current + 1);
   }
 
-  function attachEventListeners(runtimeComponent) {
-    for (const event of runtimeComponent.component.template?.events ?? []) {
-      const element = runtimeComponent.elementsByNode.get(event.node);
+  function attachEventListeners(store, component) {
+    for (const event of component.manifest.template?.events ?? []) {
+      const element = store.elementsByNode.get(event.node);
 
       if (element === undefined) {
         console.error(
-          "[EdgeZero] Missing event anchor",
+          "[EdgeZero] EZR_MISSING_EVENT_ANCHOR",
           event
         );
         continue;
       }
 
       const method = normalizeHandlerReference(event.handler);
-      const action = runtimeComponent.actionsByMethod.get(method);
+      const action = store.actionsByMethod.get(
+        componentMethodKey(component.name, method)
+      );
 
       if (action === undefined) {
         console.error(
-          "[EdgeZero] Missing action for handler",
+          "[EdgeZero] EZR_MISSING_ACTION",
           event
         );
         continue;
       }
 
       element.addEventListener("click", () => {
-        executeAction(runtimeComponent, action);
+        executeAction(store, component, action);
       });
     }
+  }
+
+  function debugComponents(store) {
+    return [...store.components.values()].map((component) => ({
+      name: component.name,
+      state: component.state
+    }));
   }
 
   function initializeRuntime(manifest) {
     const bindingAnchors = collectBindingAnchors();
     const elementsByNode = collectElementAnchors();
+    const store = createRuntimeStore(elementsByNode);
     const missingAnchors = collectMissingAnchors(
       manifest,
       bindingAnchors,
       elementsByNode
     );
-    const components = [];
 
-    for (const component of manifest.components ?? []) {
-      const runtimeComponent = initializeComponentRuntime(
-        component,
-        bindingAnchors,
-        elementsByNode
+    for (const manifestComponent of manifest.components ?? []) {
+      const component = initializeComponentRuntime(
+        store,
+        manifestComponent,
+        bindingAnchors
       );
-      attachEventListeners(runtimeComponent);
-      components.push({
-        name: component.name,
-        state: runtimeComponent.state
-      });
+      attachEventListeners(store, component);
     }
 
     return {
       manifest,
       missingAnchors,
-      components
+      store,
+      components: debugComponents(store)
     };
   }
 
@@ -316,6 +371,10 @@ mod tests {
         assert!(runtime.contains("data-ez-node"));
         assert!(runtime.contains("ez-binding:"));
         assert!(runtime.contains("normalizeHandlerReference"));
+        assert!(runtime.contains("createRuntimeStore"));
+        assert!(runtime.contains("readField"));
+        assert!(runtime.contains("writeField"));
+        assert!(runtime.contains("notifyField"));
         assert!(runtime.contains("addEventListener(\"click\""));
         assert!(runtime.contains("action.operation !== \"increment\""));
         assert!(runtime.contains("dataset.ezRuntime"));

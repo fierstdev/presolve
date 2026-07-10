@@ -37,9 +37,9 @@ fn chrome_bin() -> Option<PathBuf> {
 
 #[test]
 #[ignore = "requires a local headless Chrome browser"]
-fn nested_counter_increments_in_a_real_browser() {
+fn double_binding_counter_increments_in_a_real_browser() {
     let repo_root = repo_root();
-    let out_dir = repo_root.join("target/ezc-browser-test/nested-counter");
+    let out_dir = repo_root.join("target/ezc-browser-test/double-binding-counter");
 
     if out_dir.exists() {
         fs::remove_dir_all(&out_dir).expect("failed to clean previous browser test output");
@@ -49,7 +49,7 @@ fn nested_counter_increments_in_a_real_browser() {
         .current_dir(&repo_root)
         .args([
             "build",
-            "fixtures/0004-nested-jsx/input/NestedCounter.tsx",
+            "fixtures/0005-double-binding-counter/input/DoubleBindingCounter.tsx",
             "--out",
             out_dir
                 .to_str()
@@ -141,12 +141,15 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   const button = document.querySelector("button");
   if (button === null) fail("button not found");
   if (!document.body.textContent.includes("Count:0")) fail("initial count was not 0");
+  if (!document.body.textContent.includes("Mirror:0")) fail("initial mirror was not 0");
 
   button.click();
   await waitFor(() => document.body.textContent.includes("Count:1"), "count 1");
+  if (!document.body.textContent.includes("Mirror:1")) fail("mirror was not 1");
 
   button.click();
   await waitFor(() => document.body.textContent.includes("Count:2"), "count 2");
+  if (!document.body.textContent.includes("Mirror:2")) fail("mirror was not 2");
 
   if (document.documentElement.dataset.ezRuntime !== "ready") {
     fail("runtime was not ready");
@@ -158,6 +161,14 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 
   if (window.__EDGEZERO__.components[0].state.count !== 2) {
     fail("debug state did not update to 2");
+  }
+
+  if (!(window.__EDGEZERO__.store.components instanceof Map)) {
+    fail("runtime store components was not a Map");
+  }
+
+  if (!(window.__EDGEZERO__.store.bindingsByField instanceof Map)) {
+    fail("runtime store bindingsByField was not a Map");
   }
 
   document.body.dataset.browserTest = "pass";
