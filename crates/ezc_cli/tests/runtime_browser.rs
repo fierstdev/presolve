@@ -705,6 +705,63 @@ fn keyed_lists_reconcile_in_a_real_browser() {
 }
 
 #[test]
+fn object_keyed_lists_reconcile_in_a_real_browser() {
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/object-keyed-list-reconciliation");
+
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean previous browser test output");
+    }
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0025-object-keyed-list-reconciliation/input/ObjectKeyedListReconciliation.tsx",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("browser test output path was not valid UTF-8"),
+        ])
+        .output()
+        .expect("failed to run ezc_cli build");
+
+    assert!(
+        output.status.success(),
+        "expected build to succeed\\nstatus: {}\\nstderr:\\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    write_object_keyed_list_reconciliation_probe_page(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile dir");
+    let user_data_dir = format!(
+        "--user-data-dir={}",
+        profile_dir
+            .to_str()
+            .expect("Chrome profile path was not valid UTF-8")
+    );
+    let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
+
+    let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    server.stop();
+
+    assert!(
+        stdout.contains("EDGEZERO_OBJECT_KEYED_LIST_BROWSER_TEST_PASS"),
+        "browser probe did not pass\\nstatus: {}\\nstdout:\\n{}\\nstderr:\\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn runtime_contract_diagnostics_report_manifest_boot_failures_in_a_real_browser() {
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/runtime-contract");
@@ -1894,6 +1951,130 @@ const listLabels = () => [...document.querySelectorAll("ol li")].map((item) => i
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
   document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_KEYED_LIST_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  console.error(error);
+});
+</script>
+</body>"#,
+    );
+
+    fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
+}
+
+#[allow(clippy::too_many_lines)]
+fn write_object_keyed_list_reconciliation_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
+    let probe = index.replace(
+        "</body>",
+        r#"<script>
+const fail = (message) => {
+  throw new Error(message);
+};
+
+const edgezeroConsoleErrors = [];
+const originalConsoleError = console.error.bind(console);
+console.error = (...args) => {
+  const message = args.map((arg) => {
+    if (arg instanceof Error) return arg.message;
+    if (typeof arg === "string") return arg;
+    return JSON.stringify(arg);
+  }).join(" ");
+
+  edgezeroConsoleErrors.push(message);
+  originalConsoleError(...args);
+};
+
+const waitFor = (predicate, label) => new Promise((resolve, reject) => {
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    if (predicate()) {
+      resolve();
+      return;
+    }
+
+    if (Date.now() > deadline) {
+      reject(new Error(`Timed out waiting for ${label}`));
+      return;
+    }
+
+    setTimeout(tick, 20);
+  };
+
+  tick();
+});
+
+const listLabels = () => [...document.querySelectorAll("ol li")].map((item) => item.textContent);
+
+(async () => {
+  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+
+  const buttons = document.querySelectorAll("button");
+  if (buttons.length !== 2) fail("expected object list reconciliation controls");
+
+  if (JSON.stringify(listLabels()) !== JSON.stringify(["0:North(west)", "1:South(east)"])) {
+    fail(`initial object list contents were unexpected: ${listLabels().join(" | ")}`);
+  }
+
+  const north = document.querySelector("[data-ez-node='n7:north']");
+  const south = document.querySelector("[data-ez-node='n7:south']");
+  if (north === null || south === null) fail("initial object keyed list nodes were not found");
+
+  const listNode = window.__EDGEZERO__.manifest.components[0].template.nodes.find(
+    (node) => node.kind === "list"
+  );
+  if (
+    listNode === undefined ||
+    listNode.start !== "n5" ||
+    listNode.end !== "n6" ||
+    listNode.item_root !== "n7" ||
+    listNode.key_expression !== "item.id"
+  ) {
+    fail("object list manifest node did not expose member-key reconciliation metadata");
+  }
+
+  buttons[0].click();
+  await waitFor(
+    () => JSON.stringify(listLabels()) === JSON.stringify(["0:South(east)", "1:East(central)", "2:North(west)"]),
+    "reconciled object list"
+  );
+
+  if (document.querySelector("[data-ez-node='n7:north']") !== north) {
+    fail("North object node was recreated instead of retained during movement");
+  }
+  if (document.querySelector("[data-ez-node='n7:south']") !== south) {
+    fail("South object node was recreated instead of retained during movement");
+  }
+  const east = document.querySelector("[data-ez-node='n7:east']");
+  if (east === null || east.textContent !== "1:East(central)") {
+    fail("East object node did not receive member bindings during insertion");
+  }
+  if (window.__EDGEZERO__.store.elementsByNode.get("n7:north") !== north) {
+    fail("runtime element index did not retain the North object node");
+  }
+  if (JSON.stringify(window.__EDGEZERO__.components[0].state.items.map((item) => item.id)) !== JSON.stringify(["south", "east", "north"])) {
+    fail("debug state did not retain the reconciled object array");
+  }
+
+  buttons[1].click();
+  await waitFor(
+    () => JSON.stringify(listLabels()) === JSON.stringify(["0:East(central)"]),
+    "trimmed object list"
+  );
+
+  if (document.querySelector("[data-ez-node='n7:east']") !== east) {
+    fail("East object node was recreated instead of retained during deletion");
+  }
+  if (document.querySelector("[data-ez-node='n7:north']") !== null || document.querySelector("[data-ez-node='n7:south']") !== null) {
+    fail("stale object keyed list nodes were not removed during deletion");
+  }
+  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
+    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  }
+
+  document.body.dataset.browserTest = "pass";
+  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_OBJECT_KEYED_LIST_BROWSER_TEST_PASS</div>");
+})().catch((error) => {
+  document.body.dataset.browserTest = "fail";
+  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_OBJECT_KEYED_LIST_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>

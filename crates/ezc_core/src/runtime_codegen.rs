@@ -398,9 +398,55 @@ const RUNTIME_STUB: &str = r#"(() => {
     return String(value).replaceAll("--", "—");
   }
 
+  function listItemMemberPath(node, expression) {
+    const prefix = `${String(node.item_variable ?? "")}.`;
+    const value = String(expression ?? "");
+
+    if (!value.startsWith(prefix)) {
+      return null;
+    }
+
+    const path = value.slice(prefix.length).split(".");
+    return path.length === 0 || path.some((member) => member === "") ? null : path;
+  }
+
+  function listItemMemberValue(node, item, expression) {
+    const path = listItemMemberPath(node, expression);
+
+    if (path === null) {
+      return undefined;
+    }
+
+    let value = item;
+
+    for (const member of path) {
+      if (
+        value === null ||
+        typeof value !== "object" ||
+        Array.isArray(value) ||
+        !Object.prototype.hasOwnProperty.call(value, member)
+      ) {
+        return undefined;
+      }
+
+      value = value[member];
+    }
+
+    return value;
+  }
+
+  function isListKeyPrimitive(value) {
+    return value === null || (typeof value !== "object" && typeof value !== "undefined");
+  }
+
   function listItemKey(node, item, index) {
     if (node.key_expression === node.item_variable) {
-      return Array.isArray(item) ? String(index) : normalizeListKey(item);
+      return isListKeyPrimitive(item) ? normalizeListKey(item) : String(index);
+    }
+
+    if (listItemMemberPath(node, node.key_expression) !== null) {
+      const value = listItemMemberValue(node, item, node.key_expression);
+      return isListKeyPrimitive(value) ? normalizeListKey(value) : String(index);
     }
 
     if (node.index_variable === node.key_expression) {
@@ -426,6 +472,37 @@ const RUNTIME_STUB: &str = r#"(() => {
       .replaceAll("__ez_list_key__", escapeHtmlAttribute(key))
       .replaceAll("__ez_list_item__", escapeHtmlText(formatBindingValue(item)))
       .replaceAll("__ez_list_index__", String(index));
+  }
+
+  function populateListItemMemberBindings(node, item, fragment) {
+    const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_COMMENT);
+    const markers = [];
+
+    while (walker.nextNode()) {
+      markers.push(walker.currentNode);
+    }
+
+    const memberPrefix = `:${String(node.item_variable ?? "")}.`;
+
+    for (const marker of markers) {
+      const comment = String(marker.nodeValue ?? "");
+      const expressionStart = comment.lastIndexOf(memberPrefix);
+
+      if (expressionStart < 0) {
+        continue;
+      }
+
+      const expression = comment.slice(expressionStart + 1);
+      const value = listItemMemberValue(node, item, expression);
+      marker.after(document.createTextNode(value === undefined ? "" : formatBindingValue(value)));
+    }
+  }
+
+  function renderListItemElement(node, item, index, key) {
+    const template = document.createElement("template");
+    template.innerHTML = renderListItemHtml(node, item, index, key);
+    populateListItemMemberBindings(node, item, template.content);
+    return template.content.firstElementChild;
   }
 
   function initialListInstances(store, node, items) {
@@ -478,9 +555,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       let instance = instances.get(key);
 
       if (instance === undefined) {
-        const template = document.createElement("template");
-        template.innerHTML = renderListItemHtml(node, item, index, key);
-        const element = template.content.firstElementChild;
+        const element = renderListItemElement(node, item, index, key);
 
         if (element === null) {
           reportDiagnostic(
@@ -1093,6 +1168,9 @@ mod tests {
         assert!(runtime.contains("executeActions"));
         assert!(runtime.contains("formatBindingValue"));
         assert!(runtime.contains("value === null ? \"\" : String(value)"));
+        assert!(runtime.contains("listItemMemberPath"));
+        assert!(runtime.contains("populateListItemMemberBindings"));
+        assert!(runtime.contains("renderListItemElement"));
         assert!(runtime.contains("component.state[field] = node.initial_value"));
         assert!(!runtime.contains("component.state[field] = Number(node.initial_value)"));
         assert!(runtime.contains("installDelegatedEventListeners"));
