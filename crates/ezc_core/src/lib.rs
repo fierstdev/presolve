@@ -6,6 +6,7 @@
 
 pub mod application_semantic_model;
 pub mod asm_validation;
+pub mod compiler_pass;
 pub mod component_graph;
 pub mod explain;
 pub mod html_codegen;
@@ -23,6 +24,7 @@ pub use application_semantic_model::{
     build_application_semantic_model, ApplicationSemanticModel, SemanticEntity,
 };
 pub use asm_validation::{validate_application_semantic_model, AsmValidationDiagnostic};
+pub use compiler_pass::{AnalysisPass, DependencyAnalysis, DependencyAnalysisPass};
 pub use component_graph::{
     build_component_graph, ComponentAction, ComponentDiagnostic, ComponentGraph, ComponentMethod,
     ComponentNode, RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler,
@@ -331,6 +333,13 @@ class Counter extends Component {
             .collect::<Vec<_>>();
         assert!(codes.contains(&"EZASM1002"));
         assert!(codes.contains(&"EZASM1006"));
+
+        let dependencies = DependencyAnalysisPass.analyze(&asm);
+        assert_eq!(dependencies.dependencies[&component.actions[0].id].len(), 1);
+        assert_eq!(
+            dependencies.dependents[&component.state_fields[0].id].len(),
+            1
+        );
     }
 
     #[test]

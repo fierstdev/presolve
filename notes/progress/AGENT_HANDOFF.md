@@ -3,24 +3,24 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: cli: add asm inspection
+* Latest commit: compiler: add dependency analysis
 * Working tree: clean after committing this slice
 * Date: 2026-07-10 19:30:12 PDT
 
 Last completed slice
 
-* Slice: ASM-8 - `ez asm` CLI
-* Summary: Added deterministic application-semantic inspection through the compiler CLI.
-* Key files: crates/ezc_cli/src/main.rs
-* New behavior: `ezc asm <file>` prints ASM component, template, ownership, reference, provenance, compiler-diagnostic, and validation-diagnostic counts.
-* Tests added or changed: existing CLI regression suite remains green; focused manual command output was compiled and exercised through the same command path.
-* Fixtures added or changed: None; this slice does not alter HTML, manifest, or runtime artifacts.
+* Slice: Era III-A - Dependency analysis
+* Summary: Added the first reusable compiler analysis-pass interface and an ASM dependency analysis pass.
+* Key files: crates/ezc_core/src/compiler_pass.rs, crates/ezc_core/src/lib.rs
+* New behavior: `DependencyAnalysisPass` derives deterministic forward dependencies and reverse dependents from resolved ASM references.
+* Tests added or changed: core coverage proves action/state dependency and reverse-dependent traversal.
+* Fixtures added or changed: None; this slice does not alter CLI, HTML, manifest, or runtime artifacts.
 
 Current in-progress slice
 
-* Slice: ASM-8 - `ez asm` CLI
+* Slice: Era III-A - Dependency analysis
 * Status: Complete
-* Completed: ASM-1 through ASM-8
+* Completed: ASM-1 through ASM-8; Era III-A - Dependency analysis
 * Remaining: None
 
 Verification
@@ -134,7 +134,7 @@ Known limitations
 
 Exact next step
 
-Start Era III planning: define the first compiler-pass infrastructure slice, beginning with dependency analysis over the Application Semantic Model.
+Start Era III-B - Constant evaluation. Define a read-only constant-evaluation analysis over existing serializable state and action operands.
 
 Useful commands
 
