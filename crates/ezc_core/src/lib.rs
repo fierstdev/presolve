@@ -19,6 +19,7 @@ pub mod resume_explain;
 pub mod resume_instance;
 pub mod resume_manifest;
 pub mod resume_plan;
+pub mod route_graph;
 pub mod runtime_codegen;
 pub mod semantic_id;
 pub mod semantic_provenance;
