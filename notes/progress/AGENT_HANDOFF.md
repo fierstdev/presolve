@@ -3,24 +3,24 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: add route graph
+* Latest commit: compiler: add module graph
 * Working tree: clean after committing this slice
 * Date: 2026-07-10 19:49:12 PDT
 
 Last completed slice
 
-* Slice: Era V-A - Route graph
-* Summary: Added application route graph metadata derived from ASM components.
-* Key files: crates/ezc_core/src/route_graph.rs, crates/ezc_core/src/lib.rs
-* New behavior: `RouteGraph` maps declared route paths to component semantic IDs.
+* Slice: Era V-B - Module graph
+* Summary: Added source-module metadata from component provenance.
+* Key files: crates/ezc_core/src/module_graph.rs, crates/ezc_core/src/lib.rs
+* New behavior: `ModuleGraph` groups component semantic IDs by source module path.
 * Tests added or changed: core suite and clippy pass.
 * Fixtures added or changed: None.
 
 Current in-progress slice
 
-* Slice: Era V-A - Route graph
+* Slice: Era V-B - Module graph
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A - Route graph
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-B
 * Remaining: None
 
 Verification
@@ -134,7 +134,7 @@ Known limitations
 
 Exact next step
 
-Start Era V-B - Module graph. Model source modules and component ownership across files.
+Start Era V-C - Layout graph. Model route layouts once layout semantics are introduced.
 
 Useful commands
 

@@ -12,6 +12,7 @@ pub mod explain;
 pub mod html_codegen;
 pub mod lazy_action_chunks;
 pub mod model;
+pub mod module_graph;
 pub mod page_codegen;
 pub mod resume_boot;
 pub mod resume_diagnostics;
