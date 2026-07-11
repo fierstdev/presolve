@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use serde::Serialize;
 
 use crate::semantic_id::{SemanticId, SemanticOwner};
+use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
 
 use ezc_parser::{
     ParsedClass, ParsedEventHandler, ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue,
@@ -14,6 +15,7 @@ use ezc_parser::{
 pub struct ComponentGraph {
     pub components: Vec<ComponentNode>,
     pub diagnostics: Vec<ComponentDiagnostic>,
+    pub references: Vec<SemanticReference>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -164,6 +166,8 @@ pub enum RenderAttributeValue {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RenderEventHandler {
+    pub id: SemanticId,
+    pub owner: SemanticOwner,
     pub event: String,
     pub handler: String,
     pub span: SourceSpan,
@@ -190,9 +194,12 @@ pub struct ComponentDiagnostic {
 pub fn build_component_graph(parsed: &ParsedFile) -> ComponentGraph {
     let mut components = Vec::new();
     let mut diagnostics = Vec::new();
+    let mut references = Vec::new();
 
     for class in &parsed.classes {
-        components.push(build_component_node(class, &mut diagnostics));
+        let component = build_component_node(class, &mut diagnostics);
+        references.extend(collect_semantic_references(&component));
+        components.push(component);
     }
 
     if parsed.classes.is_empty() && parsed.diagnostics.is_empty() {
@@ -205,6 +212,7 @@ pub fn build_component_graph(parsed: &ParsedFile) -> ComponentGraph {
     ComponentGraph {
         components,
         diagnostics,
+        references,
     }
 }
 
@@ -270,7 +278,7 @@ fn build_component_node(
         .methods
         .iter()
         .find(|method| method.name == "render")
-        .map(render_model_from_parsed_method);
+        .map(|method| render_model_from_parsed_method(method, &id));
 
     if render.is_none() {
         diagnostics.push(ComponentDiagnostic {
@@ -300,15 +308,20 @@ fn build_component_node(
     }
 }
 
-fn render_model_from_parsed_method(method: &ezc_parser::ParsedMethod) -> RenderModel {
+fn render_model_from_parsed_method(
+    method: &ezc_parser::ParsedMethod,
+    component_id: &SemanticId,
+) -> RenderModel {
     let root = method.jsx_roots.first();
     let root_element = root.and_then(parsed_root_element);
     let root_fragment = root.and_then(parsed_root_fragment);
+    let mut event_ids = EventIdAllocator::default();
 
     RenderModel {
         root_element: root_element.map(|element| element.name.clone()),
         root_span: root_element.map(|element| element.span),
-        root_fragment: root_fragment.map(render_fragment_from_parsed),
+        root_fragment: root_fragment
+            .map(|fragment| render_fragment_from_parsed(fragment, component_id, &mut event_ids)),
         attributes: root_element.map_or_else(Vec::new, |element| {
             element
                 .attributes
@@ -320,14 +333,16 @@ fn render_model_from_parsed_method(method: &ezc_parser::ParsedMethod) -> RenderM
             element
                 .event_handlers
                 .iter()
-                .map(render_event_handler_from_parsed)
+                .map(|handler| {
+                    render_event_handler_from_parsed(handler, component_id, &mut event_ids)
+                })
                 .collect()
         }),
         children: root_element.map_or_else(Vec::new, |element| {
             element
                 .children
                 .iter()
-                .map(render_child_from_parsed)
+                .map(|child| render_child_from_parsed(child, component_id, &mut event_ids))
                 .collect()
         }),
         bindings: method.bindings.clone(),
@@ -453,7 +468,11 @@ fn decorator_argument(class: &ParsedClass, name: &str) -> Option<String> {
         .and_then(|decorator| decorator.argument.clone())
 }
 
-fn render_child_from_parsed(child: &ParsedJsxChild) -> RenderChild {
+fn render_child_from_parsed(
+    child: &ParsedJsxChild,
+    component_id: &SemanticId,
+    event_ids: &mut EventIdAllocator,
+) -> RenderChild {
     match child {
         ParsedJsxChild::Text { value, span } => RenderChild::Text {
             value: value.clone(),
@@ -474,49 +493,73 @@ fn render_child_from_parsed(child: &ParsedJsxChild) -> RenderChild {
             event_handlers: element
                 .event_handlers
                 .iter()
-                .map(render_event_handler_from_parsed)
+                .map(|handler| render_event_handler_from_parsed(handler, component_id, event_ids))
                 .collect(),
             children: element
                 .children
                 .iter()
-                .map(render_child_from_parsed)
+                .map(|child| render_child_from_parsed(child, component_id, event_ids))
                 .collect::<Vec<_>>(),
         }),
-        ParsedJsxChild::Fragment(fragment) => {
-            RenderChild::Fragment(render_fragment_from_parsed(fragment))
+        ParsedJsxChild::Fragment(fragment) => RenderChild::Fragment(render_fragment_from_parsed(
+            fragment,
+            component_id,
+            event_ids,
+        )),
+        ParsedJsxChild::Conditional(conditional) => RenderChild::Conditional(
+            render_conditional_from_parsed(conditional, component_id, event_ids),
+        ),
+        ParsedJsxChild::List(list) => {
+            RenderChild::List(render_list_from_parsed(list, component_id, event_ids))
         }
-        ParsedJsxChild::Conditional(conditional) => {
-            RenderChild::Conditional(render_conditional_from_parsed(conditional))
-        }
-        ParsedJsxChild::List(list) => RenderChild::List(render_list_from_parsed(list)),
     }
 }
 
-fn render_list_from_parsed(list: &ParsedJsxList) -> RenderList {
+fn render_list_from_parsed(
+    list: &ParsedJsxList,
+    component_id: &SemanticId,
+    event_ids: &mut EventIdAllocator,
+) -> RenderList {
     RenderList {
         iterable: list.iterable.clone(),
         item_variable: list.item_variable.clone(),
         index_variable: list.index_variable.clone(),
         key_expression: list.key_expression.clone(),
         span: list.span,
-        item_template: render_children_from_parsed_node(&list.item_template),
+        item_template: render_children_from_parsed_node(
+            &list.item_template,
+            component_id,
+            event_ids,
+        ),
     }
 }
 
-fn render_conditional_from_parsed(conditional: &ParsedJsxConditional) -> RenderConditional {
+fn render_conditional_from_parsed(
+    conditional: &ParsedJsxConditional,
+    component_id: &SemanticId,
+    event_ids: &mut EventIdAllocator,
+) -> RenderConditional {
     RenderConditional {
         condition: conditional.condition.clone(),
         span: conditional.span,
-        when_true: render_children_from_parsed_node(&conditional.when_true),
+        when_true: render_children_from_parsed_node(
+            &conditional.when_true,
+            component_id,
+            event_ids,
+        ),
         when_false: conditional
             .when_false
             .as_ref()
-            .map(render_children_from_parsed_node)
+            .map(|node| render_children_from_parsed_node(node, component_id, event_ids))
             .unwrap_or_default(),
     }
 }
 
-fn render_children_from_parsed_node(node: &ParsedJsxNode) -> Vec<RenderChild> {
+fn render_children_from_parsed_node(
+    node: &ParsedJsxNode,
+    component_id: &SemanticId,
+    event_ids: &mut EventIdAllocator,
+) -> Vec<RenderChild> {
     match node {
         ParsedJsxNode::Element(element) => vec![RenderChild::Element(RenderElement {
             tag_name: element.name.clone(),
@@ -529,29 +572,33 @@ fn render_children_from_parsed_node(node: &ParsedJsxNode) -> Vec<RenderChild> {
             event_handlers: element
                 .event_handlers
                 .iter()
-                .map(render_event_handler_from_parsed)
+                .map(|handler| render_event_handler_from_parsed(handler, component_id, event_ids))
                 .collect(),
             children: element
                 .children
                 .iter()
-                .map(render_child_from_parsed)
+                .map(|child| render_child_from_parsed(child, component_id, event_ids))
                 .collect::<Vec<_>>(),
         })],
         ParsedJsxNode::Fragment(fragment) => fragment
             .children
             .iter()
-            .map(render_child_from_parsed)
+            .map(|child| render_child_from_parsed(child, component_id, event_ids))
             .collect(),
     }
 }
 
-fn render_fragment_from_parsed(fragment: &ParsedJsxFragment) -> RenderFragment {
+fn render_fragment_from_parsed(
+    fragment: &ParsedJsxFragment,
+    component_id: &SemanticId,
+    event_ids: &mut EventIdAllocator,
+) -> RenderFragment {
     RenderFragment {
         span: fragment.span,
         children: fragment
             .children
             .iter()
-            .map(render_child_from_parsed)
+            .map(|child| render_child_from_parsed(child, component_id, event_ids))
             .collect(),
     }
 }
@@ -574,12 +621,70 @@ fn render_attribute_from_parsed(attribute: &ParsedJsxAttribute) -> RenderAttribu
     }
 }
 
-fn render_event_handler_from_parsed(event_handler: &ParsedEventHandler) -> RenderEventHandler {
+fn render_event_handler_from_parsed(
+    event_handler: &ParsedEventHandler,
+    component_id: &SemanticId,
+    event_ids: &mut EventIdAllocator,
+) -> RenderEventHandler {
     RenderEventHandler {
+        id: component_id.event_handler(&event_handler.event, event_ids.next()),
+        owner: SemanticOwner::entity(component_id.template()),
         event: event_handler.event.clone(),
         handler: event_handler.handler.clone(),
         span: event_handler.span,
     }
+}
+
+#[derive(Debug, Default)]
+struct EventIdAllocator {
+    next: usize,
+}
+
+impl EventIdAllocator {
+    fn next(&mut self) -> usize {
+        let current = self.next;
+        self.next += 1;
+        current
+    }
+}
+
+fn collect_semantic_references(component: &ComponentNode) -> Vec<SemanticReference> {
+    let mut references = component
+        .actions
+        .iter()
+        .filter_map(|action| {
+            component
+                .state_fields
+                .iter()
+                .find(|field| field.name == action.field)
+                .map(|field| SemanticReference {
+                    kind: SemanticReferenceKind::ActionState,
+                    source: action.id.clone(),
+                    target: field.id.clone(),
+                })
+        })
+        .collect::<Vec<_>>();
+
+    if let Some(render) = &component.render {
+        references.extend(
+            render_event_handlers(render)
+                .into_iter()
+                .filter_map(|handler| {
+                    let method_name = this_member_name(&handler.handler)?;
+                    component
+                        .methods
+                        .iter()
+                        .find(|method| method.name == method_name)
+                        .map(|method| SemanticReference {
+                            kind: SemanticReferenceKind::EventMethod,
+                            source: handler.id.clone(),
+                            target: method.id.clone(),
+                        })
+                }),
+        );
+    }
+
+    references
 }
 
 fn render_event_handlers(render: &RenderModel) -> Vec<&RenderEventHandler> {

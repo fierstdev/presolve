@@ -11,6 +11,7 @@ pub mod model;
 pub mod page_codegen;
 pub mod runtime_codegen;
 pub mod semantic_id;
+pub mod semantic_reference;
 pub mod summarize;
 pub mod template_graph;
 pub mod template_manifest;
@@ -28,6 +29,7 @@ pub use model::{
 pub use page_codegen::generate_standalone_page;
 pub use runtime_codegen::generate_runtime_stub;
 pub use semantic_id::{SemanticId, SemanticOwner};
+pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
 pub use summarize::summarize_source;
 pub use template_graph::{
     build_template_graph, AttributeValue, ConditionalNode, ElementNode, FragmentNode, ListNode,
@@ -123,6 +125,7 @@ class Counter extends Component {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn builds_component_graph_from_parsed_counter() {
         let source = include_str!("../../../fixtures/0001-source-summary/input/Counter.tsx");
 
@@ -197,6 +200,14 @@ class Counter extends Component {
         assert_eq!(render.root_span.expect("expected root span").line, 12);
         assert_eq!(render.root_span.expect("expected root span").column, 7);
         assert_eq!(render.event_handlers.len(), 1);
+        assert_eq!(
+            render.event_handlers[0].id.as_str(),
+            "component:x-counter/event:click:0"
+        );
+        assert_eq!(
+            render.event_handlers[0].owner,
+            SemanticOwner::entity(component.id.template())
+        );
         assert_eq!(render.event_handlers[0].event, "click");
         assert_eq!(render.event_handlers[0].handler, "this.increment");
         assert_eq!(render.event_handlers[0].span.line, 12);
@@ -216,6 +227,25 @@ class Counter extends Component {
         assert_eq!(expression, "this.count");
         assert_eq!(span.line, 13);
         assert_eq!(span.column, 16);
+
+        assert_eq!(
+            graph.references,
+            vec![
+                SemanticReference {
+                    kind: SemanticReferenceKind::ActionState,
+                    source: SemanticId::component(Some("x-counter"), "Counter")
+                        .action("increment", 0),
+                    target: SemanticId::component(Some("x-counter"), "Counter")
+                        .state_field("count"),
+                },
+                SemanticReference {
+                    kind: SemanticReferenceKind::EventMethod,
+                    source: SemanticId::component(Some("x-counter"), "Counter")
+                        .event_handler("click", 0),
+                    target: SemanticId::component(Some("x-counter"), "Counter").method("increment"),
+                },
+            ]
+        );
     }
 
     #[test]
@@ -239,6 +269,7 @@ class Counter extends Component {
         assert!(codes.contains(&"EZC1001"));
         assert!(codes.contains(&"EZC1003"));
         assert!(codes.contains(&"EZC1004"));
+        assert!(graph.references.is_empty());
     }
 
     #[test]

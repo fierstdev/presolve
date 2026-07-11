@@ -56,6 +56,11 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn event_handler(&self, event: &str, index: usize) -> Self {
+        self.child("event", &format!("{event}:{index}"))
+    }
+
+    #[must_use]
     pub fn template(&self) -> Self {
         self.child("template", "render")
     }
@@ -96,6 +101,10 @@ mod tests {
         assert_eq!(
             component.action("increment", 0).as_str(),
             "component:x-counter/action:increment:0"
+        );
+        assert_eq!(
+            component.event_handler("click", 0).as_str(),
+            "component:x-counter/event:click:0"
         );
         assert_eq!(
             component.template().as_str(),

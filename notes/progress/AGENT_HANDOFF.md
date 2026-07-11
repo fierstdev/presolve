@@ -3,24 +3,24 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: model semantic ownership
+* Latest commit: compiler: resolve semantic references
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 19:14:05 PDT
+* Date: 2026-07-10 19:18:48 PDT
 
 Last completed slice
 
-* Slice: ASM-2 - Semantic ownership
-* Summary: Added explicit typed owner relationships across the named component and template semantics introduced in ASM-1.
-* Key files: crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/lib.rs
-* New behavior: Component roots are owned by the application; state fields, methods, and rendered templates are owned by their component; action steps are owned by their defining method.
-* Tests added or changed: ownership root/entity type coverage, component ownership assertions, action ownership expectations, and template ownership assertions.
+* Slice: ASM-3 - Cross-reference resolution
+* Summary: Added explicit resolved semantic references for state-writing actions and event-handler method invocation.
+* Key files: crates/ezc_core/src/semantic_reference.rs, crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/lib.rs
+* New behavior: `ComponentGraph.references` records directed `ActionState` edges from action steps to state fields and `EventMethod` edges from event handlers to methods. Event handlers now receive deterministic semantic IDs and template ownership.
+* Tests added or changed: counter graph expectations assert both resolved edges and event identity; semantic-error coverage proves unresolved targets do not produce a reference.
 * Fixtures added or changed: None; this slice deliberately does not alter CLI, HTML, manifest, or runtime artifacts.
 
 Current in-progress slice
 
-* Slice: ASM-2 - Semantic ownership
+* Slice: ASM-3 - Cross-reference resolution
 * Status: Complete
-* Completed: ASM-1 - Global semantic IDs; ASM-2 - Semantic ownership
+* Completed: ASM-1 - Global semantic IDs; ASM-2 - Semantic ownership; ASM-3 - Cross-reference resolution
 * Remaining: None
 
 Verification
@@ -85,6 +85,15 @@ Architecture decisions made
 * Decision: Component state, methods, and rendered templates are component-owned; action steps are method-owned.
 * Reason: These are the direct lexical/semantic containment relationships already established by the current frontend and action model.
 * Tradeoff: Render-tree descendants do not yet have semantic IDs, so their ownership remains deferred until a later ASM slice extends semantic identity below the template root.
+* Decision: Cross references are directed resolved edges stored on `ComponentGraph`, with a kind, source semantic ID, and target semantic ID.
+* Reason: Existing graph consumers can access relationships without an ASM shell, while later ASM/query slices can migrate this stable relation shape intact.
+* Tradeoff: There is no reverse index or centralized relation table yet; query-oriented traversal remains deferred to ASM-6.
+* Decision: Event handlers use deterministic component-scoped IDs in render traversal order and are owned by the rendered template.
+* Reason: Event-to-method references need a distinct semantic source even though general render descendants still lack semantic identity.
+* Tradeoff: Inserting an earlier event changes later event IDs; source-provenance-backed refinement remains deferred to ASM-4.
+* Decision: Only fully resolved action/state and event/method pairs create semantic references.
+* Reason: Reference consumers can rely on every target ID existing in the graph, while existing diagnostics remain the source of unresolved-reference feedback.
+* Tradeoff: Unresolved attempts are not retained as partial relation records until diagnostics and provenance gain their planned ASM models.
 
 Known limitations
 
@@ -102,14 +111,15 @@ Known limitations
 * Item: Runtime schema compatibility is exact-match only; no backward/forward manifest migration exists yet.
 * Item: Source spans are available on parser/render/template structures and CLI development output, but runtime manifests intentionally omit source metadata for now.
 * Item: Fragment nodes are visible in compiler/template output but intentionally omitted from runtime manifests until a runtime range-anchor use case appears.
-* Item: Semantic IDs and direct ownership currently cover components, state fields, methods, action steps, and rendered templates. Template descendants still use backend-local `n*` IDs and have no semantic ownership yet.
-* Item: Ownership has no centralized relation table or query API yet. Duplicate component semantic identities, cross-references, source provenance, validation, and CLI inspection remain deferred to ASM-3 through ASM-8.
+* Item: Semantic IDs and direct ownership currently cover components, state fields, methods, action steps, rendered templates, and event handlers. General template descendants still use backend-local `n*` IDs and have no semantic ownership yet.
+* Item: Resolved references currently cover action-to-state and event-to-method pairs only. Bindings, attributes, conditionals, lists, routes, and unresolved reference attempts have no semantic relation records yet.
+* Item: Ownership and references have no centralized relation table or query API yet. Duplicate component semantic identities, source provenance, validation, and CLI inspection remain deferred to ASM-4 through ASM-8.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 
 Exact next step
 
-Start ASM-3 - Cross-reference resolution. Build explicit semantic references between existing IDs, beginning with actions to their target state fields and event handlers to their target methods.
+Start ASM-4 - Source provenance. Attach source paths and spans to semantic IDs and resolved relations so diagnostics and future tooling can trace every compiler entity back to its origin.
 
 Useful commands
 
