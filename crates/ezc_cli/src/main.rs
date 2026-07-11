@@ -94,8 +94,9 @@ fn run_graph(mut args: Vec<String>) {
 }
 
 fn run_asm(args: &[String]) {
-    let (input_paths, format, entity_id) = parse_asm_inputs(args);
-    let sources = input_paths
+    let inputs = parse_asm_inputs(args);
+    let sources = inputs
+        .paths
         .into_iter()
         .map(|path| {
             let source = fs::read_to_string(&path).unwrap_or_else(|error| {
@@ -114,22 +115,23 @@ fn run_asm(args: &[String]) {
     let asm = build_application_semantic_model_for_unit(&unit);
     let validation = validate_application_semantic_model(&asm);
 
-    match (format.as_str(), entity_id) {
-        ("text", Some(entity_id)) => {
-            let entity = find_asm_entity(&asm, &entity_id);
-            print_asm_entity_text(&asm, entity, &asm.diagnostics);
-        }
-        ("json", Some(entity_id)) => {
-            let entity = find_asm_entity(&asm, &entity_id);
-            print!(
-                "{}",
-                asm_entity_inspection_json(&asm, entity, &asm.diagnostics)
-            );
-        }
+    let entity = match (inputs.entity_id, inputs.source_selection) {
+        (Some(entity_id), None) => Some(find_asm_entity(&asm, &entity_id)),
+        (None, Some((path, offset))) => Some(find_asm_entity_at(&asm, &path, offset)),
+        (None, None) => None,
+        (Some(_), Some(_)) => unreachable!("ASM input validation rejects conflicting selectors"),
+    };
+
+    match (inputs.format.as_str(), entity) {
+        ("text", Some(entity)) => print_asm_entity_text(&asm, entity, &asm.diagnostics),
+        ("json", Some(entity)) => print!(
+            "{}",
+            asm_entity_inspection_json(&asm, entity, &asm.diagnostics)
+        ),
         ("text", None) => print_asm_text(&paths, &asm, &validation),
         ("json", None) => print!("{}", asm_inspection_json(&paths, &asm, &validation)),
         _ => {
-            eprintln!("unsupported format: {format}");
+            eprintln!("unsupported format: {}", inputs.format);
             process::exit(1);
         }
     }
@@ -478,6 +480,51 @@ fn find_asm_entity<'a>(asm: &'a ApplicationSemanticModel, entity_id: &str) -> &'
         })
 }
 
+fn find_asm_entity_at<'a>(
+    asm: &'a ApplicationSemanticModel,
+    path: &Path,
+    offset: usize,
+) -> &'a SemanticId {
+    let mut candidates = asm.entities_at(path, offset);
+    if candidates.is_empty() {
+        eprintln!("no ASM entity at {}:{offset}", path.display());
+        process::exit(1);
+    }
+    candidates.sort_by(|left, right| {
+        let left_span = &asm
+            .provenance(left)
+            .expect("ASM entities have provenance")
+            .span;
+        let right_span = &asm
+            .provenance(right)
+            .expect("ASM entities have provenance")
+            .span;
+        (left_span.end - left_span.start, left.as_str())
+            .cmp(&(right_span.end - right_span.start, right.as_str()))
+    });
+
+    let entity = candidates[0];
+    let entity_span = &asm
+        .provenance(entity)
+        .expect("ASM entities have provenance")
+        .span;
+    if candidates.get(1).is_some_and(|other| {
+        let other_span = &asm
+            .provenance(other)
+            .expect("ASM entities have provenance")
+            .span;
+        other_span.end - other_span.start == entity_span.end - entity_span.start
+    }) {
+        eprintln!("ambiguous ASM entity at {}:{offset}", path.display());
+        for candidate in candidates {
+            eprintln!("  {}", candidate.as_str());
+        }
+        process::exit(1);
+    }
+
+    entity
+}
+
 fn print_asm_entity_text(
     asm: &ApplicationSemanticModel,
     id: &SemanticId,
@@ -594,10 +641,19 @@ fn related_entity_diagnostics<'a>(
         .collect()
 }
 
-fn parse_asm_inputs(args: &[String]) -> (Vec<PathBuf>, String, Option<String>) {
+struct AsmInputs {
+    paths: Vec<PathBuf>,
+    format: String,
+    entity_id: Option<String>,
+    source_selection: Option<(PathBuf, usize)>,
+}
+
+fn parse_asm_inputs(args: &[String]) -> AsmInputs {
     let mut paths = Vec::new();
     let mut format = "text".to_string();
     let mut entity_id = None;
+    let mut source_path = None;
+    let mut source_offset = None;
     let mut index = 0;
 
     while index < args.len() {
@@ -618,6 +674,25 @@ fn parse_asm_inputs(args: &[String]) -> (Vec<PathBuf>, String, Option<String>) {
                 entity_id = Some(value.clone());
                 index += 2;
             }
+            "--source" => {
+                let Some(value) = args.get(index + 1) else {
+                    eprintln!("missing value for --source");
+                    process::exit(1);
+                };
+                source_path = Some(PathBuf::from(value));
+                index += 2;
+            }
+            "--offset" => {
+                let Some(value) = args.get(index + 1) else {
+                    eprintln!("missing value for --offset");
+                    process::exit(1);
+                };
+                source_offset = Some(value.parse::<usize>().unwrap_or_else(|_| {
+                    eprintln!("invalid byte offset: {value}");
+                    process::exit(1);
+                }));
+                index += 2;
+            }
             option if option.starts_with('-') => {
                 eprintln!("unknown option: {option}");
                 process::exit(1);
@@ -634,7 +709,25 @@ fn parse_asm_inputs(args: &[String]) -> (Vec<PathBuf>, String, Option<String>) {
         print_usage_and_exit();
     }
 
-    (paths, format, entity_id)
+    let source_selection = match (source_path, source_offset) {
+        (Some(path), Some(offset)) => Some((path, offset)),
+        (None, None) => None,
+        _ => {
+            eprintln!("--source and --offset must be used together");
+            process::exit(1);
+        }
+    };
+    if entity_id.is_some() && source_selection.is_some() {
+        eprintln!("--entity cannot be combined with --source or --offset");
+        process::exit(1);
+    }
+
+    AsmInputs {
+        paths,
+        format,
+        entity_id,
+        source_selection,
+    }
 }
 
 fn parse_check_inputs(args: &[String]) -> (Vec<PathBuf>, String, Vec<String>, ParseSeverity) {
@@ -1761,7 +1854,7 @@ fn write_build_artifacts(
 fn print_usage_and_exit() -> ! {
     eprintln!("usage:");
     eprintln!("  ezc_cli explain <file> [--format text|json]");
-    eprintln!("  ezc_cli asm <file> [--entity semantic-id] [--format text|json]");
+    eprintln!("  ezc_cli asm <file> [--entity semantic-id | --source path --offset byte] [--format text|json]");
     eprintln!(
         "  ezc_cli check <file> [file...] [--format text|json] [--category parser|compiler|validation] [--fail-on error|warning|info]"
     );

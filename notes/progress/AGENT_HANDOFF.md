@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: cli: add asm entity inspection
+* Latest commit: cli: add asm source selection
 * Working tree: clean after committing this slice
-* Date: 2026-07-11 13:25:03 PDT
+* Date: 2026-07-11 13:48:34 PDT
 
 Last completed slice
 
-* Slice: C8-A - ASM entity inspection
-* Summary: Added a developer-facing canonical entity inspection surface to `ezc asm`.
+* Slice: C8-B - ASM entity inspection by source offset
+* Summary: Added deterministic source-driven selection to the ASM inspection CLI.
 * Key files: README.md, crates/ezc_cli/src/main.rs, crates/ezc_cli/tests/explain.rs
-* New behavior: `ezc_cli asm <file> --entity <semantic-id> [--format text|json]` reports entity kind, owner, provenance, child/descendant containment, incoming/outgoing references, and overlap-based compiler diagnostics. Unknown IDs fail explicitly.
-* Tests added or changed: CLI integration coverage verifies JSON/text inspection and unknown-ID failure.
+* New behavior: `ezc_cli asm <file> --source <path> --offset <byte> [--format text|json]` selects the uniquely narrowest overlapping entity. Empty, tied, malformed, and conflicting selections fail explicitly.
+* Tests added or changed: CLI integration coverage verifies source selection, no-match failure, and selector conflict failure.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C8-A - ASM entity inspection
+* Slice: C8-B - ASM entity inspection by source offset
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A
-* Remaining: C8-B add ASM entity inspection selected by source path and byte offset.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-B
+* Remaining: C8-C add entity inspection filters for children and relations.
 
 Verification
 
@@ -190,6 +190,10 @@ Architecture decisions made
 * Reason: It exposes the canonical semantic model through an existing inspection surface without breaking the established source-summary explain contract.
 * Tradeoff: Users must first obtain a semantic ID from full ASM output; source-position selection and migration of `explain` remain follow-up work.
 
+* Decision: Source-selected inspection chooses the uniquely narrowest overlapping semantic span.
+* Reason: Source selection is useful for nested semantic entities while remaining deterministic and refusing equal-specificity ambiguity rather than silently guessing.
+* Tradeoff: The CLI accepts exact compiler paths and byte offsets only; line/column input, path normalization, source remapping, and user-selectable candidate lists remain future work.
+
 * Decision: Conditional nodes are first-class parser/render/template children with a conditional node ID plus separate start/end boundary IDs.
 * Reason: The compiler needs stable branch identity for tooling and runtime updates, while the DOM needs comment anchors that can bound branch replacement without a wrapper element.
 * Tradeoff: Runtime manifests serialize branch HTML snippets for this first slice instead of recursively hydrating dynamic bindings/events inside branch snippets.
@@ -287,11 +291,11 @@ Known limitations
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 * Item: Check policy is selected per CLI invocation. Project policy files, presets, and policy discovery are not interpreted yet.
 * Item: Parser diagnostic labels expose only `line`, `column`, `start`, and `end`; parser label messages and rendered source excerpts are not available yet. Compiler provenance in check JSON is optional, and ASM validation diagnostics still have no provenance field.
-* Item: ASM query APIs expose ownership traversal, broad entity kinds, entity/reference provenance lookup, and reference-kind filtering. `asm --entity` requires a known semantic ID; source-position selection, composite queries, path normalization, source remapping, and CLI query arguments remain future work.
+* Item: ASM query APIs expose ownership traversal, broad entity kinds, entity/reference provenance lookup, and reference-kind filtering. `asm` supports semantic-ID or source-byte selection; composite filters, line/column input, path normalization, source remapping, and CLI query arguments remain future work.
 
 Exact next step
 
-Start C8-B - Add source-path and byte-offset entity selection to `ezc asm` using C7-D provenance queries. Preserve C8-A entity document semantics and explicit unknown/ambiguous selection behavior; do not change legacy `explain`.
+Start C8-C - Add child and relation filtering to ASM entity inspection while preserving C8-A/B document semantics and deterministic selection. Do not change legacy `explain` or mutate the ASM.
 
 Useful commands
 

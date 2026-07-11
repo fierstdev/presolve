@@ -269,6 +269,43 @@ fn asm_command_rejects_unknown_semantic_entity() {
 }
 
 #[test]
+fn asm_command_inspects_entity_selected_by_source_offset() {
+    let path = "fixtures/0001-source-summary/input/Counter.tsx";
+    let entity_id =
+        "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/state:count";
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args([
+            "asm", path, "--source", path, "--offset", "79", "--format", "json",
+        ])
+        .output()
+        .expect("failed to inspect ASM entity by source offset");
+
+    assert!(output.status.success());
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("entity JSON");
+    assert_eq!(document["entity"]["id"], entity_id);
+
+    let no_entity = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["asm", path, "--source", path, "--offset", "100000"])
+        .output()
+        .expect("failed to inspect missing source offset");
+    assert!(!no_entity.status.success());
+    assert!(String::from_utf8_lossy(&no_entity.stderr).contains("no ASM entity"));
+
+    let conflicting_selector = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args([
+            "asm", path, "--entity", entity_id, "--source", path, "--offset", "79",
+        ])
+        .output()
+        .expect("failed to inspect conflicting ASM selectors");
+    assert!(!conflicting_selector.status.success());
+    assert!(String::from_utf8_lossy(&conflicting_selector.stderr)
+        .contains("--entity cannot be combined"));
+}
+
+#[test]
 fn asm_command_exposes_declared_state_types() {
     let repo_root = repo_root();
     let path = "fixtures/0025-typed-state-annotations/input/TypedState.tsx";

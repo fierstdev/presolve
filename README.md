@@ -60,12 +60,17 @@ containment, relations, and overlap-based compiler diagnostics:
 
 ```sh
 ezc_cli asm <file> --entity <semantic-id> [--format text|json]
+ezc_cli asm <file> --source <path> --offset <byte> [--format text|json]
 ```
 
 Use `ezc_cli asm <file> --format json` to discover the available semantic IDs.
 The selected-entity document includes the entity itself, direct child IDs,
 descendant count, incoming and outgoing references, and related compiler
 diagnostics. An unknown semantic ID fails explicitly.
+
+Source selection chooses the uniquely narrowest semantic span covering the
+given byte offset. No match or tied narrowest spans fail explicitly; `--entity`
+cannot be combined with `--source` or `--offset`.
 
 ## Repository rules
 
