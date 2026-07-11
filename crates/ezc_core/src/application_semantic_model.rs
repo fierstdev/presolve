@@ -110,6 +110,24 @@ impl ApplicationSemanticModel {
     }
 
     #[must_use]
+    pub fn application_roots(&self) -> Vec<&SemanticId> {
+        self.ownership
+            .iter()
+            .filter_map(|(id, owner)| matches!(owner, SemanticOwner::Application).then_some(id))
+            .collect()
+    }
+
+    #[must_use]
+    pub fn children_of(&self, owner: &SemanticId) -> Vec<&SemanticId> {
+        self.ownership
+            .iter()
+            .filter_map(|(id, entity_owner)| {
+                (entity_owner.entity_id() == Some(owner)).then_some(id)
+            })
+            .collect()
+    }
+
+    #[must_use]
     pub fn references_from(&self, id: &SemanticId) -> Vec<&SemanticReference> {
         self.references
             .iter()
@@ -314,6 +332,46 @@ fn collect_ownership(
 mod tests {
     use super::build_application_semantic_model;
     use crate::{SemanticReferenceKind, TemplateSemanticKind};
+
+    #[test]
+    fn traverses_application_ownership_in_semantic_id_order() {
+        let parsed = ezc_parser::parse_file(
+            "src/Counter.tsx",
+            r#"
+@component("x-counter")
+class Counter extends Component {
+  count = state(0);
+
+  increment() {
+    this.count++;
+  }
+
+  render() {
+    return <button onClick={this.increment}>{this.count}</button>;
+  }
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        let component = &asm.components[0];
+        let roots = asm.application_roots();
+
+        assert_eq!(roots, vec![&component.id]);
+        assert_eq!(
+            asm.children_of(&component.id),
+            vec![
+                &component.methods[0].id,
+                &component.methods[1].id,
+                &component.state_fields[0].id,
+                &asm.templates[0].id,
+            ]
+        );
+        assert_eq!(
+            asm.children_of(&component.methods[0].id),
+            vec![&component.actions[0].id]
+        );
+    }
 
     #[test]
     fn resolves_template_state_dependencies() {

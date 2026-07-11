@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: cli: expose compiler diagnostic provenance
+* Latest commit: core: add asm ownership traversal
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 23:39:14 PDT
+* Date: 2026-07-11 03:40:29 PDT
 
 Last completed slice
 
-* Slice: C6-G - Compiler diagnostic provenance in check JSON
-* Summary: Added optional source provenance to compiler diagnostics in `ezc check --format json`.
-* Key files: README.md, crates/ezc_cli/src/main.rs, crates/ezc_cli/tests/explain.rs
-* New behavior: Compiler diagnostics with reliable source locations now include JSON `provenance` using the ASM shape: `path`, `start`, `end`, `line`, and `column`. Diagnostics without reliable locations omit the field.
-* Tests added or changed: JSON integration contracts cover both present and omitted compiler provenance.
+* Slice: C7-A - ASM ownership traversal queries
+* Summary: Added deterministic ownership traversal to the canonical application model.
+* Key files: crates/ezc_core/src/application_semantic_model.rs
+* New behavior: ASM consumers can query application-root semantic IDs with `application_roots()` and direct children with `children_of()`, returned in semantic-ID order.
+* Tests added or changed: Core coverage verifies root, direct component-child, and method-action traversal ordering.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C6-G - Compiler diagnostic provenance in check JSON
+* Slice: C7-A - ASM ownership traversal queries
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G
-* Remaining: C6 check-output provenance series complete; select the next compiler roadmap slice.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A
+* Remaining: C7-B add deterministic transitive ownership traversal for semantic tooling.
 
 Verification
 
@@ -162,6 +162,10 @@ Architecture decisions made
 * Reason: Check consumers receive the same canonical coordinates as ASM inspection without representing missing provenance as an invented location or a misleading null contract.
 * Tradeoff: Only diagnostics with reliable compiler provenance include the field. Source remapping, code frames, and provenance for ASM validation diagnostics remain future work.
 
+* Decision: ASM ownership traversal exposes application roots and direct children as semantic IDs ordered by the canonical ownership map.
+* Reason: Tooling can navigate the compiler-owned hierarchy without rebuilding ownership from public fields or depending on source declaration order.
+* Tradeoff: C7-A is intentionally direct-only; transitive traversal, entity-kind filters, and source-to-semantic lookup remain follow-up query capabilities.
+
 * Decision: Conditional nodes are first-class parser/render/template children with a conditional node ID plus separate start/end boundary IDs.
 * Reason: The compiler needs stable branch identity for tooling and runtime updates, while the DOM needs comment anchors that can bound branch replacement without a wrapper element.
 * Tradeoff: Runtime manifests serialize branch HTML snippets for this first slice instead of recursively hydrating dynamic bindings/events inside branch snippets.
@@ -259,10 +263,11 @@ Known limitations
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 * Item: Check policy is selected per CLI invocation. Project policy files, presets, and policy discovery are not interpreted yet.
 * Item: Parser diagnostic labels expose only `line`, `column`, `start`, and `end`; parser label messages and rendered source excerpts are not available yet. Compiler provenance in check JSON is optional, and ASM validation diagnostics still have no provenance field.
+* Item: ASM ownership queries currently expose only application roots and one direct child level. Transitive walks, filters, reverse source lookup, and CLI query arguments remain future work.
 
 Exact next step
 
-Select the next compiler roadmap slice after the completed C6 check-output provenance series. Preserve the established check JSON schema, parser labels, optional compiler provenance, category filtering, and exit behavior unless the next slice explicitly evolves them.
+Start C7-B - Add deterministic transitive ownership traversal over the canonical ASM while preserving C7-A direct-query ordering and ownership semantics. Do not add CLI syntax or mutate the semantic model.
 
 Useful commands
 
