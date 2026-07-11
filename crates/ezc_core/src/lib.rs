@@ -12,6 +12,7 @@ pub mod explain;
 pub mod html_codegen;
 pub mod model;
 pub mod page_codegen;
+pub mod resume_instance;
 pub mod resume_manifest;
 pub mod resume_plan;
 pub mod runtime_codegen;

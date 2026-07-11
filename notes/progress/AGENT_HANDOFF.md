@@ -3,24 +3,24 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: add resume manifest
+* Latest commit: compiler: add serializable instances
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 19:30:12 PDT
+* Date: 2026-07-10 19:49:12 PDT
 
 Last completed slice
 
-* Slice: Era IV-B - Resume manifest
-* Summary: Added a versioned serialized artifact for compiler-derived resume plans.
-* Key files: crates/ezc_core/src/resume_manifest.rs, crates/ezc_core/src/resume_plan.rs, crates/ezc_core/src/lib.rs
-* New behavior: `ResumeManifest` schema v1 serializes component/state/event semantic references.
+* Slice: Era IV-C - Serializable instance model
+* Summary: Added a serializable component instance payload derived from known ASM state.
+* Key files: crates/ezc_core/src/resume_instance.rs, crates/ezc_core/src/lib.rs
+* New behavior: `SerializableInstance` carries component semantic identity plus serializable initial state keyed by state semantic IDs.
 * Tests added or changed: core suite and clippy pass.
 * Fixtures added or changed: None.
 
 Current in-progress slice
 
-* Slice: Era IV-B - Resume manifest
+* Slice: Era IV-C - Serializable instance model
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-B
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-C
 * Remaining: None
 
 Verification
@@ -134,7 +134,7 @@ Known limitations
 
 Exact next step
 
-Start Era IV-C - Serializable instance model. Define the runtime instance payload derived from the resume manifest.
+Start Era IV-D - Resume diagnostics. Add compiler diagnostics for incomplete or non-resumable instance plans.
 
 Useful commands
 
