@@ -36,7 +36,7 @@ pub mod template_semantics;
 
 pub use application_semantic_model::{
     build_application_semantic_model, build_application_semantic_model_for_unit,
-    ApplicationSemanticModel, SemanticEntity,
+    ApplicationSemanticModel, SemanticEntity, SemanticEntityKind,
 };
 pub use asm_validation::{validate_application_semantic_model, AsmValidationDiagnostic};
 pub use binding_table::{

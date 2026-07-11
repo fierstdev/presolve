@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: core: add asm descendant traversal
+* Latest commit: core: add asm entity kind queries
 * Working tree: clean after committing this slice
-* Date: 2026-07-11 06:47:16 PDT
+* Date: 2026-07-11 06:56:53 PDT
 
 Last completed slice
 
-* Slice: C7-B - ASM transitive ownership traversal
-* Summary: Added deterministic transitive traversal to the canonical application model.
-* Key files: crates/ezc_core/src/application_semantic_model.rs
-* New behavior: `descendants_of()` returns each owned semantic ID in depth-first pre-order, preserving C7-A direct-child semantic-ID ordering.
-* Tests added or changed: Core coverage verifies parent-before-child ordering and complete traversal of a single-root ASM.
+* Slice: C7-C - ASM semantic entity-kind queries
+* Summary: Added typed deterministic filters over canonical semantic entities.
+* Key files: crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/lib.rs
+* New behavior: `SemanticEntityKind` classifies canonical entities and `entities_of_kind()` returns matching semantic IDs in ownership-map order.
+* Tests added or changed: Core coverage verifies stable method, action, and state-field filtering.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C7-B - ASM transitive ownership traversal
+* Slice: C7-C - ASM semantic entity-kind queries
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-B
-* Remaining: C7-C add deterministic semantic entity-kind queries for tooling filters.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-C
+* Remaining: C7-D add source-provenance lookup queries for semantic tooling.
 
 Verification
 
@@ -170,6 +170,10 @@ Architecture decisions made
 * Reason: Consumers encounter each semantic parent before its complete owned subtree while every sibling order remains the canonical semantic-ID order.
 * Tradeoff: The query returns IDs only and does not encode depth, paths, filters, or source lookup results.
 
+* Decision: ASM entity filtering uses a typed `SemanticEntityKind` enum and ownership-map ordering.
+* Reason: Tooling can request stable semantic categories without stringly typed kinds or independent scans of graph-specific collections.
+* Tradeoff: C7-C filters only the broad canonical entity categories; template subkinds, composite predicates, and source-location predicates remain follow-up work.
+
 * Decision: Conditional nodes are first-class parser/render/template children with a conditional node ID plus separate start/end boundary IDs.
 * Reason: The compiler needs stable branch identity for tooling and runtime updates, while the DOM needs comment anchors that can bound branch replacement without a wrapper element.
 * Tradeoff: Runtime manifests serialize branch HTML snippets for this first slice instead of recursively hydrating dynamic bindings/events inside branch snippets.
@@ -267,11 +271,11 @@ Known limitations
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 * Item: Check policy is selected per CLI invocation. Project policy files, presets, and policy discovery are not interpreted yet.
 * Item: Parser diagnostic labels expose only `line`, `column`, `start`, and `end`; parser label messages and rendered source excerpts are not available yet. Compiler provenance in check JSON is optional, and ASM validation diagnostics still have no provenance field.
-* Item: ASM ownership queries expose roots, direct children, and depth-first descendants. Entity-kind filters, depth metadata, reverse source lookup, and CLI query arguments remain future work.
+* Item: ASM ownership queries expose roots, direct children, descendants, and broad entity-kind filters. Depth metadata, template subkind/composite filters, reverse source lookup, and CLI query arguments remain future work.
 
 Exact next step
 
-Start C7-C - Add deterministic semantic entity-kind queries for tooling filters while preserving C7-A/B ownership traversal ordering and read-only ASM semantics. Do not add CLI syntax or mutate the semantic model.
+Start C7-D - Add deterministic source-provenance lookup queries for semantic tooling while preserving C7 ownership and entity-kind ordering. Do not add CLI syntax or mutate the semantic model.
 
 Useful commands
 

@@ -38,6 +38,32 @@ pub enum SemanticEntity<'a> {
     TemplateEntity(&'a TemplateSemanticEntity),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SemanticEntityKind {
+    Component,
+    StateField,
+    Method,
+    Action,
+    EventHandler,
+    Template,
+    TemplateEntity,
+}
+
+impl SemanticEntity<'_> {
+    #[must_use]
+    pub fn kind(self) -> SemanticEntityKind {
+        match self {
+            Self::Component(_) => SemanticEntityKind::Component,
+            Self::StateField(_) => SemanticEntityKind::StateField,
+            Self::Method(_) => SemanticEntityKind::Method,
+            Self::Action(_) => SemanticEntityKind::Action,
+            Self::EventHandler(_) => SemanticEntityKind::EventHandler,
+            Self::Template(_) => SemanticEntityKind::Template,
+            Self::TemplateEntity(_) => SemanticEntityKind::TemplateEntity,
+        }
+    }
+}
+
 impl ApplicationSemanticModel {
     #[must_use]
     pub fn entity(&self, id: &SemanticId) -> Option<SemanticEntity<'_>> {
@@ -132,6 +158,14 @@ impl ApplicationSemanticModel {
         let mut descendants = Vec::new();
         self.collect_descendants(owner, &mut descendants);
         descendants
+    }
+
+    #[must_use]
+    pub fn entities_of_kind(&self, kind: SemanticEntityKind) -> Vec<&SemanticId> {
+        self.ownership
+            .keys()
+            .filter(|id| self.entity(id).is_some_and(|entity| entity.kind() == kind))
+            .collect()
     }
 
     fn collect_descendants<'a>(
@@ -349,7 +383,7 @@ fn collect_ownership(
 #[cfg(test)]
 mod tests {
     use super::build_application_semantic_model;
-    use crate::{SemanticReferenceKind, TemplateSemanticKind};
+    use crate::{SemanticEntityKind, SemanticReferenceKind, TemplateSemanticKind};
 
     #[test]
     fn traverses_application_ownership_in_semantic_id_order() {
@@ -394,6 +428,18 @@ class Counter extends Component {
         assert_eq!(descendants[1], &component.actions[0].id);
         assert_eq!(descendants[2], &component.methods[1].id);
         assert_eq!(descendants.len(), asm.ownership.len() - 1);
+        assert_eq!(
+            asm.entities_of_kind(SemanticEntityKind::Method),
+            vec![&component.methods[0].id, &component.methods[1].id]
+        );
+        assert_eq!(
+            asm.entities_of_kind(SemanticEntityKind::Action),
+            vec![&component.actions[0].id]
+        );
+        assert_eq!(
+            asm.entities_of_kind(SemanticEntityKind::StateField),
+            vec![&component.state_fields[0].id]
+        );
     }
 
     #[test]
