@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::path::Path;
 
 use ezc_parser::ParsedFile;
 
@@ -165,6 +166,27 @@ impl ApplicationSemanticModel {
         self.ownership
             .keys()
             .filter(|id| self.entity(id).is_some_and(|entity| entity.kind() == kind))
+            .collect()
+    }
+
+    #[must_use]
+    pub fn entities_in_file(&self, path: &Path) -> Vec<&SemanticId> {
+        self.provenance
+            .iter()
+            .filter_map(|(id, provenance)| (provenance.path == path).then_some(id))
+            .collect()
+    }
+
+    #[must_use]
+    pub fn entities_at(&self, path: &Path, offset: usize) -> Vec<&SemanticId> {
+        self.provenance
+            .iter()
+            .filter_map(|(id, provenance)| {
+                (provenance.path == path
+                    && provenance.span.start <= offset
+                    && offset < provenance.span.end)
+                    .then_some(id)
+            })
             .collect()
     }
 
@@ -440,6 +462,20 @@ class Counter extends Component {
             asm.entities_of_kind(SemanticEntityKind::StateField),
             vec![&component.state_fields[0].id]
         );
+        let state_id = &component.state_fields[0].id;
+        let state_provenance = asm.provenance(state_id).expect("state provenance");
+        assert_eq!(
+            asm.entities_in_file(state_provenance.path.as_path()).len(),
+            asm.ownership.len()
+        );
+        let at_state =
+            asm.entities_at(state_provenance.path.as_path(), state_provenance.span.start);
+        assert!(at_state.contains(&state_id));
+        assert!(at_state.iter().all(|id| {
+            let provenance = asm.provenance(id).expect("entity provenance");
+            provenance.span.start <= state_provenance.span.start
+                && state_provenance.span.start < provenance.span.end
+        }));
     }
 
     #[test]
