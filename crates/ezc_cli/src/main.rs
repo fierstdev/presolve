@@ -169,6 +169,10 @@ fn asm_inspection_json(
         .map(|diagnostic| AsmInspectionDiagnostic {
             code: &diagnostic.code,
             message: &diagnostic.message,
+            provenance: diagnostic
+                .provenance
+                .as_ref()
+                .map(AsmInspectionProvenance::from),
         })
         .collect::<Vec<_>>();
     diagnostics.sort_by(|left, right| (left.code, left.message).cmp(&(right.code, right.message)));
@@ -178,6 +182,7 @@ fn asm_inspection_json(
         .map(|diagnostic| AsmInspectionDiagnostic {
             code: &diagnostic.code,
             message: &diagnostic.message,
+            provenance: None,
         })
         .collect::<Vec<_>>();
     validation.sort_by(|left, right| (left.code, left.message).cmp(&(right.code, right.message)));
@@ -352,6 +357,8 @@ struct AsmInspectionReference<'a> {
 struct AsmInspectionDiagnostic<'a> {
     code: &'a str,
     message: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    provenance: Option<AsmInspectionProvenance>,
 }
 
 #[derive(Serialize)]

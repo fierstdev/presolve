@@ -294,6 +294,48 @@ fn asm_command_reports_primitive_declared_state_type_mismatches() {
                 message.contains("declares") && message.contains("initializes")
             })
     }));
+
+    let count = diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("state field `count`"))
+        })
+        .expect("count mismatch diagnostic");
+    assert_eq!(
+        count["provenance"]["path"],
+        "fixtures/0027-declared-state-type-diagnostics/input/InvalidTypedState.tsx"
+    );
+    assert_eq!(count["provenance"]["line"], 3);
+    assert_eq!(count["provenance"]["column"], 8);
+}
+
+#[test]
+fn asm_command_omits_unavailable_diagnostic_provenance() {
+    let repo_root = repo_root();
+    let path = "fixtures/0003-semantic-errors/input/BrokenSemantics.tsx";
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["asm", path, "--format", "json"])
+        .output()
+        .expect("failed to run semantic-errors ezc_cli asm --format json");
+
+    assert!(output.status.success());
+
+    let document: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("ASM inspection output was not valid JSON");
+    let diagnostic = document["diagnostics"]
+        .as_array()
+        .and_then(|diagnostics| {
+            diagnostics
+                .iter()
+                .find(|diagnostic| diagnostic["code"] == "EZC1003")
+        })
+        .expect("unlocated semantic diagnostic");
+
+    assert!(diagnostic.get("provenance").is_none());
 }
 
 #[test]

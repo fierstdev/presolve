@@ -209,6 +209,7 @@ pub struct RenderModel {
 pub struct ComponentDiagnostic {
     pub code: String,
     pub message: String,
+    pub provenance: Option<SourceProvenance>,
 }
 
 #[must_use]
@@ -254,6 +255,7 @@ fn build_component_graph_with_identity(
 
     if parsed.classes.is_empty() && parsed.diagnostics.is_empty() {
         diagnostics.push(ComponentDiagnostic {
+            provenance: None,
             code: "EZC1000".to_string(),
             message: "no component classes found".to_string(),
         });
@@ -278,6 +280,7 @@ fn build_component_node(
 
     if element_name.is_none() {
         diagnostics.push(ComponentDiagnostic {
+            provenance: None,
             code: "EZC1001".to_string(),
             message: format!("class `{}` is missing @component(...)", class.name),
         });
@@ -343,6 +346,7 @@ fn build_component_node(
 
     if render.is_none() {
         diagnostics.push(ComponentDiagnostic {
+            provenance: None,
             code: "EZC1002".to_string(),
             message: format!("class `{}` is missing render()", class.name),
         });
@@ -385,11 +389,10 @@ fn collect_declared_state_type_diagnostics(
     diagnostics: &mut Vec<ComponentDiagnostic>,
 ) {
     for field in state_fields {
-        let Some(declared_type_kind) = field
-            .declared_type
-            .as_ref()
-            .and_then(|declared_type| declared_type.kind)
-        else {
+        let Some(declared_type) = field.declared_type.as_ref() else {
+            continue;
+        };
+        let Some(declared_type_kind) = declared_type.kind else {
             continue;
         };
         let Some(initial_value_kind) = field
@@ -402,6 +405,7 @@ fn collect_declared_state_type_diagnostics(
 
         if declared_type_kind != initial_value_kind {
             diagnostics.push(ComponentDiagnostic {
+                provenance: Some(declared_type.provenance.clone()),
                 code: "EZC1016".to_string(),
                 message: format!(
                     "state field `{}` in class `{class_name}` declares `{}` but initializes with `{}`",
@@ -505,6 +509,7 @@ fn collect_render_binding_diagnostics(
         if let Some(name) = this_member_name(binding) {
             if !property_names.contains(&name) {
                 diagnostics.push(ComponentDiagnostic {
+                    provenance: None,
                     code: "EZC1003".to_string(),
                     message: format!(
                         "render binding `{binding}` references unknown field `{name}` in class `{}`",
@@ -530,6 +535,7 @@ fn collect_render_event_diagnostics(
     for event_handler in render_event_handlers(render) {
         if event_handler.event != "click" {
             diagnostics.push(ComponentDiagnostic {
+                provenance: None,
                 code: "EZC1005".to_string(),
                 message: format!(
                     "event `{}` is not supported yet in class `{}`",
@@ -541,6 +547,7 @@ fn collect_render_event_diagnostics(
         if let Some(name) = this_member_name(&event_handler.handler) {
             if !method_names.contains(&name) {
                 diagnostics.push(ComponentDiagnostic {
+                    provenance: None,
                     code: "EZC1004".to_string(),
                     message: format!(
                         "event handler `{}` references unknown method `{name}` in class `{}`",
@@ -1039,6 +1046,7 @@ fn collect_list_diagnostics(
 ) {
     if list.key_expression.is_empty() {
         diagnostics.push(ComponentDiagnostic {
+            provenance: None,
             code: "EZC1011".to_string(),
             message: format!(
                 "list over `{}` in class `{class_name}` is missing a `key={{...}}` attribute; stable keys are required for retained-node reconciliation",
@@ -1050,6 +1058,7 @@ fn collect_list_diagnostics(
 
     if list.index_variable.as_deref() == Some(list.key_expression.as_str()) {
         diagnostics.push(ComponentDiagnostic {
+            provenance: None,
             code: "EZC1012".to_string(),
             message: format!(
                 "list key `{}` in class `{class_name}` uses the iteration index; index keys are unstable when items move",
@@ -1062,6 +1071,7 @@ fn collect_list_diagnostics(
     let member_path = list_member_key_path(list);
     if list.key_expression != list.item_variable && member_path.is_none() {
         diagnostics.push(ComponentDiagnostic {
+            provenance: None,
             code: "EZC1013".to_string(),
             message: format!(
                 "list key `{}` in class `{class_name}` is not supported yet; use the item variable `{}` or one of its object members",
@@ -1087,6 +1097,7 @@ fn collect_list_diagnostics(
         let key_value = member_path.map_or(Some(value), |path| value.member_path_value(path));
         let Some(key) = key_value.and_then(list_key_from_static_value) else {
             diagnostics.push(ComponentDiagnostic {
+                provenance: None,
                 code: "EZC1015".to_string(),
                 message: member_path.map_or_else(
                     || format!(
@@ -1104,6 +1115,7 @@ fn collect_list_diagnostics(
 
         if keys.contains(&key) {
             diagnostics.push(ComponentDiagnostic {
+                provenance: None,
                 code: "EZC1014".to_string(),
                 message: format!(
                     "list key `{}` resolves to duplicate initial value `{key}` in class `{class_name}`; keyed reconciliation requires unique keys",
@@ -1195,6 +1207,7 @@ fn collect_attribute_diagnostics_for_attributes(
         if !attribute.name.starts_with("on") {
             if seen.contains(&attribute.name.as_str()) {
                 diagnostics.push(ComponentDiagnostic {
+                    provenance: None,
                     code: "EZC1007".to_string(),
                     message: format!(
                         "attribute `{}` is declared more than once on the same element in class `{}`",
@@ -1222,6 +1235,7 @@ fn collect_attribute_diagnostics_for_attributes(
                     Some(field_name)
                         if state_fields.iter().any(|field| field.name == field_name) => {}
                     Some(field_name) => diagnostics.push(ComponentDiagnostic {
+                        provenance: None,
                         code: "EZC1003".to_string(),
                         message: format!(
                             "attribute binding `{}` references unknown state field `{field_name}` in class `{}`",
@@ -1229,6 +1243,7 @@ fn collect_attribute_diagnostics_for_attributes(
                         ),
                     }),
                     None => diagnostics.push(ComponentDiagnostic {
+                        provenance: None,
                         code: "EZC1008".to_string(),
                         message: format!(
                             "attribute `{}` uses an unsupported expression value in class `{}`",
@@ -1239,6 +1254,7 @@ fn collect_attribute_diagnostics_for_attributes(
             }
             RenderAttributeValue::Spread(_) => {
                 diagnostics.push(ComponentDiagnostic {
+                    provenance: None,
                     code: "EZC1009".to_string(),
                     message: format!(
                         "JSX spread attributes are not supported yet in class `{class_name}`"
@@ -1247,6 +1263,7 @@ fn collect_attribute_diagnostics_for_attributes(
             }
             RenderAttributeValue::Unsupported if !is_event_attribute(&attribute.name) => {
                 diagnostics.push(ComponentDiagnostic {
+                    provenance: None,
                     code: "EZC1010".to_string(),
                     message: format!(
                         "attribute `{}` uses an unsupported JSX value in class `{}`",
@@ -1398,6 +1415,7 @@ fn collect_duplicate_events_for_handlers(
     for event_handler in event_handlers {
         if seen.contains(&event_handler.event.as_str()) {
             diagnostics.push(ComponentDiagnostic {
+                provenance: None,
                 code: "EZC1006".to_string(),
                 message: format!(
                     "event `{}` is declared more than once on the same element in class `{}`",

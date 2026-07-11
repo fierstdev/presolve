@@ -497,6 +497,17 @@ class Panel extends Component {
                 ),
             ]
         );
+
+        let provenance = graph.diagnostics[0]
+            .provenance
+            .as_ref()
+            .expect("mismatch diagnostic provenance");
+        assert_eq!(
+            provenance.path,
+            Path::new("fixtures/0027-declared-state-type-diagnostics/input/InvalidTypedState.tsx")
+        );
+        assert_eq!(provenance.span.line, 3);
+        assert_eq!(provenance.span.column, 8);
     }
 
     #[test]
