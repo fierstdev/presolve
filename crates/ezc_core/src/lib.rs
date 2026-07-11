@@ -511,6 +511,58 @@ class Panel extends Component {
     }
 
     #[test]
+    fn reports_primitive_declared_state_action_assignment_mismatches() {
+        let source = include_str!(
+            "../../../fixtures/0028-primitive-action-type-diagnostics/input/InvalidTypedActions.tsx"
+        );
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0028-primitive-action-type-diagnostics/input/InvalidTypedActions.tsx",
+            source,
+        );
+        let graph = build_component_graph_for_module(&parsed);
+        let diagnostics = graph
+            .diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.code.as_str(), diagnostic.message.as_str()))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            diagnostics,
+            vec![
+                (
+                    "EZC1017",
+                    "state field `count` in class `InvalidTypedActions` declares `number` but action `apply` assigns `string`",
+                ),
+                (
+                    "EZC1017",
+                    "state field `title` in class `InvalidTypedActions` declares `string` but action `apply` assigns `number`",
+                ),
+                (
+                    "EZC1017",
+                    "state field `enabled` in class `InvalidTypedActions` declares `boolean` but action `apply` assigns `null`",
+                ),
+                (
+                    "EZC1017",
+                    "state field `empty` in class `InvalidTypedActions` declares `null` but action `apply` assigns `boolean`",
+                ),
+            ]
+        );
+
+        let provenance = graph.diagnostics[0]
+            .provenance
+            .as_ref()
+            .expect("action mismatch diagnostic provenance");
+        assert_eq!(
+            provenance.path,
+            Path::new(
+                "fixtures/0028-primitive-action-type-diagnostics/input/InvalidTypedActions.tsx"
+            )
+        );
+        assert_eq!(provenance.span.line, 11);
+        assert_eq!(provenance.span.column, 5);
+    }
+
+    #[test]
     fn assembles_application_semantic_model_from_multiple_files() {
         let unit = CompilationUnit::parse_sources([
             (

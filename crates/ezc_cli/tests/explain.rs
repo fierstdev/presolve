@@ -339,6 +339,46 @@ fn asm_command_omits_unavailable_diagnostic_provenance() {
 }
 
 #[test]
+fn asm_command_reports_primitive_action_type_mismatches() {
+    let repo_root = repo_root();
+    let path = "fixtures/0028-primitive-action-type-diagnostics/input/InvalidTypedActions.tsx";
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["asm", path, "--format", "json"])
+        .output()
+        .expect("failed to run invalid typed-actions ezc_cli asm --format json");
+
+    assert!(output.status.success());
+
+    let document: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("ASM inspection output was not valid JSON");
+    let diagnostics = document["diagnostics"]
+        .as_array()
+        .expect("ASM inspection diagnostics");
+
+    assert_eq!(diagnostics.len(), 4);
+    assert!(diagnostics.iter().all(|diagnostic| {
+        diagnostic["code"] == "EZC1017"
+            && diagnostic["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("action `apply` assigns"))
+    }));
+
+    let count = diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("state field `count`"))
+        })
+        .expect("count action mismatch diagnostic");
+    assert_eq!(count["provenance"]["path"], path);
+    assert_eq!(count["provenance"]["line"], 11);
+    assert_eq!(count["provenance"]["column"], 5);
+}
+
+#[test]
 fn parse_command_matches_valid_counter_fixture() {
     let repo_root = repo_root();
 
