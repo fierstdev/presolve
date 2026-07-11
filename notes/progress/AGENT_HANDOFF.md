@@ -3,24 +3,24 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: add global semantic ids
+* Latest commit: compiler: model semantic ownership
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 19:08:52 PDT
+* Date: 2026-07-10 19:14:05 PDT
 
 Last completed slice
 
-* Slice: ASM-1 - Global semantic IDs
-* Summary: Added typed, component-scoped semantic identities to establish the first stable cross-graph compiler contract for the Application Semantic Model transition.
+* Slice: ASM-2 - Semantic ownership
+* Summary: Added explicit typed owner relationships across the named component and template semantics introduced in ASM-1.
 * Key files: crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/lib.rs
-* New behavior: Components, state fields, methods, actions, and rendered templates receive readable semantic IDs derived from the application-facing component element name. IDs remain stable when unrelated component declaration order changes.
-* Tests added or changed: semantic-ID derivation and invalid-component fallback tests, component/template identity assertions, and a two-component declaration-order regression.
+* New behavior: Component roots are owned by the application; state fields, methods, and rendered templates are owned by their component; action steps are owned by their defining method.
+* Tests added or changed: ownership root/entity type coverage, component ownership assertions, action ownership expectations, and template ownership assertions.
 * Fixtures added or changed: None; this slice deliberately does not alter CLI, HTML, manifest, or runtime artifacts.
 
 Current in-progress slice
 
-* Slice: ASM-1 - Global semantic IDs
+* Slice: ASM-2 - Semantic ownership
 * Status: Complete
-* Completed: ASM-1 - Global semantic IDs
+* Completed: ASM-1 - Global semantic IDs; ASM-2 - Semantic ownership
 * Remaining: None
 
 Verification
@@ -79,6 +79,12 @@ Architecture decisions made
 * Decision: Semantic IDs do not change template manifests, static HTML, or runtime artifacts in ASM-1.
 * Reason: This establishes a compiler-platform contract without forcing a backend schema change before ownership and cross-reference semantics exist.
 * Tradeoff: Semantic IDs are inspectable through compiler APIs only until the planned `ez asm` CLI slice.
+* Decision: Ownership is a typed relationship with either the application root or a direct owning `SemanticId`.
+* Reason: The compiler can distinguish top-level component roots from semantic children without reserving a synthetic application ID before the Application Semantic Model exists.
+* Tradeoff: Ownership is currently stored on existing graph entities rather than in a centralized ASM relation table; the query API and ASM shell will consolidate access later.
+* Decision: Component state, methods, and rendered templates are component-owned; action steps are method-owned.
+* Reason: These are the direct lexical/semantic containment relationships already established by the current frontend and action model.
+* Tradeoff: Render-tree descendants do not yet have semantic IDs, so their ownership remains deferred until a later ASM slice extends semantic identity below the template root.
 
 Known limitations
 
@@ -96,14 +102,14 @@ Known limitations
 * Item: Runtime schema compatibility is exact-match only; no backward/forward manifest migration exists yet.
 * Item: Source spans are available on parser/render/template structures and CLI development output, but runtime manifests intentionally omit source metadata for now.
 * Item: Fragment nodes are visible in compiler/template output but intentionally omitted from runtime manifests until a runtime range-anchor use case appears.
-* Item: Semantic IDs currently cover components, state fields, methods, action steps, and rendered templates. Template descendants still use backend-local `n*` IDs until the ownership model assigns semantic identity across the full render tree.
-* Item: Duplicate component semantic identities, cross-references, source provenance, validation, and CLI inspection are intentionally deferred to ASM-2 through ASM-8.
+* Item: Semantic IDs and direct ownership currently cover components, state fields, methods, action steps, and rendered templates. Template descendants still use backend-local `n*` IDs and have no semantic ownership yet.
+* Item: Ownership has no centralized relation table or query API yet. Duplicate component semantic identities, cross-references, source provenance, validation, and CLI inspection remain deferred to ASM-3 through ASM-8.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 
 Exact next step
 
-Start ASM-2 - Semantic ownership. Define explicit parent/owner relationships across component, state, method, action, and template semantics using the new `SemanticId` contract.
+Start ASM-3 - Cross-reference resolution. Build explicit semantic references between existing IDs, beginning with actions to their target state fields and event handlers to their target methods.
 
 Useful commands
 

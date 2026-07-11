@@ -12,6 +12,28 @@ use serde::Serialize;
 #[serde(transparent)]
 pub struct SemanticId(String);
 
+/// Direct owner of a semantic entity within one compiled application.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SemanticOwner {
+    Application,
+    Entity(SemanticId),
+}
+
+impl SemanticOwner {
+    #[must_use]
+    pub fn entity(id: SemanticId) -> Self {
+        Self::Entity(id)
+    }
+
+    #[must_use]
+    pub fn entity_id(&self) -> Option<&SemanticId> {
+        match self {
+            Self::Application => None,
+            Self::Entity(id) => Some(id),
+        }
+    }
+}
+
 impl SemanticId {
     #[must_use]
     pub fn component(element_name: Option<&str>, class_name: &str) -> Self {
@@ -56,7 +78,7 @@ impl fmt::Display for SemanticId {
 
 #[cfg(test)]
 mod tests {
-    use super::SemanticId;
+    use super::{SemanticId, SemanticOwner};
 
     #[test]
     fn derives_component_scoped_ids() {
@@ -86,6 +108,17 @@ mod tests {
         assert_eq!(
             SemanticId::component(None, "MissingDecorator").as_str(),
             "component:MissingDecorator"
+        );
+    }
+
+    #[test]
+    fn distinguishes_application_roots_from_entity_owners() {
+        let component = SemanticId::component(Some("x-counter"), "Counter");
+
+        assert_eq!(SemanticOwner::Application.entity_id(), None);
+        assert_eq!(
+            SemanticOwner::entity(component.clone()).entity_id(),
+            Some(&component)
         );
     }
 }

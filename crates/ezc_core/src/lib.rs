@@ -27,7 +27,7 @@ pub use model::{
 };
 pub use page_codegen::generate_standalone_page;
 pub use runtime_codegen::generate_runtime_stub;
-pub use semantic_id::SemanticId;
+pub use semantic_id::{SemanticId, SemanticOwner};
 pub use summarize::summarize_source;
 pub use template_graph::{
     build_template_graph, AttributeValue, ConditionalNode, ElementNode, FragmentNode, ListNode,
@@ -137,6 +137,7 @@ class Counter extends Component {
 
         assert_eq!(component.class_name, "Counter");
         assert_eq!(component.id.as_str(), "component:x-counter");
+        assert_eq!(component.owner, SemanticOwner::Application);
         assert_eq!(component.element_name.as_deref(), Some("x-counter"));
         assert_eq!(component.route_path.as_deref(), Some("/counter"));
 
@@ -145,6 +146,10 @@ class Counter extends Component {
         assert_eq!(
             component.state_fields[0].id.as_str(),
             "component:x-counter/state:count"
+        );
+        assert_eq!(
+            component.state_fields[0].owner,
+            SemanticOwner::entity(component.id.clone())
         );
         assert_eq!(
             component.state_fields[0].initial_value,
@@ -163,9 +168,16 @@ class Counter extends Component {
             "component:x-counter/method:increment"
         );
         assert_eq!(
+            component.methods[0].owner,
+            SemanticOwner::entity(component.id.clone())
+        );
+        assert_eq!(
             component.actions,
             vec![ComponentAction {
                 id: SemanticId::component(Some("x-counter"), "Counter").action("increment", 0),
+                owner: SemanticOwner::entity(
+                    SemanticId::component(Some("x-counter"), "Counter").method("increment"),
+                ),
                 method: "increment".to_string(),
                 operation: StateOperation::AddAssign(SerializableValue::Number("1".to_string())),
                 field: "count".to_string(),
@@ -331,6 +343,10 @@ class Counter extends Component {
             vec![ComponentAction {
                 id: SemanticId::component(Some("x-nested-counter"), "NestedCounter")
                     .action("increment", 0),
+                owner: SemanticOwner::entity(
+                    SemanticId::component(Some("x-nested-counter"), "NestedCounter")
+                        .method("increment"),
+                ),
                 method: "increment".to_string(),
                 operation: StateOperation::Increment,
                 field: "count".to_string(),
@@ -356,6 +372,10 @@ class Counter extends Component {
             vec![ComponentAction {
                 id: SemanticId::component(Some("x-decrement-counter"), "DecrementCounter")
                     .action("decrement", 0),
+                owner: SemanticOwner::entity(
+                    SemanticId::component(Some("x-decrement-counter"), "DecrementCounter")
+                        .method("decrement"),
+                ),
                 method: "decrement".to_string(),
                 operation: StateOperation::Decrement,
                 field: "count".to_string(),
@@ -382,6 +402,10 @@ class Counter extends Component {
                 ComponentAction {
                     id: SemanticId::component(Some("x-step-counter"), "StepCounter")
                         .action("addTwo", 0),
+                    owner: SemanticOwner::entity(
+                        SemanticId::component(Some("x-step-counter"), "StepCounter")
+                            .method("addTwo"),
+                    ),
                     method: "addTwo".to_string(),
                     operation: StateOperation::AddAssign(SerializableValue::Number(
                         "2".to_string()
@@ -391,6 +415,10 @@ class Counter extends Component {
                 ComponentAction {
                     id: SemanticId::component(Some("x-step-counter"), "StepCounter")
                         .action("subtractThree", 0),
+                    owner: SemanticOwner::entity(
+                        SemanticId::component(Some("x-step-counter"), "StepCounter")
+                            .method("subtractThree"),
+                    ),
                     method: "subtractThree".to_string(),
                     operation: StateOperation::SubtractAssign(SerializableValue::Number(
                         "3".to_string()
@@ -419,6 +447,9 @@ class Counter extends Component {
             vec![ComponentAction {
                 id: SemanticId::component(Some("x-reset-counter"), "ResetCounter")
                     .action("reset", 0),
+                owner: SemanticOwner::entity(
+                    SemanticId::component(Some("x-reset-counter"), "ResetCounter").method("reset"),
+                ),
                 method: "reset".to_string(),
                 operation: StateOperation::Assign(SerializableValue::Number("0".to_string())),
                 field: "count".to_string(),
@@ -440,6 +471,9 @@ class Counter extends Component {
             component.actions,
             vec![ComponentAction {
                 id: SemanticId::component(Some("x-toggle-flag"), "ToggleFlag").action("toggle", 0),
+                owner: SemanticOwner::entity(
+                    SemanticId::component(Some("x-toggle-flag"), "ToggleFlag").method("toggle"),
+                ),
                 method: "toggle".to_string(),
                 operation: StateOperation::Toggle,
                 field: "enabled".to_string(),
@@ -467,6 +501,14 @@ class Counter extends Component {
                     id:
                         SemanticId::component(Some("x-batch-action-counter"), "BatchActionCounter",)
                             .action("apply", 0),
+                    owner:
+                        SemanticOwner::entity(
+                            SemanticId::component(
+                                Some("x-batch-action-counter"),
+                                "BatchActionCounter",
+                            )
+                            .method("apply"),
+                        ),
                     method: "apply".to_string(),
                     operation: StateOperation::AddAssign(SerializableValue::Number(
                         "2".to_string()
@@ -477,6 +519,14 @@ class Counter extends Component {
                     id:
                         SemanticId::component(Some("x-batch-action-counter"), "BatchActionCounter",)
                             .action("apply", 1),
+                    owner:
+                        SemanticOwner::entity(
+                            SemanticId::component(
+                                Some("x-batch-action-counter"),
+                                "BatchActionCounter",
+                            )
+                            .method("apply"),
+                        ),
                     method: "apply".to_string(),
                     operation: StateOperation::Decrement,
                     field: "count".to_string(),
@@ -485,6 +535,14 @@ class Counter extends Component {
                     id:
                         SemanticId::component(Some("x-batch-action-counter"), "BatchActionCounter",)
                             .action("apply", 2),
+                    owner:
+                        SemanticOwner::entity(
+                            SemanticId::component(
+                                Some("x-batch-action-counter"),
+                                "BatchActionCounter",
+                            )
+                            .method("apply"),
+                        ),
                     method: "apply".to_string(),
                     operation: StateOperation::Assign(SerializableValue::Number("8".to_string())),
                     field: "count".to_string(),
@@ -493,6 +551,14 @@ class Counter extends Component {
                     id:
                         SemanticId::component(Some("x-batch-action-counter"), "BatchActionCounter",)
                             .action("apply", 3),
+                    owner:
+                        SemanticOwner::entity(
+                            SemanticId::component(
+                                Some("x-batch-action-counter"),
+                                "BatchActionCounter",
+                            )
+                            .method("apply"),
+                        ),
                     method: "apply".to_string(),
                     operation: StateOperation::Increment,
                     field: "count".to_string(),
@@ -501,6 +567,14 @@ class Counter extends Component {
                     id:
                         SemanticId::component(Some("x-batch-action-counter"), "BatchActionCounter",)
                             .action("apply", 4),
+                    owner:
+                        SemanticOwner::entity(
+                            SemanticId::component(
+                                Some("x-batch-action-counter"),
+                                "BatchActionCounter",
+                            )
+                            .method("apply"),
+                        ),
                     method: "apply".to_string(),
                     operation: StateOperation::Toggle,
                     field: "enabled".to_string(),
@@ -871,6 +945,10 @@ class BadAttrs extends Component {
         let template = &template_graph.templates[0];
         assert_eq!(template.component_name, "Counter");
         assert_eq!(template.id.as_str(), "component:x-counter/template:render");
+        assert_eq!(
+            template.owner,
+            SemanticOwner::entity(SemanticId::component(Some("x-counter"), "Counter"))
+        );
 
         let root = template.root.as_ref().expect("expected template root");
 

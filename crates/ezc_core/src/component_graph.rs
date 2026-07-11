@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use serde::Serialize;
 
-use crate::semantic_id::SemanticId;
+use crate::semantic_id::{SemanticId, SemanticOwner};
 
 use ezc_parser::{
     ParsedClass, ParsedEventHandler, ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue,
@@ -19,6 +19,7 @@ pub struct ComponentGraph {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentNode {
     pub id: SemanticId,
+    pub owner: SemanticOwner,
     pub class_name: String,
     pub element_name: Option<String>,
     pub route_path: Option<String>,
@@ -31,6 +32,7 @@ pub struct ComponentNode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StateField {
     pub id: SemanticId,
+    pub owner: SemanticOwner,
     pub name: String,
     pub initial_value: Option<SerializableValue>,
 }
@@ -72,12 +74,14 @@ impl SerializableValue {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentMethod {
     pub id: SemanticId,
+    pub owner: SemanticOwner,
     pub name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentAction {
     pub id: SemanticId,
+    pub owner: SemanticOwner,
     pub method: String,
     pub operation: StateOperation,
     pub field: String,
@@ -225,6 +229,7 @@ fn build_component_node(
         .filter(|property| property.initializer.as_deref() == Some("state(...)"))
         .map(|property| StateField {
             id: id.state_field(&property.name),
+            owner: SemanticOwner::entity(id.clone()),
             name: property.name.clone(),
             initial_value: property
                 .state_initial_value
@@ -238,6 +243,7 @@ fn build_component_node(
         .iter()
         .map(|method| ComponentMethod {
             id: id.method(&method.name),
+            owner: SemanticOwner::entity(id.clone()),
             name: method.name.clone(),
         })
         .collect::<Vec<_>>();
@@ -252,6 +258,7 @@ fn build_component_node(
                 .enumerate()
                 .map(|(index, update)| ComponentAction {
                     id: id.action(&method.name, index),
+                    owner: SemanticOwner::entity(id.method(&method.name)),
                     method: method.name.clone(),
                     operation: state_operation_from_parsed(&update.operation),
                     field: update.field.clone(),
@@ -282,6 +289,7 @@ fn build_component_node(
 
     ComponentNode {
         id,
+        owner: SemanticOwner::Application,
         class_name: class.name.clone(),
         element_name,
         route_path,
