@@ -65,10 +65,16 @@ fn generate_element_html(element: &ElementNode, scope: Option<&ListRenderScope<'
     html.push('"');
 
     for attribute in &element.attributes {
-        if let Some(attribute_html) = generate_attribute_html(attribute) {
+        if let Some(attribute_html) = generate_attribute_html(attribute, scope) {
             html.push(' ');
             html.push_str(&attribute_html);
         }
+    }
+
+    if let Some(list_attribute_bindings) = list_attribute_bindings(&element.attributes, scope) {
+        html.push_str(" data-ez-list-bindings=\"");
+        html.push_str(&escape_attr(&list_attribute_bindings));
+        html.push('"');
     }
 
     html.push('>');
@@ -106,6 +112,12 @@ fn generate_child_html(child: &TemplateChild, scope: Option<&ListRenderScope<'_>
                 initial_value.as_ref(),
                 scope,
             )));
+
+            if scope.is_some() {
+                html.push_str("<!-- ez-list-binding-end:");
+                html.push_str(&escape_comment(&node_id_for_scope(&id.0, scope)));
+                html.push_str(" -->");
+            }
 
             html
         }
@@ -202,6 +214,14 @@ fn binding_render_text(
     initial_value: Option<&SerializableValue>,
     scope: Option<&ListRenderScope<'_>>,
 ) -> String {
+    binding_render_value(expression, initial_value, scope)
+}
+
+fn binding_render_value(
+    expression: &str,
+    initial_value: Option<&SerializableValue>,
+    scope: Option<&ListRenderScope<'_>>,
+) -> String {
     if let Some(scope) = scope {
         if expression == scope.item_variable {
             return scope.item.map_or_else(
@@ -268,14 +288,18 @@ fn serializable_list_key(value: &SerializableValue) -> Option<String> {
     }
 }
 
-fn generate_attribute_html(attribute: &TemplateAttribute) -> Option<String> {
+fn generate_attribute_html(
+    attribute: &TemplateAttribute,
+    scope: Option<&ListRenderScope<'_>>,
+) -> Option<String> {
     match &attribute.value {
         AttributeValue::Boolean => Some(attribute.name.clone()),
-        AttributeValue::Binding { initial_value, .. }
-            if is_boolean_attribute(&attribute.name)
-                && initial_value
-                    .as_ref()
-                    .is_none_or(|value| value.render_text() != "true") =>
+        AttributeValue::Binding {
+            expression,
+            initial_value,
+            ..
+        } if is_boolean_attribute(&attribute.name)
+            && binding_render_value(expression, initial_value.as_ref(), scope) != "true" =>
         {
             None
         }
@@ -283,24 +307,57 @@ fn generate_attribute_html(attribute: &TemplateAttribute) -> Option<String> {
             let mut html = String::new();
             html.push_str(&attribute.name);
             html.push_str("=\"");
-            html.push_str(&escape_attr(&attribute_value_string(attribute)));
+            html.push_str(&escape_attr(&attribute_value_string(attribute, scope)));
             html.push('"');
             Some(html)
         }
     }
 }
 
-fn attribute_value_string(attribute: &TemplateAttribute) -> String {
+fn attribute_value_string(
+    attribute: &TemplateAttribute,
+    scope: Option<&ListRenderScope<'_>>,
+) -> String {
     match &attribute.value {
         AttributeValue::Boolean => String::new(),
         AttributeValue::Static(value) => value.clone(),
-        AttributeValue::Binding { initial_value, .. } => initial_value
-            .as_ref()
-            .map(SerializableValue::render_text)
-            .unwrap_or_default(),
+        AttributeValue::Binding {
+            expression,
+            initial_value,
+            ..
+        } => binding_render_value(expression, initial_value.as_ref(), scope),
         AttributeValue::EventHandler { handler, .. } => handler.clone(),
         AttributeValue::BindingList(bindings) => bindings.join(","),
     }
+}
+
+fn list_attribute_bindings(
+    attributes: &[TemplateAttribute],
+    scope: Option<&ListRenderScope<'_>>,
+) -> Option<String> {
+    let scope = scope?;
+    let bindings = attributes
+        .iter()
+        .filter_map(|attribute| {
+            let AttributeValue::Binding { expression, .. } = &attribute.value else {
+                return None;
+            };
+
+            list_item_binding_expression(expression, scope)
+                .then(|| format!("{}={expression}", attribute.name))
+        })
+        .collect::<Vec<_>>();
+
+    (!bindings.is_empty()).then(|| bindings.join(";"))
+}
+
+fn list_item_binding_expression(expression: &str, scope: &ListRenderScope<'_>) -> bool {
+    expression == scope.item_variable
+        || scope.index_variable == Some(expression)
+        || expression
+            .strip_prefix(scope.item_variable)
+            .and_then(|suffix| suffix.strip_prefix('.'))
+            .is_some_and(|path| !path.is_empty() && !path.split('.').any(str::is_empty))
 }
 
 fn is_boolean_attribute(name: &str) -> bool {

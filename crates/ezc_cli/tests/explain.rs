@@ -1973,6 +1973,38 @@ fn html_command_matches_object_keyed_list_reconciliation_fixture() {
 }
 
 #[test]
+fn html_command_matches_dynamic_list_item_behavior_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "html",
+            "fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli html");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\\nstatus: {}\\nstderr:\\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0026-dynamic-list-item-behavior/expected/html.html"),
+    )
+    .expect("failed to read expected dynamic list item behavior html fixture");
+
+    assert_eq!(
+        normalize_html_for_fixture(&actual),
+        normalize_html_for_fixture(&expected)
+    );
+}
+
+#[test]
 fn html_command_matches_static_object_keyed_list_fixture() {
     let repo_root = repo_root();
 
@@ -2057,6 +2089,10 @@ fn manifest_command_matches_list_and_object_value_fixtures() {
         (
             "fixtures/0025-object-keyed-list-reconciliation/input/ObjectKeyedListReconciliation.tsx",
             "fixtures/0025-object-keyed-list-reconciliation/expected/manifest.json",
+        ),
+        (
+            "fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx",
+            "fixtures/0026-dynamic-list-item-behavior/expected/manifest.json",
         ),
     ] {
         let output = Command::new(ezc_cli_bin())

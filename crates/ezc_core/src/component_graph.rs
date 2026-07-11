@@ -636,6 +636,7 @@ fn collect_render_attribute_diagnostics(
         state_fields,
         class_name,
         diagnostics,
+        None,
     );
 
     for child in &render.children {
@@ -815,6 +816,7 @@ fn collect_child_attribute_diagnostics(
                 state_fields,
                 class_name,
                 diagnostics,
+                None,
             );
 
             for child in &element.children {
@@ -836,7 +838,14 @@ fn collect_child_attribute_diagnostics(
         }
         RenderChild::List(list) => {
             for child in &list.item_template {
-                collect_child_attribute_diagnostics(child, state_fields, class_name, diagnostics);
+                collect_list_item_attribute_diagnostics(
+                    child,
+                    state_fields,
+                    class_name,
+                    diagnostics,
+                    &list.item_variable,
+                    list.index_variable.as_deref(),
+                );
             }
         }
         RenderChild::Text { .. } | RenderChild::Binding { .. } => {}
@@ -848,6 +857,7 @@ fn collect_attribute_diagnostics_for_attributes(
     state_fields: &[StateField],
     class_name: &str,
     diagnostics: &mut Vec<ComponentDiagnostic>,
+    list_scope: Option<(&str, Option<&str>)>,
 ) {
     let mut seen = Vec::<&str>::new();
 
@@ -871,6 +881,13 @@ fn collect_attribute_diagnostics_for_attributes(
             RenderAttributeValue::Expression(expression)
                 if !is_event_attribute(&attribute.name) =>
             {
+                if expression.as_deref().is_some_and(|expression| {
+                    list_scope
+                        .is_some_and(|scope| list_item_attribute_expression(expression, scope))
+                }) {
+                    continue;
+                }
+
                 match expression.as_deref().and_then(this_member_name) {
                     Some(field_name)
                         if state_fields.iter().any(|field| field.name == field_name) => {}
@@ -910,6 +927,94 @@ fn collect_attribute_diagnostics_for_attributes(
             _ => {}
         }
     }
+}
+
+fn collect_list_item_attribute_diagnostics(
+    child: &RenderChild,
+    state_fields: &[StateField],
+    class_name: &str,
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+    item_variable: &str,
+    index_variable: Option<&str>,
+) {
+    match child {
+        RenderChild::Element(element) => {
+            collect_attribute_diagnostics_for_attributes(
+                &element.attributes,
+                state_fields,
+                class_name,
+                diagnostics,
+                Some((item_variable, index_variable)),
+            );
+
+            for child in &element.children {
+                collect_list_item_attribute_diagnostics(
+                    child,
+                    state_fields,
+                    class_name,
+                    diagnostics,
+                    item_variable,
+                    index_variable,
+                );
+            }
+        }
+        RenderChild::Fragment(fragment) => {
+            for child in &fragment.children {
+                collect_list_item_attribute_diagnostics(
+                    child,
+                    state_fields,
+                    class_name,
+                    diagnostics,
+                    item_variable,
+                    index_variable,
+                );
+            }
+        }
+        RenderChild::Conditional(conditional) => {
+            for child in &conditional.when_true {
+                collect_list_item_attribute_diagnostics(
+                    child,
+                    state_fields,
+                    class_name,
+                    diagnostics,
+                    item_variable,
+                    index_variable,
+                );
+            }
+            for child in &conditional.when_false {
+                collect_list_item_attribute_diagnostics(
+                    child,
+                    state_fields,
+                    class_name,
+                    diagnostics,
+                    item_variable,
+                    index_variable,
+                );
+            }
+        }
+        RenderChild::List(list) => {
+            for child in &list.item_template {
+                collect_list_item_attribute_diagnostics(
+                    child,
+                    state_fields,
+                    class_name,
+                    diagnostics,
+                    &list.item_variable,
+                    list.index_variable.as_deref(),
+                );
+            }
+        }
+        RenderChild::Text { .. } | RenderChild::Binding { .. } => {}
+    }
+}
+
+fn list_item_attribute_expression(expression: &str, scope: (&str, Option<&str>)) -> bool {
+    expression == scope.0
+        || scope.1 == Some(expression)
+        || expression
+            .strip_prefix(scope.0)
+            .and_then(|suffix| suffix.strip_prefix('.'))
+            .is_some_and(|path| !path.is_empty() && !path.split('.').any(str::is_empty))
 }
 
 fn is_event_attribute(name: &str) -> bool {

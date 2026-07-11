@@ -1206,7 +1206,7 @@ class BadAttrs extends Component {
                     index_variable: Some("index".to_string()),
                     key_expression: "item.id".to_string(),
                     item_root: "n4".to_string(),
-                    item_template_html: "<li data-ez-node=\"n4:__ez_list_key__\" data-ez-bindings=\"index,item.label\"><!-- ez-binding:n5:__ez_list_key__:index -->__ez_list_index__:<!-- ez-binding:n6:__ez_list_key__:item.label --></li>".to_string(),
+                    item_template_html: "<li data-ez-node=\"n4:__ez_list_key__\" data-ez-bindings=\"index,item.label\"><!-- ez-binding:n5:__ez_list_key__:index -->__ez_list_index__<!-- ez-list-binding-end:n5:__ez_list_key__ -->:<!-- ez-binding:n6:__ez_list_key__:item.label --><!-- ez-list-binding-end:n6:__ez_list_key__ --></li>".to_string(),
                 },
             ]
         );
@@ -1292,7 +1292,7 @@ class BadAttrs extends Component {
         let template_graph = build_template_graph(&component_graph);
         assert_eq!(
             generate_static_html(&template_graph),
-            "<ol data-ez-node=\"n0\" data-ez-bindings=\"this.items\"><!-- ez-list-start:n2:this.items --><li data-ez-node=\"n4:north\" data-ez-bindings=\"index,item.label,item.details.region\"><!-- ez-binding:n5:north:index -->0:<!-- ez-binding:n6:north:item.label -->North(<!-- ez-binding:n7:north:item.details.region -->west)</li><li data-ez-node=\"n4:south\" data-ez-bindings=\"index,item.label,item.details.region\"><!-- ez-binding:n5:south:index -->1:<!-- ez-binding:n6:south:item.label -->South(<!-- ez-binding:n7:south:item.details.region -->east)</li><!-- ez-list-end:n3 --></ol>\n"
+            "<ol data-ez-node=\"n0\" data-ez-bindings=\"this.items\"><!-- ez-list-start:n2:this.items --><li data-ez-node=\"n4:north\" data-ez-bindings=\"index,item.label,item.details.region\"><!-- ez-binding:n5:north:index -->0<!-- ez-list-binding-end:n5:north -->:<!-- ez-binding:n6:north:item.label -->North<!-- ez-list-binding-end:n6:north -->(<!-- ez-binding:n7:north:item.details.region -->west<!-- ez-list-binding-end:n7:north -->)</li><li data-ez-node=\"n4:south\" data-ez-bindings=\"index,item.label,item.details.region\"><!-- ez-binding:n5:south:index -->1<!-- ez-list-binding-end:n5:south -->:<!-- ez-binding:n6:south:item.label -->South<!-- ez-list-binding-end:n6:south -->(<!-- ez-binding:n7:south:item.details.region -->east<!-- ez-list-binding-end:n7:south -->)</li><!-- ez-list-end:n3 --></ol>\n"
         );
     }
 
@@ -1327,7 +1327,7 @@ class BadAttrs extends Component {
 
         assert_eq!(
             generate_static_html(&template_graph),
-            "<ol data-ez-node=\"n0\" data-ez-bindings=\"this.labels\"><!-- ez-list-start:n2:this.labels --><li data-ez-node=\"n4:North\" data-ez-bindings=\"index,label\"><!-- ez-binding:n5:North:index -->0:<!-- ez-binding:n6:North:label -->North</li><li data-ez-node=\"n4:South\" data-ez-bindings=\"index,label\"><!-- ez-binding:n5:South:index -->1:<!-- ez-binding:n6:South:label -->South</li><!-- ez-list-end:n3 --></ol>\n"
+            "<ol data-ez-node=\"n0\" data-ez-bindings=\"this.labels\"><!-- ez-list-start:n2:this.labels --><li data-ez-node=\"n4:North\" data-ez-bindings=\"index,label\"><!-- ez-binding:n5:North:index -->0<!-- ez-list-binding-end:n5:North -->:<!-- ez-binding:n6:North:label -->North<!-- ez-list-binding-end:n6:North --></li><li data-ez-node=\"n4:South\" data-ez-bindings=\"index,label\"><!-- ez-binding:n5:South:index -->1<!-- ez-list-binding-end:n5:South -->:<!-- ez-binding:n6:South:label -->South<!-- ez-list-binding-end:n6:South --></li><!-- ez-list-end:n3 --></ol>\n"
         );
 
         let manifest = build_template_manifest(&component_graph, &template_graph);
@@ -1351,7 +1351,7 @@ class BadAttrs extends Component {
                     index_variable: Some("index".to_string()),
                     key_expression: "label".to_string(),
                     item_root: "n4".to_string(),
-                    item_template_html: "<li data-ez-node=\"n4:__ez_list_key__\" data-ez-bindings=\"index,label\"><!-- ez-binding:n5:__ez_list_key__:index -->__ez_list_index__:<!-- ez-binding:n6:__ez_list_key__:label -->__ez_list_item__</li>".to_string(),
+                    item_template_html: "<li data-ez-node=\"n4:__ez_list_key__\" data-ez-bindings=\"index,label\"><!-- ez-binding:n5:__ez_list_key__:index -->__ez_list_index__<!-- ez-list-binding-end:n5:__ez_list_key__ -->:<!-- ez-binding:n6:__ez_list_key__:label -->__ez_list_item__<!-- ez-list-binding-end:n6:__ez_list_key__ --></li>".to_string(),
                 },
             ]
         );

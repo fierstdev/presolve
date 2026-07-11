@@ -435,6 +435,22 @@ const RUNTIME_STUB: &str = r#"(() => {
     return value;
   }
 
+  function listItemBindingValue(node, item, index, expression) {
+    if (expression === node.item_variable) {
+      return item;
+    }
+
+    if (expression === node.index_variable) {
+      return index;
+    }
+
+    if (listItemMemberPath(node, expression) !== null) {
+      return listItemMemberValue(node, item, expression);
+    }
+
+    return undefined;
+  }
+
   function isListKeyPrimitive(value) {
     return value === null || (typeof value !== "object" && typeof value !== "undefined");
   }
@@ -498,6 +514,108 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
+  function listItemBindingExpression(node, comment) {
+    const value = String(comment ?? "");
+    const memberPrefix = `:${String(node.item_variable ?? "")}.`;
+    const memberStart = value.lastIndexOf(memberPrefix);
+
+    if (memberStart >= 0) {
+      return value.slice(memberStart + 1);
+    }
+
+    const itemSuffix = `:${String(node.item_variable ?? "")}`;
+    if (value.endsWith(itemSuffix)) {
+      return String(node.item_variable ?? "");
+    }
+
+    const indexSuffix = `:${String(node.index_variable ?? "")}`;
+    if (node.index_variable !== null && node.index_variable !== undefined && value.endsWith(indexSuffix)) {
+      return String(node.index_variable);
+    }
+
+    return null;
+  }
+
+  function updateListItemTextBindings(node, instance) {
+    const walker = document.createTreeWalker(instance.element, NodeFilter.SHOW_COMMENT);
+
+    while (walker.nextNode()) {
+      const marker = walker.currentNode;
+      const expression = listItemBindingExpression(node, marker.nodeValue);
+
+      if (expression === null) {
+        continue;
+      }
+
+      const textNode = marker.nextSibling;
+      const value = listItemBindingValue(node, instance.item, instance.index, expression);
+      const text = value === undefined ? "" : formatBindingValue(value);
+
+      if (textNode instanceof Text) {
+        textNode.textContent = text;
+      } else if (
+        textNode instanceof Comment &&
+        String(textNode.nodeValue ?? "").startsWith("ez-list-binding-end:")
+      ) {
+        textNode.before(document.createTextNode(text));
+      }
+    }
+  }
+
+  function listItemElements(root) {
+    return [root, ...root.querySelectorAll("[data-ez-list-bindings]")];
+  }
+
+  function updateListItemAttributes(node, instance) {
+    for (const element of listItemElements(instance.element)) {
+      const bindings = String(element.dataset.ezListBindings ?? "");
+
+      for (const binding of bindings.split(";")) {
+        const separator = binding.indexOf("=");
+
+        if (separator < 1) {
+          continue;
+        }
+
+        const attribute = binding.slice(0, separator);
+        const expression = binding.slice(separator + 1);
+        const value = listItemBindingValue(node, instance.item, instance.index, expression);
+        updateAttributeBinding(element, attribute, value);
+      }
+    }
+  }
+
+  function listItemEventElements(root) {
+    return [root, ...root.querySelectorAll("[data-ez-on-click]")];
+  }
+
+  function registerListItemEvents(store, component, instance) {
+    for (const element of listItemEventElements(instance.element)) {
+      const node = element.dataset.ezNode;
+      const handler = element.dataset.ezOnClick;
+
+      if (node !== undefined && handler !== undefined) {
+        registerEvent(store, component, { node, event: "click", handler });
+      }
+    }
+  }
+
+  function unregisterListItemEvents(store, instance) {
+    const eventsByNode = store.eventsByType.get("click");
+
+    if (eventsByNode === undefined) {
+      return;
+    }
+
+    for (const element of listItemEventElements(instance.element)) {
+      const node = element.dataset.ezNode;
+
+      if (node !== undefined) {
+        eventsByNode.delete(node);
+      }
+    }
+  }
+
   function renderListItemElement(node, item, index, key) {
     const template = document.createElement("template");
     template.innerHTML = renderListItemHtml(node, item, index, key);
@@ -513,14 +631,14 @@ const RUNTIME_STUB: &str = r#"(() => {
       const element = store.elementsByNode.get(`${node.item_root}:${key}`);
 
       if (element !== undefined) {
-        instances.set(key, { element, item, index });
+        instances.set(key, { element, item, index, key });
       }
     }
 
     return instances;
   }
 
-  function reconcileKeyedList(store, node, startMarker, endMarker, instances, value) {
+  function reconcileKeyedList(store, component, node, startMarker, endMarker, instances, value) {
     if (
       startMarker.parentNode === null ||
       endMarker.parentNode === null ||
@@ -568,17 +686,21 @@ const RUNTIME_STUB: &str = r#"(() => {
         }
 
         parent.insertBefore(element, endMarker);
-        instance = { element, item, index };
+        instance = { element, item, index, key };
+        registerListItemEvents(store, component, instance);
       }
 
       instance.item = item;
       instance.index = index;
+      updateListItemTextBindings(node, instance);
+      updateListItemAttributes(node, instance);
       nextInstances.set(key, instance);
       ordered.push(instance);
     }
 
     for (const [key, instance] of instances) {
       if (!nextInstances.has(key)) {
+        unregisterListItemEvents(store, instance);
         instance.element.remove();
       }
     }
@@ -759,9 +881,13 @@ const RUNTIME_STUB: &str = r#"(() => {
           node,
           listItems(component.state[field])
         );
+        for (const instance of instances.values()) {
+          registerListItemEvents(store, component, instance);
+        }
         registerBinding(store, component, field, (value) => {
           instances = reconcileKeyedList(
             store,
+            component,
             node,
             start.marker,
             end.marker,
@@ -1170,6 +1296,11 @@ mod tests {
         assert!(runtime.contains("value === null ? \"\" : String(value)"));
         assert!(runtime.contains("listItemMemberPath"));
         assert!(runtime.contains("populateListItemMemberBindings"));
+        assert!(runtime.contains("updateListItemTextBindings"));
+        assert!(runtime.contains("updateListItemAttributes"));
+        assert!(runtime.contains("registerListItemEvents"));
+        assert!(runtime.contains("unregisterListItemEvents"));
+        assert!(runtime.contains("ez-list-binding-end:"));
         assert!(runtime.contains("renderListItemElement"));
         assert!(runtime.contains("component.state[field] = node.initial_value"));
         assert!(!runtime.contains("component.state[field] = Number(node.initial_value)"));

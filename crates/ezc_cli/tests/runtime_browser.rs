@@ -762,6 +762,63 @@ fn object_keyed_lists_reconcile_in_a_real_browser() {
 }
 
 #[test]
+fn dynamic_list_items_refresh_in_a_real_browser() {
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/dynamic-list-item-behavior");
+
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean previous browser test output");
+    }
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("browser test output path was not valid UTF-8"),
+        ])
+        .output()
+        .expect("failed to run ezc_cli build");
+
+    assert!(
+        output.status.success(),
+        "expected build to succeed\\nstatus: {}\\nstderr:\\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    write_dynamic_list_item_behavior_probe_page(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile dir");
+    let user_data_dir = format!(
+        "--user-data-dir={}",
+        profile_dir
+            .to_str()
+            .expect("Chrome profile path was not valid UTF-8")
+    );
+    let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
+
+    let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    server.stop();
+
+    assert!(
+        stdout.contains("EDGEZERO_DYNAMIC_LIST_ITEM_BROWSER_TEST_PASS"),
+        "browser probe did not pass\\nstatus: {}\\nstdout:\\n{}\\nstderr:\\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn runtime_contract_diagnostics_report_manifest_boot_failures_in_a_real_browser() {
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/runtime-contract");
@@ -2075,6 +2132,114 @@ const listLabels = () => [...document.querySelectorAll("ol li")].map((item) => i
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
   document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_OBJECT_KEYED_LIST_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  console.error(error);
+});
+</script>
+</body>"#,
+    );
+
+    fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
+}
+
+#[allow(clippy::too_many_lines)]
+fn write_dynamic_list_item_behavior_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
+    let probe = index.replace(
+        "</body>",
+        r#"<script>
+const fail = (message) => {
+  throw new Error(message);
+};
+
+const edgezeroConsoleErrors = [];
+const originalConsoleError = console.error.bind(console);
+console.error = (...args) => {
+  const message = args.map((arg) => {
+    if (arg instanceof Error) return arg.message;
+    if (typeof arg === "string") return arg;
+    return JSON.stringify(arg);
+  }).join(" ");
+
+  edgezeroConsoleErrors.push(message);
+  originalConsoleError(...args);
+};
+
+const waitFor = (predicate, label) => new Promise((resolve, reject) => {
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    if (predicate()) {
+      resolve();
+      return;
+    }
+
+    if (Date.now() > deadline) {
+      reject(new Error(`Timed out waiting for ${label}`));
+      return;
+    }
+
+    setTimeout(tick, 20);
+  };
+
+  tick();
+});
+
+const itemButtons = () => [...document.querySelectorAll("ol li button")];
+
+(async () => {
+  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+
+  const refresh = document.querySelector("section > button");
+  const selections = document.querySelector("p");
+  const north = document.querySelector("[data-ez-node='n8:north']");
+  const south = document.querySelector("[data-ez-node='n8:south']");
+  if (refresh === null || selections === null || north === null || south === null) {
+    fail("initial dynamic list controls or roots were missing");
+  }
+  if (north.title !== "west" || north.dataset.label !== "North") {
+    fail("initial list attributes were not rendered from item members");
+  }
+
+  itemButtons()[0].click();
+  await waitFor(() => selections.textContent === "1", "initial list item event");
+
+  refresh.click();
+  await waitFor(
+    () => itemButtons().map((button) => button.textContent).join("|") === "0:Northern(central)|1:East(coastal)|2:Southern(mountain)",
+    "refreshed list item bindings"
+  );
+
+  if (document.querySelector("[data-ez-node='n8:north']") !== north) {
+    fail("North root was replaced instead of refreshed in place");
+  }
+  if (document.querySelector("[data-ez-node='n8:south']") !== south) {
+    fail("South root was replaced instead of refreshed in place");
+  }
+  if (north.title !== "central" || north.dataset.label !== "Northern") {
+    fail("retained North attributes did not refresh");
+  }
+  if (south.title !== "mountain" || south.dataset.label !== "Southern") {
+    fail("retained South attributes did not refresh");
+  }
+
+  const east = document.querySelector("[data-ez-node='n8:east']");
+  if (east === null || east.title !== "coastal" || east.dataset.label !== "East") {
+    fail("inserted East attributes were not materialized");
+  }
+
+  itemButtons()[1].click();
+  await waitFor(() => selections.textContent === "2", "inserted list item event");
+  itemButtons()[0].click();
+  await waitFor(() => selections.textContent === "3", "retained list item event");
+
+  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
+    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  }
+
+  document.body.dataset.browserTest = "pass";
+  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_DYNAMIC_LIST_ITEM_BROWSER_TEST_PASS</div>");
+})().catch((error) => {
+  document.body.dataset.browserTest = "fail";
+  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_DYNAMIC_LIST_ITEM_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>

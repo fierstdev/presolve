@@ -116,6 +116,12 @@ pub struct ListNode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TemplateNodeId(pub String);
 
+#[derive(Clone, Copy)]
+struct ListItemTemplateScope<'a> {
+    item_variable: &'a str,
+    index_variable: Option<&'a str>,
+}
+
 #[must_use]
 pub fn build_template_graph(component_graph: &ComponentGraph) -> TemplateGraph {
     let mut ids = TemplateIdAllocator::default();
@@ -131,7 +137,7 @@ pub fn build_template_graph(component_graph: &ComponentGraph) -> TemplateGraph {
                 .and_then(|render| element_from_render(render, &component.state_fields, &mut ids)),
             root_fragment: component.render.as_ref().and_then(|render| {
                 render.root_fragment.as_ref().map(|fragment| {
-                    fragment_from_render_fragment(fragment, &component.state_fields, &mut ids)
+                    fragment_from_render_fragment(fragment, &component.state_fields, &mut ids, None)
                 })
             }),
         })
@@ -157,12 +163,13 @@ fn element_from_render(
         &direct_bindings,
         state_fields,
         ids,
+        None,
     );
 
     let children = render
         .children
         .iter()
-        .map(|child| template_child_from_render(child, state_fields, ids))
+        .map(|child| template_child_from_render(child, state_fields, ids, None))
         .collect::<Vec<_>>();
 
     Some(ElementNode {
@@ -178,6 +185,7 @@ fn element_from_render_element(
     element: &RenderElement,
     state_fields: &[StateField],
     ids: &mut TemplateIdAllocator,
+    list_scope: Option<ListItemTemplateScope<'_>>,
 ) -> ElementNode {
     let id = ids.alloc();
 
@@ -191,11 +199,12 @@ fn element_from_render_element(
             &collect_direct_bindings_from_children(&element.children),
             state_fields,
             ids,
+            list_scope,
         ),
         children: element
             .children
             .iter()
-            .map(|child| template_child_from_render(child, state_fields, ids))
+            .map(|child| template_child_from_render(child, state_fields, ids, list_scope))
             .collect::<Vec<_>>(),
     }
 }
@@ -204,6 +213,7 @@ fn fragment_from_render_fragment(
     fragment: &RenderFragment,
     state_fields: &[StateField],
     ids: &mut TemplateIdAllocator,
+    list_scope: Option<ListItemTemplateScope<'_>>,
 ) -> FragmentNode {
     FragmentNode {
         id: ids.alloc(),
@@ -211,7 +221,7 @@ fn fragment_from_render_fragment(
         children: fragment
             .children
             .iter()
-            .map(|child| template_child_from_render(child, state_fields, ids))
+            .map(|child| template_child_from_render(child, state_fields, ids, list_scope))
             .collect(),
     }
 }
@@ -222,6 +232,7 @@ fn template_attributes(
     bindings: &[String],
     state_fields: &[StateField],
     ids: &mut TemplateIdAllocator,
+    list_scope: Option<ListItemTemplateScope<'_>>,
 ) -> Vec<TemplateAttribute> {
     let mut attributes = Vec::new();
 
@@ -243,7 +254,10 @@ fn template_attributes(
             }
             RenderAttributeValue::Expression(Some(expression))
                 if !is_event_attribute(&attribute.name)
-                    && expression.strip_prefix("this.").is_some() =>
+                    && attribute.name != "key"
+                    && (expression.strip_prefix("this.").is_some()
+                        || list_scope
+                            .is_some_and(|scope| list_item_expression(expression, scope))) =>
             {
                 attributes.push(TemplateAttribute {
                     name: attribute.name.clone(),
@@ -287,6 +301,15 @@ fn is_event_attribute(name: &str) -> bool {
         .is_some_and(char::is_uppercase)
 }
 
+fn list_item_expression(expression: &str, scope: ListItemTemplateScope<'_>) -> bool {
+    expression == scope.item_variable
+        || scope.index_variable == Some(expression)
+        || expression
+            .strip_prefix(scope.item_variable)
+            .and_then(|suffix| suffix.strip_prefix('.'))
+            .is_some_and(|path| !path.is_empty() && !path.split('.').any(str::is_empty))
+}
+
 fn collect_direct_bindings_from_children(children: &[RenderChild]) -> Vec<String> {
     let mut bindings = Vec::new();
 
@@ -311,6 +334,7 @@ fn template_child_from_render(
     child: &RenderChild,
     state_fields: &[StateField],
     ids: &mut TemplateIdAllocator,
+    list_scope: Option<ListItemTemplateScope<'_>>,
 ) -> TemplateChild {
     match child {
         RenderChild::Text { value, span } => TemplateChild::Text {
@@ -325,14 +349,20 @@ fn template_child_from_render(
             span: *span,
         },
 
-        RenderChild::Element(element) => {
-            TemplateChild::Element(element_from_render_element(element, state_fields, ids))
-        }
-        RenderChild::Fragment(fragment) => {
-            TemplateChild::Fragment(fragment_from_render_fragment(fragment, state_fields, ids))
-        }
+        RenderChild::Element(element) => TemplateChild::Element(element_from_render_element(
+            element,
+            state_fields,
+            ids,
+            list_scope,
+        )),
+        RenderChild::Fragment(fragment) => TemplateChild::Fragment(fragment_from_render_fragment(
+            fragment,
+            state_fields,
+            ids,
+            list_scope,
+        )),
         RenderChild::Conditional(conditional) => TemplateChild::Conditional(
-            conditional_from_render_conditional(conditional, state_fields, ids),
+            conditional_from_render_conditional(conditional, state_fields, ids, list_scope),
         ),
         RenderChild::List(list) => {
             TemplateChild::List(list_from_render_list(list, state_fields, ids))
@@ -358,7 +388,17 @@ fn list_from_render_list(
         item_template: list
             .item_template
             .iter()
-            .map(|child| template_child_from_render(child, state_fields, ids))
+            .map(|child| {
+                template_child_from_render(
+                    child,
+                    state_fields,
+                    ids,
+                    Some(ListItemTemplateScope {
+                        item_variable: &list.item_variable,
+                        index_variable: list.index_variable.as_deref(),
+                    }),
+                )
+            })
             .collect(),
     }
 }
@@ -367,6 +407,7 @@ fn conditional_from_render_conditional(
     conditional: &RenderConditional,
     state_fields: &[StateField],
     ids: &mut TemplateIdAllocator,
+    list_scope: Option<ListItemTemplateScope<'_>>,
 ) -> ConditionalNode {
     ConditionalNode {
         id: ids.alloc(),
@@ -378,12 +419,12 @@ fn conditional_from_render_conditional(
         when_true: conditional
             .when_true
             .iter()
-            .map(|child| template_child_from_render(child, state_fields, ids))
+            .map(|child| template_child_from_render(child, state_fields, ids, list_scope))
             .collect(),
         when_false: conditional
             .when_false
             .iter()
-            .map(|child| template_child_from_render(child, state_fields, ids))
+            .map(|child| template_child_from_render(child, state_fields, ids, list_scope))
             .collect(),
     }
 }

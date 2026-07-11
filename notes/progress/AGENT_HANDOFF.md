@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: runtime: reconcile object keyed lists
+* Latest commit: runtime: refresh dynamic list items
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 18:38:30 PDT
+* Date: 2026-07-10 18:57:10 PDT
 
 Last completed slice
 
-* Slice: 7F-G - Object keyed-list reconciliation
-* Summary: Extended browser list reconciliation to derive keys and inserted member bindings from object items using the compiler's dot-member contract.
-* Key files: crates/ezc_core/src/runtime_codegen.rs, crates/ezc_cli/tests/runtime_browser.rs, crates/ezc_cli/tests/explain.rs
-* New behavior: The runtime resolves `item.id` keys for initial object roots and later list assignments. New object rows materialize member bindings such as `item.label` and `item.details.region` before insertion, while unchanged member keys retain their DOM roots across moves and deletions.
-* Tests added or changed: runtime codegen contract assertions, CLI HTML/manifest golden checks, and a browser probe covering object-key reorder, insertion, deletion, retained identity, and inserted nested-member text.
-* Fixtures added or changed: fixtures/0025-object-keyed-list-reconciliation
+* Slice: 7F-H - Dynamic list-item behavior
+* Summary: Completed retained keyed-list refresh for direct item/index/member text, item-scoped dynamic attributes, and delegated click actions.
+* Key files: crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/html_codegen.rs, crates/ezc_core/src/runtime_codegen.rs, crates/ezc_cli/tests/runtime_browser.rs
+* New behavior: Retained keyed roots receive refreshed text and item-member attributes after array assignment. Initial and inserted list roots register their click actions, and removed roots unregister their actions without disturbing retained identity.
+* Tests added or changed: runtime codegen contract assertions, CLI HTML/manifest golden checks, and a browser probe covering retained member text/attributes, inserted attributes, retained identity, and initial/inserted delegated events.
+* Fixtures added or changed: fixtures/0026-dynamic-list-item-behavior; list fixture HTML and manifest golden artifacts now include list binding end anchors.
 
 Current in-progress slice
 
 * Slice: 7F - Lists and keys
-* Status: In progress
-* Completed: 7F-A - List semantic model; 7F-B - Static initial list rendering; 7F-C - Keyed reconciliation; 7F-D - Key diagnostics; 7F-E - Recursive object serializable values; 7F-F - Member-expression evaluation; 7F-G - Object keyed-list reconciliation
-* Remaining: 7F-H - Dynamic list-item behavior.
+* Status: Complete
+* Completed: 7F-A - List semantic model; 7F-B - Static initial list rendering; 7F-C - Keyed reconciliation; 7F-D - Key diagnostics; 7F-E - Recursive object serializable values; 7F-F - Member-expression evaluation; 7F-G - Object keyed-list reconciliation; 7F-H - Dynamic list-item behavior
+* Remaining: None
 
 Verification
 
@@ -64,6 +64,12 @@ Architecture decisions made
 * Decision: The browser runtime mirrors the compiler's dot-member semantics for list keys and insertion-time text bindings.
 * Reason: Initial compiler IDs, manifest templates, and future object list assignments need one consistent object path contract to retain roots and materialize new rows correctly.
 * Tradeoff: Runtime member evaluation is intentionally limited to list keys and text binding comments. It does not yet refresh retained item content, attributes, events, or nested dynamic behavior.
+* Decision: Scoped list bindings emit a compiler-owned end anchor after each binding comment, plus element-local metadata for dynamic item attributes.
+* Reason: A retained item can refresh text without swallowing adjacent static punctuation, and attribute updates can reuse the runtime's existing attribute semantics without adding a client-side expression evaluator.
+* Tradeoff: The metadata accepts only the direct item/index variables and non-empty dot-member paths; arbitrary expressions remain unsupported.
+* Decision: List-item click actions are discovered from retained or inserted DOM roots and registered in the delegated event map; removed roots explicitly unregister their nodes.
+* Reason: Keyed root identity remains stable while events work for both compiler-rendered and runtime-inserted rows.
+* Tradeoff: Only the existing delegated click/action contract is hydrated. Conditional branch replacement inside a list item still does not register new dynamic behavior.
 
 Known limitations
 
@@ -71,13 +77,13 @@ Known limitations
 * Item: Conditional branch snippets are replaced as static HTML. Bindings, events, and nested dynamic behavior inside swapped-in branch snippets are not re-registered yet.
 * Item: Keyed lists currently accept only `iterable.map((item, index?) => <element>...</element>)` with identifier parameters and an expression-bodied callback. Static and runtime reconciliation support a direct primitive item key or a dot-member key such as `item.id` that resolves to a unique primitive.
 * Item: Missing keys, index keys, unsupported expressions, duplicate statically-known primitive keys, and missing/non-primitive member keys emit `EZC1011` through `EZC1015`.
-* Item: List item templates must have one root element. New runtime instances substitute direct item/index values and dot-member text bindings, but retained item text, attributes, events, and nested dynamic behavior do not refresh yet.
+* Item: List item templates must have one root element. Retained and inserted items refresh direct item/index/member text and direct item/index/member attributes, and hydrate delegated click actions. Nested dynamic behavior still does not refresh or re-register.
 * Item: Duplicate runtime list keys that arise from dynamic state still produce `EZR_DUPLICATE_LIST_KEY` and the later duplicate is skipped. A missing/non-primitive dynamic member key falls back to index identity; compiler diagnostics cover only statically-known initial items.
 * Item: Only `this.<field>++`, `this.<field>--`, `this.<field> += <literal>`, `this.<field> -= <literal>`, `this.<field> = <literal>`, and `this.<field> = !this.<field>` are recognized as action steps.
 * Item: The browser runtime supports only delegated click events, ordered closed action steps, numeric/string/boolean/null initial state, binding callback text/attribute updates, and conditional branch replacement.
 * Item: Static and `this.<stateField>` dynamic JSX attributes are preserved, but `className`/`htmlFor` normalization policy is still intentionally undecided.
 * Item: Dynamic attributes are limited to primitive state-field bindings; arbitrary expressions, method calls, spread attributes, arrays, and objects are not emitted yet.
-* Item: The serializable value model supports primitives, recursive arrays, and recursive object literals. Static and insertion-time runtime member paths resolve object data, while retained item updates remain deferred to 7F-H.
+* Item: The serializable value model supports primitives, recursive arrays, and recursive object literals. Static and runtime list paths resolve direct item/index values and non-empty item-member paths; arbitrary JavaScript expressions remain unsupported.
 * Item: Runtime schema compatibility is exact-match only; no backward/forward manifest migration exists yet.
 * Item: Source spans are available on parser/render/template structures and CLI development output, but runtime manifests intentionally omit source metadata for now.
 * Item: Fragment nodes are visible in compiler/template output but intentionally omitted from runtime manifests until a runtime range-anchor use case appears.
@@ -86,7 +92,7 @@ Known limitations
 
 Exact next step
 
-Start Slice 7F-H - Dynamic list-item behavior. Refresh retained list item bindings after array assignments, then add the narrow runtime behavior needed for dynamic item attributes and delegated events without disturbing keyed root identity.
+Start ASM-1 - Global semantic IDs. Introduce application-wide stable semantic IDs and the ownership/provenance foundation for the Application Semantic Model, without adding further major language features.
 
 Useful commands
 
