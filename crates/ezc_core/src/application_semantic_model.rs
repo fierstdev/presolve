@@ -128,6 +128,24 @@ impl ApplicationSemanticModel {
     }
 
     #[must_use]
+    pub fn descendants_of(&self, owner: &SemanticId) -> Vec<&SemanticId> {
+        let mut descendants = Vec::new();
+        self.collect_descendants(owner, &mut descendants);
+        descendants
+    }
+
+    fn collect_descendants<'a>(
+        &'a self,
+        owner: &SemanticId,
+        descendants: &mut Vec<&'a SemanticId>,
+    ) {
+        for child in self.children_of(owner) {
+            descendants.push(child);
+            self.collect_descendants(child, descendants);
+        }
+    }
+
+    #[must_use]
     pub fn references_from(&self, id: &SemanticId) -> Vec<&SemanticReference> {
         self.references
             .iter()
@@ -371,6 +389,11 @@ class Counter extends Component {
             asm.children_of(&component.methods[0].id),
             vec![&component.actions[0].id]
         );
+        let descendants = asm.descendants_of(&component.id);
+        assert_eq!(descendants[0], &component.methods[0].id);
+        assert_eq!(descendants[1], &component.actions[0].id);
+        assert_eq!(descendants[2], &component.methods[1].id);
+        assert_eq!(descendants.len(), asm.ownership.len() - 1);
     }
 
     #[test]
