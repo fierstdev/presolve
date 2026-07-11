@@ -3,24 +3,24 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: add resume boot plan
+* Latest commit: compiler: plan lazy action chunks
 * Working tree: clean after committing this slice
 * Date: 2026-07-10 19:49:12 PDT
 
 Last completed slice
 
-* Slice: Era IV-E - Zero-replay browser boot planning
-* Summary: Added a compiler-derived boot plan that combines resume artifacts and eligibility diagnostics.
-* Key files: crates/ezc_core/src/resume_boot.rs, crates/ezc_core/src/lib.rs
-* New behavior: `ResumeBootPlan.zero_replay` is true only when planned state is fully represented by serializable instances.
+* Slice: Era IV-F - Lazy action chunks
+* Summary: Added compiler plans for loading action sequences by resumable event identity.
+* Key files: crates/ezc_core/src/lazy_action_chunks.rs, crates/ezc_core/src/lib.rs
+* New behavior: each delegated event maps to a lazy action chunk containing its handler action IDs.
 * Tests added or changed: core suite and clippy pass.
 * Fixtures added or changed: None.
 
 Current in-progress slice
 
-* Slice: Era IV-E - Zero-replay browser boot planning
+* Slice: Era IV-F - Lazy action chunks
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-E
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-F
 * Remaining: None
 
 Verification
@@ -134,7 +134,7 @@ Known limitations
 
 Exact next step
 
-Start Era IV-F - Lazy action chunks. Plan resumable action loading from manifest event semantics.
+Start Era IV-G - Resume explainability. Explain resume-plan eligibility, instances, diagnostics, and chunks.
 
 Useful commands
 

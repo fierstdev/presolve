@@ -10,6 +10,7 @@ pub mod compiler_pass;
 pub mod component_graph;
 pub mod explain;
 pub mod html_codegen;
+pub mod lazy_action_chunks;
 pub mod model;
 pub mod page_codegen;
 pub mod resume_boot;
