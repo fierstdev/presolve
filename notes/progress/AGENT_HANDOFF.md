@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: qualify canonical semantic identities
+* Latest commit: compiler: lower template semantic entities
 * Working tree: clean after committing this slice
 * Date: 2026-07-10 20:30:00 PDT
 
 Last completed slice
 
-* Slice: C2-D - Module-qualified semantic identities
-* Summary: Qualified canonical component semantic IDs by stable normalized module path.
-* Key files: crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/symbol_table.rs
-* New behavior: The ASM, symbol table, and binding table use IDs such as `module:src/Counter.tsx/component:x-counter`; equal component tags in distinct modules no longer collide.
-* Tests added or changed: module-path normalization, multi-file canonical IDs, and non-colliding duplicate component tags.
+* Slice: C3-A - Template semantic entities
+* Summary: Lowered authored template descendants and bindings into typed canonical ASM entities.
+* Key files: crates/ezc_core/src/template_semantics.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/semantic_id.rs
+* New behavior: Elements, fragments, text, bindings, attributes, event attributes, conditionals, and lists have module-qualified semantic IDs, template ownership, and source provenance.
+* Tests added or changed: authored attribute/text bindings and ASM template-entity queries.
 * Fixtures added or changed: None.
 
 Current in-progress slice
 
-* Slice: C2-D - Module-qualified semantic identities
+* Slice: C3-A - Template semantic entities
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D
-* Remaining: C3-A typed semantic lowering for template descendants and bindings.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A
+* Remaining: C3-B resolve template bindings and conditions to component state semantics.
 
 Verification
 
@@ -37,6 +37,10 @@ Verification
 * just e2e: pass
 
 Architecture decisions made
+
+* Decision: Template descendants are lowered into canonical semantic entities separate from backend-local `n*` template IDs.
+* Reason: Developer tools and compiler analyses need typed, owned, provenance-backed template semantics without taking a dependency on DOM emission details.
+* Tradeoff: Template entity paths are deterministic traversal paths, while generated HTML/template-manifest contracts retain their existing local anchor IDs.
 
 * Decision: Canonical ASM/frontend consumers use module-qualified semantic IDs, while the existing backend-facing graph retains legacy component-scoped IDs until its runtime contracts are deliberately migrated.
 * Reason: A canonical application model must distinguish semantically equivalent components from different modules, but the established HTML/template runtime protocol does not serialize these IDs and should not be changed implicitly.
@@ -160,13 +164,13 @@ Known limitations
 * Item: Fragment nodes are visible in compiler/template output but intentionally omitted from runtime manifests until a runtime range-anchor use case appears.
 * Item: Semantic IDs and direct ownership currently cover components, state fields, methods, action steps, rendered templates, and event handlers. General template descendants still use backend-local `n*` IDs and have no semantic ownership or provenance entries yet.
 * Item: Resolved references currently cover action-to-state and event-to-method pairs only. Bindings, attributes, conditionals, lists, routes, and unresolved reference attempts have no semantic relation records or provenance-backed relations yet.
-* Item: Canonical compiler products now use module-qualified component IDs, and `BindingTable` resolves local/relative re-export chains plus named/default/namespace imports. External and namespace re-exports, external package bindings, tsconfig aliases, template-descendant semantic entities, source remapping, and type semantics are still absent. Legacy backend graph identity remains a compatibility path.
+* Item: Canonical compiler products now include module-qualified template entities, and `BindingTable` resolves local/relative re-export chains plus named/default/namespace imports. Template expression-to-state resolution, external and namespace re-exports, external package bindings, tsconfig aliases, source remapping, and type semantics are still absent. Legacy backend graph identity remains a compatibility path.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 
 Exact next step
 
-Start C3-A - Lower template descendants and bindings into typed semantic entities with module-qualified IDs and source provenance. Do not change generated HTML/runtime artifact schemas or add type inference in that slice.
+Start C3-B - Resolve template bindings, dynamic attributes, and conditional dependencies to component state semantic IDs. Do not add arbitrary expression evaluation, type inference, or runtime artifact changes in that slice.
 
 Useful commands
 

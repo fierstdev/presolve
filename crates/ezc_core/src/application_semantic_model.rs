@@ -11,12 +11,14 @@ use crate::semantic_id::{SemanticId, SemanticOwner};
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::SemanticReference;
 use crate::template_graph::{build_template_graph, TemplateNode};
+use crate::template_semantics::{build_template_semantic_entities, TemplateSemanticEntity};
 
 /// Application-level semantic data assembled from the compiler's existing graphs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ApplicationSemanticModel {
     pub components: Vec<ComponentNode>,
     pub templates: Vec<TemplateNode>,
+    pub template_entities: Vec<TemplateSemanticEntity>,
     pub diagnostics: Vec<ComponentDiagnostic>,
     pub ownership: BTreeMap<SemanticId, SemanticOwner>,
     pub references: Vec<SemanticReference>,
@@ -31,6 +33,7 @@ pub enum SemanticEntity<'a> {
     Action(&'a ComponentAction),
     EventHandler(&'a RenderEventHandler),
     Template(&'a TemplateNode),
+    TemplateEntity(&'a TemplateSemanticEntity),
 }
 
 impl ApplicationSemanticModel {
@@ -59,10 +62,14 @@ impl ApplicationSemanticModel {
             }
         }
 
-        self.templates
+        if let Some(template) = self.templates.iter().find(|template| template.id == *id) {
+            return Some(SemanticEntity::Template(template));
+        }
+
+        self.template_entities
             .iter()
-            .find(|template| template.id == *id)
-            .map(SemanticEntity::Template)
+            .find(|entity| entity.id == *id)
+            .map(SemanticEntity::TemplateEntity)
     }
 
     #[must_use]
@@ -73,6 +80,21 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub fn template(&self, id: &SemanticId) -> Option<&TemplateNode> {
         self.templates.iter().find(|template| template.id == *id)
+    }
+
+    #[must_use]
+    pub fn template_entity(&self, id: &SemanticId) -> Option<&TemplateSemanticEntity> {
+        self.template_entities
+            .iter()
+            .find(|entity| entity.id == *id)
+    }
+
+    #[must_use]
+    pub fn template_entities_for(&self, template: &SemanticId) -> Vec<&TemplateSemanticEntity> {
+        self.template_entities
+            .iter()
+            .filter(|entity| entity.owner.entity_id() == Some(template))
+            .collect()
     }
 
     #[must_use]
@@ -120,23 +142,32 @@ fn build_application_semantic_model_from_files(files: &[ParsedFile]) -> Applicat
     let mut diagnostics = Vec::new();
     let mut references = Vec::new();
     let mut provenance = BTreeMap::new();
+    let mut template_entities = Vec::new();
 
     for parsed in files {
         let component_graph = build_component_graph_for_module(parsed);
         let template_graph = build_template_graph(&component_graph);
+        let file_template_entities = build_template_semantic_entities(&template_graph.templates);
 
         components.extend(component_graph.components);
         templates.extend(template_graph.templates);
         diagnostics.extend(component_graph.diagnostics);
         references.extend(component_graph.references);
         provenance.extend(component_graph.provenance);
+        provenance.extend(
+            file_template_entities
+                .iter()
+                .map(|entity| (entity.id.clone(), entity.provenance.clone())),
+        );
+        template_entities.extend(file_template_entities);
     }
 
-    let ownership = collect_ownership(&components, &templates);
+    let ownership = collect_ownership(&components, &templates, &template_entities);
 
     ApplicationSemanticModel {
         components,
         templates,
+        template_entities,
         diagnostics,
         ownership,
         references,
@@ -147,6 +178,7 @@ fn build_application_semantic_model_from_files(files: &[ParsedFile]) -> Applicat
 fn collect_ownership(
     components: &[ComponentNode],
     templates: &[TemplateNode],
+    template_entities: &[TemplateSemanticEntity],
 ) -> BTreeMap<SemanticId, SemanticOwner> {
     let mut ownership = BTreeMap::new();
 
@@ -171,6 +203,10 @@ fn collect_ownership(
 
     for template in templates {
         ownership.insert(template.id.clone(), template.owner.clone());
+    }
+
+    for entity in template_entities {
+        ownership.insert(entity.id.clone(), entity.owner.clone());
     }
 
     ownership

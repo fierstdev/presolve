@@ -32,6 +32,7 @@ pub mod summarize;
 pub mod symbol_table;
 pub mod template_graph;
 pub mod template_manifest;
+pub mod template_semantics;
 
 pub use application_semantic_model::{
     build_application_semantic_model, build_application_semantic_model_for_unit,
@@ -82,6 +83,9 @@ pub use template_manifest::{
     build_template_manifest, template_manifest_json, ManifestAction, ManifestBindingTarget,
     ManifestComponent, ManifestEvent, ManifestNode, ManifestOperation, ManifestTemplate,
     TemplateManifest, TEMPLATE_MANIFEST_SCHEMA_VERSION,
+};
+pub use template_semantics::{
+    build_template_semantic_entities, TemplateSemanticEntity, TemplateSemanticKind,
 };
 
 #[cfg(test)]
@@ -321,6 +325,7 @@ class Counter extends Component {
 
         assert!(asm.diagnostics.is_empty());
         assert_eq!(asm.templates.len(), 1);
+        assert!(asm.template_entities.len() >= 3);
         assert_eq!(asm.references.len(), 2);
         assert_eq!(asm.ownership.len(), asm.provenance.len());
         assert_eq!(asm.ownership[&component.id], SemanticOwner::Application);
@@ -353,6 +358,19 @@ class Counter extends Component {
             Some(&component.actions[0].owner)
         );
         assert_eq!(asm.provenance(&asm.templates[0].id).unwrap().span.line, 10);
+        let template_binding = asm
+            .template_entities
+            .iter()
+            .find(|entity| entity.kind == TemplateSemanticKind::Binding)
+            .expect("template binding entity");
+        assert!(matches!(
+            asm.entity(&template_binding.id),
+            Some(SemanticEntity::TemplateEntity(_))
+        ));
+        assert_eq!(
+            asm.template_entities_for(&asm.templates[0].id).len(),
+            asm.template_entities.len()
+        );
         assert_eq!(asm.references_from(&component.actions[0].id).len(), 1);
         assert_eq!(asm.references_to(&component.state_fields[0].id).len(), 1);
         assert!(validate_application_semantic_model(&asm).is_empty());

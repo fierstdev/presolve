@@ -80,6 +80,11 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn template_entity(&self, kind: &str, path: &str) -> Self {
+        self.child(kind, path)
+    }
+
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
