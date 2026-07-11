@@ -241,7 +241,10 @@ fn check_json(
         Vec::new()
     };
     let compiler_diagnostics = if check_category_enabled(categories, "compiler") {
-        asm.diagnostics.iter().map(|diagnostic| serde_json::json!({"code": diagnostic.code, "message": diagnostic.message})).collect::<Vec<_>>()
+        asm.diagnostics
+            .iter()
+            .map(compiler_diagnostic_json)
+            .collect::<Vec<_>>()
     } else {
         Vec::new()
     };
@@ -265,6 +268,20 @@ fn parser_diagnostic_json(path: &Path, diagnostic: &ParseDiagnostic) -> serde_js
             "end": label.span.end,
         })).collect::<Vec<_>>(),
     })
+}
+
+fn compiler_diagnostic_json(diagnostic: &ezc_core::ComponentDiagnostic) -> serde_json::Value {
+    let mut document = serde_json::Map::new();
+    document.insert("code".to_string(), serde_json::json!(diagnostic.code));
+    document.insert("message".to_string(), serde_json::json!(diagnostic.message));
+    if let Some(provenance) = &diagnostic.provenance {
+        document.insert(
+            "provenance".to_string(),
+            serde_json::to_value(AsmInspectionProvenance::from(provenance))
+                .expect("compiler provenance should serialize"),
+        );
+    }
+    serde_json::Value::Object(document)
 }
 
 fn parser_diagnostics_fail(unit: &CompilationUnit, fail_on: &ParseSeverity) -> bool {

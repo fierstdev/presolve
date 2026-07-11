@@ -47,8 +47,11 @@ filters never change summary counts or the command's exit status. JSON output
 includes the selected parser threshold in `fail_on` so automation can record
 the effective policy. Each parser diagnostic includes `labels` with source
 `line`, `column`, `start`, and `end` coordinates; text output prints the same
-file-qualified label locations below the diagnostic. Check policy is currently
-selected per command; no project configuration file is interpreted yet.
+file-qualified label locations below the diagnostic. Compiler diagnostics with
+reliable source locations include optional JSON `provenance` using `path`,
+`line`, `column`, `start`, and `end`; diagnostics without a reliable source
+location omit that field. Check policy is currently selected per command; no
+project configuration file is interpreted yet.
 
 ## Repository rules
 

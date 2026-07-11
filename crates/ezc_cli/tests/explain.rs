@@ -568,6 +568,50 @@ fn check_command_emits_json_diagnostics() {
         Some(5)
     );
     assert_eq!(document["fail_on"], "Error");
+    let title_diagnostic = document["compiler_diagnostics"]
+        .as_array()
+        .expect("compiler diagnostics")
+        .iter()
+        .find(|diagnostic| {
+            diagnostic["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("state field `title`"))
+        })
+        .expect("title diagnostic");
+    assert_eq!(
+        title_diagnostic["provenance"],
+        serde_json::json!({
+            "path": "fixtures/0031-primitive-compound-action-type-diagnostics/input/InvalidTypedCompoundActions.tsx",
+            "start": 261,
+            "end": 276,
+            "line": 9,
+            "column": 5,
+        })
+    );
+}
+
+#[test]
+fn check_command_omits_unavailable_compiler_diagnostic_provenance_in_json() {
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args([
+            "check",
+            "fixtures/0003-semantic-errors/input/BrokenSemantics.tsx",
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("failed to run ezc_cli check");
+
+    assert!(!output.status.success());
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("check JSON");
+    let component_diagnostic = document["compiler_diagnostics"]
+        .as_array()
+        .expect("compiler diagnostics")
+        .iter()
+        .find(|diagnostic| diagnostic["code"] == "EZC1001")
+        .expect("missing component diagnostic");
+    assert!(component_diagnostic.get("provenance").is_none());
 }
 
 #[test]
