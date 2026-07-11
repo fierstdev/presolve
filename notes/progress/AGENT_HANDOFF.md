@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: validate primitive compound actions
+* Latest commit: cli: show asm diagnostic locations
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 22:10:48 PDT
+* Date: 2026-07-10 22:13:07 PDT
 
 Last completed slice
 
-* Slice: C5-K - Primitive compound action validation
-* Summary: Added source-provenanced diagnostics for invalid compound numeric targets and operands.
-* Key files: crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/lib.rs, crates/ezc_cli/tests/explain.rs
-* New behavior: `EZC1020` reports non-number exact primitive targets and `EZC1021` reports non-number literal operands for `this.<field> += <literal>` and `-=` actions.
-* Tests added or changed: core and CLI coverage for target, primitive operand, and composite operand diagnostics.
-* Fixtures added or changed: fixtures/0031-primitive-compound-action-type-diagnostics.
+* Slice: C5-L - ASM text diagnostic locations
+* Summary: Exposed source-provenanced compiler diagnostics in human-readable ASM inspection output.
+* Key files: crates/ezc_cli/src/main.rs, crates/ezc_cli/tests/explain.rs
+* New behavior: `ezc asm <file>` retains its count summary and adds deterministic compiler diagnostic details with `path:line:column` and byte span only when diagnostics exist.
+* Tests added or changed: healthy text output compatibility and source-provenanced diagnostic text coverage.
+* Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C5-K - Primitive compound action validation
+* Slice: C5-L - ASM text diagnostic locations
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-K
-* Remaining: C5-L expose compiler diagnostic source locations in text `ezc asm` output.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-L
+* Remaining: C5-M expose ASM validation diagnostics in text `ezc asm` output.
 
 Verification
 
@@ -105,6 +105,10 @@ Architecture decisions made
 * Decision: Compound arithmetic uses `EZC1020` for non-number exact primitive targets and `EZC1021` for non-number literal operands.
 * Reason: Target and operand failures are independent compiler facts, so separate diagnostics give tools actionable, source-provenanced evidence without expression evaluation.
 * Tradeoff: Only serializable literal operands are classified; arbitrary expressions, variable flow, and unclassified declarations remain outside the type system.
+
+* Decision: Text ASM inspection appends deterministic compiler diagnostic details only when compiler diagnostics exist.
+* Reason: Command-line users can see the same canonical source evidence as JSON consumers without changing successful zero-diagnostic output.
+* Tradeoff: ASM validation diagnostics are still count-only in text output; JSON remains the complete machine-readable inspection interface.
 
 * Decision: Canonical ASM/frontend consumers use module-qualified semantic IDs, while the existing backend-facing graph retains legacy component-scoped IDs until its runtime contracts are deliberately migrated.
 * Reason: A canonical application model must distinguish semantically equivalent components from different modules, but the established HTML/template runtime protocol does not serialize these IDs and should not be changed implicitly.
@@ -229,14 +233,14 @@ Known limitations
 * Item: Semantic IDs, direct ownership, and provenance cover components, state fields, methods, action steps, rendered templates, event handlers, and authored template descendants. Backend HTML/template-manifest nodes still use local `n*` IDs as a compatibility contract.
 * Item: Resolved references cover action-to-state, event-to-method, and direct text-binding/dynamic-attribute/conditional/keyed-list-iterable-to-state pairs. Routes, member expressions, computed expressions, and unresolved reference attempts have no semantic relation records yet.
 * Item: Canonical compiler products now include module-qualified template entities, direct template state dependencies, and direct template event-method dependencies, while `BindingTable` resolves local/relative re-export chains plus named/default/namespace imports. External and namespace re-exports, external package bindings, tsconfig aliases, source remapping, and type semantics are still absent. Legacy backend graph identity remains a compatibility path.
-* Item: `ezc asm` accepts explicit source files and exposes a generic inspection document. Project discovery, tsconfig resolution, source remapping, typed action payloads, and machine-readable backend plans remain future slices.
+* Item: `ezc asm` accepts explicit source files and exposes generic JSON and text inspection. Text shows compiler diagnostic provenance when present but not ASM validation diagnostic details. Project discovery, tsconfig resolution, source remapping, typed action payloads, and machine-readable backend plans remain future slices.
 * Item: Declared state types include canonical primitive classification, optional ASM JSON `declared_type.kind`, and source-provenanced `EZC1016` through `EZC1021` diagnostics for supported initializer and action forms. Other compiler/ASM diagnostics may omit provenance. Arbitrary action expressions, variable flow, manifests, runtime, imported types, non-state annotations, inference, unions, aliases, generics, and general assignment compatibility remain outside current type validation.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 
 Exact next step
 
-Start C5-L - Expose source-provenanced compiler diagnostics in human-readable `ezc asm` text output. Preserve JSON schema behavior and diagnostic ordering; do not change validation rules, manifests, runtime behavior, or CLI exit semantics.
+Start C5-M - Expose ASM validation diagnostics in human-readable `ezc asm` text output. Preserve compiler diagnostic ordering and JSON schema behavior; do not change validation rules, manifests, runtime behavior, or CLI exit semantics.
 
 Useful commands
 

@@ -498,6 +498,27 @@ fn asm_command_reports_compound_numeric_action_target_and_operand_mismatches() {
 }
 
 #[test]
+fn asm_command_text_reports_source_provenanced_compiler_diagnostics() {
+    let repo_root = repo_root();
+    let path =
+        "fixtures/0031-primitive-compound-action-type-diagnostics/input/InvalidTypedCompoundActions.tsx";
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["asm", path])
+        .output()
+        .expect("failed to run invalid typed-compound-actions ezc_cli asm");
+
+    assert!(output.status.success());
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    assert!(actual.contains("  compiler diagnostics:\n"));
+    assert!(actual.contains("    EZC1020: state field `title`"));
+    assert!(actual.contains("    EZC1021: action `apply`"));
+    assert!(actual.contains(&format!("      at {path}:9:5 span=")));
+}
+
+#[test]
 fn parse_command_matches_valid_counter_fixture() {
     let repo_root = repo_root();
 

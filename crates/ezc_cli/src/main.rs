@@ -142,6 +142,28 @@ fn print_asm_text(
     println!("  provenance: {}", asm.provenance.len());
     println!("  diagnostics: {}", asm.diagnostics.len());
     println!("  validation: {}", validation.len());
+
+    let mut diagnostics = asm.diagnostics.iter().collect::<Vec<_>>();
+    diagnostics.sort_by(|left, right| {
+        (left.code.as_str(), left.message.as_str())
+            .cmp(&(right.code.as_str(), right.message.as_str()))
+    });
+    if !diagnostics.is_empty() {
+        println!("  compiler diagnostics:");
+        for diagnostic in diagnostics {
+            println!("    {}: {}", diagnostic.code, diagnostic.message);
+            if let Some(provenance) = &diagnostic.provenance {
+                println!(
+                    "      at {}:{}:{} span={}..{}",
+                    provenance.path.display(),
+                    provenance.span.line,
+                    provenance.span.column,
+                    provenance.span.start,
+                    provenance.span.end,
+                );
+            }
+        }
+    }
 }
 
 fn asm_inspection_json(
