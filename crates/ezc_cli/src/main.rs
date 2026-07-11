@@ -34,6 +34,7 @@ fn main() {
         "parse" => run_parse(args),
         "graph" => run_graph(args),
         "asm" => run_asm(&args),
+        "check" => run_check(&args),
         "template" => run_template(args),
         "html" => run_html(args),
         "manifest" => run_manifest(args),
@@ -122,6 +123,63 @@ fn run_asm(args: &[String]) {
     }
 }
 
+fn run_check(args: &[String]) {
+    let input_paths = parse_check_inputs(args);
+    let sources = input_paths
+        .into_iter()
+        .map(|path| {
+            let source = fs::read_to_string(&path).unwrap_or_else(|error| {
+                eprintln!("failed to read {}: {error}", path.display());
+                process::exit(1);
+            });
+            (path, source)
+        })
+        .collect::<Vec<_>>();
+    let unit = CompilationUnit::parse_sources(sources);
+    let asm = build_application_semantic_model_for_unit(&unit);
+    let validation = validate_application_semantic_model(&asm);
+    let parser_diagnostic_count = unit
+        .files()
+        .iter()
+        .map(|file| file.diagnostics.len())
+        .sum::<usize>();
+
+    println!("Check:");
+    println!("  files: {}", unit.files().len());
+    println!("  parser diagnostics: {parser_diagnostic_count}");
+    println!("  compiler diagnostics: {}", asm.diagnostics.len());
+    println!("  ASM validation diagnostics: {}", validation.len());
+
+    for file in unit.files() {
+        for diagnostic in &file.diagnostics {
+            println!(
+                "  parser {}: {}",
+                diagnostic_severity_label(&diagnostic.severity),
+                diagnostic.message
+            );
+            for label in &diagnostic.labels {
+                println!(
+                    "    at {}:{}:{} span={}..{}",
+                    file.path.display(),
+                    label.span.line,
+                    label.span.column,
+                    label.span.start,
+                    label.span.end,
+                );
+            }
+        }
+    }
+
+    print_compiler_diagnostics(&asm.diagnostics);
+    if let Some(validation_text) = asm_validation_diagnostics_text(&validation) {
+        print!("{validation_text}");
+    }
+
+    if parser_diagnostic_count + asm.diagnostics.len() + validation.len() > 0 {
+        process::exit(1);
+    }
+}
+
 fn print_asm_text(
     paths: &[PathBuf],
     asm: &ApplicationSemanticModel,
@@ -144,7 +202,15 @@ fn print_asm_text(
     println!("  diagnostics: {}", asm.diagnostics.len());
     println!("  validation: {}", validation.len());
 
-    let mut diagnostics = asm.diagnostics.iter().collect::<Vec<_>>();
+    print_compiler_diagnostics(&asm.diagnostics);
+
+    if let Some(validation_text) = asm_validation_diagnostics_text(validation) {
+        print!("{validation_text}");
+    }
+}
+
+fn print_compiler_diagnostics(diagnostics: &[ezc_core::ComponentDiagnostic]) {
+    let mut diagnostics = diagnostics.iter().collect::<Vec<_>>();
     diagnostics.sort_by(|left, right| {
         (left.code.as_str(), left.message.as_str())
             .cmp(&(right.code.as_str(), right.message.as_str()))
@@ -164,10 +230,6 @@ fn print_asm_text(
                 );
             }
         }
-    }
-
-    if let Some(validation_text) = asm_validation_diagnostics_text(validation) {
-        print!("{validation_text}");
     }
 }
 
@@ -304,6 +366,23 @@ fn parse_asm_inputs(args: &[String]) -> (Vec<PathBuf>, String) {
     }
 
     (paths, format)
+}
+
+fn parse_check_inputs(args: &[String]) -> Vec<PathBuf> {
+    if args.is_empty() {
+        eprintln!("missing file path");
+        print_usage_and_exit();
+    }
+
+    args.iter()
+        .map(|arg| {
+            if arg.starts_with('-') {
+                eprintln!("unknown option: {arg}");
+                process::exit(1);
+            }
+            PathBuf::from(arg)
+        })
+        .collect()
 }
 
 fn semantic_entity_kind(entity: SemanticEntity<'_>) -> &'static str {
@@ -1334,6 +1413,7 @@ fn print_usage_and_exit() -> ! {
     eprintln!("usage:");
     eprintln!("  ezc_cli explain <file> [--format text|json]");
     eprintln!("  ezc_cli asm <file> [--format text|json]");
+    eprintln!("  ezc_cli check <file> [file...]");
     eprintln!("  ezc_cli parse <file>");
     eprintln!("  ezc_cli graph <file>");
     eprintln!("  ezc_cli template <file>");

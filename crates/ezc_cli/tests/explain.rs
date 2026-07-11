@@ -519,6 +519,58 @@ fn asm_command_text_reports_source_provenanced_compiler_diagnostics() {
 }
 
 #[test]
+fn check_command_succeeds_without_diagnostics() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["check", "fixtures/0001-source-summary/input/Counter.tsx"])
+        .output()
+        .expect("failed to run ezc_cli check");
+
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8"),
+        "Check:\n  files: 1\n  parser diagnostics: 0\n  compiler diagnostics: 0\n  ASM validation diagnostics: 0\n"
+    );
+}
+
+#[test]
+fn check_command_fails_for_compiler_diagnostics() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "check",
+            "fixtures/0031-primitive-compound-action-type-diagnostics/input/InvalidTypedCompoundActions.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli check");
+
+    assert!(!output.status.success());
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    assert!(actual.contains("  compiler diagnostics: 5\n"));
+    assert!(actual.contains("    EZC1020: state field `title`"));
+}
+
+#[test]
+fn check_command_fails_for_parser_diagnostics() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["check", "fixtures/0002-broken-tsx/input/BrokenCounter.tsx"])
+        .output()
+        .expect("failed to run ezc_cli check");
+
+    assert!(!output.status.success());
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    assert!(actual.contains("  parser diagnostics: 1\n"));
+    assert!(actual.contains("  parser Error:"));
+}
+
+#[test]
 fn parse_command_matches_valid_counter_fixture() {
     let repo_root = repo_root();
 

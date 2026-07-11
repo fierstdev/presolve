@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: cli: show asm validation diagnostics
+* Latest commit: cli: add compiler check command
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 22:15:47 PDT
+* Date: 2026-07-10 22:18:58 PDT
 
 Last completed slice
 
-* Slice: C5-M - ASM text validation diagnostics
-* Summary: Completed the human-readable ASM diagnostic surface with validation diagnostic details.
-* Key files: crates/ezc_cli/src/main.rs
-* New behavior: text ASM output appends sorted `ASM validation diagnostics` only when they exist; normal compiler output and JSON inspection remain unchanged.
-* Tests added or changed: direct formatter coverage for empty and deterministic validation diagnostic output.
+* Slice: C6-A - Compiler check command
+* Summary: Added a canonical multi-file validation command for parser, compiler, and ASM diagnostics.
+* Key files: crates/ezc_cli/src/main.rs, crates/ezc_cli/tests/explain.rs
+* New behavior: `ezc check <file> [file...]` reports parser/compiler/ASM validation diagnostics and exits nonzero when any are present.
+* Tests added or changed: clean, compiler-failure, and parser-failure command coverage.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C5-M - ASM text validation diagnostics
+* Slice: C6-A - Compiler check command
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M
-* Remaining: C6-A add an explicit `ezc check` command for compiler and ASM validation diagnostics.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A
+* Remaining: C6-B add JSON output to `ezc check`.
 
 Verification
 
@@ -244,7 +244,7 @@ Known limitations
 
 Exact next step
 
-Start C6-A - Add an explicit `ezc check` command that reports compiler and ASM validation diagnostics for one or more source files and exits nonzero when diagnostics exist. Reuse canonical `CompilationUnit` and diagnostics; do not alter parsing, validation rules, manifests, runtime behavior, or project discovery.
+Start C6-B - Add deterministic JSON output to `ezc check` while preserving C6-A text output and exit status.
 
 Useful commands
 
