@@ -6,6 +6,7 @@
 
 pub mod application_semantic_model;
 pub mod asm_validation;
+pub mod binding_table;
 pub mod compilation_unit;
 pub mod compiler_pass;
 pub mod component_graph;
@@ -37,6 +38,10 @@ pub use application_semantic_model::{
     ApplicationSemanticModel, SemanticEntity,
 };
 pub use asm_validation::{validate_application_semantic_model, AsmValidationDiagnostic};
+pub use binding_table::{
+    build_binding_table, BindingDiagnostic, BindingTable, ExportBinding, ImportBinding,
+    ImportBindingTarget, ModuleBindingTable,
+};
 pub use compilation_unit::CompilationUnit;
 pub use compiler_pass::{
     AnalysisPass, ConstantEvaluation, ConstantEvaluationPass, DependencyAnalysis,
