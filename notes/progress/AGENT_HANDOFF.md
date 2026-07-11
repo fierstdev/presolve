@@ -5,7 +5,7 @@ Repository state
 * Branch: main
 * Latest commit: compiler: add module graph
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 19:49:12 PDT
+* Date: 2026-07-10 20:06:00 PDT
 
 Last completed slice
 
@@ -37,6 +37,10 @@ Verification
 * just e2e: pass
 
 Architecture decisions made
+
+* Decision: Every completed slice updates both this handoff and the active weekly progress log before its checkpoint is finalized.
+* Reason: The handoff preserves immediate continuation context while the progress log preserves the durable implementation chronology.
+* Tradeoff: Documentation-only recovery commits may be required when a prior checkpoint omitted the weekly entry.
 
 * Decision: Conditional nodes are first-class parser/render/template children with a conditional node ID plus separate start/end boundary IDs.
 * Reason: The compiler needs stable branch identity for tooling and runtime updates, while the DOM needs comment anchors that can bound branch replacement without a wrapper element.
