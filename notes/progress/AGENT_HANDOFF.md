@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: cli: expose asm state types
+* Latest commit: compiler: classify primitive state types
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 21:36:03 PDT
+* Date: 2026-07-10 21:39:50 PDT
 
 Last completed slice
 
-* Slice: C5-C - ASM declared type inspection
-* Summary: Exposed canonical declared state types through `ezc asm --format json`.
-* Key files: crates/ezc_cli/src/main.rs, crates/ezc_cli/tests/explain.rs, fixtures/0025-typed-state-annotations/input/TypedState.tsx
-* New behavior: Typed state entities include optional `declared_type` text and annotation provenance. Untyped entities retain the C4-A JSON shape.
-* Tests added or changed: typed-state ASM JSON metadata and exact source provenance.
-* Fixtures added or changed: fixtures/0025-typed-state-annotations.
+* Slice: C5-D - Primitive state type classification
+* Summary: Classified exact primitive declared state types in canonical metadata.
+* Key files: crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/lib.rs, fixtures/0025-typed-state-annotations/input/TypedState.tsx
+* New behavior: `DeclaredStateType.kind` recognizes exact `string`, `number`, `boolean`, and `null` declarations while preserving all other text as unclassified.
+* Tests added or changed: primitive classification for all supported forms and union non-classification.
+* Fixtures added or changed: expanded fixtures/0025-typed-state-annotations.
 
 Current in-progress slice
 
-* Slice: C5-C - ASM declared type inspection
+* Slice: C5-D - Primitive state type classification
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-C
-* Remaining: C5-D classify supported primitive declared state types.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-D
+* Remaining: C5-E expose primitive type classification in ASM JSON inspection.
 
 Verification
 
@@ -73,6 +73,10 @@ Architecture decisions made
 * Decision: ASM JSON exposes declared type data only on state entities that actually have a declaration.
 * Reason: The optional field extends the stable inspection document without changing the representation of existing untyped programs.
 * Tradeoff: The document reports raw declared text and provenance; it does not classify, resolve, or validate the type expression.
+
+* Decision: Primitive declared type classification recognizes only exact `string`, `number`, `boolean`, and `null` text.
+* Reason: The compiler gains a reliable first typed vocabulary without silently interpreting unions, aliases, generics, literals, or imported names.
+* Tradeoff: Any other valid TypeScript type remains available as raw declared text but has no classification or checking semantics yet.
 
 * Decision: Canonical ASM/frontend consumers use module-qualified semantic IDs, while the existing backend-facing graph retains legacy component-scoped IDs until its runtime contracts are deliberately migrated.
 * Reason: A canonical application model must distinguish semantically equivalent components from different modules, but the established HTML/template runtime protocol does not serialize these IDs and should not be changed implicitly.
@@ -198,13 +202,13 @@ Known limitations
 * Item: Resolved references cover action-to-state, event-to-method, and direct text-binding/dynamic-attribute/conditional/keyed-list-iterable-to-state pairs. Routes, member expressions, computed expressions, and unresolved reference attempts have no semantic relation records yet.
 * Item: Canonical compiler products now include module-qualified template entities, direct template state dependencies, and direct template event-method dependencies, while `BindingTable` resolves local/relative re-export chains plus named/default/namespace imports. External and namespace re-exports, external package bindings, tsconfig aliases, source remapping, and type semantics are still absent. Legacy backend graph identity remains a compatibility path.
 * Item: `ezc asm` accepts explicit source files and exposes a generic inspection document. Project discovery, tsconfig resolution, source remapping, typed action payloads, and machine-readable backend plans remain future slices.
-* Item: Declared state types are canonical `StateField` metadata and optional ASM JSON data with source provenance. Diagnostics, manifests, runtime, imported types, non-state annotations, inference, unions, and assignment compatibility do not yet consume or validate types.
+* Item: Declared state types include canonical primitive classification and optional raw ASM JSON data with source provenance. Diagnostics, manifests, runtime, imported types, non-state annotations, inference, unions, aliases, generics, literals, and assignment compatibility do not yet consume or validate types.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 
 Exact next step
 
-Start C5-D - Classify supported primitive declared state types in canonical metadata. Preserve raw text/provenance; support only exact `string`, `number`, `boolean`, and `null` names, with no inference, unions, import resolution, validation, or runtime changes.
+Start C5-E - Expose primitive declared state type classification in `ezc asm --format json`. Add optional classification metadata only; do not validate assignments, alter type resolution, or change manifests/runtime artifacts.
 
 Useful commands
 

@@ -50,9 +50,9 @@ pub use compiler_pass::{
 };
 pub use component_graph::{
     build_component_graph, build_component_graph_for_module, ComponentAction, ComponentDiagnostic,
-    ComponentGraph, ComponentMethod, ComponentNode, DeclaredStateType, RenderAttribute,
-    RenderAttributeValue, RenderChild, RenderEventHandler, RenderFragment, RenderList, RenderModel,
-    SerializableValue, StateField, StateOperation,
+    ComponentGraph, ComponentMethod, ComponentNode, DeclaredStateType, DeclaredStateTypeKind,
+    RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler, RenderFragment,
+    RenderList, RenderModel, SerializableValue, StateField, StateOperation,
 };
 pub use explain::{explain_json, explain_text};
 pub use html_codegen::generate_static_html;
@@ -416,11 +416,47 @@ class Panel extends Component {
         assert_eq!(graph_type.provenance.path, Path::new("src/Panel.tsx"));
         assert_eq!(graph_type.provenance.span.line, 4);
         assert_eq!(graph_type.provenance.span.column, 8);
+        assert_eq!(graph_type.kind, Some(DeclaredStateTypeKind::Number));
 
         let asm = build_application_semantic_model(&parsed);
         assert_eq!(
             asm.components[0].state_fields[0].declared_type,
             Some(graph_type.clone())
+        );
+    }
+
+    #[test]
+    fn classifies_exact_primitive_declared_state_types() {
+        let source =
+            include_str!("../../../fixtures/0025-typed-state-annotations/input/TypedState.tsx");
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0025-typed-state-annotations/input/TypedState.tsx",
+            source,
+        );
+        let graph = build_component_graph_for_module(&parsed);
+        let kinds = graph.components[0]
+            .state_fields
+            .iter()
+            .map(|field| {
+                (
+                    field.name.as_str(),
+                    field
+                        .declared_type
+                        .as_ref()
+                        .and_then(|declared_type| declared_type.kind),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            kinds,
+            vec![
+                ("count", Some(DeclaredStateTypeKind::Number)),
+                ("status", None),
+                ("title", Some(DeclaredStateTypeKind::String)),
+                ("enabled", Some(DeclaredStateTypeKind::Boolean)),
+                ("empty", Some(DeclaredStateTypeKind::Null)),
+            ]
         );
     }
 

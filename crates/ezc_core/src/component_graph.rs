@@ -48,6 +48,16 @@ pub struct StateField {
 pub struct DeclaredStateType {
     pub text: String,
     pub provenance: SourceProvenance,
+    pub kind: Option<DeclaredStateTypeKind>,
+}
+
+/// The primitive state type forms currently recognized without type inference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeclaredStateTypeKind {
+    String,
+    Number,
+    Boolean,
+    Null,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -289,6 +299,7 @@ fn build_component_node(
                 DeclaredStateType {
                     text: annotation.text.clone(),
                     provenance: SourceProvenance::new(path, annotation.span),
+                    kind: declared_state_type_kind(&annotation.text),
                 }
             }),
         })
@@ -353,6 +364,16 @@ fn build_component_node(
         methods,
         actions,
         render,
+    }
+}
+
+fn declared_state_type_kind(text: &str) -> Option<DeclaredStateTypeKind> {
+    match text {
+        "string" => Some(DeclaredStateTypeKind::String),
+        "number" => Some(DeclaredStateTypeKind::Number),
+        "boolean" => Some(DeclaredStateTypeKind::Boolean),
+        "null" => Some(DeclaredStateTypeKind::Null),
+        _ => None,
     }
 }
 
