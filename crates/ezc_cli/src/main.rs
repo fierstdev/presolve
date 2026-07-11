@@ -124,7 +124,7 @@ fn run_asm(args: &[String]) {
 }
 
 fn run_check(args: &[String]) {
-    let (input_paths, format, categories) = parse_check_inputs(args);
+    let (input_paths, format, categories, fail_on) = parse_check_inputs(args);
     let sources = input_paths
         .into_iter()
         .map(|path| {
@@ -151,15 +151,22 @@ fn run_check(args: &[String]) {
             &validation,
             parser_diagnostic_count,
             &categories,
+            &fail_on,
         ),
-        "json" => print!("{}", check_json(&unit, &asm, &validation, &categories)),
+        "json" => print!(
+            "{}",
+            check_json(&unit, &asm, &validation, &categories, &fail_on)
+        ),
         _ => {
             eprintln!("unsupported format: {format}");
             process::exit(1);
         }
     }
 
-    if parser_diagnostic_count + asm.diagnostics.len() + validation.len() > 0 {
+    if parser_diagnostics_fail(&unit, &fail_on)
+        || !asm.diagnostics.is_empty()
+        || !validation.is_empty()
+    {
         process::exit(1);
     }
 }
@@ -170,12 +177,14 @@ fn print_check_text(
     validation: &[AsmValidationDiagnostic],
     parser_diagnostic_count: usize,
     categories: &[String],
+    fail_on: &ParseSeverity,
 ) {
     println!("Check:");
     println!("  files: {}", unit.files().len());
     println!("  parser diagnostics: {parser_diagnostic_count}");
     println!("  compiler diagnostics: {}", asm.diagnostics.len());
     println!("  ASM validation diagnostics: {}", validation.len());
+    println!("  parser fail on: {}", diagnostic_severity_label(fail_on));
     if check_category_enabled(categories, "parser") {
         for file in unit.files() {
             for diagnostic in &file.diagnostics {
@@ -202,6 +211,7 @@ fn check_json(
     asm: &ApplicationSemanticModel,
     validation: &[AsmValidationDiagnostic],
     categories: &[String],
+    fail_on: &ParseSeverity,
 ) -> String {
     let parser_count = unit
         .files()
@@ -223,7 +233,21 @@ fn check_json(
     } else {
         Vec::new()
     };
-    serde_json::to_string_pretty(&serde_json::json!({"schema_version": 1, "files": unit.files().iter().map(|file| file.path.display().to_string()).collect::<Vec<_>>(), "summary": {"parser_diagnostics": parser_count, "compiler_diagnostics": asm.diagnostics.len(), "validation": validation.len()}, "categories": categories, "parser_diagnostics": parser_diagnostics, "compiler_diagnostics": compiler_diagnostics, "validation": validation_diagnostics})).expect("check document should serialize") + "\n"
+    serde_json::to_string_pretty(&serde_json::json!({"schema_version": 1, "files": unit.files().iter().map(|file| file.path.display().to_string()).collect::<Vec<_>>(), "summary": {"parser_diagnostics": parser_count, "compiler_diagnostics": asm.diagnostics.len(), "validation": validation.len()}, "categories": categories, "fail_on": diagnostic_severity_label(fail_on), "parser_diagnostics": parser_diagnostics, "compiler_diagnostics": compiler_diagnostics, "validation": validation_diagnostics})).expect("check document should serialize") + "\n"
+}
+
+fn parser_diagnostics_fail(unit: &CompilationUnit, fail_on: &ParseSeverity) -> bool {
+    unit.files()
+        .iter()
+        .flat_map(|file| &file.diagnostics)
+        .any(|diagnostic| severity_rank(&diagnostic.severity) >= severity_rank(fail_on))
+}
+fn severity_rank(severity: &ParseSeverity) -> u8 {
+    match severity {
+        ParseSeverity::Info => 0,
+        ParseSeverity::Warning => 1,
+        ParseSeverity::Error => 2,
+    }
 }
 
 fn check_category_enabled(categories: &[String], category: &str) -> bool {
@@ -418,7 +442,7 @@ fn parse_asm_inputs(args: &[String]) -> (Vec<PathBuf>, String) {
     (paths, format)
 }
 
-fn parse_check_inputs(args: &[String]) -> (Vec<PathBuf>, String, Vec<String>) {
+fn parse_check_inputs(args: &[String]) -> (Vec<PathBuf>, String, Vec<String>, ParseSeverity) {
     if args.is_empty() {
         eprintln!("missing file path");
         print_usage_and_exit();
@@ -427,6 +451,7 @@ fn parse_check_inputs(args: &[String]) -> (Vec<PathBuf>, String, Vec<String>) {
     let mut paths = Vec::new();
     let mut format = "text".to_string();
     let mut categories = Vec::new();
+    let mut fail_on = ParseSeverity::Error;
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
@@ -450,6 +475,22 @@ fn parse_check_inputs(args: &[String]) -> (Vec<PathBuf>, String, Vec<String>) {
                 categories.push(value.clone());
                 index += 2;
             }
+            "--fail-on" => {
+                let Some(value) = args.get(index + 1) else {
+                    eprintln!("missing value for --fail-on");
+                    process::exit(1);
+                };
+                fail_on = match value.as_str() {
+                    "error" => ParseSeverity::Error,
+                    "warning" => ParseSeverity::Warning,
+                    "info" => ParseSeverity::Info,
+                    _ => {
+                        eprintln!("unsupported fail policy: {value}");
+                        process::exit(1);
+                    }
+                };
+                index += 2;
+            }
             option if option.starts_with('-') => {
                 eprintln!("unknown option: {option}");
                 process::exit(1);
@@ -460,7 +501,7 @@ fn parse_check_inputs(args: &[String]) -> (Vec<PathBuf>, String, Vec<String>) {
             }
         }
     }
-    (paths, format, categories)
+    (paths, format, categories, fail_on)
 }
 
 fn semantic_entity_kind(entity: SemanticEntity<'_>) -> &'static str {

@@ -531,7 +531,7 @@ fn check_command_succeeds_without_diagnostics() {
     assert!(output.status.success());
     assert_eq!(
         String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8"),
-        "Check:\n  files: 1\n  parser diagnostics: 0\n  compiler diagnostics: 0\n  ASM validation diagnostics: 0\n"
+        "Check:\n  files: 1\n  parser diagnostics: 0\n  compiler diagnostics: 0\n  ASM validation diagnostics: 0\n  parser fail on: Error\n"
     );
 }
 
