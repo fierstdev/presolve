@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: core: add asm provenance queries
+* Latest commit: core: add asm reference kind queries
 * Working tree: clean after committing this slice
-* Date: 2026-07-11 12:21:50 PDT
+* Date: 2026-07-11 12:48:33 PDT
 
 Last completed slice
 
-* Slice: C7-D - ASM source-provenance lookup queries
-* Summary: Added deterministic file and byte-offset lookup over canonical semantic provenance.
+* Slice: C7-E - ASM semantic reference-kind queries
+* Summary: Added deterministic filtering over canonical semantic references.
 * Key files: crates/ezc_core/src/application_semantic_model.rs
-* New behavior: `entities_in_file()` returns all semantic IDs with provenance in a file; `entities_at()` returns every entity whose half-open source span covers a byte offset.
-* Tests added or changed: Core coverage verifies file-wide lookup and nested source-span lookup from a state declaration.
+* New behavior: `references_of_kind()` returns references of one `SemanticReferenceKind`, ordered by source and target semantic IDs.
+* Tests added or changed: Core coverage verifies resolved action-to-state filtering and endpoints.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C7-D - ASM source-provenance lookup queries
+* Slice: C7-E - ASM semantic reference-kind queries
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-D
-* Remaining: C7-E add deterministic semantic reference-kind queries for tooling filters.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-E
+* Remaining: C7-F add deterministic semantic reference provenance lookup for tooling.
 
 Verification
 
@@ -178,6 +178,10 @@ Architecture decisions made
 * Reason: The compiler preserves source coordinates in this form, so tooling can map source selections to all overlapping semantic entities without inventing line/column conversions or boundary ambiguity.
 * Tradeoff: Path normalization, line/column inputs, source remapping, nearest-entity ranking, and editor-range protocols remain future work.
 
+* Decision: ASM reference-kind queries order results by source and target semantic IDs.
+* Reason: Tooling receives a stable relation filter independent of construction order.
+* Tradeoff: C7-E filters a single reference kind only; endpoint, provenance, and composite relation queries remain follow-up work.
+
 * Decision: Conditional nodes are first-class parser/render/template children with a conditional node ID plus separate start/end boundary IDs.
 * Reason: The compiler needs stable branch identity for tooling and runtime updates, while the DOM needs comment anchors that can bound branch replacement without a wrapper element.
 * Tradeoff: Runtime manifests serialize branch HTML snippets for this first slice instead of recursively hydrating dynamic bindings/events inside branch snippets.
@@ -275,11 +279,11 @@ Known limitations
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 * Item: Check policy is selected per CLI invocation. Project policy files, presets, and policy discovery are not interpreted yet.
 * Item: Parser diagnostic labels expose only `line`, `column`, `start`, and `end`; parser label messages and rendered source excerpts are not available yet. Compiler provenance in check JSON is optional, and ASM validation diagnostics still have no provenance field.
-* Item: ASM ownership queries expose roots, direct children, descendants, broad entity-kind filters, and exact provenance lookup. Depth metadata, template subkind/composite filters, path normalization, source remapping, and CLI query arguments remain future work.
+* Item: ASM query APIs expose ownership traversal, broad entity kinds, exact provenance lookup, and reference-kind filtering. Composite queries, path normalization, source remapping, and CLI query arguments remain future work.
 
 Exact next step
 
-Start C7-E - Add deterministic semantic reference-kind queries for tooling filters while preserving C7 ownership, entity-kind, and provenance lookup ordering. Do not add CLI syntax or mutate the semantic model.
+Start C7-F - Add deterministic semantic reference provenance lookup while preserving C7 ownership, entity-kind, and reference-kind filtering. Do not add CLI syntax or mutate the semantic model.
 
 Useful commands
 

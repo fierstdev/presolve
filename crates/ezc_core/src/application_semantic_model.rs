@@ -190,6 +190,20 @@ impl ApplicationSemanticModel {
             .collect()
     }
 
+    #[must_use]
+    pub fn references_of_kind(&self, kind: SemanticReferenceKind) -> Vec<&SemanticReference> {
+        let mut references = self
+            .references
+            .iter()
+            .filter(|reference| reference.kind == kind)
+            .collect::<Vec<_>>();
+        references.sort_by(|left, right| {
+            (left.source.as_str(), left.target.as_str())
+                .cmp(&(right.source.as_str(), right.target.as_str()))
+        });
+        references
+    }
+
     fn collect_descendants<'a>(
         &'a self,
         owner: &SemanticId,
@@ -476,6 +490,10 @@ class Counter extends Component {
             provenance.span.start <= state_provenance.span.start
                 && state_provenance.span.start < provenance.span.end
         }));
+        let action_references = asm.references_of_kind(SemanticReferenceKind::ActionState);
+        assert_eq!(action_references.len(), 1);
+        assert_eq!(action_references[0].source, component.actions[0].id);
+        assert_eq!(action_references[0].target, component.state_fields[0].id);
     }
 
     #[test]
