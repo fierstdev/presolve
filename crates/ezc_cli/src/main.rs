@@ -5,9 +5,10 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 use ezc_core::{
-    build_component_graph, build_template_graph, build_template_manifest, explain_json,
-    explain_text, generate_runtime_stub, generate_standalone_page, generate_static_html,
-    summarize_source, template_manifest_json, AttributeValue, ComponentGraph, RenderAttribute,
+    build_application_semantic_model, build_component_graph, build_template_graph,
+    build_template_manifest, explain_json, explain_text, generate_runtime_stub,
+    generate_standalone_page, generate_static_html, summarize_source, template_manifest_json,
+    validate_application_semantic_model, AttributeValue, ComponentGraph, RenderAttribute,
     RenderAttributeValue, SerializableValue, StateOperation, TemplateChild, TemplateGraph,
 };
 use ezc_parser::{
@@ -28,6 +29,7 @@ fn main() {
         "explain" => run_explain(args),
         "parse" => run_parse(args),
         "graph" => run_graph(args),
+        "asm" => run_asm(args),
         "template" => run_template(args),
         "html" => run_html(args),
         "manifest" => run_manifest(args),
@@ -83,6 +85,29 @@ fn run_graph(mut args: Vec<String>) {
     let graph = build_component_graph(&parsed);
 
     print_component_graph(&path, &graph);
+}
+
+fn run_asm(mut args: Vec<String>) {
+    if args.is_empty() {
+        eprintln!("missing file path");
+        print_usage_and_exit();
+    }
+    let path = PathBuf::from(args.remove(0));
+    let source = fs::read_to_string(&path).unwrap_or_else(|error| {
+        eprintln!("failed to read {}: {error}", path.display());
+        process::exit(1);
+    });
+    let asm = build_application_semantic_model(&parse_file(&path, &source));
+    let validation = validate_application_semantic_model(&asm);
+    println!("File: {}", path.display());
+    println!("ApplicationSemanticModel:");
+    println!("  components: {}", asm.components.len());
+    println!("  templates: {}", asm.templates.len());
+    println!("  ownership: {}", asm.ownership.len());
+    println!("  references: {}", asm.references.len());
+    println!("  provenance: {}", asm.provenance.len());
+    println!("  diagnostics: {}", asm.diagnostics.len());
+    println!("  validation: {}", validation.len());
 }
 
 fn run_template(mut args: Vec<String>) {

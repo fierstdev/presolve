@@ -3,24 +3,24 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: validate application semantic model
+* Latest commit: cli: add asm inspection
 * Working tree: clean after committing this slice
 * Date: 2026-07-10 19:30:12 PDT
 
 Last completed slice
 
-* Slice: ASM-7 - ASM validation
-* Summary: Added deterministic validation for semantic entity, ownership, provenance, and reference invariants.
-* Key files: crates/ezc_core/src/asm_validation.rs, crates/ezc_core/src/lib.rs
-* New behavior: `validate_application_semantic_model` reports structured `EZASM1001` through `EZASM1006` diagnostics for missing or inconsistent semantic metadata.
-* Tests added or changed: core coverage verifies a valid assembled model and detects missing action provenance plus mismatched reference provenance.
-* Fixtures added or changed: None; this slice does not alter CLI, HTML, manifest, or runtime artifacts.
+* Slice: ASM-8 - `ez asm` CLI
+* Summary: Added deterministic application-semantic inspection through the compiler CLI.
+* Key files: crates/ezc_cli/src/main.rs
+* New behavior: `ezc asm <file>` prints ASM component, template, ownership, reference, provenance, compiler-diagnostic, and validation-diagnostic counts.
+* Tests added or changed: existing CLI regression suite remains green; focused manual command output was compiled and exercised through the same command path.
+* Fixtures added or changed: None; this slice does not alter HTML, manifest, or runtime artifacts.
 
 Current in-progress slice
 
-* Slice: ASM-7 - ASM validation
+* Slice: ASM-8 - `ez asm` CLI
 * Status: Complete
-* Completed: ASM-1 through ASM-7
+* Completed: ASM-1 through ASM-8
 * Remaining: None
 
 Verification
@@ -134,7 +134,7 @@ Known limitations
 
 Exact next step
 
-Start ASM-8 - `ez asm` CLI. Expose deterministic application semantic inspection through a dedicated CLI command backed by the ASM query and validation APIs.
+Start Era III planning: define the first compiler-pass infrastructure slice, beginning with dependency analysis over the Application Semantic Model.
 
 Useful commands
 
