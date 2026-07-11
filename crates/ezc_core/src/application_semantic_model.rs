@@ -3,7 +3,8 @@ use std::collections::BTreeMap;
 use ezc_parser::ParsedFile;
 
 use crate::component_graph::{
-    build_component_graph, render_event_handlers, ComponentDiagnostic, ComponentNode,
+    build_component_graph, render_event_handlers, ComponentAction, ComponentDiagnostic,
+    ComponentMethod, ComponentNode, RenderEventHandler, StateField,
 };
 use crate::semantic_id::{SemanticId, SemanticOwner};
 use crate::semantic_provenance::SourceProvenance;
@@ -19,6 +20,85 @@ pub struct ApplicationSemanticModel {
     pub ownership: BTreeMap<SemanticId, SemanticOwner>,
     pub references: Vec<SemanticReference>,
     pub provenance: BTreeMap<SemanticId, SourceProvenance>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SemanticEntity<'a> {
+    Component(&'a ComponentNode),
+    StateField(&'a StateField),
+    Method(&'a ComponentMethod),
+    Action(&'a ComponentAction),
+    EventHandler(&'a RenderEventHandler),
+    Template(&'a TemplateNode),
+}
+
+impl ApplicationSemanticModel {
+    #[must_use]
+    pub fn entity(&self, id: &SemanticId) -> Option<SemanticEntity<'_>> {
+        for component in &self.components {
+            if component.id == *id {
+                return Some(SemanticEntity::Component(component));
+            }
+            if let Some(field) = component.state_fields.iter().find(|field| field.id == *id) {
+                return Some(SemanticEntity::StateField(field));
+            }
+            if let Some(method) = component.methods.iter().find(|method| method.id == *id) {
+                return Some(SemanticEntity::Method(method));
+            }
+            if let Some(action) = component.actions.iter().find(|action| action.id == *id) {
+                return Some(SemanticEntity::Action(action));
+            }
+            if let Some(render) = &component.render {
+                if let Some(handler) = render_event_handlers(render)
+                    .into_iter()
+                    .find(|handler| handler.id == *id)
+                {
+                    return Some(SemanticEntity::EventHandler(handler));
+                }
+            }
+        }
+
+        self.templates
+            .iter()
+            .find(|template| template.id == *id)
+            .map(SemanticEntity::Template)
+    }
+
+    #[must_use]
+    pub fn component(&self, id: &SemanticId) -> Option<&ComponentNode> {
+        self.components.iter().find(|component| component.id == *id)
+    }
+
+    #[must_use]
+    pub fn template(&self, id: &SemanticId) -> Option<&TemplateNode> {
+        self.templates.iter().find(|template| template.id == *id)
+    }
+
+    #[must_use]
+    pub fn owner(&self, id: &SemanticId) -> Option<&SemanticOwner> {
+        self.ownership.get(id)
+    }
+
+    #[must_use]
+    pub fn provenance(&self, id: &SemanticId) -> Option<&SourceProvenance> {
+        self.provenance.get(id)
+    }
+
+    #[must_use]
+    pub fn references_from(&self, id: &SemanticId) -> Vec<&SemanticReference> {
+        self.references
+            .iter()
+            .filter(move |reference| reference.source == *id)
+            .collect()
+    }
+
+    #[must_use]
+    pub fn references_to(&self, id: &SemanticId) -> Vec<&SemanticReference> {
+        self.references
+            .iter()
+            .filter(move |reference| reference.target == *id)
+            .collect()
+    }
 }
 
 #[must_use]

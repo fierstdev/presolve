@@ -3,24 +3,24 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: add application semantic model
+* Latest commit: compiler: add semantic query api
 * Working tree: clean after committing this slice
 * Date: 2026-07-10 19:30:12 PDT
 
 Last completed slice
 
-* Slice: ASM-5 - ApplicationSemanticModel shell
-* Summary: Added the application-level semantic model that assembles the existing compiler graphs and relation metadata behind one stable API.
-* Key files: crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/lib.rs
-* New behavior: `ApplicationSemanticModel` exposes components, templates, diagnostics, centralized ownership, resolved references, and provenance. It is constructed from the existing component/template graph builders without changing backend outputs.
-* Tests added or changed: core coverage verifies the assembled model preserves the counter component, template, ownership, references, and provenance consistently.
-* Fixtures added or changed: None; this slice deliberately does not alter CLI, HTML, manifest, or runtime artifacts.
+* Slice: ASM-6 - Compiler query API
+* Summary: Added deterministic read-only queries over the application semantic model.
+* Key files: crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/lib.rs
+* New behavior: Semantic consumers can look up entities, components, templates, owners, provenance, and directed references without traversing compiler internals.
+* Tests added or changed: core coverage exercises entity, ownership, provenance, template, and forward/reverse reference queries.
+* Fixtures added or changed: None; this slice does not alter CLI, HTML, manifest, or runtime artifacts.
 
 Current in-progress slice
 
-* Slice: ASM-5 - ApplicationSemanticModel shell
+* Slice: ASM-6 - Compiler query API
 * Status: Complete
-* Completed: ASM-1 - Global semantic IDs; ASM-2 - Semantic ownership; ASM-3 - Cross-reference resolution; ASM-4 - Source provenance; ASM-5 - ApplicationSemanticModel shell
+* Completed: ASM-1 through ASM-6
 * Remaining: None
 
 Verification
@@ -134,7 +134,7 @@ Known limitations
 
 Exact next step
 
-Start ASM-6 - Compiler query API. Add read-only, deterministic lookup and traversal APIs over `ApplicationSemanticModel` for IDs, ownership, references, provenance, and components.
+Start ASM-7 - ASM validation. Define and run deterministic semantic-model invariants before exposing the model through a CLI.
 
 Useful commands
 

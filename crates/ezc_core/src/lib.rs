@@ -18,7 +18,9 @@ pub mod summarize;
 pub mod template_graph;
 pub mod template_manifest;
 
-pub use application_semantic_model::{build_application_semantic_model, ApplicationSemanticModel};
+pub use application_semantic_model::{
+    build_application_semantic_model, ApplicationSemanticModel, SemanticEntity,
+};
 pub use component_graph::{
     build_component_graph, ComponentAction, ComponentDiagnostic, ComponentGraph, ComponentMethod,
     ComponentNode, RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler,
@@ -298,6 +300,24 @@ class Counter extends Component {
             SemanticOwner::entity(component.id.clone())
         );
         assert_eq!(asm.provenance[&asm.templates[0].id].span.line, 10);
+
+        assert!(matches!(
+            asm.entity(&component.id),
+            Some(SemanticEntity::Component(_))
+        ));
+        assert!(matches!(
+            asm.entity(&component.state_fields[0].id),
+            Some(SemanticEntity::StateField(_))
+        ));
+        assert_eq!(asm.component(&component.id), Some(component));
+        assert_eq!(asm.template(&asm.templates[0].id), Some(&asm.templates[0]));
+        assert_eq!(
+            asm.owner(&component.actions[0].id),
+            Some(&component.actions[0].owner)
+        );
+        assert_eq!(asm.provenance(&asm.templates[0].id).unwrap().span.line, 10);
+        assert_eq!(asm.references_from(&component.actions[0].id).len(), 1);
+        assert_eq!(asm.references_to(&component.state_fields[0].id).len(), 1);
     }
 
     #[test]
