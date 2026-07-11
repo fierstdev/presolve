@@ -269,6 +269,34 @@ fn asm_command_exposes_declared_state_types() {
 }
 
 #[test]
+fn asm_command_reports_primitive_declared_state_type_mismatches() {
+    let repo_root = repo_root();
+    let path = "fixtures/0027-declared-state-type-diagnostics/input/InvalidTypedState.tsx";
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["asm", path, "--format", "json"])
+        .output()
+        .expect("failed to run invalid typed-state ezc_cli asm --format json");
+
+    assert!(output.status.success());
+
+    let document: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("ASM inspection output was not valid JSON");
+    let diagnostics = document["diagnostics"]
+        .as_array()
+        .expect("ASM inspection diagnostics");
+
+    assert_eq!(diagnostics.len(), 4);
+    assert!(diagnostics.iter().all(|diagnostic| {
+        diagnostic["code"] == "EZC1016"
+            && diagnostic["message"].as_str().is_some_and(|message| {
+                message.contains("declares") && message.contains("initializes")
+            })
+    }));
+}
+
+#[test]
 fn parse_command_matches_valid_counter_fixture() {
     let repo_root = repo_root();
 

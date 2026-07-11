@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: cli: expose asm primitive type kinds
+* Latest commit: compiler: validate primitive state initializers
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 21:46:07 PDT
+* Date: 2026-07-10 21:51:22 PDT
 
 Last completed slice
 
-* Slice: C5-E - ASM primitive type inspection
-* Summary: Exposed canonical primitive declared-state classification through the versioned ASM JSON document.
-* Key files: crates/ezc_cli/src/main.rs, crates/ezc_cli/tests/explain.rs
-* New behavior: typed state entities expose optional `declared_type.kind` as `string`, `number`, `boolean`, or `null`; unclassified declarations preserve raw text and provenance but omit `kind`.
-* Tests added or changed: CLI JSON inspection coverage for classified `number` and an unclassified union declaration.
-* Fixtures added or changed: none.
+* Slice: C5-F - Primitive state initializer validation
+* Summary: Added canonical diagnostics for incompatible primitive declared-state initializers.
+* Key files: crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/lib.rs, crates/ezc_cli/tests/explain.rs
+* New behavior: `EZC1016` reports an exact declared `string`, `number`, `boolean`, or `null` type initialized by a different primitive literal; diagnostics are available through the ASM inspection document.
+* Tests added or changed: exact core diagnostics and CLI ASM diagnostic coverage.
+* Fixtures added or changed: fixtures/0027-declared-state-type-diagnostics.
 
 Current in-progress slice
 
-* Slice: C5-E - ASM primitive type inspection
+* Slice: C5-F - Primitive state initializer validation
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-E
-* Remaining: C5-F validate declared primitive state types against statically serializable initial state values.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-F
+* Remaining: C5-G add source provenance to primitive state initializer diagnostics.
 
 Verification
 
@@ -81,6 +81,10 @@ Architecture decisions made
 * Decision: ASM JSON serializes an optional primitive `declared_type.kind` directly from canonical declared-state metadata.
 * Reason: Inspection consumers receive a stable, reliable classification field without duplicating TypeScript interpretation in the CLI or inventing an `unknown` category.
 * Tradeoff: Unclassified declarations omit `kind`; this remains descriptive metadata and has no validation, runtime, manifest, or backend effect.
+
+* Decision: Primitive initializer validation compares only exact recognized declared types with statically known primitive initializer values.
+* Reason: The canonical compiler can provide immediately reliable diagnostics from authored source without implying general TypeScript assignment compatibility or runtime flow analysis.
+* Tradeoff: Unclassified declarations, arrays, objects, missing values, action updates, inferred types, aliases, imports, and unions do not produce type diagnostics in this slice.
 
 * Decision: Canonical ASM/frontend consumers use module-qualified semantic IDs, while the existing backend-facing graph retains legacy component-scoped IDs until its runtime contracts are deliberately migrated.
 * Reason: A canonical application model must distinguish semantically equivalent components from different modules, but the established HTML/template runtime protocol does not serialize these IDs and should not be changed implicitly.
@@ -206,13 +210,13 @@ Known limitations
 * Item: Resolved references cover action-to-state, event-to-method, and direct text-binding/dynamic-attribute/conditional/keyed-list-iterable-to-state pairs. Routes, member expressions, computed expressions, and unresolved reference attempts have no semantic relation records yet.
 * Item: Canonical compiler products now include module-qualified template entities, direct template state dependencies, and direct template event-method dependencies, while `BindingTable` resolves local/relative re-export chains plus named/default/namespace imports. External and namespace re-exports, external package bindings, tsconfig aliases, source remapping, and type semantics are still absent. Legacy backend graph identity remains a compatibility path.
 * Item: `ezc asm` accepts explicit source files and exposes a generic inspection document. Project discovery, tsconfig resolution, source remapping, typed action payloads, and machine-readable backend plans remain future slices.
-* Item: Declared state types include canonical primitive classification and optional ASM JSON `declared_type.kind` metadata with source provenance. Diagnostics, manifests, runtime, imported types, non-state annotations, inference, unions, aliases, generics, literals, and assignment compatibility do not yet consume or validate types.
+* Item: Declared state types include canonical primitive classification, optional ASM JSON `declared_type.kind`, and `EZC1016` diagnostics for incompatible primitive initializers. Diagnostic source provenance, action assignments, manifests, runtime, imported types, non-state annotations, inference, unions, aliases, generics, composite values, and general assignment compatibility remain outside current type validation.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 
 Exact next step
 
-Start C5-F - Validate exact primitive declared state types against statically serializable initial state values. Emit canonical diagnostics for literal primitive mismatches only; do not add variable-flow analysis, action validation, unions, aliases, imports, manifest changes, or runtime behavior.
+Start C5-G - Add source provenance to `EZC1016` primitive state initializer diagnostics and expose it through `ezc asm --format json`. Preserve existing diagnostic codes/messages and do not broaden validation into actions, inference, unions, aliases, imports, manifests, or runtime behavior.
 
 Useful commands
 

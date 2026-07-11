@@ -305,6 +305,8 @@ fn build_component_node(
         })
         .collect::<Vec<_>>();
 
+    collect_declared_state_type_diagnostics(&state_fields, &class.name, diagnostics);
+
     let methods = class
         .methods
         .iter()
@@ -374,6 +376,62 @@ fn declared_state_type_kind(text: &str) -> Option<DeclaredStateTypeKind> {
         "boolean" => Some(DeclaredStateTypeKind::Boolean),
         "null" => Some(DeclaredStateTypeKind::Null),
         _ => None,
+    }
+}
+
+fn collect_declared_state_type_diagnostics(
+    state_fields: &[StateField],
+    class_name: &str,
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+) {
+    for field in state_fields {
+        let Some(declared_type_kind) = field
+            .declared_type
+            .as_ref()
+            .and_then(|declared_type| declared_type.kind)
+        else {
+            continue;
+        };
+        let Some(initial_value_kind) = field
+            .initial_value
+            .as_ref()
+            .and_then(primitive_serializable_value_type_kind)
+        else {
+            continue;
+        };
+
+        if declared_type_kind != initial_value_kind {
+            diagnostics.push(ComponentDiagnostic {
+                code: "EZC1016".to_string(),
+                message: format!(
+                    "state field `{}` in class `{class_name}` declares `{}` but initializes with `{}`",
+                    field.name,
+                    declared_state_type_kind_name(declared_type_kind),
+                    declared_state_type_kind_name(initial_value_kind),
+                ),
+            });
+        }
+    }
+}
+
+fn primitive_serializable_value_type_kind(
+    value: &SerializableValue,
+) -> Option<DeclaredStateTypeKind> {
+    match value {
+        SerializableValue::String(_) => Some(DeclaredStateTypeKind::String),
+        SerializableValue::Number(_) => Some(DeclaredStateTypeKind::Number),
+        SerializableValue::Boolean(_) => Some(DeclaredStateTypeKind::Boolean),
+        SerializableValue::Null => Some(DeclaredStateTypeKind::Null),
+        SerializableValue::Array(_) | SerializableValue::Object(_) => None,
+    }
+}
+
+fn declared_state_type_kind_name(kind: DeclaredStateTypeKind) -> &'static str {
+    match kind {
+        DeclaredStateTypeKind::String => "string",
+        DeclaredStateTypeKind::Number => "number",
+        DeclaredStateTypeKind::Boolean => "boolean",
+        DeclaredStateTypeKind::Null => "null",
     }
 }
 

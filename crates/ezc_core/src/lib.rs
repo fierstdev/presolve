@@ -461,6 +461,45 @@ class Panel extends Component {
     }
 
     #[test]
+    fn reports_primitive_declared_state_initializer_mismatches() {
+        let source = include_str!(
+            "../../../fixtures/0027-declared-state-type-diagnostics/input/InvalidTypedState.tsx"
+        );
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0027-declared-state-type-diagnostics/input/InvalidTypedState.tsx",
+            source,
+        );
+        let graph = build_component_graph_for_module(&parsed);
+        let diagnostics = graph
+            .diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.code.as_str(), diagnostic.message.as_str()))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            diagnostics,
+            vec![
+                (
+                    "EZC1016",
+                    "state field `count` in class `InvalidTypedState` declares `number` but initializes with `string`",
+                ),
+                (
+                    "EZC1016",
+                    "state field `title` in class `InvalidTypedState` declares `string` but initializes with `number`",
+                ),
+                (
+                    "EZC1016",
+                    "state field `enabled` in class `InvalidTypedState` declares `boolean` but initializes with `null`",
+                ),
+                (
+                    "EZC1016",
+                    "state field `empty` in class `InvalidTypedState` declares `null` but initializes with `boolean`",
+                ),
+            ]
+        );
+    }
+
+    #[test]
     fn assembles_application_semantic_model_from_multiple_files() {
         let unit = CompilationUnit::parse_sources([
             (
