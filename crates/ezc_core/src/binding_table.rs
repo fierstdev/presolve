@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::compilation_unit::CompilationUnit;
 use crate::module_graph::{ModuleEdgeKind, ModuleGraph, ModuleTarget};
-use crate::symbol_table::{ModuleSymbol, SymbolTable};
+use crate::symbol_table::{ModuleSymbol, SymbolKind, SymbolTable};
 
 /// Resolved local exports and relative-module imports.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -88,6 +88,8 @@ pub fn build_binding_table(
     let mut diagnostics = Vec::new();
 
     collect_local_exports(unit, symbols, &mut tables, &mut diagnostics);
+    resolve_relative_reexports(unit, modules, &mut tables, &mut diagnostics);
+    collect_identity_collisions(symbols, &mut diagnostics);
 
     let exports_by_path = tables
         .iter()
@@ -169,7 +171,7 @@ fn resolve_relative_imports(
 ) {
     for (file, table) in unit.files().iter().zip(tables.iter_mut()) {
         for import in &file.imports {
-            let target = module_target(modules, &file.path, import.span);
+            let target = module_target(modules, &file.path, import.span, ModuleEdgeKind::Import);
             let ModuleTarget::Resolved(target_path) = target else {
                 if matches!(target, ModuleTarget::Unresolved) {
                     diagnostics.push(BindingDiagnostic {
@@ -212,6 +214,158 @@ fn resolve_relative_imports(
     }
 }
 
+fn resolve_relative_reexports(
+    unit: &CompilationUnit,
+    modules: &ModuleGraph,
+    tables: &mut [ModuleBindingTable],
+    diagnostics: &mut Vec<BindingDiagnostic>,
+) {
+    for _ in 0..unit.files().len() {
+        let exports_by_path = tables
+            .iter()
+            .map(|table| (table.path.clone(), table.exports.clone()))
+            .collect::<BTreeMap<_, _>>();
+        let mut changed = false;
+
+        for (file, table) in unit.files().iter().zip(tables.iter_mut()) {
+            for export in file.exports.iter().filter(|export| export.source.is_some()) {
+                let edge_kind = match export.kind {
+                    ezc_parser::ParsedExportKind::Named => ModuleEdgeKind::NamedReExport,
+                    ezc_parser::ParsedExportKind::All => ModuleEdgeKind::ExportAll,
+                    ezc_parser::ParsedExportKind::Default => continue,
+                };
+                let target = module_target(modules, &file.path, export.span, edge_kind);
+                let ModuleTarget::Resolved(target_path) = target else {
+                    if matches!(target, ModuleTarget::Unresolved) {
+                        push_diagnostic_once(
+                            diagnostics,
+                            BindingDiagnostic {
+                                code: "EZBIND1006".to_string(),
+                                module: file.path.clone(),
+                                name: export.source.clone().unwrap_or_default(),
+                                message: "relative re-export does not resolve to a module"
+                                    .to_string(),
+                            },
+                        );
+                    }
+                    continue;
+                };
+                let target_exports = exports_by_path
+                    .get(&target_path)
+                    .cloned()
+                    .unwrap_or_default();
+
+                match export.kind {
+                    ezc_parser::ParsedExportKind::Named => {
+                        for specifier in &export.specifiers {
+                            let Some(local_name) = &specifier.local else {
+                                continue;
+                            };
+                            let Some(target) = target_exports.get(local_name) else {
+                                continue;
+                            };
+                            changed |= insert_reexport(
+                                table,
+                                ExportBinding {
+                                    exported_name: specifier.exported.clone(),
+                                    local_name: local_name.clone(),
+                                    symbol: target.symbol.clone(),
+                                },
+                            );
+                        }
+                    }
+                    ezc_parser::ParsedExportKind::All if export.specifiers.is_empty() => {
+                        for (name, target) in target_exports {
+                            if name != "default" {
+                                changed |= insert_reexport(
+                                    table,
+                                    ExportBinding {
+                                        exported_name: name.clone(),
+                                        local_name: target.local_name,
+                                        symbol: target.symbol,
+                                    },
+                                );
+                            }
+                        }
+                    }
+                    ezc_parser::ParsedExportKind::All => {
+                        push_diagnostic_once(
+                            diagnostics,
+                            BindingDiagnostic {
+                                code: "EZBIND1007".to_string(),
+                                module: file.path.clone(),
+                                name: export.source.clone().unwrap_or_default(),
+                                message: "namespace re-export bindings are not supported yet"
+                                    .to_string(),
+                            },
+                        );
+                    }
+                    ezc_parser::ParsedExportKind::Default => {}
+                }
+            }
+        }
+
+        if !changed {
+            break;
+        }
+    }
+}
+
+fn insert_reexport(table: &mut ModuleBindingTable, binding: ExportBinding) -> bool {
+    if table.exports.contains_key(&binding.exported_name) {
+        return false;
+    }
+
+    table.exports.insert(binding.exported_name.clone(), binding);
+    true
+}
+
+fn collect_identity_collisions(symbols: &SymbolTable, diagnostics: &mut Vec<BindingDiagnostic>) {
+    let mut paths_by_id = BTreeMap::<String, Vec<PathBuf>>::new();
+
+    for module in &symbols.modules {
+        for symbol in module
+            .symbols
+            .values()
+            .filter(|symbol| symbol.kind == SymbolKind::Component)
+        {
+            paths_by_id
+                .entry(symbol.id.as_str().to_string())
+                .or_default()
+                .push(module.path.clone());
+        }
+    }
+
+    for paths in paths_by_id.values_mut() {
+        paths.sort();
+        paths.dedup();
+    }
+
+    for (id, paths) in paths_by_id.into_iter().filter(|(_, paths)| paths.len() > 1) {
+        diagnostics.push(BindingDiagnostic {
+            code: "EZBIND1008".to_string(),
+            module: paths[0].clone(),
+            name: id.clone(),
+            message: format!(
+                "semantic identity `{id}` collides across modules: {}",
+                paths
+                    .iter()
+                    .map(|path| path.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        });
+    }
+}
+
+fn push_diagnostic_once(diagnostics: &mut Vec<BindingDiagnostic>, diagnostic: BindingDiagnostic) {
+    if diagnostics.iter().any(|existing| existing == &diagnostic) {
+        return;
+    }
+
+    diagnostics.push(diagnostic);
+}
+
 fn resolve_import_binding(
     specifier: &ezc_parser::ParsedImportSpecifier,
     target_path: &Path,
@@ -246,13 +400,12 @@ fn module_target(
     modules: &ModuleGraph,
     source: &Path,
     span: ezc_parser::SourceSpan,
+    kind: ModuleEdgeKind,
 ) -> ModuleTarget {
     modules
         .edges
         .iter()
-        .find(|edge| {
-            edge.kind == ModuleEdgeKind::Import && edge.source == source && edge.span == span
-        })
+        .find(|edge| edge.kind == kind && edge.source == source && edge.span == span)
         .map_or(ModuleTarget::Unresolved, |edge| edge.target.clone())
 }
 
@@ -412,5 +565,94 @@ export class Counter extends Component {
             .collect::<Vec<_>>();
 
         assert_eq!(codes, vec!["EZBIND1003", "EZBIND1002"]);
+    }
+
+    #[test]
+    fn resolves_named_and_export_all_reexport_chains() {
+        let unit = CompilationUnit::parse_sources([
+            (
+                "src/App.tsx",
+                r#"
+import { PrimaryButton } from "./index";
+"#,
+            ),
+            (
+                "src/base.tsx",
+                r#"
+@component("x-button")
+export class Button extends Component {
+  render() {
+    return <button>Button</button>;
+  }
+}
+"#,
+            ),
+            (
+                "src/bridge.ts",
+                r#"
+export { Button as PrimaryButton } from "./base";
+"#,
+            ),
+            (
+                "src/index.ts",
+                r#"
+export * from "./bridge";
+"#,
+            ),
+        ]);
+        let symbols = build_symbol_table(&unit);
+        let modules = build_module_graph(&unit);
+        let bindings = build_binding_table(&unit, &symbols, &modules);
+
+        assert!(bindings.diagnostics.is_empty());
+        assert_eq!(
+            bindings
+                .resolve_import("src/App.tsx", "PrimaryButton")
+                .expect("resolved re-export")
+                .target,
+            ImportBindingTarget::Symbol(
+                bindings
+                    .module("src/index.ts")
+                    .expect("index module")
+                    .exports["PrimaryButton"]
+                    .symbol
+                    .clone()
+            )
+        );
+    }
+
+    #[test]
+    fn reports_component_semantic_identity_collisions_across_modules() {
+        let unit = CompilationUnit::parse_sources([
+            (
+                "src/First.tsx",
+                r#"
+@component("x-duplicate")
+class First extends Component {
+  render() {
+    return <div>First</div>;
+  }
+}
+"#,
+            ),
+            (
+                "src/Second.tsx",
+                r#"
+@component("x-duplicate")
+class Second extends Component {
+  render() {
+    return <div>Second</div>;
+  }
+}
+"#,
+            ),
+        ]);
+        let symbols = build_symbol_table(&unit);
+        let modules = build_module_graph(&unit);
+        let bindings = build_binding_table(&unit, &symbols, &modules);
+
+        assert_eq!(bindings.diagnostics.len(), 1);
+        assert_eq!(bindings.diagnostics[0].code, "EZBIND1008");
+        assert_eq!(bindings.diagnostics[0].name, "component:x-duplicate");
     }
 }

@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: add relative module bindings
+* Latest commit: compiler: resolve re-export chains
 * Working tree: clean after committing this slice
 * Date: 2026-07-10 20:30:00 PDT
 
 Last completed slice
 
-* Slice: C2-B - Relative module binding resolution
-* Summary: Resolved local exports and named/default/namespace imports across relative module edges.
-* Key files: crates/ezc_core/src/binding_table.rs, crates/ezc_core/src/lib.rs
-* New behavior: `BindingTable` exposes resolved import targets backed by local semantic symbols and explicit namespace export maps.
-* Tests added or changed: relative named/default/namespace bindings plus unresolved and missing-export diagnostics.
+* Slice: C2-C - Re-export chains and identity collisions
+* Summary: Flattened relative named/export-all re-export chains and detected colliding component semantic identities across modules.
+* Key files: crates/ezc_core/src/binding_table.rs
+* New behavior: Relative imports can resolve through re-export chains; duplicate component semantic IDs across modules report `EZBIND1008`.
+* Tests added or changed: named/export-all re-export propagation and cross-module identity collision diagnostics.
 * Fixtures added or changed: None.
 
 Current in-progress slice
 
-* Slice: C2-B - Relative module binding resolution
+* Slice: C2-C - Re-export chains and identity collisions
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-B
-* Remaining: C2-C re-export resolution and module-identity collision diagnostics.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-C
+* Remaining: C2-D module-qualified semantic identities.
 
 Verification
 
@@ -37,6 +37,10 @@ Verification
 * just e2e: pass
 
 Architecture decisions made
+
+* Decision: Relative re-exports are flattened with a bounded fixed-point pass over the compilation unit.
+* Reason: It resolves named and export-all chains through the same `ModuleGraph` and `BindingTable` products without recursive parser work or order-dependent results.
+* Tradeoff: External and namespace re-exports remain unresolved, and the current component-scoped semantic IDs still require the next module-qualified identity migration.
 
 * Decision: C2-B resolves only local exports and imports whose module-graph target is a relative file in the current `CompilationUnit`.
 * Reason: Compiler bindings must use the same source/module/symbol products as the rest of `ezco`, while package resolution and re-export chains require additional well-defined frontend semantics.
@@ -152,13 +156,13 @@ Known limitations
 * Item: Fragment nodes are visible in compiler/template output but intentionally omitted from runtime manifests until a runtime range-anchor use case appears.
 * Item: Semantic IDs and direct ownership currently cover components, state fields, methods, action steps, rendered templates, and event handlers. General template descendants still use backend-local `n*` IDs and have no semantic ownership or provenance entries yet.
 * Item: Resolved references currently cover action-to-state and event-to-method pairs only. Bindings, attributes, conditionals, lists, routes, and unresolved reference attempts have no semantic relation records or provenance-backed relations yet.
-* Item: `BindingTable` resolves local exports and relative named/default/namespace imports to semantic symbols. Re-export chains, external package bindings, tsconfig aliases, duplicate semantic IDs, source remapping, and type semantics are still absent. The legacy single-file ASM API remains as a compatibility wrapper.
+* Item: `BindingTable` resolves local and relative re-export chains plus named/default/namespace imports to semantic symbols. External and namespace re-exports, external package bindings, tsconfig aliases, module-qualified semantic IDs, source remapping, and type semantics are still absent. The legacy single-file ASM API remains as a compatibility wrapper.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 
 Exact next step
 
-Start C2-C - Resolve named and export-all re-export chains across relative module edges, then report deterministic module-identity collisions. Do not resolve external packages or add type semantics in that slice.
+Start C2-D - Migrate component semantic identities to include a stable module path, then remove cross-module component-ID collisions from the canonical model. Do not change runtime artifact schemas or add type semantics in that slice.
 
 Useful commands
 
