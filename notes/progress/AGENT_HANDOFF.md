@@ -3,24 +3,24 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: add dead semantic analysis
+* Latest commit: compiler: add optimization planning
 * Working tree: clean after committing this slice
 * Date: 2026-07-10 19:30:12 PDT
 
 Last completed slice
 
-* Slice: Era III-C - Dead semantic analysis
-* Summary: Added conservative dead-candidate analysis for unreachable non-render methods and their action steps.
+* Slice: Era III-D - Optimization planning
+* Summary: Added non-mutating optimization recommendations from dead semantic analysis.
 * Key files: crates/ezc_core/src/compiler_pass.rs
-* New behavior: `DeadSemanticAnalysisPass` treats render and event-target methods as live, reporting other methods/actions as unreferenced candidates.
+* New behavior: `OptimizationPlanningPass` emits candidate semantic IDs with source provenance, without transforming the model.
 * Tests added or changed: core suite and clippy pass.
-* Fixtures added or changed: None; this slice does not alter CLI, HTML, manifest, or runtime artifacts.
+* Fixtures added or changed: None.
 
 Current in-progress slice
 
-* Slice: Era III-C - Dead semantic analysis
+* Slice: Era III-D - Optimization planning
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-C
+* Completed: ASM-1 through ASM-8; Era III-A through III-D
 * Remaining: None
 
 Verification
@@ -134,7 +134,7 @@ Known limitations
 
 Exact next step
 
-Start Era III-D - Optimization planning. Convert dependency, constant, and dead-candidate analysis into non-mutating optimization recommendations.
+Start Era III-E - Explainability. Expose pass outputs through deterministic compiler explanations.
 
 Useful commands
 

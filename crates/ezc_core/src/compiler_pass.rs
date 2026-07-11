@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use crate::application_semantic_model::ApplicationSemanticModel;
 use crate::component_graph::{SerializableValue, StateOperation};
 use crate::semantic_id::SemanticId;
+use crate::semantic_provenance::SourceProvenance;
 
 pub trait AnalysisPass {
     type Output;
@@ -115,5 +116,36 @@ impl AnalysisPass for DeadSemanticAnalysisPass {
             unreferenced_methods: methods,
             unreferenced_actions: actions,
         }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct OptimizationPlanningPass;
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OptimizationPlan {
+    pub recommendations: Vec<OptimizationRecommendation>,
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OptimizationRecommendation {
+    pub id: SemanticId,
+    pub provenance: SourceProvenance,
+}
+
+impl AnalysisPass for OptimizationPlanningPass {
+    type Output = OptimizationPlan;
+    fn analyze(&self, model: &ApplicationSemanticModel) -> OptimizationPlan {
+        let dead = DeadSemanticAnalysisPass.analyze(model);
+        let recommendations = dead
+            .unreferenced_methods
+            .into_iter()
+            .chain(dead.unreferenced_actions)
+            .filter_map(|id| {
+                model
+                    .provenance(&id)
+                    .cloned()
+                    .map(|provenance| OptimizationRecommendation { id, provenance })
+            })
+            .collect();
+        OptimizationPlan { recommendations }
     }
 }
