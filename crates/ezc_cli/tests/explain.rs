@@ -419,6 +419,47 @@ fn asm_command_reports_non_boolean_primitive_toggle_actions() {
 }
 
 #[test]
+fn asm_command_reports_non_numeric_primitive_increment_and_decrement_actions() {
+    let repo_root = repo_root();
+    let path =
+        "fixtures/0030-primitive-numeric-action-type-diagnostics/input/InvalidTypedNumericActions.tsx";
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["asm", path, "--format", "json"])
+        .output()
+        .expect("failed to run invalid typed-numeric-actions ezc_cli asm --format json");
+
+    assert!(output.status.success());
+
+    let document: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("ASM inspection output was not valid JSON");
+    let diagnostics = document["diagnostics"]
+        .as_array()
+        .expect("ASM inspection diagnostics");
+
+    assert_eq!(diagnostics.len(), 3);
+    assert!(diagnostics.iter().all(|diagnostic| {
+        diagnostic["code"] == "EZC1019"
+            && diagnostic["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("applies numeric"))
+    }));
+
+    let title = diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("state field `title`"))
+        })
+        .expect("title numeric action diagnostic");
+    assert_eq!(title["provenance"]["path"], path);
+    assert_eq!(title["provenance"]["line"], 10);
+    assert_eq!(title["provenance"]["column"], 5);
+}
+
+#[test]
 fn parse_command_matches_valid_counter_fixture() {
     let repo_root = repo_root();
 

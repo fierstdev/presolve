@@ -311,6 +311,7 @@ fn build_component_node(
     collect_declared_state_type_diagnostics(&state_fields, &class.name, diagnostics);
     collect_declared_state_action_type_diagnostics(class, &state_fields, path, diagnostics);
     collect_declared_state_toggle_type_diagnostics(class, &state_fields, path, diagnostics);
+    collect_declared_state_numeric_action_type_diagnostics(class, &state_fields, path, diagnostics);
 
     let methods = class
         .methods
@@ -494,6 +495,47 @@ fn collect_declared_state_toggle_type_diagnostics(
                         class.name,
                         declared_state_type_kind_name(declared_type_kind),
                         method.name,
+                    ),
+                });
+            }
+        }
+    }
+}
+
+fn collect_declared_state_numeric_action_type_diagnostics(
+    class: &ParsedClass,
+    state_fields: &[StateField],
+    path: &Path,
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+) {
+    for method in &class.methods {
+        for update in &method.state_updates {
+            let operation = match update.operation {
+                ParsedStateOperation::Increment => "increment",
+                ParsedStateOperation::Decrement => "decrement",
+                _ => continue,
+            };
+            let Some(field) = state_fields.iter().find(|field| field.name == update.field) else {
+                continue;
+            };
+            let Some(declared_type) = field.declared_type.as_ref() else {
+                continue;
+            };
+            let Some(declared_type_kind) = declared_type.kind else {
+                continue;
+            };
+
+            if declared_type_kind != DeclaredStateTypeKind::Number {
+                diagnostics.push(ComponentDiagnostic {
+                    provenance: Some(SourceProvenance::new(path, update.span)),
+                    code: "EZC1019".to_string(),
+                    message: format!(
+                        "state field `{}` in class `{}` declares `{}` but action `{}` applies numeric {}",
+                        field.name,
+                        class.name,
+                        declared_state_type_kind_name(declared_type_kind),
+                        method.name,
+                        operation,
                     ),
                 });
             }

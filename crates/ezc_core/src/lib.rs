@@ -611,6 +611,54 @@ class Panel extends Component {
     }
 
     #[test]
+    fn reports_non_numeric_primitive_increment_and_decrement_actions() {
+        let source = include_str!(
+            "../../../fixtures/0030-primitive-numeric-action-type-diagnostics/input/InvalidTypedNumericActions.tsx"
+        );
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0030-primitive-numeric-action-type-diagnostics/input/InvalidTypedNumericActions.tsx",
+            source,
+        );
+        let graph = build_component_graph_for_module(&parsed);
+        let diagnostics = graph
+            .diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.code.as_str(), diagnostic.message.as_str()))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            diagnostics,
+            vec![
+                (
+                    "EZC1019",
+                    "state field `title` in class `InvalidTypedNumericActions` declares `string` but action `apply` applies numeric increment",
+                ),
+                (
+                    "EZC1019",
+                    "state field `enabled` in class `InvalidTypedNumericActions` declares `boolean` but action `apply` applies numeric decrement",
+                ),
+                (
+                    "EZC1019",
+                    "state field `empty` in class `InvalidTypedNumericActions` declares `null` but action `apply` applies numeric increment",
+                ),
+            ]
+        );
+
+        let provenance = graph.diagnostics[0]
+            .provenance
+            .as_ref()
+            .expect("numeric action diagnostic provenance");
+        assert_eq!(
+            provenance.path,
+            Path::new(
+                "fixtures/0030-primitive-numeric-action-type-diagnostics/input/InvalidTypedNumericActions.tsx"
+            )
+        );
+        assert_eq!(provenance.span.line, 10);
+        assert_eq!(provenance.span.column, 5);
+    }
+
+    #[test]
     fn assembles_application_semantic_model_from_multiple_files() {
         let unit = CompilationUnit::parse_sources([
             (
