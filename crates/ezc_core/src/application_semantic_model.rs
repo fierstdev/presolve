@@ -204,6 +204,38 @@ impl ApplicationSemanticModel {
         references
     }
 
+    #[must_use]
+    pub fn references_in_file(&self, path: &Path) -> Vec<&SemanticReference> {
+        let mut references = self
+            .references
+            .iter()
+            .filter(|reference| reference.provenance.path == path)
+            .collect::<Vec<_>>();
+        references.sort_by(|left, right| {
+            (left.source.as_str(), left.target.as_str())
+                .cmp(&(right.source.as_str(), right.target.as_str()))
+        });
+        references
+    }
+
+    #[must_use]
+    pub fn references_at(&self, path: &Path, offset: usize) -> Vec<&SemanticReference> {
+        let mut references = self
+            .references
+            .iter()
+            .filter(|reference| {
+                reference.provenance.path == path
+                    && reference.provenance.span.start <= offset
+                    && offset < reference.provenance.span.end
+            })
+            .collect::<Vec<_>>();
+        references.sort_by(|left, right| {
+            (left.source.as_str(), left.target.as_str())
+                .cmp(&(right.source.as_str(), right.target.as_str()))
+        });
+        references
+    }
+
     fn collect_descendants<'a>(
         &'a self,
         owner: &SemanticId,
@@ -494,6 +526,20 @@ class Counter extends Component {
         assert_eq!(action_references.len(), 1);
         assert_eq!(action_references[0].source, component.actions[0].id);
         assert_eq!(action_references[0].target, component.state_fields[0].id);
+        let action_provenance = &action_references[0].provenance;
+        assert_eq!(
+            asm.references_in_file(action_provenance.path.as_path())
+                .len(),
+            asm.references.len()
+        );
+        let at_action = asm.references_at(
+            action_provenance.path.as_path(),
+            action_provenance.span.start,
+        );
+        assert!(at_action.iter().any(|reference| {
+            reference.source == component.actions[0].id
+                && reference.target == component.state_fields[0].id
+        }));
     }
 
     #[test]
