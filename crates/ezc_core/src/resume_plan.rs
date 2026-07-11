@@ -1,12 +1,13 @@
 use crate::application_semantic_model::ApplicationSemanticModel;
 use crate::component_graph::render_event_handlers;
 use crate::semantic_id::SemanticId;
+use serde::Serialize;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ResumePlan {
     pub components: Vec<ResumeComponentPlan>,
 }
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ResumeComponentPlan {
     pub component: SemanticId,
     pub state: Vec<SemanticId>,

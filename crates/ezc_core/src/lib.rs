@@ -12,6 +12,7 @@ pub mod explain;
 pub mod html_codegen;
 pub mod model;
 pub mod page_codegen;
+pub mod resume_manifest;
 pub mod resume_plan;
 pub mod runtime_codegen;
 pub mod semantic_id;
@@ -40,6 +41,9 @@ pub use model::{
     ClassSummary, DecoratorSummary, Diagnostic, RenderMethodSummary, Severity, SourceSummary, Span,
 };
 pub use page_codegen::generate_standalone_page;
+pub use resume_manifest::{
+    build_resume_manifest, resume_manifest_json, ResumeManifest, RESUME_MANIFEST_SCHEMA_VERSION,
+};
 pub use resume_plan::{build_resume_plan, ResumeComponentPlan, ResumePlan};
 pub use runtime_codegen::generate_runtime_stub;
 pub use semantic_id::{SemanticId, SemanticOwner};

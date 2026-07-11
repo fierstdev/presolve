@@ -3,24 +3,24 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: add resume plan
+* Latest commit: compiler: add resume manifest
 * Working tree: clean after committing this slice
 * Date: 2026-07-10 19:30:12 PDT
 
 Last completed slice
 
-* Slice: Era IV-A - Resume plan
-* Summary: Added compiler-derived static resumability planning from ASM state and event semantics.
-* Key files: crates/ezc_core/src/resume_plan.rs, crates/ezc_core/src/lib.rs
-* New behavior: `ResumePlan` inventories each component's state and delegated event semantic IDs.
+* Slice: Era IV-B - Resume manifest
+* Summary: Added a versioned serialized artifact for compiler-derived resume plans.
+* Key files: crates/ezc_core/src/resume_manifest.rs, crates/ezc_core/src/resume_plan.rs, crates/ezc_core/src/lib.rs
+* New behavior: `ResumeManifest` schema v1 serializes component/state/event semantic references.
 * Tests added or changed: core suite and clippy pass.
 * Fixtures added or changed: None.
 
 Current in-progress slice
 
-* Slice: Era IV-A - Resume plan
+* Slice: Era IV-B - Resume manifest
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A - Resume plan
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-B
 * Remaining: None
 
 Verification
@@ -134,7 +134,7 @@ Known limitations
 
 Exact next step
 
-Start Era IV-B - Resume manifest. Serialize the compiler-derived resume plan as a stable artifact.
+Start Era IV-C - Serializable instance model. Define the runtime instance payload derived from the resume manifest.
 
 Useful commands
 
