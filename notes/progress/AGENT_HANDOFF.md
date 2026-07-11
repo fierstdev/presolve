@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: add module edge graph
+* Latest commit: compiler: add local symbol tables
 * Working tree: clean after committing this slice
 * Date: 2026-07-10 20:30:00 PDT
 
 Last completed slice
 
-* Slice: C1-B - Import/export extraction and module edges
-* Summary: Extracted source module declarations and derived deterministic file-level import/re-export edges.
-* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/module_graph.rs
-* New behavior: Parsed files retain imports and exports; `ModuleGraph` resolves relative files inside a `CompilationUnit`, preserves external packages, and reports unresolved relative specifiers.
-* Tests added or changed: parser declaration extraction and module-edge graph resolution.
+* Slice: C2-A - Local module symbol tables
+* Summary: Indexed declared component classes, state fields, and methods within each compilation-unit module.
+* Key files: crates/ezc_core/src/symbol_table.rs, crates/ezc_core/src/lib.rs
+* New behavior: `SymbolTable` resolves local names such as `Counter`, `Counter.count`, and `Counter.increment` to semantic IDs, ownership, and source provenance.
+* Tests added or changed: per-module member indexing and duplicate local symbol diagnostics.
 * Fixtures added or changed: None.
 
 Current in-progress slice
 
-* Slice: C1-B - Import/export extraction and module edges
+* Slice: C2-A - Local module symbol tables
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B
-* Remaining: C2 symbol resolution.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A
+* Remaining: C2-B imported and exported binding resolution.
 
 Verification
 
@@ -37,6 +37,10 @@ Verification
 * just e2e: pass
 
 Architecture decisions made
+
+* Decision: C2-A indexes only declarations local to each source module using class-qualified member names.
+* Reason: Local declaration identity must be stable before imports, exports, aliases, and package resolution can form cross-module bindings.
+* Tradeoff: Imports and export aliases are intentionally absent from `SymbolTable`; resolving them is the next C2-B slice.
 
 * Decision: Module edges are derived from parsed import and re-export declarations in `CompilationUnit`, not from component provenance.
 * Reason: File relationships are frontend semantics that must exist before symbol resolution and must be shared by all ASM consumers.
@@ -144,13 +148,13 @@ Known limitations
 * Item: Fragment nodes are visible in compiler/template output but intentionally omitted from runtime manifests until a runtime range-anchor use case appears.
 * Item: Semantic IDs and direct ownership currently cover components, state fields, methods, action steps, rendered templates, and event handlers. General template descendants still use backend-local `n*` IDs and have no semantic ownership or provenance entries yet.
 * Item: Resolved references currently cover action-to-state and event-to-method pairs only. Bindings, attributes, conditionals, lists, routes, and unresolved reference attempts have no semantic relation records or provenance-backed relations yet.
-* Item: `CompilationUnit` now carries parsed imports and exports, and `ModuleGraph` resolves relative import/re-export edges. Package resolution, tsconfig aliases, duplicate semantic IDs, source remapping, and all symbol bindings are still absent. The legacy single-file ASM API remains as a compatibility wrapper.
+* Item: `SymbolTable` indexes local component declarations and members, while `ModuleGraph` resolves relative import/re-export edges. Imported/exported binding resolution, package resolution, tsconfig aliases, duplicate semantic IDs, source remapping, and type semantics are still absent. The legacy single-file ASM API remains as a compatibility wrapper.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 
 Exact next step
 
-Start C2-A - Introduce per-module symbol tables for declared component classes, state fields, and methods. Do not resolve imported bindings or add type semantics in that slice.
+Start C2-B - Resolve named/default/namespace import bindings and local export aliases across resolved relative module edges. Do not resolve external packages or add type semantics in that slice.
 
 Useful commands
 
