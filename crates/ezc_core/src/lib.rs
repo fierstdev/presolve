@@ -326,7 +326,7 @@ class Counter extends Component {
         assert!(asm.diagnostics.is_empty());
         assert_eq!(asm.templates.len(), 1);
         assert!(asm.template_entities.len() >= 3);
-        assert_eq!(asm.references.len(), 3);
+        assert_eq!(asm.references.len(), 4);
         assert_eq!(asm.ownership.len(), asm.provenance.len());
         assert_eq!(asm.ownership[&component.id], SemanticOwner::Application);
         assert_eq!(
@@ -373,6 +373,7 @@ class Counter extends Component {
         );
         assert_eq!(asm.references_from(&component.actions[0].id).len(), 1);
         assert_eq!(asm.references_to(&component.state_fields[0].id).len(), 2);
+        assert_eq!(asm.references_to(&component.methods[0].id).len(), 2);
         assert!(validate_application_semantic_model(&asm).is_empty());
 
         let mut invalid = asm.clone();

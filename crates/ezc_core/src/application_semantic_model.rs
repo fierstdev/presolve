@@ -169,6 +169,11 @@ fn build_application_semantic_model_from_files(files: &[ParsedFile]) -> Applicat
         &templates,
         &template_entities,
     ));
+    references.extend(build_template_event_references(
+        &components,
+        &templates,
+        &template_entities,
+    ));
 
     let ownership = collect_ownership(&components, &templates, &template_entities);
 
@@ -200,21 +205,12 @@ fn build_template_state_references(
             )
         })
         .filter_map(|entity| {
-            let field_name = entity.expression.as_deref().and_then(state_field_name)?;
-            let template_id = entity.owner.entity_id()?;
-            let component_id = templates
+            let field_name = entity.expression.as_deref().and_then(this_member_name)?;
+            let component = template_entity_component(components, templates, entity)?;
+            let field = component
+                .state_fields
                 .iter()
-                .find(|template| template.id == *template_id)
-                .and_then(|template| template.owner.entity_id())?;
-            let field = components
-                .iter()
-                .find(|component| component.id == *component_id)
-                .and_then(|component| {
-                    component
-                        .state_fields
-                        .iter()
-                        .find(|field| field.name == field_name)
-                })?;
+                .find(|field| field.name == field_name)?;
 
             Some(SemanticReference {
                 kind: SemanticReferenceKind::TemplateState,
@@ -226,7 +222,49 @@ fn build_template_state_references(
         .collect()
 }
 
-fn state_field_name(expression: &str) -> Option<&str> {
+fn build_template_event_references(
+    components: &[ComponentNode],
+    templates: &[TemplateNode],
+    template_entities: &[TemplateSemanticEntity],
+) -> Vec<SemanticReference> {
+    template_entities
+        .iter()
+        .filter(|entity| entity.kind == TemplateSemanticKind::EventAttribute)
+        .filter_map(|entity| {
+            let method_name = entity.expression.as_deref().and_then(this_member_name)?;
+            let component = template_entity_component(components, templates, entity)?;
+            let method = component
+                .methods
+                .iter()
+                .find(|method| method.name == method_name)?;
+
+            Some(SemanticReference {
+                kind: SemanticReferenceKind::EventMethod,
+                source: entity.id.clone(),
+                target: method.id.clone(),
+                provenance: entity.provenance.clone(),
+            })
+        })
+        .collect()
+}
+
+fn template_entity_component<'a>(
+    components: &'a [ComponentNode],
+    templates: &[TemplateNode],
+    entity: &TemplateSemanticEntity,
+) -> Option<&'a ComponentNode> {
+    let template_id = entity.owner.entity_id()?;
+    let component_id = templates
+        .iter()
+        .find(|template| template.id == *template_id)
+        .and_then(|template| template.owner.entity_id())?;
+
+    components
+        .iter()
+        .find(|component| component.id == *component_id)
+}
+
+fn this_member_name(expression: &str) -> Option<&str> {
     expression.strip_prefix("this.").filter(|name| {
         !name.is_empty()
             && name
@@ -375,5 +413,50 @@ class KeyedList extends Component {
         assert_eq!(list.kind, TemplateSemanticKind::List);
         assert_eq!(list.expression.as_deref(), Some("this.items"));
         assert_eq!(reference.provenance, list.provenance);
+    }
+
+    #[test]
+    fn resolves_template_event_attribute_to_component_method() {
+        let parsed = ezc_parser::parse_file(
+            "src/Counter.tsx",
+            r#"
+@component("x-counter")
+class Counter extends Component {
+  count = state(0);
+
+  increment() {
+    this.count += 1;
+  }
+
+  render() {
+    return <button onClick={() => this.increment()}>Count</button>;
+  }
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        let component = &asm.components[0];
+        let method = component
+            .methods
+            .iter()
+            .find(|method| method.name == "increment")
+            .expect("increment method");
+        let reference = asm
+            .references_to(&method.id)
+            .into_iter()
+            .find(|reference| {
+                reference.kind == SemanticReferenceKind::EventMethod
+                    && asm
+                        .template_entity(&reference.source)
+                        .is_some_and(|entity| entity.kind == TemplateSemanticKind::EventAttribute)
+            })
+            .expect("template event method reference");
+
+        assert_eq!(
+            reference.provenance.path,
+            std::path::Path::new("src/Counter.tsx")
+        );
+        assert_eq!(reference.provenance.span.line, 11);
     }
 }

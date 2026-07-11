@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: resolve list iterable dependencies
+* Latest commit: compiler: resolve template event references
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 21:03:06 PDT
+* Date: 2026-07-10 21:06:51 PDT
 
 Last completed slice
 
-* Slice: C3-C - Keyed-list iterable dependencies
-* Summary: Resolved keyed-list iterable reads to canonical component state IDs.
-* Key files: crates/ezc_core/src/application_semantic_model.rs
-* New behavior: A keyed-list entity with a direct `this.<stateField>` iterable emits a source-provenanced `TemplateState` reference to the state field on its owning component.
-* Tests added or changed: keyed-list iterable dependency resolution and existing workspace regression coverage.
+* Slice: C3-D - Template event-method references
+* Summary: Resolved canonical template event attributes to component method IDs.
+* Key files: crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/lib.rs
+* New behavior: A typed event attribute with a direct `this.<method>` handler emits an `EventMethod` reference from the authored template entity to its owning component method.
+* Tests added or changed: template event-attribute source/target/provenance resolution and existing ASM reference expectations.
 * Fixtures added or changed: None.
 
 Current in-progress slice
 
-* Slice: C3-C - Keyed-list iterable dependencies
+* Slice: C3-D - Template event-method references
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-C
-* Remaining: C3-D resolve template event attributes to component method semantic IDs.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D
+* Remaining: C4-A add deterministic JSON output to `ezc asm` for canonical ASM inspection.
 
 Verification
 
@@ -49,6 +49,10 @@ Architecture decisions made
 * Decision: Keyed-list iterable dependencies reuse `TemplateState` with the list semantic entity as their source.
 * Reason: A list's iterable is a direct template state read, so it has the same component ownership, provenance, and invalidation semantics as other direct template reads.
 * Tradeoff: Item/index scope, keys, item members, and nested list-item expressions remain outside the component-state dependency model.
+
+* Decision: Template event attributes reuse `EventMethod` with the canonical event-attribute entity as their source.
+* Reason: The existing render-handler edge remains for backend compatibility, while ASM consumers can now trace an event directly from its authored template entity to the resolved method.
+* Tradeoff: Both legacy render-handler and canonical template-event sources point at the same method until the backend-facing graph is migrated.
 
 * Decision: Canonical ASM/frontend consumers use module-qualified semantic IDs, while the existing backend-facing graph retains legacy component-scoped IDs until its runtime contracts are deliberately migrated.
 * Reason: A canonical application model must distinguish semantically equivalent components from different modules, but the established HTML/template runtime protocol does not serialize these IDs and should not be changed implicitly.
@@ -171,14 +175,14 @@ Known limitations
 * Item: Source spans are available on parser/render/template structures and CLI development output, but runtime manifests intentionally omit source metadata for now.
 * Item: Fragment nodes are visible in compiler/template output but intentionally omitted from runtime manifests until a runtime range-anchor use case appears.
 * Item: Semantic IDs, direct ownership, and provenance cover components, state fields, methods, action steps, rendered templates, event handlers, and authored template descendants. Backend HTML/template-manifest nodes still use local `n*` IDs as a compatibility contract.
-* Item: Resolved references cover action-to-state, event-to-method, and direct text-binding/dynamic-attribute/conditional/keyed-list-iterable-to-state pairs. Template event attributes, routes, member expressions, computed expressions, and unresolved reference attempts have no semantic relation records yet.
-* Item: Canonical compiler products now include module-qualified template entities and direct template state dependencies, while `BindingTable` resolves local/relative re-export chains plus named/default/namespace imports. External and namespace re-exports, external package bindings, tsconfig aliases, source remapping, and type semantics are still absent. Legacy backend graph identity remains a compatibility path.
+* Item: Resolved references cover action-to-state, event-to-method, and direct text-binding/dynamic-attribute/conditional/keyed-list-iterable-to-state pairs. Routes, member expressions, computed expressions, and unresolved reference attempts have no semantic relation records yet.
+* Item: Canonical compiler products now include module-qualified template entities, direct template state dependencies, and direct template event-method dependencies, while `BindingTable` resolves local/relative re-export chains plus named/default/namespace imports. External and namespace re-exports, external package bindings, tsconfig aliases, source remapping, and type semantics are still absent. Legacy backend graph identity remains a compatibility path.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 
 Exact next step
 
-Start C3-D - Resolve template event attributes to component method semantic IDs. Do not alter event parsing, dispatch, runtime artifacts, or add arbitrary handler evaluation in that slice.
+Start C4-A - Add deterministic JSON output to `ezc asm` for canonical ASM inspection. Do not add multi-file CLI input, mutation APIs, backend artifact changes, or unstable internal-debug serialization in that slice.
 
 Useful commands
 
