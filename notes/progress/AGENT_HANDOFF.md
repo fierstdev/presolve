@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: resolve template event references
+* Latest commit: cli: add asm json inspection
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 21:06:51 PDT
+* Date: 2026-07-10 21:13:45 PDT
 
 Last completed slice
 
-* Slice: C3-D - Template event-method references
-* Summary: Resolved canonical template event attributes to component method IDs.
-* Key files: crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/lib.rs
-* New behavior: A typed event attribute with a direct `this.<method>` handler emits an `EventMethod` reference from the authored template entity to its owning component method.
-* Tests added or changed: template event-attribute source/target/provenance resolution and existing ASM reference expectations.
+* Slice: C4-A - ASM JSON inspection
+* Summary: Added versioned, deterministic JSON inspection to `ezc asm`.
+* Key files: crates/ezc_cli/src/main.rs, crates/ezc_cli/tests/explain.rs, crates/ezc_cli/Cargo.toml
+* New behavior: `ezc asm <file> --format json` emits schema version 1 with canonical entities, ownership, source provenance, resolved references, compiler diagnostics, and ASM validation diagnostics. The text summary remains the default.
+* Tests added or changed: ASM text summary preservation, JSON repeatability, schema shape, and canonical template-event relation exposure.
 * Fixtures added or changed: None.
 
 Current in-progress slice
 
-* Slice: C3-D - Template event-method references
+* Slice: C4-A - ASM JSON inspection
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D
-* Remaining: C4-A add deterministic JSON output to `ezc asm` for canonical ASM inspection.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A
+* Remaining: C4-B extend `ezc asm` to inspect a multi-file `CompilationUnit`.
 
 Verification
 
@@ -53,6 +53,10 @@ Architecture decisions made
 * Decision: Template event attributes reuse `EventMethod` with the canonical event-attribute entity as their source.
 * Reason: The existing render-handler edge remains for backend compatibility, while ASM consumers can now trace an event directly from its authored template entity to the resolved method.
 * Tradeoff: Both legacy render-handler and canonical template-event sources point at the same method until the backend-facing graph is migrated.
+
+* Decision: `ezc asm --format json` owns an explicit schema-versioned inspection document rather than serializing compiler structs directly.
+* Reason: CLI consumers need a stable, deterministic interface that can evolve independently of Rust data-layout changes.
+* Tradeoff: The document exposes generic entity kinds, owners, provenance, relations, and diagnostics, not every compiler-internal field or backend artifact.
 
 * Decision: Canonical ASM/frontend consumers use module-qualified semantic IDs, while the existing backend-facing graph retains legacy component-scoped IDs until its runtime contracts are deliberately migrated.
 * Reason: A canonical application model must distinguish semantically equivalent components from different modules, but the established HTML/template runtime protocol does not serialize these IDs and should not be changed implicitly.
@@ -177,12 +181,13 @@ Known limitations
 * Item: Semantic IDs, direct ownership, and provenance cover components, state fields, methods, action steps, rendered templates, event handlers, and authored template descendants. Backend HTML/template-manifest nodes still use local `n*` IDs as a compatibility contract.
 * Item: Resolved references cover action-to-state, event-to-method, and direct text-binding/dynamic-attribute/conditional/keyed-list-iterable-to-state pairs. Routes, member expressions, computed expressions, and unresolved reference attempts have no semantic relation records yet.
 * Item: Canonical compiler products now include module-qualified template entities, direct template state dependencies, and direct template event-method dependencies, while `BindingTable` resolves local/relative re-export chains plus named/default/namespace imports. External and namespace re-exports, external package bindings, tsconfig aliases, source remapping, and type semantics are still absent. Legacy backend graph identity remains a compatibility path.
+* Item: `ezc asm --format json` accepts one source file and exposes a generic inspection document. Multi-file CLI input, source remapping, typed action payloads, and machine-readable backend plans remain future slices.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 
 Exact next step
 
-Start C4-A - Add deterministic JSON output to `ezc asm` for canonical ASM inspection. Do not add multi-file CLI input, mutation APIs, backend artifact changes, or unstable internal-debug serialization in that slice.
+Start C4-B - Extend `ezc asm` to inspect a multi-file `CompilationUnit`. Preserve the C4-A JSON schema, deterministic file ordering, and module-qualified semantic IDs; do not add project discovery, tsconfig resolution, or backend artifact changes.
 
 Useful commands
 

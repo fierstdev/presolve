@@ -88,6 +88,75 @@ fn explain_command_matches_json_fixture() {
 }
 
 #[test]
+fn asm_command_reports_text_summary() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["asm", "fixtures/0001-source-summary/input/Counter.tsx"])
+        .output()
+        .expect("failed to run ezc_cli asm");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8"),
+        "File: fixtures/0001-source-summary/input/Counter.tsx\nApplicationSemanticModel:\n  components: 1\n  templates: 1\n  ownership: 11\n  references: 4\n  provenance: 11\n  diagnostics: 0\n  validation: 0\n"
+    );
+}
+
+#[test]
+fn asm_command_emits_deterministic_json_inspection() {
+    let repo_root = repo_root();
+    let args = [
+        "asm",
+        "fixtures/0001-source-summary/input/Counter.tsx",
+        "--format",
+        "json",
+    ];
+
+    let first = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(args)
+        .output()
+        .expect("failed to run ezc_cli asm --format json");
+    let second = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(args)
+        .output()
+        .expect("failed to rerun ezc_cli asm --format json");
+
+    assert!(first.status.success());
+    assert!(second.status.success());
+    assert_eq!(first.stdout, second.stdout);
+
+    let document: serde_json::Value =
+        serde_json::from_slice(&first.stdout).expect("ASM inspection output was not valid JSON");
+    assert_eq!(document["schema_version"], 1);
+    assert_eq!(
+        document["file"],
+        "fixtures/0001-source-summary/input/Counter.tsx"
+    );
+    assert_eq!(document["entities"].as_array().map(Vec::len), Some(11));
+    assert_eq!(document["diagnostics"], serde_json::json!([]));
+    assert_eq!(document["validation"], serde_json::json!([]));
+    assert!(document["references"].as_array().is_some_and(|references| {
+        references.iter().any(|reference| {
+            reference["kind"] == "event-method"
+                && reference["source"]
+                    == "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/template:render/event-attribute:root.data-ez-on-click"
+                && reference["target"]
+                    == "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/method:increment"
+        })
+    }));
+}
+
+#[test]
 fn parse_command_matches_valid_counter_fixture() {
     let repo_root = repo_root();
 

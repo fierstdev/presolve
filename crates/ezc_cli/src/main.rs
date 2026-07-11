@@ -8,13 +8,16 @@ use ezc_core::{
     build_application_semantic_model, build_component_graph, build_template_graph,
     build_template_manifest, explain_json, explain_text, generate_runtime_stub,
     generate_standalone_page, generate_static_html, summarize_source, template_manifest_json,
-    validate_application_semantic_model, AttributeValue, ComponentGraph, RenderAttribute,
-    RenderAttributeValue, SerializableValue, StateOperation, TemplateChild, TemplateGraph,
+    validate_application_semantic_model, ApplicationSemanticModel, AsmValidationDiagnostic,
+    AttributeValue, ComponentGraph, RenderAttribute, RenderAttributeValue, SemanticEntity,
+    SemanticOwner, SemanticReferenceKind, SerializableValue, SourceProvenance, StateOperation,
+    TemplateChild, TemplateGraph, TemplateSemanticKind,
 };
 use ezc_parser::{
     parse_file, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
     ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxNode, ParsedMethod, SourceSpan,
 };
+use serde::Serialize;
 
 fn main() {
     let mut args = env::args().skip(1).collect::<Vec<_>>();
@@ -93,12 +96,29 @@ fn run_asm(mut args: Vec<String>) {
         print_usage_and_exit();
     }
     let path = PathBuf::from(args.remove(0));
+    let format = parse_format(&args);
     let source = fs::read_to_string(&path).unwrap_or_else(|error| {
         eprintln!("failed to read {}: {error}", path.display());
         process::exit(1);
     });
     let asm = build_application_semantic_model(&parse_file(&path, &source));
     let validation = validate_application_semantic_model(&asm);
+
+    match format.as_str() {
+        "text" => print_asm_text(&path, &asm, &validation),
+        "json" => print!("{}", asm_inspection_json(&path, &asm, &validation)),
+        _ => {
+            eprintln!("unsupported format: {format}");
+            process::exit(1);
+        }
+    }
+}
+
+fn print_asm_text(
+    path: &Path,
+    asm: &ApplicationSemanticModel,
+    validation: &[AsmValidationDiagnostic],
+) {
     println!("File: {}", path.display());
     println!("ApplicationSemanticModel:");
     println!("  components: {}", asm.components.len());
@@ -108,6 +128,162 @@ fn run_asm(mut args: Vec<String>) {
     println!("  provenance: {}", asm.provenance.len());
     println!("  diagnostics: {}", asm.diagnostics.len());
     println!("  validation: {}", validation.len());
+}
+
+fn asm_inspection_json(
+    path: &Path,
+    asm: &ApplicationSemanticModel,
+    validation: &[AsmValidationDiagnostic],
+) -> String {
+    let mut references = asm
+        .references
+        .iter()
+        .map(|reference| AsmInspectionReference {
+            kind: semantic_reference_kind(reference.kind),
+            source: reference.source.as_str(),
+            target: reference.target.as_str(),
+            provenance: (&reference.provenance).into(),
+        })
+        .collect::<Vec<_>>();
+    references.sort_by(|left, right| {
+        (left.source, left.target, left.kind).cmp(&(right.source, right.target, right.kind))
+    });
+
+    let mut diagnostics = asm
+        .diagnostics
+        .iter()
+        .map(|diagnostic| AsmInspectionDiagnostic {
+            code: &diagnostic.code,
+            message: &diagnostic.message,
+        })
+        .collect::<Vec<_>>();
+    diagnostics.sort_by(|left, right| (left.code, left.message).cmp(&(right.code, right.message)));
+
+    let mut validation = validation
+        .iter()
+        .map(|diagnostic| AsmInspectionDiagnostic {
+            code: &diagnostic.code,
+            message: &diagnostic.message,
+        })
+        .collect::<Vec<_>>();
+    validation.sort_by(|left, right| (left.code, left.message).cmp(&(right.code, right.message)));
+
+    let document = AsmInspectionDocument {
+        schema_version: 1,
+        file: path.display().to_string(),
+        entities: asm
+            .ownership
+            .iter()
+            .map(|(id, owner)| {
+                let entity = asm
+                    .entity(id)
+                    .expect("ASM ownership should only contain semantic entities");
+                let provenance = asm
+                    .provenance(id)
+                    .expect("ASM ownership should have source provenance");
+
+                AsmInspectionEntity {
+                    id: id.as_str(),
+                    kind: semantic_entity_kind(entity),
+                    owner: semantic_owner_id(owner),
+                    provenance: provenance.into(),
+                }
+            })
+            .collect(),
+        references,
+        diagnostics,
+        validation,
+    };
+
+    serde_json::to_string_pretty(&document).expect("ASM inspection document should serialize")
+        + "\n"
+}
+
+fn semantic_entity_kind(entity: SemanticEntity<'_>) -> &'static str {
+    match entity {
+        SemanticEntity::Component(_) => "component",
+        SemanticEntity::StateField(_) => "state-field",
+        SemanticEntity::Method(_) => "method",
+        SemanticEntity::Action(_) => "action",
+        SemanticEntity::EventHandler(_) => "event-handler",
+        SemanticEntity::Template(_) => "template",
+        SemanticEntity::TemplateEntity(entity) => match entity.kind {
+            TemplateSemanticKind::Element => "template-element",
+            TemplateSemanticKind::Fragment => "template-fragment",
+            TemplateSemanticKind::Text => "template-text",
+            TemplateSemanticKind::Binding => "template-binding",
+            TemplateSemanticKind::Attribute => "template-attribute",
+            TemplateSemanticKind::AttributeBinding => "template-attribute-binding",
+            TemplateSemanticKind::EventAttribute => "template-event-attribute",
+            TemplateSemanticKind::Conditional => "template-conditional",
+            TemplateSemanticKind::List => "template-list",
+        },
+    }
+}
+
+fn semantic_owner_id(owner: &SemanticOwner) -> Option<&str> {
+    owner.entity_id().map(ezc_core::SemanticId::as_str)
+}
+
+fn semantic_reference_kind(kind: SemanticReferenceKind) -> &'static str {
+    match kind {
+        SemanticReferenceKind::ActionState => "action-state",
+        SemanticReferenceKind::EventMethod => "event-method",
+        SemanticReferenceKind::TemplateState => "template-state",
+    }
+}
+
+#[derive(Serialize)]
+struct AsmInspectionDocument<'a> {
+    schema_version: u32,
+    file: String,
+    entities: Vec<AsmInspectionEntity<'a>>,
+    references: Vec<AsmInspectionReference<'a>>,
+    diagnostics: Vec<AsmInspectionDiagnostic<'a>>,
+    validation: Vec<AsmInspectionDiagnostic<'a>>,
+}
+
+#[derive(Serialize)]
+struct AsmInspectionEntity<'a> {
+    id: &'a str,
+    kind: &'static str,
+    owner: Option<&'a str>,
+    provenance: AsmInspectionProvenance,
+}
+
+#[derive(Serialize)]
+struct AsmInspectionReference<'a> {
+    kind: &'static str,
+    source: &'a str,
+    target: &'a str,
+    provenance: AsmInspectionProvenance,
+}
+
+#[derive(Serialize)]
+struct AsmInspectionDiagnostic<'a> {
+    code: &'a str,
+    message: &'a str,
+}
+
+#[derive(Serialize)]
+struct AsmInspectionProvenance {
+    path: String,
+    start: usize,
+    end: usize,
+    line: usize,
+    column: usize,
+}
+
+impl From<&SourceProvenance> for AsmInspectionProvenance {
+    fn from(provenance: &SourceProvenance) -> Self {
+        Self {
+            path: provenance.path.display().to_string(),
+            start: provenance.span.start,
+            end: provenance.span.end,
+            line: provenance.span.line,
+            column: provenance.span.column,
+        }
+    }
 }
 
 fn run_template(mut args: Vec<String>) {
@@ -1014,6 +1190,7 @@ fn write_build_artifacts(
 fn print_usage_and_exit() -> ! {
     eprintln!("usage:");
     eprintln!("  ezc_cli explain <file> [--format text|json]");
+    eprintln!("  ezc_cli asm <file> [--format text|json]");
     eprintln!("  ezc_cli parse <file>");
     eprintln!("  ezc_cli graph <file>");
     eprintln!("  ezc_cli template <file>");
