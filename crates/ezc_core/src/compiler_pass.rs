@@ -4,6 +4,7 @@ use crate::application_semantic_model::ApplicationSemanticModel;
 use crate::component_graph::{SerializableValue, StateOperation};
 use crate::semantic_id::SemanticId;
 use crate::semantic_provenance::SourceProvenance;
+use crate::validate_application_semantic_model;
 
 pub trait AnalysisPass {
     type Output;
@@ -147,5 +148,33 @@ impl AnalysisPass for OptimizationPlanningPass {
             })
             .collect();
         OptimizationPlan { recommendations }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct ExplainabilityPass;
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExplainabilityReport {
+    pub lines: Vec<String>,
+}
+impl AnalysisPass for ExplainabilityPass {
+    type Output = ExplainabilityReport;
+    fn analyze(&self, model: &ApplicationSemanticModel) -> ExplainabilityReport {
+        let dependencies = DependencyAnalysisPass.analyze(model);
+        let constants = ConstantEvaluationPass.analyze(model);
+        let optimizations = OptimizationPlanningPass.analyze(model);
+        let validation = validate_application_semantic_model(model);
+        ExplainabilityReport {
+            lines: vec![
+                format!("components={}", model.components.len()),
+                format!("dependencies={}", dependencies.dependencies.len()),
+                format!("constants={}", constants.values.len()),
+                format!(
+                    "optimization_recommendations={}",
+                    optimizations.recommendations.len()
+                ),
+                format!("validation_diagnostics={}", validation.len()),
+            ],
+        }
     }
 }

@@ -3,24 +3,24 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: add optimization planning
+* Latest commit: compiler: add explainability
 * Working tree: clean after committing this slice
 * Date: 2026-07-10 19:30:12 PDT
 
 Last completed slice
 
-* Slice: Era III-D - Optimization planning
-* Summary: Added non-mutating optimization recommendations from dead semantic analysis.
+* Slice: Era III-E - Explainability
+* Summary: Added deterministic analysis-pass explanations over ASM and pass outputs.
 * Key files: crates/ezc_core/src/compiler_pass.rs
-* New behavior: `OptimizationPlanningPass` emits candidate semantic IDs with source provenance, without transforming the model.
+* New behavior: `ExplainabilityPass` reports component, dependency, constant, optimization, and validation totals.
 * Tests added or changed: core suite and clippy pass.
 * Fixtures added or changed: None.
 
 Current in-progress slice
 
-* Slice: Era III-D - Optimization planning
+* Slice: Era III-E - Explainability
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-D
+* Completed: ASM-1 through ASM-8; Era III-A through III-E
 * Remaining: None
 
 Verification
@@ -134,7 +134,7 @@ Known limitations
 
 Exact next step
 
-Start Era III-E - Explainability. Expose pass outputs through deterministic compiler explanations.
+Start Era IV planning: derive the first resumability plan from ASM analysis.
 
 Useful commands
 
