@@ -2,6 +2,7 @@
 @component("x-list-key-diagnostics")
 class ListKeyDiagnostics extends Component {
   labels = state(["North", "North"]);
+  records = state([{ id: "north" }]);
 
   render() {
     return (
@@ -10,6 +11,7 @@ class ListKeyDiagnostics extends Component {
         <ol>{this.labels.map((label, index) => <li key={index}>{label}</li>)}</ol>
         <ol>{this.labels.map((label) => <li key={label.length}>{label}</li>)}</ol>
         <ol>{this.labels.map((label) => <li key={label}>{label}</li>)}</ol>
+        <ol>{this.records.map((record) => <li key={record.slug}>{record.id}</li>)}</ol>
       </section>
     );
   }

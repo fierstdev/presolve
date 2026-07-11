@@ -1941,6 +1941,38 @@ fn html_command_matches_keyed_list_reconciliation_fixture() {
 }
 
 #[test]
+fn html_command_matches_static_object_keyed_list_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "html",
+            "fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli html");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\\nstatus: {}\\nstderr:\\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0024-static-object-keyed-list/expected/html.html"),
+    )
+    .expect("failed to read expected static object keyed list html fixture");
+
+    assert_eq!(
+        normalize_html_for_fixture(&actual),
+        normalize_html_for_fixture(&expected)
+    );
+}
+
+#[test]
 fn template_command_matches_keyed_list_reconciliation_fixture() {
     let repo_root = repo_root();
 
@@ -1985,6 +2017,10 @@ fn manifest_command_matches_list_and_object_value_fixtures() {
         (
             "fixtures/0023-recursive-object-values/input/RecursiveObjectValues.tsx",
             "fixtures/0023-recursive-object-values/expected/manifest.json",
+        ),
+        (
+            "fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx",
+            "fixtures/0024-static-object-keyed-list/expected/manifest.json",
         ),
     ] {
         let output = Command::new(ezc_cli_bin())

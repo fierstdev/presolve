@@ -3,14 +3,16 @@ ComponentGraph:
   diagnostics:
     EZC1011: list over `this.labels` in class `ListKeyDiagnostics` is missing a `key={...}` attribute; stable keys are required for retained-node reconciliation
     EZC1012: list key `index` in class `ListKeyDiagnostics` uses the iteration index; index keys are unstable when items move
-    EZC1013: list key `label.length` in class `ListKeyDiagnostics` is not supported yet; use the item variable `label` for primitive keyed lists
+    EZC1015: list key `label.length` cannot resolve a primitive member value for initial item at index 0 in class `ListKeyDiagnostics`; every item must provide that member
     EZC1014: list key `label` resolves to duplicate initial value `North` in class `ListKeyDiagnostics`; keyed reconciliation requires unique keys
+    EZC1015: list key `record.slug` cannot resolve a primitive member value for initial item at index 0 in class `ListKeyDiagnostics`; every item must provide that member
   components:
     component ListKeyDiagnostics
       element: x-list-key-diagnostics
       route: /list-key-diagnostics
       state:
         labels
+        records
       methods:
         render
       render:
@@ -18,8 +20,9 @@ ComponentGraph:
         attributes: none
         event handlers: none
         children:
-          Element <ol> @ 9:9 span=203..258
-          Element <ol> @ 10:9 span=267..341
-          Element <ol> @ 11:9 span=350..424
-          Element <ol> @ 12:9 span=433..500
-        bindings: this.labels, this.labels, this.labels, this.labels
+          Element <ol> @ 10:9 span=241..296
+          Element <ol> @ 11:9 span=305..379
+          Element <ol> @ 12:9 span=388..462
+          Element <ol> @ 13:9 span=471..538
+          Element <ol> @ 14:9 span=547..626
+        bindings: this.labels, this.labels, this.labels, this.labels, this.records

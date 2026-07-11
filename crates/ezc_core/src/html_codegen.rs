@@ -209,6 +209,9 @@ fn binding_render_text(
                 SerializableValue::render_text,
             );
         }
+        if let Some(value) = list_item_member_value(expression, scope) {
+            return value.render_text();
+        }
         if scope.index_variable == Some(expression) {
             return scope
                 .index
@@ -224,11 +227,36 @@ fn list_instance_key(list: &ListNode, item: &SerializableValue, index: usize) ->
         return serializable_list_key(item).unwrap_or_else(|| index.to_string());
     }
 
+    if let Some(path) = list_member_key_path(list) {
+        return item
+            .member_path_value(path)
+            .and_then(serializable_list_key)
+            .unwrap_or_else(|| index.to_string());
+    }
+
     if list.index_variable.as_deref() == Some(list.key_expression.as_str()) {
         return index.to_string();
     }
 
     index.to_string()
+}
+
+fn list_item_member_value<'a>(
+    expression: &str,
+    scope: &'a ListRenderScope<'a>,
+) -> Option<&'a SerializableValue> {
+    let path = expression
+        .strip_prefix(scope.item_variable)?
+        .strip_prefix('.')?;
+
+    scope.item?.member_path_value(path)
+}
+
+fn list_member_key_path(list: &ListNode) -> Option<&str> {
+    list.key_expression
+        .strip_prefix(&list.item_variable)
+        .and_then(|suffix| suffix.strip_prefix('.'))
+        .filter(|path| !path.is_empty() && !path.split('.').any(str::is_empty))
 }
 
 fn serializable_list_key(value: &SerializableValue) -> Option<String> {

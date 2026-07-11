@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "components": [
+    {
+      "name": "StaticObjectKeyedList",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "ol"
+          },
+          {
+            "kind": "list",
+            "id": "n1",
+            "start": "n2",
+            "end": "n3",
+            "iterable": "this.items",
+            "initial_value": [
+              {
+                "details": {
+                  "region": "west"
+                },
+                "id": "north",
+                "label": "North"
+              },
+              {
+                "details": {
+                  "region": "east"
+                },
+                "id": "south",
+                "label": "South"
+              }
+            ],
+            "item_variable": "item",
+            "index_variable": "index",
+            "key_expression": "item.id",
+            "item_root": "n4",
+            "item_template_html": "<li data-ez-node=\"n4:__ez_list_key__\" data-ez-bindings=\"index,item.label,item.details.region\"><!-- ez-binding:n5:__ez_list_key__:index -->__ez_list_index__:<!-- ez-binding:n6:__ez_list_key__:item.label -->(<!-- ez-binding:n7:__ez_list_key__:item.details.region -->)</li>"
+          }
+        ],
+        "events": []
+      },
+      "actions": []
+    }
+  ]
+}

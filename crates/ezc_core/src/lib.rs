@@ -1150,13 +1150,7 @@ class BadAttrs extends Component {
         );
 
         let component_graph = build_component_graph(&parsed);
-        assert_eq!(
-            component_graph.diagnostics,
-            vec![ComponentDiagnostic {
-                code: "EZC1013".to_string(),
-                message: "list key `item.id` in class `KeyedList` is not supported yet; use the item variable `item` for primitive keyed lists".to_string(),
-            }]
-        );
+        assert!(component_graph.diagnostics.is_empty());
 
         let template_graph = build_template_graph(&component_graph);
         let root = template_graph.templates[0]
@@ -1281,6 +1275,25 @@ class BadAttrs extends Component {
             manifest.components[0].actions[0].operand,
             Some(SerializableValue::Object(_))
         ));
+    }
+
+    #[test]
+    fn renders_static_object_list_members_and_keys() {
+        let source = include_str!(
+            "../../../fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx"
+        );
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx",
+            source,
+        );
+        let component_graph = build_component_graph(&parsed);
+        assert!(component_graph.diagnostics.is_empty());
+
+        let template_graph = build_template_graph(&component_graph);
+        assert_eq!(
+            generate_static_html(&template_graph),
+            "<ol data-ez-node=\"n0\" data-ez-bindings=\"this.items\"><!-- ez-list-start:n2:this.items --><li data-ez-node=\"n4:north\" data-ez-bindings=\"index,item.label,item.details.region\"><!-- ez-binding:n5:north:index -->0:<!-- ez-binding:n6:north:item.label -->North(<!-- ez-binding:n7:north:item.details.region -->west)</li><li data-ez-node=\"n4:south\" data-ez-bindings=\"index,item.label,item.details.region\"><!-- ez-binding:n5:south:index -->1:<!-- ez-binding:n6:south:item.label -->South(<!-- ez-binding:n7:south:item.details.region -->east)</li><!-- ez-list-end:n3 --></ol>\n"
+        );
     }
 
     #[test]

@@ -51,6 +51,18 @@ impl SerializableValue {
             Self::Null | Self::Array(_) | Self::Object(_) => String::new(),
         }
     }
+
+    #[must_use]
+    pub fn member_path_value(&self, path: &str) -> Option<&Self> {
+        if path.is_empty() {
+            return None;
+        }
+
+        path.split('.').try_fold(self, |value, member| match value {
+            Self::Object(values) if !member.is_empty() => values.get(member),
+            _ => None,
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -716,11 +728,12 @@ fn collect_list_diagnostics(
         return;
     }
 
-    if list.key_expression != list.item_variable {
+    let member_path = list_member_key_path(list);
+    if list.key_expression != list.item_variable && member_path.is_none() {
         diagnostics.push(ComponentDiagnostic {
             code: "EZC1013".to_string(),
             message: format!(
-                "list key `{}` in class `{class_name}` is not supported yet; use the item variable `{}` for primitive keyed lists",
+                "list key `{}` in class `{class_name}` is not supported yet; use the item variable `{}` or one of its object members",
                 list.key_expression, list.item_variable
             ),
         });
@@ -739,9 +752,23 @@ fn collect_list_diagnostics(
     };
 
     let mut keys = Vec::new();
-    for value in values {
-        let Some(key) = list_key_from_static_value(value) else {
-            continue;
+    for (index, value) in values.iter().enumerate() {
+        let key_value = member_path.map_or(Some(value), |path| value.member_path_value(path));
+        let Some(key) = key_value.and_then(list_key_from_static_value) else {
+            diagnostics.push(ComponentDiagnostic {
+                code: "EZC1015".to_string(),
+                message: member_path.map_or_else(
+                    || format!(
+                        "list key `{}` resolves to a non-primitive initial item at index {index} in class `{class_name}`; keyed reconciliation requires primitive keys",
+                        list.key_expression
+                    ),
+                    |_| format!(
+                        "list key `{}` cannot resolve a primitive member value for initial item at index {index} in class `{class_name}`; every item must provide that member",
+                        list.key_expression
+                    ),
+                ),
+            });
+            return;
         };
 
         if keys.contains(&key) {
@@ -757,6 +784,13 @@ fn collect_list_diagnostics(
 
         keys.push(key);
     }
+}
+
+fn list_member_key_path(list: &RenderList) -> Option<&str> {
+    list.key_expression
+        .strip_prefix(&list.item_variable)
+        .and_then(|suffix| suffix.strip_prefix('.'))
+        .filter(|path| !path.is_empty() && !path.split('.').any(str::is_empty))
 }
 
 fn list_key_from_static_value(value: &SerializableValue) -> Option<String> {

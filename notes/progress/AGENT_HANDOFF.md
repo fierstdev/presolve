@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: preserve recursive object values
+* Latest commit: compiler: evaluate static list members
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 18:15:12 PDT
+* Date: 2026-07-10 18:30:58 PDT
 
 Last completed slice
 
-* Slice: 7F-E - Recursive object serializable values
-* Summary: Extended the compiler's recursive serializable-value contract to object literals and preserved those values in component state and runtime manifests.
-* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/html_codegen.rs, crates/ezc_cli/src/main.rs
-* New behavior: `state({...})` and literal assignment operands now accept recursively serializable objects with identifier, string, or numeric keys. Objects serialize as deterministic JSON maps in binding initial values and action operands.
-* Tests added or changed: parser coverage for nested object/array values and object assignment, core component/manifest coverage, and CLI manifest golden coverage.
-* Fixtures added or changed: fixtures/0023-recursive-object-values
+* Slice: 7F-F - Member-expression evaluation
+* Summary: Added constrained static evaluation for dot-member expressions over serializable object list items.
+* Key files: crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/html_codegen.rs, crates/ezc_core/src/lib.rs, crates/ezc_cli/tests/explain.rs
+* New behavior: Static list templates resolve expressions such as `item.label` and `item.details.region`; member keys such as `item.id` produce stable initial item IDs. Missing or non-primitive initial key members produce `EZC1015`.
+* Tests added or changed: core static HTML coverage for nested member bindings and member-derived IDs, CLI HTML/manifest goldens, and expanded key diagnostics coverage for missing members.
+* Fixtures added or changed: fixtures/0024-static-object-keyed-list; updated 0019 and 0022 keyed-list graph fixtures
 
 Current in-progress slice
 
 * Slice: 7F - Lists and keys
 * Status: In progress
-* Completed: 7F-A - List semantic model; 7F-B - Static initial list rendering; 7F-C - Keyed reconciliation; 7F-D - Key diagnostics; 7F-E - Recursive object serializable values
-* Remaining: 7F-F - Member-expression evaluation; 7F-G - Object keyed-list reconciliation; 7F-H - Dynamic list-item behavior.
+* Completed: 7F-A - List semantic model; 7F-B - Static initial list rendering; 7F-C - Keyed reconciliation; 7F-D - Key diagnostics; 7F-E - Recursive object serializable values; 7F-F - Member-expression evaluation
+* Remaining: 7F-G - Object keyed-list reconciliation; 7F-H - Dynamic list-item behavior.
 
 Verification
 
@@ -58,20 +58,23 @@ Architecture decisions made
 * Decision: Serializable object values use ordered maps with static identifier, string, or numeric keys.
 * Reason: The compiler needs recursively traversable data that serializes to deterministic JSON objects in manifests without introducing a new dependency or arbitrary expression evaluation.
 * Tradeoff: Spreads, computed keys, shorthand references, methods, accessors, and non-literal property values remain unsupported until later language slices define their semantics.
+* Decision: Static list member evaluation accepts non-empty dot paths rooted at the list item variable.
+* Reason: A small, compiler-owned evaluator can resolve object members for static HTML, member-derived IDs, and diagnostics without becoming a general JavaScript interpreter.
+* Tradeoff: Member expressions are evaluated only from compile-time initial list items. Runtime template substitution and reconciliation remain deferred to 7F-G.
 
 Known limitations
 
 * Item: Conditional rendering only supports simple `this.<stateField>` conditions with JSX element or fragment branches.
 * Item: Conditional branch snippets are replaced as static HTML. Bindings, events, and nested dynamic behavior inside swapped-in branch snippets are not re-registered yet.
-* Item: Keyed lists currently accept only `iterable.map((item, index?) => <element>...</element>)` with identifier parameters and an expression-bodied callback. A valid reconciled list must use the direct primitive item variable as `key={item}`.
-* Item: Missing keys, index keys, unsupported expressions, and duplicate statically-known primitive keys emit `EZC1011` through `EZC1014`. Object/member-expression keys such as `item.id` remain deferred to 7F-F and later.
-* Item: List item templates must have one root element; only direct item/index text bindings are substituted for newly inserted roots. Attributes, events, and nested dynamic behavior inside list templates are not hydrated yet.
+* Item: Keyed lists currently accept only `iterable.map((item, index?) => <element>...</element>)` with identifier parameters and an expression-bodied callback. Static lists support a direct primitive item key or a dot-member key such as `item.id` that resolves to a unique primitive.
+* Item: Missing keys, index keys, unsupported expressions, duplicate statically-known primitive keys, and missing/non-primitive member keys emit `EZC1011` through `EZC1015`.
+* Item: List item templates must have one root element. Static HTML resolves direct item/index values and dot-member bindings, but new runtime instances still substitute only direct item/index text bindings until 7F-G.
 * Item: Duplicate runtime list keys that arise from dynamic state still produce `EZR_DUPLICATE_LIST_KEY` and the later duplicate is skipped. The compiler detects only duplicate statically-known primitive initial values.
 * Item: Only `this.<field>++`, `this.<field>--`, `this.<field> += <literal>`, `this.<field> -= <literal>`, `this.<field> = <literal>`, and `this.<field> = !this.<field>` are recognized as action steps.
 * Item: The browser runtime supports only delegated click events, ordered closed action steps, numeric/string/boolean/null initial state, binding callback text/attribute updates, and conditional branch replacement.
 * Item: Static and `this.<stateField>` dynamic JSX attributes are preserved, but `className`/`htmlFor` normalization policy is still intentionally undecided.
 * Item: Dynamic attributes are limited to primitive state-field bindings; arbitrary expressions, method calls, spread attributes, arrays, and objects are not emitted yet.
-* Item: The serializable value model supports primitives, recursive arrays, and recursive object literals. Object property/member-expression evaluation, including `item.id`, remains deferred to 7F-F.
+* Item: The serializable value model supports primitives, recursive arrays, and recursive object literals. Static member paths resolve object data, but runtime member evaluation and object keyed reconciliation remain deferred to 7F-G.
 * Item: Runtime schema compatibility is exact-match only; no backward/forward manifest migration exists yet.
 * Item: Source spans are available on parser/render/template structures and CLI development output, but runtime manifests intentionally omit source metadata for now.
 * Item: Fragment nodes are visible in compiler/template output but intentionally omitted from runtime manifests until a runtime range-anchor use case appears.
@@ -80,7 +83,7 @@ Known limitations
 
 Exact next step
 
-Start Slice 7F-F - Member-expression evaluation. Resolve static object members for list item templates and key expressions, establish explicit missing-property behavior, and use the evaluation path to prepare object keyed-list reconciliation.
+Start Slice 7F-G - Object keyed-list reconciliation. Teach the browser runtime to evaluate member-derived keys and substitute member bindings for inserted object list items, then verify retained identity across object list reorder, insertion, and deletion.
 
 Useful commands
 
