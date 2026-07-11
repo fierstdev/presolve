@@ -306,6 +306,69 @@ fn asm_command_inspects_entity_selected_by_source_offset() {
 }
 
 #[test]
+fn asm_command_filters_selected_entity_children_and_relations() {
+    let path = "fixtures/0001-source-summary/input/Counter.tsx";
+    let component_id = "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter";
+    let state_id =
+        "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/state:count";
+
+    let children = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args([
+            "asm",
+            path,
+            "--entity",
+            component_id,
+            "--child-kind",
+            "method",
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("failed to filter ASM entity children");
+    assert!(children.status.success());
+    let children: serde_json::Value = serde_json::from_slice(&children.stdout).expect("child JSON");
+    assert_eq!(
+        children["children"],
+        serde_json::json!([
+            "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/method:increment",
+            "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/method:render"
+        ])
+    );
+
+    let relations = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args([
+            "asm",
+            path,
+            "--entity",
+            state_id,
+            "--reference-kind",
+            "action-state",
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("failed to filter ASM entity references");
+    assert!(relations.status.success());
+    let relations: serde_json::Value =
+        serde_json::from_slice(&relations.stdout).expect("relation JSON");
+    assert_eq!(
+        relations["incoming_references"].as_array().map(Vec::len),
+        Some(1)
+    );
+    assert_eq!(relations["incoming_references"][0]["kind"], "action-state");
+
+    let unselected = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["asm", path, "--child-kind", "method"])
+        .output()
+        .expect("failed to reject unselected ASM filters");
+    assert!(!unselected.status.success());
+    assert!(String::from_utf8_lossy(&unselected.stderr).contains("require an ASM entity selector"));
+}
+
+#[test]
 fn asm_command_exposes_declared_state_types() {
     let repo_root = repo_root();
     let path = "fixtures/0025-typed-state-annotations/input/TypedState.tsx";

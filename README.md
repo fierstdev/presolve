@@ -72,6 +72,18 @@ Source selection chooses the uniquely narrowest semantic span covering the
 given byte offset. No match or tied narrowest spans fail explicitly; `--entity`
 cannot be combined with `--source` or `--offset`.
 
+Selected entity inspection supports optional filters:
+
+```sh
+ezc_cli asm <file> --entity <semantic-id> --child-kind method
+ezc_cli asm <file> --entity <semantic-id> --reference-kind action-state
+```
+
+`--child-kind` accepts `component`, `state-field`, `method`, `action`,
+`event-handler`, `template`, or `template-entity`. `--reference-kind` accepts
+`action-state`, `event-method`, or `template-state`. Filters require an entity
+selector and affect only the returned children or relations.
+
 ## Repository rules
 
 - No major feature without an issue.

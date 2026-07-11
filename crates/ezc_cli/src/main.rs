@@ -11,9 +11,9 @@ use ezc_core::{
     generate_standalone_page, generate_static_html, summarize_source, template_manifest_json,
     validate_application_semantic_model, ApplicationSemanticModel, AsmValidationDiagnostic,
     AttributeValue, CompilationUnit, ComponentGraph, DeclaredStateTypeKind, RenderAttribute,
-    RenderAttributeValue, SemanticEntity, SemanticId, SemanticOwner, SemanticReferenceKind,
-    SerializableValue, SourceProvenance, StateOperation, TemplateChild, TemplateGraph,
-    TemplateSemanticKind,
+    RenderAttributeValue, SemanticEntity, SemanticEntityKind, SemanticId, SemanticOwner,
+    SemanticReferenceKind, SerializableValue, SourceProvenance, StateOperation, TemplateChild,
+    TemplateGraph, TemplateSemanticKind,
 };
 use ezc_parser::{
     parse_file, ParseDiagnostic, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
@@ -121,12 +121,18 @@ fn run_asm(args: &[String]) {
         (None, None) => None,
         (Some(_), Some(_)) => unreachable!("ASM input validation rejects conflicting selectors"),
     };
+    if !inputs.filters.is_empty() && entity.is_none() {
+        eprintln!("--child-kind and --reference-kind require an ASM entity selector");
+        process::exit(1);
+    }
 
     match (inputs.format.as_str(), entity) {
-        ("text", Some(entity)) => print_asm_entity_text(&asm, entity, &asm.diagnostics),
+        ("text", Some(entity)) => {
+            print_asm_entity_text(&asm, entity, &asm.diagnostics, inputs.filters);
+        }
         ("json", Some(entity)) => print!(
             "{}",
-            asm_entity_inspection_json(&asm, entity, &asm.diagnostics)
+            asm_entity_inspection_json(&asm, entity, &asm.diagnostics, inputs.filters)
         ),
         ("text", None) => print_asm_text(&paths, &asm, &validation),
         ("json", None) => print!("{}", asm_inspection_json(&paths, &asm, &validation)),
@@ -529,6 +535,7 @@ fn print_asm_entity_text(
     asm: &ApplicationSemanticModel,
     id: &SemanticId,
     diagnostics: &[ezc_core::ComponentDiagnostic],
+    filters: AsmEntityFilters,
 ) {
     let entity = asm
         .entity(id)
@@ -549,10 +556,20 @@ fn print_asm_entity_text(
         provenance.span.start,
         provenance.span.end
     );
-    println!("  children: {}", asm.children_of(id).len());
+    let children = filtered_entity_children(asm, id, filters);
+    println!("  children: {}", children.len());
+    for child in children {
+        println!("    {}", child.as_str());
+    }
     println!("  descendants: {}", asm.descendants_of(id).len());
-    print_entity_references("outgoing", asm.references_from(id));
-    print_entity_references("incoming", asm.references_to(id));
+    print_entity_references(
+        "outgoing",
+        filtered_entity_references(asm.references_from(id), filters),
+    );
+    print_entity_references(
+        "incoming",
+        filtered_entity_references(asm.references_to(id), filters),
+    );
     print_entity_diagnostics(diagnostics, provenance);
 }
 
@@ -583,6 +600,7 @@ fn asm_entity_inspection_json(
     asm: &ApplicationSemanticModel,
     id: &SemanticId,
     diagnostics: &[ezc_core::ComponentDiagnostic],
+    filters: AsmEntityFilters,
 ) -> String {
     let entity = asm
         .entity(id)
@@ -597,19 +615,16 @@ fn asm_entity_inspection_json(
             provenance: provenance.into(),
             declared_type: declared_state_type(entity),
         },
-        children: asm
-            .children_of(id)
+        children: filtered_entity_children(asm, id, filters)
             .into_iter()
             .map(SemanticId::as_str)
             .collect(),
         descendant_count: asm.descendants_of(id).len(),
-        outgoing_references: asm
-            .references_from(id)
+        outgoing_references: filtered_entity_references(asm.references_from(id), filters)
             .into_iter()
             .map(AsmInspectionReference::from)
             .collect(),
-        incoming_references: asm
-            .references_to(id)
+        incoming_references: filtered_entity_references(asm.references_to(id), filters)
             .into_iter()
             .map(AsmInspectionReference::from)
             .collect(),
@@ -620,6 +635,41 @@ fn asm_entity_inspection_json(
     };
 
     serde_json::to_string_pretty(&document).expect("ASM entity inspection should serialize") + "\n"
+}
+
+fn filtered_entity_children<'a>(
+    asm: &'a ApplicationSemanticModel,
+    id: &SemanticId,
+    filters: AsmEntityFilters,
+) -> Vec<&'a SemanticId> {
+    asm.children_of(id)
+        .into_iter()
+        .filter(|child| {
+            filters.child_kind.is_none_or(|kind| {
+                asm.entity(child)
+                    .is_some_and(|entity| entity.kind() == kind)
+            })
+        })
+        .collect()
+}
+
+fn filtered_entity_references(
+    references: Vec<&ezc_core::SemanticReference>,
+    filters: AsmEntityFilters,
+) -> Vec<&ezc_core::SemanticReference> {
+    let mut references = references
+        .into_iter()
+        .filter(|reference| {
+            filters
+                .reference_kind
+                .is_none_or(|kind| reference.kind == kind)
+        })
+        .collect::<Vec<_>>();
+    references.sort_by(|left, right| {
+        (left.source.as_str(), left.target.as_str())
+            .cmp(&(right.source.as_str(), right.target.as_str()))
+    });
+    references
 }
 
 fn related_entity_diagnostics<'a>(
@@ -646,6 +696,19 @@ struct AsmInputs {
     format: String,
     entity_id: Option<String>,
     source_selection: Option<(PathBuf, usize)>,
+    filters: AsmEntityFilters,
+}
+
+#[derive(Clone, Copy, Default)]
+struct AsmEntityFilters {
+    child_kind: Option<SemanticEntityKind>,
+    reference_kind: Option<SemanticReferenceKind>,
+}
+
+impl AsmEntityFilters {
+    fn is_empty(self) -> bool {
+        self.child_kind.is_none() && self.reference_kind.is_none()
+    }
 }
 
 fn parse_asm_inputs(args: &[String]) -> AsmInputs {
@@ -654,6 +717,7 @@ fn parse_asm_inputs(args: &[String]) -> AsmInputs {
     let mut entity_id = None;
     let mut source_path = None;
     let mut source_offset = None;
+    let mut filters = AsmEntityFilters::default();
     let mut index = 0;
 
     while index < args.len() {
@@ -693,6 +757,22 @@ fn parse_asm_inputs(args: &[String]) -> AsmInputs {
                 }));
                 index += 2;
             }
+            "--child-kind" => {
+                let Some(value) = args.get(index + 1) else {
+                    eprintln!("missing value for --child-kind");
+                    process::exit(1);
+                };
+                filters.child_kind = Some(parse_asm_entity_kind(value));
+                index += 2;
+            }
+            "--reference-kind" => {
+                let Some(value) = args.get(index + 1) else {
+                    eprintln!("missing value for --reference-kind");
+                    process::exit(1);
+                };
+                filters.reference_kind = Some(parse_asm_reference_kind(value));
+                index += 2;
+            }
             option if option.starts_with('-') => {
                 eprintln!("unknown option: {option}");
                 process::exit(1);
@@ -727,6 +807,35 @@ fn parse_asm_inputs(args: &[String]) -> AsmInputs {
         format,
         entity_id,
         source_selection,
+        filters,
+    }
+}
+
+fn parse_asm_entity_kind(value: &str) -> SemanticEntityKind {
+    match value {
+        "component" => SemanticEntityKind::Component,
+        "state-field" => SemanticEntityKind::StateField,
+        "method" => SemanticEntityKind::Method,
+        "action" => SemanticEntityKind::Action,
+        "event-handler" => SemanticEntityKind::EventHandler,
+        "template" => SemanticEntityKind::Template,
+        "template-entity" => SemanticEntityKind::TemplateEntity,
+        _ => {
+            eprintln!("unsupported ASM child kind: {value}");
+            process::exit(1);
+        }
+    }
+}
+
+fn parse_asm_reference_kind(value: &str) -> SemanticReferenceKind {
+    match value {
+        "action-state" => SemanticReferenceKind::ActionState,
+        "event-method" => SemanticReferenceKind::EventMethod,
+        "template-state" => SemanticReferenceKind::TemplateState,
+        _ => {
+            eprintln!("unsupported ASM reference kind: {value}");
+            process::exit(1);
+        }
     }
 }
 
@@ -1854,7 +1963,7 @@ fn write_build_artifacts(
 fn print_usage_and_exit() -> ! {
     eprintln!("usage:");
     eprintln!("  ezc_cli explain <file> [--format text|json]");
-    eprintln!("  ezc_cli asm <file> [--entity semantic-id | --source path --offset byte] [--format text|json]");
+    eprintln!("  ezc_cli asm <file> [--entity semantic-id | --source path --offset byte] [--child-kind kind] [--reference-kind kind] [--format text|json]");
     eprintln!(
         "  ezc_cli check <file> [file...] [--format text|json] [--category parser|compiler|validation] [--fail-on error|warning|info]"
     );
