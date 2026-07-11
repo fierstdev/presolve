@@ -772,7 +772,7 @@ fn collect_semantic_references(
     references
 }
 
-fn render_event_handlers(render: &RenderModel) -> Vec<&RenderEventHandler> {
+pub(crate) fn render_event_handlers(render: &RenderModel) -> Vec<&RenderEventHandler> {
     let mut event_handlers = render.event_handlers.iter().collect::<Vec<_>>();
 
     for child in &render.children {

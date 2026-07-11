@@ -4,6 +4,7 @@
 //! spans, obvious declarations, and diagnostics. That gives the project a stable
 //! place to learn compiler fundamentals before choosing a real parser backend.
 
+pub mod application_semantic_model;
 pub mod component_graph;
 pub mod explain;
 pub mod html_codegen;
@@ -17,6 +18,7 @@ pub mod summarize;
 pub mod template_graph;
 pub mod template_manifest;
 
+pub use application_semantic_model::{build_application_semantic_model, ApplicationSemanticModel};
 pub use component_graph::{
     build_component_graph, ComponentAction, ComponentDiagnostic, ComponentGraph, ComponentMethod,
     ComponentNode, RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler,
@@ -267,6 +269,35 @@ class Counter extends Component {
         assert_eq!(graph.provenance[&component.actions[0].id].span.line, 7);
         assert_eq!(graph.provenance[&component.id.template()].span.line, 10);
         assert_eq!(graph.provenance[&render.event_handlers[0].id].span.line, 12);
+    }
+
+    #[test]
+    fn assembles_application_semantic_model_from_existing_graphs() {
+        let source = include_str!("../../../fixtures/0001-source-summary/input/Counter.tsx");
+        let parsed =
+            ezc_parser::parse_file("fixtures/0001-source-summary/input/Counter.tsx", source);
+
+        let asm = build_application_semantic_model(&parsed);
+        let component = &asm.components[0];
+
+        assert!(asm.diagnostics.is_empty());
+        assert_eq!(asm.templates.len(), 1);
+        assert_eq!(asm.references.len(), 2);
+        assert_eq!(asm.ownership.len(), asm.provenance.len());
+        assert_eq!(asm.ownership[&component.id], SemanticOwner::Application);
+        assert_eq!(
+            asm.ownership[&component.state_fields[0].id],
+            SemanticOwner::entity(component.id.clone())
+        );
+        assert_eq!(
+            asm.ownership[&component.actions[0].id],
+            SemanticOwner::entity(component.methods[0].id.clone())
+        );
+        assert_eq!(
+            asm.ownership[&asm.templates[0].id],
+            SemanticOwner::entity(component.id.clone())
+        );
+        assert_eq!(asm.provenance[&asm.templates[0].id].span.line, 10);
     }
 
     #[test]
