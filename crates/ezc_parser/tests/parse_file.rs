@@ -714,3 +714,36 @@ fn parses_serializable_array_state_for_static_keyed_list() {
         ]))
     );
 }
+
+#[test]
+fn parses_keyless_jsx_list_rendering_for_key_diagnostics() {
+    let source = r#"
+@component("x-keyless-list")
+class KeylessList extends Component {
+  labels = state(["North"]);
+
+  render() {
+    return <ol>{this.labels.map((label) => <li>{label}</li>)}</ol>;
+  }
+}
+"#;
+
+    let parsed = parse_file("KeylessList.tsx", source);
+    assert!(parsed.diagnostics.is_empty());
+
+    let class = parsed.classes.first().expect("expected class");
+    let render = class
+        .methods
+        .iter()
+        .find(|method| method.name == "render")
+        .expect("expected render method");
+    let ParsedJsxNode::Element(list_root) = &render.jsx_roots[0] else {
+        panic!("expected list root");
+    };
+    let ParsedJsxChild::List(list) = &list_root.children[0] else {
+        panic!("expected keyless list child");
+    };
+
+    assert_eq!(list.iterable, "this.labels");
+    assert_eq!(list.key_expression, "");
+}

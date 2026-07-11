@@ -388,7 +388,7 @@ fn parsed_jsx_list(call: &oxc_ast::ast::CallExpression<'_>, source: &str) -> Opt
         None => None,
     };
     let item_template = parsed_jsx_node_from_expression(callback.get_expression()?, source)?;
-    let key_expression = key_expression_from_jsx_node(&item_template)?;
+    let key_expression = key_expression_from_jsx_node(&item_template).unwrap_or_default();
 
     Some(ParsedJsxList {
         iterable,

@@ -1,0 +1,25 @@
+File: fixtures/0022-keyed-list-diagnostics/input/ListKeyDiagnostics.tsx
+ComponentGraph:
+  diagnostics:
+    EZC1011: list over `this.labels` in class `ListKeyDiagnostics` is missing a `key={...}` attribute; stable keys are required for retained-node reconciliation
+    EZC1012: list key `index` in class `ListKeyDiagnostics` uses the iteration index; index keys are unstable when items move
+    EZC1013: list key `label.length` in class `ListKeyDiagnostics` is not supported yet; use the item variable `label` for primitive keyed lists
+    EZC1014: list key `label` resolves to duplicate initial value `North` in class `ListKeyDiagnostics`; keyed reconciliation requires unique keys
+  components:
+    component ListKeyDiagnostics
+      element: x-list-key-diagnostics
+      route: /list-key-diagnostics
+      state:
+        labels
+      methods:
+        render
+      render:
+        root: <section>
+        attributes: none
+        event handlers: none
+        children:
+          Element <ol> @ 9:9 span=203..258
+          Element <ol> @ 10:9 span=267..341
+          Element <ol> @ 11:9 span=350..424
+          Element <ol> @ 12:9 span=433..500
+        bindings: this.labels, this.labels, this.labels, this.labels

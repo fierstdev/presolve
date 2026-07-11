@@ -1,7 +1,7 @@
 File: fixtures/0019-keyed-list-semantics/input/KeyedList.tsx
 ComponentGraph:
   diagnostics:
-    none
+    EZC1013: list key `item.id` in class `KeyedList` is not supported yet; use the item variable `item` for primitive keyed lists
   components:
     component KeyedList
       element: x-keyed-list

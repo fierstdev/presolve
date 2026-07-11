@@ -248,6 +248,7 @@ fn build_component_node(
         collect_render_event_diagnostics(class, render, diagnostics);
         collect_duplicate_event_diagnostics(render, &class.name, diagnostics);
         collect_render_attribute_diagnostics(render, &state_fields, &class.name, diagnostics);
+        collect_render_list_diagnostics(render, &state_fields, &class.name, diagnostics);
     }
 
     ComponentNode {
@@ -623,6 +624,138 @@ fn collect_render_attribute_diagnostics(
         for child in &fragment.children {
             collect_child_attribute_diagnostics(child, state_fields, class_name, diagnostics);
         }
+    }
+}
+
+fn collect_render_list_diagnostics(
+    render: &RenderModel,
+    state_fields: &[StateField],
+    class_name: &str,
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+) {
+    for child in &render.children {
+        collect_child_list_diagnostics(child, state_fields, class_name, diagnostics);
+    }
+    if let Some(fragment) = &render.root_fragment {
+        for child in &fragment.children {
+            collect_child_list_diagnostics(child, state_fields, class_name, diagnostics);
+        }
+    }
+}
+
+fn collect_child_list_diagnostics(
+    child: &RenderChild,
+    state_fields: &[StateField],
+    class_name: &str,
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+) {
+    match child {
+        RenderChild::Element(element) => {
+            for child in &element.children {
+                collect_child_list_diagnostics(child, state_fields, class_name, diagnostics);
+            }
+        }
+        RenderChild::Fragment(fragment) => {
+            for child in &fragment.children {
+                collect_child_list_diagnostics(child, state_fields, class_name, diagnostics);
+            }
+        }
+        RenderChild::Conditional(conditional) => {
+            for child in &conditional.when_true {
+                collect_child_list_diagnostics(child, state_fields, class_name, diagnostics);
+            }
+            for child in &conditional.when_false {
+                collect_child_list_diagnostics(child, state_fields, class_name, diagnostics);
+            }
+        }
+        RenderChild::List(list) => {
+            collect_list_diagnostics(list, state_fields, class_name, diagnostics);
+
+            for child in &list.item_template {
+                collect_child_list_diagnostics(child, state_fields, class_name, diagnostics);
+            }
+        }
+        RenderChild::Text { .. } | RenderChild::Binding { .. } => {}
+    }
+}
+
+fn collect_list_diagnostics(
+    list: &RenderList,
+    state_fields: &[StateField],
+    class_name: &str,
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+) {
+    if list.key_expression.is_empty() {
+        diagnostics.push(ComponentDiagnostic {
+            code: "EZC1011".to_string(),
+            message: format!(
+                "list over `{}` in class `{class_name}` is missing a `key={{...}}` attribute; stable keys are required for retained-node reconciliation",
+                list.iterable
+            ),
+        });
+        return;
+    }
+
+    if list.index_variable.as_deref() == Some(list.key_expression.as_str()) {
+        diagnostics.push(ComponentDiagnostic {
+            code: "EZC1012".to_string(),
+            message: format!(
+                "list key `{}` in class `{class_name}` uses the iteration index; index keys are unstable when items move",
+                list.key_expression
+            ),
+        });
+        return;
+    }
+
+    if list.key_expression != list.item_variable {
+        diagnostics.push(ComponentDiagnostic {
+            code: "EZC1013".to_string(),
+            message: format!(
+                "list key `{}` in class `{class_name}` is not supported yet; use the item variable `{}` for primitive keyed lists",
+                list.key_expression, list.item_variable
+            ),
+        });
+        return;
+    }
+
+    let Some(field_name) = this_member_name(&list.iterable) else {
+        return;
+    };
+    let Some(SerializableValue::Array(values)) = state_fields
+        .iter()
+        .find(|field| field.name == field_name)
+        .and_then(|field| field.initial_value.as_ref())
+    else {
+        return;
+    };
+
+    let mut keys = Vec::new();
+    for value in values {
+        let Some(key) = list_key_from_static_value(value) else {
+            continue;
+        };
+
+        if keys.contains(&key) {
+            diagnostics.push(ComponentDiagnostic {
+                code: "EZC1014".to_string(),
+                message: format!(
+                    "list key `{}` resolves to duplicate initial value `{key}` in class `{class_name}`; keyed reconciliation requires unique keys",
+                    list.key_expression
+                ),
+            });
+            return;
+        }
+
+        keys.push(key);
+    }
+}
+
+fn list_key_from_static_value(value: &SerializableValue) -> Option<String> {
+    match value {
+        SerializableValue::Null => Some("null".to_string()),
+        SerializableValue::Number(value) | SerializableValue::String(value) => Some(value.clone()),
+        SerializableValue::Boolean(value) => Some(value.to_string()),
+        SerializableValue::Array(_) => None,
     }
 }
 

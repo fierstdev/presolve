@@ -1150,7 +1150,13 @@ class BadAttrs extends Component {
         );
 
         let component_graph = build_component_graph(&parsed);
-        assert!(component_graph.diagnostics.is_empty());
+        assert_eq!(
+            component_graph.diagnostics,
+            vec![ComponentDiagnostic {
+                code: "EZC1013".to_string(),
+                message: "list key `item.id` in class `KeyedList` is not supported yet; use the item variable `item` for primitive keyed lists".to_string(),
+            }]
+        );
 
         let template_graph = build_template_graph(&component_graph);
         let root = template_graph.templates[0]

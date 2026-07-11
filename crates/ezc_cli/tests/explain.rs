@@ -250,6 +250,35 @@ fn graph_command_matches_keyed_list_semantics_fixture() {
 }
 
 #[test]
+fn graph_command_matches_keyed_list_diagnostics_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "graph",
+            "fixtures/0022-keyed-list-diagnostics/input/ListKeyDiagnostics.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli graph");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\\nstatus: {}\\nstderr:\\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0022-keyed-list-diagnostics/expected/graph.txt"),
+    )
+    .expect("failed to read expected keyed list diagnostics graph fixture");
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
 fn graph_command_matches_semantic_errors_fixture() {
     let repo_root = repo_root();
 
