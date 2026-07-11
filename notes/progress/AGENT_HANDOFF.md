@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: add layout graph
+* Latest commit: compiler: add compilation unit frontend
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 20:06:00 PDT
+* Date: 2026-07-10 20:30:00 PDT
 
 Last completed slice
 
-* Slice: Era V-C - Layout graph foundation
-* Summary: Added route layout-chain metadata without introducing layout syntax.
-* Key files: crates/ezc_core/src/layout_graph.rs, crates/ezc_core/src/lib.rs
-* New behavior: `LayoutGraph` maps routes to component IDs with explicit empty layout chains.
-* Tests added or changed: core suite and clippy pass.
+* Slice: C1-A - Compilation unit frontend
+* Summary: Introduced a deterministic multi-file compiler input and ASM aggregation path.
+* Key files: crates/ezc_core/src/compilation_unit.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/lib.rs
+* New behavior: `CompilationUnit` parses or accepts multiple source files in path order; the ASM can aggregate existing component/template semantics from the complete unit.
+* Tests added or changed: deterministic unit ordering and two-file ASM aggregation.
 * Fixtures added or changed: None.
 
 Current in-progress slice
 
-* Slice: Era V-C - Layout graph foundation
+* Slice: C1-A - Compilation unit frontend
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C
-* Remaining: None
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A
+* Remaining: C1-B import/export extraction and module-edge resolution; C2 symbol resolution.
 
 Verification
 
@@ -37,6 +37,14 @@ Verification
 * just e2e: pass
 
 Architecture decisions made
+
+* Decision: The compiler frontend now accepts a deterministic `CompilationUnit` before application-level semantic construction.
+* Reason: `ezco` needs a project-wide input boundary so every later graph, analysis, plan, and developer product can consume one semantic model rather than independently reparsing files.
+* Tradeoff: C1-A aggregates existing file-local semantics only. Import/export declarations, resolved module edges, duplicate semantic identity diagnostics, and symbols remain later compiler-front-end work.
+
+* Decision: Existing route, module, layout, and resume metadata remain experimental compiler consumers rather than evidence that application-platform semantics are complete.
+* Reason: The revised roadmap prioritizes real multi-file frontend and symbol resolution before adding further platform graphs.
+* Tradeoff: Era V-D and adjacent application-platform slices are deferred until the canonical ASM has the necessary compiler foundations.
 
 * Decision: Every completed slice updates both this handoff and the active weekly progress log before its checkpoint is finalized.
 * Reason: The handoff preserves immediate continuation context while the progress log preserves the durable implementation chronology.
@@ -132,13 +140,13 @@ Known limitations
 * Item: Fragment nodes are visible in compiler/template output but intentionally omitted from runtime manifests until a runtime range-anchor use case appears.
 * Item: Semantic IDs and direct ownership currently cover components, state fields, methods, action steps, rendered templates, and event handlers. General template descendants still use backend-local `n*` IDs and have no semantic ownership or provenance entries yet.
 * Item: Resolved references currently cover action-to-state and event-to-method pairs only. Bindings, attributes, conditionals, lists, routes, and unresolved reference attempts have no semantic relation records or provenance-backed relations yet.
-* Item: `ApplicationSemanticModel` currently assembles one parsed file's existing compiler outputs. Multi-file aggregation, source remapping, generated-source provenance, query APIs, validation, and CLI inspection remain deferred to ASM-6 through ASM-8.
+* Item: `ApplicationSemanticModel` aggregates existing graph outputs from a deterministic `CompilationUnit`, but imports, exports, module edges, duplicate semantic IDs, source remapping, and symbols are still absent. The legacy single-file API remains as a compatibility wrapper.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 
 Exact next step
 
-Start Era V-D - Data model foundation. Model component state as application data resources without adding remote data semantics.
+Start C1-B - Extract import/export declarations and construct a real module-edge graph from `CompilationUnit` source files. Do not add symbol resolution or application-platform semantics in that slice.
 
 Useful commands
 

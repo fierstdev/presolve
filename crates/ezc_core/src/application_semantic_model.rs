@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use ezc_parser::ParsedFile;
 
+use crate::compilation_unit::CompilationUnit;
 use crate::component_graph::{
     build_component_graph, render_event_handlers, ComponentAction, ComponentDiagnostic,
     ComponentMethod, ComponentNode, RenderEventHandler, StateField,
@@ -103,17 +104,43 @@ impl ApplicationSemanticModel {
 
 #[must_use]
 pub fn build_application_semantic_model(parsed: &ParsedFile) -> ApplicationSemanticModel {
-    let component_graph = build_component_graph(parsed);
-    let template_graph = build_template_graph(&component_graph);
-    let ownership = collect_ownership(&component_graph.components, &template_graph.templates);
+    build_application_semantic_model_from_files(std::slice::from_ref(parsed))
+}
+
+#[must_use]
+pub fn build_application_semantic_model_for_unit(
+    unit: &CompilationUnit,
+) -> ApplicationSemanticModel {
+    build_application_semantic_model_from_files(unit.files())
+}
+
+fn build_application_semantic_model_from_files(files: &[ParsedFile]) -> ApplicationSemanticModel {
+    let mut components = Vec::new();
+    let mut templates = Vec::new();
+    let mut diagnostics = Vec::new();
+    let mut references = Vec::new();
+    let mut provenance = BTreeMap::new();
+
+    for parsed in files {
+        let component_graph = build_component_graph(parsed);
+        let template_graph = build_template_graph(&component_graph);
+
+        components.extend(component_graph.components);
+        templates.extend(template_graph.templates);
+        diagnostics.extend(component_graph.diagnostics);
+        references.extend(component_graph.references);
+        provenance.extend(component_graph.provenance);
+    }
+
+    let ownership = collect_ownership(&components, &templates);
 
     ApplicationSemanticModel {
-        components: component_graph.components,
-        templates: template_graph.templates,
-        diagnostics: component_graph.diagnostics,
+        components,
+        templates,
+        diagnostics,
         ownership,
-        references: component_graph.references,
-        provenance: component_graph.provenance,
+        references,
+        provenance,
     }
 }
 

@@ -6,6 +6,7 @@
 
 pub mod application_semantic_model;
 pub mod asm_validation;
+pub mod compilation_unit;
 pub mod compiler_pass;
 pub mod component_graph;
 pub mod explain;
@@ -31,9 +32,11 @@ pub mod template_graph;
 pub mod template_manifest;
 
 pub use application_semantic_model::{
-    build_application_semantic_model, ApplicationSemanticModel, SemanticEntity,
+    build_application_semantic_model, build_application_semantic_model_for_unit,
+    ApplicationSemanticModel, SemanticEntity,
 };
 pub use asm_validation::{validate_application_semantic_model, AsmValidationDiagnostic};
+pub use compilation_unit::CompilationUnit;
 pub use compiler_pass::{
     AnalysisPass, ConstantEvaluation, ConstantEvaluationPass, DependencyAnalysis,
     DependencyAnalysisPass,
@@ -357,6 +360,53 @@ class Counter extends Component {
             dependencies.dependents[&component.state_fields[0].id].len(),
             1
         );
+    }
+
+    #[test]
+    fn assembles_application_semantic_model_from_multiple_files() {
+        let unit = CompilationUnit::parse_sources([
+            (
+                "src/Zeta.tsx",
+                r#"
+@component("x-zeta")
+class Zeta extends Component {
+  render() {
+    return <div>Zeta</div>;
+  }
+}
+"#,
+            ),
+            (
+                "src/Alpha.tsx",
+                r#"
+@component("x-alpha")
+class Alpha extends Component {
+  render() {
+    return <div>Alpha</div>;
+  }
+}
+"#,
+            ),
+        ]);
+
+        let asm = build_application_semantic_model_for_unit(&unit);
+
+        assert_eq!(
+            unit.files()
+                .iter()
+                .map(|file| file.path.to_string_lossy().into_owned())
+                .collect::<Vec<_>>(),
+            vec!["src/Alpha.tsx", "src/Zeta.tsx"]
+        );
+        assert_eq!(
+            asm.components
+                .iter()
+                .map(|component| component.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["component:x-alpha", "component:x-zeta"]
+        );
+        assert!(asm.diagnostics.is_empty());
+        assert!(validate_application_semantic_model(&asm).is_empty());
     }
 
     #[test]
