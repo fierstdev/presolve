@@ -1,4 +1,5 @@
 use std::env;
+use std::fmt::Write as _;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -164,6 +165,30 @@ fn print_asm_text(
             }
         }
     }
+
+    if let Some(validation_text) = asm_validation_diagnostics_text(validation) {
+        print!("{validation_text}");
+    }
+}
+
+fn asm_validation_diagnostics_text(validation: &[AsmValidationDiagnostic]) -> Option<String> {
+    if validation.is_empty() {
+        return None;
+    }
+
+    let mut diagnostics = validation.iter().collect::<Vec<_>>();
+    diagnostics.sort_by(|left, right| {
+        (left.code.as_str(), left.message.as_str())
+            .cmp(&(right.code.as_str(), right.message.as_str()))
+    });
+
+    let mut output = String::from("  ASM validation diagnostics:\n");
+    for diagnostic in diagnostics {
+        writeln!(output, "    {}: {}", diagnostic.code, diagnostic.message)
+            .expect("writing to String should not fail");
+    }
+
+    Some(output)
 }
 
 fn asm_inspection_json(
@@ -1316,4 +1341,33 @@ fn print_usage_and_exit() -> ! {
     eprintln!("  ezc_cli manifest <file>");
     eprintln!("  ezc_cli build <file> [--out dir]");
     process::exit(1);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn formats_sorted_asm_validation_diagnostics_only_when_present() {
+        assert!(asm_validation_diagnostics_text(&[]).is_none());
+
+        let diagnostics = vec![
+            AsmValidationDiagnostic {
+                code: "EZASM1002".to_string(),
+                message: "second".to_string(),
+            },
+            AsmValidationDiagnostic {
+                code: "EZASM1001".to_string(),
+                message: "first".to_string(),
+            },
+        ];
+
+        assert_eq!(
+            asm_validation_diagnostics_text(&diagnostics),
+            Some(
+                "  ASM validation diagnostics:\n    EZASM1001: first\n    EZASM1002: second\n"
+                    .to_string()
+            )
+        );
+    }
 }
