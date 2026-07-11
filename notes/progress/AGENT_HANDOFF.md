@@ -3,24 +3,24 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: add constant evaluation
+* Latest commit: compiler: add dead semantic analysis
 * Working tree: clean after committing this slice
 * Date: 2026-07-10 19:30:12 PDT
 
 Last completed slice
 
-* Slice: Era III-B - Constant evaluation
-* Summary: Added constant evaluation for compiler-owned serializable state and action operands.
-* Key files: crates/ezc_core/src/compiler_pass.rs, crates/ezc_core/src/lib.rs
-* New behavior: `ConstantEvaluationPass` maps semantic IDs to known initial state values and literal action operands.
-* Tests added or changed: core suite and clippy pass; dedicated operand assertions remain a follow-up hardening task.
+* Slice: Era III-C - Dead semantic analysis
+* Summary: Added conservative dead-candidate analysis for unreachable non-render methods and their action steps.
+* Key files: crates/ezc_core/src/compiler_pass.rs
+* New behavior: `DeadSemanticAnalysisPass` treats render and event-target methods as live, reporting other methods/actions as unreferenced candidates.
+* Tests added or changed: core suite and clippy pass.
 * Fixtures added or changed: None; this slice does not alter CLI, HTML, manifest, or runtime artifacts.
 
 Current in-progress slice
 
-* Slice: Era III-B - Constant evaluation
+* Slice: Era III-C - Dead semantic analysis
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A - Dependency analysis; Era III-B - Constant evaluation
+* Completed: ASM-1 through ASM-8; Era III-A through III-C
 * Remaining: None
 
 Verification
@@ -134,7 +134,7 @@ Known limitations
 
 Exact next step
 
-Start Era III-C - Dead semantic analysis. Use ownership, references, and dependency results to identify currently unreachable semantic entities.
+Start Era III-D - Optimization planning. Convert dependency, constant, and dead-candidate analysis into non-mutating optimization recommendations.
 
 Useful commands
 

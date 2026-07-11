@@ -77,3 +77,43 @@ impl AnalysisPass for ConstantEvaluationPass {
         ConstantEvaluation { values }
     }
 }
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct DeadSemanticAnalysisPass;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeadSemanticAnalysis {
+    pub unreferenced_methods: Vec<SemanticId>,
+    pub unreferenced_actions: Vec<SemanticId>,
+}
+
+impl AnalysisPass for DeadSemanticAnalysisPass {
+    type Output = DeadSemanticAnalysis;
+    fn analyze(&self, model: &ApplicationSemanticModel) -> DeadSemanticAnalysis {
+        let live = model
+            .references
+            .iter()
+            .map(|reference| reference.target.clone())
+            .collect::<std::collections::BTreeSet<_>>();
+        let mut methods = Vec::new();
+        let mut actions = Vec::new();
+        for component in &model.components {
+            for method in &component.methods {
+                if method.name != "render" && !live.contains(&method.id) {
+                    methods.push(method.id.clone());
+                    actions.extend(
+                        component
+                            .actions
+                            .iter()
+                            .filter(|action| action.owner.entity_id() == Some(&method.id))
+                            .map(|action| action.id.clone()),
+                    );
+                }
+            }
+        }
+        DeadSemanticAnalysis {
+            unreferenced_methods: methods,
+            unreferenced_actions: actions,
+        }
+    }
+}
