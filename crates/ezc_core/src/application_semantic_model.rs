@@ -4,7 +4,7 @@ use ezc_parser::ParsedFile;
 
 use crate::compilation_unit::CompilationUnit;
 use crate::component_graph::{
-    build_component_graph, render_event_handlers, ComponentAction, ComponentDiagnostic,
+    build_component_graph_for_module, render_event_handlers, ComponentAction, ComponentDiagnostic,
     ComponentMethod, ComponentNode, RenderEventHandler, StateField,
 };
 use crate::semantic_id::{SemanticId, SemanticOwner};
@@ -122,7 +122,7 @@ fn build_application_semantic_model_from_files(files: &[ParsedFile]) -> Applicat
     let mut provenance = BTreeMap::new();
 
     for parsed in files {
-        let component_graph = build_component_graph(parsed);
+        let component_graph = build_component_graph_for_module(parsed);
         let template_graph = build_template_graph(&component_graph);
 
         components.extend(component_graph.components);

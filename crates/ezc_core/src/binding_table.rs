@@ -525,7 +525,7 @@ export default class Status extends Component {
         assert_eq!(module, &std::path::PathBuf::from("src/ui/Counter.tsx"));
         assert_eq!(
             exports["Widget"].id,
-            SemanticId::component(Some("x-counter"), "Counter")
+            SemanticId::component_in_module("src/ui/Counter.tsx", Some("x-counter"), "Counter")
         );
         assert!(bindings
             .resolve_import("src/app/App.tsx", "packageValue")
@@ -622,7 +622,7 @@ export * from "./bridge";
     }
 
     #[test]
-    fn reports_component_semantic_identity_collisions_across_modules() {
+    fn module_qualified_component_ids_do_not_collide_across_modules() {
         let unit = CompilationUnit::parse_sources([
             (
                 "src/First.tsx",
@@ -651,8 +651,18 @@ class Second extends Component {
         let modules = build_module_graph(&unit);
         let bindings = build_binding_table(&unit, &symbols, &modules);
 
-        assert_eq!(bindings.diagnostics.len(), 1);
-        assert_eq!(bindings.diagnostics[0].code, "EZBIND1008");
-        assert_eq!(bindings.diagnostics[0].name, "component:x-duplicate");
+        assert!(bindings.diagnostics.is_empty());
+        assert_ne!(
+            symbols
+                .module("src/First.tsx")
+                .expect("first module")
+                .symbols["First"]
+                .id,
+            symbols
+                .module("src/Second.tsx")
+                .expect("second module")
+                .symbols["Second"]
+                .id
+        );
     }
 }

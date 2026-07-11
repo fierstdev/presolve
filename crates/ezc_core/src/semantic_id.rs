@@ -1,4 +1,5 @@
 use std::fmt;
+use std::path::{Component, Path};
 
 use serde::Serialize;
 
@@ -41,6 +42,19 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn component_in_module(
+        module_path: impl AsRef<Path>,
+        element_name: Option<&str>,
+        class_name: &str,
+    ) -> Self {
+        Self(format!(
+            "module:{}/component:{}",
+            normalized_module_path(module_path.as_ref()),
+            element_name.unwrap_or(class_name)
+        ))
+    }
+
+    #[must_use]
     pub fn state_field(&self, name: &str) -> Self {
         self.child("state", name)
     }
@@ -72,6 +86,32 @@ impl SemanticId {
 
     fn child(&self, kind: &str, name: &str) -> Self {
         Self(format!("{}/{kind}:{name}", self.0))
+    }
+}
+
+fn normalized_module_path(path: &Path) -> String {
+    let mut segments = Vec::new();
+    let absolute = path.is_absolute();
+
+    for component in path.components() {
+        match component {
+            Component::CurDir | Component::RootDir | Component::Prefix(_) => {}
+            Component::ParentDir => {
+                if segments.last().is_some_and(|segment| *segment != "..") {
+                    segments.pop();
+                } else {
+                    segments.push("..".to_string());
+                }
+            }
+            Component::Normal(segment) => segments.push(segment.to_string_lossy().into_owned()),
+        }
+    }
+
+    let path = segments.join("/");
+    if absolute {
+        format!("/{path}")
+    } else {
+        path
     }
 }
 
@@ -109,6 +149,21 @@ mod tests {
         assert_eq!(
             component.template().as_str(),
             "component:x-counter/template:render"
+        );
+    }
+
+    #[test]
+    fn derives_module_qualified_component_ids() {
+        let component =
+            SemanticId::component_in_module("src/../src/Counter.tsx", Some("x-counter"), "Counter");
+
+        assert_eq!(
+            component.as_str(),
+            "module:src/Counter.tsx/component:x-counter"
+        );
+        assert_eq!(
+            component.state_field("count").as_str(),
+            "module:src/Counter.tsx/component:x-counter/state:count"
         );
     }
 

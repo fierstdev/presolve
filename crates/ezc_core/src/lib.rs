@@ -48,9 +48,10 @@ pub use compiler_pass::{
     DependencyAnalysisPass,
 };
 pub use component_graph::{
-    build_component_graph, ComponentAction, ComponentDiagnostic, ComponentGraph, ComponentMethod,
-    ComponentNode, RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler,
-    RenderFragment, RenderList, RenderModel, SerializableValue, StateField, StateOperation,
+    build_component_graph, build_component_graph_for_module, ComponentAction, ComponentDiagnostic,
+    ComponentGraph, ComponentMethod, ComponentNode, RenderAttribute, RenderAttributeValue,
+    RenderChild, RenderEventHandler, RenderFragment, RenderList, RenderModel, SerializableValue,
+    StateField, StateOperation,
 };
 pub use explain::{explain_json, explain_text};
 pub use html_codegen::generate_static_html;
@@ -415,7 +416,10 @@ class Alpha extends Component {
                 .iter()
                 .map(|component| component.id.as_str())
                 .collect::<Vec<_>>(),
-            vec!["component:x-alpha", "component:x-zeta"]
+            vec![
+                "module:src/Alpha.tsx/component:x-alpha",
+                "module:src/Zeta.tsx/component:x-zeta"
+            ]
         );
         assert!(asm.diagnostics.is_empty());
         assert!(validate_application_semantic_model(&asm).is_empty());

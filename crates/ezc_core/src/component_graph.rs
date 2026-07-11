@@ -195,13 +195,36 @@ pub struct ComponentDiagnostic {
 
 #[must_use]
 pub fn build_component_graph(parsed: &ParsedFile) -> ComponentGraph {
+    build_component_graph_with_identity(parsed, false)
+}
+
+/// Build compiler semantics with a source-module-qualified identity root.
+///
+/// The canonical application model and compiler frontend use this path. The
+/// legacy graph builder remains available for backend compatibility while
+/// runtime artifact contracts are migrated independently.
+#[must_use]
+pub fn build_component_graph_for_module(parsed: &ParsedFile) -> ComponentGraph {
+    build_component_graph_with_identity(parsed, true)
+}
+
+fn build_component_graph_with_identity(
+    parsed: &ParsedFile,
+    module_qualified_identity: bool,
+) -> ComponentGraph {
     let mut components = Vec::new();
     let mut diagnostics = Vec::new();
     let mut references = Vec::new();
     let mut provenance = BTreeMap::new();
 
     for class in &parsed.classes {
-        let component = build_component_node(class, &mut diagnostics);
+        let element_name = decorator_argument(class, "component");
+        let id = if module_qualified_identity {
+            SemanticId::component_in_module(&parsed.path, element_name.as_deref(), &class.name)
+        } else {
+            SemanticId::component(element_name.as_deref(), &class.name)
+        };
+        let component = build_component_node(class, id, &mut diagnostics);
         let component_provenance = collect_component_provenance(class, &component, &parsed.path);
         references.extend(collect_semantic_references(
             &component,
@@ -228,11 +251,11 @@ pub fn build_component_graph(parsed: &ParsedFile) -> ComponentGraph {
 
 fn build_component_node(
     class: &ParsedClass,
+    id: SemanticId,
     diagnostics: &mut Vec<ComponentDiagnostic>,
 ) -> ComponentNode {
     let element_name = decorator_argument(class, "component");
     let route_path = decorator_argument(class, "route");
-    let id = SemanticId::component(element_name.as_deref(), &class.name);
 
     if element_name.is_none() {
         diagnostics.push(ComponentDiagnostic {

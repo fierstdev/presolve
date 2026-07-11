@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use crate::compilation_unit::CompilationUnit;
-use crate::component_graph::build_component_graph;
+use crate::component_graph::build_component_graph_for_module;
 use crate::semantic_id::{SemanticId, SemanticOwner};
 use crate::semantic_provenance::SourceProvenance;
 
@@ -64,7 +64,7 @@ pub fn build_symbol_table(unit: &CompilationUnit) -> SymbolTable {
     let mut diagnostics = Vec::new();
 
     for file in unit.files() {
-        let graph = build_component_graph(file);
+        let graph = build_component_graph_for_module(file);
         let mut symbols = BTreeMap::new();
 
         for component in graph.components {
@@ -196,7 +196,7 @@ class Status extends Component {
         assert_eq!(counter.symbols["Counter"].kind, SymbolKind::Component);
         assert_eq!(
             counter.symbols["Counter"].id,
-            SemanticId::component(Some("x-counter"), "Counter")
+            SemanticId::component_in_module("src/Counter.tsx", Some("x-counter"), "Counter")
         );
         assert_eq!(
             counter.symbols["Counter.count"].kind,
@@ -204,7 +204,11 @@ class Status extends Component {
         );
         assert_eq!(
             counter.symbols["Counter.count"].owner,
-            SemanticOwner::entity(SemanticId::component(Some("x-counter"), "Counter"))
+            SemanticOwner::entity(SemanticId::component_in_module(
+                "src/Counter.tsx",
+                Some("x-counter"),
+                "Counter"
+            ))
         );
         assert_eq!(
             counter.symbols["Counter.increment"].kind,
