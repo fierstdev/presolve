@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,6 +40,7 @@ pub enum ParsedSerializableValue {
     String(String),
     Boolean(bool),
     Array(Vec<ParsedSerializableValue>),
+    Object(BTreeMap<String, ParsedSerializableValue>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

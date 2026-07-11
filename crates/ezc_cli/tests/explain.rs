@@ -1970,7 +1970,7 @@ fn template_command_matches_keyed_list_reconciliation_fixture() {
 }
 
 #[test]
-fn manifest_command_matches_keyed_list_fixtures() {
+fn manifest_command_matches_list_and_object_value_fixtures() {
     let repo_root = repo_root();
 
     for (input, expected) in [
@@ -1981,6 +1981,10 @@ fn manifest_command_matches_keyed_list_fixtures() {
         (
             "fixtures/0021-keyed-list-reconciliation/input/KeyedListReconciliation.tsx",
             "fixtures/0021-keyed-list-reconciliation/expected/manifest.json",
+        ),
+        (
+            "fixtures/0023-recursive-object-values/input/RecursiveObjectValues.tsx",
+            "fixtures/0023-recursive-object-values/expected/manifest.json",
         ),
     ] {
         let output = Command::new(ezc_cli_bin())
@@ -1998,7 +2002,7 @@ fn manifest_command_matches_keyed_list_fixtures() {
 
         let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
         let expected = std::fs::read_to_string(repo_root.join(expected))
-            .expect("failed to read expected keyed list manifest fixture");
+            .expect("failed to read expected manifest fixture");
 
         assert_json_eq(&actual, &expected);
     }

@@ -40,7 +40,7 @@ pub use template_manifest::{
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
+    use std::{collections::BTreeMap, path::Path};
 
     #[test]
     fn summarizes_component_decorator_class_and_render_method() {
@@ -1216,6 +1216,71 @@ class BadAttrs extends Component {
                 },
             ]
         );
+    }
+
+    #[test]
+    fn preserves_recursive_object_values_in_component_and_manifest_models() {
+        let source = include_str!(
+            "../../../fixtures/0023-recursive-object-values/input/RecursiveObjectValues.tsx"
+        );
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0023-recursive-object-values/input/RecursiveObjectValues.tsx",
+            source,
+        );
+
+        let component_graph = build_component_graph(&parsed);
+        assert!(component_graph.diagnostics.is_empty());
+
+        let profile = SerializableValue::Object(BTreeMap::from([
+            (
+                "name".to_string(),
+                SerializableValue::String("North".to_string()),
+            ),
+            (
+                "settings".to_string(),
+                SerializableValue::Object(BTreeMap::from([
+                    ("enabled".to_string(), SerializableValue::Boolean(true)),
+                    (
+                        "tags".to_string(),
+                        SerializableValue::Array(vec![
+                            SerializableValue::String("compiler".to_string()),
+                            SerializableValue::Object(BTreeMap::from([
+                                (
+                                    "name".to_string(),
+                                    SerializableValue::String("runtime".to_string()),
+                                ),
+                                (
+                                    "rank".to_string(),
+                                    SerializableValue::Number("2".to_string()),
+                                ),
+                            ])),
+                        ]),
+                    ),
+                ])),
+            ),
+        ]));
+        assert_eq!(
+            component_graph.components[0].state_fields[0].initial_value,
+            Some(profile.clone())
+        );
+
+        let template_graph = build_template_graph(&component_graph);
+        let manifest = build_template_manifest(&component_graph, &template_graph);
+        assert_eq!(
+            manifest.components[0].template.nodes[3],
+            ManifestNode::Binding {
+                id: "n3".to_string(),
+                expression: "this.profile".to_string(),
+                initial_value: Some(profile),
+                target: None,
+                element: None,
+                attribute: None,
+            }
+        );
+        assert!(matches!(
+            manifest.components[0].actions[0].operand,
+            Some(SerializableValue::Object(_))
+        ));
     }
 
     #[test]

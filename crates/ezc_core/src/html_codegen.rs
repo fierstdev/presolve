@@ -236,7 +236,7 @@ fn serializable_list_key(value: &SerializableValue) -> Option<String> {
         SerializableValue::Null => Some("null".to_string()),
         SerializableValue::Number(value) | SerializableValue::String(value) => Some(value.clone()),
         SerializableValue::Boolean(value) => Some(value.to_string()),
-        SerializableValue::Array(_) => None,
+        SerializableValue::Array(_) | SerializableValue::Object(_) => None,
     }
 }
 

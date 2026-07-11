@@ -1,10 +1,12 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
     Argument, AssignmentTarget, BindingPatternKind, ClassElement, Declaration, Expression,
     JSXAttributeItem, JSXAttributeName, JSXAttributeValue, JSXChild, JSXElementName, JSXExpression,
-    JSXFragment, Program, PropertyKey, SimpleAssignmentTarget, Statement,
+    JSXFragment, ObjectPropertyKind, Program, PropertyKey, PropertyKind, SimpleAssignmentTarget,
+    Statement,
 };
 use oxc_diagnostics::Severity as OxcSeverity;
 use oxc_parser::Parser;
@@ -662,6 +664,34 @@ fn serializable_value_from_expression(
             .map(|element| serializable_value_from_expression(element.as_expression()?))
             .collect::<Option<Vec<_>>>()
             .map(ParsedSerializableValue::Array),
+        Expression::ObjectExpression(object) => object
+            .properties
+            .iter()
+            .map(|property| {
+                let ObjectPropertyKind::ObjectProperty(property) = property else {
+                    return None;
+                };
+
+                if property.computed || property.method || property.kind != PropertyKind::Init {
+                    return None;
+                }
+
+                let key = object_property_key_name(&property.key)?;
+                let value = serializable_value_from_expression(&property.value)?;
+                Some((key, value))
+            })
+            .collect::<Option<BTreeMap<_, _>>>()
+            .map(ParsedSerializableValue::Object),
+        _ => None,
+    }
+}
+
+fn object_property_key_name(key: &PropertyKey<'_>) -> Option<String> {
+    match key {
+        PropertyKey::StaticIdentifier(_)
+        | PropertyKey::StringLiteral(_)
+        | PropertyKey::NumericLiteral(_) => property_key_name(key),
+        PropertyKey::PrivateIdentifier(_) => None,
         _ => None,
     }
 }

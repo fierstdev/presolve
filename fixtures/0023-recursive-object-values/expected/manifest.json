@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "components": [
+    {
+      "name": "RecursiveObjectValues",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "section"
+          },
+          {
+            "kind": "element",
+            "id": "n1",
+            "tag": "button"
+          },
+          {
+            "kind": "element",
+            "id": "n2",
+            "tag": "p"
+          },
+          {
+            "kind": "binding",
+            "id": "n3",
+            "expression": "this.profile",
+            "initial_value": {
+              "name": "North",
+              "settings": {
+                "enabled": true,
+                "tags": [
+                  "compiler",
+                  {
+                    "name": "runtime",
+                    "rank": "2"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "events": [
+          {
+            "node": "n1",
+            "event": "click",
+            "handler": "this.replace"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "method": "replace",
+          "operation": "assign",
+          "field": "profile",
+          "operand": {
+            "name": "South",
+            "settings": {
+              "enabled": false,
+              "tags": [
+                "runtime"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

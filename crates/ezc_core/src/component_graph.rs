@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde::Serialize;
 
 use ezc_parser::{
@@ -37,6 +39,7 @@ pub enum SerializableValue {
     String(String),
     Boolean(bool),
     Array(Vec<SerializableValue>),
+    Object(BTreeMap<String, SerializableValue>),
 }
 
 impl SerializableValue {
@@ -45,7 +48,7 @@ impl SerializableValue {
         match self {
             Self::Number(value) | Self::String(value) => value.clone(),
             Self::Boolean(value) => value.to_string(),
-            Self::Null | Self::Array(_) => String::new(),
+            Self::Null | Self::Array(_) | Self::Object(_) => String::new(),
         }
     }
 }
@@ -398,6 +401,12 @@ fn serializable_value_from_parsed(value: &ParsedSerializableValue) -> Serializab
         ParsedSerializableValue::Array(values) => {
             SerializableValue::Array(values.iter().map(serializable_value_from_parsed).collect())
         }
+        ParsedSerializableValue::Object(values) => SerializableValue::Object(
+            values
+                .iter()
+                .map(|(key, value)| (key.clone(), serializable_value_from_parsed(value)))
+                .collect(),
+        ),
     }
 }
 
@@ -755,7 +764,7 @@ fn list_key_from_static_value(value: &SerializableValue) -> Option<String> {
         SerializableValue::Null => Some("null".to_string()),
         SerializableValue::Number(value) | SerializableValue::String(value) => Some(value.clone()),
         SerializableValue::Boolean(value) => Some(value.to_string()),
-        SerializableValue::Array(_) => None,
+        SerializableValue::Array(_) | SerializableValue::Object(_) => None,
     }
 }
 

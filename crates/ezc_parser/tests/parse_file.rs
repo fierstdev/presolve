@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use ezc_parser::{
     parse_file, ParseSeverity, ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxElement,
     ParsedJsxNode, ParsedSerializableValue, ParsedStateOperation,
@@ -746,4 +748,90 @@ class KeylessList extends Component {
 
     assert_eq!(list.iterable, "this.labels");
     assert_eq!(list.key_expression, "");
+}
+
+#[test]
+fn parses_recursive_object_serializable_values() {
+    let source = include_str!(
+        "../../../fixtures/0023-recursive-object-values/input/RecursiveObjectValues.tsx"
+    );
+    let parsed = parse_file(
+        "fixtures/0023-recursive-object-values/input/RecursiveObjectValues.tsx",
+        source,
+    );
+
+    assert!(parsed.diagnostics.is_empty());
+
+    let class = parsed.classes.first().expect("expected class");
+    assert_eq!(
+        class.properties[0].state_initial_value,
+        Some(ParsedSerializableValue::Object(BTreeMap::from([
+            (
+                "name".to_string(),
+                ParsedSerializableValue::String("North".to_string())
+            ),
+            (
+                "settings".to_string(),
+                ParsedSerializableValue::Object(BTreeMap::from([
+                    (
+                        "enabled".to_string(),
+                        ParsedSerializableValue::Boolean(true)
+                    ),
+                    (
+                        "tags".to_string(),
+                        ParsedSerializableValue::Array(vec![
+                            ParsedSerializableValue::String("compiler".to_string()),
+                            ParsedSerializableValue::Object(BTreeMap::from([
+                                (
+                                    "name".to_string(),
+                                    ParsedSerializableValue::String("runtime".to_string())
+                                ),
+                                (
+                                    "rank".to_string(),
+                                    ParsedSerializableValue::Number("2".to_string())
+                                ),
+                            ])),
+                        ]),
+                    ),
+                ])),
+            ),
+        ])))
+    );
+
+    let replace = class
+        .methods
+        .iter()
+        .find(|method| method.name == "replace")
+        .expect("expected replace method");
+    assert!(matches!(
+        replace.state_updates.as_slice(),
+        [update] if matches!(update.operation, ParsedStateOperation::Assign(ParsedSerializableValue::Object(_)))
+    ));
+}
+
+#[test]
+fn parses_static_string_and_numeric_object_keys() {
+    let source = r#"
+@component("x-object-keys")
+class ObjectKeys extends Component {
+  profile = state({ "display-name": "North", 7: true });
+
+  render() {
+    return <p>Keys</p>;
+  }
+}
+"#;
+    let parsed = parse_file("ObjectKeys.tsx", source);
+
+    assert!(parsed.diagnostics.is_empty());
+    assert_eq!(
+        parsed.classes[0].properties[0].state_initial_value,
+        Some(ParsedSerializableValue::Object(BTreeMap::from([
+            ("7".to_string(), ParsedSerializableValue::Boolean(true)),
+            (
+                "display-name".to_string(),
+                ParsedSerializableValue::String("North".to_string())
+            ),
+        ])))
+    );
 }
