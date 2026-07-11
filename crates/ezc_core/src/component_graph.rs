@@ -40,6 +40,14 @@ pub struct StateField {
     pub owner: SemanticOwner,
     pub name: String,
     pub initial_value: Option<SerializableValue>,
+    pub declared_type: Option<DeclaredStateType>,
+}
+
+/// Explicit state type metadata carried from the parser into canonical compiler data.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeclaredStateType {
+    pub text: String,
+    pub provenance: SourceProvenance,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -224,7 +232,7 @@ fn build_component_graph_with_identity(
         } else {
             SemanticId::component(element_name.as_deref(), &class.name)
         };
-        let component = build_component_node(class, id, &mut diagnostics);
+        let component = build_component_node(class, &parsed.path, id, &mut diagnostics);
         let component_provenance = collect_component_provenance(class, &component, &parsed.path);
         references.extend(collect_semantic_references(
             &component,
@@ -251,6 +259,7 @@ fn build_component_graph_with_identity(
 
 fn build_component_node(
     class: &ParsedClass,
+    path: &Path,
     id: SemanticId,
     diagnostics: &mut Vec<ComponentDiagnostic>,
 ) -> ComponentNode {
@@ -276,6 +285,12 @@ fn build_component_node(
                 .state_initial_value
                 .as_ref()
                 .map(serializable_value_from_parsed),
+            declared_type: property.state_type_annotation.as_ref().map(|annotation| {
+                DeclaredStateType {
+                    text: annotation.text.clone(),
+                    provenance: SourceProvenance::new(path, annotation.span),
+                }
+            }),
         })
         .collect::<Vec<_>>();
 

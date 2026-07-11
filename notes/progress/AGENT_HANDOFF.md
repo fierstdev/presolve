@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: parser: retain state type annotations
+* Latest commit: compiler: lower declared state types
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 21:22:23 PDT
+* Date: 2026-07-10 21:25:29 PDT
 
 Last completed slice
 
-* Slice: C5-A - State type annotation parsing
-* Summary: Retained authored TypeScript type annotations for `state(...)` fields in parser summaries.
-* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_parser/tests/parse_file.rs
-* New behavior: State properties expose a `ParsedTypeAnnotation` with trimmed type text and a source span beginning at the authored colon. Non-state property annotations remain outside this slice.
-* Tests added or changed: primitive and union state annotations, annotation source positions, and non-state annotation exclusion.
+* Slice: C5-B - Declared state type lowering
+* Summary: Lowered parser state annotations into canonical component and ASM state fields.
+* Key files: crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/lib.rs
+* New behavior: `StateField.declared_type` now carries authored type text and full source provenance as `DeclaredStateType`, visible through both component graphs and the ASM.
+* Tests added or changed: component-graph and ASM state-type propagation with annotation path/line/column checks.
 * Fixtures added or changed: None.
 
 Current in-progress slice
 
-* Slice: C5-A - State type annotation parsing
+* Slice: C5-B - Declared state type lowering
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A
-* Remaining: C5-B lower declared state types into canonical component and ASM data.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-B
+* Remaining: C5-C expose declared state types in ASM JSON inspection.
 
 Verification
 
@@ -65,6 +65,10 @@ Architecture decisions made
 * Decision: Parser summaries retain type annotations only when a property is recognized as a `state(...)` declaration.
 * Reason: Explicit state types are the first type-semantic input needed by the canonical model, without expanding this slice to general TypeScript declaration analysis.
 * Tradeoff: Annotation text is captured verbatim apart from outer whitespace and the leading colon; no inference, imports, compatibility checks, or non-state property types are modeled yet.
+
+* Decision: Declared state types are attached to `StateField` as metadata with independent source provenance.
+* Reason: The canonical component and ASM models can expose the actual authored type and its source location without treating a type annotation as a separate executable semantic entity.
+* Tradeoff: Declared type metadata is descriptive only; it creates no type references, diagnostics, runtime behavior, or compatibility requirements.
 
 * Decision: Canonical ASM/frontend consumers use module-qualified semantic IDs, while the existing backend-facing graph retains legacy component-scoped IDs until its runtime contracts are deliberately migrated.
 * Reason: A canonical application model must distinguish semantically equivalent components from different modules, but the established HTML/template runtime protocol does not serialize these IDs and should not be changed implicitly.
@@ -190,13 +194,13 @@ Known limitations
 * Item: Resolved references cover action-to-state, event-to-method, and direct text-binding/dynamic-attribute/conditional/keyed-list-iterable-to-state pairs. Routes, member expressions, computed expressions, and unresolved reference attempts have no semantic relation records yet.
 * Item: Canonical compiler products now include module-qualified template entities, direct template state dependencies, and direct template event-method dependencies, while `BindingTable` resolves local/relative re-export chains plus named/default/namespace imports. External and namespace re-exports, external package bindings, tsconfig aliases, source remapping, and type semantics are still absent. Legacy backend graph identity remains a compatibility path.
 * Item: `ezc asm` accepts explicit source files and exposes a generic inspection document. Project discovery, tsconfig resolution, source remapping, typed action payloads, and machine-readable backend plans remain future slices.
-* Item: State-field type annotations are parser metadata only. The component graph, ASM, diagnostics, manifests, runtime, imported types, non-state annotations, inference, unions, and assignment compatibility do not yet consume or validate types.
+* Item: Declared state types are canonical `StateField` metadata with source provenance. ASM JSON, diagnostics, manifests, runtime, imported types, non-state annotations, inference, unions, and assignment compatibility do not yet consume or validate types.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 
 Exact next step
 
-Start C5-B - Lower declared state-field type annotations into canonical component and ASM data. Preserve the authored parser text/span; do not infer types, resolve imports, validate values, or change manifests/runtime artifacts.
+Start C5-C - Expose declared state types through the versioned `ezc asm --format json` inspection document. Preserve schema compatibility with optional state-entity metadata; do not type-check, add type imports, or change manifests/runtime artifacts.
 
 Useful commands
 
