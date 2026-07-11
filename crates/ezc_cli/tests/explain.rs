@@ -567,6 +567,7 @@ fn check_command_emits_json_diagnostics() {
         document["compiler_diagnostics"].as_array().map(Vec::len),
         Some(5)
     );
+    assert_eq!(document["fail_on"], "Error");
 }
 
 #[test]

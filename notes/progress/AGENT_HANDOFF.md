@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: cli: add check severity policy
+* Latest commit: docs: document check policies
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 22:35:18 PDT
+* Date: 2026-07-10 22:59:06 PDT
 
 Last completed slice
 
-* Slice: C6-D - Check diagnostic severity policy
-* Summary: Added explicit parser severity thresholds to compiler check exit policy.
-* Key files: crates/ezc_cli/src/main.rs, crates/ezc_cli/tests/explain.rs
-* New behavior: `ezc check --fail-on error|warning|info` controls which parser severities fail checks; compiler and ASM validation diagnostics remain hard failures.
-* Tests added or changed: default error-policy text contract coverage.
+* Slice: C6-E - Check policy documentation and project defaults
+* Summary: Documented the command-scoped parser policy and made browser e2e entry points deterministic on constrained hosts.
+* Key files: README.md, crates/ezc_cli/src/main.rs, crates/ezc_cli/tests/explain.rs, package.json, justfile
+* New behavior: `ezc_cli check` help and repository documentation now describe `--category` and `--fail-on`; the project default remains `--fail-on error`, while compiler and ASM validation diagnostics always fail. `pnpm test:e2e` and `just e2e` now run the Chrome suite with one Rust test thread.
+* Tests added or changed: JSON check output now asserts its default `fail_on` value; e2e recipe commands now serialize browser test execution.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C6-D - Check diagnostic severity policy
+* Slice: C6-E - Check policy documentation and project defaults
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-D
-* Remaining: C6-E add check policy documentation and project defaults.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-E
+* Remaining: C6-F add parser diagnostic label provenance to `ezc check` output.
 
 Verification
 
@@ -32,7 +32,7 @@ Verification
 * cargo test -p ezc_cli --test runtime_browser -- --nocapture: pass
 * CI=true cargo test -p ezc_cli --test runtime_browser -- --nocapture: pass
 * cargo clippy --workspace --all-targets -- -D warnings: pass
-* cargo test --workspace: pass
+* RUST_TEST_THREADS=1 cargo test --workspace: pass
 * pnpm test:e2e: pass
 * just e2e: pass
 
@@ -146,6 +146,14 @@ Architecture decisions made
 * Reason: The handoff preserves immediate continuation context while the progress log preserves the durable implementation chronology.
 * Tradeoff: Documentation-only recovery commits may be required when a prior checkpoint omitted the weekly entry.
 
+* Decision: `ezc check` defaults parser failures to `error` and keeps that policy command-scoped until a project configuration format is deliberately designed.
+* Reason: The compiler can establish a predictable default without implying that an undocumented configuration file is accepted or that compiler/ASM integrity findings are suppressible.
+* Tradeoff: Teams must pass a policy threshold in their command invocation; project presets and policy-file discovery remain future work.
+
+* Decision: Browser e2e recipe entry points run with one Rust test thread.
+* Reason: Each test launches a real Chrome process, and serial execution prevents host-resource contention and stale profile locks during the documented verification commands.
+* Tradeoff: The browser suite takes longer to run, but `pnpm test:e2e` and `just e2e` now produce a reproducible result on constrained development hosts.
+
 * Decision: Conditional nodes are first-class parser/render/template children with a conditional node ID plus separate start/end boundary IDs.
 * Reason: The compiler needs stable branch identity for tooling and runtime updates, while the DOM needs comment anchors that can bound branch replacement without a wrapper element.
 * Tradeoff: Runtime manifests serialize branch HTML snippets for this first slice instead of recursively hydrating dynamic bindings/events inside branch snippets.
@@ -241,10 +249,11 @@ Known limitations
 * Item: Declared state types include canonical primitive classification, optional ASM JSON `declared_type.kind`, and source-provenanced `EZC1016` through `EZC1021` diagnostics for supported initializer and action forms. Other compiler/ASM diagnostics may omit provenance. Arbitrary action expressions, variable flow, manifests, runtime, imported types, non-state annotations, inference, unions, aliases, generics, and general assignment compatibility remain outside current type validation.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
+* Item: Check policy is selected per CLI invocation. Project policy files, presets, and policy discovery are not interpreted yet.
 
 Exact next step
 
-Start C6-E - Add check policy documentation and project defaults without changing C6-D semantics.
+Start C6-F - Extend `ezc check` parser diagnostic output with label provenance while preserving C6-E policy defaults, canonical diagnostics, and exit behavior. Do not introduce a project configuration format or change parser semantics.
 
 Useful commands
 
@@ -256,7 +265,7 @@ Useful commands
 * `cargo clippy --workspace --all-targets -- -D warnings`
 * `pnpm test:e2e`
 * `just e2e`
-* `cargo test --workspace`
+* `RUST_TEST_THREADS=1 cargo test --workspace`
 * `cargo run -p ezc_cli -- build fixtures/0005-double-binding-counter/input/DoubleBindingCounter.tsx --out target/ezc-manual/double-binding-counter`
 * `cargo run -p ezc_cli -- build fixtures/0009-decrement-counter/input/DecrementCounter.tsx --out target/ezc-manual/decrement-counter`
 * `cargo run -p ezc_cli -- build fixtures/0010-add-subtract-assign/input/StepCounter.tsx --out target/ezc-manual/step-counter`

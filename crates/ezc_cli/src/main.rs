@@ -1532,7 +1532,9 @@ fn print_usage_and_exit() -> ! {
     eprintln!("usage:");
     eprintln!("  ezc_cli explain <file> [--format text|json]");
     eprintln!("  ezc_cli asm <file> [--format text|json]");
-    eprintln!("  ezc_cli check <file> [file...] [--format text|json]");
+    eprintln!(
+        "  ezc_cli check <file> [file...] [--format text|json] [--category parser|compiler|validation] [--fail-on error|warning|info]"
+    );
     eprintln!("  ezc_cli parse <file>");
     eprintln!("  ezc_cli graph <file>");
     eprintln!("  ezc_cli template <file>");

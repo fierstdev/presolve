@@ -20,7 +20,33 @@ This is not the real TSX compiler yet. It is the first learning and infrastructu
 cargo test --workspace
 cargo run -p ezc_cli -- explain fixtures/0001-source-summary/input/Counter.tsx
 cargo run -p ezc_cli -- explain fixtures/0001-source-summary/input/Counter.tsx --format json
+cargo run -p ezc_cli -- check fixtures/0001-source-summary/input/Counter.tsx
 ```
+
+## Check policy
+
+Use `ezc_cli check` to compile one or more source files, assemble the canonical
+Application Semantic Model (ASM), and report parser, compiler, and ASM
+validation diagnostics.
+
+```sh
+ezc_cli check <file> [file...] \
+  [--format text|json] \
+  [--category parser|compiler|validation] \
+  [--fail-on error|warning|info]
+```
+
+The project default is `--fail-on error`: parser errors fail the command, while
+parser warnings and informational diagnostics remain visible without failing it.
+`--fail-on warning` also fails on warnings, and `--fail-on info` fails on every
+parser diagnostic. Compiler diagnostics and ASM validation diagnostics always
+fail `check`, regardless of the selected parser threshold.
+
+Repeat `--category` to limit diagnostic detail in text or JSON output. Category
+filters never change summary counts or the command's exit status. JSON output
+includes the selected parser threshold in `fail_on` so automation can record
+the effective policy. Check policy is currently selected per command; no
+project configuration file is interpreted yet.
 
 ## Repository rules
 

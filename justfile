@@ -6,10 +6,10 @@ check:
     cargo test --workspace
 
 e2e:
-    cargo test -p ezc_cli --test runtime_browser -- --nocapture
+    cargo test -p ezc_cli --test runtime_browser -- --nocapture --test-threads=1
 
 e2e-headed:
-    cargo test -p ezc_cli --test runtime_browser -- --nocapture
+    cargo test -p ezc_cli --test runtime_browser -- --nocapture --test-threads=1
 
 explain-counter:
     cargo run -p ezc_cli -- explain fixtures/0001-source-summary/input/Counter.tsx
