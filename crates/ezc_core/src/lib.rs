@@ -5,6 +5,7 @@
 //! place to learn compiler fundamentals before choosing a real parser backend.
 
 pub mod application_semantic_model;
+pub mod asm_validation;
 pub mod component_graph;
 pub mod explain;
 pub mod html_codegen;
@@ -21,6 +22,7 @@ pub mod template_manifest;
 pub use application_semantic_model::{
     build_application_semantic_model, ApplicationSemanticModel, SemanticEntity,
 };
+pub use asm_validation::{validate_application_semantic_model, AsmValidationDiagnostic};
 pub use component_graph::{
     build_component_graph, ComponentAction, ComponentDiagnostic, ComponentGraph, ComponentMethod,
     ComponentNode, RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler,
@@ -318,6 +320,17 @@ class Counter extends Component {
         assert_eq!(asm.provenance(&asm.templates[0].id).unwrap().span.line, 10);
         assert_eq!(asm.references_from(&component.actions[0].id).len(), 1);
         assert_eq!(asm.references_to(&component.state_fields[0].id).len(), 1);
+        assert!(validate_application_semantic_model(&asm).is_empty());
+
+        let mut invalid = asm.clone();
+        invalid.provenance.remove(&component.actions[0].id);
+        let diagnostics = validate_application_semantic_model(&invalid);
+        let codes = diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.code.as_str())
+            .collect::<Vec<_>>();
+        assert!(codes.contains(&"EZASM1002"));
+        assert!(codes.contains(&"EZASM1006"));
     }
 
     #[test]
