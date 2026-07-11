@@ -244,6 +244,7 @@ fn asm_command_exposes_declared_state_types() {
         count["declared_type"],
         serde_json::json!({
             "text": "number",
+            "kind": "number",
             "provenance": {
                 "path": path,
                 "start": 72,
@@ -253,6 +254,18 @@ fn asm_command_exposes_declared_state_types() {
             }
         })
     );
+
+    let status = document["entities"]
+        .as_array()
+        .and_then(|entities| {
+            entities.iter().find(|entity| {
+                entity["id"]
+                    == "module:fixtures/0025-typed-state-annotations/input/TypedState.tsx/component:x-typed-state/state:status"
+            })
+        })
+        .expect("status state entity");
+
+    assert!(status["declared_type"].get("kind").is_none());
 }
 
 #[test]

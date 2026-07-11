@@ -9,9 +9,9 @@ use ezc_core::{
     build_template_manifest, explain_json, explain_text, generate_runtime_stub,
     generate_standalone_page, generate_static_html, summarize_source, template_manifest_json,
     validate_application_semantic_model, ApplicationSemanticModel, AsmValidationDiagnostic,
-    AttributeValue, CompilationUnit, ComponentGraph, RenderAttribute, RenderAttributeValue,
-    SemanticEntity, SemanticOwner, SemanticReferenceKind, SerializableValue, SourceProvenance,
-    StateOperation, TemplateChild, TemplateGraph, TemplateSemanticKind,
+    AttributeValue, CompilationUnit, ComponentGraph, DeclaredStateTypeKind, RenderAttribute,
+    RenderAttributeValue, SemanticEntity, SemanticOwner, SemanticReferenceKind, SerializableValue,
+    SourceProvenance, StateOperation, TemplateChild, TemplateGraph, TemplateSemanticKind,
 };
 use ezc_parser::{
     parse_file, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
@@ -296,8 +296,18 @@ fn declared_state_type(entity: SemanticEntity<'_>) -> Option<AsmInspectionDeclar
 
     Some(AsmInspectionDeclaredType {
         text: &declared_type.text,
+        kind: declared_type.kind.map(asm_declared_state_type_kind),
         provenance: (&declared_type.provenance).into(),
     })
+}
+
+fn asm_declared_state_type_kind(kind: DeclaredStateTypeKind) -> &'static str {
+    match kind {
+        DeclaredStateTypeKind::String => "string",
+        DeclaredStateTypeKind::Number => "number",
+        DeclaredStateTypeKind::Boolean => "boolean",
+        DeclaredStateTypeKind::Null => "null",
+    }
 }
 
 #[derive(Serialize)]
@@ -325,6 +335,8 @@ struct AsmInspectionEntity<'a> {
 #[derive(Serialize)]
 struct AsmInspectionDeclaredType<'a> {
     text: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    kind: Option<&'static str>,
     provenance: AsmInspectionProvenance,
 }
 
