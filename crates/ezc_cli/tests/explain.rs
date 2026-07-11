@@ -460,6 +460,44 @@ fn asm_command_reports_non_numeric_primitive_increment_and_decrement_actions() {
 }
 
 #[test]
+fn asm_command_reports_compound_numeric_action_target_and_operand_mismatches() {
+    let repo_root = repo_root();
+    let path =
+        "fixtures/0031-primitive-compound-action-type-diagnostics/input/InvalidTypedCompoundActions.tsx";
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["asm", path, "--format", "json"])
+        .output()
+        .expect("failed to run invalid typed-compound-actions ezc_cli asm --format json");
+
+    assert!(output.status.success());
+
+    let document: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("ASM inspection output was not valid JSON");
+    let diagnostics = document["diagnostics"]
+        .as_array()
+        .expect("ASM inspection diagnostics");
+
+    assert_eq!(diagnostics.len(), 5);
+    assert!(diagnostics
+        .iter()
+        .all(|diagnostic| diagnostic["code"] == "EZC1020" || diagnostic["code"] == "EZC1021"));
+
+    let title = diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("state field `title`"))
+        })
+        .expect("title compound action diagnostic");
+    assert_eq!(title["provenance"]["path"], path);
+    assert_eq!(title["provenance"]["line"], 9);
+    assert_eq!(title["provenance"]["column"], 5);
+}
+
+#[test]
 fn parse_command_matches_valid_counter_fixture() {
     let repo_root = repo_root();
 

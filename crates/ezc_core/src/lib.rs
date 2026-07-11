@@ -659,6 +659,62 @@ class Panel extends Component {
     }
 
     #[test]
+    fn reports_compound_numeric_action_target_and_operand_mismatches() {
+        let source = include_str!(
+            "../../../fixtures/0031-primitive-compound-action-type-diagnostics/input/InvalidTypedCompoundActions.tsx"
+        );
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0031-primitive-compound-action-type-diagnostics/input/InvalidTypedCompoundActions.tsx",
+            source,
+        );
+        let graph = build_component_graph_for_module(&parsed);
+        let diagnostics = graph
+            .diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.code.as_str(), diagnostic.message.as_str()))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            diagnostics,
+            vec![
+                (
+                    "EZC1020",
+                    "state field `title` in class `InvalidTypedCompoundActions` declares `string` but action `apply` applies numeric add assignment",
+                ),
+                (
+                    "EZC1021",
+                    "action `apply` applies numeric subtract assignment to state field `count` with `boolean` operand",
+                ),
+                (
+                    "EZC1020",
+                    "state field `enabled` in class `InvalidTypedCompoundActions` declares `boolean` but action `apply` applies numeric add assignment",
+                ),
+                (
+                    "EZC1021",
+                    "action `apply` applies numeric add assignment to state field `enabled` with `null` operand",
+                ),
+                (
+                    "EZC1021",
+                    "action `apply` applies numeric add assignment to state field `count` with `array` operand",
+                ),
+            ]
+        );
+
+        let provenance = graph.diagnostics[0]
+            .provenance
+            .as_ref()
+            .expect("compound action diagnostic provenance");
+        assert_eq!(
+            provenance.path,
+            Path::new(
+                "fixtures/0031-primitive-compound-action-type-diagnostics/input/InvalidTypedCompoundActions.tsx"
+            )
+        );
+        assert_eq!(provenance.span.line, 9);
+        assert_eq!(provenance.span.column, 5);
+    }
+
+    #[test]
     fn assembles_application_semantic_model_from_multiple_files() {
         let unit = CompilationUnit::parse_sources([
             (

@@ -312,6 +312,12 @@ fn build_component_node(
     collect_declared_state_action_type_diagnostics(class, &state_fields, path, diagnostics);
     collect_declared_state_toggle_type_diagnostics(class, &state_fields, path, diagnostics);
     collect_declared_state_numeric_action_type_diagnostics(class, &state_fields, path, diagnostics);
+    collect_declared_state_compound_numeric_action_type_diagnostics(
+        class,
+        &state_fields,
+        path,
+        diagnostics,
+    );
 
     let methods = class
         .methods
@@ -543,6 +549,62 @@ fn collect_declared_state_numeric_action_type_diagnostics(
     }
 }
 
+fn collect_declared_state_compound_numeric_action_type_diagnostics(
+    class: &ParsedClass,
+    state_fields: &[StateField],
+    path: &Path,
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+) {
+    for method in &class.methods {
+        for update in &method.state_updates {
+            let (operation, operand) = match &update.operation {
+                ParsedStateOperation::AddAssign(value) => ("add assignment", value),
+                ParsedStateOperation::SubtractAssign(value) => ("subtract assignment", value),
+                _ => continue,
+            };
+            let Some(field) = state_fields.iter().find(|field| field.name == update.field) else {
+                continue;
+            };
+            let Some(declared_type) = field.declared_type.as_ref() else {
+                continue;
+            };
+            let Some(declared_type_kind) = declared_type.kind else {
+                continue;
+            };
+
+            if declared_type_kind != DeclaredStateTypeKind::Number {
+                diagnostics.push(ComponentDiagnostic {
+                    provenance: Some(SourceProvenance::new(path, update.span)),
+                    code: "EZC1020".to_string(),
+                    message: format!(
+                        "state field `{}` in class `{}` declares `{}` but action `{}` applies numeric {}",
+                        field.name,
+                        class.name,
+                        declared_state_type_kind_name(declared_type_kind),
+                        method.name,
+                        operation,
+                    ),
+                });
+            }
+
+            let operand = serializable_value_from_parsed(operand);
+            if !matches!(operand, SerializableValue::Number(_)) {
+                diagnostics.push(ComponentDiagnostic {
+                    provenance: Some(SourceProvenance::new(path, update.span)),
+                    code: "EZC1021".to_string(),
+                    message: format!(
+                        "action `{}` applies numeric {} to state field `{}` with `{}` operand",
+                        method.name,
+                        operation,
+                        field.name,
+                        serializable_value_type_name(&operand),
+                    ),
+                });
+            }
+        }
+    }
+}
+
 fn primitive_serializable_value_type_kind(
     value: &SerializableValue,
 ) -> Option<DeclaredStateTypeKind> {
@@ -552,6 +614,17 @@ fn primitive_serializable_value_type_kind(
         SerializableValue::Boolean(_) => Some(DeclaredStateTypeKind::Boolean),
         SerializableValue::Null => Some(DeclaredStateTypeKind::Null),
         SerializableValue::Array(_) | SerializableValue::Object(_) => None,
+    }
+}
+
+fn serializable_value_type_name(value: &SerializableValue) -> &'static str {
+    match value {
+        SerializableValue::Null => "null",
+        SerializableValue::Number(_) => "number",
+        SerializableValue::String(_) => "string",
+        SerializableValue::Boolean(_) => "boolean",
+        SerializableValue::Array(_) => "array",
+        SerializableValue::Object(_) => "object",
     }
 }
 
