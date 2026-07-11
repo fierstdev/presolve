@@ -6,7 +6,43 @@ use std::path::PathBuf;
 pub struct ParsedFile {
     pub path: PathBuf,
     pub classes: Vec<ParsedClass>,
+    pub imports: Vec<ParsedImport>,
+    pub exports: Vec<ParsedExport>,
     pub diagnostics: Vec<ParseDiagnostic>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedImport {
+    pub source: String,
+    pub specifiers: Vec<ParsedImportSpecifier>,
+    pub span: SourceSpan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedImportSpecifier {
+    pub imported: String,
+    pub local: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedExport {
+    pub kind: ParsedExportKind,
+    pub source: Option<String>,
+    pub specifiers: Vec<ParsedExportSpecifier>,
+    pub span: SourceSpan,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParsedExportKind {
+    Named,
+    Default,
+    All,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedExportSpecifier {
+    pub local: Option<String>,
+    pub exported: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

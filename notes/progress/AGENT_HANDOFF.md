@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: add compilation unit frontend
+* Latest commit: compiler: add module edge graph
 * Working tree: clean after committing this slice
 * Date: 2026-07-10 20:30:00 PDT
 
 Last completed slice
 
-* Slice: C1-A - Compilation unit frontend
-* Summary: Introduced a deterministic multi-file compiler input and ASM aggregation path.
-* Key files: crates/ezc_core/src/compilation_unit.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/lib.rs
-* New behavior: `CompilationUnit` parses or accepts multiple source files in path order; the ASM can aggregate existing component/template semantics from the complete unit.
-* Tests added or changed: deterministic unit ordering and two-file ASM aggregation.
+* Slice: C1-B - Import/export extraction and module edges
+* Summary: Extracted source module declarations and derived deterministic file-level import/re-export edges.
+* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/module_graph.rs
+* New behavior: Parsed files retain imports and exports; `ModuleGraph` resolves relative files inside a `CompilationUnit`, preserves external packages, and reports unresolved relative specifiers.
+* Tests added or changed: parser declaration extraction and module-edge graph resolution.
 * Fixtures added or changed: None.
 
 Current in-progress slice
 
-* Slice: C1-A - Compilation unit frontend
+* Slice: C1-B - Import/export extraction and module edges
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A
-* Remaining: C1-B import/export extraction and module-edge resolution; C2 symbol resolution.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B
+* Remaining: C2 symbol resolution.
 
 Verification
 
@@ -37,6 +37,10 @@ Verification
 * just e2e: pass
 
 Architecture decisions made
+
+* Decision: Module edges are derived from parsed import and re-export declarations in `CompilationUnit`, not from component provenance.
+* Reason: File relationships are frontend semantics that must exist before symbol resolution and must be shared by all ASM consumers.
+* Tradeoff: C1-B resolves only relative source files already present in the unit. Package resolution, tsconfig aliases, extension remapping, and symbol bindings remain C2 or later frontend work.
 
 * Decision: The compiler frontend now accepts a deterministic `CompilationUnit` before application-level semantic construction.
 * Reason: `ezco` needs a project-wide input boundary so every later graph, analysis, plan, and developer product can consume one semantic model rather than independently reparsing files.
@@ -140,13 +144,13 @@ Known limitations
 * Item: Fragment nodes are visible in compiler/template output but intentionally omitted from runtime manifests until a runtime range-anchor use case appears.
 * Item: Semantic IDs and direct ownership currently cover components, state fields, methods, action steps, rendered templates, and event handlers. General template descendants still use backend-local `n*` IDs and have no semantic ownership or provenance entries yet.
 * Item: Resolved references currently cover action-to-state and event-to-method pairs only. Bindings, attributes, conditionals, lists, routes, and unresolved reference attempts have no semantic relation records or provenance-backed relations yet.
-* Item: `ApplicationSemanticModel` aggregates existing graph outputs from a deterministic `CompilationUnit`, but imports, exports, module edges, duplicate semantic IDs, source remapping, and symbols are still absent. The legacy single-file API remains as a compatibility wrapper.
+* Item: `CompilationUnit` now carries parsed imports and exports, and `ModuleGraph` resolves relative import/re-export edges. Package resolution, tsconfig aliases, duplicate semantic IDs, source remapping, and all symbol bindings are still absent. The legacy single-file ASM API remains as a compatibility wrapper.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 
 Exact next step
 
-Start C1-B - Extract import/export declarations and construct a real module-edge graph from `CompilationUnit` source files. Do not add symbol resolution or application-platform semantics in that slice.
+Start C2-A - Introduce per-module symbol tables for declared component classes, state fields, and methods. Do not resolve imported bindings or add type semantics in that slice.
 
 Useful commands
 

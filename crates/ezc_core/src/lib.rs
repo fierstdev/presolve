@@ -51,6 +51,9 @@ pub use html_codegen::generate_static_html;
 pub use model::{
     ClassSummary, DecoratorSummary, Diagnostic, RenderMethodSummary, Severity, SourceSummary, Span,
 };
+pub use module_graph::{
+    build_module_graph, ModuleEdge, ModuleEdgeKind, ModuleGraph, ModuleNode, ModuleTarget,
+};
 pub use page_codegen::generate_standalone_page;
 pub use resume_manifest::{
     build_resume_manifest, resume_manifest_json, ResumeManifest, RESUME_MANIFEST_SCHEMA_VERSION,
@@ -465,6 +468,8 @@ class Counter extends Component {
         let parsed = ezc_parser::ParsedFile {
             path: "DuplicateEvent.tsx".into(),
             diagnostics: Vec::new(),
+            imports: Vec::new(),
+            exports: Vec::new(),
             classes: vec![ezc_parser::ParsedClass {
                 name: "DuplicateEvent".to_string(),
                 span: test_span(),

@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use ezc_parser::{
-    parse_file, ParseSeverity, ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxElement,
-    ParsedJsxNode, ParsedSerializableValue, ParsedStateOperation,
+    parse_file, ParseSeverity, ParsedExportKind, ParsedJsxAttributeValue, ParsedJsxChild,
+    ParsedJsxElement, ParsedJsxNode, ParsedSerializableValue, ParsedStateOperation,
 };
 
 fn jsx_root_element(root: &ParsedJsxNode) -> &ParsedJsxElement {
@@ -11,6 +11,54 @@ fn jsx_root_element(root: &ParsedJsxNode) -> &ParsedJsxElement {
     };
 
     element
+}
+
+#[test]
+fn parses_module_imports_and_exports() {
+    let parsed = parse_file(
+        "src/App.tsx",
+        r#"
+import AppShell, { Card as AppCard } from "./ui";
+import * as runtime from "edgezero-runtime";
+export { AppCard as Card };
+export const title = "EdgeZero";
+export { Status } from "./status";
+export * as shared from "./shared";
+export default class App {}
+"#,
+    );
+
+    assert!(parsed.diagnostics.is_empty());
+    assert_eq!(parsed.imports.len(), 2);
+    assert_eq!(parsed.imports[0].source, "./ui");
+    assert_eq!(parsed.imports[0].specifiers[0].imported, "default");
+    assert_eq!(parsed.imports[0].specifiers[0].local, "AppShell");
+    assert_eq!(parsed.imports[0].specifiers[1].imported, "Card");
+    assert_eq!(parsed.imports[0].specifiers[1].local, "AppCard");
+    assert_eq!(parsed.imports[1].specifiers[0].imported, "*");
+    assert_eq!(parsed.imports[1].specifiers[0].local, "runtime");
+
+    assert_eq!(parsed.exports.len(), 5);
+    assert_eq!(parsed.exports[0].kind, ParsedExportKind::Named);
+    assert_eq!(
+        parsed.exports[0].specifiers[0].local.as_deref(),
+        Some("AppCard")
+    );
+    assert_eq!(parsed.exports[0].specifiers[0].exported, "Card");
+    assert_eq!(
+        parsed.exports[1].specifiers[0].local.as_deref(),
+        Some("title")
+    );
+    assert_eq!(parsed.exports[1].specifiers[0].exported, "title");
+    assert_eq!(parsed.exports[2].source.as_deref(), Some("./status"));
+    assert_eq!(parsed.exports[3].kind, ParsedExportKind::All);
+    assert_eq!(parsed.exports[3].specifiers[0].exported, "shared");
+    assert_eq!(parsed.exports[4].kind, ParsedExportKind::Default);
+    assert_eq!(
+        parsed.exports[4].specifiers[0].local.as_deref(),
+        Some("App")
+    );
+    assert_eq!(parsed.classes[0].name, "App");
 }
 
 #[test]

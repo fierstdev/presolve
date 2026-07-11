@@ -3,10 +3,11 @@ use std::path::{Path, PathBuf};
 
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
-    Argument, AssignmentTarget, BindingPatternKind, ClassElement, Declaration, Expression,
-    JSXAttributeItem, JSXAttributeName, JSXAttributeValue, JSXChild, JSXElementName, JSXExpression,
-    JSXFragment, ObjectPropertyKind, Program, PropertyKey, PropertyKind, SimpleAssignmentTarget,
-    Statement,
+    Argument, AssignmentTarget, BindingPatternKind, ClassElement, Declaration,
+    ExportDefaultDeclarationKind, Expression, ImportDeclarationSpecifier, JSXAttributeItem,
+    JSXAttributeName, JSXAttributeValue, JSXChild, JSXElementName, JSXExpression, JSXFragment,
+    ModuleExportName, ObjectPropertyKind, Program, PropertyKey, PropertyKind,
+    SimpleAssignmentTarget, Statement,
 };
 use oxc_diagnostics::Severity as OxcSeverity;
 use oxc_parser::Parser;
@@ -14,9 +15,11 @@ use oxc_span::{SourceType, Span};
 
 use crate::model::{
     ParseDiagnostic, ParseLabel, ParseSeverity, ParsedClass, ParsedDecorator, ParsedEventHandler,
-    ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional,
-    ParsedJsxElement, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedMethod,
-    ParsedProperty, ParsedSerializableValue, ParsedStateOperation, ParsedStateUpdate, SourceSpan,
+    ParsedExport, ParsedExportKind, ParsedExportSpecifier, ParsedFile, ParsedImport,
+    ParsedImportSpecifier, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild,
+    ParsedJsxConditional, ParsedJsxElement, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode,
+    ParsedMethod, ParsedProperty, ParsedSerializableValue, ParsedStateOperation, ParsedStateUpdate,
+    SourceSpan,
 };
 
 pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
@@ -29,7 +32,7 @@ pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
     let allocator = Allocator::default();
     let ret = Parser::new(&allocator, source, source_type).parse();
 
-    let classes = parse_program(&ret.program, source);
+    let (classes, imports, exports) = parse_program(&ret.program, source);
     let diagnostics = ret
         .errors
         .iter()
@@ -39,14 +42,67 @@ pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
     ParsedFile {
         path: PathBuf::from(path),
         classes,
+        imports,
+        exports,
         diagnostics,
     }
 }
 
-fn parse_program(program: &Program<'_>, source: &str) -> Vec<ParsedClass> {
+fn parse_program(
+    program: &Program<'_>,
+    source: &str,
+) -> (Vec<ParsedClass>, Vec<ParsedImport>, Vec<ParsedExport>) {
     let mut classes = Vec::new();
+    let mut imports = Vec::new();
+    let mut exports = Vec::new();
 
     for statement in &program.body {
+        match statement {
+            Statement::ImportDeclaration(declaration) => {
+                imports.push(parse_import_declaration(declaration, source));
+                continue;
+            }
+            Statement::ExportNamedDeclaration(declaration) => {
+                exports.push(parse_named_export_declaration(declaration, source));
+                if let Some(declaration) = &declaration.declaration {
+                    if let Some(class) = parse_declaration(declaration, source) {
+                        classes.push(class);
+                    }
+                }
+                continue;
+            }
+            Statement::ExportDefaultDeclaration(declaration) => {
+                exports.push(parse_default_export_declaration(declaration, source));
+                if let ExportDefaultDeclarationKind::ClassDeclaration(class) =
+                    &declaration.declaration
+                {
+                    if let Some(class) = parse_class(class, source) {
+                        classes.push(class);
+                    }
+                }
+                continue;
+            }
+            Statement::ExportAllDeclaration(declaration) => {
+                exports.push(ParsedExport {
+                    kind: ParsedExportKind::All,
+                    source: Some(declaration.source.value.to_string()),
+                    specifiers: declaration
+                        .exported
+                        .as_ref()
+                        .map(|exported| {
+                            vec![ParsedExportSpecifier {
+                                local: None,
+                                exported: module_export_name(exported),
+                            }]
+                        })
+                        .unwrap_or_default(),
+                    span: source_span(source, declaration.span),
+                });
+                continue;
+            }
+            _ => {}
+        }
+
         if let Some(declaration) = statement.as_declaration() {
             if let Some(class) = parse_declaration(declaration, source) {
                 classes.push(class);
@@ -54,7 +110,144 @@ fn parse_program(program: &Program<'_>, source: &str) -> Vec<ParsedClass> {
         }
     }
 
-    classes
+    (classes, imports, exports)
+}
+
+fn parse_import_declaration(
+    declaration: &oxc_ast::ast::ImportDeclaration<'_>,
+    source: &str,
+) -> ParsedImport {
+    let specifiers = declaration
+        .specifiers
+        .as_ref()
+        .map(|specifiers| {
+            specifiers
+                .iter()
+                .map(|specifier| match specifier {
+                    ImportDeclarationSpecifier::ImportSpecifier(specifier) => {
+                        ParsedImportSpecifier {
+                            imported: module_export_name(&specifier.imported),
+                            local: specifier.local.name.to_string(),
+                        }
+                    }
+                    ImportDeclarationSpecifier::ImportDefaultSpecifier(specifier) => {
+                        ParsedImportSpecifier {
+                            imported: "default".to_string(),
+                            local: specifier.local.name.to_string(),
+                        }
+                    }
+                    ImportDeclarationSpecifier::ImportNamespaceSpecifier(specifier) => {
+                        ParsedImportSpecifier {
+                            imported: "*".to_string(),
+                            local: specifier.local.name.to_string(),
+                        }
+                    }
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    ParsedImport {
+        source: declaration.source.value.to_string(),
+        specifiers,
+        span: source_span(source, declaration.span),
+    }
+}
+
+fn parse_named_export_declaration(
+    declaration: &oxc_ast::ast::ExportNamedDeclaration<'_>,
+    source: &str,
+) -> ParsedExport {
+    let mut specifiers = declaration
+        .specifiers
+        .iter()
+        .map(|specifier| ParsedExportSpecifier {
+            local: Some(module_export_name(&specifier.local)),
+            exported: module_export_name(&specifier.exported),
+        })
+        .collect::<Vec<_>>();
+
+    if let Some(declaration) = &declaration.declaration {
+        specifiers.extend(named_declaration_exports(declaration));
+    }
+
+    ParsedExport {
+        kind: ParsedExportKind::Named,
+        source: declaration
+            .source
+            .as_ref()
+            .map(|source| source.value.to_string()),
+        specifiers,
+        span: source_span(source, declaration.span),
+    }
+}
+
+fn parse_default_export_declaration(
+    declaration: &oxc_ast::ast::ExportDefaultDeclaration<'_>,
+    source: &str,
+) -> ParsedExport {
+    ParsedExport {
+        kind: ParsedExportKind::Default,
+        source: None,
+        specifiers: vec![ParsedExportSpecifier {
+            local: default_declaration_name(&declaration.declaration),
+            exported: "default".to_string(),
+        }],
+        span: source_span(source, declaration.span),
+    }
+}
+
+fn named_declaration_exports(declaration: &Declaration<'_>) -> Vec<ParsedExportSpecifier> {
+    let name = match declaration {
+        Declaration::ClassDeclaration(class) => class.id.as_ref().map(|id| id.name.to_string()),
+        Declaration::FunctionDeclaration(function) => {
+            function.id.as_ref().map(|id| id.name.to_string())
+        }
+        Declaration::VariableDeclaration(declaration) => {
+            let names = declaration
+                .declarations
+                .iter()
+                .filter_map(|declarator| binding_identifier_name(&declarator.id.kind))
+                .collect::<Vec<_>>();
+
+            return names
+                .into_iter()
+                .map(|name| ParsedExportSpecifier {
+                    local: Some(name.clone()),
+                    exported: name,
+                })
+                .collect();
+        }
+        _ => None,
+    };
+
+    name.map(|name| {
+        vec![ParsedExportSpecifier {
+            local: Some(name.clone()),
+            exported: name,
+        }]
+    })
+    .unwrap_or_default()
+}
+
+fn default_declaration_name(declaration: &ExportDefaultDeclarationKind<'_>) -> Option<String> {
+    match declaration {
+        ExportDefaultDeclarationKind::ClassDeclaration(class) => {
+            class.id.as_ref().map(|id| id.name.to_string())
+        }
+        ExportDefaultDeclarationKind::FunctionDeclaration(function) => {
+            function.id.as_ref().map(|id| id.name.to_string())
+        }
+        _ => None,
+    }
+}
+
+fn module_export_name(name: &ModuleExportName<'_>) -> String {
+    match name {
+        ModuleExportName::IdentifierName(name) => name.name.to_string(),
+        ModuleExportName::IdentifierReference(name) => name.name.to_string(),
+        ModuleExportName::StringLiteral(name) => name.value.to_string(),
+    }
 }
 
 fn parse_declaration(declaration: &Declaration<'_>, source: &str) -> Option<ParsedClass> {
@@ -62,6 +255,10 @@ fn parse_declaration(declaration: &Declaration<'_>, source: &str) -> Option<Pars
         return None;
     };
 
+    parse_class(class, source)
+}
+
+fn parse_class(class: &oxc_ast::ast::Class<'_>, source: &str) -> Option<ParsedClass> {
     let name = class
         .id
         .as_ref()
