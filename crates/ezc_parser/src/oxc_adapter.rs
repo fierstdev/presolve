@@ -19,7 +19,7 @@ use crate::model::{
     ParsedImportSpecifier, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild,
     ParsedJsxConditional, ParsedJsxElement, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode,
     ParsedMethod, ParsedProperty, ParsedSerializableValue, ParsedStateOperation, ParsedStateUpdate,
-    SourceSpan,
+    ParsedTypeAnnotation, SourceSpan,
 };
 
 pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
@@ -336,13 +336,29 @@ fn parse_property(
     let initializer = property.value.as_ref().and_then(expression_summary);
 
     let state_initial_value = property.value.as_ref().and_then(state_initial_value);
+    let state_type_annotation = (initializer.as_deref() == Some("state(...)"))
+        .then_some(property.type_annotation.as_ref())
+        .flatten()
+        .map(|annotation| parsed_type_annotation(annotation.span, source));
 
     Some(ParsedProperty {
         name,
         initializer,
         state_initial_value,
+        state_type_annotation,
         span: source_span(source, property.span),
     })
+}
+
+fn parsed_type_annotation(span: Span, source: &str) -> ParsedTypeAnnotation {
+    let span = source_span(source, span);
+    let text = source[span.start..span.end]
+        .strip_prefix(':')
+        .expect("TypeScript annotation span should start with a colon")
+        .trim()
+        .to_string();
+
+    ParsedTypeAnnotation { text, span }
 }
 
 fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Option<ParsedMethod> {

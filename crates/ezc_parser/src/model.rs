@@ -66,6 +66,14 @@ pub struct ParsedProperty {
     pub name: String,
     pub initializer: Option<String>,
     pub state_initial_value: Option<ParsedSerializableValue>,
+    pub state_type_annotation: Option<ParsedTypeAnnotation>,
+    pub span: SourceSpan,
+}
+
+/// Authored TypeScript annotation retained for a state field without type checking.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedTypeAnnotation {
+    pub text: String,
     pub span: SourceSpan,
 }
 

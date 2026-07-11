@@ -151,6 +151,37 @@ fn parses_counter_fixture() {
 }
 
 #[test]
+fn retains_explicit_state_field_type_annotations() {
+    let source = r#"
+@component("x-panel")
+class Panel extends Component {
+  count: number = state(0);
+  status: "idle" | "loading" = state("idle");
+  label: string = "Panel";
+}
+"#;
+
+    let parsed = parse_file("src/Panel.tsx", source);
+    assert!(parsed.diagnostics.is_empty());
+
+    let properties = &parsed.classes[0].properties;
+    let count = properties[0]
+        .state_type_annotation
+        .as_ref()
+        .expect("count state annotation");
+    let status = properties[1]
+        .state_type_annotation
+        .as_ref()
+        .expect("status state annotation");
+
+    assert_eq!(count.text, "number");
+    assert_eq!(count.span.line, 4);
+    assert_eq!(count.span.column, 8);
+    assert_eq!(status.text, "\"idle\" | \"loading\"");
+    assert!(properties[2].state_type_annotation.is_none());
+}
+
+#[test]
 fn parses_string_state_literal_without_source_quotes() {
     let source = include_str!("../../../fixtures/0006-string-state/input/StringGreeting.tsx");
 
