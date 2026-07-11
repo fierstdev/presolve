@@ -15,6 +15,7 @@ pub mod model;
 pub mod page_codegen;
 pub mod resume_boot;
 pub mod resume_diagnostics;
+pub mod resume_explain;
 pub mod resume_instance;
 pub mod resume_manifest;
 pub mod resume_plan;

@@ -3,24 +3,24 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: plan lazy action chunks
+* Latest commit: compiler: add resume explainability
 * Working tree: clean after committing this slice
 * Date: 2026-07-10 19:49:12 PDT
 
 Last completed slice
 
-* Slice: Era IV-F - Lazy action chunks
-* Summary: Added compiler plans for loading action sequences by resumable event identity.
-* Key files: crates/ezc_core/src/lazy_action_chunks.rs, crates/ezc_core/src/lib.rs
-* New behavior: each delegated event maps to a lazy action chunk containing its handler action IDs.
+* Slice: Era IV-G - Resume explainability
+* Summary: Added deterministic compiler-side resume eligibility explanations.
+* Key files: crates/ezc_core/src/resume_explain.rs, crates/ezc_core/src/lib.rs
+* New behavior: `explain_resume` summarizes components, instances, chunks, zero-replay eligibility, and diagnostics.
 * Tests added or changed: core suite and clippy pass.
 * Fixtures added or changed: None.
 
 Current in-progress slice
 
-* Slice: Era IV-F - Lazy action chunks
+* Slice: Era IV-G - Resume explainability
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-F
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G
 * Remaining: None
 
 Verification
@@ -134,7 +134,7 @@ Known limitations
 
 Exact next step
 
-Start Era IV-G - Resume explainability. Explain resume-plan eligibility, instances, diagnostics, and chunks.
+Start Era V planning: define the first application-platform slice from ASM route and module semantics.
 
 Useful commands
 
