@@ -379,6 +379,46 @@ fn asm_command_reports_primitive_action_type_mismatches() {
 }
 
 #[test]
+fn asm_command_reports_non_boolean_primitive_toggle_actions() {
+    let repo_root = repo_root();
+    let path = "fixtures/0029-primitive-toggle-type-diagnostics/input/InvalidTypedToggles.tsx";
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["asm", path, "--format", "json"])
+        .output()
+        .expect("failed to run invalid typed-toggles ezc_cli asm --format json");
+
+    assert!(output.status.success());
+
+    let document: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("ASM inspection output was not valid JSON");
+    let diagnostics = document["diagnostics"]
+        .as_array()
+        .expect("ASM inspection diagnostics");
+
+    assert_eq!(diagnostics.len(), 3);
+    assert!(diagnostics.iter().all(|diagnostic| {
+        diagnostic["code"] == "EZC1018"
+            && diagnostic["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("applies a boolean toggle"))
+    }));
+
+    let count = diagnostics
+        .iter()
+        .find(|diagnostic| {
+            diagnostic["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("state field `count`"))
+        })
+        .expect("count toggle diagnostic");
+    assert_eq!(count["provenance"]["path"], path);
+    assert_eq!(count["provenance"]["line"], 10);
+    assert_eq!(count["provenance"]["column"], 5);
+}
+
+#[test]
 fn parse_command_matches_valid_counter_fixture() {
     let repo_root = repo_root();
 

@@ -563,6 +563,54 @@ class Panel extends Component {
     }
 
     #[test]
+    fn reports_non_boolean_primitive_toggle_actions() {
+        let source = include_str!(
+            "../../../fixtures/0029-primitive-toggle-type-diagnostics/input/InvalidTypedToggles.tsx"
+        );
+        let parsed = ezc_parser::parse_file(
+            "fixtures/0029-primitive-toggle-type-diagnostics/input/InvalidTypedToggles.tsx",
+            source,
+        );
+        let graph = build_component_graph_for_module(&parsed);
+        let diagnostics = graph
+            .diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.code.as_str(), diagnostic.message.as_str()))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            diagnostics,
+            vec![
+                (
+                    "EZC1018",
+                    "state field `count` in class `InvalidTypedToggles` declares `number` but action `apply` applies a boolean toggle",
+                ),
+                (
+                    "EZC1018",
+                    "state field `title` in class `InvalidTypedToggles` declares `string` but action `apply` applies a boolean toggle",
+                ),
+                (
+                    "EZC1018",
+                    "state field `empty` in class `InvalidTypedToggles` declares `null` but action `apply` applies a boolean toggle",
+                ),
+            ]
+        );
+
+        let provenance = graph.diagnostics[0]
+            .provenance
+            .as_ref()
+            .expect("toggle diagnostic provenance");
+        assert_eq!(
+            provenance.path,
+            Path::new(
+                "fixtures/0029-primitive-toggle-type-diagnostics/input/InvalidTypedToggles.tsx"
+            )
+        );
+        assert_eq!(provenance.span.line, 10);
+        assert_eq!(provenance.span.column, 5);
+    }
+
+    #[test]
     fn assembles_application_semantic_model_from_multiple_files() {
         let unit = CompilationUnit::parse_sources([
             (
