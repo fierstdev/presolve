@@ -53,6 +53,20 @@ reliable source locations include optional JSON `provenance` using `path`,
 location omit that field. Check policy is currently selected per command; no
 project configuration file is interpreted yet.
 
+## ASM entity inspection
+
+Inspect one canonical semantic entity with its ownership, provenance,
+containment, relations, and overlap-based compiler diagnostics:
+
+```sh
+ezc_cli asm <file> --entity <semantic-id> [--format text|json]
+```
+
+Use `ezc_cli asm <file> --format json` to discover the available semantic IDs.
+The selected-entity document includes the entity itself, direct child IDs,
+descendant count, incoming and outgoing references, and related compiler
+diagnostics. An unknown semantic ID fails explicitly.
+
 ## Repository rules
 
 - No major feature without an issue.

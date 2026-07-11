@@ -216,6 +216,59 @@ fn asm_command_inspects_a_sorted_multi_file_unit() {
 }
 
 #[test]
+fn asm_command_inspects_one_semantic_entity() {
+    let path = "fixtures/0001-source-summary/input/Counter.tsx";
+    let entity_id =
+        "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/state:count";
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["asm", path, "--entity", entity_id, "--format", "json"])
+        .output()
+        .expect("failed to inspect ASM entity");
+
+    assert!(output.status.success());
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("entity JSON");
+    assert_eq!(document["schema_version"], 1);
+    assert_eq!(document["entity"]["id"], entity_id);
+    assert_eq!(document["entity"]["kind"], "state-field");
+    assert_eq!(document["children"], serde_json::json!([]));
+    assert_eq!(document["descendant_count"], 0);
+    assert_eq!(document["outgoing_references"], serde_json::json!([]));
+    assert_eq!(
+        document["incoming_references"].as_array().map(Vec::len),
+        Some(2)
+    );
+
+    let text_output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["asm", path, "--entity", entity_id])
+        .output()
+        .expect("failed to inspect ASM entity as text");
+    assert!(text_output.status.success());
+    let text = String::from_utf8(text_output.stdout).expect("entity text");
+    assert!(text.contains(&format!("ASM Entity: {entity_id}\n")));
+    assert!(text.contains("  kind: state-field\n"));
+    assert!(text.contains("  incoming references: 2\n"));
+}
+
+#[test]
+fn asm_command_rejects_unknown_semantic_entity() {
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args([
+            "asm",
+            "fixtures/0001-source-summary/input/Counter.tsx",
+            "--entity",
+            "component:unknown",
+        ])
+        .output()
+        .expect("failed to inspect unknown ASM entity");
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("unknown ASM entity"));
+}
+
+#[test]
 fn asm_command_exposes_declared_state_types() {
     let repo_root = repo_root();
     let path = "fixtures/0025-typed-state-annotations/input/TypedState.tsx";

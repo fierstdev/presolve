@@ -11,8 +11,9 @@ use ezc_core::{
     generate_standalone_page, generate_static_html, summarize_source, template_manifest_json,
     validate_application_semantic_model, ApplicationSemanticModel, AsmValidationDiagnostic,
     AttributeValue, CompilationUnit, ComponentGraph, DeclaredStateTypeKind, RenderAttribute,
-    RenderAttributeValue, SemanticEntity, SemanticOwner, SemanticReferenceKind, SerializableValue,
-    SourceProvenance, StateOperation, TemplateChild, TemplateGraph, TemplateSemanticKind,
+    RenderAttributeValue, SemanticEntity, SemanticId, SemanticOwner, SemanticReferenceKind,
+    SerializableValue, SourceProvenance, StateOperation, TemplateChild, TemplateGraph,
+    TemplateSemanticKind,
 };
 use ezc_parser::{
     parse_file, ParseDiagnostic, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
@@ -93,7 +94,7 @@ fn run_graph(mut args: Vec<String>) {
 }
 
 fn run_asm(args: &[String]) {
-    let (input_paths, format) = parse_asm_inputs(args);
+    let (input_paths, format, entity_id) = parse_asm_inputs(args);
     let sources = input_paths
         .into_iter()
         .map(|path| {
@@ -113,9 +114,20 @@ fn run_asm(args: &[String]) {
     let asm = build_application_semantic_model_for_unit(&unit);
     let validation = validate_application_semantic_model(&asm);
 
-    match format.as_str() {
-        "text" => print_asm_text(&paths, &asm, &validation),
-        "json" => print!("{}", asm_inspection_json(&paths, &asm, &validation)),
+    match (format.as_str(), entity_id) {
+        ("text", Some(entity_id)) => {
+            let entity = find_asm_entity(&asm, &entity_id);
+            print_asm_entity_text(&asm, entity, &asm.diagnostics);
+        }
+        ("json", Some(entity_id)) => {
+            let entity = find_asm_entity(&asm, &entity_id);
+            print!(
+                "{}",
+                asm_entity_inspection_json(&asm, entity, &asm.diagnostics)
+            );
+        }
+        ("text", None) => print_asm_text(&paths, &asm, &validation),
+        ("json", None) => print!("{}", asm_inspection_json(&paths, &asm, &validation)),
         _ => {
             eprintln!("unsupported format: {format}");
             process::exit(1);
@@ -456,9 +468,136 @@ fn asm_inspection_json(
         + "\n"
 }
 
-fn parse_asm_inputs(args: &[String]) -> (Vec<PathBuf>, String) {
+fn find_asm_entity<'a>(asm: &'a ApplicationSemanticModel, entity_id: &str) -> &'a SemanticId {
+    asm.ownership
+        .keys()
+        .find(|id| id.as_str() == entity_id)
+        .unwrap_or_else(|| {
+            eprintln!("unknown ASM entity: {entity_id}");
+            process::exit(1);
+        })
+}
+
+fn print_asm_entity_text(
+    asm: &ApplicationSemanticModel,
+    id: &SemanticId,
+    diagnostics: &[ezc_core::ComponentDiagnostic],
+) {
+    let entity = asm
+        .entity(id)
+        .expect("ASM ownership should contain entities");
+    let provenance = asm.provenance(id).expect("ASM entities have provenance");
+    println!("ASM Entity: {}", id.as_str());
+    println!("  kind: {}", semantic_entity_kind(entity));
+    println!(
+        "  owner: {}",
+        semantic_owner_id(asm.owner(id).expect("ASM entities have owners"))
+            .unwrap_or("application")
+    );
+    println!(
+        "  provenance: {}:{}:{} span={}..{}",
+        provenance.path.display(),
+        provenance.span.line,
+        provenance.span.column,
+        provenance.span.start,
+        provenance.span.end
+    );
+    println!("  children: {}", asm.children_of(id).len());
+    println!("  descendants: {}", asm.descendants_of(id).len());
+    print_entity_references("outgoing", asm.references_from(id));
+    print_entity_references("incoming", asm.references_to(id));
+    print_entity_diagnostics(diagnostics, provenance);
+}
+
+fn print_entity_references(label: &str, references: Vec<&ezc_core::SemanticReference>) {
+    println!("  {label} references: {}", references.len());
+    for reference in references {
+        println!(
+            "    {}: {} -> {}",
+            semantic_reference_kind(reference.kind),
+            reference.source.as_str(),
+            reference.target.as_str()
+        );
+    }
+}
+
+fn print_entity_diagnostics(
+    diagnostics: &[ezc_core::ComponentDiagnostic],
+    provenance: &SourceProvenance,
+) {
+    let diagnostics = related_entity_diagnostics(diagnostics, provenance);
+    println!("  diagnostics: {}", diagnostics.len());
+    for diagnostic in diagnostics {
+        println!("    {}: {}", diagnostic.code, diagnostic.message);
+    }
+}
+
+fn asm_entity_inspection_json(
+    asm: &ApplicationSemanticModel,
+    id: &SemanticId,
+    diagnostics: &[ezc_core::ComponentDiagnostic],
+) -> String {
+    let entity = asm
+        .entity(id)
+        .expect("ASM ownership should contain entities");
+    let provenance = asm.provenance(id).expect("ASM entities have provenance");
+    let document = AsmEntityInspectionDocument {
+        schema_version: 1,
+        entity: AsmInspectionEntity {
+            id: id.as_str(),
+            kind: semantic_entity_kind(entity),
+            owner: semantic_owner_id(asm.owner(id).expect("ASM entities have owners")),
+            provenance: provenance.into(),
+            declared_type: declared_state_type(entity),
+        },
+        children: asm
+            .children_of(id)
+            .into_iter()
+            .map(SemanticId::as_str)
+            .collect(),
+        descendant_count: asm.descendants_of(id).len(),
+        outgoing_references: asm
+            .references_from(id)
+            .into_iter()
+            .map(AsmInspectionReference::from)
+            .collect(),
+        incoming_references: asm
+            .references_to(id)
+            .into_iter()
+            .map(AsmInspectionReference::from)
+            .collect(),
+        diagnostics: related_entity_diagnostics(diagnostics, provenance)
+            .into_iter()
+            .map(AsmInspectionDiagnostic::from)
+            .collect(),
+    };
+
+    serde_json::to_string_pretty(&document).expect("ASM entity inspection should serialize") + "\n"
+}
+
+fn related_entity_diagnostics<'a>(
+    diagnostics: &'a [ezc_core::ComponentDiagnostic],
+    provenance: &SourceProvenance,
+) -> Vec<&'a ezc_core::ComponentDiagnostic> {
+    diagnostics
+        .iter()
+        .filter(|diagnostic| {
+            diagnostic
+                .provenance
+                .as_ref()
+                .is_some_and(|diagnostic_provenance| {
+                    diagnostic_provenance.path == provenance.path
+                        && diagnostic_provenance.span.start < provenance.span.end
+                        && provenance.span.start < diagnostic_provenance.span.end
+                })
+        })
+        .collect()
+}
+
+fn parse_asm_inputs(args: &[String]) -> (Vec<PathBuf>, String, Option<String>) {
     let mut paths = Vec::new();
     let mut format = "text".to_string();
+    let mut entity_id = None;
     let mut index = 0;
 
     while index < args.len() {
@@ -469,6 +608,14 @@ fn parse_asm_inputs(args: &[String]) -> (Vec<PathBuf>, String) {
                     process::exit(1);
                 };
                 format.clone_from(value);
+                index += 2;
+            }
+            "--entity" => {
+                let Some(value) = args.get(index + 1) else {
+                    eprintln!("missing value for --entity");
+                    process::exit(1);
+                };
+                entity_id = Some(value.clone());
                 index += 2;
             }
             option if option.starts_with('-') => {
@@ -487,7 +634,7 @@ fn parse_asm_inputs(args: &[String]) -> (Vec<PathBuf>, String) {
         print_usage_and_exit();
     }
 
-    (paths, format)
+    (paths, format, entity_id)
 }
 
 fn parse_check_inputs(args: &[String]) -> (Vec<PathBuf>, String, Vec<String>, ParseSeverity) {
@@ -621,6 +768,17 @@ struct AsmInspectionDocument<'a> {
 }
 
 #[derive(Serialize)]
+struct AsmEntityInspectionDocument<'a> {
+    schema_version: u32,
+    entity: AsmInspectionEntity<'a>,
+    children: Vec<&'a str>,
+    descendant_count: usize,
+    outgoing_references: Vec<AsmInspectionReference<'a>>,
+    incoming_references: Vec<AsmInspectionReference<'a>>,
+    diagnostics: Vec<AsmInspectionDiagnostic<'a>>,
+}
+
+#[derive(Serialize)]
 struct AsmInspectionEntity<'a> {
     id: &'a str,
     kind: &'static str,
@@ -646,12 +804,36 @@ struct AsmInspectionReference<'a> {
     provenance: AsmInspectionProvenance,
 }
 
+impl<'a> From<&'a ezc_core::SemanticReference> for AsmInspectionReference<'a> {
+    fn from(reference: &'a ezc_core::SemanticReference) -> Self {
+        Self {
+            kind: semantic_reference_kind(reference.kind),
+            source: reference.source.as_str(),
+            target: reference.target.as_str(),
+            provenance: (&reference.provenance).into(),
+        }
+    }
+}
+
 #[derive(Serialize)]
 struct AsmInspectionDiagnostic<'a> {
     code: &'a str,
     message: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
     provenance: Option<AsmInspectionProvenance>,
+}
+
+impl<'a> From<&'a ezc_core::ComponentDiagnostic> for AsmInspectionDiagnostic<'a> {
+    fn from(diagnostic: &'a ezc_core::ComponentDiagnostic) -> Self {
+        Self {
+            code: &diagnostic.code,
+            message: &diagnostic.message,
+            provenance: diagnostic
+                .provenance
+                .as_ref()
+                .map(AsmInspectionProvenance::from),
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -1579,7 +1761,7 @@ fn write_build_artifacts(
 fn print_usage_and_exit() -> ! {
     eprintln!("usage:");
     eprintln!("  ezc_cli explain <file> [--format text|json]");
-    eprintln!("  ezc_cli asm <file> [--format text|json]");
+    eprintln!("  ezc_cli asm <file> [--entity semantic-id] [--format text|json]");
     eprintln!(
         "  ezc_cli check <file> [file...] [--format text|json] [--category parser|compiler|validation] [--fail-on error|warning|info]"
     );
