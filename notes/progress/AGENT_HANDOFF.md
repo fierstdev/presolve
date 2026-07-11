@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: docs: document check policies
+* Latest commit: cli: expose parser diagnostic label provenance
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 22:59:06 PDT
+* Date: 2026-07-10 23:13:58 PDT
 
 Last completed slice
 
-* Slice: C6-E - Check policy documentation and project defaults
-* Summary: Documented the command-scoped parser policy and made browser e2e entry points deterministic on constrained hosts.
-* Key files: README.md, crates/ezc_cli/src/main.rs, crates/ezc_cli/tests/explain.rs, package.json, justfile
-* New behavior: `ezc_cli check` help and repository documentation now describe `--category` and `--fail-on`; the project default remains `--fail-on error`, while compiler and ASM validation diagnostics always fail. `pnpm test:e2e` and `just e2e` now run the Chrome suite with one Rust test thread.
-* Tests added or changed: JSON check output now asserts its default `fail_on` value; e2e recipe commands now serialize browser test execution.
+* Slice: C6-F - Parser diagnostic label provenance
+* Summary: Exposed parser diagnostic label spans through both `ezc check` output formats.
+* Key files: README.md, crates/ezc_cli/src/main.rs, crates/ezc_cli/tests/explain.rs
+* New behavior: Text `ezc check` renders file-qualified label locations below parser diagnostics. JSON parser diagnostics now include a deterministic `labels` array with `line`, `column`, `start`, and `end` coordinates.
+* Tests added or changed: Text and JSON integration contracts cover the broken-TSX parser label provenance.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C6-E - Check policy documentation and project defaults
+* Slice: C6-F - Parser diagnostic label provenance
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-E
-* Remaining: C6-F add parser diagnostic label provenance to `ezc check` output.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-F
+* Remaining: C6-G add compiler diagnostic provenance to `ezc check --format json`.
 
 Verification
 
@@ -29,8 +29,8 @@ Verification
 * cargo test -p ezc_parser: pass
 * cargo test -p ezc_core: pass
 * cargo test -p ezc_cli --test explain: pass
-* cargo test -p ezc_cli --test runtime_browser -- --nocapture: pass
-* CI=true cargo test -p ezc_cli --test runtime_browser -- --nocapture: pass
+* RUST_TEST_THREADS=1 cargo test -p ezc_cli --test runtime_browser -- --nocapture: pass
+* CI=true RUST_TEST_THREADS=1 cargo test -p ezc_cli --test runtime_browser -- --nocapture: pass
 * cargo clippy --workspace --all-targets -- -D warnings: pass
 * RUST_TEST_THREADS=1 cargo test --workspace: pass
 * pnpm test:e2e: pass
@@ -154,6 +154,10 @@ Architecture decisions made
 * Reason: Each test launches a real Chrome process, and serial execution prevents host-resource contention and stale profile locks during the documented verification commands.
 * Tradeoff: The browser suite takes longer to run, but `pnpm test:e2e` and `just e2e` now produce a reproducible result on constrained development hosts.
 
+* Decision: `ezc check` projects parser label provenance as a deterministic array of source coordinates.
+* Reason: CLI and automation consumers can navigate from a parser diagnostic to every parser-provided span without reparsing the source or depending on backend-specific diagnostics.
+* Tradeoff: Labels currently provide only positional spans. Label messages, source excerpts, code frames, and compiler/ASM provenance in check JSON remain separate follow-up work.
+
 * Decision: Conditional nodes are first-class parser/render/template children with a conditional node ID plus separate start/end boundary IDs.
 * Reason: The compiler needs stable branch identity for tooling and runtime updates, while the DOM needs comment anchors that can bound branch replacement without a wrapper element.
 * Tradeoff: Runtime manifests serialize branch HTML snippets for this first slice instead of recursively hydrating dynamic bindings/events inside branch snippets.
@@ -250,10 +254,11 @@ Known limitations
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 * Item: Check policy is selected per CLI invocation. Project policy files, presets, and policy discovery are not interpreted yet.
+* Item: Parser diagnostic labels expose only `line`, `column`, `start`, and `end`; parser label messages and rendered source excerpts are not available yet. `ezc check --format json` still omits compiler diagnostic provenance.
 
 Exact next step
 
-Start C6-F - Extend `ezc check` parser diagnostic output with label provenance while preserving C6-E policy defaults, canonical diagnostics, and exit behavior. Do not introduce a project configuration format or change parser semantics.
+Start C6-G - Add optional compiler diagnostic provenance to `ezc check --format json` while preserving parser label output, category filtering, summaries, and exit behavior. Do not introduce source remapping or alter compiler validation rules.
 
 Useful commands
 
@@ -261,7 +266,7 @@ Useful commands
 * `cargo test -p ezc_parser`
 * `cargo test -p ezc_core`
 * `cargo test -p ezc_cli`
-* `cargo test -p ezc_cli --test runtime_browser -- --nocapture`
+* `RUST_TEST_THREADS=1 cargo test -p ezc_cli --test runtime_browser -- --nocapture`
 * `cargo clippy --workspace --all-targets -- -D warnings`
 * `pnpm test:e2e`
 * `just e2e`
@@ -279,7 +284,7 @@ Useful commands
 * `cargo run -p ezc_cli -- build fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx --out target/ezc-manual/logical-and-conditional`
 * `cargo run -p ezc_cli -- template fixtures/0019-keyed-list-semantics/input/KeyedList.tsx`
 * `cargo run -p ezc_cli -- html fixtures/0020-static-keyed-list/input/StaticKeyedList.tsx`
-* `cargo test -p ezc_cli --test runtime_browser keyed_lists_reconcile_in_a_real_browser -- --nocapture`
+* `RUST_TEST_THREADS=1 cargo test -p ezc_cli --test runtime_browser keyed_lists_reconcile_in_a_real_browser -- --nocapture`
 * `cargo run -p ezc_cli -- build fixtures/0004-nested-jsx/input/NestedCounter.tsx --out target/ezc-manual/runtime-contract`
 
 Changed but uncommitted files

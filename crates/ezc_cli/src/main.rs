@@ -15,7 +15,7 @@ use ezc_core::{
     SourceProvenance, StateOperation, TemplateChild, TemplateGraph, TemplateSemanticKind,
 };
 use ezc_parser::{
-    parse_file, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
+    parse_file, ParseDiagnostic, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
     ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxNode, ParsedMethod, SourceSpan,
 };
 use serde::Serialize;
@@ -193,6 +193,16 @@ fn print_check_text(
                     diagnostic_severity_label(&diagnostic.severity),
                     diagnostic.message
                 );
+                for label in &diagnostic.labels {
+                    println!(
+                        "    at {}:{}:{} span={}..{}",
+                        file.path.display(),
+                        label.span.line,
+                        label.span.column,
+                        label.span.start,
+                        label.span.end
+                    );
+                }
             }
         }
     }
@@ -219,7 +229,14 @@ fn check_json(
         .map(|file| file.diagnostics.len())
         .sum::<usize>();
     let parser_diagnostics = if check_category_enabled(categories, "parser") {
-        unit.files().iter().flat_map(|file| file.diagnostics.iter().map(move |diagnostic| serde_json::json!({"path": file.path, "severity": diagnostic_severity_label(&diagnostic.severity), "message": diagnostic.message}))).collect::<Vec<_>>()
+        unit.files()
+            .iter()
+            .flat_map(|file| {
+                file.diagnostics
+                    .iter()
+                    .map(move |diagnostic| parser_diagnostic_json(&file.path, diagnostic))
+            })
+            .collect::<Vec<_>>()
     } else {
         Vec::new()
     };
@@ -234,6 +251,20 @@ fn check_json(
         Vec::new()
     };
     serde_json::to_string_pretty(&serde_json::json!({"schema_version": 1, "files": unit.files().iter().map(|file| file.path.display().to_string()).collect::<Vec<_>>(), "summary": {"parser_diagnostics": parser_count, "compiler_diagnostics": asm.diagnostics.len(), "validation": validation.len()}, "categories": categories, "fail_on": diagnostic_severity_label(fail_on), "parser_diagnostics": parser_diagnostics, "compiler_diagnostics": compiler_diagnostics, "validation": validation_diagnostics})).expect("check document should serialize") + "\n"
+}
+
+fn parser_diagnostic_json(path: &Path, diagnostic: &ParseDiagnostic) -> serde_json::Value {
+    serde_json::json!({
+        "path": path,
+        "severity": diagnostic_severity_label(&diagnostic.severity),
+        "message": diagnostic.message,
+        "labels": diagnostic.labels.iter().map(|label| serde_json::json!({
+            "line": label.span.line,
+            "column": label.span.column,
+            "start": label.span.start,
+            "end": label.span.end,
+        })).collect::<Vec<_>>(),
+    })
 }
 
 fn parser_diagnostics_fail(unit: &CompilationUnit, fail_on: &ParseSeverity) -> bool {

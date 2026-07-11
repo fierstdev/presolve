@@ -597,6 +597,29 @@ fn check_command_fails_for_parser_diagnostics() {
     let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
     assert!(actual.contains("  parser diagnostics: 1\n"));
     assert!(actual.contains("  parser Error:"));
+    assert!(actual
+        .contains("    at fixtures/0002-broken-tsx/input/BrokenCounter.tsx:9:16 span=198..199\n"));
+}
+
+#[test]
+fn check_command_exposes_parser_diagnostic_label_provenance_in_json() {
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args([
+            "check",
+            "fixtures/0002-broken-tsx/input/BrokenCounter.tsx",
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("failed to run ezc_cli check");
+
+    assert!(!output.status.success());
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("check JSON");
+    assert_eq!(
+        document["parser_diagnostics"][0]["labels"],
+        serde_json::json!([{"line": 9, "column": 16, "start": 198, "end": 199}])
+    );
 }
 
 #[test]

@@ -45,8 +45,10 @@ fail `check`, regardless of the selected parser threshold.
 Repeat `--category` to limit diagnostic detail in text or JSON output. Category
 filters never change summary counts or the command's exit status. JSON output
 includes the selected parser threshold in `fail_on` so automation can record
-the effective policy. Check policy is currently selected per command; no
-project configuration file is interpreted yet.
+the effective policy. Each parser diagnostic includes `labels` with source
+`line`, `column`, `start`, and `end` coordinates; text output prints the same
+file-qualified label locations below the diagnostic. Check policy is currently
+selected per command; no project configuration file is interpreted yet.
 
 ## Repository rules
 
