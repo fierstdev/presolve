@@ -2,6 +2,8 @@ use std::collections::BTreeMap;
 
 use serde::Serialize;
 
+use crate::semantic_id::SemanticId;
+
 use ezc_parser::{
     ParsedClass, ParsedEventHandler, ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue,
     ParsedJsxChild, ParsedJsxConditional, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode,
@@ -16,6 +18,7 @@ pub struct ComponentGraph {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentNode {
+    pub id: SemanticId,
     pub class_name: String,
     pub element_name: Option<String>,
     pub route_path: Option<String>,
@@ -27,6 +30,7 @@ pub struct ComponentNode {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StateField {
+    pub id: SemanticId,
     pub name: String,
     pub initial_value: Option<SerializableValue>,
 }
@@ -67,11 +71,13 @@ impl SerializableValue {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentMethod {
+    pub id: SemanticId,
     pub name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentAction {
+    pub id: SemanticId,
     pub method: String,
     pub operation: StateOperation,
     pub field: String,
@@ -204,6 +210,7 @@ fn build_component_node(
 ) -> ComponentNode {
     let element_name = decorator_argument(class, "component");
     let route_path = decorator_argument(class, "route");
+    let id = SemanticId::component(element_name.as_deref(), &class.name);
 
     if element_name.is_none() {
         diagnostics.push(ComponentDiagnostic {
@@ -217,6 +224,7 @@ fn build_component_node(
         .iter()
         .filter(|property| property.initializer.as_deref() == Some("state(...)"))
         .map(|property| StateField {
+            id: id.state_field(&property.name),
             name: property.name.clone(),
             initial_value: property
                 .state_initial_value
@@ -229,6 +237,7 @@ fn build_component_node(
         .methods
         .iter()
         .map(|method| ComponentMethod {
+            id: id.method(&method.name),
             name: method.name.clone(),
         })
         .collect::<Vec<_>>();
@@ -237,11 +246,16 @@ fn build_component_node(
         .methods
         .iter()
         .flat_map(|method| {
-            method.state_updates.iter().map(|update| ComponentAction {
-                method: method.name.clone(),
-                operation: state_operation_from_parsed(&update.operation),
-                field: update.field.clone(),
-            })
+            method
+                .state_updates
+                .iter()
+                .enumerate()
+                .map(|(index, update)| ComponentAction {
+                    id: id.action(&method.name, index),
+                    method: method.name.clone(),
+                    operation: state_operation_from_parsed(&update.operation),
+                    field: update.field.clone(),
+                })
         })
         .collect::<Vec<_>>();
 
@@ -267,6 +281,7 @@ fn build_component_node(
     }
 
     ComponentNode {
+        id,
         class_name: class.name.clone(),
         element_name,
         route_path,

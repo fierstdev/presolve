@@ -3,24 +3,24 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: runtime: refresh dynamic list items
+* Latest commit: compiler: add global semantic ids
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 18:57:10 PDT
+* Date: 2026-07-10 19:08:52 PDT
 
 Last completed slice
 
-* Slice: 7F-H - Dynamic list-item behavior
-* Summary: Completed retained keyed-list refresh for direct item/index/member text, item-scoped dynamic attributes, and delegated click actions.
-* Key files: crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/html_codegen.rs, crates/ezc_core/src/runtime_codegen.rs, crates/ezc_cli/tests/runtime_browser.rs
-* New behavior: Retained keyed roots receive refreshed text and item-member attributes after array assignment. Initial and inserted list roots register their click actions, and removed roots unregister their actions without disturbing retained identity.
-* Tests added or changed: runtime codegen contract assertions, CLI HTML/manifest golden checks, and a browser probe covering retained member text/attributes, inserted attributes, retained identity, and initial/inserted delegated events.
-* Fixtures added or changed: fixtures/0026-dynamic-list-item-behavior; list fixture HTML and manifest golden artifacts now include list binding end anchors.
+* Slice: ASM-1 - Global semantic IDs
+* Summary: Added typed, component-scoped semantic identities to establish the first stable cross-graph compiler contract for the Application Semantic Model transition.
+* Key files: crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/lib.rs
+* New behavior: Components, state fields, methods, actions, and rendered templates receive readable semantic IDs derived from the application-facing component element name. IDs remain stable when unrelated component declaration order changes.
+* Tests added or changed: semantic-ID derivation and invalid-component fallback tests, component/template identity assertions, and a two-component declaration-order regression.
+* Fixtures added or changed: None; this slice deliberately does not alter CLI, HTML, manifest, or runtime artifacts.
 
 Current in-progress slice
 
-* Slice: 7F - Lists and keys
+* Slice: ASM-1 - Global semantic IDs
 * Status: Complete
-* Completed: 7F-A - List semantic model; 7F-B - Static initial list rendering; 7F-C - Keyed reconciliation; 7F-D - Key diagnostics; 7F-E - Recursive object serializable values; 7F-F - Member-expression evaluation; 7F-G - Object keyed-list reconciliation; 7F-H - Dynamic list-item behavior
+* Completed: ASM-1 - Global semantic IDs
 * Remaining: None
 
 Verification
@@ -70,6 +70,15 @@ Architecture decisions made
 * Decision: List-item click actions are discovered from retained or inserted DOM roots and registered in the delegated event map; removed roots explicitly unregister their nodes.
 * Reason: Keyed root identity remains stable while events work for both compiler-rendered and runtime-inserted rows.
 * Tradeoff: Only the existing delegated click/action contract is hydrated. Conditional branch replacement inside a list item still does not register new dynamic behavior.
+* Decision: Semantic IDs are typed compiler values with readable component-scoped paths, such as `component:x-counter/state:count`.
+* Reason: Existing template IDs are local backend anchors. The ASM needs stable identities that survive unrelated declaration ordering and can be shared by future semantic consumers.
+* Tradeoff: Component identity uses `@component(...)` when available and falls back to the class name for invalid components. Duplicate identity validation and source provenance are deferred to later ASM slices.
+* Decision: Actions use their source order within the owning method as their final semantic-ID segment.
+* Reason: The parser does not yet retain per-action source spans, but ordered action steps are already a compiler contract.
+* Tradeoff: Inserting an earlier action step changes later action IDs; source-provenance-backed refinement remains deferred to ASM-4.
+* Decision: Semantic IDs do not change template manifests, static HTML, or runtime artifacts in ASM-1.
+* Reason: This establishes a compiler-platform contract without forcing a backend schema change before ownership and cross-reference semantics exist.
+* Tradeoff: Semantic IDs are inspectable through compiler APIs only until the planned `ez asm` CLI slice.
 
 Known limitations
 
@@ -87,12 +96,14 @@ Known limitations
 * Item: Runtime schema compatibility is exact-match only; no backward/forward manifest migration exists yet.
 * Item: Source spans are available on parser/render/template structures and CLI development output, but runtime manifests intentionally omit source metadata for now.
 * Item: Fragment nodes are visible in compiler/template output but intentionally omitted from runtime manifests until a runtime range-anchor use case appears.
+* Item: Semantic IDs currently cover components, state fields, methods, action steps, and rendered templates. Template descendants still use backend-local `n*` IDs until the ownership model assigns semantic identity across the full render tree.
+* Item: Duplicate component semantic identities, cross-references, source provenance, validation, and CLI inspection are intentionally deferred to ASM-2 through ASM-8.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 
 Exact next step
 
-Start ASM-1 - Global semantic IDs. Introduce application-wide stable semantic IDs and the ownership/provenance foundation for the Application Semantic Model, without adding further major language features.
+Start ASM-2 - Semantic ownership. Define explicit parent/owner relationships across component, state, method, action, and template semantics using the new `SemanticId` contract.
 
 Useful commands
 

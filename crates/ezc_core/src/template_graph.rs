@@ -5,6 +5,8 @@ use crate::component_graph::{
 };
 use ezc_parser::SourceSpan;
 
+use crate::semantic_id::SemanticId;
+
 #[derive(Debug, Default)]
 struct TemplateIdAllocator {
     next: usize,
@@ -25,6 +27,7 @@ pub struct TemplateGraph {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TemplateNode {
+    pub id: SemanticId,
     pub component_name: String,
     pub root: Option<ElementNode>,
     pub root_fragment: Option<FragmentNode>,
@@ -130,6 +133,7 @@ pub fn build_template_graph(component_graph: &ComponentGraph) -> TemplateGraph {
         .components
         .iter()
         .map(|component| TemplateNode {
+            id: component.id.template(),
             component_name: component.class_name.clone(),
             root: component
                 .render

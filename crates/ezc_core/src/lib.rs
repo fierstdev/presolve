@@ -10,6 +10,7 @@ pub mod html_codegen;
 pub mod model;
 pub mod page_codegen;
 pub mod runtime_codegen;
+pub mod semantic_id;
 pub mod summarize;
 pub mod template_graph;
 pub mod template_manifest;
@@ -26,6 +27,7 @@ pub use model::{
 };
 pub use page_codegen::generate_standalone_page;
 pub use runtime_codegen::generate_runtime_stub;
+pub use semantic_id::SemanticId;
 pub use summarize::summarize_source;
 pub use template_graph::{
     build_template_graph, AttributeValue, ConditionalNode, ElementNode, FragmentNode, ListNode,
@@ -134,11 +136,16 @@ class Counter extends Component {
         let component = graph.components.first().expect("expected component");
 
         assert_eq!(component.class_name, "Counter");
+        assert_eq!(component.id.as_str(), "component:x-counter");
         assert_eq!(component.element_name.as_deref(), Some("x-counter"));
         assert_eq!(component.route_path.as_deref(), Some("/counter"));
 
         assert_eq!(component.state_fields.len(), 1);
         assert_eq!(component.state_fields[0].name, "count");
+        assert_eq!(
+            component.state_fields[0].id.as_str(),
+            "component:x-counter/state:count"
+        );
         assert_eq!(
             component.state_fields[0].initial_value,
             Some(SerializableValue::Number("0".to_string()))
@@ -152,8 +159,13 @@ class Counter extends Component {
 
         assert_eq!(method_names, vec!["increment", "render"]);
         assert_eq!(
+            component.methods[0].id.as_str(),
+            "component:x-counter/method:increment"
+        );
+        assert_eq!(
             component.actions,
             vec![ComponentAction {
+                id: SemanticId::component(Some("x-counter"), "Counter").action("increment", 0),
                 method: "increment".to_string(),
                 operation: StateOperation::AddAssign(SerializableValue::Number("1".to_string())),
                 field: "count".to_string(),
@@ -317,6 +329,8 @@ class Counter extends Component {
         assert_eq!(
             component.actions,
             vec![ComponentAction {
+                id: SemanticId::component(Some("x-nested-counter"), "NestedCounter")
+                    .action("increment", 0),
                 method: "increment".to_string(),
                 operation: StateOperation::Increment,
                 field: "count".to_string(),
@@ -340,6 +354,8 @@ class Counter extends Component {
         assert_eq!(
             component.actions,
             vec![ComponentAction {
+                id: SemanticId::component(Some("x-decrement-counter"), "DecrementCounter")
+                    .action("decrement", 0),
                 method: "decrement".to_string(),
                 operation: StateOperation::Decrement,
                 field: "count".to_string(),
@@ -364,6 +380,8 @@ class Counter extends Component {
             component.actions,
             vec![
                 ComponentAction {
+                    id: SemanticId::component(Some("x-step-counter"), "StepCounter")
+                        .action("addTwo", 0),
                     method: "addTwo".to_string(),
                     operation: StateOperation::AddAssign(SerializableValue::Number(
                         "2".to_string()
@@ -371,6 +389,8 @@ class Counter extends Component {
                     field: "count".to_string(),
                 },
                 ComponentAction {
+                    id: SemanticId::component(Some("x-step-counter"), "StepCounter")
+                        .action("subtractThree", 0),
                     method: "subtractThree".to_string(),
                     operation: StateOperation::SubtractAssign(SerializableValue::Number(
                         "3".to_string()
@@ -397,6 +417,8 @@ class Counter extends Component {
         assert_eq!(
             component.actions,
             vec![ComponentAction {
+                id: SemanticId::component(Some("x-reset-counter"), "ResetCounter")
+                    .action("reset", 0),
                 method: "reset".to_string(),
                 operation: StateOperation::Assign(SerializableValue::Number("0".to_string())),
                 field: "count".to_string(),
@@ -417,6 +439,7 @@ class Counter extends Component {
         assert_eq!(
             component.actions,
             vec![ComponentAction {
+                id: SemanticId::component(Some("x-toggle-flag"), "ToggleFlag").action("toggle", 0),
                 method: "toggle".to_string(),
                 operation: StateOperation::Toggle,
                 field: "enabled".to_string(),
@@ -441,6 +464,9 @@ class Counter extends Component {
             component.actions,
             vec![
                 ComponentAction {
+                    id:
+                        SemanticId::component(Some("x-batch-action-counter"), "BatchActionCounter",)
+                            .action("apply", 0),
                     method: "apply".to_string(),
                     operation: StateOperation::AddAssign(SerializableValue::Number(
                         "2".to_string()
@@ -448,21 +474,33 @@ class Counter extends Component {
                     field: "count".to_string(),
                 },
                 ComponentAction {
+                    id:
+                        SemanticId::component(Some("x-batch-action-counter"), "BatchActionCounter",)
+                            .action("apply", 1),
                     method: "apply".to_string(),
                     operation: StateOperation::Decrement,
                     field: "count".to_string(),
                 },
                 ComponentAction {
+                    id:
+                        SemanticId::component(Some("x-batch-action-counter"), "BatchActionCounter",)
+                            .action("apply", 2),
                     method: "apply".to_string(),
                     operation: StateOperation::Assign(SerializableValue::Number("8".to_string())),
                     field: "count".to_string(),
                 },
                 ComponentAction {
+                    id:
+                        SemanticId::component(Some("x-batch-action-counter"), "BatchActionCounter",)
+                            .action("apply", 3),
                     method: "apply".to_string(),
                     operation: StateOperation::Increment,
                     field: "count".to_string(),
                 },
                 ComponentAction {
+                    id:
+                        SemanticId::component(Some("x-batch-action-counter"), "BatchActionCounter",)
+                            .action("apply", 4),
                     method: "apply".to_string(),
                     operation: StateOperation::Toggle,
                     field: "enabled".to_string(),
@@ -832,6 +870,7 @@ class BadAttrs extends Component {
 
         let template = &template_graph.templates[0];
         assert_eq!(template.component_name, "Counter");
+        assert_eq!(template.id.as_str(), "component:x-counter/template:render");
 
         let root = template.root.as_ref().expect("expected template root");
 
@@ -890,6 +929,79 @@ class BadAttrs extends Component {
         );
         assert_eq!(span.line, 13);
         assert_eq!(span.column, 16);
+    }
+
+    #[test]
+    fn semantic_ids_are_stable_when_component_declaration_order_changes() {
+        let alpha = r#"
+@component("x-alpha")
+class Alpha extends Component {
+  count = state(0);
+
+  increment() {
+    this.count++;
+  }
+
+  render() {
+    return <p>{this.count}</p>;
+  }
+}
+"#;
+        let beta = r#"
+@component("x-beta")
+class Beta extends Component {
+  enabled = state(false);
+
+  toggle() {
+    this.enabled = !this.enabled;
+  }
+
+  render() {
+    return <p>{this.enabled}</p>;
+  }
+}
+"#;
+
+        let ids_for = |source: &str| {
+            let parsed = ezc_parser::parse_file("App.tsx", source);
+            let component_graph = build_component_graph(&parsed);
+            let template_graph = build_template_graph(&component_graph);
+            let template_ids = template_graph
+                .templates
+                .iter()
+                .map(|template| (template.component_name.as_str(), template.id.to_string()))
+                .collect::<BTreeMap<_, _>>();
+
+            component_graph
+                .components
+                .iter()
+                .map(|component| {
+                    let ids = component
+                        .state_fields
+                        .iter()
+                        .map(|field| field.id.to_string())
+                        .chain(component.methods.iter().map(|method| method.id.to_string()))
+                        .chain(component.actions.iter().map(|action| action.id.to_string()))
+                        .chain(std::iter::once(
+                            template_ids
+                                .get(component.class_name.as_str())
+                                .expect("expected component template")
+                                .clone(),
+                        ))
+                        .collect::<Vec<_>>();
+
+                    (
+                        component.class_name.clone(),
+                        (component.id.to_string(), ids),
+                    )
+                })
+                .collect::<BTreeMap<_, _>>()
+        };
+
+        assert_eq!(
+            ids_for(&format!("{alpha}\n{beta}")),
+            ids_for(&format!("{beta}\n{alpha}"))
+        );
     }
 
     #[test]
