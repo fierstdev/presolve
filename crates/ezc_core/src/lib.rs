@@ -24,7 +24,10 @@ pub use application_semantic_model::{
     build_application_semantic_model, ApplicationSemanticModel, SemanticEntity,
 };
 pub use asm_validation::{validate_application_semantic_model, AsmValidationDiagnostic};
-pub use compiler_pass::{AnalysisPass, DependencyAnalysis, DependencyAnalysisPass};
+pub use compiler_pass::{
+    AnalysisPass, ConstantEvaluation, ConstantEvaluationPass, DependencyAnalysis,
+    DependencyAnalysisPass,
+};
 pub use component_graph::{
     build_component_graph, ComponentAction, ComponentDiagnostic, ComponentGraph, ComponentMethod,
     ComponentNode, RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler,

@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::application_semantic_model::ApplicationSemanticModel;
+use crate::component_graph::{SerializableValue, StateOperation};
 use crate::semantic_id::SemanticId;
 
 pub trait AnalysisPass {
@@ -40,5 +41,39 @@ impl AnalysisPass for DependencyAnalysisPass {
             dependencies,
             dependents,
         }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct ConstantEvaluationPass;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConstantEvaluation {
+    pub values: BTreeMap<SemanticId, SerializableValue>,
+}
+
+impl AnalysisPass for ConstantEvaluationPass {
+    type Output = ConstantEvaluation;
+    fn analyze(&self, model: &ApplicationSemanticModel) -> ConstantEvaluation {
+        let mut values = BTreeMap::new();
+        for component in &model.components {
+            for field in &component.state_fields {
+                if let Some(value) = &field.initial_value {
+                    values.insert(field.id.clone(), value.clone());
+                }
+            }
+            for action in &component.actions {
+                let value = match &action.operation {
+                    StateOperation::AddAssign(value)
+                    | StateOperation::SubtractAssign(value)
+                    | StateOperation::Assign(value) => Some(value),
+                    _ => None,
+                };
+                if let Some(value) = value {
+                    values.insert(action.id.clone(), value.clone());
+                }
+            }
+        }
+        ConstantEvaluation { values }
     }
 }
