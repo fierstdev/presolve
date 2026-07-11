@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: resolve template state dependencies
+* Latest commit: compiler: resolve list iterable dependencies
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 21:00:34 PDT
+* Date: 2026-07-10 21:03:06 PDT
 
 Last completed slice
 
-* Slice: C3-B - Template state dependencies
-* Summary: Resolved direct template state reads to canonical component state IDs.
-* Key files: crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/semantic_reference.rs, crates/ezc_core/src/lib.rs
-* New behavior: Authored text bindings, dynamic attributes, and conditionals with a direct `this.<stateField>` expression emit source-provenanced `TemplateState` references to their owning component state field.
-* Tests added or changed: template binding/attribute/conditional dependency resolution, member-expression non-resolution, and existing ASM dependency expectations.
+* Slice: C3-C - Keyed-list iterable dependencies
+* Summary: Resolved keyed-list iterable reads to canonical component state IDs.
+* Key files: crates/ezc_core/src/application_semantic_model.rs
+* New behavior: A keyed-list entity with a direct `this.<stateField>` iterable emits a source-provenanced `TemplateState` reference to the state field on its owning component.
+* Tests added or changed: keyed-list iterable dependency resolution and existing workspace regression coverage.
 * Fixtures added or changed: None.
 
 Current in-progress slice
 
-* Slice: C3-B - Template state dependencies
+* Slice: C3-C - Keyed-list iterable dependencies
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-B
-* Remaining: C3-C resolve keyed-list iterable dependencies to component state semantics.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-C
+* Remaining: C3-D resolve template event attributes to component method semantic IDs.
 
 Verification
 
@@ -44,7 +44,11 @@ Architecture decisions made
 
 * Decision: Only direct `this.<stateField>` template reads resolve to `TemplateState` references in C3-B.
 * Reason: The ASM gains reliable dependency edges for supported template behavior without introducing a general expression evaluator or speculative partial references.
-* Tradeoff: Member access, computed expressions, lists, and unresolved field names remain absent from the relation graph until dedicated semantic slices define their behavior.
+* Tradeoff: Member access, computed expressions, and unresolved field names remain absent from the relation graph; keyed-list iterables are resolved by the dedicated C3-C extension.
+
+* Decision: Keyed-list iterable dependencies reuse `TemplateState` with the list semantic entity as their source.
+* Reason: A list's iterable is a direct template state read, so it has the same component ownership, provenance, and invalidation semantics as other direct template reads.
+* Tradeoff: Item/index scope, keys, item members, and nested list-item expressions remain outside the component-state dependency model.
 
 * Decision: Canonical ASM/frontend consumers use module-qualified semantic IDs, while the existing backend-facing graph retains legacy component-scoped IDs until its runtime contracts are deliberately migrated.
 * Reason: A canonical application model must distinguish semantically equivalent components from different modules, but the established HTML/template runtime protocol does not serialize these IDs and should not be changed implicitly.
@@ -167,14 +171,14 @@ Known limitations
 * Item: Source spans are available on parser/render/template structures and CLI development output, but runtime manifests intentionally omit source metadata for now.
 * Item: Fragment nodes are visible in compiler/template output but intentionally omitted from runtime manifests until a runtime range-anchor use case appears.
 * Item: Semantic IDs, direct ownership, and provenance cover components, state fields, methods, action steps, rendered templates, event handlers, and authored template descendants. Backend HTML/template-manifest nodes still use local `n*` IDs as a compatibility contract.
-* Item: Resolved references cover action-to-state, event-to-method, and direct text-binding/dynamic-attribute/conditional-to-state pairs. List iterables, routes, member expressions, computed expressions, and unresolved reference attempts have no semantic relation records yet.
+* Item: Resolved references cover action-to-state, event-to-method, and direct text-binding/dynamic-attribute/conditional/keyed-list-iterable-to-state pairs. Template event attributes, routes, member expressions, computed expressions, and unresolved reference attempts have no semantic relation records yet.
 * Item: Canonical compiler products now include module-qualified template entities and direct template state dependencies, while `BindingTable` resolves local/relative re-export chains plus named/default/namespace imports. External and namespace re-exports, external package bindings, tsconfig aliases, source remapping, and type semantics are still absent. Legacy backend graph identity remains a compatibility path.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 
 Exact next step
 
-Start C3-C - Resolve keyed-list iterable dependencies to component state semantic IDs. Do not add item-scope expression evaluation, list runtime changes, type inference, or arbitrary expression evaluation in that slice.
+Start C3-D - Resolve template event attributes to component method semantic IDs. Do not alter event parsing, dispatch, runtime artifacts, or add arbitrary handler evaluation in that slice.
 
 Useful commands
 

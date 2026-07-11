@@ -196,6 +196,7 @@ fn build_template_state_references(
                 TemplateSemanticKind::Binding
                     | TemplateSemanticKind::AttributeBinding
                     | TemplateSemanticKind::Conditional
+                    | TemplateSemanticKind::List
             )
         })
         .filter_map(|entity| {
@@ -341,5 +342,38 @@ class Panel extends Component {
                 .count(),
             0
         );
+    }
+
+    #[test]
+    fn resolves_keyed_list_iterable_to_component_state() {
+        let parsed = ezc_parser::parse_file(
+            "src/KeyedList.tsx",
+            r#"
+@component("x-keyed-list")
+class KeyedList extends Component {
+  items = state([]);
+
+  render() {
+    return <ul>{this.items.map((item) => <li key={item}>{item}</li>)}</ul>;
+  }
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        let component = &asm.components[0];
+        let state = &component.state_fields[0];
+        let reference = asm
+            .references_to(&state.id)
+            .into_iter()
+            .find(|reference| reference.kind == SemanticReferenceKind::TemplateState)
+            .expect("list iterable state reference");
+        let list = asm
+            .template_entity(&reference.source)
+            .expect("list semantic entity");
+
+        assert_eq!(list.kind, TemplateSemanticKind::List);
+        assert_eq!(list.expression.as_deref(), Some("this.items"));
+        assert_eq!(reference.provenance, list.provenance);
     }
 }
