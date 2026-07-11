@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: lower template semantic entities
+* Latest commit: compiler: resolve template state dependencies
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 20:30:00 PDT
+* Date: 2026-07-10 21:00:34 PDT
 
 Last completed slice
 
-* Slice: C3-A - Template semantic entities
-* Summary: Lowered authored template descendants and bindings into typed canonical ASM entities.
-* Key files: crates/ezc_core/src/template_semantics.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/semantic_id.rs
-* New behavior: Elements, fragments, text, bindings, attributes, event attributes, conditionals, and lists have module-qualified semantic IDs, template ownership, and source provenance.
-* Tests added or changed: authored attribute/text bindings and ASM template-entity queries.
+* Slice: C3-B - Template state dependencies
+* Summary: Resolved direct template state reads to canonical component state IDs.
+* Key files: crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/semantic_reference.rs, crates/ezc_core/src/lib.rs
+* New behavior: Authored text bindings, dynamic attributes, and conditionals with a direct `this.<stateField>` expression emit source-provenanced `TemplateState` references to their owning component state field.
+* Tests added or changed: template binding/attribute/conditional dependency resolution, member-expression non-resolution, and existing ASM dependency expectations.
 * Fixtures added or changed: None.
 
 Current in-progress slice
 
-* Slice: C3-A - Template semantic entities
+* Slice: C3-B - Template state dependencies
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A
-* Remaining: C3-B resolve template bindings and conditions to component state semantics.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-B
+* Remaining: C3-C resolve keyed-list iterable dependencies to component state semantics.
 
 Verification
 
@@ -41,6 +41,10 @@ Architecture decisions made
 * Decision: Template descendants are lowered into canonical semantic entities separate from backend-local `n*` template IDs.
 * Reason: Developer tools and compiler analyses need typed, owned, provenance-backed template semantics without taking a dependency on DOM emission details.
 * Tradeoff: Template entity paths are deterministic traversal paths, while generated HTML/template-manifest contracts retain their existing local anchor IDs.
+
+* Decision: Only direct `this.<stateField>` template reads resolve to `TemplateState` references in C3-B.
+* Reason: The ASM gains reliable dependency edges for supported template behavior without introducing a general expression evaluator or speculative partial references.
+* Tradeoff: Member access, computed expressions, lists, and unresolved field names remain absent from the relation graph until dedicated semantic slices define their behavior.
 
 * Decision: Canonical ASM/frontend consumers use module-qualified semantic IDs, while the existing backend-facing graph retains legacy component-scoped IDs until its runtime contracts are deliberately migrated.
 * Reason: A canonical application model must distinguish semantically equivalent components from different modules, but the established HTML/template runtime protocol does not serialize these IDs and should not be changed implicitly.
@@ -162,15 +166,15 @@ Known limitations
 * Item: Runtime schema compatibility is exact-match only; no backward/forward manifest migration exists yet.
 * Item: Source spans are available on parser/render/template structures and CLI development output, but runtime manifests intentionally omit source metadata for now.
 * Item: Fragment nodes are visible in compiler/template output but intentionally omitted from runtime manifests until a runtime range-anchor use case appears.
-* Item: Semantic IDs and direct ownership currently cover components, state fields, methods, action steps, rendered templates, and event handlers. General template descendants still use backend-local `n*` IDs and have no semantic ownership or provenance entries yet.
-* Item: Resolved references currently cover action-to-state and event-to-method pairs only. Bindings, attributes, conditionals, lists, routes, and unresolved reference attempts have no semantic relation records or provenance-backed relations yet.
-* Item: Canonical compiler products now include module-qualified template entities, and `BindingTable` resolves local/relative re-export chains plus named/default/namespace imports. Template expression-to-state resolution, external and namespace re-exports, external package bindings, tsconfig aliases, source remapping, and type semantics are still absent. Legacy backend graph identity remains a compatibility path.
+* Item: Semantic IDs, direct ownership, and provenance cover components, state fields, methods, action steps, rendered templates, event handlers, and authored template descendants. Backend HTML/template-manifest nodes still use local `n*` IDs as a compatibility contract.
+* Item: Resolved references cover action-to-state, event-to-method, and direct text-binding/dynamic-attribute/conditional-to-state pairs. List iterables, routes, member expressions, computed expressions, and unresolved reference attempts have no semantic relation records yet.
+* Item: Canonical compiler products now include module-qualified template entities and direct template state dependencies, while `BindingTable` resolves local/relative re-export chains plus named/default/namespace imports. External and namespace re-exports, external package bindings, tsconfig aliases, source remapping, and type semantics are still absent. Legacy backend graph identity remains a compatibility path.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 
 Exact next step
 
-Start C3-B - Resolve template bindings, dynamic attributes, and conditional dependencies to component state semantic IDs. Do not add arbitrary expression evaluation, type inference, or runtime artifact changes in that slice.
+Start C3-C - Resolve keyed-list iterable dependencies to component state semantic IDs. Do not add item-scope expression evaluation, list runtime changes, type inference, or arbitrary expression evaluation in that slice.
 
 Useful commands
 

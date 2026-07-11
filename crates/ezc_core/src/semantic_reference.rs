@@ -14,4 +14,5 @@ pub struct SemanticReference {
 pub enum SemanticReferenceKind {
     ActionState,
     EventMethod,
+    TemplateState,
 }

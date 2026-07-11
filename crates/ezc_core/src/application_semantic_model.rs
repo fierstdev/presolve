@@ -9,9 +9,11 @@ use crate::component_graph::{
 };
 use crate::semantic_id::{SemanticId, SemanticOwner};
 use crate::semantic_provenance::SourceProvenance;
-use crate::semantic_reference::SemanticReference;
+use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
 use crate::template_graph::{build_template_graph, TemplateNode};
-use crate::template_semantics::{build_template_semantic_entities, TemplateSemanticEntity};
+use crate::template_semantics::{
+    build_template_semantic_entities, TemplateSemanticEntity, TemplateSemanticKind,
+};
 
 /// Application-level semantic data assembled from the compiler's existing graphs.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -162,6 +164,12 @@ fn build_application_semantic_model_from_files(files: &[ParsedFile]) -> Applicat
         template_entities.extend(file_template_entities);
     }
 
+    references.extend(build_template_state_references(
+        &components,
+        &templates,
+        &template_entities,
+    ));
+
     let ownership = collect_ownership(&components, &templates, &template_entities);
 
     ApplicationSemanticModel {
@@ -173,6 +181,57 @@ fn build_application_semantic_model_from_files(files: &[ParsedFile]) -> Applicat
         references,
         provenance,
     }
+}
+
+fn build_template_state_references(
+    components: &[ComponentNode],
+    templates: &[TemplateNode],
+    template_entities: &[TemplateSemanticEntity],
+) -> Vec<SemanticReference> {
+    template_entities
+        .iter()
+        .filter(|entity| {
+            matches!(
+                entity.kind,
+                TemplateSemanticKind::Binding
+                    | TemplateSemanticKind::AttributeBinding
+                    | TemplateSemanticKind::Conditional
+            )
+        })
+        .filter_map(|entity| {
+            let field_name = entity.expression.as_deref().and_then(state_field_name)?;
+            let template_id = entity.owner.entity_id()?;
+            let component_id = templates
+                .iter()
+                .find(|template| template.id == *template_id)
+                .and_then(|template| template.owner.entity_id())?;
+            let field = components
+                .iter()
+                .find(|component| component.id == *component_id)
+                .and_then(|component| {
+                    component
+                        .state_fields
+                        .iter()
+                        .find(|field| field.name == field_name)
+                })?;
+
+            Some(SemanticReference {
+                kind: SemanticReferenceKind::TemplateState,
+                source: entity.id.clone(),
+                target: field.id.clone(),
+                provenance: entity.provenance.clone(),
+            })
+        })
+        .collect()
+}
+
+fn state_field_name(expression: &str) -> Option<&str> {
+    expression.strip_prefix("this.").filter(|name| {
+        !name.is_empty()
+            && name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+    })
 }
 
 fn collect_ownership(
@@ -210,4 +269,77 @@ fn collect_ownership(
     }
 
     ownership
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_application_semantic_model;
+    use crate::{SemanticReferenceKind, TemplateSemanticKind};
+
+    #[test]
+    fn resolves_template_state_dependencies() {
+        let parsed = ezc_parser::parse_file(
+            "src/Panel.tsx",
+            r#"
+@component("x-panel")
+class Panel extends Component {
+  enabled = state(true);
+
+  render() {
+    return <section hidden={this.enabled}>{this.enabled}{this.enabled ? <span>On</span> : <span>Off</span>}</section>;
+  }
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        let component = &asm.components[0];
+        let state = &component.state_fields[0];
+        let state_references = asm.references_to(&state.id);
+
+        assert_eq!(state_references.len(), 3);
+        assert!(state_references.iter().all(|reference| {
+            reference.kind == SemanticReferenceKind::TemplateState
+                && reference.target == state.id
+                && reference.provenance.path.as_path() == std::path::Path::new("src/Panel.tsx")
+        }));
+        assert!(state_references.iter().any(|reference| {
+            asm.template_entity(&reference.source)
+                .is_some_and(|entity| entity.kind == TemplateSemanticKind::Binding)
+        }));
+        assert!(state_references.iter().any(|reference| {
+            asm.template_entity(&reference.source)
+                .is_some_and(|entity| entity.kind == TemplateSemanticKind::AttributeBinding)
+        }));
+        assert!(state_references.iter().any(|reference| {
+            asm.template_entity(&reference.source)
+                .is_some_and(|entity| entity.kind == TemplateSemanticKind::Conditional)
+        }));
+    }
+
+    #[test]
+    fn leaves_member_expressions_unresolved_without_expression_evaluation() {
+        let parsed = ezc_parser::parse_file(
+            "src/Panel.tsx",
+            r#"
+@component("x-panel")
+class Panel extends Component {
+  enabled = state(true);
+
+  render() {
+    return <section data-value={this.enabled.value}>Panel</section>;
+  }
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        assert_eq!(
+            asm.references
+                .iter()
+                .filter(|reference| reference.kind == SemanticReferenceKind::TemplateState)
+                .count(),
+            0
+        );
+    }
 }
