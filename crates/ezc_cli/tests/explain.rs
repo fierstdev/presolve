@@ -88,6 +88,68 @@ fn explain_command_matches_json_fixture() {
 }
 
 #[test]
+fn explain_command_inspects_entities_through_the_canonical_asm_path() {
+    let path = "fixtures/0001-source-summary/input/Counter.tsx";
+    let entity_id = "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter";
+    let inspection_args = [
+        path,
+        "--entity",
+        entity_id,
+        "--child-kind",
+        "method",
+        "--reference-kind",
+        "event-method",
+        "--format",
+        "json",
+    ];
+
+    let explain = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .arg("explain")
+        .args(inspection_args)
+        .output()
+        .expect("failed to inspect an ASM entity through ezc_cli explain");
+    let asm = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .arg("asm")
+        .args(inspection_args)
+        .output()
+        .expect("failed to inspect an ASM entity through ezc_cli asm");
+
+    assert!(explain.status.success());
+    assert!(asm.status.success());
+    assert_eq!(explain.stdout, asm.stdout);
+
+    let document: serde_json::Value =
+        serde_json::from_slice(&explain.stdout).expect("entity inspection JSON");
+    assert_eq!(document["entity"]["id"], entity_id);
+    assert_eq!(
+        document["children"],
+        serde_json::json!([
+            "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/method:increment",
+            "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/method:render"
+        ])
+    );
+}
+
+#[test]
+fn explain_command_rejects_entity_filters_without_a_selector() {
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args([
+            "explain",
+            "fixtures/0001-source-summary/input/Counter.tsx",
+            "--child-kind",
+            "method",
+        ])
+        .output()
+        .expect("failed to run filtered ezc_cli explain");
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("require an ASM entity selector"));
+}
+
+#[test]
 fn asm_command_reports_text_summary() {
     let repo_root = repo_root();
 
@@ -154,6 +216,66 @@ fn asm_command_emits_deterministic_json_inspection() {
                     == "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/method:increment"
         })
     }));
+}
+
+#[test]
+fn asm_command_exports_a_deterministic_semantic_graph() {
+    let repo_root = repo_root();
+    let path = "fixtures/0001-source-summary/input/Counter.tsx";
+    let args = ["asm", path, "--format", "graph"];
+
+    let first = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(args)
+        .output()
+        .expect("failed to export a semantic graph");
+    let second = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(args)
+        .output()
+        .expect("failed to re-export a semantic graph");
+
+    assert!(first.status.success());
+    assert!(second.status.success());
+    assert_eq!(first.stdout, second.stdout);
+
+    let graph: serde_json::Value =
+        serde_json::from_slice(&first.stdout).expect("semantic graph output was not valid JSON");
+    let component_id = "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter";
+    assert_eq!(graph["schema_version"], 1);
+    assert_eq!(graph["roots"], serde_json::json!([component_id]));
+    assert_eq!(graph["nodes"].as_array().map(Vec::len), Some(11));
+    assert_eq!(graph["edges"].as_array().map(Vec::len), Some(14));
+    assert!(graph["nodes"].as_array().is_some_and(|nodes| {
+        nodes.iter().any(|node| {
+            node["id"]
+                == "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/state:count"
+                && node["kind"] == "state-field"
+        })
+    }));
+    assert!(graph["edges"].as_array().is_some_and(|edges| {
+        edges.iter().any(|edge| {
+            edge["kind"] == "ownership"
+                && edge["source"] == component_id
+                && edge["target"]
+                    == "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/method:increment"
+        }) && edges.iter().any(|edge| {
+            edge["kind"] == "action-state"
+                && edge["source"]
+                    == "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/action:increment:0"
+                && edge["target"]
+                    == "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/state:count"
+        })
+    }));
+
+    let selected = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["asm", path, "--format", "graph", "--entity", component_id])
+        .output()
+        .expect("failed to reject a selected graph export");
+    assert!(!selected.status.success());
+    assert!(String::from_utf8_lossy(&selected.stderr)
+        .contains("cannot be combined with ASM entity selection or filters"));
 }
 
 #[test]
@@ -231,6 +353,12 @@ fn asm_command_inspects_one_semantic_entity() {
     assert_eq!(document["schema_version"], 1);
     assert_eq!(document["entity"]["id"], entity_id);
     assert_eq!(document["entity"]["kind"], "state-field");
+    assert_eq!(
+        document["parents"],
+        serde_json::json!([
+            "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter"
+        ])
+    );
     assert_eq!(document["children"], serde_json::json!([]));
     assert_eq!(document["descendant_count"], 0);
     assert_eq!(document["outgoing_references"], serde_json::json!([]));
@@ -248,7 +376,37 @@ fn asm_command_inspects_one_semantic_entity() {
     let text = String::from_utf8(text_output.stdout).expect("entity text");
     assert!(text.contains(&format!("ASM Entity: {entity_id}\n")));
     assert!(text.contains("  kind: state-field\n"));
+    assert!(text.contains("  parents: 1\n"));
     assert!(text.contains("  incoming references: 2\n"));
+}
+
+#[test]
+fn asm_entity_inspection_navigates_action_ancestors_children_and_references() {
+    let path = "fixtures/0001-source-summary/input/Counter.tsx";
+    let action_id =
+        "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/action:increment:0";
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["asm", path, "--entity", action_id, "--format", "json"])
+        .output()
+        .expect("failed to navigate an ASM action entity");
+
+    assert!(output.status.success());
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("entity JSON");
+    assert_eq!(
+        document["parents"],
+        serde_json::json!([
+            "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/method:increment",
+            "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter"
+        ])
+    );
+    assert_eq!(document["children"], serde_json::json!([]));
+    assert_eq!(
+        document["outgoing_references"].as_array().map(Vec::len),
+        Some(1)
+    );
+    assert_eq!(document["outgoing_references"][0]["kind"], "action-state");
+    assert_eq!(document["incoming_references"], serde_json::json!([]));
 }
 
 #[test]
@@ -419,6 +577,102 @@ fn asm_command_exposes_declared_state_types() {
         .expect("status state entity");
 
     assert!(status["declared_type"].get("kind").is_none());
+}
+
+#[test]
+fn asm_command_exposes_constant_state_initializers() {
+    let path = "fixtures/0032-arithmetic-state-initializer/input/ArithmeticState.tsx";
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["asm", path, "--format", "json"])
+        .output()
+        .expect("failed to inspect arithmetic state");
+    assert!(output.status.success());
+
+    let document: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("ASM inspection output");
+    let state = document["entities"]
+        .as_array()
+        .and_then(|entities| {
+            entities
+                .iter()
+                .find(|entity| entity["kind"] == "state-field")
+        })
+        .expect("state entity");
+    assert_eq!(state["initial_expression"], "((1 + 2) * 3)");
+}
+
+#[test]
+fn asm_command_exposes_constant_comparison_state_initializers() {
+    let path = "fixtures/0033-constant-comparison-state-initializer/input/ComparisonState.tsx";
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["asm", path, "--format", "json"])
+        .output()
+        .expect("failed to inspect comparison state");
+    assert!(output.status.success());
+
+    let document: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("ASM inspection output");
+    let state = document["entities"]
+        .as_array()
+        .and_then(|entities| {
+            entities.iter().find(|entity| {
+                entity["id"]
+                    == "module:fixtures/0033-constant-comparison-state-initializer/input/ComparisonState.tsx/component:x-comparison-state/state:ready"
+            })
+        })
+        .expect("ready state entity");
+    assert_eq!(state["initial_expression"], "(((1 + 2) * 3) >= 9)");
+}
+
+#[test]
+fn asm_command_exposes_constant_logical_state_initializers() {
+    let path = "fixtures/0034-constant-logical-state-initializer/input/LogicalState.tsx";
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["asm", path, "--format", "json"])
+        .output()
+        .expect("failed to inspect logical state");
+    assert!(output.status.success());
+
+    let document: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("ASM inspection output");
+    let state = document["entities"]
+        .as_array()
+        .and_then(|entities| {
+            entities.iter().find(|entity| {
+                entity["id"]
+                    == "module:fixtures/0034-constant-logical-state-initializer/input/LogicalState.tsx/component:x-logical-state/state:ready"
+            })
+        })
+        .expect("ready state entity");
+    assert_eq!(state["initial_expression"], "((1 < 2) && (3 >= 3))");
+}
+
+#[test]
+fn asm_command_exposes_constant_nullish_state_initializers() {
+    let path = "fixtures/0035-constant-nullish-state-initializer/input/NullishState.tsx";
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["asm", path, "--format", "json"])
+        .output()
+        .expect("failed to inspect nullish state");
+    assert!(output.status.success());
+
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("ASM JSON");
+    let state = document["entities"]
+        .as_array()
+        .and_then(|entities| {
+            entities
+                .iter()
+                .find(|entity| entity["kind"] == "state-field")
+        })
+        .expect("state entity");
+    assert_eq!(state["initial_expression"], "(null ?? \"fallback\")");
 }
 
 #[test]
@@ -901,6 +1155,93 @@ fn parse_command_matches_keyed_list_semantics_fixture() {
 }
 
 #[test]
+fn parse_command_matches_arithmetic_state_initializer_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "parse",
+            "fixtures/0032-arithmetic-state-initializer/input/ArithmeticState.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli parse");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0032-arithmetic-state-initializer/expected/parse.txt"),
+    )
+    .expect("failed to read expected arithmetic state initializer parse fixture");
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn parse_command_matches_comparison_state_initializer_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "parse",
+            "fixtures/0033-constant-comparison-state-initializer/input/ComparisonState.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli parse");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0033-constant-comparison-state-initializer/expected/parse.txt"),
+    )
+    .expect("failed to read expected comparison state initializer parse fixture");
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn parse_command_matches_logical_state_initializer_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "parse",
+            "fixtures/0034-constant-logical-state-initializer/input/LogicalState.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli parse");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0034-constant-logical-state-initializer/expected/parse.txt"),
+    )
+    .expect("failed to read expected logical state initializer parse fixture");
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
 fn graph_command_matches_valid_counter_fixture() {
     let repo_root = repo_root();
 
@@ -1040,6 +1381,93 @@ fn graph_command_matches_semantic_errors_fixture() {
 }
 
 #[test]
+fn graph_command_matches_arithmetic_state_initializer_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "graph",
+            "fixtures/0032-arithmetic-state-initializer/input/ArithmeticState.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli graph");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0032-arithmetic-state-initializer/expected/graph.txt"),
+    )
+    .expect("failed to read expected arithmetic state initializer graph fixture");
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn graph_command_matches_comparison_state_initializer_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "graph",
+            "fixtures/0033-constant-comparison-state-initializer/input/ComparisonState.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli graph");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0033-constant-comparison-state-initializer/expected/graph.txt"),
+    )
+    .expect("failed to read expected comparison state initializer graph fixture");
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn graph_command_matches_logical_state_initializer_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "graph",
+            "fixtures/0034-constant-logical-state-initializer/input/LogicalState.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli graph");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0034-constant-logical-state-initializer/expected/graph.txt"),
+    )
+    .expect("failed to read expected logical state initializer graph fixture");
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
 fn html_command_matches_valid_counter_fixture() {
     let repo_root = repo_root();
 
@@ -1061,6 +1489,102 @@ fn html_command_matches_valid_counter_fixture() {
     let expected =
         std::fs::read_to_string(repo_root.join("fixtures/0001-source-summary/expected/html.html"))
             .expect("failed to read expected html fixture");
+
+    assert_eq!(
+        normalize_html_for_fixture(&actual),
+        normalize_html_for_fixture(&expected)
+    );
+}
+
+#[test]
+fn html_command_matches_arithmetic_state_initializer_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "html",
+            "fixtures/0032-arithmetic-state-initializer/input/ArithmeticState.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli html");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0032-arithmetic-state-initializer/expected/html.html"),
+    )
+    .expect("failed to read expected arithmetic state initializer HTML fixture");
+
+    assert_eq!(
+        normalize_html_for_fixture(&actual),
+        normalize_html_for_fixture(&expected)
+    );
+}
+
+#[test]
+fn html_command_matches_comparison_state_initializer_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "html",
+            "fixtures/0033-constant-comparison-state-initializer/input/ComparisonState.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli html");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0033-constant-comparison-state-initializer/expected/html.html"),
+    )
+    .expect("failed to read expected comparison state initializer HTML fixture");
+
+    assert_eq!(
+        normalize_html_for_fixture(&actual),
+        normalize_html_for_fixture(&expected)
+    );
+}
+
+#[test]
+fn html_command_matches_logical_state_initializer_fixture() {
+    let repo_root = repo_root();
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "html",
+            "fixtures/0034-constant-logical-state-initializer/input/LogicalState.tsx",
+        ])
+        .output()
+        .expect("failed to run ezc_cli html");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0034-constant-logical-state-initializer/expected/html.html"),
+    )
+    .expect("failed to read expected logical state initializer HTML fixture");
 
     assert_eq!(
         normalize_html_for_fixture(&actual),
@@ -2846,4 +3370,48 @@ fn manifest_command_matches_list_and_object_value_fixtures() {
 
         assert_json_eq(&actual, &expected);
     }
+}
+
+#[test]
+fn unary_state_initializer_fixture_matches_parse_graph_and_html() {
+    let repo_root = repo_root();
+    let input = "fixtures/0036-constant-unary-state-initializer/input/UnaryState.tsx";
+
+    for (command, expected) in [
+        (
+            "parse",
+            "fixtures/0036-constant-unary-state-initializer/expected/parse.txt",
+        ),
+        (
+            "graph",
+            "fixtures/0036-constant-unary-state-initializer/expected/graph.txt",
+        ),
+    ] {
+        let output = Command::new(ezc_cli_bin())
+            .current_dir(&repo_root)
+            .args([command, input])
+            .output()
+            .expect("failed to run unary fixture command");
+        assert!(output.status.success());
+        let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+        let expected = std::fs::read_to_string(repo_root.join(expected))
+            .expect("failed to read unary fixture expectation");
+        assert_eq!(actual, expected);
+    }
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["html", input])
+        .output()
+        .expect("failed to run unary fixture HTML command");
+    assert!(output.status.success());
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0036-constant-unary-state-initializer/expected/html.html"),
+    )
+    .expect("failed to read unary fixture HTML expectation");
+    assert_eq!(
+        normalize_html_for_fixture(&actual),
+        normalize_html_for_fixture(&expected)
+    );
 }

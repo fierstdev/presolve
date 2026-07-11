@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fmt;
 use std::path::Path;
 
 use serde::Serialize;
@@ -8,9 +9,11 @@ use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
 
 use ezc_parser::{
-    ParsedClass, ParsedEventHandler, ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue,
-    ParsedJsxChild, ParsedJsxConditional, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode,
-    ParsedSerializableValue, ParsedStateOperation, SourceSpan,
+    ParsedArithmeticExpression, ParsedArithmeticExpressionKind, ParsedArithmeticOperator,
+    ParsedClass, ParsedComparisonOperator, ParsedConstantExpression, ParsedConstantExpressionKind,
+    ParsedEventHandler, ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild,
+    ParsedJsxConditional, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLogicalOperator,
+    ParsedSerializableValue, ParsedStateOperation, ParsedUnaryOperator, SourceSpan,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,7 +43,369 @@ pub struct StateField {
     pub owner: SemanticOwner,
     pub name: String,
     pub initial_value: Option<SerializableValue>,
+    pub initial_expression: Option<ConstantExpression>,
     pub declared_type: Option<DeclaredStateType>,
+}
+
+/// A compiler-owned numeric arithmetic expression lowered from a state initializer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArithmeticExpression {
+    pub kind: ArithmeticExpressionKind,
+    pub span: SourceSpan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ArithmeticExpressionKind {
+    Number(String),
+    Binary {
+        operator: ArithmeticOperator,
+        left: Box<ArithmeticExpression>,
+        right: Box<ArithmeticExpression>,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArithmeticOperator {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Remainder,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ArithmeticEvaluationError {
+    InvalidNumber(String),
+    DivisionByZero,
+    NonFiniteResult,
+}
+
+/// A compiler-owned constant expression lowered from a state initializer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConstantExpression {
+    pub kind: ConstantExpressionKind,
+    pub span: SourceSpan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConstantExpressionKind {
+    Literal(SerializableValue),
+    Boolean(bool),
+    Arithmetic(ArithmeticExpression),
+    Comparison {
+        operator: ComparisonOperator,
+        left: ArithmeticExpression,
+        right: ArithmeticExpression,
+    },
+    Logical {
+        operator: LogicalOperator,
+        left: Box<ConstantExpression>,
+        right: Box<ConstantExpression>,
+    },
+    NullishCoalescing {
+        left: Box<ConstantExpression>,
+        right: Box<ConstantExpression>,
+    },
+    Unary {
+        operator: UnaryOperator,
+        operand: Box<ConstantExpression>,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ComparisonOperator {
+    Equal,
+    NotEqual,
+    LessThan,
+    LessThanOrEqual,
+    GreaterThan,
+    GreaterThanOrEqual,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LogicalOperator {
+    And,
+    Or,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnaryOperator {
+    Not,
+    Plus,
+    Minus,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConstantEvaluationError {
+    Arithmetic(ArithmeticEvaluationError),
+}
+
+impl ArithmeticExpression {
+    /// Evaluate a finite constant numeric expression using `EdgeZero` arithmetic semantics.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid numeric literal, division or remainder by zero,
+    /// or a non-finite intermediate or final result.
+    pub fn evaluate(&self) -> Result<SerializableValue, ArithmeticEvaluationError> {
+        self.evaluate_number()
+            .map(|value| SerializableValue::Number(value.to_string()))
+    }
+
+    fn evaluate_number(&self) -> Result<f64, ArithmeticEvaluationError> {
+        let value = match &self.kind {
+            ArithmeticExpressionKind::Number(value) => value
+                .parse::<f64>()
+                .map_err(|_| ArithmeticEvaluationError::InvalidNumber(value.clone()))?,
+            ArithmeticExpressionKind::Binary {
+                operator,
+                left,
+                right,
+            } => {
+                let left = left.evaluate_number()?;
+                let right = right.evaluate_number()?;
+                match operator {
+                    ArithmeticOperator::Add => left + right,
+                    ArithmeticOperator::Subtract => left - right,
+                    ArithmeticOperator::Multiply => left * right,
+                    ArithmeticOperator::Divide => {
+                        if right == 0.0 {
+                            return Err(ArithmeticEvaluationError::DivisionByZero);
+                        }
+                        left / right
+                    }
+                    ArithmeticOperator::Remainder => {
+                        if right == 0.0 {
+                            return Err(ArithmeticEvaluationError::DivisionByZero);
+                        }
+                        left % right
+                    }
+                }
+            }
+        };
+
+        value
+            .is_finite()
+            .then_some(value)
+            .ok_or(ArithmeticEvaluationError::NonFiniteResult)
+    }
+}
+
+impl ConstantExpression {
+    /// Evaluate a constant state initializer using `EdgeZero` expression semantics.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when one of the expression's numeric arithmetic operands is invalid.
+    pub fn evaluate(&self) -> Result<SerializableValue, ConstantEvaluationError> {
+        match &self.kind {
+            ConstantExpressionKind::Literal(value) => Ok(value.clone()),
+            ConstantExpressionKind::Boolean(value) => Ok(SerializableValue::Boolean(*value)),
+            ConstantExpressionKind::Arithmetic(expression) => expression
+                .evaluate()
+                .map_err(ConstantEvaluationError::Arithmetic),
+            ConstantExpressionKind::Comparison {
+                operator,
+                left,
+                right,
+            } => {
+                let left = left
+                    .evaluate_number()
+                    .map_err(ConstantEvaluationError::Arithmetic)?;
+                let right = right
+                    .evaluate_number()
+                    .map_err(ConstantEvaluationError::Arithmetic)?;
+                Ok(SerializableValue::Boolean(match operator {
+                    ComparisonOperator::Equal => numbers_are_equal(left, right),
+                    ComparisonOperator::NotEqual => !numbers_are_equal(left, right),
+                    ComparisonOperator::LessThan => left < right,
+                    ComparisonOperator::LessThanOrEqual => left <= right,
+                    ComparisonOperator::GreaterThan => left > right,
+                    ComparisonOperator::GreaterThanOrEqual => left >= right,
+                }))
+            }
+            ConstantExpressionKind::Logical {
+                operator,
+                left,
+                right,
+            } => {
+                let left = left.evaluate_boolean()?;
+                let value = match (operator, left) {
+                    (LogicalOperator::And, false) => false,
+                    (LogicalOperator::Or, true) => true,
+                    (LogicalOperator::And | LogicalOperator::Or, _) => right.evaluate_boolean()?,
+                };
+                Ok(SerializableValue::Boolean(value))
+            }
+            ConstantExpressionKind::NullishCoalescing { left, right } => {
+                let value = left.evaluate()?;
+                if matches!(value, SerializableValue::Null) {
+                    right.evaluate()
+                } else {
+                    Ok(value)
+                }
+            }
+            ConstantExpressionKind::Unary { operator, operand } => match operator {
+                UnaryOperator::Not => Ok(SerializableValue::Boolean(!operand.evaluate_boolean()?)),
+                UnaryOperator::Plus | UnaryOperator::Minus => {
+                    let SerializableValue::Number(value) = operand.evaluate()? else {
+                        unreachable!("parser requires numeric unary operands");
+                    };
+                    let value = value.parse::<f64>().map_err(|_| {
+                        ConstantEvaluationError::Arithmetic(
+                            ArithmeticEvaluationError::InvalidNumber(value),
+                        )
+                    })?;
+                    let value = if matches!(operator, UnaryOperator::Minus) {
+                        -value
+                    } else {
+                        value
+                    };
+                    value
+                        .is_finite()
+                        .then_some(SerializableValue::Number(value.to_string()))
+                        .ok_or(ConstantEvaluationError::Arithmetic(
+                            ArithmeticEvaluationError::NonFiniteResult,
+                        ))
+                }
+            },
+        }
+    }
+
+    fn evaluate_boolean(&self) -> Result<bool, ConstantEvaluationError> {
+        let SerializableValue::Boolean(value) = self.evaluate()? else {
+            unreachable!("parser only permits boolean constants as logical operands");
+        };
+        Ok(value)
+    }
+}
+
+fn numbers_are_equal(left: f64, right: f64) -> bool {
+    // EdgeZero constant expressions deliberately use exact finite numeric equality.
+    // No tolerance is compiler semantics because the language has no approximate
+    // comparison operator or configurable precision model.
+    #[allow(clippy::float_cmp)]
+    {
+        left == right
+    }
+}
+
+impl fmt::Display for ArithmeticExpression {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.kind {
+            ArithmeticExpressionKind::Number(value) => value.fmt(formatter),
+            ArithmeticExpressionKind::Binary {
+                operator,
+                left,
+                right,
+            } => write!(formatter, "({left} {operator} {right})"),
+        }
+    }
+}
+
+impl fmt::Display for ConstantExpression {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.kind {
+            ConstantExpressionKind::Literal(value) => format_constant_literal(value, formatter),
+            ConstantExpressionKind::Boolean(value) => value.fmt(formatter),
+            ConstantExpressionKind::Arithmetic(expression) => expression.fmt(formatter),
+            ConstantExpressionKind::Comparison {
+                operator,
+                left,
+                right,
+            } => write!(formatter, "({left} {operator} {right})"),
+            ConstantExpressionKind::Logical {
+                operator,
+                left,
+                right,
+            } => write!(formatter, "({left} {operator} {right})"),
+            ConstantExpressionKind::NullishCoalescing { left, right } => {
+                write!(formatter, "({left} ?? {right})")
+            }
+            ConstantExpressionKind::Unary { operator, operand } => {
+                write!(formatter, "({operator}{operand})")
+            }
+        }
+    }
+}
+
+fn format_constant_literal(
+    value: &SerializableValue,
+    formatter: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
+    match value {
+        SerializableValue::Null => formatter.write_str("null"),
+        SerializableValue::Number(value) => formatter.write_str(value),
+        SerializableValue::String(value) => write!(formatter, "{value:?}"),
+        SerializableValue::Boolean(value) => write!(formatter, "{value}"),
+        SerializableValue::Array(_) | SerializableValue::Object(_) => {
+            unreachable!("nullish constant literals are primitive values")
+        }
+    }
+}
+
+impl fmt::Display for ArithmeticOperator {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let operator = match self {
+            Self::Add => "+",
+            Self::Subtract => "-",
+            Self::Multiply => "*",
+            Self::Divide => "/",
+            Self::Remainder => "%",
+        };
+        formatter.write_str(operator)
+    }
+}
+
+impl fmt::Display for ComparisonOperator {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let operator = match self {
+            Self::Equal => "===",
+            Self::NotEqual => "!==",
+            Self::LessThan => "<",
+            Self::LessThanOrEqual => "<=",
+            Self::GreaterThan => ">",
+            Self::GreaterThanOrEqual => ">=",
+        };
+        formatter.write_str(operator)
+    }
+}
+
+impl fmt::Display for LogicalOperator {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::And => "&&",
+            Self::Or => "||",
+        })
+    }
+}
+impl fmt::Display for UnaryOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Not => "!",
+            Self::Plus => "+",
+            Self::Minus => "-",
+        })
+    }
+}
+
+impl fmt::Display for ArithmeticEvaluationError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidNumber(value) => {
+                write!(formatter, "unsupported numeric literal `{value}`")
+            }
+            Self::DivisionByZero => formatter.write_str("division or remainder by zero"),
+            Self::NonFiniteResult => formatter.write_str("non-finite result"),
+        }
+    }
+}
+
+impl fmt::Display for ConstantEvaluationError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Arithmetic(error) => error.fmt(formatter),
+        }
+    }
 }
 
 /// Explicit state type metadata carried from the parser into canonical compiler data.
@@ -286,28 +651,9 @@ fn build_component_node(
         });
     }
 
-    let state_fields = class
-        .properties
-        .iter()
-        .filter(|property| property.initializer.as_deref() == Some("state(...)"))
-        .map(|property| StateField {
-            id: id.state_field(&property.name),
-            owner: SemanticOwner::entity(id.clone()),
-            name: property.name.clone(),
-            initial_value: property
-                .state_initial_value
-                .as_ref()
-                .map(serializable_value_from_parsed),
-            declared_type: property.state_type_annotation.as_ref().map(|annotation| {
-                DeclaredStateType {
-                    text: annotation.text.clone(),
-                    provenance: SourceProvenance::new(path, annotation.span),
-                    kind: declared_state_type_kind(&annotation.text),
-                }
-            }),
-        })
-        .collect::<Vec<_>>();
+    let state_fields = state_fields_from_class(class, path, &id);
 
+    collect_constant_initializer_diagnostics(&state_fields, path, diagnostics);
     collect_declared_state_type_diagnostics(&state_fields, &class.name, diagnostics);
     collect_declared_state_action_type_diagnostics(class, &state_fields, path, diagnostics);
     collect_declared_state_toggle_type_diagnostics(class, &state_fields, path, diagnostics);
@@ -379,6 +725,181 @@ fn build_component_node(
         methods,
         actions,
         render,
+    }
+}
+
+fn state_fields_from_class(class: &ParsedClass, path: &Path, id: &SemanticId) -> Vec<StateField> {
+    class
+        .properties
+        .iter()
+        .filter(|property| property.initializer.as_deref() == Some("state(...)"))
+        .map(|property| {
+            let initial_expression = property
+                .state_initial_expression
+                .as_ref()
+                .map(constant_expression_from_parsed);
+            let initial_value = property
+                .state_initial_value
+                .as_ref()
+                .map(serializable_value_from_parsed)
+                .or_else(|| {
+                    initial_expression
+                        .as_ref()
+                        .and_then(|expression| expression.evaluate().ok())
+                });
+
+            StateField {
+                id: id.state_field(&property.name),
+                owner: SemanticOwner::entity(id.clone()),
+                name: property.name.clone(),
+                initial_value,
+                initial_expression,
+                declared_type: property.state_type_annotation.as_ref().map(|annotation| {
+                    DeclaredStateType {
+                        text: annotation.text.clone(),
+                        provenance: SourceProvenance::new(path, annotation.span),
+                        kind: declared_state_type_kind(&annotation.text),
+                    }
+                }),
+            }
+        })
+        .collect()
+}
+
+fn arithmetic_expression_from_parsed(
+    expression: &ParsedArithmeticExpression,
+) -> ArithmeticExpression {
+    let kind = match &expression.kind {
+        ParsedArithmeticExpressionKind::Number(value) => {
+            ArithmeticExpressionKind::Number(value.clone())
+        }
+        ParsedArithmeticExpressionKind::Binary {
+            operator,
+            left,
+            right,
+        } => ArithmeticExpressionKind::Binary {
+            operator: arithmetic_operator_from_parsed(*operator),
+            left: Box::new(arithmetic_expression_from_parsed(left)),
+            right: Box::new(arithmetic_expression_from_parsed(right)),
+        },
+    };
+
+    ArithmeticExpression {
+        kind,
+        span: expression.span,
+    }
+}
+
+fn constant_expression_from_parsed(expression: &ParsedConstantExpression) -> ConstantExpression {
+    let kind = match &expression.kind {
+        ParsedConstantExpressionKind::Primitive(value) => {
+            ConstantExpressionKind::Literal(serializable_value_from_parsed(value))
+        }
+        ParsedConstantExpressionKind::Boolean(value) => ConstantExpressionKind::Boolean(*value),
+        ParsedConstantExpressionKind::Arithmetic(expression) => {
+            ConstantExpressionKind::Arithmetic(arithmetic_expression_from_parsed(expression))
+        }
+        ParsedConstantExpressionKind::Comparison {
+            operator,
+            left,
+            right,
+        } => ConstantExpressionKind::Comparison {
+            operator: comparison_operator_from_parsed(*operator),
+            left: arithmetic_expression_from_parsed(left),
+            right: arithmetic_expression_from_parsed(right),
+        },
+        ParsedConstantExpressionKind::Logical {
+            operator,
+            left,
+            right,
+        } => ConstantExpressionKind::Logical {
+            operator: logical_operator_from_parsed(*operator),
+            left: Box::new(constant_expression_from_parsed(left)),
+            right: Box::new(constant_expression_from_parsed(right)),
+        },
+        ParsedConstantExpressionKind::NullishCoalescing { left, right } => {
+            ConstantExpressionKind::NullishCoalescing {
+                left: Box::new(constant_expression_from_parsed(left)),
+                right: Box::new(constant_expression_from_parsed(right)),
+            }
+        }
+        ParsedConstantExpressionKind::Unary { operator, operand } => {
+            ConstantExpressionKind::Unary {
+                operator: match operator {
+                    ParsedUnaryOperator::Not => UnaryOperator::Not,
+                    ParsedUnaryOperator::Plus => UnaryOperator::Plus,
+                    ParsedUnaryOperator::Minus => UnaryOperator::Minus,
+                },
+                operand: Box::new(constant_expression_from_parsed(operand)),
+            }
+        }
+    };
+
+    ConstantExpression {
+        kind,
+        span: expression.span,
+    }
+}
+
+fn arithmetic_operator_from_parsed(operator: ParsedArithmeticOperator) -> ArithmeticOperator {
+    match operator {
+        ParsedArithmeticOperator::Add => ArithmeticOperator::Add,
+        ParsedArithmeticOperator::Subtract => ArithmeticOperator::Subtract,
+        ParsedArithmeticOperator::Multiply => ArithmeticOperator::Multiply,
+        ParsedArithmeticOperator::Divide => ArithmeticOperator::Divide,
+        ParsedArithmeticOperator::Remainder => ArithmeticOperator::Remainder,
+    }
+}
+
+fn comparison_operator_from_parsed(operator: ParsedComparisonOperator) -> ComparisonOperator {
+    match operator {
+        ParsedComparisonOperator::Equal => ComparisonOperator::Equal,
+        ParsedComparisonOperator::NotEqual => ComparisonOperator::NotEqual,
+        ParsedComparisonOperator::LessThan => ComparisonOperator::LessThan,
+        ParsedComparisonOperator::LessThanOrEqual => ComparisonOperator::LessThanOrEqual,
+        ParsedComparisonOperator::GreaterThan => ComparisonOperator::GreaterThan,
+        ParsedComparisonOperator::GreaterThanOrEqual => ComparisonOperator::GreaterThanOrEqual,
+    }
+}
+
+fn logical_operator_from_parsed(operator: ParsedLogicalOperator) -> LogicalOperator {
+    match operator {
+        ParsedLogicalOperator::And => LogicalOperator::And,
+        ParsedLogicalOperator::Or => LogicalOperator::Or,
+    }
+}
+
+fn collect_constant_initializer_diagnostics(
+    state_fields: &[StateField],
+    path: &Path,
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+) {
+    for field in state_fields {
+        let Some(expression) = &field.initial_expression else {
+            continue;
+        };
+        let Err(error) = expression.evaluate() else {
+            continue;
+        };
+
+        let (code, initializer_kind) = match &expression.kind {
+            ConstantExpressionKind::Arithmetic(_) => ("EZC1022", "arithmetic"),
+            ConstantExpressionKind::Comparison { .. } => ("EZC1023", "comparison"),
+            ConstantExpressionKind::Boolean(_) | ConstantExpressionKind::Logical { .. } => {
+                ("EZC1024", "logical")
+            }
+            ConstantExpressionKind::Literal(_)
+            | ConstantExpressionKind::NullishCoalescing { .. } => ("EZC1025", "nullish-coalescing"),
+            ConstantExpressionKind::Unary { .. } => ("EZC1026", "unary"),
+        };
+        diagnostics.push(ComponentDiagnostic {
+            provenance: Some(SourceProvenance::new(path, expression.span)),
+            code: code.to_string(),
+            message: format!(
+                "state field `{}` has an invalid {initializer_kind} initializer: {error}",
+                field.name
+            ),
+        });
     }
 }
 

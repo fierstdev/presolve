@@ -1,0 +1,20 @@
+File: fixtures/0036-constant-unary-state-initializer/input/UnaryState.tsx
+ComponentGraph:
+  diagnostics:
+    none
+  components:
+    component UnaryState
+      element: x-unary-state
+      route: none
+      state:
+        negated = (!(1 < 2))
+        signed = (-(1 + 2))
+      methods:
+        render
+      render:
+        root: <output>
+        attributes: none
+        event handlers: none
+        children:
+          Binding("this.signed") @ 7:20 span=172..185
+        bindings: this.signed

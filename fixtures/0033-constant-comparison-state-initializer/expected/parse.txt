@@ -1,0 +1,19 @@
+File: fixtures/0033-constant-comparison-state-initializer/input/ComparisonState.tsx
+Diagnostics:
+  none
+
+Classes:
+  class ComparisonState at 1:1
+    decorators:
+      @component("x-comparison-state") at 1:1
+    properties:
+      ready = state(...) at 3:3
+      different = state(...) at 4:3
+    methods:
+      render at 6:3
+        jsx root <output> at 7:12
+          attributes: none
+          event handlers: none
+          children:
+            Binding("this.ready") @ 7:20 span=194..206
+        bindings: this.ready

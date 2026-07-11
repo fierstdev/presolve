@@ -66,6 +66,7 @@ pub struct ParsedProperty {
     pub name: String,
     pub initializer: Option<String>,
     pub state_initial_value: Option<ParsedSerializableValue>,
+    pub state_initial_expression: Option<ParsedConstantExpression>,
     pub state_type_annotation: Option<ParsedTypeAnnotation>,
     pub span: SourceSpan,
 }
@@ -87,6 +88,87 @@ pub enum ParsedSerializableValue {
     Object(BTreeMap<String, ParsedSerializableValue>),
 }
 
+/// A compiler-owned numeric arithmetic expression accepted in `state(...)`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedArithmeticExpression {
+    pub kind: ParsedArithmeticExpressionKind,
+    pub span: SourceSpan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParsedArithmeticExpressionKind {
+    Number(String),
+    Binary {
+        operator: ParsedArithmeticOperator,
+        left: Box<ParsedArithmeticExpression>,
+        right: Box<ParsedArithmeticExpression>,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParsedArithmeticOperator {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Remainder,
+}
+
+/// A compiler-owned constant expression accepted in `state(...)`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedConstantExpression {
+    pub kind: ParsedConstantExpressionKind,
+    pub span: SourceSpan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParsedConstantExpressionKind {
+    Primitive(ParsedSerializableValue),
+    Boolean(bool),
+    Arithmetic(ParsedArithmeticExpression),
+    Comparison {
+        operator: ParsedComparisonOperator,
+        left: ParsedArithmeticExpression,
+        right: ParsedArithmeticExpression,
+    },
+    Logical {
+        operator: ParsedLogicalOperator,
+        left: Box<ParsedConstantExpression>,
+        right: Box<ParsedConstantExpression>,
+    },
+    NullishCoalescing {
+        left: Box<ParsedConstantExpression>,
+        right: Box<ParsedConstantExpression>,
+    },
+    Unary {
+        operator: ParsedUnaryOperator,
+        operand: Box<ParsedConstantExpression>,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParsedComparisonOperator {
+    Equal,
+    NotEqual,
+    LessThan,
+    LessThanOrEqual,
+    GreaterThan,
+    GreaterThanOrEqual,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParsedLogicalOperator {
+    And,
+    Or,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParsedUnaryOperator {
+    Not,
+    Plus,
+    Minus,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedMethod {
     pub name: String,
@@ -94,6 +176,14 @@ pub struct ParsedMethod {
     pub jsx_roots: Vec<ParsedJsxNode>,
     pub bindings: Vec<String>,
     pub state_updates: Vec<ParsedStateUpdate>,
+    pub local_variables: Vec<ParsedLocalVariable>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedLocalVariable {
+    pub name: String,
+    pub value: ParsedSerializableValue,
+    pub span: SourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

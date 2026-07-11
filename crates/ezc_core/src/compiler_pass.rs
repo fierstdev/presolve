@@ -1,16 +1,30 @@
 use std::collections::BTreeMap;
 
-use crate::application_semantic_model::ApplicationSemanticModel;
+use crate::application_semantic_model::{ApplicationSemanticModel, SemanticEntityKind};
 use crate::component_graph::{SerializableValue, StateOperation};
 use crate::semantic_id::SemanticId;
 use crate::semantic_provenance::SourceProvenance;
 use crate::validate_application_semantic_model;
 
-pub trait AnalysisPass {
+/// An immutable transformation from canonical ASM input to a compiler product.
+///
+/// Implementations must treat the input ASM as read-only and return a newly
+/// constructed output. This is the common pass boundary for analysis products
+/// today and future transformed ASM products where applicable.
+pub trait ImmutableAsmPass {
     type Output;
 
-    fn analyze(&self, model: &ApplicationSemanticModel) -> Self::Output;
+    fn transform(&self, model: &ApplicationSemanticModel) -> Self::Output;
 }
+
+/// Compatibility surface for existing analysis consumers.
+pub trait AnalysisPass: ImmutableAsmPass {
+    fn analyze(&self, model: &ApplicationSemanticModel) -> Self::Output {
+        self.transform(model)
+    }
+}
+
+impl<T> AnalysisPass for T where T: ImmutableAsmPass {}
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct DependencyAnalysisPass;
@@ -21,10 +35,10 @@ pub struct DependencyAnalysis {
     pub dependents: BTreeMap<SemanticId, Vec<SemanticId>>,
 }
 
-impl AnalysisPass for DependencyAnalysisPass {
+impl ImmutableAsmPass for DependencyAnalysisPass {
     type Output = DependencyAnalysis;
 
-    fn analyze(&self, model: &ApplicationSemanticModel) -> DependencyAnalysis {
+    fn transform(&self, model: &ApplicationSemanticModel) -> DependencyAnalysis {
         let mut dependencies = BTreeMap::<SemanticId, Vec<SemanticId>>::new();
         let mut dependents = BTreeMap::<SemanticId, Vec<SemanticId>>::new();
 
@@ -54,9 +68,9 @@ pub struct ConstantEvaluation {
     pub values: BTreeMap<SemanticId, SerializableValue>,
 }
 
-impl AnalysisPass for ConstantEvaluationPass {
+impl ImmutableAsmPass for ConstantEvaluationPass {
     type Output = ConstantEvaluation;
-    fn analyze(&self, model: &ApplicationSemanticModel) -> ConstantEvaluation {
+    fn transform(&self, model: &ApplicationSemanticModel) -> ConstantEvaluation {
         let mut values = BTreeMap::new();
         for component in &model.components {
             for field in &component.state_fields {
@@ -89,9 +103,9 @@ pub struct DeadSemanticAnalysis {
     pub unreferenced_actions: Vec<SemanticId>,
 }
 
-impl AnalysisPass for DeadSemanticAnalysisPass {
+impl ImmutableAsmPass for DeadSemanticAnalysisPass {
     type Output = DeadSemanticAnalysis;
-    fn analyze(&self, model: &ApplicationSemanticModel) -> DeadSemanticAnalysis {
+    fn transform(&self, model: &ApplicationSemanticModel) -> DeadSemanticAnalysis {
         let live = model
             .references
             .iter()
@@ -104,11 +118,15 @@ impl AnalysisPass for DeadSemanticAnalysisPass {
                 if method.name != "render" && !live.contains(&method.id) {
                     methods.push(method.id.clone());
                     actions.extend(
-                        component
-                            .actions
+                        model
+                            .children_of(&method.id)
                             .iter()
-                            .filter(|action| action.owner.entity_id() == Some(&method.id))
-                            .map(|action| action.id.clone()),
+                            .filter(|id| {
+                                model.entity(id).is_some_and(|entity| {
+                                    entity.kind() == SemanticEntityKind::Action
+                                })
+                            })
+                            .map(|id| (*id).clone()),
                     );
                 }
             }
@@ -132,10 +150,10 @@ pub struct OptimizationRecommendation {
     pub provenance: SourceProvenance,
 }
 
-impl AnalysisPass for OptimizationPlanningPass {
+impl ImmutableAsmPass for OptimizationPlanningPass {
     type Output = OptimizationPlan;
-    fn analyze(&self, model: &ApplicationSemanticModel) -> OptimizationPlan {
-        let dead = DeadSemanticAnalysisPass.analyze(model);
+    fn transform(&self, model: &ApplicationSemanticModel) -> OptimizationPlan {
+        let dead = DeadSemanticAnalysisPass.transform(model);
         let recommendations = dead
             .unreferenced_methods
             .into_iter()
@@ -157,12 +175,12 @@ pub struct ExplainabilityPass;
 pub struct ExplainabilityReport {
     pub lines: Vec<String>,
 }
-impl AnalysisPass for ExplainabilityPass {
+impl ImmutableAsmPass for ExplainabilityPass {
     type Output = ExplainabilityReport;
-    fn analyze(&self, model: &ApplicationSemanticModel) -> ExplainabilityReport {
-        let dependencies = DependencyAnalysisPass.analyze(model);
-        let constants = ConstantEvaluationPass.analyze(model);
-        let optimizations = OptimizationPlanningPass.analyze(model);
+    fn transform(&self, model: &ApplicationSemanticModel) -> ExplainabilityReport {
+        let dependencies = DependencyAnalysisPass.transform(model);
+        let constants = ConstantEvaluationPass.transform(model);
+        let optimizations = OptimizationPlanningPass.transform(model);
         let validation = validate_application_semantic_model(model);
         ExplainabilityReport {
             lines: vec![
@@ -176,5 +194,86 @@ impl AnalysisPass for ExplainabilityPass {
                 format!("validation_diagnostics={}", validation.len()),
             ],
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        AnalysisPass, ConstantEvaluationPass, DeadSemanticAnalysisPass, DependencyAnalysisPass,
+        ExplainabilityPass, ImmutableAsmPass, OptimizationPlanningPass,
+    };
+    use crate::{build_application_semantic_model, SemanticOwner};
+
+    #[test]
+    fn finds_dead_actions_from_canonical_ownership() {
+        let parsed = ezc_parser::parse_file(
+            "src/Counter.tsx",
+            r#"
+@component("x-counter")
+class Counter extends Component {
+  count = state(0);
+
+  unused() {
+    this.count++;
+  }
+
+  render() {
+    return <div>Counter</div>;
+  }
+}
+"#,
+        );
+        let mut asm = build_application_semantic_model(&parsed);
+        let action_id = asm.components[0].actions[0].id.clone();
+        asm.components[0].actions[0].owner = SemanticOwner::Application;
+
+        let analysis = DeadSemanticAnalysisPass.analyze(&asm);
+        assert_eq!(analysis.unreferenced_actions, vec![action_id]);
+    }
+
+    #[test]
+    fn transforms_asm_immutably_with_compatibility_analysis_results() {
+        let parsed = ezc_parser::parse_file(
+            "src/Counter.tsx",
+            r#"
+@component("x-counter")
+class Counter extends Component {
+  count = state(0);
+
+  increment() {
+    this.count++;
+  }
+
+  render() {
+    return <button onClick={() => this.increment()}>{this.count}</button>;
+  }
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let original = asm.clone();
+
+        assert_eq!(
+            DependencyAnalysisPass.transform(&asm),
+            DependencyAnalysisPass.analyze(&asm)
+        );
+        assert_eq!(
+            ConstantEvaluationPass.transform(&asm),
+            ConstantEvaluationPass.analyze(&asm)
+        );
+        assert_eq!(
+            DeadSemanticAnalysisPass.transform(&asm),
+            DeadSemanticAnalysisPass.analyze(&asm)
+        );
+        assert_eq!(
+            OptimizationPlanningPass.transform(&asm),
+            OptimizationPlanningPass.analyze(&asm)
+        );
+        assert_eq!(
+            ExplainabilityPass.transform(&asm),
+            ExplainabilityPass.analyze(&asm)
+        );
+        assert_eq!(asm, original);
     }
 }

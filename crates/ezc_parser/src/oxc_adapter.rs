@@ -14,12 +14,15 @@ use oxc_parser::Parser;
 use oxc_span::{SourceType, Span};
 
 use crate::model::{
-    ParseDiagnostic, ParseLabel, ParseSeverity, ParsedClass, ParsedDecorator, ParsedEventHandler,
-    ParsedExport, ParsedExportKind, ParsedExportSpecifier, ParsedFile, ParsedImport,
-    ParsedImportSpecifier, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild,
-    ParsedJsxConditional, ParsedJsxElement, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode,
-    ParsedMethod, ParsedProperty, ParsedSerializableValue, ParsedStateOperation, ParsedStateUpdate,
-    ParsedTypeAnnotation, SourceSpan,
+    ParseDiagnostic, ParseLabel, ParseSeverity, ParsedArithmeticExpression,
+    ParsedArithmeticExpressionKind, ParsedArithmeticOperator, ParsedClass,
+    ParsedComparisonOperator, ParsedConstantExpression, ParsedConstantExpressionKind,
+    ParsedDecorator, ParsedEventHandler, ParsedExport, ParsedExportKind, ParsedExportSpecifier,
+    ParsedFile, ParsedImport, ParsedImportSpecifier, ParsedJsxAttribute, ParsedJsxAttributeValue,
+    ParsedJsxChild, ParsedJsxConditional, ParsedJsxElement, ParsedJsxFragment, ParsedJsxList,
+    ParsedJsxNode, ParsedLocalVariable, ParsedLogicalOperator, ParsedMethod, ParsedProperty,
+    ParsedSerializableValue, ParsedStateOperation, ParsedStateUpdate, ParsedTypeAnnotation,
+    ParsedUnaryOperator, SourceSpan,
 };
 
 pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
@@ -336,6 +339,10 @@ fn parse_property(
     let initializer = property.value.as_ref().and_then(expression_summary);
 
     let state_initial_value = property.value.as_ref().and_then(state_initial_value);
+    let state_initial_expression = property
+        .value
+        .as_ref()
+        .and_then(|expression| state_initial_constant_expression(expression, source));
     let state_type_annotation = (initializer.as_deref() == Some("state(...)"))
         .then_some(property.type_annotation.as_ref())
         .flatten()
@@ -345,6 +352,7 @@ fn parse_property(
         name,
         initializer,
         state_initial_value,
+        state_initial_expression,
         state_type_annotation,
         span: source_span(source, property.span),
     })
@@ -367,6 +375,7 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
     let mut jsx_roots = Vec::new();
     let mut bindings = Vec::new();
     let mut state_updates = Vec::new();
+    let mut local_variables = Vec::new();
 
     if let Some(body) = &method.value.body {
         for statement in &body.statements {
@@ -374,6 +383,7 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
             if let Some(update) = parsed_state_update(statement, source) {
                 state_updates.push(update);
             }
+            local_variables.extend(parsed_local_variables(statement, source));
         }
     }
 
@@ -383,7 +393,27 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
         jsx_roots,
         bindings,
         state_updates,
+        local_variables,
     })
+}
+
+fn parsed_local_variables(statement: &Statement<'_>, source: &str) -> Vec<ParsedLocalVariable> {
+    let Some(Declaration::VariableDeclaration(declaration)) = statement.as_declaration() else {
+        return Vec::new();
+    };
+    declaration
+        .declarations
+        .iter()
+        .filter_map(|declarator| {
+            let name = binding_identifier_name(&declarator.id.kind)?;
+            let value = serializable_value_from_expression(declarator.init.as_ref()?)?;
+            Some(ParsedLocalVariable {
+                name,
+                value,
+                span: source_span(source, declarator.span),
+            })
+        })
+        .collect()
 }
 
 fn parsed_state_update(statement: &Statement<'_>, source: &str) -> Option<ParsedStateUpdate> {
@@ -861,6 +891,268 @@ fn state_initial_value(expression: &Expression<'_>) -> Option<ParsedSerializable
     }
 
     call.arguments.first().and_then(state_argument_literal)
+}
+
+fn state_initial_constant_expression(
+    expression: &Expression<'_>,
+    source: &str,
+) -> Option<ParsedConstantExpression> {
+    let Expression::CallExpression(call) = expression else {
+        return None;
+    };
+    let Expression::Identifier(callee) = &call.callee else {
+        return None;
+    };
+    if callee.name != "state" || call.arguments.len() != 1 {
+        return None;
+    }
+
+    let expression = parsed_constant_expression(call.arguments[0].as_expression()?, source)?;
+    (!matches!(
+        expression.kind,
+        ParsedConstantExpressionKind::Primitive(_) | ParsedConstantExpressionKind::Boolean(_)
+    ))
+    .then_some(expression)
+}
+
+fn parsed_constant_expression(
+    expression: &Expression<'_>,
+    source: &str,
+) -> Option<ParsedConstantExpression> {
+    if let Expression::ParenthesizedExpression(parenthesized) = expression {
+        return parsed_constant_expression(&parenthesized.expression, source);
+    }
+    if let Expression::BooleanLiteral(literal) = expression {
+        return Some(ParsedConstantExpression {
+            kind: ParsedConstantExpressionKind::Boolean(literal.value),
+            span: source_span(source, literal.span),
+        });
+    }
+    if let Some(primitive) = parsed_primitive_constant_expression(expression, source) {
+        return Some(primitive);
+    }
+    if let Some(unary) = parsed_unary_constant_expression(expression, source) {
+        return Some(unary);
+    }
+    if let Some(logical) = parsed_logical_expression(expression, source) {
+        return Some(logical);
+    }
+    if let Some(comparison) = parsed_comparison_expression(expression, source) {
+        return Some(comparison);
+    }
+    if let Some(nullish) = parsed_nullish_coalescing_expression(expression, source) {
+        return Some(nullish);
+    }
+
+    let arithmetic = parsed_arithmetic_expression(expression, source)?;
+    matches!(
+        arithmetic.kind,
+        ParsedArithmeticExpressionKind::Binary { .. }
+    )
+    .then_some(ParsedConstantExpression {
+        span: arithmetic.span,
+        kind: ParsedConstantExpressionKind::Arithmetic(arithmetic),
+    })
+}
+
+fn parsed_unary_constant_expression(
+    expression: &Expression<'_>,
+    source: &str,
+) -> Option<ParsedConstantExpression> {
+    let Expression::UnaryExpression(unary) = expression else {
+        return None;
+    };
+    let operator = match unary.operator.as_str() {
+        "!" => ParsedUnaryOperator::Not,
+        "+" => ParsedUnaryOperator::Plus,
+        "-" => ParsedUnaryOperator::Minus,
+        _ => return None,
+    };
+    let operand = parsed_constant_expression(&unary.argument, source)?;
+    let valid = match operator {
+        ParsedUnaryOperator::Not => matches!(
+            operand.kind,
+            ParsedConstantExpressionKind::Boolean(_)
+                | ParsedConstantExpressionKind::Comparison { .. }
+                | ParsedConstantExpressionKind::Logical { .. }
+        ),
+        ParsedUnaryOperator::Plus | ParsedUnaryOperator::Minus => matches!(
+            operand.kind,
+            ParsedConstantExpressionKind::Primitive(ParsedSerializableValue::Number(_))
+                | ParsedConstantExpressionKind::Arithmetic(_)
+        ),
+    };
+    valid.then_some(ParsedConstantExpression {
+        kind: ParsedConstantExpressionKind::Unary {
+            operator,
+            operand: Box::new(operand),
+        },
+        span: source_span(source, unary.span),
+    })
+}
+
+fn parsed_primitive_constant_expression(
+    expression: &Expression<'_>,
+    source: &str,
+) -> Option<ParsedConstantExpression> {
+    let (value, span) = match expression {
+        Expression::NullLiteral(literal) => (ParsedSerializableValue::Null, literal.span),
+        Expression::NumericLiteral(literal) => (
+            ParsedSerializableValue::Number(literal.raw.as_ref()?.to_string()),
+            literal.span,
+        ),
+        Expression::StringLiteral(literal) => (
+            ParsedSerializableValue::String(literal.value.to_string()),
+            literal.span,
+        ),
+        _ => return None,
+    };
+
+    Some(ParsedConstantExpression {
+        kind: ParsedConstantExpressionKind::Primitive(value),
+        span: source_span(source, span),
+    })
+}
+
+fn parsed_logical_expression(
+    expression: &Expression<'_>,
+    source: &str,
+) -> Option<ParsedConstantExpression> {
+    let Expression::LogicalExpression(logical) = expression else {
+        return None;
+    };
+    let operator = match logical.operator.as_str() {
+        "&&" => ParsedLogicalOperator::And,
+        "||" => ParsedLogicalOperator::Or,
+        _ => return None,
+    };
+
+    Some(ParsedConstantExpression {
+        kind: ParsedConstantExpressionKind::Logical {
+            operator,
+            left: Box::new(parsed_boolean_constant_expression(&logical.left, source)?),
+            right: Box::new(parsed_boolean_constant_expression(&logical.right, source)?),
+        },
+        span: source_span(source, logical.span),
+    })
+}
+
+fn parsed_nullish_coalescing_expression(
+    expression: &Expression<'_>,
+    source: &str,
+) -> Option<ParsedConstantExpression> {
+    let Expression::LogicalExpression(logical) = expression else {
+        return None;
+    };
+    if logical.operator.as_str() != "??" {
+        return None;
+    }
+
+    Some(ParsedConstantExpression {
+        kind: ParsedConstantExpressionKind::NullishCoalescing {
+            left: Box::new(parsed_nullish_constant_expression(&logical.left, source)?),
+            right: Box::new(parsed_nullish_constant_expression(&logical.right, source)?),
+        },
+        span: source_span(source, logical.span),
+    })
+}
+
+fn parsed_boolean_constant_expression(
+    expression: &Expression<'_>,
+    source: &str,
+) -> Option<ParsedConstantExpression> {
+    let expression = parsed_constant_expression(expression, source)?;
+    matches!(
+        expression.kind,
+        ParsedConstantExpressionKind::Boolean(_)
+            | ParsedConstantExpressionKind::Comparison { .. }
+            | ParsedConstantExpressionKind::Logical { .. }
+    )
+    .then_some(expression)
+}
+
+fn parsed_nullish_constant_expression(
+    expression: &Expression<'_>,
+    source: &str,
+) -> Option<ParsedConstantExpression> {
+    let expression = parsed_constant_expression(expression, source)?;
+    matches!(
+        expression.kind,
+        ParsedConstantExpressionKind::Primitive(_)
+            | ParsedConstantExpressionKind::Boolean(_)
+            | ParsedConstantExpressionKind::Arithmetic(_)
+            | ParsedConstantExpressionKind::Comparison { .. }
+            | ParsedConstantExpressionKind::Logical { .. }
+            | ParsedConstantExpressionKind::NullishCoalescing { .. }
+    )
+    .then_some(expression)
+}
+
+fn parsed_comparison_expression(
+    expression: &Expression<'_>,
+    source: &str,
+) -> Option<ParsedConstantExpression> {
+    if let Expression::ParenthesizedExpression(parenthesized) = expression {
+        return parsed_comparison_expression(&parenthesized.expression, source);
+    }
+    let Expression::BinaryExpression(binary) = expression else {
+        return None;
+    };
+    let operator = match binary.operator.as_str() {
+        "===" => ParsedComparisonOperator::Equal,
+        "!==" => ParsedComparisonOperator::NotEqual,
+        "<" => ParsedComparisonOperator::LessThan,
+        "<=" => ParsedComparisonOperator::LessThanOrEqual,
+        ">" => ParsedComparisonOperator::GreaterThan,
+        ">=" => ParsedComparisonOperator::GreaterThanOrEqual,
+        _ => return None,
+    };
+
+    Some(ParsedConstantExpression {
+        kind: ParsedConstantExpressionKind::Comparison {
+            operator,
+            left: parsed_arithmetic_expression(&binary.left, source)?,
+            right: parsed_arithmetic_expression(&binary.right, source)?,
+        },
+        span: source_span(source, binary.span),
+    })
+}
+
+fn parsed_arithmetic_expression(
+    expression: &Expression<'_>,
+    source: &str,
+) -> Option<ParsedArithmeticExpression> {
+    match expression {
+        Expression::ParenthesizedExpression(parenthesized) => {
+            parsed_arithmetic_expression(&parenthesized.expression, source)
+        }
+        Expression::NumericLiteral(literal) => Some(ParsedArithmeticExpression {
+            kind: ParsedArithmeticExpressionKind::Number(literal.raw.as_ref()?.to_string()),
+            span: source_span(source, literal.span),
+        }),
+        Expression::BinaryExpression(binary) => {
+            let operator = match binary.operator.as_str() {
+                "+" => ParsedArithmeticOperator::Add,
+                "-" => ParsedArithmeticOperator::Subtract,
+                "*" => ParsedArithmeticOperator::Multiply,
+                "/" => ParsedArithmeticOperator::Divide,
+                "%" => ParsedArithmeticOperator::Remainder,
+                _ => return None,
+            };
+            let left = parsed_arithmetic_expression(&binary.left, source)?;
+            let right = parsed_arithmetic_expression(&binary.right, source)?;
+
+            Some(ParsedArithmeticExpression {
+                kind: ParsedArithmeticExpressionKind::Binary {
+                    operator,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                },
+                span: source_span(source, binary.span),
+            })
+        }
+        _ => None,
+    }
 }
 
 fn state_argument_literal(argument: &Argument<'_>) -> Option<ParsedSerializableValue> {

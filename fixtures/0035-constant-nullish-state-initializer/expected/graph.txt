@@ -1,0 +1,20 @@
+File: fixtures/0035-constant-nullish-state-initializer/input/NullishState.tsx
+ComponentGraph:
+  diagnostics:
+    none
+  components:
+    component NullishState
+      element: x-nullish-state
+      route: none
+      state:
+        label = (null ?? "fallback")
+        total = (5 ?? (10 / 0))
+      methods:
+        render
+      render:
+        root: <output>
+        attributes: none
+        event handlers: none
+        children:
+          Binding("this.label") @ 7:20 span=187..199
+        bindings: this.label

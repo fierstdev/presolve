@@ -61,16 +61,26 @@ containment, relations, and overlap-based compiler diagnostics:
 ```sh
 ezc_cli asm <file> --entity <semantic-id> [--format text|json]
 ezc_cli asm <file> --source <path> --offset <byte> [--format text|json]
+ezc_cli explain <file> --entity <semantic-id> [--format text|json]
+ezc_cli explain <file> --source <path> --offset <byte> [--format text|json]
 ```
 
 Use `ezc_cli asm <file> --format json` to discover the available semantic IDs.
 The selected-entity document includes the entity itself, direct child IDs,
-descendant count, incoming and outgoing references, and related compiler
-diagnostics. An unknown semantic ID fails explicitly.
+nearest-first parent IDs through the application root, descendant count, incoming and outgoing references,
+and related compiler diagnostics. This is the canonical semantic-navigation
+surface: ownership is navigated through parents and direct children, while
+relations are navigated through ordered incoming and outgoing references. An
+unknown semantic ID fails explicitly.
 
 Source selection chooses the uniquely narrowest semantic span covering the
 given byte offset. No match or tied narrowest spans fail explicitly; `--entity`
 cannot be combined with `--source` or `--offset`.
+
+`ezc_cli explain <file>` retains its legacy source-summary output. Supplying
+an entity selector (or an entity filter) activates the same read-only,
+canonical ASM inspection path as `ezc_cli asm`, including its text/JSON
+document, source selection, deterministic filtering, and explicit failures.
 
 Selected entity inspection supports optional filters:
 
@@ -83,6 +93,50 @@ ezc_cli asm <file> --entity <semantic-id> --reference-kind action-state
 `event-handler`, `template`, or `template-entity`. `--reference-kind` accepts
 `action-state`, `event-method`, or `template-state`. Filters require an entity
 selector and affect only the returned children or relations.
+
+## Semantic graph export
+
+Export the canonical ASM as a stable JSON graph:
+
+```sh
+ezc_cli asm <file> [file...] --format graph
+```
+
+The graph schema has a version, ordered application roots, typed semantic nodes
+with source provenance, and ordered edges. Ownership edges point from parent to
+child; resolved action/state, event/method, and template/state edges retain
+their canonical direction. The export intentionally excludes parser facts,
+backend-local node IDs, manifests, runtime artifacts, and diagnostics. Entity
+selection and filters are not accepted for whole-application graph export.
+
+## Constant expression state initializers
+
+The compiler recognizes constant expressions inside `state(...)` initializers.
+It lowers the authored expression into a compiler-owned constant-expression
+model, evaluates it during compilation, and retains the canonical expression
+for ASM inspection and ComponentGraph output:
+
+```tsx
+total: number = state((1 + 2) * 3);
+ready: boolean = state(((1 + 2) * 3) >= 9);
+```
+
+Arithmetic supports `+`, `-`, `*`, `/`, and `%`. Comparisons accept numeric
+arithmetic operands and support `===`, `!==`, `<`, `<=`, `>`, and `>=`; they
+evaluate to a boolean. Logical `&&` and `||` compose boolean literals and
+comparisons with compiler-time short-circuit semantics. Division or remainder
+by zero, invalid numeric literals, and non-finite arithmetic results report
+`EZC1022` for arithmetic initializers, `EZC1023` for comparisons, or `EZC1024`
+when reached through a logical initializer. This is deliberately not general
+JavaScript evaluation: state reads, local variables, calls, coercions,
+truthiness, unary operators, and action expressions are outside this slice.
+
+Nullish coalescing `??` selects between supported constant primitives and B1-B3
+expressions. It evaluates left-to-right at compile time and only evaluates the
+right side when the left result is `null`; a reached invalid arithmetic branch
+reports `EZC1025`.
+
+Unary `!`, `+`, and `-` are evaluated by the compiler for supported boolean and numeric constant expressions.
 
 ## Repository rules
 

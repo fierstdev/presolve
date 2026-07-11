@@ -6,14 +6,14 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 use ezc_core::{
-    build_application_semantic_model_for_unit, build_component_graph, build_template_graph,
-    build_template_manifest, explain_json, explain_text, generate_runtime_stub,
-    generate_standalone_page, generate_static_html, summarize_source, template_manifest_json,
-    validate_application_semantic_model, ApplicationSemanticModel, AsmValidationDiagnostic,
-    AttributeValue, CompilationUnit, ComponentGraph, DeclaredStateTypeKind, RenderAttribute,
-    RenderAttributeValue, SemanticEntity, SemanticEntityKind, SemanticId, SemanticOwner,
-    SemanticReferenceKind, SerializableValue, SourceProvenance, StateOperation, TemplateChild,
-    TemplateGraph, TemplateSemanticKind,
+    build_application_semantic_model_for_unit, build_component_graph, build_semantic_graph,
+    build_template_graph, build_template_manifest, explain_json, explain_text,
+    generate_runtime_stub, generate_standalone_page, generate_static_html, semantic_graph_json,
+    summarize_source, template_manifest_json, validate_application_semantic_model,
+    ApplicationSemanticModel, AsmValidationDiagnostic, AttributeValue, CompilationUnit,
+    ComponentGraph, DeclaredStateTypeKind, RenderAttribute, RenderAttributeValue, SemanticEntity,
+    SemanticEntityKind, SemanticId, SemanticOwner, SemanticReferenceKind, SerializableValue,
+    SourceProvenance, StateOperation, TemplateChild, TemplateGraph, TemplateSemanticKind,
 };
 use ezc_parser::{
     parse_file, ParseDiagnostic, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
@@ -48,6 +48,14 @@ fn main() {
 }
 
 fn run_explain(mut args: Vec<String>) {
+    if args
+        .iter()
+        .any(|argument| is_asm_entity_inspection_option(argument))
+    {
+        run_asm_inspection(parse_asm_inputs(&args));
+        return;
+    }
+
     if args.is_empty() {
         eprintln!("missing file path");
         print_usage_and_exit();
@@ -94,7 +102,10 @@ fn run_graph(mut args: Vec<String>) {
 }
 
 fn run_asm(args: &[String]) {
-    let inputs = parse_asm_inputs(args);
+    run_asm_inspection(parse_asm_inputs(args));
+}
+
+fn run_asm_inspection(inputs: AsmInputs) {
     let sources = inputs
         .paths
         .into_iter()
@@ -114,6 +125,18 @@ fn run_asm(args: &[String]) {
         .collect::<Vec<_>>();
     let asm = build_application_semantic_model_for_unit(&unit);
     let validation = validate_application_semantic_model(&asm);
+
+    if inputs.format == "graph" {
+        if inputs.entity_id.is_some()
+            || inputs.source_selection.is_some()
+            || !inputs.filters.is_empty()
+        {
+            eprintln!("--format graph cannot be combined with ASM entity selection or filters");
+            process::exit(1);
+        }
+        print!("{}", semantic_graph_json(&build_semantic_graph(&asm)));
+        return;
+    }
 
     let entity = match (inputs.entity_id, inputs.source_selection) {
         (Some(entity_id), None) => Some(find_asm_entity(&asm, &entity_id)),
@@ -141,6 +164,13 @@ fn run_asm(args: &[String]) {
             process::exit(1);
         }
     }
+}
+
+fn is_asm_entity_inspection_option(argument: &str) -> bool {
+    matches!(
+        argument,
+        "--entity" | "--source" | "--offset" | "--child-kind" | "--reference-kind"
+    )
 }
 
 fn run_check(args: &[String]) {
@@ -464,6 +494,7 @@ fn asm_inspection_json(
                     owner: semantic_owner_id(owner),
                     provenance: provenance.into(),
                     declared_type: declared_state_type(entity),
+                    initial_expression: initial_expression(entity),
                 }
             })
             .collect(),
@@ -556,6 +587,11 @@ fn print_asm_entity_text(
         provenance.span.start,
         provenance.span.end
     );
+    let parents = asm.ancestors_of(id);
+    println!("  parents: {}", parents.len());
+    for parent in parents {
+        println!("    {}", parent.as_str());
+    }
     let children = filtered_entity_children(asm, id, filters);
     println!("  children: {}", children.len());
     for child in children {
@@ -614,7 +650,13 @@ fn asm_entity_inspection_json(
             owner: semantic_owner_id(asm.owner(id).expect("ASM entities have owners")),
             provenance: provenance.into(),
             declared_type: declared_state_type(entity),
+            initial_expression: initial_expression(entity),
         },
+        parents: asm
+            .ancestors_of(id)
+            .into_iter()
+            .map(SemanticId::as_str)
+            .collect(),
         children: filtered_entity_children(asm, id, filters)
             .into_iter()
             .map(SemanticId::as_str)
@@ -948,6 +990,14 @@ fn declared_state_type(entity: SemanticEntity<'_>) -> Option<AsmInspectionDeclar
     })
 }
 
+fn initial_expression(entity: SemanticEntity<'_>) -> Option<String> {
+    let SemanticEntity::StateField(field) = entity else {
+        return None;
+    };
+
+    field.initial_expression.as_ref().map(ToString::to_string)
+}
+
 fn asm_declared_state_type_kind(kind: DeclaredStateTypeKind) -> &'static str {
     match kind {
         DeclaredStateTypeKind::String => "string",
@@ -973,6 +1023,7 @@ struct AsmInspectionDocument<'a> {
 struct AsmEntityInspectionDocument<'a> {
     schema_version: u32,
     entity: AsmInspectionEntity<'a>,
+    parents: Vec<&'a str>,
     children: Vec<&'a str>,
     descendant_count: usize,
     outgoing_references: Vec<AsmInspectionReference<'a>>,
@@ -988,6 +1039,8 @@ struct AsmInspectionEntity<'a> {
     provenance: AsmInspectionProvenance,
     #[serde(skip_serializing_if = "Option::is_none")]
     declared_type: Option<AsmInspectionDeclaredType<'a>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    initial_expression: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -1467,7 +1520,11 @@ fn print_component_graph(path: &Path, graph: &ComponentGraph) {
             println!("        none");
         } else {
             for state in &component.state_fields {
-                println!("        {}", state.name);
+                if let Some(expression) = &state.initial_expression {
+                    println!("        {} = {expression}", state.name);
+                } else {
+                    println!("        {}", state.name);
+                }
             }
         }
 
@@ -1963,7 +2020,8 @@ fn write_build_artifacts(
 fn print_usage_and_exit() -> ! {
     eprintln!("usage:");
     eprintln!("  ezc_cli explain <file> [--format text|json]");
-    eprintln!("  ezc_cli asm <file> [--entity semantic-id | --source path --offset byte] [--child-kind kind] [--reference-kind kind] [--format text|json]");
+    eprintln!("  ezc_cli explain <file> [--entity semantic-id | --source path --offset byte] [--child-kind kind] [--reference-kind kind] [--format text|json]");
+    eprintln!("  ezc_cli asm <file> [--entity semantic-id | --source path --offset byte] [--child-kind kind] [--reference-kind kind] [--format text|json|graph]");
     eprintln!(
         "  ezc_cli check <file> [file...] [--format text|json] [--category parser|compiler|validation] [--fail-on error|warning|info]"
     );

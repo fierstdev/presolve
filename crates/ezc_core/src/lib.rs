@@ -25,6 +25,7 @@ pub mod resume_manifest;
 pub mod resume_plan;
 pub mod route_graph;
 pub mod runtime_codegen;
+pub mod semantic_graph;
 pub mod semantic_id;
 pub mod semantic_provenance;
 pub mod semantic_reference;
@@ -46,13 +47,16 @@ pub use binding_table::{
 pub use compilation_unit::CompilationUnit;
 pub use compiler_pass::{
     AnalysisPass, ConstantEvaluation, ConstantEvaluationPass, DependencyAnalysis,
-    DependencyAnalysisPass,
+    DependencyAnalysisPass, ImmutableAsmPass,
 };
 pub use component_graph::{
-    build_component_graph, build_component_graph_for_module, ComponentAction, ComponentDiagnostic,
-    ComponentGraph, ComponentMethod, ComponentNode, DeclaredStateType, DeclaredStateTypeKind,
-    RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler, RenderFragment,
-    RenderList, RenderModel, SerializableValue, StateField, StateOperation,
+    build_component_graph, build_component_graph_for_module, ArithmeticEvaluationError,
+    ArithmeticExpression, ArithmeticExpressionKind, ArithmeticOperator, ComparisonOperator,
+    ComponentAction, ComponentDiagnostic, ComponentGraph, ComponentMethod, ComponentNode,
+    ConstantEvaluationError, ConstantExpression, ConstantExpressionKind, DeclaredStateType,
+    DeclaredStateTypeKind, LogicalOperator, RenderAttribute, RenderAttributeValue, RenderChild,
+    RenderEventHandler, RenderFragment, RenderList, RenderModel, SerializableValue, StateField,
+    StateOperation,
 };
 pub use explain::{explain_json, explain_text};
 pub use html_codegen::generate_static_html;
@@ -68,6 +72,11 @@ pub use resume_manifest::{
 };
 pub use resume_plan::{build_resume_plan, ResumeComponentPlan, ResumePlan};
 pub use runtime_codegen::generate_runtime_stub;
+pub use semantic_graph::{
+    build_semantic_graph, semantic_graph_json, SemanticGraph, SemanticGraphEdge,
+    SemanticGraphEdgeKind, SemanticGraphNode, SemanticGraphNodeKind, SemanticGraphProvenance,
+    SEMANTIC_GRAPH_SCHEMA_VERSION,
+};
 pub use semantic_id::{SemanticId, SemanticOwner};
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
@@ -423,6 +432,309 @@ class Panel extends Component {
             asm.components[0].state_fields[0].declared_type,
             Some(graph_type.clone())
         );
+    }
+
+    #[test]
+    fn lowers_and_evaluates_constant_arithmetic_state_initializers() {
+        let parsed = ezc_parser::parse_file(
+            "src/ArithmeticState.tsx",
+            r#"
+@component("x-arithmetic-state")
+class ArithmeticState extends Component {
+  total: number = state((1 + 2) * 3);
+  difference: number = state(10 - 3);
+  quotient: number = state(10 / 2);
+  remainder: number = state(10 % 3);
+
+  render() {
+    return <output>{this.total}</output>;
+  }
+}
+"#,
+        );
+        let graph = build_component_graph_for_module(&parsed);
+        let field = &graph.components[0].state_fields[0];
+
+        assert_eq!(
+            field
+                .initial_expression
+                .as_ref()
+                .map(ToString::to_string)
+                .as_deref(),
+            Some("((1 + 2) * 3)")
+        );
+        assert_eq!(
+            field.initial_value,
+            Some(SerializableValue::Number("9".to_string()))
+        );
+        assert_eq!(
+            graph.components[0].state_fields[1].initial_value,
+            Some(SerializableValue::Number("7".to_string()))
+        );
+        assert_eq!(
+            graph.components[0].state_fields[2].initial_value,
+            Some(SerializableValue::Number("5".to_string()))
+        );
+        assert_eq!(
+            graph.components[0].state_fields[3].initial_value,
+            Some(SerializableValue::Number("1".to_string()))
+        );
+        assert!(graph.diagnostics.is_empty());
+    }
+
+    #[test]
+    fn reports_invalid_constant_arithmetic_state_initializers() {
+        let parsed = ezc_parser::parse_file(
+            "src/ArithmeticState.tsx",
+            r#"
+@component("x-arithmetic-state")
+class ArithmeticState extends Component {
+  total: number = state(10 / 0);
+}
+"#,
+        );
+        let graph = build_component_graph_for_module(&parsed);
+        let diagnostic = graph
+            .diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.code == "EZC1022")
+            .expect("arithmetic diagnostic");
+
+        assert!(diagnostic.message.contains("division or remainder by zero"));
+        assert_eq!(
+            diagnostic
+                .provenance
+                .as_ref()
+                .map(|provenance| provenance.span.line),
+            Some(4)
+        );
+    }
+
+    #[test]
+    fn lowers_and_evaluates_constant_comparison_state_initializers() {
+        let parsed = ezc_parser::parse_file(
+            "src/ComparisonState.tsx",
+            r#"
+@component("x-comparison-state")
+class ComparisonState extends Component {
+  equal: boolean = state(3 === 3);
+  notEqual: boolean = state(3 !== 4);
+  lessThan: boolean = state(2 < 3);
+  lessThanOrEqual: boolean = state(3 <= 3);
+  greaterThan: boolean = state(4 > 3);
+  ready: boolean = state(((1 + 2) * 3) >= 9);
+
+  render() {
+    return <output>{this.ready}</output>;
+  }
+}
+"#,
+        );
+        let graph = build_component_graph_for_module(&parsed);
+        let fields = &graph.components[0].state_fields;
+
+        assert_eq!(
+            fields[0]
+                .initial_expression
+                .as_ref()
+                .map(ToString::to_string)
+                .as_deref(),
+            Some("(3 === 3)")
+        );
+        for field in fields {
+            assert_eq!(field.initial_value, Some(SerializableValue::Boolean(true)));
+        }
+        assert_eq!(
+            fields[5]
+                .initial_expression
+                .as_ref()
+                .map(ToString::to_string)
+                .as_deref(),
+            Some("(((1 + 2) * 3) >= 9)")
+        );
+        assert!(graph.diagnostics.is_empty());
+    }
+
+    #[test]
+    fn reports_invalid_constant_comparison_state_initializers() {
+        let parsed = ezc_parser::parse_file(
+            "src/ComparisonState.tsx",
+            r#"
+@component("x-comparison-state")
+class ComparisonState extends Component {
+  ready: boolean = state((10 / 0) >= 1);
+}
+"#,
+        );
+        let graph = build_component_graph_for_module(&parsed);
+        let diagnostic = graph
+            .diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.code == "EZC1023")
+            .expect("comparison diagnostic");
+
+        assert!(diagnostic.message.contains("division or remainder by zero"));
+        assert_eq!(
+            diagnostic
+                .provenance
+                .as_ref()
+                .map(|provenance| provenance.span.line),
+            Some(4)
+        );
+    }
+
+    #[test]
+    fn lowers_and_evaluates_constant_logical_state_initializers() {
+        let parsed = ezc_parser::parse_file(
+            "src/LogicalState.tsx",
+            r#"
+@component("x-logical-state")
+class LogicalState extends Component {
+  both: boolean = state((1 < 2) && (3 >= 3));
+  either: boolean = state(false || (10 !== 4));
+  shortAnd: boolean = state(false && ((10 / 0) > 1));
+  shortOr: boolean = state(true || ((10 / 0) > 1));
+
+  render() {
+    return <output>{this.both}</output>;
+  }
+}
+"#,
+        );
+        let graph = build_component_graph_for_module(&parsed);
+        let fields = &graph.components[0].state_fields;
+
+        assert_eq!(
+            fields[0]
+                .initial_expression
+                .as_ref()
+                .map(ToString::to_string)
+                .as_deref(),
+            Some("((1 < 2) && (3 >= 3))")
+        );
+        assert_eq!(
+            fields
+                .iter()
+                .map(|field| field.initial_value.clone())
+                .collect::<Vec<_>>(),
+            vec![
+                Some(SerializableValue::Boolean(true)),
+                Some(SerializableValue::Boolean(true)),
+                Some(SerializableValue::Boolean(false)),
+                Some(SerializableValue::Boolean(true)),
+            ]
+        );
+        assert!(graph.diagnostics.is_empty());
+    }
+
+    #[test]
+    fn reports_evaluated_invalid_constant_logical_state_initializers() {
+        let parsed = ezc_parser::parse_file(
+            "src/LogicalState.tsx",
+            r#"
+@component("x-logical-state")
+class LogicalState extends Component {
+  ready: boolean = state(true && ((10 / 0) > 1));
+}
+"#,
+        );
+        let graph = build_component_graph_for_module(&parsed);
+        let diagnostic = graph
+            .diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.code == "EZC1024")
+            .expect("logical diagnostic");
+
+        assert!(diagnostic.message.contains("division or remainder by zero"));
+        assert_eq!(
+            diagnostic
+                .provenance
+                .as_ref()
+                .map(|provenance| provenance.span.line),
+            Some(4)
+        );
+    }
+
+    #[test]
+    fn lowers_and_evaluates_constant_nullish_state_initializers() {
+        let parsed = ezc_parser::parse_file(
+            "src/NullishState.tsx",
+            r#"
+@component("x-nullish-state")
+class NullishState extends Component {
+  label: string = state(null ?? "fallback");
+  total: number = state(5 ?? (10 / 0));
+
+  render() {
+    return <output>{this.label}</output>;
+  }
+}
+"#,
+        );
+        let graph = build_component_graph_for_module(&parsed);
+        let fields = &graph.components[0].state_fields;
+
+        assert_eq!(
+            fields[0]
+                .initial_expression
+                .as_ref()
+                .map(ToString::to_string)
+                .as_deref(),
+            Some("(null ?? \"fallback\")")
+        );
+        assert_eq!(
+            fields[0].initial_value,
+            Some(SerializableValue::String("fallback".to_string()))
+        );
+        assert_eq!(
+            fields[1].initial_value,
+            Some(SerializableValue::Number("5".to_string()))
+        );
+        assert!(graph.diagnostics.is_empty());
+    }
+
+    #[test]
+    fn lowers_and_evaluates_constant_unary_state_initializers() {
+        let parsed = ezc_parser::parse_file(
+            "src/UnaryState.tsx",
+            r#"
+@component("x-unary-state")
+class UnaryState extends Component {
+  negated: boolean = state(!(1 < 2));
+  signed: number = state(-(1 + 2));
+  render() { return <output>{this.signed}</output>; }
+}
+"#,
+        );
+        let graph = build_component_graph_for_module(&parsed);
+        assert_eq!(
+            graph.components[0].state_fields[0].initial_value,
+            Some(SerializableValue::Boolean(false))
+        );
+        assert_eq!(
+            graph.components[0].state_fields[1].initial_value,
+            Some(SerializableValue::Number("-3".to_string()))
+        );
+    }
+
+    #[test]
+    fn reports_reached_invalid_constant_nullish_state_initializers() {
+        let parsed = ezc_parser::parse_file(
+            "src/NullishState.tsx",
+            r#"
+@component("x-nullish-state")
+class NullishState extends Component {
+  total: number = state(null ?? (10 / 0));
+}
+"#,
+        );
+        let graph = build_component_graph_for_module(&parsed);
+        let diagnostic = graph
+            .diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.code == "EZC1025")
+            .expect("nullish diagnostic");
+        assert!(diagnostic.message.contains("division or remainder by zero"));
     }
 
     #[test]
@@ -856,6 +1168,7 @@ class Counter extends Component {
                     )],
                     bindings: Vec::new(),
                     state_updates: Vec::new(),
+                    local_variables: Vec::new(),
                 }],
             }],
         };

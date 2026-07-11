@@ -1,0 +1,18 @@
+File: fixtures/0032-arithmetic-state-initializer/input/ArithmeticState.tsx
+Diagnostics:
+  none
+
+Classes:
+  class ArithmeticState at 1:1
+    decorators:
+      @component("x-arithmetic-state") at 1:1
+    properties:
+      total = state(...) at 3:3
+    methods:
+      render at 5:3
+        jsx root <output> at 6:12
+          attributes: none
+          event handlers: none
+          children:
+            Binding("this.total") @ 6:20 span=146..158
+        bindings: this.total

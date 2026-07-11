@@ -1,8 +1,10 @@
 use std::collections::BTreeMap;
 
 use ezc_parser::{
-    parse_file, ParseSeverity, ParsedExportKind, ParsedJsxAttributeValue, ParsedJsxChild,
-    ParsedJsxElement, ParsedJsxNode, ParsedSerializableValue, ParsedStateOperation,
+    parse_file, ParseSeverity, ParsedArithmeticExpressionKind, ParsedArithmeticOperator,
+    ParsedComparisonOperator, ParsedConstantExpressionKind, ParsedExportKind,
+    ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxElement, ParsedJsxNode,
+    ParsedLogicalOperator, ParsedSerializableValue, ParsedStateOperation,
 };
 
 fn jsx_root_element(root: &ParsedJsxNode) -> &ParsedJsxElement {
@@ -301,6 +303,7 @@ class StepCounter extends Component {
     return <button onClick={() => this.addTwo()}>Count: {this.count}</button>;
   }
 }
+
 "#;
 
     let parsed = parse_file("StepCounter.tsx", source);
@@ -332,6 +335,119 @@ class StepCounter extends Component {
         subtract_three.state_updates[0].operation,
         ParsedStateOperation::SubtractAssign(ParsedSerializableValue::Number("3".to_string()))
     );
+}
+
+#[test]
+fn retains_constant_arithmetic_state_initializers() {
+    let source = r#"
+@component("x-arithmetic-state")
+class ArithmeticState extends Component {
+  total: number = state((1 + 2) * 3);
+}
+"#;
+    let parsed = parse_file("ArithmeticState.tsx", source);
+    let property = &parsed.classes[0].properties[0];
+    let expression = property
+        .state_initial_expression
+        .as_ref()
+        .expect("arithmetic state initializer");
+
+    let ParsedConstantExpressionKind::Arithmetic(expression) = &expression.kind else {
+        panic!("expected arithmetic constant expression");
+    };
+    let ParsedArithmeticExpressionKind::Binary {
+        operator: ParsedArithmeticOperator::Multiply,
+        left,
+        right,
+    } = &expression.kind
+    else {
+        panic!("expected multiplication expression");
+    };
+    assert!(matches!(
+        left.kind,
+        ParsedArithmeticExpressionKind::Binary {
+            operator: ParsedArithmeticOperator::Add,
+            ..
+        }
+    ));
+    assert!(
+        matches!(right.kind, ParsedArithmeticExpressionKind::Number(ref value) if value == "3")
+    );
+    assert_eq!(expression.span.line, 4);
+}
+
+#[test]
+fn retains_constant_comparison_state_initializers() {
+    let source = r#"
+@component("x-comparison-state")
+class ComparisonState extends Component {
+  ready: boolean = state(((1 + 2) * 3) >= 9);
+}
+"#;
+    let parsed = parse_file("ComparisonState.tsx", source);
+    let expression = parsed.classes[0].properties[0]
+        .state_initial_expression
+        .as_ref()
+        .expect("comparison state initializer");
+
+    let ParsedConstantExpressionKind::Comparison {
+        operator: ParsedComparisonOperator::GreaterThanOrEqual,
+        left,
+        right,
+    } = &expression.kind
+    else {
+        panic!("expected greater-than-or-equal comparison expression");
+    };
+    assert!(matches!(
+        left.kind,
+        ParsedArithmeticExpressionKind::Binary {
+            operator: ParsedArithmeticOperator::Multiply,
+            ..
+        }
+    ));
+    assert!(
+        matches!(right.kind, ParsedArithmeticExpressionKind::Number(ref value) if value == "9")
+    );
+    assert_eq!(expression.span.line, 4);
+}
+
+#[test]
+fn retains_constant_logical_state_initializers() {
+    let source = r#"
+@component("x-logical-state")
+class LogicalState extends Component {
+  ready: boolean = state((1 < 2) && (3 >= 3));
+}
+"#;
+    let parsed = parse_file("LogicalState.tsx", source);
+    let expression = parsed.classes[0].properties[0]
+        .state_initial_expression
+        .as_ref()
+        .expect("logical state initializer");
+
+    let ParsedConstantExpressionKind::Logical {
+        operator: ParsedLogicalOperator::And,
+        left,
+        right,
+    } = &expression.kind
+    else {
+        panic!("expected logical-and expression");
+    };
+    assert!(matches!(
+        left.kind,
+        ParsedConstantExpressionKind::Comparison {
+            operator: ParsedComparisonOperator::LessThan,
+            ..
+        }
+    ));
+    assert!(matches!(
+        right.kind,
+        ParsedConstantExpressionKind::Comparison {
+            operator: ParsedComparisonOperator::GreaterThanOrEqual,
+            ..
+        }
+    ));
+    assert_eq!(expression.span.line, 4);
 }
 
 #[test]

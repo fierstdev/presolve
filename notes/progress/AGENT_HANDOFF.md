@@ -4,33 +4,32 @@ Repository state
 
 * Branch: main
 * Latest commit: cli: add asm inspection filters
-* Working tree: clean after committing this slice
-* Date: 2026-07-11 14:02:35 PDT
+* Working tree: C8-D/A2/A3/A4/A5/B1/B2/B3/B4/B5 source, test, fixture, and documentation changes are present and uncommitted
+* Date: 2026-07-11
 
 Last completed slice
 
-* Slice: C8-C - ASM entity inspection filters
-* Summary: Added typed child and relation filtering to selected ASM entity inspection.
-* Key files: README.md, crates/ezc_cli/src/main.rs, crates/ezc_cli/tests/explain.rs
-* New behavior: `ezc_cli asm <file> --entity <semantic-id> [--child-kind kind] [--reference-kind kind] [--format text|json]` filters only the selected entity's direct children and incoming/outgoing references. Filters also work with source-offset selection and reject unselected full-ASM inspection.
-* Tests added or changed: CLI integration coverage verifies child-kind filtering, reference-kind filtering, and selector-required failure behavior.
-* Fixtures added or changed: none.
+* Slice: B5 - Constant unary state initializers
+* Summary: Added compiler-owned unary boolean negation and numeric sign expressions.
+* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_cli/src/main.rs
+* New behavior: Supported constant primitives and B1-B3 expressions may be composed with `??` inside `state(...)`. Canonical lowering evaluates the right side only when the left evaluates to null; backends receive the selected value, and ASM JSON/ComponentGraph retain the authored expression. Reached invalid arithmetic reports source-provenanced `EZC1025`.
+* Tests added or changed: Parser logical-tree retention; core AND/OR evaluation, short-circuit behavior, and evaluated invalid-branch diagnostics; CLI ASM JSON plus parse/graph/HTML fixture contracts.
+* Fixtures added or changed: fixtures/0035-constant-nullish-state-initializer.
 
 Current in-progress slice
 
-* Slice: C8-C - ASM entity inspection filters
+* Slice: B4 - Constant nullish-coalescing state initializers
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-C
-* Remaining: C8-D add an entity-inspection mode to `ezc explain` without changing its default source-summary output.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B3
+* Remaining: Phase B6 - add compiler-owned local variables while preserving deterministic constant-expression semantics.
 
 Verification
 
 * cargo fmt --all --check: pass
 * cargo test -p ezc_parser: pass
 * cargo test -p ezc_core: pass
-* cargo test -p ezc_cli --test explain: pass
+* cargo test -p ezc_cli: pass
 * RUST_TEST_THREADS=1 cargo test -p ezc_cli --test runtime_browser -- --nocapture: pass
-* CI=true RUST_TEST_THREADS=1 cargo test -p ezc_cli --test runtime_browser -- --nocapture: pass
 * cargo clippy --workspace --all-targets -- -D warnings: pass
 * RUST_TEST_THREADS=1 cargo test --workspace: pass
 * pnpm test:e2e: pass
@@ -198,6 +197,38 @@ Architecture decisions made
 * Reason: The CLI can reuse canonical ASM categories while making the result boundary unambiguous: direct child lists and incoming/outgoing relation lists are filtered without changing the selected entity or its ownership traversal.
 * Tradeoff: C8-C accepts one child-kind and one reference-kind filter. Composite predicates, descendant filtering, diagnostics filtering, line/column selection, and path normalization remain future work.
 
+* Decision: `ezc explain` delegates entity inspection to the same canonical ASM inspection runner as `ezc asm`.
+* Reason: The developer-facing source-summary command can expose compiler semantics without duplicating selection, ordering, filtering, diagnostic, or schema behavior.
+* Tradeoff: Plain `explain` remains a legacy source-summary surface; only explicit entity-selection or entity-filter options activate ASM inspection.
+
+* Decision: Parent navigation is a canonical ASM query and reports the ancestor chain nearest-first through the application root.
+* Reason: Semantic tooling can traverse ownership outward from any entity without reconstructing containment from entity-local fields or reversing the ownership map.
+* Tradeoff: Parent navigation reports semantic IDs only. It does not add path metadata, transitive child filtering, reference endpoint predicates, or model mutation.
+
+* Decision: Semantic graph export uses a roots collection plus parent-to-child ownership edges instead of a synthetic application node.
+* Reason: The export preserves the ASM's distinction between real semantic entities and application ownership while still providing complete deterministic graph topology.
+* Tradeoff: The graph is a JSON artifact for canonical roots, typed nodes, provenance, ownership, and resolved references only; diagnostics, parser facts, backend-local node IDs, manifests, runtime artifacts, and graph mutation are outside this slice.
+
+* Decision: Canonical ASM ownership is structurally derived for component-level semantics and consumed through the centralized ownership map.
+* Reason: Compiler analyses and semantic lowering should not silently depend on duplicate owner fields that can drift from the canonical application model.
+* Tradeoff: Legacy ComponentGraph and template-entity lowering records still retain owner fields for compatibility and initial template containment ingestion; symbol-table and backend paths remain outside this ownership migration.
+
+* Decision: Compiler analyses implement `ImmutableAsmPass`, while `AnalysisPass::analyze` remains a compatibility wrapper.
+* Reason: New compiler work receives one explicit read-only ASM transformation boundary without forcing a breaking migration on existing analysis consumers.
+* Tradeoff: Current passes produce immutable analysis products rather than rewritten ASM values. Semantic rewrite passes will use the same contract when a compiler-owned language transformation requires them.
+
+* Decision: Constant numeric state initializer arithmetic is a compiler-owned expression model that evaluates during canonical lowering.
+* Reason: Authored numeric semantics remain inspectable in the compiler while established HTML, manifest, and runtime paths receive an already-computed serializable initial value.
+* Tradeoff: B1 accepts only numeric literals, parentheses, and `+`, `-`, `*`, `/`, or `%` inside `state(...)`. State reads, local variables, calls, coercions, action expressions, comparisons, and expression typing remain later language slices.
+
+* Decision: Arithmetic and comparison initializers share one canonical `ConstantExpression` slot on a state field.
+* Reason: The compiler can extend expression semantics without parallel per-operator metadata, while preserving one inspectable authored expression and one evaluated initial value for every backend.
+* Tradeoff: B2 comparisons are numeric-only and static: operands are numeric literals or B1 arithmetic, and supported operators are `===`, `!==`, `<`, `<=`, `>`, and `>=`. String/boolean comparisons, coercion, state reads, calls, local variables, logical operators, and action expressions remain unsupported.
+
+* Decision: Constant logical expressions use explicit boolean operands and compiler-time short-circuit evaluation.
+* Reason: The compiler can statically preserve `&&`/`||` reachability and avoid emitting runtime expression intelligence or diagnostics from unreachable branches.
+* Tradeoff: B3 accepts only boolean literals, B2 comparisons, and nested logical expressions. Unary negation, truthiness, coercion, state reads, local variables, calls, nullish coalescing, and action expressions remain unsupported.
+
 * Decision: Conditional nodes are first-class parser/render/template children with a conditional node ID plus separate start/end boundary IDs.
 * Reason: The compiler needs stable branch identity for tooling and runtime updates, while the DOM needs comment anchors that can bound branch replacement without a wrapper element.
 * Tradeoff: Runtime manifests serialize branch HTML snippets for this first slice instead of recursively hydrating dynamic bindings/events inside branch snippets.
@@ -295,11 +326,14 @@ Known limitations
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 * Item: Check policy is selected per CLI invocation. Project policy files, presets, and policy discovery are not interpreted yet.
 * Item: Parser diagnostic labels expose only `line`, `column`, `start`, and `end`; parser label messages and rendered source excerpts are not available yet. Compiler provenance in check JSON is optional, and ASM validation diagnostics still have no provenance field.
-* Item: ASM query APIs expose ownership traversal, broad entity kinds, entity/reference provenance lookup, and reference-kind filtering. `asm` supports semantic-ID or source-byte selection plus one typed direct-child and one typed relation filter; composite predicates, descendant/diagnostic filtering, line/column input, path normalization, source remapping, and legacy `explain` inspection mode remain future work.
+* Item: ASM query APIs expose nearest-first parent traversal through the application root, direct and transitive ownership traversal, broad entity kinds, entity/reference provenance lookup, and reference-kind filtering. `asm` and explicit `explain` inspection mode support semantic-ID or source-byte selection plus parent, direct-child, and incoming/outgoing reference navigation, with one typed child and relation filter; composite predicates, descendant/diagnostic filtering, line/column input, path normalization, and source remapping remain future work.
+* Item: `ezc asm --format graph` exports a schema-versioned canonical semantic graph with roots, typed nodes, provenance, ownership edges, and resolved reference edges. It intentionally does not discover project files, include diagnostics, expose parser/backend/runtime artifacts, or provide graph filtering, mutation, or alternate serialization formats.
+* Item: Canonical ASM ownership now drives template entity lookup, template dependency lowering, and dead-action analysis. Legacy ComponentGraph, TemplateSemanticEntity construction, and SymbolTable records still carry owner fields as compatibility/lowering data; their removal or migration requires a later dedicated frontend/backend compatibility slice.
+* Item: Constant `state(...)` initializers use one compiler-owned expression model. Numeric arithmetic, comparisons, boolean logic, nullish coalescing, and unary `!`, `+`, and `-` evaluate statically. State reads, local variables, calls, coercions, truthiness, control flow, and semantic expression typing remain later Phase B work.
 
 Exact next step
 
-Start C8-D - Add an explicit entity-inspection mode to `ezc explain` while preserving its default source-summary output, C8-A/B/C document semantics, and read-only ASM behavior.
+Start Phase B6 - add compiler-owned local variables while preserving deterministic constant-expression semantics without broadening JavaScript compatibility.
 
 Useful commands
 
@@ -330,4 +364,19 @@ Useful commands
 
 Changed but uncommitted files
 
-* None
+* README.md
+* crates/ezc_core/src/application_semantic_model.rs
+* crates/ezc_core/src/compiler_pass.rs
+* crates/ezc_core/src/lib.rs
+* crates/ezc_core/src/semantic_graph.rs
+* crates/ezc_cli/src/main.rs
+* crates/ezc_cli/tests/explain.rs
+* crates/ezc_parser/src/lib.rs
+* crates/ezc_parser/src/model.rs
+* crates/ezc_parser/src/oxc_adapter.rs
+* crates/ezc_parser/tests/parse_file.rs
+* fixtures/0032-arithmetic-state-initializer/
+* fixtures/0033-constant-comparison-state-initializer/
+* fixtures/0034-constant-logical-state-initializer/
+* fixtures/0035-constant-nullish-state-initializer/
+* fixtures/0036-constant-unary-state-initializer/

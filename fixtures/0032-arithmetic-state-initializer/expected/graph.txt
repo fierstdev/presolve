@@ -1,0 +1,19 @@
+File: fixtures/0032-arithmetic-state-initializer/input/ArithmeticState.tsx
+ComponentGraph:
+  diagnostics:
+    none
+  components:
+    component ArithmeticState
+      element: x-arithmetic-state
+      route: none
+      state:
+        total = ((1 + 2) * 3)
+      methods:
+        render
+      render:
+        root: <output>
+        attributes: none
+        event handlers: none
+        children:
+          Binding("this.total") @ 6:20 span=146..158
+        bindings: this.total
