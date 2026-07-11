@@ -570,6 +570,19 @@ fn check_command_emits_json_diagnostics() {
 }
 
 #[test]
+fn check_command_filters_displayed_diagnostic_categories_without_changing_failure() {
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["check", "fixtures/0031-primitive-compound-action-type-diagnostics/input/InvalidTypedCompoundActions.tsx", "--format", "json", "--category", "parser"])
+        .output().expect("failed to run ezc_cli check");
+    assert!(!output.status.success());
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("check JSON");
+    assert_eq!(document["summary"]["compiler_diagnostics"], 5);
+    assert_eq!(document["categories"], serde_json::json!(["parser"]));
+    assert_eq!(document["compiler_diagnostics"], serde_json::json!([]));
+}
+
+#[test]
 fn check_command_fails_for_parser_diagnostics() {
     let repo_root = repo_root();
 

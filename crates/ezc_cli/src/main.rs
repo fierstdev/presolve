@@ -124,7 +124,7 @@ fn run_asm(args: &[String]) {
 }
 
 fn run_check(args: &[String]) {
-    let (input_paths, format) = parse_check_inputs(args);
+    let (input_paths, format, categories) = parse_check_inputs(args);
     let sources = input_paths
         .into_iter()
         .map(|path| {
@@ -145,8 +145,14 @@ fn run_check(args: &[String]) {
         .sum::<usize>();
 
     match format.as_str() {
-        "text" => print_check_text(&unit, &asm, &validation, parser_diagnostic_count),
-        "json" => print!("{}", check_json(&unit, &asm, &validation)),
+        "text" => print_check_text(
+            &unit,
+            &asm,
+            &validation,
+            parser_diagnostic_count,
+            &categories,
+        ),
+        "json" => print!("{}", check_json(&unit, &asm, &validation, &categories)),
         _ => {
             eprintln!("unsupported format: {format}");
             process::exit(1);
@@ -163,24 +169,31 @@ fn print_check_text(
     asm: &ApplicationSemanticModel,
     validation: &[AsmValidationDiagnostic],
     parser_diagnostic_count: usize,
+    categories: &[String],
 ) {
     println!("Check:");
     println!("  files: {}", unit.files().len());
     println!("  parser diagnostics: {parser_diagnostic_count}");
     println!("  compiler diagnostics: {}", asm.diagnostics.len());
     println!("  ASM validation diagnostics: {}", validation.len());
-    for file in unit.files() {
-        for diagnostic in &file.diagnostics {
-            println!(
-                "  parser {}: {}",
-                diagnostic_severity_label(&diagnostic.severity),
-                diagnostic.message
-            );
+    if check_category_enabled(categories, "parser") {
+        for file in unit.files() {
+            for diagnostic in &file.diagnostics {
+                println!(
+                    "  parser {}: {}",
+                    diagnostic_severity_label(&diagnostic.severity),
+                    diagnostic.message
+                );
+            }
         }
     }
-    print_compiler_diagnostics(&asm.diagnostics);
-    if let Some(validation_text) = asm_validation_diagnostics_text(validation) {
-        print!("{validation_text}");
+    if check_category_enabled(categories, "compiler") {
+        print_compiler_diagnostics(&asm.diagnostics);
+    }
+    if check_category_enabled(categories, "validation") {
+        if let Some(validation_text) = asm_validation_diagnostics_text(validation) {
+            print!("{validation_text}");
+        }
     }
 }
 
@@ -188,11 +201,33 @@ fn check_json(
     unit: &CompilationUnit,
     asm: &ApplicationSemanticModel,
     validation: &[AsmValidationDiagnostic],
+    categories: &[String],
 ) -> String {
-    let parser_diagnostics = unit.files().iter().flat_map(|file| file.diagnostics.iter().map(move |diagnostic| serde_json::json!({"path": file.path, "severity": diagnostic_severity_label(&diagnostic.severity), "message": diagnostic.message}))).collect::<Vec<_>>();
-    let compiler_diagnostics = asm.diagnostics.iter().map(|diagnostic| serde_json::json!({"code": diagnostic.code, "message": diagnostic.message})).collect::<Vec<_>>();
-    let validation = validation.iter().map(|diagnostic| serde_json::json!({"code": diagnostic.code, "message": diagnostic.message})).collect::<Vec<_>>();
-    serde_json::to_string_pretty(&serde_json::json!({"schema_version": 1, "files": unit.files().iter().map(|file| file.path.display().to_string()).collect::<Vec<_>>(), "parser_diagnostics": parser_diagnostics, "compiler_diagnostics": compiler_diagnostics, "validation": validation})).expect("check document should serialize") + "\n"
+    let parser_count = unit
+        .files()
+        .iter()
+        .map(|file| file.diagnostics.len())
+        .sum::<usize>();
+    let parser_diagnostics = if check_category_enabled(categories, "parser") {
+        unit.files().iter().flat_map(|file| file.diagnostics.iter().map(move |diagnostic| serde_json::json!({"path": file.path, "severity": diagnostic_severity_label(&diagnostic.severity), "message": diagnostic.message}))).collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+    let compiler_diagnostics = if check_category_enabled(categories, "compiler") {
+        asm.diagnostics.iter().map(|diagnostic| serde_json::json!({"code": diagnostic.code, "message": diagnostic.message})).collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+    let validation_diagnostics = if check_category_enabled(categories, "validation") {
+        validation.iter().map(|diagnostic| serde_json::json!({"code": diagnostic.code, "message": diagnostic.message})).collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+    serde_json::to_string_pretty(&serde_json::json!({"schema_version": 1, "files": unit.files().iter().map(|file| file.path.display().to_string()).collect::<Vec<_>>(), "summary": {"parser_diagnostics": parser_count, "compiler_diagnostics": asm.diagnostics.len(), "validation": validation.len()}, "categories": categories, "parser_diagnostics": parser_diagnostics, "compiler_diagnostics": compiler_diagnostics, "validation": validation_diagnostics})).expect("check document should serialize") + "\n"
+}
+
+fn check_category_enabled(categories: &[String], category: &str) -> bool {
+    categories.is_empty() || categories.iter().any(|item| item == category)
 }
 
 fn print_asm_text(
@@ -383,7 +418,7 @@ fn parse_asm_inputs(args: &[String]) -> (Vec<PathBuf>, String) {
     (paths, format)
 }
 
-fn parse_check_inputs(args: &[String]) -> (Vec<PathBuf>, String) {
+fn parse_check_inputs(args: &[String]) -> (Vec<PathBuf>, String, Vec<String>) {
     if args.is_empty() {
         eprintln!("missing file path");
         print_usage_and_exit();
@@ -391,6 +426,7 @@ fn parse_check_inputs(args: &[String]) -> (Vec<PathBuf>, String) {
 
     let mut paths = Vec::new();
     let mut format = "text".to_string();
+    let mut categories = Vec::new();
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
@@ -400,6 +436,18 @@ fn parse_check_inputs(args: &[String]) -> (Vec<PathBuf>, String) {
                     process::exit(1);
                 };
                 format.clone_from(value);
+                index += 2;
+            }
+            "--category" => {
+                let Some(value) = args.get(index + 1) else {
+                    eprintln!("missing value for --category");
+                    process::exit(1);
+                };
+                if !matches!(value.as_str(), "parser" | "compiler" | "validation") {
+                    eprintln!("unsupported check category: {value}");
+                    process::exit(1);
+                }
+                categories.push(value.clone());
                 index += 2;
             }
             option if option.starts_with('-') => {
@@ -412,7 +460,7 @@ fn parse_check_inputs(args: &[String]) -> (Vec<PathBuf>, String) {
             }
         }
     }
-    (paths, format)
+    (paths, format, categories)
 }
 
 fn semantic_entity_kind(entity: SemanticEntity<'_>) -> &'static str {

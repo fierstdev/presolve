@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: cli: add check json output
+* Latest commit: cli: filter check diagnostics
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 22:25:06 PDT
+* Date: 2026-07-10 22:30:11 PDT
 
 Last completed slice
 
-* Slice: C6-B - JSON compiler check output
-* Summary: Added deterministic machine-readable diagnostics to the compiler check command.
+* Slice: C6-C - Check summaries and category filters
+* Summary: Added summary counts and display filtering to canonical compiler checks.
 * Key files: crates/ezc_cli/src/main.rs, crates/ezc_cli/tests/explain.rs
-* New behavior: `ezc check <file> [file...] --format json` emits schema-versioned sorted parser/compiler/validation diagnostics and preserves C6-A exit status.
-* Tests added or changed: JSON compiler-diagnostic command coverage.
+* New behavior: `ezc check` reports category totals; repeatable `--category parser|compiler|validation` filters displayed details in text/JSON without changing nonzero status.
+* Tests added or changed: JSON summary and filtering coverage with hidden diagnostics retaining failure status.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C6-B - JSON compiler check output
+* Slice: C6-C - Check summaries and category filters
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-B
-* Remaining: C6-C add check summary counts and category filtering.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-C
+* Remaining: C6-D add check diagnostic severity policy.
 
 Verification
 
@@ -244,7 +244,7 @@ Known limitations
 
 Exact next step
 
-Start C6-C - Add deterministic check summary counts and category filtering while preserving C6-A/C6-B output and exit status.
+Start C6-D - Add check diagnostic severity policy while preserving canonical diagnostics and explicit filtering semantics.
 
 Useful commands
 
