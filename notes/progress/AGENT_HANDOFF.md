@@ -3,24 +3,24 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: compiler: resolve semantic references
+* Latest commit: compiler: record semantic provenance
 * Working tree: clean after committing this slice
-* Date: 2026-07-10 19:18:48 PDT
+* Date: 2026-07-10 19:27:26 PDT
 
 Last completed slice
 
-* Slice: ASM-3 - Cross-reference resolution
-* Summary: Added explicit resolved semantic references for state-writing actions and event-handler method invocation.
-* Key files: crates/ezc_core/src/semantic_reference.rs, crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/lib.rs
-* New behavior: `ComponentGraph.references` records directed `ActionState` edges from action steps to state fields and `EventMethod` edges from event handlers to methods. Event handlers now receive deterministic semantic IDs and template ownership.
-* Tests added or changed: counter graph expectations assert both resolved edges and event identity; semantic-error coverage proves unresolved targets do not produce a reference.
+* Slice: ASM-4 - Source provenance
+* Summary: Added canonical source provenance for semantic IDs and resolved references, including parser-originated state-update spans.
+* Key files: crates/ezc_core/src/semantic_provenance.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/semantic_reference.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_parser/src/oxc_adapter.rs
+* New behavior: `ComponentGraph.provenance` maps each current semantic ID to its source path/span. Resolved references carry the source provenance of their originating action or event handler. Template nodes read their provenance from that canonical registry.
+* Tests added or changed: parser coverage verifies state-update spans; core coverage verifies component, state, method, action, template, event, and reference locations.
 * Fixtures added or changed: None; this slice deliberately does not alter CLI, HTML, manifest, or runtime artifacts.
 
 Current in-progress slice
 
-* Slice: ASM-3 - Cross-reference resolution
+* Slice: ASM-4 - Source provenance
 * Status: Complete
-* Completed: ASM-1 - Global semantic IDs; ASM-2 - Semantic ownership; ASM-3 - Cross-reference resolution
+* Completed: ASM-1 - Global semantic IDs; ASM-2 - Semantic ownership; ASM-3 - Cross-reference resolution; ASM-4 - Source provenance
 * Remaining: None
 
 Verification
@@ -94,6 +94,15 @@ Architecture decisions made
 * Decision: Only fully resolved action/state and event/method pairs create semantic references.
 * Reason: Reference consumers can rely on every target ID existing in the graph, while existing diagnostics remain the source of unresolved-reference feedback.
 * Tradeoff: Unresolved attempts are not retained as partial relation records until diagnostics and provenance gain their planned ASM models.
+* Decision: Source provenance is stored once in a `SemanticId`-keyed registry on `ComponentGraph`.
+* Reason: Every current semantic consumer shares one authoritative path/span record instead of duplicating source fields across graph structures.
+* Tradeoff: The registry is not yet a cross-file application index; the Application Semantic Model shell will own aggregation later.
+* Decision: State update spans originate in the parser from update/assignment expressions.
+* Reason: Action semantic provenance must identify the actual operation rather than approximating it from the enclosing method.
+* Tradeoff: The span excludes the expression statement semicolon, matching the AST operation span used by the compiler.
+* Decision: Resolved references carry the provenance of their source entity.
+* Reason: Tooling and diagnostics can trace an edge to the authored action or event handler without requiring a reverse lookup first.
+* Tradeoff: Target-side provenance remains available through the semantic provenance registry; relations intentionally store only their own origin.
 
 Known limitations
 
@@ -111,15 +120,15 @@ Known limitations
 * Item: Runtime schema compatibility is exact-match only; no backward/forward manifest migration exists yet.
 * Item: Source spans are available on parser/render/template structures and CLI development output, but runtime manifests intentionally omit source metadata for now.
 * Item: Fragment nodes are visible in compiler/template output but intentionally omitted from runtime manifests until a runtime range-anchor use case appears.
-* Item: Semantic IDs and direct ownership currently cover components, state fields, methods, action steps, rendered templates, and event handlers. General template descendants still use backend-local `n*` IDs and have no semantic ownership yet.
-* Item: Resolved references currently cover action-to-state and event-to-method pairs only. Bindings, attributes, conditionals, lists, routes, and unresolved reference attempts have no semantic relation records yet.
-* Item: Ownership and references have no centralized relation table or query API yet. Duplicate component semantic identities, source provenance, validation, and CLI inspection remain deferred to ASM-4 through ASM-8.
+* Item: Semantic IDs and direct ownership currently cover components, state fields, methods, action steps, rendered templates, and event handlers. General template descendants still use backend-local `n*` IDs and have no semantic ownership or provenance entries yet.
+* Item: Resolved references currently cover action-to-state and event-to-method pairs only. Bindings, attributes, conditionals, lists, routes, and unresolved reference attempts have no semantic relation records or provenance-backed relations yet.
+* Item: Provenance currently records one parsed file path/span per semantic ID. Multi-file aggregation, source remapping, generated-source provenance, validation, query APIs, and CLI inspection remain deferred to ASM-5 through ASM-8.
 * Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 
 Exact next step
 
-Start ASM-4 - Source provenance. Attach source paths and spans to semantic IDs and resolved relations so diagnostics and future tooling can trace every compiler entity back to its origin.
+Start ASM-5 - ApplicationSemanticModel shell. Assemble components, semantic IDs, ownership, references, provenance, and diagnostics behind the first application-level compiler model without changing existing backends.
 
 Useful commands
 

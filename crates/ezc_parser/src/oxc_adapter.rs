@@ -158,7 +158,7 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
     if let Some(body) = &method.value.body {
         for statement in &body.statements {
             parse_statement_for_jsx(statement, source, &mut jsx_roots, &mut bindings);
-            if let Some(update) = parsed_state_update(statement) {
+            if let Some(update) = parsed_state_update(statement, source) {
                 state_updates.push(update);
             }
         }
@@ -173,20 +173,23 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
     })
 }
 
-fn parsed_state_update(statement: &Statement<'_>) -> Option<ParsedStateUpdate> {
+fn parsed_state_update(statement: &Statement<'_>, source: &str) -> Option<ParsedStateUpdate> {
     let Statement::ExpressionStatement(statement) = statement else {
         return None;
     };
 
     match &statement.expression {
-        Expression::UpdateExpression(update) => parsed_update_state_update(update),
-        Expression::AssignmentExpression(assignment) => parsed_assignment_state_update(assignment),
+        Expression::UpdateExpression(update) => parsed_update_state_update(update, source),
+        Expression::AssignmentExpression(assignment) => {
+            parsed_assignment_state_update(assignment, source)
+        }
         _ => None,
     }
 }
 
 fn parsed_update_state_update(
     update: &oxc_ast::ast::UpdateExpression<'_>,
+    source: &str,
 ) -> Option<ParsedStateUpdate> {
     let operation = match update.operator.as_str() {
         "++" => ParsedStateOperation::Increment,
@@ -196,11 +199,16 @@ fn parsed_update_state_update(
 
     let field = this_assignment_target_field(&update.argument)?;
 
-    Some(ParsedStateUpdate { field, operation })
+    Some(ParsedStateUpdate {
+        field,
+        operation,
+        span: source_span(source, update.span),
+    })
 }
 
 fn parsed_assignment_state_update(
     assignment: &oxc_ast::ast::AssignmentExpression<'_>,
+    source: &str,
 ) -> Option<ParsedStateUpdate> {
     let field = this_assignment_target_field_from_assignment_target(&assignment.left)?;
 
@@ -218,7 +226,11 @@ fn parsed_assignment_state_update(
         _ => return None,
     };
 
-    Some(ParsedStateUpdate { field, operation })
+    Some(ParsedStateUpdate {
+        field,
+        operation,
+        span: source_span(source, assignment.span),
+    })
 }
 
 fn this_assignment_target_field(target: &SimpleAssignmentTarget<'_>) -> Option<String> {

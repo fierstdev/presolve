@@ -1,8 +1,10 @@
 use std::collections::BTreeMap;
+use std::path::Path;
 
 use serde::Serialize;
 
 use crate::semantic_id::{SemanticId, SemanticOwner};
+use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
 
 use ezc_parser::{
@@ -16,6 +18,7 @@ pub struct ComponentGraph {
     pub components: Vec<ComponentNode>,
     pub diagnostics: Vec<ComponentDiagnostic>,
     pub references: Vec<SemanticReference>,
+    pub provenance: BTreeMap<SemanticId, SourceProvenance>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -195,10 +198,16 @@ pub fn build_component_graph(parsed: &ParsedFile) -> ComponentGraph {
     let mut components = Vec::new();
     let mut diagnostics = Vec::new();
     let mut references = Vec::new();
+    let mut provenance = BTreeMap::new();
 
     for class in &parsed.classes {
         let component = build_component_node(class, &mut diagnostics);
-        references.extend(collect_semantic_references(&component));
+        let component_provenance = collect_component_provenance(class, &component, &parsed.path);
+        references.extend(collect_semantic_references(
+            &component,
+            &component_provenance,
+        ));
+        provenance.extend(component_provenance);
         components.push(component);
     }
 
@@ -213,6 +222,7 @@ pub fn build_component_graph(parsed: &ParsedFile) -> ComponentGraph {
         components,
         diagnostics,
         references,
+        provenance,
     }
 }
 
@@ -648,7 +658,74 @@ impl EventIdAllocator {
     }
 }
 
-fn collect_semantic_references(component: &ComponentNode) -> Vec<SemanticReference> {
+fn collect_component_provenance(
+    class: &ParsedClass,
+    component: &ComponentNode,
+    path: &Path,
+) -> BTreeMap<SemanticId, SourceProvenance> {
+    let mut provenance = BTreeMap::new();
+    provenance.insert(
+        component.id.clone(),
+        SourceProvenance::new(path, class.span),
+    );
+
+    for property in &class.properties {
+        if property.initializer.as_deref() != Some("state(...)") {
+            continue;
+        }
+
+        if let Some(field) = component
+            .state_fields
+            .iter()
+            .find(|field| field.name == property.name)
+        {
+            provenance.insert(field.id.clone(), SourceProvenance::new(path, property.span));
+        }
+    }
+
+    for method in &class.methods {
+        if let Some(component_method) = component
+            .methods
+            .iter()
+            .find(|component_method| component_method.name == method.name)
+        {
+            provenance.insert(
+                component_method.id.clone(),
+                SourceProvenance::new(path, method.span),
+            );
+        }
+
+        if method.name == "render" {
+            provenance.insert(
+                component.id.template(),
+                SourceProvenance::new(path, method.span),
+            );
+        }
+
+        for (index, update) in method.state_updates.iter().enumerate() {
+            provenance.insert(
+                component.id.action(&method.name, index),
+                SourceProvenance::new(path, update.span),
+            );
+        }
+    }
+
+    if let Some(render) = &component.render {
+        for handler in render_event_handlers(render) {
+            provenance.insert(
+                handler.id.clone(),
+                SourceProvenance::new(path, handler.span),
+            );
+        }
+    }
+
+    provenance
+}
+
+fn collect_semantic_references(
+    component: &ComponentNode,
+    provenance: &BTreeMap<SemanticId, SourceProvenance>,
+) -> Vec<SemanticReference> {
     let mut references = component
         .actions
         .iter()
@@ -661,6 +738,10 @@ fn collect_semantic_references(component: &ComponentNode) -> Vec<SemanticReferen
                     kind: SemanticReferenceKind::ActionState,
                     source: action.id.clone(),
                     target: field.id.clone(),
+                    provenance: provenance
+                        .get(&action.id)
+                        .expect("action semantic provenance should exist")
+                        .clone(),
                 })
         })
         .collect::<Vec<_>>();
@@ -679,6 +760,10 @@ fn collect_semantic_references(component: &ComponentNode) -> Vec<SemanticReferen
                             kind: SemanticReferenceKind::EventMethod,
                             source: handler.id.clone(),
                             target: method.id.clone(),
+                            provenance: provenance
+                                .get(&handler.id)
+                                .expect("event semantic provenance should exist")
+                                .clone(),
                         })
                 }),
         );

@@ -6,6 +6,7 @@ use crate::component_graph::{
 use ezc_parser::SourceSpan;
 
 use crate::semantic_id::{SemanticId, SemanticOwner};
+use crate::semantic_provenance::SourceProvenance;
 
 #[derive(Debug, Default)]
 struct TemplateIdAllocator {
@@ -29,6 +30,7 @@ pub struct TemplateGraph {
 pub struct TemplateNode {
     pub id: SemanticId,
     pub owner: SemanticOwner,
+    pub provenance: SourceProvenance,
     pub component_name: String,
     pub root: Option<ElementNode>,
     pub root_fragment: Option<FragmentNode>,
@@ -127,6 +129,11 @@ struct ListItemTemplateScope<'a> {
 }
 
 #[must_use]
+///
+/// # Panics
+///
+/// Panics when a component has no semantic provenance entry. Component-graph
+/// construction establishes this invariant before template construction.
 pub fn build_template_graph(component_graph: &ComponentGraph) -> TemplateGraph {
     let mut ids = TemplateIdAllocator::default();
 
@@ -136,6 +143,12 @@ pub fn build_template_graph(component_graph: &ComponentGraph) -> TemplateGraph {
         .map(|component| TemplateNode {
             id: component.id.template(),
             owner: SemanticOwner::entity(component.id.clone()),
+            provenance: component_graph
+                .provenance
+                .get(&component.id.template())
+                .or_else(|| component_graph.provenance.get(&component.id))
+                .cloned()
+                .expect("component semantic provenance should exist"),
             component_name: component.class_name.clone(),
             root: component
                 .render

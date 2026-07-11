@@ -11,6 +11,7 @@ pub mod model;
 pub mod page_codegen;
 pub mod runtime_codegen;
 pub mod semantic_id;
+pub mod semantic_provenance;
 pub mod semantic_reference;
 pub mod summarize;
 pub mod template_graph;
@@ -29,6 +30,7 @@ pub use model::{
 pub use page_codegen::generate_standalone_page;
 pub use runtime_codegen::generate_runtime_stub;
 pub use semantic_id::{SemanticId, SemanticOwner};
+pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
 pub use summarize::summarize_source;
 pub use template_graph::{
@@ -228,24 +230,43 @@ class Counter extends Component {
         assert_eq!(span.line, 13);
         assert_eq!(span.column, 16);
 
+        assert_eq!(graph.references.len(), 2);
+        assert_eq!(graph.references[0].kind, SemanticReferenceKind::ActionState);
         assert_eq!(
-            graph.references,
-            vec![
-                SemanticReference {
-                    kind: SemanticReferenceKind::ActionState,
-                    source: SemanticId::component(Some("x-counter"), "Counter")
-                        .action("increment", 0),
-                    target: SemanticId::component(Some("x-counter"), "Counter")
-                        .state_field("count"),
-                },
-                SemanticReference {
-                    kind: SemanticReferenceKind::EventMethod,
-                    source: SemanticId::component(Some("x-counter"), "Counter")
-                        .event_handler("click", 0),
-                    target: SemanticId::component(Some("x-counter"), "Counter").method("increment"),
-                },
-            ]
+            graph.references[0].source,
+            SemanticId::component(Some("x-counter"), "Counter").action("increment", 0)
         );
+        assert_eq!(
+            graph.references[0].target,
+            SemanticId::component(Some("x-counter"), "Counter").state_field("count")
+        );
+        assert_eq!(
+            graph.references[0].provenance.path,
+            Path::new("fixtures/0001-source-summary/input/Counter.tsx")
+        );
+        assert_eq!(graph.references[0].provenance.span.line, 7);
+
+        assert_eq!(graph.references[1].kind, SemanticReferenceKind::EventMethod);
+        assert_eq!(
+            graph.references[1].source,
+            SemanticId::component(Some("x-counter"), "Counter").event_handler("click", 0)
+        );
+        assert_eq!(
+            graph.references[1].target,
+            SemanticId::component(Some("x-counter"), "Counter").method("increment")
+        );
+        assert_eq!(
+            graph.references[1].provenance.path,
+            Path::new("fixtures/0001-source-summary/input/Counter.tsx")
+        );
+        assert_eq!(graph.references[1].provenance.span.line, 12);
+
+        assert_eq!(graph.provenance[&component.id].span.line, 1);
+        assert_eq!(graph.provenance[&component.state_fields[0].id].span.line, 4);
+        assert_eq!(graph.provenance[&component.methods[0].id].span.line, 6);
+        assert_eq!(graph.provenance[&component.actions[0].id].span.line, 7);
+        assert_eq!(graph.provenance[&component.id.template()].span.line, 10);
+        assert_eq!(graph.provenance[&render.event_handlers[0].id].span.line, 12);
     }
 
     #[test]
@@ -976,6 +997,11 @@ class BadAttrs extends Component {
         let template = &template_graph.templates[0];
         assert_eq!(template.component_name, "Counter");
         assert_eq!(template.id.as_str(), "component:x-counter/template:render");
+        assert_eq!(
+            template.provenance.path,
+            Path::new("fixtures/0001-source-summary/input/Counter.tsx")
+        );
+        assert_eq!(template.provenance.span.line, 10);
         assert_eq!(
             template.owner,
             SemanticOwner::entity(SemanticId::component(Some("x-counter"), "Counter"))

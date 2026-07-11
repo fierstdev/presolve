@@ -98,6 +98,8 @@ fn parses_counter_fixture() {
         increment.state_updates[0].operation,
         ParsedStateOperation::AddAssign(ParsedSerializableValue::Number("1".to_string()))
     );
+    assert_eq!(increment.state_updates[0].span.line, 7);
+    assert_eq!(increment.state_updates[0].span.column, 5);
 }
 
 #[test]

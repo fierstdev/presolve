@@ -56,6 +56,7 @@ pub struct ParsedMethod {
 pub struct ParsedStateUpdate {
     pub field: String,
     pub operation: ParsedStateOperation,
+    pub span: SourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
