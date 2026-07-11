@@ -5,13 +5,13 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 use ezc_core::{
-    build_application_semantic_model, build_component_graph, build_template_graph,
+    build_application_semantic_model_for_unit, build_component_graph, build_template_graph,
     build_template_manifest, explain_json, explain_text, generate_runtime_stub,
     generate_standalone_page, generate_static_html, summarize_source, template_manifest_json,
     validate_application_semantic_model, ApplicationSemanticModel, AsmValidationDiagnostic,
-    AttributeValue, ComponentGraph, RenderAttribute, RenderAttributeValue, SemanticEntity,
-    SemanticOwner, SemanticReferenceKind, SerializableValue, SourceProvenance, StateOperation,
-    TemplateChild, TemplateGraph, TemplateSemanticKind,
+    AttributeValue, CompilationUnit, ComponentGraph, RenderAttribute, RenderAttributeValue,
+    SemanticEntity, SemanticOwner, SemanticReferenceKind, SerializableValue, SourceProvenance,
+    StateOperation, TemplateChild, TemplateGraph, TemplateSemanticKind,
 };
 use ezc_parser::{
     parse_file, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
@@ -32,7 +32,7 @@ fn main() {
         "explain" => run_explain(args),
         "parse" => run_parse(args),
         "graph" => run_graph(args),
-        "asm" => run_asm(args),
+        "asm" => run_asm(&args),
         "template" => run_template(args),
         "html" => run_html(args),
         "manifest" => run_manifest(args),
@@ -90,23 +90,30 @@ fn run_graph(mut args: Vec<String>) {
     print_component_graph(&path, &graph);
 }
 
-fn run_asm(mut args: Vec<String>) {
-    if args.is_empty() {
-        eprintln!("missing file path");
-        print_usage_and_exit();
-    }
-    let path = PathBuf::from(args.remove(0));
-    let format = parse_format(&args);
-    let source = fs::read_to_string(&path).unwrap_or_else(|error| {
-        eprintln!("failed to read {}: {error}", path.display());
-        process::exit(1);
-    });
-    let asm = build_application_semantic_model(&parse_file(&path, &source));
+fn run_asm(args: &[String]) {
+    let (input_paths, format) = parse_asm_inputs(args);
+    let sources = input_paths
+        .into_iter()
+        .map(|path| {
+            let source = fs::read_to_string(&path).unwrap_or_else(|error| {
+                eprintln!("failed to read {}: {error}", path.display());
+                process::exit(1);
+            });
+            (path, source)
+        })
+        .collect::<Vec<_>>();
+    let unit = CompilationUnit::parse_sources(sources);
+    let paths = unit
+        .files()
+        .iter()
+        .map(|file| file.path.clone())
+        .collect::<Vec<_>>();
+    let asm = build_application_semantic_model_for_unit(&unit);
     let validation = validate_application_semantic_model(&asm);
 
     match format.as_str() {
-        "text" => print_asm_text(&path, &asm, &validation),
-        "json" => print!("{}", asm_inspection_json(&path, &asm, &validation)),
+        "text" => print_asm_text(&paths, &asm, &validation),
+        "json" => print!("{}", asm_inspection_json(&paths, &asm, &validation)),
         _ => {
             eprintln!("unsupported format: {format}");
             process::exit(1);
@@ -115,11 +122,18 @@ fn run_asm(mut args: Vec<String>) {
 }
 
 fn print_asm_text(
-    path: &Path,
+    paths: &[PathBuf],
     asm: &ApplicationSemanticModel,
     validation: &[AsmValidationDiagnostic],
 ) {
-    println!("File: {}", path.display());
+    if paths.len() == 1 {
+        println!("File: {}", paths[0].display());
+    } else {
+        println!("Files:");
+        for path in paths {
+            println!("  {}", path.display());
+        }
+    }
     println!("ApplicationSemanticModel:");
     println!("  components: {}", asm.components.len());
     println!("  templates: {}", asm.templates.len());
@@ -131,7 +145,7 @@ fn print_asm_text(
 }
 
 fn asm_inspection_json(
-    path: &Path,
+    paths: &[PathBuf],
     asm: &ApplicationSemanticModel,
     validation: &[AsmValidationDiagnostic],
 ) -> String {
@@ -170,7 +184,13 @@ fn asm_inspection_json(
 
     let document = AsmInspectionDocument {
         schema_version: 1,
-        file: path.display().to_string(),
+        file: paths[0].display().to_string(),
+        files: (paths.len() > 1).then(|| {
+            paths
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect()
+        }),
         entities: asm
             .ownership
             .iter()
@@ -197,6 +217,40 @@ fn asm_inspection_json(
 
     serde_json::to_string_pretty(&document).expect("ASM inspection document should serialize")
         + "\n"
+}
+
+fn parse_asm_inputs(args: &[String]) -> (Vec<PathBuf>, String) {
+    let mut paths = Vec::new();
+    let mut format = "text".to_string();
+    let mut index = 0;
+
+    while index < args.len() {
+        match args[index].as_str() {
+            "--format" => {
+                let Some(value) = args.get(index + 1) else {
+                    eprintln!("missing value for --format");
+                    process::exit(1);
+                };
+                format.clone_from(value);
+                index += 2;
+            }
+            option if option.starts_with('-') => {
+                eprintln!("unknown option: {option}");
+                process::exit(1);
+            }
+            path => {
+                paths.push(PathBuf::from(path));
+                index += 1;
+            }
+        }
+    }
+
+    if paths.is_empty() {
+        eprintln!("missing file path");
+        print_usage_and_exit();
+    }
+
+    (paths, format)
 }
 
 fn semantic_entity_kind(entity: SemanticEntity<'_>) -> &'static str {
@@ -237,6 +291,8 @@ fn semantic_reference_kind(kind: SemanticReferenceKind) -> &'static str {
 struct AsmInspectionDocument<'a> {
     schema_version: u32,
     file: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    files: Option<Vec<String>>,
     entities: Vec<AsmInspectionEntity<'a>>,
     references: Vec<AsmInspectionReference<'a>>,
     diagnostics: Vec<AsmInspectionDiagnostic<'a>>,

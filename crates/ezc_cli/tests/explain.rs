@@ -157,6 +157,65 @@ fn asm_command_emits_deterministic_json_inspection() {
 }
 
 #[test]
+fn asm_command_inspects_a_sorted_multi_file_unit() {
+    let repo_root = repo_root();
+    let input_paths = [
+        "fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx",
+        "fixtures/0001-source-summary/input/Counter.tsx",
+    ];
+    let args = ["asm", input_paths[0], input_paths[1], "--format", "json"];
+
+    let text_output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["asm", input_paths[0], input_paths[1]])
+        .output()
+        .expect("failed to run multi-file ezc_cli asm");
+
+    assert!(text_output.status.success());
+    assert!(
+        String::from_utf8(text_output.stdout)
+            .expect("CLI stdout was not valid UTF-8")
+            .starts_with(
+                "Files:\n  fixtures/0001-source-summary/input/Counter.tsx\n  fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx\nApplicationSemanticModel:\n"
+            )
+    );
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(args)
+        .output()
+        .expect("failed to run multi-file ezc_cli asm --format json");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let document: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("ASM inspection output was not valid JSON");
+    assert_eq!(
+        document["file"],
+        "fixtures/0001-source-summary/input/Counter.tsx"
+    );
+    assert_eq!(
+        document["files"],
+        serde_json::json!([
+            "fixtures/0001-source-summary/input/Counter.tsx",
+            "fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx",
+        ])
+    );
+    assert_eq!(document["entities"].as_array().map(Vec::len), Some(26));
+    assert!(document["entities"].as_array().is_some_and(|entities| {
+        entities.iter().any(|entity| {
+            entity["id"]
+                == "module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button"
+        })
+    }));
+}
+
+#[test]
 fn parse_command_matches_valid_counter_fixture() {
     let repo_root = repo_root();
 
