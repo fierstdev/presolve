@@ -555,6 +555,21 @@ fn check_command_fails_for_compiler_diagnostics() {
 }
 
 #[test]
+fn check_command_emits_json_diagnostics() {
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["check", "fixtures/0031-primitive-compound-action-type-diagnostics/input/InvalidTypedCompoundActions.tsx", "--format", "json"])
+        .output().expect("failed to run ezc_cli check");
+    assert!(!output.status.success());
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("check JSON");
+    assert_eq!(document["schema_version"], 1);
+    assert_eq!(
+        document["compiler_diagnostics"].as_array().map(Vec::len),
+        Some(5)
+    );
+}
+
+#[test]
 fn check_command_fails_for_parser_diagnostics() {
     let repo_root = repo_root();
 

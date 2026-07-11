@@ -124,7 +124,7 @@ fn run_asm(args: &[String]) {
 }
 
 fn run_check(args: &[String]) {
-    let input_paths = parse_check_inputs(args);
+    let (input_paths, format) = parse_check_inputs(args);
     let sources = input_paths
         .into_iter()
         .map(|path| {
@@ -144,12 +144,31 @@ fn run_check(args: &[String]) {
         .map(|file| file.diagnostics.len())
         .sum::<usize>();
 
+    match format.as_str() {
+        "text" => print_check_text(&unit, &asm, &validation, parser_diagnostic_count),
+        "json" => print!("{}", check_json(&unit, &asm, &validation)),
+        _ => {
+            eprintln!("unsupported format: {format}");
+            process::exit(1);
+        }
+    }
+
+    if parser_diagnostic_count + asm.diagnostics.len() + validation.len() > 0 {
+        process::exit(1);
+    }
+}
+
+fn print_check_text(
+    unit: &CompilationUnit,
+    asm: &ApplicationSemanticModel,
+    validation: &[AsmValidationDiagnostic],
+    parser_diagnostic_count: usize,
+) {
     println!("Check:");
     println!("  files: {}", unit.files().len());
     println!("  parser diagnostics: {parser_diagnostic_count}");
     println!("  compiler diagnostics: {}", asm.diagnostics.len());
     println!("  ASM validation diagnostics: {}", validation.len());
-
     for file in unit.files() {
         for diagnostic in &file.diagnostics {
             println!(
@@ -157,27 +176,23 @@ fn run_check(args: &[String]) {
                 diagnostic_severity_label(&diagnostic.severity),
                 diagnostic.message
             );
-            for label in &diagnostic.labels {
-                println!(
-                    "    at {}:{}:{} span={}..{}",
-                    file.path.display(),
-                    label.span.line,
-                    label.span.column,
-                    label.span.start,
-                    label.span.end,
-                );
-            }
         }
     }
-
     print_compiler_diagnostics(&asm.diagnostics);
-    if let Some(validation_text) = asm_validation_diagnostics_text(&validation) {
+    if let Some(validation_text) = asm_validation_diagnostics_text(validation) {
         print!("{validation_text}");
     }
+}
 
-    if parser_diagnostic_count + asm.diagnostics.len() + validation.len() > 0 {
-        process::exit(1);
-    }
+fn check_json(
+    unit: &CompilationUnit,
+    asm: &ApplicationSemanticModel,
+    validation: &[AsmValidationDiagnostic],
+) -> String {
+    let parser_diagnostics = unit.files().iter().flat_map(|file| file.diagnostics.iter().map(move |diagnostic| serde_json::json!({"path": file.path, "severity": diagnostic_severity_label(&diagnostic.severity), "message": diagnostic.message}))).collect::<Vec<_>>();
+    let compiler_diagnostics = asm.diagnostics.iter().map(|diagnostic| serde_json::json!({"code": diagnostic.code, "message": diagnostic.message})).collect::<Vec<_>>();
+    let validation = validation.iter().map(|diagnostic| serde_json::json!({"code": diagnostic.code, "message": diagnostic.message})).collect::<Vec<_>>();
+    serde_json::to_string_pretty(&serde_json::json!({"schema_version": 1, "files": unit.files().iter().map(|file| file.path.display().to_string()).collect::<Vec<_>>(), "parser_diagnostics": parser_diagnostics, "compiler_diagnostics": compiler_diagnostics, "validation": validation})).expect("check document should serialize") + "\n"
 }
 
 fn print_asm_text(
@@ -368,21 +383,36 @@ fn parse_asm_inputs(args: &[String]) -> (Vec<PathBuf>, String) {
     (paths, format)
 }
 
-fn parse_check_inputs(args: &[String]) -> Vec<PathBuf> {
+fn parse_check_inputs(args: &[String]) -> (Vec<PathBuf>, String) {
     if args.is_empty() {
         eprintln!("missing file path");
         print_usage_and_exit();
     }
 
-    args.iter()
-        .map(|arg| {
-            if arg.starts_with('-') {
-                eprintln!("unknown option: {arg}");
+    let mut paths = Vec::new();
+    let mut format = "text".to_string();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--format" => {
+                let Some(value) = args.get(index + 1) else {
+                    eprintln!("missing value for --format");
+                    process::exit(1);
+                };
+                format.clone_from(value);
+                index += 2;
+            }
+            option if option.starts_with('-') => {
+                eprintln!("unknown option: {option}");
                 process::exit(1);
             }
-            PathBuf::from(arg)
-        })
-        .collect()
+            path => {
+                paths.push(PathBuf::from(path));
+                index += 1;
+            }
+        }
+    }
+    (paths, format)
 }
 
 fn semantic_entity_kind(entity: SemanticEntity<'_>) -> &'static str {
@@ -1413,7 +1443,7 @@ fn print_usage_and_exit() -> ! {
     eprintln!("usage:");
     eprintln!("  ezc_cli explain <file> [--format text|json]");
     eprintln!("  ezc_cli asm <file> [--format text|json]");
-    eprintln!("  ezc_cli check <file> [file...]");
+    eprintln!("  ezc_cli check <file> [file...] [--format text|json]");
     eprintln!("  ezc_cli parse <file>");
     eprintln!("  ezc_cli graph <file>");
     eprintln!("  ezc_cli template <file>");
