@@ -207,6 +207,7 @@ fn asm_inspection_json(
                     kind: semantic_entity_kind(entity),
                     owner: semantic_owner_id(owner),
                     provenance: provenance.into(),
+                    declared_type: declared_state_type(entity),
                 }
             })
             .collect(),
@@ -287,6 +288,18 @@ fn semantic_reference_kind(kind: SemanticReferenceKind) -> &'static str {
     }
 }
 
+fn declared_state_type(entity: SemanticEntity<'_>) -> Option<AsmInspectionDeclaredType<'_>> {
+    let SemanticEntity::StateField(field) = entity else {
+        return None;
+    };
+    let declared_type = field.declared_type.as_ref()?;
+
+    Some(AsmInspectionDeclaredType {
+        text: &declared_type.text,
+        provenance: (&declared_type.provenance).into(),
+    })
+}
+
 #[derive(Serialize)]
 struct AsmInspectionDocument<'a> {
     schema_version: u32,
@@ -304,6 +317,14 @@ struct AsmInspectionEntity<'a> {
     id: &'a str,
     kind: &'static str,
     owner: Option<&'a str>,
+    provenance: AsmInspectionProvenance,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    declared_type: Option<AsmInspectionDeclaredType<'a>>,
+}
+
+#[derive(Serialize)]
+struct AsmInspectionDeclaredType<'a> {
+    text: &'a str,
     provenance: AsmInspectionProvenance,
 }
 

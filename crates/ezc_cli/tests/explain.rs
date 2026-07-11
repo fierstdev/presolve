@@ -216,6 +216,46 @@ fn asm_command_inspects_a_sorted_multi_file_unit() {
 }
 
 #[test]
+fn asm_command_exposes_declared_state_types() {
+    let repo_root = repo_root();
+    let path = "fixtures/0025-typed-state-annotations/input/TypedState.tsx";
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["asm", path, "--format", "json"])
+        .output()
+        .expect("failed to run typed-state ezc_cli asm --format json");
+
+    assert!(output.status.success());
+
+    let document: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("ASM inspection output was not valid JSON");
+    let count = document["entities"]
+        .as_array()
+        .and_then(|entities| {
+            entities.iter().find(|entity| {
+                entity["id"]
+                    == "module:fixtures/0025-typed-state-annotations/input/TypedState.tsx/component:x-typed-state/state:count"
+            })
+        })
+        .expect("count state entity");
+
+    assert_eq!(
+        count["declared_type"],
+        serde_json::json!({
+            "text": "number",
+            "provenance": {
+                "path": path,
+                "start": 72,
+                "end": 80,
+                "line": 3,
+                "column": 8,
+            }
+        })
+    );
+}
+
+#[test]
 fn parse_command_matches_valid_counter_fixture() {
     let repo_root = repo_root();
 
