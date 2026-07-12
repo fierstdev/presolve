@@ -331,7 +331,10 @@ pub fn build_application_semantic_model_from_component_graph(
     ));
 
     ApplicationSemanticModel {
-        expression_graph: ExpressionGraph::from_components(&component_graph.components),
+        expression_graph: ExpressionGraph::from_components(
+            &component_graph.components,
+            &component_graph.provenance,
+        ),
         components: component_graph.components.clone(),
         templates,
         template_entities,
@@ -394,7 +397,7 @@ fn build_application_semantic_model_from_files(files: &[ParsedFile]) -> Applicat
     ));
 
     ApplicationSemanticModel {
-        expression_graph: ExpressionGraph::from_components(&components),
+        expression_graph: ExpressionGraph::from_components(&components, &provenance),
         components,
         templates,
         template_entities,

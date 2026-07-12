@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: 946a9ae Fold state expressions through the ASM
-* Working tree: B10 source, test, fixture, and documentation changes are present and uncommitted
+* Latest commit: 53557b5 Add canonical expression graph
+* Working tree: B11 source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: B10 - Canonical expression graph
-* Summary: Added one compiler-owned graph of stable expression nodes shared by folding and ASM inspection.
-* Key files: crates/ezc_core/src/expression_graph.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/compiler_pass.rs, crates/ezc_cli/src/main.rs
-* New behavior: State initializer lowering builds one canonical graph with stable roots and recursively keyed nodes. `ConstantFoldingPass` and ASM inspection consume that graph; legacy field-local trees remain compatibility data only.
-* Tests added or changed: Core graph construction, stable-root, evaluation, and rendering coverage; CLI fixture inspection coverage; browser integration tests serialize Chrome access for stable workspace execution.
-* Fixtures added or changed: fixtures/0041-canonical-expression-graph.
+* Slice: B11 - Expression provenance
+* Summary: Attached canonical path-aware source provenance to every expression graph node.
+* Key files: crates/ezc_core/src/expression_graph.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/compiler_pass.rs
+* New behavior: Expression lowering derives each node's path and exact authored span from its owning state field. Constant-folding diagnostics now reuse the graph root's provenance directly.
+* Tests added or changed: Core coverage verifies every graph node retains the source path and a span contained by its root expression, and that folding diagnostics reuse the canonical root provenance.
+* Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: B10 - Canonical expression graph
+* Slice: B11 - Expression provenance
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B9
-* Remaining: Phase B11 - expression provenance.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B10
+* Remaining: Phase B12 - expression queries.
 
 Verification
 
@@ -35,7 +35,11 @@ Architecture decisions made
 
 * Decision: State initializer expressions have stable graph roots and recursively keyed canonical nodes in the ASM.
 * Reason: Folding and inspection now consume the same compiler-owned topology instead of independently traversing field-local lowering structures.
-* Tradeoff: B10 retains legacy field-local trees only as lowering compatibility data; every semantic consumer added in this phase reads the canonical graph. Canonical path-aware node provenance is B11 work.
+* Tradeoff: B10 retains legacy field-local trees only as lowering compatibility data; every semantic consumer added in this phase reads the canonical graph. General expression owners remain later work.
+
+* Decision: Expression graph nodes own `SourceProvenance` rather than an unqualified source span.
+* Reason: Tooling and diagnostics need the canonical expression node itself to provide a path-aware authored location without reconstructing it from a state field.
+* Tradeoff: B11 derives provenance only for the existing state-initializer graph. Template, action, and general JavaScript expressions are not lowered yet.
 
 * Decision: Browser runtime integration tests acquire one process-wide lock before creating a Chrome probe, and the probe deadline allows 20 seconds for a cold Chrome start.
 * Reason: Cargo's workspace runner schedules tests concurrently, and the previous five-second harness deadline could kill an otherwise healthy cold-start probe with SIGKILL.
@@ -349,11 +353,11 @@ Known limitations
 * Item: Method parameters are compiler-owned identifier declarations with canonical source provenance only. They do not execute, close over values, resolve local/template/action references, or support destructuring, defaults, rest declarations, or semantic type checking.
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
-* Item: The canonical expression graph currently covers supported state initializer expressions only. Node spans are retained for diagnostics, while path-aware canonical provenance, general expression owners, and non-state expressions remain later work.
+* Item: The canonical expression graph currently covers supported state initializer expressions only. Every current node has path-aware provenance, while general expression owners and non-state expressions remain later work.
 
 Exact next step
 
-Start Phase B11 - attach canonical source provenance to every expression graph node.
+Start Phase B12 - add canonical expression graph queries.
 
 Useful commands
 

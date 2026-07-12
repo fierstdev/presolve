@@ -109,9 +109,7 @@ impl ImmutableAsmPass for ConstantFoldingPass {
                     Err(error) => push_diagnostic_once(
                         &mut folded.diagnostics,
                         ComponentDiagnostic {
-                            provenance: folded.provenance.get(&field.id).map(|provenance| {
-                                SourceProvenance::new(&provenance.path, expression.span)
-                            }),
+                            provenance: Some(expression.provenance.clone()),
                             code: constant_expression_diagnostic_code_from_node(&expression.kind)
                                 .to_string(),
                             message: format!(
@@ -396,6 +394,41 @@ class FoldedState extends Component {
         );
         assert_eq!(ConstantFoldingPass.transform(&folded), folded);
         assert_eq!(asm, original);
+    }
+
+    #[test]
+    fn uses_canonical_expression_provenance_for_folding_diagnostics() {
+        let parsed = ezc_parser::parse_file(
+            "src/InvalidExpression.tsx",
+            r#"
+@component("x-invalid-expression")
+class InvalidExpression extends Component {
+  total = state(10 / 0);
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let field = &asm.components[0].state_fields[0];
+        let root = asm
+            .expression_graph
+            .root_for(&field.id)
+            .expect("expression root");
+        let expected_provenance = asm
+            .expression_graph
+            .nodes
+            .get(root)
+            .expect("expression root node")
+            .provenance
+            .clone();
+
+        let folded = ConstantFoldingPass.transform(&asm);
+        let diagnostic = folded
+            .diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.code == "EZC1022")
+            .expect("constant-expression diagnostic");
+
+        assert_eq!(diagnostic.provenance.as_ref(), Some(&expected_provenance));
     }
 
     #[test]

@@ -159,7 +159,8 @@ parser and browser runtime do not evaluate these expressions.
 
 The ASM owns a canonical expression graph: state fields resolve to stable graph
 roots, and folding and inspection read the same graph nodes rather than
-reinterpreting field-local expression trees.
+reinterpreting field-local expression trees. Every graph node retains canonical
+source provenance, including its file path and authored expression span.
 
 ## Repository rules
 

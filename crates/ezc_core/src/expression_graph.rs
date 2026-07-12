@@ -3,9 +3,8 @@ use std::collections::BTreeMap;
 use crate::component_graph::UnaryOperator;
 use crate::{
     ComponentNode, ConstantEvaluationError, ConstantExpression, ConstantExpressionKind, SemanticId,
-    SerializableValue,
+    SerializableValue, SourceProvenance,
 };
-use ezc_parser::SourceSpan;
 
 /// Canonical compiler-owned graph for all lowered state initializer expressions.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -19,7 +18,7 @@ pub struct ExpressionNode {
     pub id: SemanticId,
     pub owner: SemanticId,
     pub kind: ExpressionNodeKind,
-    pub span: SourceSpan,
+    pub provenance: SourceProvenance,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -52,15 +51,25 @@ pub enum ExpressionNodeKind {
 }
 
 impl ExpressionGraph {
+    /// # Panics
+    ///
+    /// Panics when a state field with a lowered initializer has no canonical
+    /// source provenance.
     #[must_use]
-    pub fn from_components(components: &[ComponentNode]) -> Self {
+    pub fn from_components(
+        components: &[ComponentNode],
+        provenance: &BTreeMap<SemanticId, SourceProvenance>,
+    ) -> Self {
         let mut graph = Self::default();
         for component in components {
             for field in &component.state_fields {
                 let Some(expression) = &field.initial_expression else {
                     continue;
                 };
-                let root = graph.insert_expression(&field.id, "root", expression);
+                let field_provenance = provenance
+                    .get(&field.id)
+                    .expect("state fields with expressions should have source provenance");
+                let root = graph.insert_expression(&field.id, "root", expression, field_provenance);
                 graph.roots.insert(field.id.clone(), root);
             }
         }
@@ -91,24 +100,25 @@ impl ExpressionGraph {
         owner: &SemanticId,
         path: &str,
         expression: &ConstantExpression,
+        owner_provenance: &SourceProvenance,
     ) -> SemanticId {
         let id = owner.expression(path);
         let child = |graph: &mut Self, child_path: &str, child: &ConstantExpression| {
-            graph.insert_expression(owner, child_path, child)
+            graph.insert_expression(owner, child_path, child, owner_provenance)
         };
         let kind = match &expression.kind {
             ConstantExpressionKind::Literal(value) => ExpressionNodeKind::Literal(value.clone()),
             ConstantExpressionKind::Boolean(value) => ExpressionNodeKind::Boolean(*value),
             ConstantExpressionKind::Arithmetic(arithmetic) => {
-                return self.insert_arithmetic(owner, path, arithmetic)
+                return self.insert_arithmetic(owner, path, arithmetic, owner_provenance)
             }
             ConstantExpressionKind::Comparison {
                 left,
                 right,
                 operator,
             } => ExpressionNodeKind::Comparison {
-                left: self.insert_arithmetic(owner, &format!("{path}.0"), left),
-                right: self.insert_arithmetic(owner, &format!("{path}.1"), right),
+                left: self.insert_arithmetic(owner, &format!("{path}.0"), left, owner_provenance),
+                right: self.insert_arithmetic(owner, &format!("{path}.1"), right, owner_provenance),
                 operator: *operator,
             },
             ConstantExpressionKind::Logical {
@@ -137,7 +147,7 @@ impl ExpressionGraph {
                 id: id.clone(),
                 owner: owner.clone(),
                 kind,
-                span: expression.span,
+                provenance: SourceProvenance::new(&owner_provenance.path, expression.span),
             },
         );
         id
@@ -148,6 +158,7 @@ impl ExpressionGraph {
         owner: &SemanticId,
         path: &str,
         expression: &crate::ArithmeticExpression,
+        owner_provenance: &SourceProvenance,
     ) -> SemanticId {
         let id = owner.expression(path);
         let kind = match &expression.kind {
@@ -159,8 +170,8 @@ impl ExpressionGraph {
                 right,
                 operator,
             } => ExpressionNodeKind::Arithmetic {
-                left: self.insert_arithmetic(owner, &format!("{path}.0"), left),
-                right: self.insert_arithmetic(owner, &format!("{path}.1"), right),
+                left: self.insert_arithmetic(owner, &format!("{path}.0"), left, owner_provenance),
+                right: self.insert_arithmetic(owner, &format!("{path}.1"), right, owner_provenance),
                 operator: *operator,
             },
         };
@@ -170,7 +181,7 @@ impl ExpressionGraph {
                 id: id.clone(),
                 owner: owner.clone(),
                 kind,
-                span: expression.span,
+                provenance: SourceProvenance::new(&owner_provenance.path, expression.span),
             },
         );
         id
@@ -195,7 +206,7 @@ impl ExpressionGraph {
                     left: Box::new(self.arithmetic_from_node(left)?),
                     right: Box::new(self.arithmetic_from_node(right)?),
                 },
-                span: node.span,
+                span: node.provenance.span,
             }),
             ExpressionNodeKind::Comparison {
                 left,
@@ -228,7 +239,7 @@ impl ExpressionGraph {
         };
         Some(ConstantExpression {
             kind,
-            span: node.span,
+            span: node.provenance.span,
         })
     }
 
@@ -251,7 +262,7 @@ impl ExpressionGraph {
         };
         Some(crate::ArithmeticExpression {
             kind,
-            span: node.span,
+            span: node.provenance.span,
         })
     }
 }
@@ -287,6 +298,17 @@ class Graph extends Component {
             asm.expression_graph.render(&field.id).as_deref(),
             Some("((1 + 2) * 3)")
         );
-        assert!(asm.expression_graph.nodes.contains_key(root));
+        let root = asm
+            .expression_graph
+            .nodes
+            .get(root)
+            .expect("expression root node");
+        assert_eq!(root.provenance.path, std::path::Path::new("src/Graph.tsx"));
+        assert_eq!(root.provenance.span.line, 4);
+        assert!(asm.expression_graph.nodes.values().all(|node| {
+            node.provenance.path == std::path::Path::new("src/Graph.tsx")
+                && root.provenance.span.start <= node.provenance.span.start
+                && node.provenance.span.end <= root.provenance.span.end
+        }));
     }
 }
