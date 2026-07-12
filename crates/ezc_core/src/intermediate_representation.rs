@@ -103,6 +103,15 @@ pub struct IrDomEvent {
     pub provenance: SourceProvenance,
 }
 
+/// Conditional DOM output driven by a canonical IR value.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrDomConditional {
+    pub condition: IrValueId,
+    pub when_true: IrDomNodeId,
+    pub when_false: Option<IrDomNodeId>,
+    pub provenance: SourceProvenance,
+}
+
 /// Lowers application component ownership into deterministic IR module structure.
 #[must_use]
 pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateRepresentation {
