@@ -467,6 +467,7 @@ pub fn analyze_constant_propagation(function: &IrFunction) -> IrConstantPropagat
                 continue;
             };
             let constant = match &instruction.kind {
+                IrInstructionKind::Constant { value } => Some(value.clone()),
                 IrInstructionKind::Unary { operation, operand } => {
                     resolve_constant(operand, &constants).and_then(|operand| {
                         match (operation, operand) {
@@ -861,6 +862,7 @@ fn instruction_operands(kind: &IrInstructionKind) -> Vec<&IrOperand> {
         | IrInstructionKind::Unary { operand: value, .. } => vec![value],
         IrInstructionKind::Binary { left, right, .. } => vec![left, right],
         IrInstructionKind::Nop
+        | IrInstructionKind::Constant { .. }
         | IrInstructionKind::InitializeStorage { .. }
         | IrInstructionKind::LoadStorage { .. } => Vec::new(),
     }
@@ -872,6 +874,7 @@ fn instruction_storages(kind: &IrInstructionKind) -> Vec<&IrStorageId> {
         | IrInstructionKind::LoadStorage { storage }
         | IrInstructionKind::StoreStorage { storage, .. } => vec![storage],
         IrInstructionKind::Nop
+        | IrInstructionKind::Constant { .. }
         | IrInstructionKind::Binary { .. }
         | IrInstructionKind::Unary { .. } => Vec::new(),
     }
@@ -1124,6 +1127,9 @@ pub struct IrInstruction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IrInstructionKind {
     Nop,
+    Constant {
+        value: IrConstant,
+    },
     InitializeStorage {
         storage: IrStorageId,
     },
@@ -1143,6 +1149,36 @@ pub enum IrInstructionKind {
         operation: IrUnaryOperation,
         operand: IrOperand,
     },
+}
+
+/// Immutable primitive constant-folding pass for canonical IR.
+pub struct IrConstantFoldingPass;
+
+impl IrOptimizationPass for IrConstantFoldingPass {
+    fn name(&self) -> &'static str {
+        "constant-folding"
+    }
+
+    fn run(&self, input: &IntermediateRepresentation) -> IntermediateRepresentation {
+        let mut output = input.clone();
+        for module in &mut output.modules {
+            for function in &mut module.functions {
+                let constants = analyze_constant_propagation(function).constants;
+                for block in &mut function.blocks {
+                    for instruction in &mut block.instructions {
+                        if let Some(result) = &instruction.result {
+                            if let Some(value) = constants.get(result) {
+                                instruction.kind = IrInstructionKind::Constant {
+                                    value: value.clone(),
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        output
+    }
 }
 
 /// A binary operation with value-producing IR semantics.
