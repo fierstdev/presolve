@@ -194,6 +194,7 @@ pub struct ParsedMethod {
 pub struct ParsedMethodParameter {
     pub name: String,
     pub span: SourceSpan,
+    pub type_annotation: Option<ParsedTypeAnnotation>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -843,7 +843,7 @@ fn asm_command_reports_primitive_declared_state_type_mismatches() {
         .as_array()
         .expect("ASM inspection diagnostics");
 
-    assert_eq!(diagnostics.len(), 4);
+    assert_eq!(diagnostics.len(), 6);
     assert!(diagnostics.iter().all(|diagnostic| {
         diagnostic["code"] == "EZC1016"
             && diagnostic["message"].as_str().is_some_and(|message| {
@@ -913,13 +913,26 @@ fn asm_command_reports_primitive_action_type_mismatches() {
         .as_array()
         .expect("ASM inspection diagnostics");
 
-    assert_eq!(diagnostics.len(), 4);
-    assert!(diagnostics.iter().all(|diagnostic| {
-        diagnostic["code"] == "EZC1017"
+    assert_eq!(diagnostics.len(), 5);
+    assert!(diagnostics.iter().any(|diagnostic| {
+        diagnostic["code"] == "EZC1016"
             && diagnostic["message"]
                 .as_str()
-                .is_some_and(|message| message.contains("action `apply` assigns"))
+                .is_some_and(|message| message.contains("state field `collection`"))
     }));
+    assert_eq!(
+        diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic["code"] == "EZC1017")
+            .count(),
+        4
+    );
+    assert!(diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic["code"] == "EZC1017")
+        .all(|diagnostic| diagnostic["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("action `apply` assigns"))));
 
     let count = diagnostics
         .iter()

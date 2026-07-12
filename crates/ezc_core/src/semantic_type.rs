@@ -225,6 +225,7 @@ impl SemanticTypeModel {
         }
 
         extend_with_local_type_assignments(&mut assignments, components, provenance);
+        extend_with_parameter_type_assignments(&mut assignments, components, &aliases, bindings);
 
         Self {
             assignments,
@@ -282,6 +283,62 @@ fn extend_with_local_type_assignments(
                 origin: local.id.clone(),
                 status: SemanticTypeStatus::Inferred,
                 provenance: local_provenance.clone(),
+            },
+        );
+    }
+}
+
+fn extend_with_parameter_type_assignments(
+    assignments: &mut BTreeMap<SemanticId, SemanticTypeAssignment>,
+    components: &[ComponentNode],
+    aliases: &BTreeMap<SemanticId, SemanticTypeAlias>,
+    bindings: Option<&BindingTable>,
+) {
+    let aliases_by_path_and_name = aliases
+        .values()
+        .map(|alias| ((alias.provenance.path.clone(), alias.name.clone()), alias))
+        .collect::<BTreeMap<_, _>>();
+
+    for parameter in components
+        .iter()
+        .flat_map(|component| &component.methods)
+        .flat_map(|method| &method.parameters)
+    {
+        let Some(declared_type) = &parameter.declared_type else {
+            continue;
+        };
+        let alias = aliases_by_path_and_name
+            .get(&(
+                declared_type.provenance.path.clone(),
+                declared_type.text.clone(),
+            ))
+            .copied();
+        let imported_alias = bindings
+            .and_then(|bindings| {
+                bindings.resolve_import(&declared_type.provenance.path, &declared_type.text)
+            })
+            .and_then(|binding| match &binding.target {
+                ImportBindingTarget::Symbol(symbol) if symbol.kind == SymbolKind::TypeAlias => {
+                    aliases.get(&symbol.id)
+                }
+                _ => None,
+            });
+        let alias = alias.or(imported_alias);
+        let semantic_type = alias
+            .map(|alias| alias.semantic_type.clone())
+            .or_else(|| semantic_type_from_annotation(&declared_type.text));
+        let Some(semantic_type) = semantic_type else {
+            continue;
+        };
+        assignments.insert(
+            parameter.id.clone(),
+            SemanticTypeAssignment {
+                id: SemanticTypeId::for_subject(&parameter.id),
+                subject: parameter.id.clone(),
+                semantic_type,
+                origin: alias.map_or_else(|| parameter.id.clone(), |alias| alias.id.clone()),
+                status: SemanticTypeStatus::Declared,
+                provenance: declared_type.provenance.clone(),
             },
         );
     }

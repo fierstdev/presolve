@@ -38,6 +38,7 @@ pub enum SemanticEntity<'a> {
     Component(&'a ComponentNode),
     StateField(&'a StateField),
     Method(&'a ComponentMethod),
+    Parameter(&'a crate::MethodParameter),
     LocalVariable(&'a MethodLocalVariable),
     Action(&'a ComponentAction),
     EventHandler(&'a RenderEventHandler),
@@ -50,6 +51,7 @@ pub enum SemanticEntityKind {
     Component,
     StateField,
     Method,
+    Parameter,
     LocalVariable,
     Action,
     EventHandler,
@@ -64,6 +66,7 @@ impl SemanticEntity<'_> {
             Self::Component(_) => SemanticEntityKind::Component,
             Self::StateField(_) => SemanticEntityKind::StateField,
             Self::Method(_) => SemanticEntityKind::Method,
+            Self::Parameter(_) => SemanticEntityKind::Parameter,
             Self::LocalVariable(_) => SemanticEntityKind::LocalVariable,
             Self::Action(_) => SemanticEntityKind::Action,
             Self::EventHandler(_) => SemanticEntityKind::EventHandler,
@@ -85,6 +88,14 @@ impl ApplicationSemanticModel {
             }
             if let Some(method) = component.methods.iter().find(|method| method.id == *id) {
                 return Some(SemanticEntity::Method(method));
+            }
+            if let Some(parameter) = component
+                .methods
+                .iter()
+                .flat_map(|method| method.parameters.iter())
+                .find(|parameter| parameter.id == *id)
+            {
+                return Some(SemanticEntity::Parameter(parameter));
             }
             if let Some(local) = component
                 .methods
@@ -641,6 +652,12 @@ fn collect_ownership(
                 method.id.clone(),
                 SemanticOwner::entity(component.id.clone()),
             );
+            for parameter in &method.parameters {
+                ownership.insert(
+                    parameter.id.clone(),
+                    SemanticOwner::entity(method.id.clone()),
+                );
+            }
             for local in &method.local_variables {
                 ownership.insert(local.id.clone(), SemanticOwner::entity(method.id.clone()));
             }
@@ -718,6 +735,39 @@ class TypedState extends Component {
             assignment.provenance,
             field.declared_type.as_ref().unwrap().provenance
         );
+    }
+
+    #[test]
+    fn lowers_typed_method_parameters_into_canonical_entities() {
+        let parsed = ezc_parser::parse_file(
+            "src/Parameters.tsx",
+            r#"
+@component("x-parameters")
+class Parameters extends Component {
+  save(title: string, retries?: number) {}
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        let method = &asm.components[0].methods[0];
+        let parameters = &method.parameters;
+
+        assert_eq!(parameters.len(), 2);
+        assert_eq!(
+            asm.semantic_types.assignments[&parameters[0].id].semantic_type,
+            crate::SemanticType::String
+        );
+        assert_eq!(
+            asm.semantic_types.assignments[&parameters[1].id].semantic_type,
+            crate::SemanticType::Number
+        );
+        assert!(parameters.iter().all(|parameter| {
+            asm.owner(&parameter.id) == Some(&SemanticOwner::entity(method.id.clone()))
+                && asm
+                    .entity(&parameter.id)
+                    .is_some_and(|entity| entity.kind() == SemanticEntityKind::Parameter)
+        }));
     }
 
     #[test]

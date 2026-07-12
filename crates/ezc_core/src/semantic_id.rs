@@ -83,6 +83,11 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn parameter(&self, name: &str, index: usize) -> Self {
+        self.child("parameter", &format!("{name}:{index}"))
+    }
+
+    #[must_use]
     pub fn expression(&self, path: &str) -> Self {
         self.child("expression", path)
     }

@@ -179,6 +179,20 @@ class Parameters extends Component {
     assert_eq!(methods[0].parameters[0].span.column, 8);
     assert_eq!(methods[0].parameters[1].span.line, 4);
     assert_eq!(methods[0].parameters[1].span.column, 23);
+    assert_eq!(
+        methods[0].parameters[0]
+            .type_annotation
+            .as_ref()
+            .map(|annotation| annotation.text.as_str()),
+        Some("string")
+    );
+    assert_eq!(
+        methods[0].parameters[1]
+            .type_annotation
+            .as_ref()
+            .map(|annotation| annotation.text.as_str()),
+        Some("number")
+    );
 
     assert_eq!(methods[1].name, "ignored");
     assert!(methods[1].parameters.is_empty());

@@ -153,6 +153,11 @@ local entities also receive inferred canonical semantic types. List-item scopes,
 duplicate local names, member access, calls, runtime updates, closure capture,
 and non-serializable local expressions remain unresolved.
 
+Supported identifier method parameters are likewise canonical method-owned ASM
+entities. Their authored annotations lower to declared semantic types with
+stable identity and provenance; defaults, destructuring, rest parameters,
+optionality semantics, and call-site validation remain future work.
+
 Constant state expressions are lowered without evaluation, then folded by an
 immutable compiler pass over the ASM. The pass produces a new canonical model
 with folded state values and diagnostics, which backend products consume. The

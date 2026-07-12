@@ -13,7 +13,7 @@ use ezc_parser::{
     ParsedClass, ParsedComparisonOperator, ParsedConstantExpression, ParsedConstantExpressionKind,
     ParsedEventHandler, ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild,
     ParsedJsxConditional, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLogicalOperator,
-    ParsedSerializableValue, ParsedStateOperation, ParsedUnaryOperator, SourceSpan,
+    ParsedMethod, ParsedSerializableValue, ParsedStateOperation, ParsedUnaryOperator, SourceSpan,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -408,7 +408,7 @@ impl fmt::Display for ConstantEvaluationError {
     }
 }
 
-/// Explicit state type metadata carried from the parser into canonical compiler data.
+/// Explicit authored type metadata carried from the parser into canonical compiler data.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeclaredStateType {
     pub text: String,
@@ -471,8 +471,11 @@ pub struct ComponentMethod {
 /// A compiler-owned declaration of a supported method parameter.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MethodParameter {
+    pub id: SemanticId,
+    pub owner: SemanticOwner,
     pub name: String,
     pub span: SourceSpan,
+    pub declared_type: Option<DeclaredStateType>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -685,31 +688,7 @@ fn build_component_node(
     let methods = class
         .methods
         .iter()
-        .map(|method| ComponentMethod {
-            id: id.method(&method.name),
-            owner: SemanticOwner::entity(id.clone()),
-            name: method.name.clone(),
-            local_variables: method
-                .local_variables
-                .iter()
-                .enumerate()
-                .map(|(index, local)| MethodLocalVariable {
-                    id: id.method(&method.name).local_variable(&local.name, index),
-                    owner: SemanticOwner::entity(id.method(&method.name)),
-                    name: local.name.clone(),
-                    value: serializable_value_from_parsed(&local.value),
-                    span: local.span,
-                })
-                .collect(),
-            parameters: method
-                .parameters
-                .iter()
-                .map(|parameter| MethodParameter {
-                    name: parameter.name.clone(),
-                    span: parameter.span,
-                })
-                .collect(),
-        })
+        .map(|method| component_method_from_parsed(method, path, &id))
         .collect::<Vec<_>>();
 
     let actions = class
@@ -762,6 +741,49 @@ fn build_component_node(
         methods,
         actions,
         render,
+    }
+}
+
+fn component_method_from_parsed(
+    method: &ParsedMethod,
+    path: &Path,
+    component_id: &SemanticId,
+) -> ComponentMethod {
+    let id = component_id.method(&method.name);
+    ComponentMethod {
+        id: id.clone(),
+        owner: SemanticOwner::entity(component_id.clone()),
+        name: method.name.clone(),
+        local_variables: method
+            .local_variables
+            .iter()
+            .enumerate()
+            .map(|(index, local)| MethodLocalVariable {
+                id: id.local_variable(&local.name, index),
+                owner: SemanticOwner::entity(id.clone()),
+                name: local.name.clone(),
+                value: serializable_value_from_parsed(&local.value),
+                span: local.span,
+            })
+            .collect(),
+        parameters: method
+            .parameters
+            .iter()
+            .enumerate()
+            .map(|(index, parameter)| MethodParameter {
+                id: id.parameter(&parameter.name, index),
+                owner: SemanticOwner::entity(id.clone()),
+                name: parameter.name.clone(),
+                span: parameter.span,
+                declared_type: parameter.type_annotation.as_ref().map(|annotation| {
+                    DeclaredStateType {
+                        kind: declared_state_type_kind(&annotation.text),
+                        text: annotation.text.clone(),
+                        provenance: SourceProvenance::new(path, annotation.span),
+                    }
+                }),
+            })
+            .collect(),
     }
 }
 
@@ -1555,6 +1577,12 @@ fn collect_component_provenance(
             .iter()
             .find(|component_method| component_method.name == method.name)
         {
+            for parameter in &component_method.parameters {
+                provenance.insert(
+                    parameter.id.clone(),
+                    SourceProvenance::new(path, parameter.span),
+                );
+            }
             for local in &component_method.local_variables {
                 provenance.insert(local.id.clone(), SourceProvenance::new(path, local.span));
             }

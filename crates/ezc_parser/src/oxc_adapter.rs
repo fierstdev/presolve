@@ -416,6 +416,11 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
             Some(ParsedMethodParameter {
                 name: binding_identifier_name(&parameter.pattern.kind)?,
                 span: source_span(source, parameter.span),
+                type_annotation: parameter
+                    .pattern
+                    .type_annotation
+                    .as_ref()
+                    .map(|annotation| parsed_type_annotation(annotation.span, source)),
             })
         })
         .collect();
