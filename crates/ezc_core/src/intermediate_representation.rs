@@ -1224,6 +1224,34 @@ impl IrOptimizationPass for IrCommonSubexpressionEliminationPass {
     }
 }
 
+/// Immutable instruction-simplification pass for current canonical IR forms.
+pub struct IrInstructionSimplificationPass;
+
+impl IrOptimizationPass for IrInstructionSimplificationPass {
+    fn name(&self) -> &'static str {
+        "instruction-simplification"
+    }
+
+    fn run(&self, input: &IntermediateRepresentation) -> IntermediateRepresentation {
+        let mut output = input.clone();
+        for module in &mut output.modules {
+            for function in &mut module.functions {
+                let constants = analyze_constant_propagation(function).constants;
+                for block in &mut function.blocks {
+                    for instruction in &mut block.instructions {
+                        if let IrInstructionKind::Copy { source } = &instruction.kind {
+                            if let Some(value) = resolve_constant(source, &constants) {
+                                instruction.kind = IrInstructionKind::Constant { value };
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        output
+    }
+}
+
 fn replace_copy_operands(kind: &mut IrInstructionKind, copies: &BTreeMap<IrValueId, IrOperand>) {
     let resolve = |operand: &mut IrOperand| {
         while let IrOperand::Value(value) = operand {
