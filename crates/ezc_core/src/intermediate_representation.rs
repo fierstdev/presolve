@@ -24,15 +24,24 @@ pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateR
         let Some(provenance) = model.provenance(&component.id) else {
             continue;
         };
-        modules
+        let module = modules
             .entry(provenance.path.clone())
             .or_insert_with(|| IrModule {
                 path: provenance.path.clone(),
                 components: Vec::new(),
                 functions: Vec::new(),
-            })
-            .components
-            .push(component.id.clone());
+            });
+        module.components.push(component.id.clone());
+        module
+            .functions
+            .extend(component.methods.iter().filter_map(|method| {
+                model.provenance(&method.id).map(|provenance| IrFunction {
+                    id: method.id.clone(),
+                    name: method.name.clone(),
+                    provenance: provenance.clone(),
+                    blocks: Vec::new(),
+                })
+            }));
     }
     IntermediateRepresentation {
         modules: modules.into_values().collect(),
@@ -118,7 +127,7 @@ mod tests {
     fn lowers_components_into_modules_without_functions() {
         let parsed = ezc_parser::parse_file(
             "src/Counter.tsx",
-            "@component(\"x-counter\") class Counter extends Component {}",
+            "@component(\"x-counter\") class Counter extends Component { increment() {} }",
         );
         let model = crate::build_application_semantic_model(&parsed);
         let ir = lower_components_to_ir(&model);
@@ -128,6 +137,7 @@ mod tests {
             ir.modules[0].components,
             vec![model.components[0].id.clone()]
         );
-        assert!(ir.modules[0].functions.is_empty());
+        assert_eq!(ir.modules[0].functions[0].name, "increment");
+        assert!(ir.modules[0].functions[0].blocks.is_empty());
     }
 }
