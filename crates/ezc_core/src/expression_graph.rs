@@ -490,7 +490,7 @@ class Graph extends Component {
     }
 
     #[test]
-    fn lowers_supported_computed_getter_expressions_without_resolving_reads() {
+    fn lowers_supported_computed_getter_expressions_into_the_canonical_graph() {
         let parsed = ezc_parser::parse_file(
             "src/ComputedExpressions.tsx",
             r#"
@@ -576,6 +576,9 @@ class ComputedExpressions extends Component {
             .nodes_for(&visible)
             .iter()
             .all(|node| !asm.semantic_types.assignments.contains_key(&node.id)));
-        assert!(asm.references.is_empty());
+        assert!(asm.references.iter().any(|reference| {
+            reference.kind == crate::SemanticReferenceKind::ComputedState
+                && reference.source == doubled
+        }));
     }
 }

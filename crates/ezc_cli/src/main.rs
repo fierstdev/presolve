@@ -890,6 +890,8 @@ fn parse_asm_entity_kind(value: &str) -> SemanticEntityKind {
 fn parse_asm_reference_kind(value: &str) -> SemanticReferenceKind {
     match value {
         "action-state" => SemanticReferenceKind::ActionState,
+        "computed-state" => SemanticReferenceKind::ComputedState,
+        "computed-computed" => SemanticReferenceKind::ComputedComputed,
         "event-method" => SemanticReferenceKind::EventMethod,
         "template-state" => SemanticReferenceKind::TemplateState,
         "template-local" => SemanticReferenceKind::TemplateLocal,
@@ -994,6 +996,8 @@ fn semantic_owner_id(owner: &SemanticOwner) -> Option<&str> {
 fn semantic_reference_kind(kind: SemanticReferenceKind) -> &'static str {
     match kind {
         SemanticReferenceKind::ActionState => "action-state",
+        SemanticReferenceKind::ComputedState => "computed-state",
+        SemanticReferenceKind::ComputedComputed => "computed-computed",
         SemanticReferenceKind::EventMethod => "event-method",
         SemanticReferenceKind::TemplateState => "template-state",
         SemanticReferenceKind::TemplateLocal => "template-local",

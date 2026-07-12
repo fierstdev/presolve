@@ -457,7 +457,14 @@ pub fn build_application_semantic_model_from_component_graph(
         &templates,
         &template_entities,
     );
+    let expression_graph =
+        ExpressionGraph::from_components(&component_graph.components, &component_graph.provenance);
     let mut references = component_graph.references.clone();
+    references.extend(build_computed_references(
+        &component_graph.components,
+        &computed_values,
+        &expression_graph,
+    ));
     references.extend(build_template_state_references(
         &component_graph.components,
         &template_entities,
@@ -474,8 +481,6 @@ pub fn build_application_semantic_model_from_component_graph(
         &ownership,
     ));
 
-    let expression_graph =
-        ExpressionGraph::from_components(&component_graph.components, &component_graph.provenance);
     let semantic_types =
         SemanticTypeModel::from_components(&component_graph.components, &provenance)
             .with_expression_types(&expression_graph, &component_graph.components)
@@ -559,7 +564,13 @@ fn build_application_semantic_model_from_files_with_bindings(
         &templates,
         &template_entities,
     );
+    let expression_graph = ExpressionGraph::from_components(&components, &provenance);
 
+    references.extend(build_computed_references(
+        &components,
+        &computed_values,
+        &expression_graph,
+    ));
     references.extend(build_template_state_references(
         &components,
         &template_entities,
@@ -576,7 +587,6 @@ fn build_application_semantic_model_from_files_with_bindings(
         &ownership,
     ));
 
-    let expression_graph = ExpressionGraph::from_components(&components, &provenance);
     let semantic_types = SemanticTypeModel::from_components_with_aliases_and_bindings(
         &components,
         &provenance,
@@ -599,6 +609,59 @@ fn build_application_semantic_model_from_files_with_bindings(
         references,
         provenance,
     }
+}
+
+fn build_computed_references(
+    components: &[ComponentNode],
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    expression_graph: &ExpressionGraph,
+) -> Vec<SemanticReference> {
+    let mut references = BTreeMap::new();
+
+    for computed in computed_values.values() {
+        let Some(component_id) = computed.owner.entity_id() else {
+            continue;
+        };
+        let Some(component) = components
+            .iter()
+            .find(|component| component.id == *component_id)
+        else {
+            continue;
+        };
+
+        for node in expression_graph.nodes_for(&computed.id) {
+            let crate::ExpressionNodeKind::ThisMember { name } = &node.kind else {
+                continue;
+            };
+            let reference = if let Some(field) = component
+                .state_fields
+                .iter()
+                .find(|field| field.name == *name)
+            {
+                SemanticReference {
+                    kind: SemanticReferenceKind::ComputedState,
+                    source: computed.id.clone(),
+                    target: field.id.clone(),
+                    provenance: computed.provenance.clone(),
+                }
+            } else if let Some(target) = computed_values.get(&component.id.computed(name)) {
+                SemanticReference {
+                    kind: SemanticReferenceKind::ComputedComputed,
+                    source: computed.id.clone(),
+                    target: target.id.clone(),
+                    provenance: computed.provenance.clone(),
+                }
+            } else {
+                continue;
+            };
+            references.insert(
+                (reference.source.clone(), reference.target.clone()),
+                reference,
+            );
+        }
+    }
+
+    references.into_values().collect()
 }
 
 fn build_template_state_references(
@@ -1000,6 +1063,65 @@ class Computed extends Component {
             asm.entities_of_kind(SemanticEntityKind::Computed),
             vec![&computed_id]
         );
+    }
+
+    #[test]
+    fn resolves_computed_reads_to_canonical_state_and_computed_references() {
+        let parsed = ezc_parser::parse_file(
+            "src/ComputedReads.tsx",
+            r#"
+@component("x-computed-reads")
+class ComputedReads extends Component {
+  count = state(1);
+  profile = state({ hidden: false });
+
+  @computed()
+  get doubled() { return this.count * 2; }
+
+  @computed()
+  get visible() { return this.doubled + this.count + this.count; }
+
+  @computed()
+  get profileHidden() { return this.profile.hidden; }
+
+  @computed()
+  get unresolved() { return this.missing; }
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let component = &asm.components[0];
+        let count = component.id.state_field("count");
+        let profile = component.id.state_field("profile");
+        let doubled = component.id.computed("doubled");
+        let visible = component.id.computed("visible");
+        let profile_hidden = component.id.computed("profileHidden");
+        let unresolved = component.id.computed("unresolved");
+
+        let state_references = asm.references_of_kind(SemanticReferenceKind::ComputedState);
+        assert_eq!(state_references.len(), 3);
+        assert!(state_references
+            .iter()
+            .any(|reference| reference.source == doubled && reference.target == count));
+        assert!(state_references
+            .iter()
+            .any(|reference| reference.source == visible && reference.target == count));
+        assert!(state_references.iter().any(|reference| {
+            reference.source == profile_hidden && reference.target == profile
+        }));
+
+        let computed_references = asm.references_of_kind(SemanticReferenceKind::ComputedComputed);
+        assert_eq!(computed_references.len(), 1);
+        assert_eq!(computed_references[0].source, visible);
+        assert_eq!(computed_references[0].target, doubled);
+        assert!(!asm
+            .references
+            .iter()
+            .any(|reference| reference.source == unresolved));
+        assert!(asm
+            .references
+            .iter()
+            .all(|reference| { asm.provenance(&reference.source) == Some(&reference.provenance) }));
     }
 
     #[test]

@@ -13,6 +13,8 @@ pub struct SemanticReference {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SemanticReferenceKind {
     ActionState,
+    ComputedState,
+    ComputedComputed,
     EventMethod,
     TemplateState,
     TemplateLocal,

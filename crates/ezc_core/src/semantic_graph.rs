@@ -67,6 +67,8 @@ pub struct SemanticGraphEdge {
 pub enum SemanticGraphEdgeKind {
     Ownership,
     ActionState,
+    ComputedState,
+    ComputedComputed,
     EventMethod,
     TemplateState,
     TemplateLocal,
@@ -164,6 +166,8 @@ impl SemanticGraphEdgeKind {
         match self {
             Self::Ownership => "ownership",
             Self::ActionState => "action-state",
+            Self::ComputedState => "computed-state",
+            Self::ComputedComputed => "computed-computed",
             Self::EventMethod => "event-method",
             Self::TemplateState => "template-state",
             Self::TemplateLocal => "template-local",
@@ -201,6 +205,8 @@ fn semantic_graph_node_kind(entity: SemanticEntity<'_>) -> SemanticGraphNodeKind
 fn semantic_graph_edge_kind(kind: SemanticReferenceKind) -> SemanticGraphEdgeKind {
     match kind {
         SemanticReferenceKind::ActionState => SemanticGraphEdgeKind::ActionState,
+        SemanticReferenceKind::ComputedState => SemanticGraphEdgeKind::ComputedState,
+        SemanticReferenceKind::ComputedComputed => SemanticGraphEdgeKind::ComputedComputed,
         SemanticReferenceKind::EventMethod => SemanticGraphEdgeKind::EventMethod,
         SemanticReferenceKind::TemplateState => SemanticGraphEdgeKind::TemplateState,
         SemanticReferenceKind::TemplateLocal => SemanticGraphEdgeKind::TemplateLocal,
@@ -282,8 +288,10 @@ class Counter extends Component {
             r#"
 @component("x-computed")
 class Computed extends Component {
+  count = state(1);
+
   @computed()
-  get remainingCount(): number { return 1; }
+  get remainingCount(): number { return this.count; }
 
   render() { return <p />; }
 }
@@ -300,6 +308,11 @@ class Computed extends Component {
             edge.kind == SemanticGraphEdgeKind::Ownership
                 && edge.source == asm.components[0].id
                 && edge.target == computed_id
+        }));
+        assert!(graph.edges.iter().any(|edge| {
+            edge.kind == SemanticGraphEdgeKind::ComputedState
+                && edge.source == computed_id
+                && edge.target == asm.components[0].id.state_field("count")
         }));
     }
 }

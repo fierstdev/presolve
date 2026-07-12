@@ -3,36 +3,38 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: E2 - computed expression lowering
-* Working tree: clean after the E2 commit
+* Latest completed slice: E3 - computed reference resolution
+* Working tree: clean after the E3 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: E2 - computed expression lowering
-* Summary: Lowered supported direct computed getter return expressions into the canonical expression graph.
-* Key files: crates/ezc_parser/src/model.rs; crates/ezc_parser/src/oxc_adapter.rs; crates/ezc_core/src/component_graph.rs; crates/ezc_core/src/expression_graph.rs
-* New behavior: Computed roots are owned by their stable computed semantic IDs and preserve literals, `this` member reads, static member access, arithmetic, comparison, logical, nullish, and unary topology with source provenance.
-* Fixtures added or changed: focused parser/core coverage for state/computed reads, supported operators, member access, deterministic graph ownership, and the absence of premature references/types.
+* Slice: E3 - computed reference resolution
+* Summary: Resolved direct computed getter `this` reads into canonical state and computed semantic references.
+* Key files: crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/semantic_reference.rs; crates/ezc_core/src/semantic_graph.rs
+* New behavior: Computed → State and Computed → Computed references are deterministic, deduplicated by semantic endpoints, and exported through canonical ASM and semantic-graph relation surfaces.
+* Fixtures added or changed: focused core coverage for state, computed, nested-member base, repeated, and unresolved reads plus semantic-graph edge export.
 
 Current in-progress slice
 
-* Slice: E2 - computed expression lowering
+* Slice: E3 - computed reference resolution
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E2
-* Remaining: E3 - computed reference resolution.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E3
+* Remaining: E4 - computed typing.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_parser: pass
-* cargo test -p ezc_core expression_graph::tests: pass
 * cargo test -p ezc_core computed: pass
 * cargo check -p ezc_cli: pass
-* cargo clippy -p ezc_parser --all-targets -- -D warnings: pass
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
+* cargo clippy -p ezc_cli --bin ezc_cli -- -D warnings: pass
 
 Architecture decisions made
+
+* Decision: Computed read references are canonical entity-to-entity edges with the computed entity as their source, and repeated reads of one target collapse into one deterministic relation.
+* Reason: Later reactive dependency and scheduler consumers need stable dependency topology rather than a source-text use list; individual read nodes and spans remain available in the canonical expression graph.
+* Tradeoff: Unresolved reads produce no relation until diagnostics are introduced in E19. Reference provenance remains the computed declaration provenance to preserve the existing source-entity reference contract.
 
 * Decision: Supported computed getter returns lower under the computed entity ID, while `this.<name>` remains an unresolved expression node and nested static access remains explicit expression topology.
 * Reason: E3 can resolve state and computed reads into canonical semantic references without reparsing getter source or conflating source names with stable semantic targets.
@@ -546,14 +548,14 @@ Known limitations
 * Item: Method parameters are compiler-owned identifier declarations with canonical source provenance only. They do not execute, close over values, resolve local/template/action references, or support destructuring, defaults, rest declarations, or semantic type checking.
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
-* Item: The canonical expression graph covers supported state initializer expressions and direct supported computed getter returns. Computed topology has stable computed owners and provenance, but its `this` reads remain unresolved, untyped, and unevaluated until E3/E4 and later computed slices.
+* Item: The canonical expression graph covers supported state initializer expressions and direct supported computed getter returns. Computed `this` base reads resolve to state/computed ASM relations, while unresolved names have no relation; computed types, evaluation, and broader semantics remain later work.
 * Item: C30 exposes direct ASM type queries only. CLI inspection output, source diagnostics, backend enforcement, resource declaration lowering, and final type diagnostic families remain later Phase C work.
 * Item: Canonical IR functions currently contain only empty entry basic blocks plus structural branch-edge and natural-loop records. Dominator and post-dominator results include only declared conditional edges; there are no source-lowered branches or loops, condition operands, explicit terminators, or statement instructions yet.
 * Item: Source lowering still creates empty function value registries and no method load/store instructions. D3-A can analyze manually constructed canonical IR now; subsequent lowering slices must populate values before source data-flow results become non-empty.
 
 Exact next step
 
-Next is E3: resolve computed-expression `this` reads into canonical Computed → State and Computed → Computed semantic references. Do not add type, purity, reactive graph, IR, or runtime behavior.
+Next is E4: assign canonical computed types through inference/declared-return validation, serialization compatibility, and execution-boundary compatibility. Do not add purity, reactive graph, IR, or runtime behavior.
 
 Useful commands
 
@@ -584,4 +586,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the E2 commit.
+* None after the E3 commit.
