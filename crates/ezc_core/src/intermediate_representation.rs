@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::{ApplicationSemanticModel, SemanticId, SourceProvenance};
 
@@ -44,17 +44,26 @@ pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateR
                 functions: Vec::new(),
             });
         module.components.push(component.id.clone());
+        let storage_offset = module.storage_initializers.len();
         module
             .storage_initializers
-            .extend(component.state_fields.iter().filter_map(|field| {
-                model.provenance(&field.id).map(|provenance| IrInstruction {
-                    id: format!("storage:{}", field.id),
-                    provenance: provenance.clone(),
-                    kind: IrInstructionKind::InitializeStorage {
-                        field: field.id.clone(),
-                    },
-                })
-            }));
+            .extend(
+                component
+                    .state_fields
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, field)| {
+                        model.provenance(&field.id).map(|provenance| IrInstruction {
+                            id: IrInstructionId::for_module(&module.path, storage_offset + index),
+                            provenance: provenance.clone(),
+                            result: None,
+                            semantic_origin: Some(field.id.clone()),
+                            kind: IrInstructionKind::InitializeStorage {
+                                field: field.id.clone(),
+                            },
+                        })
+                    }),
+            );
         if let (Some(template), Some(render)) = (
             model
                 .templates
@@ -175,6 +184,11 @@ impl IrInstructionId {
     #[must_use]
     pub fn for_block(block: &IrBlockId, index: usize) -> Self {
         Self(format!("{block}/instruction:{index}"))
+    }
+
+    #[must_use]
+    pub fn for_module(path: &Path, index: usize) -> Self {
+        Self(format!("module:{}/instruction:{index}", path.display()))
     }
 
     #[must_use]
@@ -486,16 +500,52 @@ pub fn compute_post_dominators(function: &IrFunction) -> IrPostDominatorTree {
 /// One backend-neutral instruction with stable source provenance.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IrInstruction {
-    pub id: String,
+    pub id: IrInstructionId,
     pub provenance: SourceProvenance,
+    pub result: Option<IrValueId>,
+    pub semantic_origin: Option<SemanticId>,
     pub kind: IrInstructionKind,
 }
 
-/// Instruction forms available before lowering and control-flow slices.
+/// Instruction forms available to canonical IR lowering.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IrInstructionKind {
     Nop,
-    InitializeStorage { field: SemanticId },
+    InitializeStorage {
+        field: SemanticId,
+    },
+    LoadStorage {
+        storage: IrStorageId,
+    },
+    StoreStorage {
+        storage: IrStorageId,
+        value: IrOperand,
+    },
+    Binary {
+        operation: IrBinaryOperation,
+        left: IrOperand,
+        right: IrOperand,
+    },
+    Unary {
+        operation: IrUnaryOperation,
+        operand: IrOperand,
+    },
+}
+
+/// A binary operation with value-producing IR semantics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IrBinaryOperation {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+}
+
+/// A unary operation with value-producing IR semantics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IrUnaryOperation {
+    Not,
+    Negate,
 }
 
 #[cfg(test)]
@@ -532,8 +582,16 @@ mod tests {
                 ),
                 provenance: provenance.clone(),
                 instructions: vec![IrInstruction {
-                    id: "entry.0".to_string(),
+                    id: IrInstructionId::for_block(
+                        &IrBlockId::entry_for(
+                            &SemanticId::component(Some("x-counter"), "Counter")
+                                .method("increment"),
+                        ),
+                        0,
+                    ),
                     provenance,
+                    result: None,
+                    semantic_origin: None,
                     kind: IrInstructionKind::Nop,
                 }],
             }],
@@ -622,6 +680,46 @@ mod tests {
             matches!(constant, IrOperand::Constant(IrConstant::Number(number)) if number == "1")
         );
         assert!(matches!(storage, IrOperand::Storage(_)));
+    }
+
+    #[test]
+    fn records_instruction_results_separately_from_operation_identity() {
+        let provenance = SourceProvenance::new(
+            "src/Counter.tsx",
+            ezc_parser::SourceSpan {
+                start: 0,
+                end: 1,
+                line: 1,
+                column: 1,
+            },
+        );
+        let function = SemanticId::component(Some("x-counter"), "Counter").method("increment");
+        let block = IrBlockId::entry_for(&function);
+        let storage = IrStorageId::for_semantic_origin(
+            &SemanticId::component(Some("x-counter"), "Counter").state_field("count"),
+        );
+        let instruction = IrInstruction {
+            id: IrInstructionId::for_block(&block, 0),
+            provenance,
+            result: Some(IrValueId::for_function(&function, 0)),
+            semantic_origin: Some(
+                SemanticId::component(Some("x-counter"), "Counter").state_field("count"),
+            ),
+            kind: IrInstructionKind::LoadStorage { storage },
+        };
+
+        assert_eq!(
+            instruction.id.as_str(),
+            "component:x-counter/method:increment/block:entry/instruction:0"
+        );
+        assert_eq!(
+            instruction.result.expect("load result").as_str(),
+            "component:x-counter/method:increment/value:0"
+        );
+        assert!(matches!(
+            instruction.kind,
+            IrInstructionKind::LoadStorage { .. }
+        ));
     }
 
     #[test]

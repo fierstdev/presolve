@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: D2-G2 - IR operands and constants
-* Working tree: clean after the D2-G2 commit
+* Latest completed slice: D2-G3 - instruction result contract
+* Working tree: clean after the D2-G3 commit
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: D2-G2 - IR operands and constants
-* Summary: Added a closed executable-operand model with inline primitive constants.
+* Slice: D2-G3 - instruction result contract
+* Summary: Reshaped IR instructions into identified operations with optional produced values and semantic origin.
 * Key files: crates/ezc_core/src/intermediate_representation.rs
-* New behavior: `IrOperand` accepts only an `IrValueId`, `IrConstant`, or `IrStorageId`; semantic identities cannot enter executable operand positions.
-* Tests added or changed: Core coverage locks value, number constant, and storage operand representation.
+* New behavior: `IrInstruction` now owns `IrInstructionId`, optional `IrValueId` result, provenance, optional `SemanticId` origin, and an operation kind.
+* Tests added or changed: Core coverage locks a storage load's distinct instruction/result identities and semantic origin.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: D2-G2 - IR operands and constants
+* Slice: D2-G3 - instruction result contract
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D2-G2
-* Remaining: D2-G3 - instruction result contract.
+* Completed: Phase C1 through C35; Phase D1-A through D2-G3
+* Remaining: D2-G4 - canonical value registry.
 
 Verification
 
@@ -66,6 +66,10 @@ Architecture decisions made
 * Decision: Executable operands form a closed enum of value, inline primitive constant, and storage references.
 * Reason: Data-flow can distinguish value uses from storage access while retaining constants inline, without an ambiguous catch-all semantic operand.
 * Tradeoff: D2-G2 excludes function, template, aggregate, and runtime-allocated operands until concrete lowering needs them.
+
+* Decision: An instruction identity, optional produced value, and optional authored semantic origin are independent fields on canonical IR instructions.
+* Reason: Value-producing operations can now participate in data flow without conflating an operation instance, its result, and the semantic entity from which lowering originated.
+* Tradeoff: D2-G3 adds operation shapes but does not lower load/store/arithmetic instructions from source, and result values are not yet registered or validated.
 
 * Decision: Expression graph nodes own `SourceProvenance` rather than an unqualified source span.
 * Reason: Tooling and diagnostics need the canonical expression node itself to provide a path-aware authored location without reconstructing it from a state field.
@@ -522,11 +526,11 @@ Known limitations
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
 * Item: C30 exposes direct ASM type queries only. CLI inspection output, source diagnostics, backend enforcement, resource declaration lowering, and final type diagnostic families remain later Phase C work.
 * Item: Canonical IR functions currently contain only empty entry basic blocks plus structural branch-edge and natural-loop records. Dominator and post-dominator results include only declared conditional edges; there are no source-lowered branches or loops, condition operands, explicit terminators, or statement instructions yet.
-* Item: IR identity and operands now exist but are not yet attached to instruction records or lowered storage. D2-G3 through D2-G6 will add result contracts, registries, and validation before D3 definition/use analysis begins.
+* Item: IR instructions now carry result and origin metadata, but no function-level value registry or storage registry exists yet. D2-G4 through D2-G6 will add those registries and validation before D3 definition/use analysis begins.
 
 Exact next step
 
-Continue automatically with D2-G3 - instruction result contract, committing the completed D2-G2 slice first.
+Continue automatically with D2-G4 - canonical value registry, committing the completed D2-G3 slice first.
 
 Useful commands
 
@@ -557,4 +561,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the D2-G2 commit.
+* None after the D2-G3 commit.
