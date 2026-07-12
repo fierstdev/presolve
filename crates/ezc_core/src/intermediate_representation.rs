@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use crate::{ApplicationSemanticModel, SemanticId, SourceProvenance};
@@ -189,6 +190,79 @@ pub struct IrLoop {
     pub provenance: SourceProvenance,
 }
 
+/// The immutable dominator relation derived from one canonical IR function.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrDominatorTree {
+    pub function: SemanticId,
+    pub dominators: BTreeMap<IrBlockId, Vec<IrBlockId>>,
+}
+
+/// Computes dominators from the function's entry block and canonical branch edges.
+#[must_use]
+pub fn compute_dominators(function: &IrFunction) -> IrDominatorTree {
+    let block_ids = function
+        .blocks
+        .iter()
+        .map(|block| block.id.clone())
+        .collect::<BTreeSet<_>>();
+    let mut predecessors = block_ids
+        .iter()
+        .cloned()
+        .map(|block| (block, BTreeSet::new()))
+        .collect::<BTreeMap<_, _>>();
+    for edge in &function.branch_edges {
+        if block_ids.contains(&edge.from) && block_ids.contains(&edge.to) {
+            predecessors
+                .entry(edge.to.clone())
+                .or_default()
+                .insert(edge.from.clone());
+        }
+    }
+
+    let mut dominators = block_ids
+        .iter()
+        .cloned()
+        .map(|block| {
+            let initial = if block == function.entry_block {
+                BTreeSet::from([block.clone()])
+            } else {
+                block_ids.clone()
+            };
+            (block, initial)
+        })
+        .collect::<BTreeMap<_, _>>();
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for block in &block_ids {
+            if *block == function.entry_block {
+                continue;
+            }
+            let mut next = predecessors[block]
+                .iter()
+                .filter_map(|predecessor| dominators.get(predecessor).cloned())
+                .reduce(|mut shared, predecessor_dominators| {
+                    shared.retain(|candidate| predecessor_dominators.contains(candidate));
+                    shared
+                })
+                .unwrap_or_default();
+            next.insert(block.clone());
+            if dominators.get(block) != Some(&next) {
+                dominators.insert(block.clone(), next);
+                changed = true;
+            }
+        }
+    }
+
+    IrDominatorTree {
+        function: function.id.clone(),
+        dominators: dominators
+            .into_iter()
+            .map(|(block, dominators)| (block, dominators.into_iter().collect()))
+            .collect(),
+    }
+}
+
 /// One backend-neutral instruction with stable source provenance.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IrInstruction {
@@ -207,8 +281,9 @@ pub enum IrInstructionKind {
 #[cfg(test)]
 mod tests {
     use super::{
-        lower_components_to_ir, IntermediateRepresentation, IrBlock, IrBlockId, IrBranchArm,
-        IrBranchEdge, IrFunction, IrInstruction, IrInstructionKind, IrLoop, IrLoopId, IrModule,
+        compute_dominators, lower_components_to_ir, IntermediateRepresentation, IrBlock, IrBlockId,
+        IrBranchArm, IrBranchEdge, IrFunction, IrInstruction, IrInstructionKind, IrLoop, IrLoopId,
+        IrModule,
     };
     use crate::{SemanticId, SourceProvenance};
 
@@ -323,6 +398,85 @@ mod tests {
             loop_region.exits[0].as_str(),
             "component:x-counter/method:render/block:loop-exit"
         );
+    }
+
+    #[test]
+    fn computes_dominators_from_canonical_branch_edges() {
+        let provenance = SourceProvenance::new(
+            "src/Counter.tsx",
+            ezc_parser::SourceSpan {
+                start: 0,
+                end: 1,
+                line: 1,
+                column: 1,
+            },
+        );
+        let id = SemanticId::component(Some("x-counter"), "Counter").method("render");
+        let entry = IrBlockId::entry_for(&id);
+        let when_true = IrBlockId::for_function(&id, "when-true");
+        let when_false = IrBlockId::for_function(&id, "when-false");
+        let merge = IrBlockId::for_function(&id, "merge");
+        let function = IrFunction {
+            id: id.clone(),
+            name: "render".to_string(),
+            provenance: provenance.clone(),
+            entry_block: entry.clone(),
+            blocks: vec![
+                IrBlock {
+                    id: entry.clone(),
+                    provenance: provenance.clone(),
+                    instructions: Vec::new(),
+                },
+                IrBlock {
+                    id: when_true.clone(),
+                    provenance: provenance.clone(),
+                    instructions: Vec::new(),
+                },
+                IrBlock {
+                    id: when_false.clone(),
+                    provenance: provenance.clone(),
+                    instructions: Vec::new(),
+                },
+                IrBlock {
+                    id: merge.clone(),
+                    provenance: provenance.clone(),
+                    instructions: Vec::new(),
+                },
+            ],
+            branch_edges: vec![
+                IrBranchEdge {
+                    from: entry.clone(),
+                    to: when_true,
+                    arm: IrBranchArm::True,
+                    provenance: provenance.clone(),
+                },
+                IrBranchEdge {
+                    from: entry.clone(),
+                    to: when_false,
+                    arm: IrBranchArm::False,
+                    provenance: provenance.clone(),
+                },
+                IrBranchEdge {
+                    from: entry.clone(),
+                    to: merge.clone(),
+                    arm: IrBranchArm::True,
+                    provenance: provenance.clone(),
+                },
+                IrBranchEdge {
+                    from: entry.clone(),
+                    to: merge.clone(),
+                    arm: IrBranchArm::False,
+                    provenance,
+                },
+            ],
+            loops: Vec::new(),
+        };
+
+        let tree = compute_dominators(&function);
+
+        assert_eq!(tree.function, id);
+        assert_eq!(tree.dominators[&entry], vec![entry.clone()]);
+        assert_eq!(tree.dominators[&merge], vec![entry, merge]);
     }
 
     #[test]
