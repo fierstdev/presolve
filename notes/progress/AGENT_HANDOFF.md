@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: da06332 Type template conditions
-* Working tree: C21 source, test, and documentation changes are present and uncommitted
+* Latest commit: f537133 Type template list iterables
+* Working tree: C22 source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: C21 - List iterable typing
-* Summary: Added canonical iterable/item/index types for direct resolved template lists.
-* Key files: crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/template_semantics.rs, crates/ezc_core/src/compiler_pass.rs
-* New behavior: List entities inherit iterable types; item/index template scopes receive canonical types; non-array-like iterables report `EZC1030`.
-* Tests added or changed: Core coverage verifies object item and numeric index scope types plus non-array iterable diagnostics.
+* Slice: C22 - Member access typing
+* Summary: Resolved supported list-item member paths against canonical object types.
+* Key files: crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/compiler_pass.rs
+* New behavior: List-item member bindings receive canonical result types, while unresolved object paths record failed member access and report `EZC1031`.
+* Tests added or changed: Core coverage verifies nested object-member inference and missing member diagnostics.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C21 - List iterable typing
+* Slice: C22 - Member access typing
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C21
-* Remaining: Phase C22 - member access typing.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C22
+* Remaining: Phase C23 - computed value type foundation.
 
 Verification
 
@@ -128,6 +128,10 @@ Architecture decisions made
 * Decision: Template list entities carry canonical iterable types and a dedicated item/index scope type record.
 * Reason: List-body member access, rendering, and tooling can consume stable scope semantics without re-inferring callback variables from source.
 * Tradeoff: C21 supports direct state-backed array/tuple lists only. Member access validation, arbitrary iterables, callback expressions, and list control flow remain later work.
+
+* Decision: Supported list-item member paths resolve through canonical object types and retain successful or failed access records in the type model.
+* Reason: Templates and tooling can query member result types or deterministic failures without rescanning expression strings.
+* Tradeoff: C22 currently resolves uniquely named list-item roots and dot-member object paths only. State/local member access, unions, optionality, indexes, methods, and arbitrary expressions remain later work.
 
 * Decision: Browser runtime integration tests acquire one process-wide lock before creating a Chrome probe, and the probe deadline allows 20 seconds for a cold Chrome start.
 * Reason: Cargo's workspace runner schedules tests concurrently, and the previous five-second harness deadline could kill an otherwise healthy cold-start probe with SIGKILL.
@@ -442,11 +446,11 @@ Known limitations
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
-* Item: C21 validates direct state-backed list iterables only. Member access, arbitrary iterables, callback expressions, coercion, normalization, and final type diagnostic families remain later Phase C work.
+* Item: C22 resolves supported list-item object members only. State/local members, union/optional members, indexes, methods, arbitrary expressions, coercion, normalization, and final type diagnostic families remain later Phase C work.
 
 Exact next step
 
-Continue automatically with C22 - member access typing, committing the completed C21 slice first.
+Continue automatically with C23 - computed value type foundation, committing the completed C22 slice first.
 
 Useful commands
 

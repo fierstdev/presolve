@@ -97,6 +97,7 @@ pub struct SemanticTypeModel {
     pub assignments: BTreeMap<SemanticId, SemanticTypeAssignment>,
     pub aliases: BTreeMap<SemanticId, SemanticTypeAlias>,
     pub list_scopes: BTreeMap<SemanticId, ListTemplateScopeType>,
+    pub member_accesses: BTreeMap<SemanticId, MemberAccessType>,
 }
 
 /// Canonical item and index type information for one template list scope.
@@ -107,6 +108,14 @@ pub struct ListTemplateScopeType {
     pub item_type: SemanticType,
     pub index_name: Option<String>,
     pub index_type: Option<SemanticType>,
+}
+
+/// Canonical result of one supported template list-item member access.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MemberAccessType {
+    pub entity: SemanticId,
+    pub expression: String,
+    pub semantic_type: Option<SemanticType>,
 }
 
 /// Stable identity for one compiler-owned type assignment.
@@ -286,10 +295,18 @@ impl SemanticTypeModel {
             bindings,
         );
 
+        Self::from_assignments_and_aliases(assignments, aliases)
+    }
+
+    fn from_assignments_and_aliases(
+        assignments: BTreeMap<SemanticId, SemanticTypeAssignment>,
+        aliases: BTreeMap<SemanticId, SemanticTypeAlias>,
+    ) -> Self {
         Self {
             assignments,
             aliases,
             list_scopes: BTreeMap::new(),
+            member_accesses: BTreeMap::new(),
         }
     }
 
@@ -361,6 +378,7 @@ impl SemanticTypeModel {
             );
         }
         self.with_list_scope_types(entities, references)
+            .with_list_member_types(entities)
     }
 
     fn with_list_scope_types(
@@ -417,6 +435,64 @@ impl SemanticTypeModel {
         }
         self
     }
+
+    fn with_list_member_types(mut self, entities: &[TemplateSemanticEntity]) -> Self {
+        for entity in entities.iter().filter(|entity| {
+            matches!(
+                entity.kind,
+                TemplateSemanticKind::Binding | TemplateSemanticKind::AttributeBinding
+            ) && entity.scope == crate::TemplateSemanticScope::ListItem
+        }) {
+            let Some(expression) = entity.expression.as_deref() else {
+                continue;
+            };
+            let Some((root, path)) = expression.split_once('.') else {
+                continue;
+            };
+            let scopes = self
+                .list_scopes
+                .values()
+                .filter(|scope| scope.item_name == root)
+                .collect::<Vec<_>>();
+            if scopes.len() != 1 {
+                continue;
+            }
+            let semantic_type = member_access_type(&scopes[0].item_type, path);
+            self.member_accesses.insert(
+                entity.id.clone(),
+                MemberAccessType {
+                    entity: entity.id.clone(),
+                    expression: expression.to_string(),
+                    semantic_type: semantic_type.clone(),
+                },
+            );
+            if let Some(semantic_type) = semantic_type {
+                self.assignments.insert(
+                    entity.id.clone(),
+                    SemanticTypeAssignment {
+                        id: SemanticTypeId::for_subject(&entity.id),
+                        subject: entity.id.clone(),
+                        semantic_type,
+                        origin: scopes[0].list.clone(),
+                        status: SemanticTypeStatus::Inferred,
+                        provenance: entity.provenance.clone(),
+                    },
+                );
+            }
+        }
+        self
+    }
+}
+
+fn member_access_type(semantic_type: &SemanticType, path: &str) -> Option<SemanticType> {
+    let mut current = semantic_type;
+    for member in path.split('.') {
+        let SemanticType::Object(object) = current else {
+            return None;
+        };
+        current = object.properties.get(member)?;
+    }
+    Some(current.clone())
 }
 
 fn iterable_element_type(semantic_type: &SemanticType) -> Option<SemanticType> {

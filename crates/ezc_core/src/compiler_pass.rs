@@ -151,6 +151,9 @@ impl ImmutableAsmPass for ConstantFoldingPass {
             if let Some(diagnostic) = list_iterable_type_diagnostic(&folded, entity) {
                 push_diagnostic_once(&mut folded.diagnostics, diagnostic);
             }
+            if let Some(diagnostic) = member_access_type_diagnostic(&folded, entity) {
+                push_diagnostic_once(&mut folded.diagnostics, diagnostic);
+            }
         }
 
         let graph = ComponentGraph {
@@ -455,6 +458,21 @@ fn list_iterable_type_diagnostic(
             "list iterable `{}` requires an array-like value, but has {}",
             entity.expression.as_deref().unwrap_or("<unknown>"),
             state_initializer_type_name(&assignment.semantic_type)
+        ),
+    })
+}
+
+fn member_access_type_diagnostic(
+    model: &ApplicationSemanticModel,
+    entity: &crate::TemplateSemanticEntity,
+) -> Option<ComponentDiagnostic> {
+    let access = model.semantic_types.member_accesses.get(&entity.id)?;
+    access.semantic_type.is_none().then(|| ComponentDiagnostic {
+        provenance: Some(entity.provenance.clone()),
+        code: "EZC1031".to_string(),
+        message: format!(
+            "member access `{}` does not resolve against its canonical object type",
+            access.expression
         ),
     })
 }
@@ -827,6 +845,42 @@ class TypedLists extends Component {
         let folded = ConstantFoldingPass.transform(&asm);
         assert!(folded.diagnostics.iter().any(|diagnostic| {
             diagnostic.code == "EZC1030" && diagnostic.message.contains("this.count")
+        }));
+    }
+
+    #[test]
+    fn resolves_typed_list_item_member_accesses() {
+        let parsed = ezc_parser::parse_file(
+            "src/TypedMembers.tsx",
+            r#"
+@component("x-typed-members")
+class TypedMembers extends Component {
+  todos = state([{ details: { region: "west" } }]);
+
+  render() {
+    return <ul>{this.todos.map((todo) => <li key={todo.details.region}>{todo.details.region}{todo.missing}</li>)}</ul>;
+  }
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let region = asm
+            .template_entities
+            .iter()
+            .find(|entity| entity.expression.as_deref() == Some("todo.details.region"))
+            .expect("region member binding");
+        assert_eq!(
+            asm.semantic_types.assignments[&region.id].semantic_type,
+            crate::SemanticType::String
+        );
+        assert_eq!(
+            asm.semantic_types.member_accesses[&region.id].semantic_type,
+            Some(crate::SemanticType::String)
+        );
+
+        let folded = ConstantFoldingPass.transform(&asm);
+        assert!(folded.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == "EZC1031" && diagnostic.message.contains("todo.missing")
         }));
     }
 
