@@ -14,6 +14,7 @@ pub struct IntermediateRepresentation {
 pub struct IrModule {
     pub path: PathBuf,
     pub components: Vec<SemanticId>,
+    pub storages: Vec<IrStorage>,
     pub storage_initializers: Vec<IrInstruction>,
     pub template_entrypoints: Vec<IrTemplateEntrypoint>,
     pub functions: Vec<IrFunction>,
@@ -39,11 +40,29 @@ pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateR
             .or_insert_with(|| IrModule {
                 path: provenance.path.clone(),
                 components: Vec::new(),
+                storages: Vec::new(),
                 storage_initializers: Vec::new(),
                 template_entrypoints: Vec::new(),
                 functions: Vec::new(),
             });
         module.components.push(component.id.clone());
+        module
+            .storages
+            .extend(component.state_fields.iter().filter_map(|field| {
+                model.provenance(&field.id).map(|provenance| IrStorage {
+                    id: IrStorageId::for_semantic_origin(&field.id),
+                    semantic_origin: field.id.clone(),
+                    value_type: model
+                        .semantic_types
+                        .assignments
+                        .get(&field.id)
+                        .map_or(SemanticType::Unknown, |assignment| {
+                            assignment.semantic_type.clone()
+                        }),
+                    initial_value: field.initial_value.clone(),
+                    provenance: provenance.clone(),
+                })
+            }));
         let storage_offset = module.storage_initializers.len();
         module
             .storage_initializers
@@ -59,7 +78,7 @@ pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateR
                             result: None,
                             semantic_origin: Some(field.id.clone()),
                             kind: IrInstructionKind::InitializeStorage {
-                                field: field.id.clone(),
+                                storage: IrStorageId::for_semantic_origin(&field.id),
                             },
                         })
                     }),
@@ -246,6 +265,16 @@ impl IrStorageId {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+}
+
+/// One mutable runtime storage slot lowered from an authored semantic entity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrStorage {
+    pub id: IrStorageId,
+    pub semantic_origin: SemanticId,
+    pub value_type: SemanticType,
+    pub initial_value: Option<crate::SerializableValue>,
+    pub provenance: SourceProvenance,
 }
 
 impl std::fmt::Display for IrStorageId {
@@ -537,7 +566,7 @@ pub struct IrInstruction {
 pub enum IrInstructionKind {
     Nop,
     InitializeStorage {
-        field: SemanticId,
+        storage: IrStorageId,
     },
     LoadStorage {
         storage: IrStorageId,
@@ -629,6 +658,7 @@ mod tests {
             modules: vec![IrModule {
                 path: "src/Counter.tsx".into(),
                 components: vec![SemanticId::component(Some("x-counter"), "Counter")],
+                storages: Vec::new(),
                 storage_initializers: Vec::new(),
                 template_entrypoints: Vec::new(),
                 functions: vec![function],
@@ -1068,6 +1098,15 @@ mod tests {
             ir.modules[0].storage_initializers[0].kind,
             IrInstructionKind::InitializeStorage { .. }
         ));
+        assert_eq!(ir.modules[0].storages.len(), 1);
+        assert_eq!(
+            ir.modules[0].storages[0].id.as_str(),
+            format!("storage:{}", model.components[0].state_fields[0].id).as_str()
+        );
+        assert_eq!(
+            ir.modules[0].storage_initializers[0].semantic_origin,
+            Some(model.components[0].state_fields[0].id.clone())
+        );
         assert_eq!(ir.modules[0].template_entrypoints.len(), 1);
         assert_eq!(
             ir.modules[0].template_entrypoints[0].render_method,

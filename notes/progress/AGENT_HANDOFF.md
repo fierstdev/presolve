@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: D2-G4 - canonical value registry
-* Working tree: clean after the D2-G4 commit
+* Latest completed slice: D2-G5 - storage registry
+* Working tree: clean after the D2-G5 commit
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: D2-G4 - canonical value registry
-* Summary: Added function-owned value records and canonical definition metadata.
+* Slice: D2-G5 - storage registry
+* Summary: Lowered authored state fields to distinct IR storage-slot records.
 * Key files: crates/ezc_core/src/intermediate_representation.rs
-* New behavior: `IrFunction` owns a deterministic `BTreeMap<IrValueId, IrValue>` and direct value lookup; values retain definition, type, provenance, and optional semantic origin.
-* Tests added or changed: Core coverage locks instruction-defined value lookup, numeric type, and semantic origin metadata.
+* New behavior: `IrStorage` records a distinct storage ID, semantic origin, type, initial value, and provenance; initialization instructions now refer to storage IDs.
+* Tests added or changed: Core coverage locks state storage identity and initialization-origin linkage.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: D2-G4 - canonical value registry
+* Slice: D2-G5 - storage registry
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D2-G4
-* Remaining: D2-G5 - storage registry.
+* Completed: Phase C1 through C35; Phase D1-A through D2-G5
+* Remaining: D2-G6 - IR value validation.
 
 Verification
 
@@ -74,6 +74,10 @@ Architecture decisions made
 * Decision: Transient values are owned by the IR function in a deterministic registry and identify their defining instruction, parameter, or future block parameter explicitly.
 * Reason: Definition/use, liveness, and optimization can inspect one canonical value model without inferring definitions from operation shape or conflating values with semantic entities.
 * Tradeoff: D2-G4 creates empty registries during current lowering. Parameter/block-parameter lowering and consistency validation are deferred.
+
+* Decision: State fields lower to `IrStorage` slots separate from both semantic identity and transient values.
+* Reason: Storage reads, writes, promotion, resumability, and reactive partitioning can evolve without treating an authored field as a runtime slot or computed value.
+* Tradeoff: D2-G5 only lowers storage declarations and initialization references; load/store source lowering and storage validation remain deferred.
 
 * Decision: Expression graph nodes own `SourceProvenance` rather than an unqualified source span.
 * Reason: Tooling and diagnostics need the canonical expression node itself to provide a path-aware authored location without reconstructing it from a state field.
@@ -530,11 +534,11 @@ Known limitations
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
 * Item: C30 exposes direct ASM type queries only. CLI inspection output, source diagnostics, backend enforcement, resource declaration lowering, and final type diagnostic families remain later Phase C work.
 * Item: Canonical IR functions currently contain only empty entry basic blocks plus structural branch-edge and natural-loop records. Dominator and post-dominator results include only declared conditional edges; there are no source-lowered branches or loops, condition operands, explicit terminators, or statement instructions yet.
-* Item: Function value registries now exist but are not populated by source lowering; storage slots remain semantic-field-backed initialization instructions. D2-G5 and D2-G6 will add the storage registry and validation before D3 definition/use analysis begins.
+* Item: Function value registries remain empty during current source lowering, and storage slots are not yet loaded or stored by method instructions. D2-G6 validation is still required before D3 definition/use analysis begins.
 
 Exact next step
 
-Continue automatically with D2-G5 - storage registry, committing the completed D2-G4 slice first.
+Continue automatically with D2-G6 - IR value validation, committing the completed D2-G5 slice first.
 
 Useful commands
 
@@ -565,4 +569,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the D2-G4 commit.
+* None after the D2-G5 commit.
