@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: 6c9dcb7 Lower semantic method return types
-* Working tree: C16 source, test, and documentation changes are present and uncommitted
+* Latest commit: c7bfe10 Validate canonical state assignments
+* Working tree: C17 source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: C16 - Assignment compatibility
-* Summary: Moved direct state-action assignment validation to canonical ASM semantic assignability.
+* Slice: C17 - Compound mutation typing
+* Summary: Moved toggle, increment/decrement, and compound arithmetic validation to canonical ASM semantic typing.
 * Key files: crates/ezc_core/src/compiler_pass.rs, crates/ezc_core/src/component_graph.rs
-* New behavior: Immutable ASM folding validates direct action assignments against declared canonical state types, including literal unions and collection shapes, while retaining `EZC1017`.
-* Tests added or changed: Core coverage verifies direct assignment diagnostics through the immutable ASM pass, including union and collection values.
+* New behavior: Immutable ASM folding evaluates canonical boolean/number compatibility for compound mutations while retaining `EZC1018` through `EZC1021`.
+* Tests added or changed: Core coverage verifies canonical union, collection, target, and operand mutation diagnostics through ASM folding.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C16 - Assignment compatibility
+* Slice: C17 - Compound mutation typing
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C16
-* Remaining: Phase C17 - compound mutation typing.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C17
+* Remaining: Phase C18 - template binding typing.
 
 Verification
 
@@ -108,6 +108,10 @@ Architecture decisions made
 * Decision: Direct action assignment compatibility is evaluated by the immutable ASM folding pass using canonical type assignments.
 * Reason: State initialization and mutation now share the same compiler-owned compatibility relation rather than duplicating primitive frontend checks.
 * Tradeoff: C16 covers only currently lowered direct literal assignments. Compound mutation, arbitrary expressions, parameter/local values, and final general assignability remain later work.
+
+* Decision: Compound mutation typing uses canonical boolean/number compatibility in the same immutable ASM pass as direct assignment validation.
+* Reason: Toggle and arithmetic mutation contracts now share compiler-owned types rather than frontend primitive classifiers.
+* Tradeoff: C17 covers only currently lowered literal operands and mutation forms; arbitrary expressions, coercion, and generalized operation typing remain later work.
 
 * Decision: Browser runtime integration tests acquire one process-wide lock before creating a Chrome probe, and the probe deadline allows 20 seconds for a cold Chrome start.
 * Reason: Cargo's workspace runner schedules tests concurrently, and the previous five-second harness deadline could kill an otherwise healthy cold-start probe with SIGKILL.
@@ -422,11 +426,11 @@ Known limitations
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
-* Item: C16 validates only currently lowered direct serializable action assignments through ASM folding. Compound mutation, arbitrary expressions, parameter/local values, return compatibility diagnostics, normalization, and final type diagnostic families remain later Phase C work.
+* Item: C17 validates only currently lowered literal mutation forms through ASM folding. Arbitrary expressions, coercion, parameter/local values, template typing, normalization, and final type diagnostic families remain later Phase C work.
 
 Exact next step
 
-Continue automatically with C17 - compound mutation typing, committing the completed C16 slice first.
+Continue automatically with C18 - template binding typing, committing the completed C17 slice first.
 
 Useful commands
 

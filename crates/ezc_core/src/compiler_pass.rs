@@ -132,6 +132,9 @@ impl ImmutableAsmPass for ConstantFoldingPass {
                 {
                     push_diagnostic_once(&mut folded.diagnostics, diagnostic);
                 }
+                for diagnostic in compound_mutation_type_diagnostics(&folded, component, action) {
+                    push_diagnostic_once(&mut folded.diagnostics, diagnostic);
+                }
             }
         }
 
@@ -264,6 +267,90 @@ fn action_assignment_mismatch_diagnostic(
             ),
         }
     })
+}
+
+fn compound_mutation_type_diagnostics(
+    model: &ApplicationSemanticModel,
+    component: &crate::component_graph::ComponentNode,
+    action: &crate::component_graph::ComponentAction,
+) -> Vec<ComponentDiagnostic> {
+    let Some(field) = component
+        .state_fields
+        .iter()
+        .find(|field| field.name == action.field)
+    else {
+        return Vec::new();
+    };
+    let Some(declared_type) = field.declared_type.as_ref() else {
+        return Vec::new();
+    };
+    let Some(target) = model.semantic_types.assignments.get(&field.id) else {
+        return Vec::new();
+    };
+    let provenance = model.provenance.get(&action.id).cloned();
+    let number_compatible =
+        crate::is_state_initializer_assignable(&crate::SemanticType::Number, &target.semantic_type);
+    let boolean_compatible = crate::is_state_initializer_assignable(
+        &crate::SemanticType::Boolean,
+        &target.semantic_type,
+    );
+
+    match &action.operation {
+        StateOperation::Toggle if !boolean_compatible => vec![ComponentDiagnostic {
+            provenance,
+            code: "EZC1018".to_string(),
+            message: format!(
+                "state field `{}` in class `{}` declares `{}` but action `{}` applies a boolean toggle",
+                field.name, component.class_name, declared_type.text, action.method
+            ),
+        }],
+        StateOperation::Increment | StateOperation::Decrement if !number_compatible => {
+            let operation = if matches!(action.operation, StateOperation::Increment) {
+                "increment"
+            } else {
+                "decrement"
+            };
+            vec![ComponentDiagnostic {
+                provenance,
+                code: "EZC1019".to_string(),
+                message: format!(
+                    "state field `{}` in class `{}` declares `{}` but action `{}` applies numeric {}",
+                    field.name, component.class_name, declared_type.text, action.method, operation
+                ),
+            }]
+        }
+        StateOperation::AddAssign(value) | StateOperation::SubtractAssign(value) => {
+            let operation = if matches!(action.operation, StateOperation::AddAssign(_)) {
+                "add assignment"
+            } else {
+                "subtract assignment"
+            };
+            let mut diagnostics = Vec::new();
+            if !number_compatible {
+                diagnostics.push(ComponentDiagnostic {
+                    provenance: provenance.clone(),
+                    code: "EZC1020".to_string(),
+                    message: format!(
+                        "state field `{}` in class `{}` declares `{}` but action `{}` applies numeric {}",
+                        field.name, component.class_name, declared_type.text, action.method, operation
+                    ),
+                });
+            }
+            let source = crate::state_initializer_value_type(value);
+            if !crate::is_state_initializer_assignable(&source, &crate::SemanticType::Number) {
+                diagnostics.push(ComponentDiagnostic {
+                    provenance,
+                    code: "EZC1021".to_string(),
+                    message: format!(
+                        "action `{}` applies numeric {} to state field `{}` with `{}` operand",
+                        action.method, operation, field.name, state_initializer_type_name(&source)
+                    ),
+                });
+            }
+            diagnostics
+        }
+        _ => Vec::new(),
+    }
 }
 
 fn push_diagnostic_once(
