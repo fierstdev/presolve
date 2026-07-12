@@ -6,9 +6,19 @@ use std::path::PathBuf;
 pub struct ParsedFile {
     pub path: PathBuf,
     pub classes: Vec<ParsedClass>,
+    pub type_aliases: Vec<ParsedTypeAlias>,
     pub imports: Vec<ParsedImport>,
     pub exports: Vec<ParsedExport>,
     pub diagnostics: Vec<ParseDiagnostic>,
+}
+
+/// Authored type alias retained for canonical semantic type lowering.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedTypeAlias {
+    pub name: String,
+    pub type_text: String,
+    pub span: SourceSpan,
+    pub type_span: SourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

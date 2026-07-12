@@ -407,6 +407,7 @@ fn build_application_semantic_model_from_files(files: &[ParsedFile]) -> Applicat
     let mut references = Vec::new();
     let mut provenance = BTreeMap::new();
     let mut template_entities = Vec::new();
+    let mut type_aliases = Vec::new();
 
     for parsed in files {
         let component_graph = build_component_graph_for_module(parsed);
@@ -424,6 +425,13 @@ fn build_application_semantic_model_from_files(files: &[ParsedFile]) -> Applicat
                 .map(|entity| (entity.id.clone(), entity.provenance.clone())),
         );
         template_entities.extend(file_template_entities);
+        type_aliases.extend(
+            parsed
+                .type_aliases
+                .iter()
+                .cloned()
+                .map(|alias| (parsed.path.clone(), alias)),
+        );
     }
 
     let ownership = collect_ownership(&components, &templates, &template_entities);
@@ -446,7 +454,7 @@ fn build_application_semantic_model_from_files(files: &[ParsedFile]) -> Applicat
 
     ApplicationSemanticModel {
         expression_graph: ExpressionGraph::from_components(&components, &provenance),
-        semantic_types: SemanticTypeModel::from_components(&components),
+        semantic_types: SemanticTypeModel::from_components_with_aliases(&components, &type_aliases),
         components,
         templates,
         template_entities,
@@ -837,6 +845,56 @@ class UnionTypes extends Component {
                 }),
                 crate::SemanticType::Null,
             ])
+        );
+    }
+
+    #[test]
+    fn resolves_local_type_aliases_with_canonical_alias_identity() {
+        let parsed = ezc_parser::parse_file(
+            "src/Aliases.tsx",
+            r#"
+type TodoId = string;
+type Filter = "all" | "active" | "completed";
+
+@component("x-aliases")
+class Aliases extends Component {
+  id: TodoId = state("todo-1");
+  filter: Filter = state("all");
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        let fields = &asm.components[0].state_fields;
+        let todo_id = asm
+            .semantic_types
+            .aliases
+            .values()
+            .find(|alias| alias.name == "TodoId")
+            .expect("TodoId alias");
+        let filter = asm
+            .semantic_types
+            .aliases
+            .values()
+            .find(|alias| alias.name == "Filter")
+            .expect("Filter alias");
+
+        assert_eq!(todo_id.semantic_type, crate::SemanticType::String);
+        assert_eq!(
+            filter.semantic_type,
+            crate::SemanticType::Union(vec![
+                crate::SemanticType::StringLiteral("all".to_string()),
+                crate::SemanticType::StringLiteral("active".to_string()),
+                crate::SemanticType::StringLiteral("completed".to_string()),
+            ])
+        );
+        assert_eq!(
+            asm.semantic_types.assignments[&fields[0].id].origin,
+            todo_id.id
+        );
+        assert_eq!(
+            asm.semantic_types.assignments[&fields[1].id].origin,
+            filter.id
         );
     }
 

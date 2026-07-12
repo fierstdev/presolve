@@ -55,6 +55,14 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn type_alias_in_module(module_path: impl AsRef<Path>, name: &str) -> Self {
+        Self(format!(
+            "module:{}/type-alias:{name}",
+            normalized_module_path(module_path.as_ref())
+        ))
+    }
+
+    #[must_use]
     pub fn state_field(&self, name: &str) -> Self {
         self.child("state", name)
     }

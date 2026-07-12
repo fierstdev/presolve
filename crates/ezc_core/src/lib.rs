@@ -85,8 +85,8 @@ pub use semantic_id::{SemanticId, SemanticOwner};
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
 pub use semantic_type::{
-    ObjectType, SemanticType, SemanticTypeAssignment, SemanticTypeId, SemanticTypeModel,
-    SemanticTypeStatus,
+    ObjectType, SemanticType, SemanticTypeAlias, SemanticTypeAssignment, SemanticTypeId,
+    SemanticTypeModel, SemanticTypeStatus,
 };
 pub use summarize::summarize_source;
 pub use symbol_table::{
@@ -1171,6 +1171,7 @@ class Counter extends Component {
             diagnostics: Vec::new(),
             imports: Vec::new(),
             exports: Vec::new(),
+            type_aliases: Vec::new(),
             classes: vec![ezc_parser::ParsedClass {
                 name: "DuplicateEvent".to_string(),
                 span: test_span(),

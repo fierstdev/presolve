@@ -10,6 +10,6 @@ pub use model::{
     ParsedJsxChild, ParsedJsxConditional, ParsedJsxElement, ParsedJsxFragment, ParsedJsxList,
     ParsedJsxNode, ParsedLocalVariable, ParsedLogicalOperator, ParsedMethod, ParsedMethodParameter,
     ParsedProperty, ParsedSerializableValue, ParsedStateOperation, ParsedStateUpdate,
-    ParsedTypeAnnotation, ParsedUnaryOperator, SourceSpan,
+    ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator, SourceSpan,
 };
 pub use oxc_adapter::parse_file;

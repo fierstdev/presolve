@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 use std::fmt;
+use std::path::PathBuf;
 
 use crate::{ComponentNode, SemanticId, SourceProvenance};
+use ezc_parser::ParsedTypeAlias;
 
 /// Compiler-owned semantic type algebra independent of TypeScript spelling.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,6 +40,7 @@ pub struct ObjectType {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SemanticTypeModel {
     pub assignments: BTreeMap<SemanticId, SemanticTypeAssignment>,
+    pub aliases: BTreeMap<SemanticId, SemanticTypeAlias>,
 }
 
 /// Stable identity for one compiler-owned type assignment.
@@ -80,9 +83,47 @@ pub struct SemanticTypeAssignment {
     pub provenance: SourceProvenance,
 }
 
+/// A named authored type alias resolved to canonical semantic type meaning.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SemanticTypeAlias {
+    pub id: SemanticId,
+    pub name: String,
+    pub semantic_type: SemanticType,
+    pub provenance: SourceProvenance,
+}
+
 impl SemanticTypeModel {
     #[must_use]
     pub fn from_components(components: &[ComponentNode]) -> Self {
+        Self::from_components_with_aliases(components, &[])
+    }
+
+    #[must_use]
+    pub fn from_components_with_aliases(
+        components: &[ComponentNode],
+        parsed_aliases: &[(PathBuf, ParsedTypeAlias)],
+    ) -> Self {
+        let aliases = parsed_aliases
+            .iter()
+            .filter_map(|(path, alias)| {
+                semantic_type_from_annotation(&alias.type_text).map(|semantic_type| {
+                    let id = SemanticId::type_alias_in_module(path, &alias.name);
+                    (
+                        id.clone(),
+                        SemanticTypeAlias {
+                            id,
+                            name: alias.name.clone(),
+                            semantic_type,
+                            provenance: SourceProvenance::new(path, alias.type_span),
+                        },
+                    )
+                })
+            })
+            .collect::<BTreeMap<_, _>>();
+        let aliases_by_path_and_name = aliases
+            .values()
+            .map(|alias| ((alias.provenance.path.clone(), alias.name.clone()), alias))
+            .collect::<BTreeMap<_, _>>();
         let mut assignments = BTreeMap::new();
 
         for field in components
@@ -92,7 +133,14 @@ impl SemanticTypeModel {
             let Some(declared_type) = &field.declared_type else {
                 continue;
             };
-            let Some(semantic_type) = semantic_type_from_annotation(&declared_type.text) else {
+            let alias = aliases_by_path_and_name.get(&(
+                declared_type.provenance.path.clone(),
+                declared_type.text.clone(),
+            ));
+            let semantic_type = alias
+                .map(|alias| alias.semantic_type.clone())
+                .or_else(|| semantic_type_from_annotation(&declared_type.text));
+            let Some(semantic_type) = semantic_type else {
                 continue;
             };
             assignments.insert(
@@ -101,14 +149,17 @@ impl SemanticTypeModel {
                     id: SemanticTypeId::for_subject(&field.id),
                     subject: field.id.clone(),
                     semantic_type,
-                    origin: field.id.clone(),
+                    origin: alias.map_or_else(|| field.id.clone(), |alias| alias.id.clone()),
                     status: SemanticTypeStatus::Declared,
                     provenance: declared_type.provenance.clone(),
                 },
             );
         }
 
-        Self { assignments }
+        Self {
+            assignments,
+            aliases,
+        }
     }
 }
 

@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: 59c8f2b Lower structural object semantic types
-* Working tree: C6 source, test, and documentation changes are present and uncommitted
+* Latest commit: 22cd913 Lower union semantic types
+* Working tree: C7 source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: C6 - Union and nullable types
-* Summary: Lowered top-level union and nullable state annotations into canonical union members.
-* Key files: crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/application_semantic_model.rs
-* New behavior: `T | U` annotations retain authored member order as canonical unions, including nullable and literal-union forms.
-* Tests added or changed: Core coverage verifies literal unions and object-or-null unions.
+* Slice: C7 - Type aliases
+* Summary: Retained local type aliases and resolved supported state annotations through canonical alias records.
+* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/semantic_type.rs
+* New behavior: Supported aliases receive module-qualified semantic identities and provenance; state assignments annotated with a local alias resolve to its canonical semantic type while retaining alias origin.
+* Tests added or changed: Parser/core coverage verifies local primitive and literal-union aliases plus state assignment origins.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C6 - Union and nullable types
+* Slice: C7 - Type aliases
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C6
-* Remaining: Phase C7 - type aliases.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C7
+* Remaining: Phase C8 - imported type resolution.
 
 Verification
 
@@ -68,6 +68,10 @@ Architecture decisions made
 * Decision: C6 preserves top-level union member order without normalizing or deduplicating.
 * Reason: The compiler can represent authored unions now while C28 later defines the one canonical normalization policy.
 * Tradeoff: Literal parsing inside union members is supported, but aliases, imports, and diagnostics remain later work.
+
+* Decision: C7 gives each local type alias a module-qualified semantic ID and uses that ID as the origin of resolved state assignments.
+* Reason: Alias source identity remains available to tooling while consumers receive the alias's canonical semantic type meaning.
+* Tradeoff: C7 resolves supported local aliases only; nested alias dependencies, exports, imports, generic aliases, and cycles remain later work.
 
 * Decision: Browser runtime integration tests acquire one process-wide lock before creating a Chrome probe, and the probe deadline allows 20 seconds for a cold Chrome start.
 * Reason: Cargo's workspace runner schedules tests concurrently, and the previous five-second harness deadline could kill an otherwise healthy cold-start probe with SIGKILL.
@@ -382,11 +386,11 @@ Known limitations
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
-* Item: C6 recognizes top-level union and nullable annotations. Aliases, imports, inference, compatibility, property provenance, normalization, and type diagnostics remain later Phase C work.
+* Item: C7 resolves supported local aliases only. Imports, re-exports, nested aliases, generic aliases, inference, compatibility, normalization, and type diagnostics remain later Phase C work.
 
 Exact next step
 
-Continue automatically with C7 - type aliases, committing the completed C6 slice first.
+Continue automatically with C8 - imported type resolution, committing the completed C7 slice first.
 
 Useful commands
 

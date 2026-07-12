@@ -11,7 +11,7 @@ use oxc_ast::ast::{
 };
 use oxc_diagnostics::Severity as OxcSeverity;
 use oxc_parser::Parser;
-use oxc_span::{SourceType, Span};
+use oxc_span::{GetSpan, SourceType, Span};
 
 use crate::model::{
     ParseDiagnostic, ParseLabel, ParseSeverity, ParsedArithmeticExpression,
@@ -22,7 +22,7 @@ use crate::model::{
     ParsedJsxChild, ParsedJsxConditional, ParsedJsxElement, ParsedJsxFragment, ParsedJsxList,
     ParsedJsxNode, ParsedLocalVariable, ParsedLogicalOperator, ParsedMethod, ParsedMethodParameter,
     ParsedProperty, ParsedSerializableValue, ParsedStateOperation, ParsedStateUpdate,
-    ParsedTypeAnnotation, ParsedUnaryOperator, SourceSpan,
+    ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator, SourceSpan,
 };
 
 pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
@@ -35,7 +35,7 @@ pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
     let allocator = Allocator::default();
     let ret = Parser::new(&allocator, source, source_type).parse();
 
-    let (classes, imports, exports) = parse_program(&ret.program, source);
+    let (classes, type_aliases, imports, exports) = parse_program(&ret.program, source);
     let diagnostics = ret
         .errors
         .iter()
@@ -45,6 +45,7 @@ pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
     ParsedFile {
         path: PathBuf::from(path),
         classes,
+        type_aliases,
         imports,
         exports,
         diagnostics,
@@ -54,8 +55,14 @@ pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
 fn parse_program(
     program: &Program<'_>,
     source: &str,
-) -> (Vec<ParsedClass>, Vec<ParsedImport>, Vec<ParsedExport>) {
+) -> (
+    Vec<ParsedClass>,
+    Vec<ParsedTypeAlias>,
+    Vec<ParsedImport>,
+    Vec<ParsedExport>,
+) {
     let mut classes = Vec::new();
+    let mut type_aliases = Vec::new();
     let mut imports = Vec::new();
     let mut exports = Vec::new();
 
@@ -70,6 +77,9 @@ fn parse_program(
                 if let Some(declaration) = &declaration.declaration {
                     if let Some(class) = parse_declaration(declaration, source) {
                         classes.push(class);
+                    }
+                    if let Some(alias) = parse_type_alias_declaration(declaration, source) {
+                        type_aliases.push(alias);
                     }
                 }
                 continue;
@@ -110,10 +120,30 @@ fn parse_program(
             if let Some(class) = parse_declaration(declaration, source) {
                 classes.push(class);
             }
+            if let Some(alias) = parse_type_alias_declaration(declaration, source) {
+                type_aliases.push(alias);
+            }
         }
     }
 
-    (classes, imports, exports)
+    (classes, type_aliases, imports, exports)
+}
+
+fn parse_type_alias_declaration(
+    declaration: &Declaration<'_>,
+    source: &str,
+) -> Option<ParsedTypeAlias> {
+    let Declaration::TSTypeAliasDeclaration(alias) = declaration else {
+        return None;
+    };
+    let type_span = source_span(source, alias.type_annotation.span());
+
+    Some(ParsedTypeAlias {
+        name: alias.id.name.to_string(),
+        type_text: source[type_span.start..type_span.end].trim().to_string(),
+        span: source_span(source, alias.span),
+        type_span,
+    })
 }
 
 fn parse_import_declaration(
