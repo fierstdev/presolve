@@ -3,25 +3,24 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: D2-G6 - IR value validation
+* Latest completed slice: D3-A - definition/use chains
 * Working tree: clean after the D2-G6 commit
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: D2-G6 - IR value validation
-* Summary: Added deterministic structural validation for canonical IR identity, values, operands, and storage references.
+* Slice: D3-A - definition/use chains
+* Summary: Added compiler-owned value definition/use analysis.
 * Key files: crates/ezc_core/src/intermediate_representation.rs
-* New behavior: `validate_intermediate_representation` checks duplicate instruction IDs, value definitions, value operands, storage operands, and definition ownership.
-* Tests added or changed: Core coverage locks clean lowered IR plus a result value missing from its registry.
+* New behavior: `analyze_definition_uses` records every value definition and exact instruction operand use position.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: D2-G6 - IR value validation
+* Slice: D3-A - definition/use chains
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D2-G6
-* Remaining: D3-A - definition/use chains.
+* Completed: Phase C1 through C35; Phase D1-A through D3-A
+* Remaining: D3-B - use-definition chains.
 
 Verification
 
@@ -542,7 +541,7 @@ Known limitations
 
 Exact next step
 
-Continue automatically with D3-A - definition/use chains, committing the completed D2-G6 slice first.
+Continue automatically with D3-B - use-definition chains, committing the completed D3-A slice first.
 
 Useful commands
 

@@ -325,6 +325,52 @@ pub struct IrValidationDiagnostic {
     pub message: String,
 }
 
+/// One exact value-consuming operand position in a canonical instruction.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrUse {
+    pub instruction: IrInstructionId,
+    pub operand_index: usize,
+}
+
+/// Canonical definition and use relations for one IR function.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrDefinitionUseAnalysis {
+    pub definitions: BTreeMap<IrValueId, IrValueDefinition>,
+    pub uses: BTreeMap<IrValueId, Vec<IrUse>>,
+}
+
+/// Computes definition and use chains from one function's value registry and instruction operands.
+#[must_use]
+pub fn analyze_definition_uses(function: &IrFunction) -> IrDefinitionUseAnalysis {
+    let definitions = function
+        .values
+        .iter()
+        .map(|(id, value)| (id.clone(), value.definition.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let mut uses = function
+        .values
+        .keys()
+        .cloned()
+        .map(|id| (id, Vec::new()))
+        .collect::<BTreeMap<_, _>>();
+    for block in &function.blocks {
+        for instruction in &block.instructions {
+            for (operand_index, operand) in instruction_operands(&instruction.kind)
+                .into_iter()
+                .enumerate()
+            {
+                if let IrOperand::Value(value) = operand {
+                    uses.entry(value.clone()).or_default().push(IrUse {
+                        instruction: instruction.id.clone(),
+                        operand_index,
+                    });
+                }
+            }
+        }
+    }
+    IrDefinitionUseAnalysis { definitions, uses }
+}
+
 /// Validates identity, definition, operand, and storage-reference integrity for canonical IR.
 #[must_use]
 pub fn validate_intermediate_representation(
