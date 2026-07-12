@@ -77,7 +77,12 @@ pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateR
                     id: method.id.clone(),
                     name: method.name.clone(),
                     provenance: provenance.clone(),
-                    blocks: Vec::new(),
+                    entry_block: IrBlockId::entry_for(&method.id),
+                    blocks: vec![IrBlock {
+                        id: IrBlockId::entry_for(&method.id),
+                        provenance: provenance.clone(),
+                        instructions: Vec::new(),
+                    }],
                 })
             }));
     }
@@ -92,13 +97,36 @@ pub struct IrFunction {
     pub id: SemanticId,
     pub name: String,
     pub provenance: SourceProvenance,
+    pub entry_block: IrBlockId,
     pub blocks: Vec<IrBlock>,
+}
+
+/// A stable compiler-owned basic-block identity within an IR function.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct IrBlockId(String);
+
+impl IrBlockId {
+    #[must_use]
+    pub fn entry_for(function: &SemanticId) -> Self {
+        Self(format!("{function}/block:entry"))
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for IrBlockId {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
 }
 
 /// One ordered instruction region in an IR function.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IrBlock {
-    pub id: String,
+    pub id: IrBlockId,
     pub provenance: SourceProvenance,
     pub instructions: Vec<IrInstruction>,
 }
@@ -121,8 +149,8 @@ pub enum IrInstructionKind {
 #[cfg(test)]
 mod tests {
     use super::{
-        lower_components_to_ir, IntermediateRepresentation, IrBlock, IrFunction, IrInstruction,
-        IrInstructionKind, IrModule,
+        lower_components_to_ir, IntermediateRepresentation, IrBlock, IrBlockId, IrFunction,
+        IrInstruction, IrInstructionKind, IrModule,
     };
     use crate::{SemanticId, SourceProvenance};
 
@@ -141,8 +169,13 @@ mod tests {
             id: SemanticId::component(Some("x-counter"), "Counter").method("increment"),
             name: "increment".to_string(),
             provenance: provenance.clone(),
+            entry_block: IrBlockId::entry_for(
+                &SemanticId::component(Some("x-counter"), "Counter").method("increment"),
+            ),
             blocks: vec![IrBlock {
-                id: "entry".to_string(),
+                id: IrBlockId::entry_for(
+                    &SemanticId::component(Some("x-counter"), "Counter").method("increment"),
+                ),
                 provenance: provenance.clone(),
                 instructions: vec![IrInstruction {
                     id: "entry.0".to_string(),
@@ -165,7 +198,7 @@ mod tests {
     }
 
     #[test]
-    fn lowers_components_into_modules_without_functions() {
+    fn lowers_components_into_modules_with_entry_blocks() {
         let parsed = ezc_parser::parse_file(
             "src/Counter.tsx",
             "@component(\"x-counter\") class Counter extends Component { count = state(0); increment() {} render() { return <p>{this.count}</p>; } }",
@@ -179,7 +212,16 @@ mod tests {
             vec![model.components[0].id.clone()]
         );
         assert_eq!(ir.modules[0].functions[0].name, "increment");
-        assert!(ir.modules[0].functions[0].blocks.is_empty());
+        assert_eq!(ir.modules[0].functions[0].blocks.len(), 1);
+        assert_eq!(
+            ir.modules[0].functions[0].entry_block,
+            ir.modules[0].functions[0].blocks[0].id
+        );
+        assert_eq!(
+            ir.modules[0].functions[0].entry_block.as_str(),
+            format!("{}/block:entry", ir.modules[0].functions[0].id).as_str()
+        );
+        assert!(ir.modules[0].functions[0].blocks[0].instructions.is_empty());
         assert!(matches!(
             ir.modules[0].storage_initializers[0].kind,
             IrInstructionKind::InitializeStorage { .. }

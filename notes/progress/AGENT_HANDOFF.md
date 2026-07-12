@@ -3,39 +3,41 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: a6bb4c7 Lower state storage into IR
-* Working tree: D1-E source, test, and documentation changes are present and uncommitted
+* Latest completed slice: D2-A - Basic blocks
+* Working tree: clean after the D2-A commit
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: D1-E - Template entrypoint lowering
-* Summary: Lowered render templates into canonical IR entrypoint records.
+* Slice: D2-A - Basic blocks
+* Summary: Materialized one canonical entry basic block for every lowered IR function.
 * Key files: crates/ezc_core/src/intermediate_representation.rs
-* New behavior: Each render template links its canonical template ID to its render-method ID and provenance; no DOM instructions are emitted.
-* Tests added or changed: Core coverage locks template-to-render entrypoint lowering.
+* New behavior: `IrFunction` records a stable `IrBlockId` entrypoint and owns an empty, provenanced entry block derived from its canonical method ID.
+* Tests added or changed: Core coverage locks deterministic module-qualified entry-block identity, ownership, and empty initial instruction regions.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: D1-E - Template entrypoint lowering
+* Slice: D2-A - Basic blocks
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D1-E
-* Remaining: D2-A - basic blocks.
+* Completed: Phase C1 through C35; Phase D1-A through D2-A
+* Remaining: D2-B - branch edges.
 
 Verification
 
 * cargo fmt --all --check: pass
 * cargo clippy --workspace --all-targets -- -D warnings: pass
-* cargo test --workspace: pass
-* pnpm test:e2e: pass
-* just e2e: pass
+* cargo test -p ezc_core: pass
 
 Architecture decisions made
 
 * Decision: State initializer expressions have stable graph roots and recursively keyed canonical nodes in the ASM.
 * Reason: Folding and inspection now consume the same compiler-owned topology instead of independently traversing field-local lowering structures.
 * Tradeoff: B10 retains legacy field-local trees only as lowering compatibility data; every semantic consumer added in this phase reads the canonical graph. General expression owners remain later work.
+
+* Decision: Every lowered IR function begins with one stable, empty entry basic block whose identity is derived from the canonical method ID.
+* Reason: Subsequent CFG slices can name branch and loop edges against compiler-owned nodes without backend-specific or source-offset-generated block identities.
+* Tradeoff: D2-A creates only entry regions; it does not lower statements, define terminators, or create normal/branch/loop edges.
 
 * Decision: Expression graph nodes own `SourceProvenance` rather than an unqualified source span.
 * Reason: Tooling and diagnostics need the canonical expression node itself to provide a path-aware authored location without reconstructing it from a state field.
@@ -491,10 +493,11 @@ Known limitations
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
 * Item: C30 exposes direct ASM type queries only. CLI inspection output, source diagnostics, backend enforcement, resource declaration lowering, and final type diagnostic families remain later Phase C work.
+* Item: Canonical IR functions currently contain only empty entry basic blocks. There are no terminators, branch edges, loop regions, CFG analyses, or statement instructions yet.
 
 Exact next step
 
-Continue automatically with C31 - type inspection output, committing the completed C30 slice first.
+Continue automatically with D2-B - branch edges, committing the completed D2-A slice first.
 
 Useful commands
 
@@ -525,24 +528,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* README.md
-* crates/ezc_core/src/application_semantic_model.rs
-* crates/ezc_core/src/compiler_pass.rs
-* crates/ezc_core/src/lib.rs
-* crates/ezc_core/src/semantic_graph.rs
-* crates/ezc_cli/src/main.rs
-* crates/ezc_cli/tests/explain.rs
-* crates/ezc_parser/src/lib.rs
-* crates/ezc_parser/src/model.rs
-* crates/ezc_parser/src/oxc_adapter.rs
-* crates/ezc_parser/tests/parse_file.rs
-* fixtures/0032-arithmetic-state-initializer/
-* fixtures/0033-constant-comparison-state-initializer/
-* fixtures/0034-constant-logical-state-initializer/
-* fixtures/0035-constant-nullish-state-initializer/
-* fixtures/0036-constant-unary-state-initializer/
-* fixtures/0037-method-local-constants/
-* fixtures/0038-constrained-method-parameters/
-* fixtures/0039-method-local-resolution/
-* fixtures/0040-immutable-constant-folding/
-* fixtures/0041-canonical-expression-graph/
+* None after the D2-A commit.
