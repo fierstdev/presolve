@@ -4,38 +4,38 @@ Repository state
 
 * Branch: main
 * Latest commit: cli: add asm inspection filters
-* Working tree: C8-D/A2/A3/A4/A5/B1/B2/B3/B4/B5 source, test, fixture, and documentation changes are present and uncommitted
+* Working tree: C8-D/A2/A3/A4/A5/B1/B2/B3/B4/B5/B6/B7 source, test, fixture, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: B5 - Constant unary state initializers
-* Summary: Added compiler-owned unary boolean negation and numeric sign expressions.
+* Slice: B7 - Constrained method parameters
+* Summary: Added compiler-owned identifier method parameters with canonical lowering, source provenance, and ASM inspection.
 * Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_cli/src/main.rs
-* New behavior: Supported constant primitives and B1-B3 expressions may be composed with `??` inside `state(...)`. Canonical lowering evaluates the right side only when the left evaluates to null; backends receive the selected value, and ASM JSON/ComponentGraph retain the authored expression. Reached invalid arithmetic reports source-provenanced `EZC1025`.
-* Tests added or changed: Parser logical-tree retention; core AND/OR evaluation, short-circuit behavior, and evaluated invalid-branch diagnostics; CLI ASM JSON plus parse/graph/HTML fixture contracts.
-* Fixtures added or changed: fixtures/0035-constant-nullish-state-initializer.
+* New behavior: Direct identifier parameters are retained in authored order, lowered onto their owning canonical method, and exposed as `parameters` with source provenance in ASM JSON. They add no runtime or JavaScript execution semantics.
+* Tests added or changed: Parser constraint and source-span coverage; core canonical-lowering coverage; CLI ASM JSON provenance coverage.
+* Fixtures added or changed: fixtures/0038-constrained-method-parameters.
 
 Current in-progress slice
 
-* Slice: B4 - Constant nullish-coalescing state initializers
+* Slice: B7 - Constrained method parameters
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B3
-* Remaining: Phase B6 - add compiler-owned local variables while preserving deterministic constant-expression semantics.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B7
+* Remaining: Phase B8 - constrained local-variable resolution.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_parser: pass
-* cargo test -p ezc_core: pass
-* cargo test -p ezc_cli: pass
-* RUST_TEST_THREADS=1 cargo test -p ezc_cli --test runtime_browser -- --nocapture: pass
 * cargo clippy --workspace --all-targets -- -D warnings: pass
-* RUST_TEST_THREADS=1 cargo test --workspace: pass
+* cargo test --workspace: pass
 * pnpm test:e2e: pass
 * just e2e: pass
 
 Architecture decisions made
+
+* Decision: Constrained method parameters are method-owned canonical metadata rather than runtime slots or standalone semantic entities.
+* Reason: Parameter declarations need deterministic ownership and provenance for compiler services now, while B7 deliberately establishes no execution, closure, or binding-resolution behavior.
+* Tradeoff: Only direct identifier declarations are retained in authored order; destructuring, defaults, rest parameters, captured values, render bindings, action values, and type semantics remain absent until an explicit later slice.
 
 * Decision: Template descendants are lowered into canonical semantic entities separate from backend-local `n*` template IDs.
 * Reason: Developer tools and compiler analyses need typed, owned, provenance-backed template semantics without taking a dependency on DOM emission details.
@@ -330,10 +330,11 @@ Known limitations
 * Item: `ezc asm --format graph` exports a schema-versioned canonical semantic graph with roots, typed nodes, provenance, ownership edges, and resolved reference edges. It intentionally does not discover project files, include diagnostics, expose parser/backend/runtime artifacts, or provide graph filtering, mutation, or alternate serialization formats.
 * Item: Canonical ASM ownership now drives template entity lookup, template dependency lowering, and dead-action analysis. Legacy ComponentGraph, TemplateSemanticEntity construction, and SymbolTable records still carry owner fields as compatibility/lowering data; their removal or migration requires a later dedicated frontend/backend compatibility slice.
 * Item: Constant `state(...)` initializers use one compiler-owned expression model. Numeric arithmetic, comparisons, boolean logic, nullish coalescing, and unary `!`, `+`, and `-` evaluate statically. State reads, local variables, calls, coercions, truthiness, control flow, and semantic expression typing remain later Phase B work.
+* Item: Method parameters are compiler-owned identifier declarations with canonical source provenance only. They do not execute, close over values, resolve local/template/action references, or support destructuring, defaults, rest declarations, or semantic type checking.
 
 Exact next step
 
-Start Phase B6 - add compiler-owned local variables while preserving deterministic constant-expression semantics without broadening JavaScript compatibility.
+Start Phase B8 - resolve supported method-local references deterministically from the canonical method-owned declarations without adding JavaScript execution, closures, or destructuring.
 
 Useful commands
 
@@ -380,3 +381,5 @@ Changed but uncommitted files
 * fixtures/0034-constant-logical-state-initializer/
 * fixtures/0035-constant-nullish-state-initializer/
 * fixtures/0036-constant-unary-state-initializer/
+* fixtures/0037-method-local-constants/
+* fixtures/0038-constrained-method-parameters/

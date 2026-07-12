@@ -6,7 +6,7 @@ use ezc_parser::ParsedFile;
 use crate::compilation_unit::CompilationUnit;
 use crate::component_graph::{
     build_component_graph_for_module, render_event_handlers, ComponentAction, ComponentDiagnostic,
-    ComponentMethod, ComponentNode, RenderEventHandler, StateField,
+    ComponentMethod, ComponentNode, MethodLocalVariable, RenderEventHandler, StateField,
 };
 use crate::semantic_id::{SemanticId, SemanticOwner};
 use crate::semantic_provenance::SourceProvenance;
@@ -33,6 +33,7 @@ pub enum SemanticEntity<'a> {
     Component(&'a ComponentNode),
     StateField(&'a StateField),
     Method(&'a ComponentMethod),
+    LocalVariable(&'a MethodLocalVariable),
     Action(&'a ComponentAction),
     EventHandler(&'a RenderEventHandler),
     Template(&'a TemplateNode),
@@ -44,6 +45,7 @@ pub enum SemanticEntityKind {
     Component,
     StateField,
     Method,
+    LocalVariable,
     Action,
     EventHandler,
     Template,
@@ -57,6 +59,7 @@ impl SemanticEntity<'_> {
             Self::Component(_) => SemanticEntityKind::Component,
             Self::StateField(_) => SemanticEntityKind::StateField,
             Self::Method(_) => SemanticEntityKind::Method,
+            Self::LocalVariable(_) => SemanticEntityKind::LocalVariable,
             Self::Action(_) => SemanticEntityKind::Action,
             Self::EventHandler(_) => SemanticEntityKind::EventHandler,
             Self::Template(_) => SemanticEntityKind::Template,
@@ -77,6 +80,14 @@ impl ApplicationSemanticModel {
             }
             if let Some(method) = component.methods.iter().find(|method| method.id == *id) {
                 return Some(SemanticEntity::Method(method));
+            }
+            if let Some(local) = component
+                .methods
+                .iter()
+                .flat_map(|method| method.local_variables.iter())
+                .find(|local| local.id == *id)
+            {
+                return Some(SemanticEntity::LocalVariable(local));
             }
             if let Some(action) = component.actions.iter().find(|action| action.id == *id) {
                 return Some(SemanticEntity::Action(action));
@@ -336,6 +347,11 @@ fn build_application_semantic_model_from_files(files: &[ParsedFile]) -> Applicat
         &template_entities,
         &ownership,
     ));
+    references.extend(build_template_local_references(
+        &components,
+        &template_entities,
+        &ownership,
+    ));
 
     ApplicationSemanticModel {
         components,
@@ -408,6 +424,52 @@ fn build_template_event_references(
         .collect()
 }
 
+fn build_template_local_references(
+    components: &[ComponentNode],
+    template_entities: &[TemplateSemanticEntity],
+    ownership: &BTreeMap<SemanticId, SemanticOwner>,
+) -> Vec<SemanticReference> {
+    let mut references = template_entities
+        .iter()
+        .filter(|entity| {
+            matches!(
+                entity.kind,
+                TemplateSemanticKind::Binding
+                    | TemplateSemanticKind::AttributeBinding
+                    | TemplateSemanticKind::Conditional
+                    | TemplateSemanticKind::List
+            )
+        })
+        .filter_map(|entity| {
+            let name = entity.expression.as_deref()?;
+            let component = template_entity_component(components, ownership, entity)?;
+            let render = component.methods.iter().find(|method| method.name == "render")?;
+            let local = unique_local_variable(render, name)?;
+
+            Some(SemanticReference {
+                kind: SemanticReferenceKind::TemplateLocal,
+                source: entity.id.clone(),
+                target: local.id.clone(),
+                provenance: entity.provenance.clone(),
+            })
+        })
+        .collect::<Vec<_>>();
+    references.sort_by(|left, right| {
+        (left.source.as_str(), left.target.as_str())
+            .cmp(&(right.source.as_str(), right.target.as_str()))
+    });
+    references
+}
+
+fn unique_local_variable<'a>(method: &'a ComponentMethod, name: &str) -> Option<&'a MethodLocalVariable> {
+    let mut locals = method
+        .local_variables
+        .iter()
+        .filter(|local| local.name == name);
+    let local = locals.next()?;
+    locals.next().is_none().then_some(local)
+}
+
 fn template_entity_component<'a>(
     components: &'a [ComponentNode],
     ownership: &BTreeMap<SemanticId, SemanticOwner>,
@@ -451,6 +513,9 @@ fn collect_ownership(
                 method.id.clone(),
                 SemanticOwner::entity(component.id.clone()),
             );
+            for local in &method.local_variables {
+                ownership.insert(local.id.clone(), SemanticOwner::entity(method.id.clone()));
+            }
         }
         for action in &component.actions {
             ownership.insert(

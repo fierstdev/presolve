@@ -138,6 +138,13 @@ reports `EZC1025`.
 
 Unary `!`, `+`, and `-` are evaluated by the compiler for supported boolean and numeric constant expressions.
 
+Methods may declare supported serializable local constants. They are compiler-owned lexical metadata, visible through ASM inspection, and do not yet participate in render bindings, action execution, or runtime evaluation.
+
+Methods may also declare supported identifier parameters. The compiler lowers their
+names and source provenance into the owning method's ASM metadata in authored
+order. Parameters do not execute, close over values, resolve bindings, or
+support destructuring, defaults, or rest declarations.
+
 ## Repository rules
 
 - No major feature without an issue.

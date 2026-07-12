@@ -177,6 +177,13 @@ pub struct ParsedMethod {
     pub bindings: Vec<String>,
     pub state_updates: Vec<ParsedStateUpdate>,
     pub local_variables: Vec<ParsedLocalVariable>,
+    pub parameters: Vec<ParsedMethodParameter>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedMethodParameter {
+    pub name: String,
+    pub span: SourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -29,6 +29,7 @@ pub enum SemanticGraphNodeKind {
     Component,
     StateField,
     Method,
+    LocalVariable,
     Action,
     EventHandler,
     Template,
@@ -66,6 +67,7 @@ pub enum SemanticGraphEdgeKind {
     ActionState,
     EventMethod,
     TemplateState,
+    TemplateLocal,
 }
 
 /// Build a deterministic graph export from canonical ASM semantics only.
@@ -162,6 +164,7 @@ impl SemanticGraphEdgeKind {
             Self::ActionState => "action-state",
             Self::EventMethod => "event-method",
             Self::TemplateState => "template-state",
+            Self::TemplateLocal => "template-local",
         }
     }
 }
@@ -171,6 +174,7 @@ fn semantic_graph_node_kind(entity: SemanticEntity<'_>) -> SemanticGraphNodeKind
         SemanticEntity::Component(_) => SemanticGraphNodeKind::Component,
         SemanticEntity::StateField(_) => SemanticGraphNodeKind::StateField,
         SemanticEntity::Method(_) => SemanticGraphNodeKind::Method,
+        SemanticEntity::LocalVariable(_) => SemanticGraphNodeKind::LocalVariable,
         SemanticEntity::Action(_) => SemanticGraphNodeKind::Action,
         SemanticEntity::EventHandler(_) => SemanticGraphNodeKind::EventHandler,
         SemanticEntity::Template(_) => SemanticGraphNodeKind::Template,
@@ -195,6 +199,7 @@ fn semantic_graph_edge_kind(kind: SemanticReferenceKind) -> SemanticGraphEdgeKin
         SemanticReferenceKind::ActionState => SemanticGraphEdgeKind::ActionState,
         SemanticReferenceKind::EventMethod => SemanticGraphEdgeKind::EventMethod,
         SemanticReferenceKind::TemplateState => SemanticGraphEdgeKind::TemplateState,
+        SemanticReferenceKind::TemplateLocal => SemanticGraphEdgeKind::TemplateLocal,
     }
 }
 

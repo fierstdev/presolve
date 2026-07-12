@@ -15,4 +15,5 @@ pub enum SemanticReferenceKind {
     ActionState,
     EventMethod,
     TemplateState,
+    TemplateLocal,
 }

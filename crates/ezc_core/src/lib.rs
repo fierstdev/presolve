@@ -54,9 +54,9 @@ pub use component_graph::{
     ArithmeticExpression, ArithmeticExpressionKind, ArithmeticOperator, ComparisonOperator,
     ComponentAction, ComponentDiagnostic, ComponentGraph, ComponentMethod, ComponentNode,
     ConstantEvaluationError, ConstantExpression, ConstantExpressionKind, DeclaredStateType,
-    DeclaredStateTypeKind, LogicalOperator, RenderAttribute, RenderAttributeValue, RenderChild,
-    RenderEventHandler, RenderFragment, RenderList, RenderModel, SerializableValue, StateField,
-    StateOperation,
+    DeclaredStateTypeKind, LogicalOperator, MethodParameter, RenderAttribute, RenderAttributeValue,
+    RenderChild, RenderEventHandler, RenderFragment, RenderList, RenderModel, SerializableValue,
+    StateField, StateOperation,
 };
 pub use explain::{explain_json, explain_text};
 pub use html_codegen::generate_static_html;
@@ -321,6 +321,34 @@ class Counter extends Component {
         assert_eq!(graph.provenance[&component.actions[0].id].span.line, 7);
         assert_eq!(graph.provenance[&component.id.template()].span.line, 10);
         assert_eq!(graph.provenance[&render.event_handlers[0].id].span.line, 12);
+    }
+
+    #[test]
+    fn lowers_method_parameters_into_canonical_method_metadata() {
+        let parsed = ezc_parser::parse_file(
+            "src/Parameters.tsx",
+            r#"
+@component("x-parameters")
+class Parameters extends Component {
+  save(title: string, retries?: number) {}
+}
+"#,
+        );
+
+        let graph = build_component_graph_for_module(&parsed);
+        let method = &graph.components[0].methods[0];
+
+        assert_eq!(method.name, "save");
+        assert_eq!(
+            method
+                .parameters
+                .iter()
+                .map(|parameter| parameter.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["title", "retries"]
+        );
+        assert_eq!(method.parameters[0].span.line, 4);
+        assert_eq!(method.parameters[1].span.line, 4);
     }
 
     #[test]
@@ -1169,6 +1197,7 @@ class Counter extends Component {
                     bindings: Vec::new(),
                     state_updates: Vec::new(),
                     local_variables: Vec::new(),
+                    parameters: Vec::new(),
                 }],
             }],
         };

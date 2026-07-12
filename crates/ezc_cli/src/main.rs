@@ -495,6 +495,8 @@ fn asm_inspection_json(
                     provenance: provenance.into(),
                     declared_type: declared_state_type(entity),
                     initial_expression: initial_expression(entity),
+                    local_variables: method_local_variables(entity),
+                    parameters: method_parameters(entity, provenance),
                 }
             })
             .collect(),
@@ -651,6 +653,8 @@ fn asm_entity_inspection_json(
             provenance: provenance.into(),
             declared_type: declared_state_type(entity),
             initial_expression: initial_expression(entity),
+            local_variables: method_local_variables(entity),
+            parameters: method_parameters(entity, provenance),
         },
         parents: asm
             .ancestors_of(id)
@@ -858,6 +862,7 @@ fn parse_asm_entity_kind(value: &str) -> SemanticEntityKind {
         "component" => SemanticEntityKind::Component,
         "state-field" => SemanticEntityKind::StateField,
         "method" => SemanticEntityKind::Method,
+        "local-variable" => SemanticEntityKind::LocalVariable,
         "action" => SemanticEntityKind::Action,
         "event-handler" => SemanticEntityKind::EventHandler,
         "template" => SemanticEntityKind::Template,
@@ -874,6 +879,7 @@ fn parse_asm_reference_kind(value: &str) -> SemanticReferenceKind {
         "action-state" => SemanticReferenceKind::ActionState,
         "event-method" => SemanticReferenceKind::EventMethod,
         "template-state" => SemanticReferenceKind::TemplateState,
+        "template-local" => SemanticReferenceKind::TemplateLocal,
         _ => {
             eprintln!("unsupported ASM reference kind: {value}");
             process::exit(1);
@@ -948,6 +954,7 @@ fn semantic_entity_kind(entity: SemanticEntity<'_>) -> &'static str {
         SemanticEntity::Component(_) => "component",
         SemanticEntity::StateField(_) => "state-field",
         SemanticEntity::Method(_) => "method",
+        SemanticEntity::LocalVariable(_) => "local-variable",
         SemanticEntity::Action(_) => "action",
         SemanticEntity::EventHandler(_) => "event-handler",
         SemanticEntity::Template(_) => "template",
@@ -974,6 +981,7 @@ fn semantic_reference_kind(kind: SemanticReferenceKind) -> &'static str {
         SemanticReferenceKind::ActionState => "action-state",
         SemanticReferenceKind::EventMethod => "event-method",
         SemanticReferenceKind::TemplateState => "template-state",
+        SemanticReferenceKind::TemplateLocal => "template-local",
     }
 }
 
@@ -996,6 +1004,39 @@ fn initial_expression(entity: SemanticEntity<'_>) -> Option<String> {
     };
 
     field.initial_expression.as_ref().map(ToString::to_string)
+}
+
+fn method_local_variables(entity: SemanticEntity<'_>) -> Option<Vec<String>> {
+    let SemanticEntity::Method(method) = entity else {
+        return None;
+    };
+    Some(
+        method
+            .local_variables
+            .iter()
+            .map(|local| format!("{} = {:?}", local.name, local.value))
+            .collect(),
+    )
+}
+
+fn method_parameters<'a>(
+    entity: SemanticEntity<'a>,
+    method_provenance: &SourceProvenance,
+) -> Option<Vec<AsmInspectionMethodParameter<'a>>> {
+    let SemanticEntity::Method(method) = entity else {
+        return None;
+    };
+
+    Some(
+        method
+            .parameters
+            .iter()
+            .map(|parameter| AsmInspectionMethodParameter {
+                name: &parameter.name,
+                provenance: AsmInspectionProvenance::with_span(method_provenance, parameter.span),
+            })
+            .collect(),
+    )
 }
 
 fn asm_declared_state_type_kind(kind: DeclaredStateTypeKind) -> &'static str {
@@ -1041,6 +1082,16 @@ struct AsmInspectionEntity<'a> {
     declared_type: Option<AsmInspectionDeclaredType<'a>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     initial_expression: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    local_variables: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    parameters: Option<Vec<AsmInspectionMethodParameter<'a>>>,
+}
+
+#[derive(Serialize)]
+struct AsmInspectionMethodParameter<'a> {
+    name: &'a str,
+    provenance: AsmInspectionProvenance,
 }
 
 #[derive(Serialize)]
@@ -1108,6 +1159,18 @@ impl From<&SourceProvenance> for AsmInspectionProvenance {
             end: provenance.span.end,
             line: provenance.span.line,
             column: provenance.span.column,
+        }
+    }
+}
+
+impl AsmInspectionProvenance {
+    fn with_span(provenance: &SourceProvenance, span: ezc_parser::SourceSpan) -> Self {
+        Self {
+            path: provenance.path.display().to_string(),
+            start: span.start,
+            end: span.end,
+            line: span.line,
+            column: span.column,
         }
     }
 }

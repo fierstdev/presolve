@@ -676,6 +676,74 @@ fn asm_command_exposes_constant_nullish_state_initializers() {
 }
 
 #[test]
+fn asm_command_exposes_method_local_constants() {
+    let path = "fixtures/0037-method-local-constants/input/LocalConstants.tsx";
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["asm", path, "--format", "json"])
+        .output()
+        .expect("failed to inspect method locals");
+    assert!(output.status.success());
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("ASM JSON");
+    let method = document["entities"]
+        .as_array()
+        .and_then(|entities| entities.iter().find(|entity| entity["kind"] == "method"))
+        .expect("render method entity");
+    assert_eq!(
+        method["local_variables"],
+        serde_json::json!(["title = String(\"EdgeZero\")", "enabled = Boolean(true)"])
+    );
+}
+
+#[test]
+fn asm_command_exposes_constrained_method_parameters() {
+    let path = "fixtures/0038-constrained-method-parameters/input/MethodParameters.tsx";
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["asm", path, "--format", "json"])
+        .output()
+        .expect("failed to inspect method parameters");
+    assert!(output.status.success());
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("ASM JSON");
+    let method = document["entities"]
+        .as_array()
+        .and_then(|entities| {
+            entities.iter().find(|entity| {
+                entity["kind"] == "method"
+                    && entity["id"]
+                        .as_str()
+                        .is_some_and(|id| id.ends_with("/method:save"))
+            })
+        })
+        .expect("save method entity");
+    assert_eq!(
+        method["parameters"],
+        serde_json::json!([
+            {
+                "name": "title",
+                "provenance": {
+                    "path": path,
+                    "start": 84,
+                    "end": 97,
+                    "line": 3,
+                    "column": 8
+                }
+            },
+            {
+                "name": "retries",
+                "provenance": {
+                    "path": path,
+                    "start": 99,
+                    "end": 115,
+                    "line": 3,
+                    "column": 23
+                }
+            }
+        ])
+    );
+}
+
+#[test]
 fn asm_command_reports_primitive_declared_state_type_mismatches() {
     let repo_root = repo_root();
     let path = "fixtures/0027-declared-state-type-diagnostics/input/InvalidTypedState.tsx";

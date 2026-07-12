@@ -464,6 +464,24 @@ pub struct ComponentMethod {
     pub id: SemanticId,
     pub owner: SemanticOwner,
     pub name: String,
+    pub local_variables: Vec<MethodLocalVariable>,
+    pub parameters: Vec<MethodParameter>,
+}
+
+/// A compiler-owned declaration of a supported method parameter.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MethodParameter {
+    pub name: String,
+    pub span: SourceSpan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MethodLocalVariable {
+    pub id: SemanticId,
+    pub owner: SemanticOwner,
+    pub name: String,
+    pub value: SerializableValue,
+    pub span: SourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -672,6 +690,26 @@ fn build_component_node(
             id: id.method(&method.name),
             owner: SemanticOwner::entity(id.clone()),
             name: method.name.clone(),
+            local_variables: method
+                .local_variables
+                .iter()
+                .enumerate()
+                .map(|(index, local)| MethodLocalVariable {
+                    id: id.method(&method.name).local_variable(&local.name, index),
+                    owner: SemanticOwner::entity(id.method(&method.name)),
+                    name: local.name.clone(),
+                    value: serializable_value_from_parsed(&local.value),
+                    span: local.span,
+                })
+                .collect(),
+            parameters: method
+                .parameters
+                .iter()
+                .map(|parameter| MethodParameter {
+                    name: parameter.name.clone(),
+                    span: parameter.span,
+                })
+                .collect(),
         })
         .collect::<Vec<_>>();
 
@@ -1550,6 +1588,16 @@ fn collect_component_provenance(
                 component.id.action(&method.name, index),
                 SourceProvenance::new(path, update.span),
             );
+        }
+
+        if let Some(component_method) = component
+            .methods
+            .iter()
+            .find(|component_method| component_method.name == method.name)
+        {
+            for local in &component_method.local_variables {
+                provenance.insert(local.id.clone(), SourceProvenance::new(path, local.span));
+            }
         }
     }
 

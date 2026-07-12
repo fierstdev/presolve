@@ -153,6 +153,38 @@ fn parses_counter_fixture() {
 }
 
 #[test]
+fn retains_constrained_method_parameters() {
+    let source = r#"
+@component("x-parameters")
+class Parameters extends Component {
+  save(title: string, retries?: number) {}
+  ignored({ title }, fallback = "EdgeZero", ...rest) {}
+}
+"#;
+
+    let parsed = parse_file("src/Parameters.tsx", source);
+    assert!(parsed.diagnostics.is_empty());
+
+    let methods = &parsed.classes[0].methods;
+    assert_eq!(methods[0].name, "save");
+    assert_eq!(
+        methods[0]
+            .parameters
+            .iter()
+            .map(|parameter| parameter.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["title", "retries"]
+    );
+    assert_eq!(methods[0].parameters[0].span.line, 4);
+    assert_eq!(methods[0].parameters[0].span.column, 8);
+    assert_eq!(methods[0].parameters[1].span.line, 4);
+    assert_eq!(methods[0].parameters[1].span.column, 23);
+
+    assert_eq!(methods[1].name, "ignored");
+    assert!(methods[1].parameters.is_empty());
+}
+
+#[test]
 fn retains_explicit_state_field_type_annotations() {
     let source = r#"
 @component("x-panel")

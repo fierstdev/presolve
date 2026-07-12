@@ -70,6 +70,11 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn local_variable(&self, name: &str, index: usize) -> Self {
+        self.child("local", &format!("{name}:{index}"))
+    }
+
+    #[must_use]
     pub fn event_handler(&self, event: &str, index: usize) -> Self {
         self.child("event", &format!("{event}:{index}"))
     }
@@ -146,6 +151,10 @@ mod tests {
         assert_eq!(
             component.action("increment", 0).as_str(),
             "component:x-counter/action:increment:0"
+        );
+        assert_eq!(
+            component.method("render").local_variable("title", 0).as_str(),
+            "component:x-counter/method:render/local:title:0"
         );
         assert_eq!(
             component.event_handler("click", 0).as_str(),
