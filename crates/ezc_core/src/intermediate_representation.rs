@@ -409,6 +409,30 @@ impl IrPassManager {
     }
 }
 
+/// An immutable ordered optimization pipeline.
+pub struct IrOptimizationPipeline {
+    passes: Vec<Box<dyn IrOptimizationPass>>,
+}
+
+impl IrOptimizationPipeline {
+    #[must_use]
+    pub fn new(passes: Vec<Box<dyn IrOptimizationPass>>) -> Self {
+        Self { passes }
+    }
+
+    #[must_use]
+    pub fn pass_names(&self) -> Vec<&'static str> {
+        self.passes.iter().map(|pass| pass.name()).collect()
+    }
+
+    #[must_use]
+    pub fn run(&self, input: &IntermediateRepresentation) -> IntermediateRepresentation {
+        self.passes
+            .iter()
+            .fold(input.clone(), |current, pass| pass.run(&current))
+    }
+}
+
 /// Detects dead result assignments without treating storage effects as removable.
 #[must_use]
 pub fn analyze_dead_assignments(function: &IrFunction) -> IrDeadAssignmentAnalysis {
