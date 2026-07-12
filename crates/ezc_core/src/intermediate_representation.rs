@@ -169,6 +169,40 @@ impl IrUpdateScheduler {
     pub fn new(graph: IrReactiveGraph) -> Self {
         Self { graph }
     }
+
+    #[must_use]
+    pub fn dependency_order(&self) -> Vec<String> {
+        let mut incoming = self
+            .graph
+            .nodes
+            .keys()
+            .cloned()
+            .map(|id| (id, 0_usize))
+            .collect::<BTreeMap<_, _>>();
+        for edge in &self.graph.edges {
+            if let Some(count) = incoming.get_mut(&edge.target) {
+                *count += 1;
+            }
+        }
+        let mut ready = incoming
+            .iter()
+            .filter(|(_, count)| **count == 0)
+            .map(|(id, _)| id.clone())
+            .collect::<BTreeSet<_>>();
+        let mut order = Vec::new();
+        while let Some(id) = ready.pop_first() {
+            order.push(id.clone());
+            for edge in self.graph.dependents_of(&id) {
+                if let Some(count) = incoming.get_mut(&edge.target) {
+                    *count -= 1;
+                    if *count == 0 {
+                        ready.insert(edge.target.clone());
+                    }
+                }
+            }
+        }
+        order
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
