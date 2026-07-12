@@ -94,6 +94,15 @@ pub enum IrDomAttributeValue {
     Binding(IrValueId),
 }
 
+/// A DOM event bound to an authored handler semantic identity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrDomEvent {
+    pub node: IrDomNodeId,
+    pub event: String,
+    pub handler: SemanticId,
+    pub provenance: SourceProvenance,
+}
+
 /// Lowers application component ownership into deterministic IR module structure.
 #[must_use]
 pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateRepresentation {
