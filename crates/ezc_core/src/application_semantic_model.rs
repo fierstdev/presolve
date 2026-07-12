@@ -377,15 +377,17 @@ pub fn build_application_semantic_model_from_component_graph(
         &ownership,
     ));
 
+    let expression_graph =
+        ExpressionGraph::from_components(&component_graph.components, &component_graph.provenance);
+    let semantic_types = SemanticTypeModel::from_components(
+        &component_graph.components,
+        &component_graph.provenance,
+    )
+    .with_expression_types(&expression_graph);
+
     ApplicationSemanticModel {
-        expression_graph: ExpressionGraph::from_components(
-            &component_graph.components,
-            &component_graph.provenance,
-        ),
-        semantic_types: SemanticTypeModel::from_components(
-            &component_graph.components,
-            &component_graph.provenance,
-        ),
+        expression_graph,
+        semantic_types,
         components: component_graph.components.clone(),
         templates,
         template_entities,
@@ -465,14 +467,18 @@ fn build_application_semantic_model_from_files_with_bindings(
         &ownership,
     ));
 
+    let expression_graph = ExpressionGraph::from_components(&components, &provenance);
+    let semantic_types = SemanticTypeModel::from_components_with_aliases_and_bindings(
+        &components,
+        &provenance,
+        &type_aliases,
+        bindings,
+    )
+    .with_expression_types(&expression_graph);
+
     ApplicationSemanticModel {
-        expression_graph: ExpressionGraph::from_components(&components, &provenance),
-        semantic_types: SemanticTypeModel::from_components_with_aliases_and_bindings(
-            &components,
-            &provenance,
-            &type_aliases,
-            bindings,
-        ),
+        expression_graph,
+        semantic_types,
         components,
         templates,
         template_entities,
@@ -1013,6 +1019,43 @@ class InferredState extends Component {
                 ),
             ]
         );
+    }
+
+    #[test]
+    fn propagates_canonical_types_to_expression_graph_nodes() {
+        let parsed = ezc_parser::parse_file(
+            "src/ExpressionTypes.tsx",
+            r#"
+@component("x-expression-types")
+class ExpressionTypes extends Component {
+  total = state((1 + 2) * 3);
+  ready = state(1 < 2);
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        let total = &asm.components[0].state_fields[0];
+        let ready = &asm.components[0].state_fields[1];
+        let total_root = asm
+            .expression_root(&total.id)
+            .expect("total expression root");
+        let ready_root = asm
+            .expression_root(&ready.id)
+            .expect("ready expression root");
+
+        assert_eq!(
+            asm.semantic_types.assignments[total_root].semantic_type,
+            crate::SemanticType::Number
+        );
+        assert_eq!(
+            asm.semantic_types.assignments[ready_root].semantic_type,
+            crate::SemanticType::Boolean
+        );
+        assert!(asm
+            .expression_dependencies(total_root)
+            .iter()
+            .all(|id| asm.semantic_types.assignments.contains_key(*id)));
     }
 
     #[test]

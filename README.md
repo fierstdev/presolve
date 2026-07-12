@@ -167,10 +167,14 @@ dependents, owner state fields, and path/offset provenance selection.
 ## Semantic type foundation
 
 The ASM owns a compiler-defined `SemanticType` algebra independent of raw
-TypeScript spelling. C1 establishes unknown, never, null, boolean, number,
-string, array, object, and union forms plus an initially empty canonical type
-assignment model. Parsing type annotations, inference, assignability, and type
-diagnostics are intentionally deferred to later Phase C slices.
+TypeScript spelling. Current Phase C lowering covers primitive and literal
+annotations, arrays, tuples, structural objects, unions, local/imported type
+aliases, inferred direct state values, state-initializer compatibility, and the
+existing canonical state-initializer expression graph. Each assignment retains
+its stable subject identity, origin, declared-or-inferred status, and source
+provenance. General operator diagnostics, state reads, locals, templates,
+actions, normalization, and the final general assignability engine remain
+later Phase C work.
 
 Each future type assignment has a stable canonical identity, a semantic origin,
 declared-or-inferred status, and source provenance. C2 establishes this metadata

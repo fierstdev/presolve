@@ -6,6 +6,7 @@ use crate::{
     BindingTable, ComponentNode, ImportBindingTarget, SemanticId, SerializableValue,
     SourceProvenance, SymbolKind,
 };
+use crate::{ExpressionGraph, ExpressionNodeKind};
 use ezc_parser::ParsedTypeAlias;
 
 /// Compiler-owned semantic type algebra independent of TypeScript spelling.
@@ -217,6 +218,70 @@ impl SemanticTypeModel {
             assignments,
             aliases,
         }
+    }
+
+    /// Attaches inferred types to every canonical expression node in `graph`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the graph's node index contains an ID that does not resolve
+    /// to an expression node.
+    #[must_use]
+    pub fn with_expression_types(mut self, graph: &ExpressionGraph) -> Self {
+        let nodes = graph.nodes.keys().cloned().collect::<Vec<_>>();
+        for id in nodes {
+            let semantic_type = expression_semantic_type(&id, graph, &self.assignments);
+            let node = graph.node(&id).expect("expression graph node");
+            self.assignments.insert(
+                id.clone(),
+                SemanticTypeAssignment {
+                    id: SemanticTypeId::for_subject(&id),
+                    subject: id,
+                    semantic_type,
+                    origin: node.owner.clone(),
+                    status: SemanticTypeStatus::Inferred,
+                    provenance: node.provenance.clone(),
+                },
+            );
+        }
+        self
+    }
+}
+
+fn expression_semantic_type(
+    id: &SemanticId,
+    graph: &ExpressionGraph,
+    assignments: &BTreeMap<SemanticId, SemanticTypeAssignment>,
+) -> SemanticType {
+    let node = graph.node(id).expect("expression graph node");
+    let child_type = |id: &SemanticId| {
+        assignments.get(id).map_or_else(
+            || expression_semantic_type(id, graph, assignments),
+            |assignment| assignment.semantic_type.clone(),
+        )
+    };
+
+    match &node.kind {
+        ExpressionNodeKind::Literal(value) => state_initializer_value_type(value),
+        ExpressionNodeKind::Boolean(value) => SemanticType::BooleanLiteral(*value),
+        ExpressionNodeKind::Arithmetic { .. } => SemanticType::Number,
+        ExpressionNodeKind::Comparison { .. } | ExpressionNodeKind::Logical { .. } => {
+            SemanticType::Boolean
+        }
+        ExpressionNodeKind::NullishCoalescing { left, right } => {
+            let left = child_type(left);
+            let right = child_type(right);
+            if left == right {
+                left
+            } else {
+                SemanticType::Union(vec![left, right])
+            }
+        }
+        ExpressionNodeKind::Unary { operator, .. } => match operator {
+            crate::component_graph::UnaryOperator::Not => SemanticType::Boolean,
+            crate::component_graph::UnaryOperator::Plus
+            | crate::component_graph::UnaryOperator::Minus => SemanticType::Number,
+        },
     }
 }
 
