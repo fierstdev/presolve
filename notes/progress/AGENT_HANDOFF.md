@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: f9c4f72 Establish typed action signatures
-* Working tree: C25 source, test, and documentation changes are present and uncommitted
+* Latest commit: c17f59f Add canonical resource types
+* Working tree: C26 source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: C25 - Resource type foundation
-* Summary: Added a compiler-owned canonical resource type contract.
-* Key files: crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/compiler_pass.rs
-* New behavior: `Resource<T>` semantics now retain data/error types, pending state, serializability intent, and client/server/shared execution boundary.
-* Tests added or changed: Core representation coverage includes a shared serializable resource with typed data and unknown error.
+* Slice: C26 - Serialization compatibility
+* Summary: Added structural canonical serialization compatibility evaluation.
+* Key files: crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/lib.rs
+* New behavior: Primitives, containers, objects, unions, and resources now determine serialization compatibility recursively; unknown/never and incompatible resource data/error remain non-serializable.
+* Tests added or changed: Core coverage verifies primitive, structural object, unknown, and resource serialization outcomes.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C25 - Resource type foundation
+* Slice: C26 - Serialization compatibility
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C25
-* Remaining: Phase C26 - serialization compatibility.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C26
+* Remaining: Phase C27 - server/client boundary compatibility.
 
 Verification
 
@@ -144,6 +144,10 @@ Architecture decisions made
 * Decision: Resources are represented directly in the semantic type algebra with explicit data, error, pending, serializability, and execution-boundary metadata.
 * Reason: Later resources, resumability, and backend planning can share one durable contract rather than wrap untyped runtime values.
 * Tradeoff: C25 provides only type representation. Resource declaration lowering, loading/execution, error propagation, serialization enforcement, and boundary validation remain later work.
+
+* Decision: Serialization compatibility is one recursive canonical type query, with unknown/never treated as incompatible until proven otherwise.
+* Reason: Resumability and backend planning can make deterministic decisions from semantic types instead of runtime value guesses.
+* Tradeoff: C26 defines compatibility only; no source declarations are rejected and no boundary-specific diagnostics or generation behavior is introduced yet.
 
 * Decision: Browser runtime integration tests acquire one process-wide lock before creating a Chrome probe, and the probe deadline allows 20 seconds for a cold Chrome start.
 * Reason: Cargo's workspace runner schedules tests concurrently, and the previous five-second harness deadline could kill an otherwise healthy cold-start probe with SIGKILL.
@@ -458,11 +462,11 @@ Known limitations
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
-* Item: C25 provides resource type representation only. Declaration lowering, execution, errors, serialization enforcement, boundary validation, normalization, and final type diagnostic families remain later Phase C work.
+* Item: C26 defines serialization compatibility only. Source rejection, resource declaration lowering, execution, boundary validation, normalization, and final type diagnostic families remain later Phase C work.
 
 Exact next step
 
-Continue automatically with C26 - serialization compatibility, committing the completed C25 slice first.
+Continue automatically with C27 - server/client boundary compatibility, committing the completed C26 slice first.
 
 Useful commands
 

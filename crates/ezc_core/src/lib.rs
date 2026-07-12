@@ -86,9 +86,10 @@ pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
 pub use semantic_type::{
     dom_binding_contract, is_state_initializer_assignable, operator_result_type,
-    state_initializer_value_type, DomBindingContract, DomBindingKind, ObjectType,
-    ResourceExecutionBoundary, ResourceType, SemanticOperator, SemanticType, SemanticTypeAlias,
-    SemanticTypeAssignment, SemanticTypeId, SemanticTypeModel, SemanticTypeStatus,
+    serialization_compatibility, state_initializer_value_type, DomBindingContract, DomBindingKind,
+    ObjectType, ResourceExecutionBoundary, ResourceType, SemanticOperator, SemanticType,
+    SemanticTypeAlias, SemanticTypeAssignment, SemanticTypeId, SemanticTypeModel,
+    SemanticTypeStatus, SerializationCompatibility,
 };
 pub use summarize::summarize_source;
 pub use symbol_table::{

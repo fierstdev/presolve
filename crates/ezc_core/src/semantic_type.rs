@@ -97,6 +97,49 @@ pub enum ResourceExecutionBoundary {
     Shared,
 }
 
+/// Whether a canonical semantic type can safely cross a compiler/runtime boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SerializationCompatibility {
+    Serializable,
+    NotSerializable,
+}
+
+/// Determines structural serialization compatibility for a canonical type.
+#[must_use]
+pub fn serialization_compatibility(semantic_type: &SemanticType) -> SerializationCompatibility {
+    let serializable = match semantic_type {
+        SemanticType::Unknown | SemanticType::Never => false,
+        SemanticType::Null
+        | SemanticType::Boolean
+        | SemanticType::Number
+        | SemanticType::String
+        | SemanticType::BooleanLiteral(_)
+        | SemanticType::NumberLiteral(_)
+        | SemanticType::StringLiteral(_) => true,
+        SemanticType::Array(element) => {
+            serialization_compatibility(element) == SerializationCompatibility::Serializable
+        }
+        SemanticType::Tuple(items) | SemanticType::Union(items) => items.iter().all(|item| {
+            serialization_compatibility(item) == SerializationCompatibility::Serializable
+        }),
+        SemanticType::Object(object) => object.properties.values().all(|property| {
+            serialization_compatibility(property) == SerializationCompatibility::Serializable
+        }),
+        SemanticType::Resource(resource) => {
+            resource.serializable
+                && serialization_compatibility(&resource.data)
+                    == SerializationCompatibility::Serializable
+                && serialization_compatibility(&resource.error)
+                    == SerializationCompatibility::Serializable
+        }
+    };
+    if serializable {
+        SerializationCompatibility::Serializable
+    } else {
+        SerializationCompatibility::NotSerializable
+    }
+}
+
 /// Structural object shape in the canonical semantic type algebra.
 ///
 /// C1 establishes only the representation. Object declaration lowering,
@@ -1155,8 +1198,9 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::{
-        operator_result_type, ObjectType, ResourceExecutionBoundary, ResourceType,
-        SemanticOperator, SemanticType, SemanticTypeAssignment, SemanticTypeId, SemanticTypeStatus,
+        operator_result_type, serialization_compatibility, ObjectType, ResourceExecutionBoundary,
+        ResourceType, SemanticOperator, SemanticType, SemanticTypeAssignment, SemanticTypeId,
+        SemanticTypeStatus, SerializationCompatibility,
     };
     use crate::{
         component_graph::UnaryOperator, ArithmeticOperator, ComparisonOperator, LogicalOperator,
@@ -1226,6 +1270,37 @@ mod tests {
         assert_eq!(
             assignment.provenance.path,
             std::path::Path::new("src/Counter.tsx")
+        );
+    }
+
+    #[test]
+    fn determines_structural_serialization_compatibility() {
+        assert_eq!(
+            serialization_compatibility(&SemanticType::Number),
+            SerializationCompatibility::Serializable
+        );
+        assert_eq!(
+            serialization_compatibility(&SemanticType::Object(ObjectType {
+                properties: BTreeMap::from([(
+                    "todos".to_string(),
+                    SemanticType::Array(Box::new(SemanticType::String)),
+                )]),
+            })),
+            SerializationCompatibility::Serializable
+        );
+        assert_eq!(
+            serialization_compatibility(&SemanticType::Unknown),
+            SerializationCompatibility::NotSerializable
+        );
+        assert_eq!(
+            serialization_compatibility(&SemanticType::Resource(ResourceType {
+                data: Box::new(SemanticType::String),
+                error: Box::new(SemanticType::Unknown),
+                pending: true,
+                serializable: true,
+                execution_boundary: ResourceExecutionBoundary::Shared,
+            })),
+            SerializationCompatibility::NotSerializable
         );
     }
 
