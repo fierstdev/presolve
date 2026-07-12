@@ -1136,6 +1136,7 @@ class Counter extends Component {
                     span: test_span(),
                     decorators: Vec::new(),
                     is_getter: false,
+                    is_async: false,
                     jsx_roots: vec![ezc_parser::ParsedJsxNode::Element(
                         ezc_parser::ParsedJsxElement {
                             name: "button".to_string(),

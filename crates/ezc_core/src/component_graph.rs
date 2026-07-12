@@ -465,11 +465,32 @@ pub struct ComponentMethod {
     pub owner: SemanticOwner,
     pub name: String,
     pub is_getter: bool,
-    pub is_computed: bool,
+    pub is_async: bool,
+    pub semantic_role: MethodSemanticRole,
     pub local_variables: Vec<MethodLocalVariable>,
     pub parameters: Vec<MethodParameter>,
     pub declared_return_type: Option<DeclaredStateType>,
     pub return_values: Vec<SerializableValue>,
+}
+
+/// Additional semantic role carried by a compiler-owned method declaration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MethodSemanticRole {
+    Standard,
+    Computed,
+    Action,
+}
+
+impl ComponentMethod {
+    #[must_use]
+    pub const fn is_computed(&self) -> bool {
+        matches!(self.semantic_role, MethodSemanticRole::Computed)
+    }
+
+    #[must_use]
+    pub const fn is_action(&self) -> bool {
+        matches!(self.semantic_role, MethodSemanticRole::Action)
+    }
 }
 
 /// A compiler-owned declaration of a supported method parameter.
@@ -750,11 +771,8 @@ fn component_method_from_parsed(
         owner: SemanticOwner::entity(component_id.clone()),
         name: method.name.clone(),
         is_getter: method.is_getter,
-        is_computed: method.is_getter
-            && method
-                .decorators
-                .iter()
-                .any(|decorator| decorator.name == "computed"),
+        is_async: method.is_async,
+        semantic_role: method_semantic_role(method),
         local_variables: method
             .local_variables
             .iter()
@@ -797,6 +815,25 @@ fn component_method_from_parsed(
             .iter()
             .map(serializable_value_from_parsed)
             .collect(),
+    }
+}
+
+fn method_semantic_role(method: &ParsedMethod) -> MethodSemanticRole {
+    if method.is_getter
+        && method
+            .decorators
+            .iter()
+            .any(|decorator| decorator.name == "computed")
+    {
+        MethodSemanticRole::Computed
+    } else if method
+        .decorators
+        .iter()
+        .any(|decorator| decorator.name == "action")
+    {
+        MethodSemanticRole::Action
+    } else {
+        MethodSemanticRole::Standard
     }
 }
 

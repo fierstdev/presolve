@@ -830,8 +830,38 @@ class Computed extends Component {
             .expect("computed type contract");
 
         assert!(method.is_getter);
-        assert!(method.is_computed);
+        assert!(method.is_computed());
         assert_eq!(computed.semantic_type, crate::SemanticType::Number);
+    }
+
+    #[test]
+    fn establishes_typed_action_input_and_output_contracts() {
+        let parsed = ezc_parser::parse_file(
+            "src/Action.tsx",
+            r#"
+type ActionResult = number;
+
+@component("x-action")
+class Action extends Component {
+  @action()
+  async addTodo(input: string): ActionResult { return 1; }
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        let method = &asm.components[0].methods[0];
+        let signature = asm
+            .semantic_types
+            .action_signatures
+            .get(&method.id)
+            .expect("action signature");
+
+        assert!(method.is_action());
+        assert!(signature.is_async);
+        assert_eq!(signature.input.len(), 1);
+        assert_eq!(signature.input[0].1, crate::SemanticType::String);
+        assert_eq!(signature.output, Some(crate::SemanticType::Number));
     }
 
     #[test]

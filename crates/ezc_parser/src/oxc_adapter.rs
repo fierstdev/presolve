@@ -448,6 +448,7 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
             .filter_map(|decorator| parse_decorator(decorator, source))
             .collect(),
         is_getter: method.kind == oxc_ast::ast::MethodDefinitionKind::Get,
+        is_async: method.value.r#async,
         jsx_roots,
         bindings,
         state_updates,

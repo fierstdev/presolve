@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: f55129c Resolve typed list member access
-* Working tree: C23 source, test, and documentation changes are present and uncommitted
+* Latest commit: 723f68d Establish typed computed getters
+* Working tree: C24 source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: C23 - Computed value type foundation
-* Summary: Added canonical typed computed-getter records backed by method return contracts.
+* Slice: C24 - Action signature foundation
+* Summary: Added canonical typed input/output contracts for decorator-marked action methods.
 * Key files: crates/ezc_parser/src/model.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/semantic_type.rs
-* New behavior: `@computed()` getters retain decorator/getter metadata and emit canonical computed value type records from their declared/inferred return type.
-* Tests added or changed: Parser/core coverage verifies an annotated computed getter's canonical `number` result contract.
+* New behavior: `@action()` methods retain action and async semantic roles; their typed parameter entities and return assignment become one canonical action signature.
+* Tests added or changed: Parser/core coverage verifies async action input/output signature lowering through a local result alias.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C23 - Computed value type foundation
+* Slice: C24 - Action signature foundation
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C23
-* Remaining: Phase C24 - action signature foundation.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C24
+* Remaining: Phase C25 - resource type foundation.
 
 Verification
 
@@ -136,6 +136,10 @@ Architecture decisions made
 * Decision: A computed value is a decorator-marked getter with a canonical result record that reuses the method's return type assignment.
 * Reason: Computed consumers can query a durable typed contract before the full dependency/runtime computed phase exists.
 * Tradeoff: C23 establishes metadata and result typing only. Dependency tracking, getter evaluation, template computed reads, caching, async computed values, and runtime behavior remain later work.
+
+* Decision: An action signature is a decorator-marked method whose existing typed parameters and return contract are assembled into one canonical action record.
+* Reason: Forms, server actions, and tooling can query input/output contracts before action transport/runtime semantics are introduced.
+* Tradeoff: C24 establishes signature metadata only. Promise/generic resolution, input validation, invocation, transport, server boundaries, and runtime action behavior remain later work.
 
 * Decision: Browser runtime integration tests acquire one process-wide lock before creating a Chrome probe, and the probe deadline allows 20 seconds for a cold Chrome start.
 * Reason: Cargo's workspace runner schedules tests concurrently, and the previous five-second harness deadline could kill an otherwise healthy cold-start probe with SIGKILL.
@@ -450,11 +454,11 @@ Known limitations
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
-* Item: C23 establishes computed getter result contracts only. Dependencies, evaluation, caching, template reads, async values, runtime behavior, normalization, and final type diagnostic families remain later Phase C work.
+* Item: C24 establishes action signature contracts only. Promise/generic resolution, validation, invocation, transport, server boundaries, runtime behavior, normalization, and final type diagnostic families remain later Phase C work.
 
 Exact next step
 
-Continue automatically with C24 - action signature foundation, committing the completed C23 slice first.
+Continue automatically with C25 - resource type foundation, committing the completed C24 slice first.
 
 Useful commands
 

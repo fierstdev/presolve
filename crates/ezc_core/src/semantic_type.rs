@@ -99,6 +99,7 @@ pub struct SemanticTypeModel {
     pub list_scopes: BTreeMap<SemanticId, ListTemplateScopeType>,
     pub member_accesses: BTreeMap<SemanticId, MemberAccessType>,
     pub computed_values: BTreeMap<SemanticId, ComputedValueType>,
+    pub action_signatures: BTreeMap<SemanticId, ActionSignatureType>,
 }
 
 /// Canonical item and index type information for one template list scope.
@@ -125,6 +126,15 @@ pub struct ComputedValueType {
     pub method: SemanticId,
     pub semantic_type: SemanticType,
     pub provenance: SourceProvenance,
+}
+
+/// Canonical input/output type contract for one decorator-marked action method.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionSignatureType {
+    pub method: SemanticId,
+    pub input: Vec<(SemanticId, SemanticType)>,
+    pub output: Option<SemanticType>,
+    pub is_async: bool,
 }
 
 /// Stable identity for one compiler-owned type assignment.
@@ -306,6 +316,7 @@ impl SemanticTypeModel {
 
         Self::from_assignments_and_aliases(assignments, aliases)
             .with_computed_value_types(components)
+            .with_action_signature_types(components)
     }
 
     fn from_assignments_and_aliases(
@@ -318,6 +329,7 @@ impl SemanticTypeModel {
             list_scopes: BTreeMap::new(),
             member_accesses: BTreeMap::new(),
             computed_values: BTreeMap::new(),
+            action_signatures: BTreeMap::new(),
         }
     }
 
@@ -325,7 +337,7 @@ impl SemanticTypeModel {
         for method in components
             .iter()
             .flat_map(|component| &component.methods)
-            .filter(|method| method.is_computed)
+            .filter(|method| method.is_computed())
         {
             let Some(assignment) = self.assignments.get(&method.id) else {
                 continue;
@@ -336,6 +348,38 @@ impl SemanticTypeModel {
                     method: method.id.clone(),
                     semantic_type: assignment.semantic_type.clone(),
                     provenance: assignment.provenance.clone(),
+                },
+            );
+        }
+        self
+    }
+
+    fn with_action_signature_types(mut self, components: &[ComponentNode]) -> Self {
+        for method in components
+            .iter()
+            .flat_map(|component| &component.methods)
+            .filter(|method| method.is_action())
+        {
+            let input = method
+                .parameters
+                .iter()
+                .filter_map(|parameter| {
+                    self.assignments
+                        .get(&parameter.id)
+                        .map(|assignment| (parameter.id.clone(), assignment.semantic_type.clone()))
+                })
+                .collect();
+            let output = self
+                .assignments
+                .get(&method.id)
+                .map(|assignment| assignment.semantic_type.clone());
+            self.action_signatures.insert(
+                method.id.clone(),
+                ActionSignatureType {
+                    method: method.id.clone(),
+                    input,
+                    output,
+                    is_async: method.is_async,
                 },
             );
         }
