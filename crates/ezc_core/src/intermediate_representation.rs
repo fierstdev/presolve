@@ -194,6 +194,14 @@ impl IrReactiveGraph {
         })
         .unwrap_or_default()
     }
+
+    #[must_use]
+    pub fn invalidations_from(&self, source: &str) -> Vec<&IrReactiveEdge> {
+        self.edges
+            .iter()
+            .filter(|edge| edge.source == source && edge.kind == IrReactiveEdgeKind::Invalidates)
+            .collect()
+    }
 }
 
 #[must_use]
