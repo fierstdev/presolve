@@ -106,6 +106,7 @@ impl ImmutableAsmPass for ConstantFoldingPass {
                         ComponentDiagnostic {
                             provenance: Some(expression.provenance.clone()),
                             code: constant_expression_diagnostic_code_from_node(&expression.kind)
+                                .as_str()
                                 .to_string(),
                             message: format!(
                                 "state field `{}` has an invalid {} initializer: {error}",
@@ -120,6 +121,11 @@ impl ImmutableAsmPass for ConstantFoldingPass {
 
         for component in &folded.components {
             for field in &component.state_fields {
+                if let Some(diagnostic) =
+                    unknown_declared_type_diagnostic(&folded, field, component)
+                {
+                    push_diagnostic_once(&mut folded.diagnostics, diagnostic);
+                }
                 if let Some(diagnostic) =
                     folded_type_mismatch_diagnostic(&folded, field, &component.class_name)
                 {
@@ -167,16 +173,24 @@ impl ImmutableAsmPass for ConstantFoldingPass {
     }
 }
 
-fn constant_expression_diagnostic_code_from_node(kind: &crate::ExpressionNodeKind) -> &'static str {
+fn constant_expression_diagnostic_code_from_node(
+    kind: &crate::ExpressionNodeKind,
+) -> crate::TypeDiagnosticCode {
     match kind {
-        crate::ExpressionNodeKind::Arithmetic { .. } => "EZC1022",
-        crate::ExpressionNodeKind::Comparison { .. } => "EZC1023",
+        crate::ExpressionNodeKind::Arithmetic { .. } => {
+            crate::TypeDiagnosticCode::InvalidArithmeticOperator
+        }
+        crate::ExpressionNodeKind::Comparison { .. } => {
+            crate::TypeDiagnosticCode::InvalidComparisonOperator
+        }
         crate::ExpressionNodeKind::Boolean(_) | crate::ExpressionNodeKind::Logical { .. } => {
-            "EZC1024"
+            crate::TypeDiagnosticCode::InvalidLogicalOperator
         }
         crate::ExpressionNodeKind::Literal(_)
-        | crate::ExpressionNodeKind::NullishCoalescing { .. } => "EZC1025",
-        crate::ExpressionNodeKind::Unary { .. } => "EZC1026",
+        | crate::ExpressionNodeKind::NullishCoalescing { .. } => {
+            crate::TypeDiagnosticCode::InvalidNullishOperator
+        }
+        crate::ExpressionNodeKind::Unary { .. } => crate::TypeDiagnosticCode::InvalidUnaryOperator,
     }
 }
 
@@ -244,12 +258,30 @@ fn folded_type_mismatch_diagnostic(
     let source = crate::state_initializer_value_type(field.initial_value.as_ref()?);
     (!crate::is_assignable(&source, &target.semantic_type)).then(|| ComponentDiagnostic {
         provenance: Some(declared_type.provenance.clone()),
-        code: "EZC1016".to_string(),
+        code: crate::TypeDiagnosticCode::IncompatibleStateInitializer
+            .as_str()
+            .to_string(),
         message: format!(
             "state field `{}` in class `{class_name}` declares `{}` but initializes with `{}`",
             field.name,
             declared_type.text,
             state_initializer_type_name(&source)
+        ),
+    })
+}
+
+fn unknown_declared_type_diagnostic(
+    model: &ApplicationSemanticModel,
+    field: &crate::component_graph::StateField,
+    component: &crate::component_graph::ComponentNode,
+) -> Option<ComponentDiagnostic> {
+    let declared_type = field.declared_type.as_ref()?;
+    (!model.semantic_types.assignments.contains_key(&field.id)).then(|| ComponentDiagnostic {
+        provenance: Some(declared_type.provenance.clone()),
+        code: crate::TypeDiagnosticCode::UnknownType.as_str().to_string(),
+        message: format!(
+            "state field `{}` in class `{}` declares unresolved type `{}`",
+            field.name, component.class_name, declared_type.text
         ),
     })
 }
@@ -271,7 +303,9 @@ fn action_assignment_mismatch_diagnostic(
     let source = crate::state_initializer_value_type(value);
     (!crate::is_assignable(&source, &target.semantic_type)).then(|| ComponentDiagnostic {
         provenance: model.provenance.get(&action.id).cloned(),
-        code: "EZC1017".to_string(),
+        code: crate::TypeDiagnosticCode::IncompatibleAssignment
+            .as_str()
+            .to_string(),
         message: format!(
             "state field `{}` in class `{}` declares `{}` but action `{}` assigns `{}`",
             field.name,
@@ -310,7 +344,9 @@ fn compound_mutation_type_diagnostics(
     match &action.operation {
         StateOperation::Toggle if !boolean_compatible => vec![ComponentDiagnostic {
             provenance,
-            code: "EZC1018".to_string(),
+            code: crate::TypeDiagnosticCode::InvalidToggleTarget
+                .as_str()
+                .to_string(),
             message: format!(
                 "state field `{}` in class `{}` declares `{}` but action `{}` applies a boolean toggle",
                 field.name, component.class_name, declared_type.text, action.method
@@ -324,7 +360,9 @@ fn compound_mutation_type_diagnostics(
             };
             vec![ComponentDiagnostic {
                 provenance,
-                code: "EZC1019".to_string(),
+                code: crate::TypeDiagnosticCode::InvalidNumericMutationTarget
+                    .as_str()
+                    .to_string(),
                 message: format!(
                     "state field `{}` in class `{}` declares `{}` but action `{}` applies numeric {}",
                     field.name, component.class_name, declared_type.text, action.method, operation
@@ -341,7 +379,9 @@ fn compound_mutation_type_diagnostics(
             if !number_compatible {
                 diagnostics.push(ComponentDiagnostic {
                     provenance: provenance.clone(),
-                    code: "EZC1020".to_string(),
+                    code: crate::TypeDiagnosticCode::InvalidCompoundMutationTarget
+                        .as_str()
+                        .to_string(),
                     message: format!(
                         "state field `{}` in class `{}` declares `{}` but action `{}` applies numeric {}",
                         field.name, component.class_name, declared_type.text, action.method, operation
@@ -352,7 +392,9 @@ fn compound_mutation_type_diagnostics(
             if !crate::is_assignable(&source, &crate::SemanticType::Number) {
                 diagnostics.push(ComponentDiagnostic {
                     provenance,
-                    code: "EZC1021".to_string(),
+                    code: crate::TypeDiagnosticCode::InvalidCompoundMutationOperand
+                        .as_str()
+                        .to_string(),
                     message: format!(
                         "action `{}` applies numeric {} to state field `{}` with `{}` operand",
                         action.method, operation, field.name, state_initializer_type_name(&source)
@@ -375,7 +417,9 @@ fn template_binding_type_diagnostic(
     let assignment = model.semantic_types.assignments.get(&entity.id)?;
     (!is_text_renderable(&assignment.semantic_type)).then(|| ComponentDiagnostic {
         provenance: Some(entity.provenance.clone()),
-        code: "EZC1027".to_string(),
+        code: crate::TypeDiagnosticCode::NonRenderableValue
+            .as_str()
+            .to_string(),
         message: format!(
             "template text binding `{}` cannot render a {} value directly",
             entity.expression.as_deref().unwrap_or("<unknown>"),
@@ -397,7 +441,9 @@ fn attribute_binding_type_diagnostic(
     (!crate::is_assignable(&assignment.semantic_type, &contract.semantic_type)).then(|| {
         ComponentDiagnostic {
             provenance: Some(entity.provenance.clone()),
-            code: "EZC1028".to_string(),
+            code: crate::TypeDiagnosticCode::InvalidBinding
+                .as_str()
+                .to_string(),
             message: format!(
                 "{} binding `{}` requires {}, but expression `{}` has {}",
                 match contract.kind {
@@ -423,7 +469,9 @@ fn conditional_type_diagnostic(
     let assignment = model.semantic_types.assignments.get(&entity.id)?;
     (!is_boolean_condition(&assignment.semantic_type)).then(|| ComponentDiagnostic {
         provenance: Some(entity.provenance.clone()),
-        code: "EZC1029".to_string(),
+        code: crate::TypeDiagnosticCode::InvalidCondition
+            .as_str()
+            .to_string(),
         message: format!(
             "conditional expression `{}` requires boolean, but has {}",
             entity.expression.as_deref().unwrap_or("<unknown>"),
@@ -448,7 +496,9 @@ fn list_iterable_type_diagnostic(
     );
     (!iterable).then(|| ComponentDiagnostic {
         provenance: Some(entity.provenance.clone()),
-        code: "EZC1030".to_string(),
+        code: crate::TypeDiagnosticCode::NonIterableList
+            .as_str()
+            .to_string(),
         message: format!(
             "list iterable `{}` requires an array-like value, but has {}",
             entity.expression.as_deref().unwrap_or("<unknown>"),
@@ -464,7 +514,9 @@ fn member_access_type_diagnostic(
     let access = model.semantic_types.member_accesses.get(&entity.id)?;
     access.semantic_type.is_none().then(|| ComponentDiagnostic {
         provenance: Some(entity.provenance.clone()),
-        code: "EZC1031".to_string(),
+        code: crate::TypeDiagnosticCode::MissingMember
+            .as_str()
+            .to_string(),
         message: format!(
             "member access `{}` does not resolve against its canonical object type",
             access.expression
@@ -908,6 +960,25 @@ class StateCompatibility extends Component {
         assert!(diagnostics[0].message.contains("invalid"));
         assert!(diagnostics[0].message.contains("declares `string[]`"));
         assert!(diagnostics[0].message.contains("initializes with `tuple`"));
+    }
+
+    #[test]
+    fn reports_unresolved_declared_state_types_with_a_stable_type_diagnostic() {
+        let parsed = ezc_parser::parse_file(
+            "src/UnknownStateType.tsx",
+            r#"
+@component("x-unknown-state-type")
+class UnknownStateType extends Component {
+  value: MissingType = state(null);
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let folded = ConstantFoldingPass.transform(&asm);
+        assert!(folded.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == crate::TypeDiagnosticCode::UnknownType.as_str()
+                && diagnostic.message.contains("MissingType")
+        }));
     }
 
     #[test]

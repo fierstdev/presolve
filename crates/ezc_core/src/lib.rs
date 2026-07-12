@@ -90,7 +90,7 @@ pub use semantic_type::{
     state_initializer_value_type, BoundaryCompatibility, DomBindingContract, DomBindingKind,
     ExecutionBoundary, ObjectType, ResourceExecutionBoundary, ResourceType, SemanticOperator,
     SemanticType, SemanticTypeAlias, SemanticTypeAssignment, SemanticTypeId, SemanticTypeModel,
-    SemanticTypeStatus, SerializationCompatibility,
+    SemanticTypeStatus, SerializationCompatibility, TypeDiagnosticCode, TypeDiagnosticFamily,
 };
 pub use summarize::summarize_source;
 pub use symbol_table::{

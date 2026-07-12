@@ -365,6 +365,93 @@ pub enum SemanticTypeStatus {
     Inferred,
 }
 
+/// Stable families for diagnostics produced from canonical semantic types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TypeDiagnosticFamily {
+    UnknownType,
+    InvalidOperator,
+    IncompatibleAssignment,
+    MissingMember,
+    InvalidCondition,
+    NonIterableList,
+    NonRenderableValue,
+    InvalidBinding,
+    NonSerializableState,
+}
+
+/// Stable codes for diagnostics produced from canonical semantic types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TypeDiagnosticCode {
+    IncompatibleStateInitializer,
+    IncompatibleAssignment,
+    InvalidToggleTarget,
+    InvalidNumericMutationTarget,
+    InvalidCompoundMutationTarget,
+    InvalidCompoundMutationOperand,
+    InvalidArithmeticOperator,
+    InvalidComparisonOperator,
+    InvalidLogicalOperator,
+    InvalidNullishOperator,
+    InvalidUnaryOperator,
+    NonRenderableValue,
+    InvalidBinding,
+    InvalidCondition,
+    NonIterableList,
+    MissingMember,
+    UnknownType,
+    NonSerializableState,
+}
+
+impl TypeDiagnosticCode {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::IncompatibleStateInitializer => "EZC1016",
+            Self::IncompatibleAssignment => "EZC1017",
+            Self::InvalidToggleTarget => "EZC1018",
+            Self::InvalidNumericMutationTarget => "EZC1019",
+            Self::InvalidCompoundMutationTarget => "EZC1020",
+            Self::InvalidCompoundMutationOperand => "EZC1021",
+            Self::InvalidArithmeticOperator => "EZC1022",
+            Self::InvalidComparisonOperator => "EZC1023",
+            Self::InvalidLogicalOperator => "EZC1024",
+            Self::InvalidNullishOperator => "EZC1025",
+            Self::InvalidUnaryOperator => "EZC1026",
+            Self::NonRenderableValue => "EZC1027",
+            Self::InvalidBinding => "EZC1028",
+            Self::InvalidCondition => "EZC1029",
+            Self::NonIterableList => "EZC1030",
+            Self::MissingMember => "EZC1031",
+            Self::UnknownType => "EZC1032",
+            Self::NonSerializableState => "EZC1033",
+        }
+    }
+
+    #[must_use]
+    pub const fn family(self) -> TypeDiagnosticFamily {
+        match self {
+            Self::UnknownType => TypeDiagnosticFamily::UnknownType,
+            Self::InvalidArithmeticOperator
+            | Self::InvalidComparisonOperator
+            | Self::InvalidLogicalOperator
+            | Self::InvalidNullishOperator
+            | Self::InvalidUnaryOperator => TypeDiagnosticFamily::InvalidOperator,
+            Self::IncompatibleStateInitializer
+            | Self::IncompatibleAssignment
+            | Self::InvalidToggleTarget
+            | Self::InvalidNumericMutationTarget
+            | Self::InvalidCompoundMutationTarget
+            | Self::InvalidCompoundMutationOperand => TypeDiagnosticFamily::IncompatibleAssignment,
+            Self::MissingMember => TypeDiagnosticFamily::MissingMember,
+            Self::InvalidCondition => TypeDiagnosticFamily::InvalidCondition,
+            Self::NonIterableList => TypeDiagnosticFamily::NonIterableList,
+            Self::NonRenderableValue => TypeDiagnosticFamily::NonRenderableValue,
+            Self::InvalidBinding => TypeDiagnosticFamily::InvalidBinding,
+            Self::NonSerializableState => TypeDiagnosticFamily::NonSerializableState,
+        }
+    }
+}
+
 /// A type assignment with canonical identity, semantic origin, and authored location.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SemanticTypeAssignment {
@@ -1379,6 +1466,7 @@ mod tests {
         serialization_compatibility, BoundaryCompatibility, ExecutionBoundary, ObjectType,
         ResourceExecutionBoundary, ResourceType, SemanticOperator, SemanticType,
         SemanticTypeAssignment, SemanticTypeId, SemanticTypeStatus, SerializationCompatibility,
+        TypeDiagnosticCode, TypeDiagnosticFamily,
     };
     use crate::{
         component_graph::UnaryOperator, ArithmeticOperator, ComparisonOperator, LogicalOperator,
@@ -1417,6 +1505,23 @@ mod tests {
         ];
 
         assert_eq!(types.len(), 14);
+    }
+
+    #[test]
+    fn assigns_stable_codes_to_canonical_type_diagnostic_families() {
+        assert_eq!(TypeDiagnosticCode::UnknownType.as_str(), "EZC1032");
+        assert_eq!(
+            TypeDiagnosticCode::InvalidArithmeticOperator.family(),
+            TypeDiagnosticFamily::InvalidOperator
+        );
+        assert_eq!(
+            TypeDiagnosticCode::IncompatibleAssignment.family(),
+            TypeDiagnosticFamily::IncompatibleAssignment
+        );
+        assert_eq!(
+            TypeDiagnosticCode::NonSerializableState.family(),
+            TypeDiagnosticFamily::NonSerializableState
+        );
     }
 
     #[test]
