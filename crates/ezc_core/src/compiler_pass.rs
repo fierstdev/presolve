@@ -138,6 +138,12 @@ impl ImmutableAsmPass for ConstantFoldingPass {
             }
         }
 
+        for entity in &folded.template_entities {
+            if let Some(diagnostic) = template_binding_type_diagnostic(&folded, entity) {
+                push_diagnostic_once(&mut folded.diagnostics, diagnostic);
+            }
+        }
+
         let graph = ComponentGraph {
             components: folded.components.clone(),
             diagnostics: folded.diagnostics.clone(),
@@ -353,6 +359,43 @@ fn compound_mutation_type_diagnostics(
     }
 }
 
+fn template_binding_type_diagnostic(
+    model: &ApplicationSemanticModel,
+    entity: &crate::TemplateSemanticEntity,
+) -> Option<ComponentDiagnostic> {
+    if entity.kind != crate::TemplateSemanticKind::Binding {
+        return None;
+    }
+    let assignment = model.semantic_types.assignments.get(&entity.id)?;
+    (!is_text_renderable(&assignment.semantic_type)).then(|| ComponentDiagnostic {
+        provenance: Some(entity.provenance.clone()),
+        code: "EZC1027".to_string(),
+        message: format!(
+            "template text binding `{}` cannot render a {} value directly",
+            entity.expression.as_deref().unwrap_or("<unknown>"),
+            state_initializer_type_name(&assignment.semantic_type)
+        ),
+    })
+}
+
+fn is_text_renderable(semantic_type: &crate::SemanticType) -> bool {
+    match semantic_type {
+        crate::SemanticType::Unknown
+        | crate::SemanticType::Null
+        | crate::SemanticType::Boolean
+        | crate::SemanticType::Number
+        | crate::SemanticType::String
+        | crate::SemanticType::BooleanLiteral(_)
+        | crate::SemanticType::NumberLiteral(_)
+        | crate::SemanticType::StringLiteral(_) => true,
+        crate::SemanticType::Union(members) => members.iter().all(is_text_renderable),
+        crate::SemanticType::Never
+        | crate::SemanticType::Array(_)
+        | crate::SemanticType::Tuple(_)
+        | crate::SemanticType::Object(_) => false,
+    }
+}
+
 fn push_diagnostic_once(
     diagnostics: &mut Vec<ComponentDiagnostic>,
     diagnostic: ComponentDiagnostic,
@@ -527,6 +570,51 @@ class FoldedState extends Component {
         );
         assert_eq!(ConstantFoldingPass.transform(&folded), folded);
         assert_eq!(asm, original);
+    }
+
+    #[test]
+    fn rejects_non_renderable_direct_text_bindings_with_canonical_types() {
+        let parsed = ezc_parser::parse_file(
+            "src/NonRenderableBinding.tsx",
+            r#"
+@component("x-non-renderable")
+class NonRenderableBinding extends Component {
+  user = state({ id: "1" });
+  label = state("EdgeZero");
+
+  render() {
+    return <p>{this.user}{this.label}</p>;
+  }
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let binding = asm
+            .template_entities
+            .iter()
+            .find(|entity| entity.expression.as_deref() == Some("this.user"))
+            .expect("user text binding");
+
+        assert_eq!(
+            asm.semantic_types.assignments[&binding.id].semantic_type,
+            crate::SemanticType::Object(crate::ObjectType {
+                properties: std::collections::BTreeMap::from([(
+                    "id".to_string(),
+                    crate::SemanticType::String,
+                )]),
+            })
+        );
+
+        let folded = ConstantFoldingPass.transform(&asm);
+        assert!(folded.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == "EZC1027"
+                && diagnostic.message.contains("this.user")
+                && diagnostic.message.contains("object")
+        }));
+        assert!(!folded
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("this.label")));
     }
 
     #[test]

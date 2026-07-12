@@ -394,7 +394,8 @@ pub fn build_application_semantic_model_from_component_graph(
         &component_graph.components,
         &component_graph.provenance,
     )
-    .with_expression_types(&expression_graph);
+    .with_expression_types(&expression_graph)
+    .with_template_binding_types(&template_entities, &references);
 
     ApplicationSemanticModel {
         expression_graph,
@@ -485,7 +486,8 @@ fn build_application_semantic_model_from_files_with_bindings(
         &type_aliases,
         bindings,
     )
-    .with_expression_types(&expression_graph);
+    .with_expression_types(&expression_graph)
+    .with_template_binding_types(&template_entities, &references);
 
     ApplicationSemanticModel {
         expression_graph,

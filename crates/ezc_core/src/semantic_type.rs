@@ -6,7 +6,10 @@ use crate::{
     BindingTable, ComponentNode, ImportBindingTarget, SemanticId, SerializableValue,
     SourceProvenance, SymbolKind,
 };
-use crate::{ExpressionGraph, ExpressionNodeKind};
+use crate::{
+    ExpressionGraph, ExpressionNodeKind, SemanticReference, SemanticReferenceKind,
+    TemplateSemanticEntity, TemplateSemanticKind,
+};
 use ezc_parser::ParsedTypeAlias;
 
 /// A compiler-owned operator category used by semantic expression typing.
@@ -261,6 +264,45 @@ impl SemanticTypeModel {
                     origin: node.owner.clone(),
                     status: SemanticTypeStatus::Inferred,
                     provenance: node.provenance.clone(),
+                },
+            );
+        }
+        self
+    }
+
+    /// Attaches inferred types to direct text-binding entities with resolved
+    /// state or local targets.
+    #[must_use]
+    pub fn with_template_binding_types(
+        mut self,
+        entities: &[TemplateSemanticEntity],
+        references: &[SemanticReference],
+    ) -> Self {
+        for entity in entities
+            .iter()
+            .filter(|entity| entity.kind == TemplateSemanticKind::Binding)
+        {
+            let Some(reference) = references.iter().find(|reference| {
+                reference.source == entity.id
+                    && matches!(
+                        reference.kind,
+                        SemanticReferenceKind::TemplateState | SemanticReferenceKind::TemplateLocal
+                    )
+            }) else {
+                continue;
+            };
+            let Some(target) = self.assignments.get(&reference.target) else {
+                continue;
+            };
+            self.assignments.insert(
+                entity.id.clone(),
+                SemanticTypeAssignment {
+                    id: SemanticTypeId::for_subject(&entity.id),
+                    subject: entity.id.clone(),
+                    semantic_type: target.semantic_type.clone(),
+                    origin: target.origin.clone(),
+                    status: SemanticTypeStatus::Inferred,
+                    provenance: entity.provenance.clone(),
                 },
             );
         }
