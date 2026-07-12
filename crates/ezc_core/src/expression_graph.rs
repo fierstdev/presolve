@@ -3,11 +3,11 @@ use std::path::Path;
 
 use crate::component_graph::UnaryOperator;
 use crate::{
-    ComponentNode, ConstantEvaluationError, ConstantExpression, ConstantExpressionKind, SemanticId,
-    SerializableValue, SourceProvenance,
+    ComponentNode, ComputedExpression, ComputedExpressionKind, ConstantEvaluationError,
+    ConstantExpression, ConstantExpressionKind, SemanticId, SerializableValue, SourceProvenance,
 };
 
-/// Canonical compiler-owned graph for all lowered state initializer expressions.
+/// Canonical compiler-owned graph for all lowered state initializer and computed expressions.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ExpressionGraph {
     pub roots: BTreeMap<SemanticId, SemanticId>,
@@ -26,6 +26,13 @@ pub struct ExpressionNode {
 pub enum ExpressionNodeKind {
     Literal(SerializableValue),
     Boolean(bool),
+    ThisMember {
+        name: String,
+    },
+    MemberAccess {
+        object: SemanticId,
+        property: String,
+    },
     Arithmetic {
         left: SemanticId,
         right: SemanticId,
@@ -55,7 +62,10 @@ impl ExpressionNode {
     #[must_use]
     pub fn dependencies(&self) -> Vec<&SemanticId> {
         match &self.kind {
-            ExpressionNodeKind::Literal(_) | ExpressionNodeKind::Boolean(_) => Vec::new(),
+            ExpressionNodeKind::Literal(_)
+            | ExpressionNodeKind::Boolean(_)
+            | ExpressionNodeKind::ThisMember { .. } => Vec::new(),
+            ExpressionNodeKind::MemberAccess { object, .. } => vec![object],
             ExpressionNodeKind::Arithmetic { left, right, .. }
             | ExpressionNodeKind::Comparison { left, right, .. }
             | ExpressionNodeKind::Logical { left, right, .. }
@@ -68,8 +78,7 @@ impl ExpressionNode {
 impl ExpressionGraph {
     /// # Panics
     ///
-    /// Panics when a state field with a lowered initializer has no canonical
-    /// source provenance.
+    /// Panics when an expression owner has no canonical source provenance.
     #[must_use]
     pub fn from_components(
         components: &[ComponentNode],
@@ -86,6 +95,26 @@ impl ExpressionGraph {
                     .expect("state fields with expressions should have source provenance");
                 let root = graph.insert_expression(&field.id, "root", expression, field_provenance);
                 graph.roots.insert(field.id.clone(), root);
+            }
+            for method in component
+                .methods
+                .iter()
+                .filter(|method| method.is_computed())
+            {
+                let Some(expression) = &method.computed_expression else {
+                    continue;
+                };
+                let method_provenance = provenance
+                    .get(&method.id)
+                    .expect("computed methods with expressions should have source provenance");
+                let computed = component.id.computed(&method.name);
+                let root = graph.insert_computed_expression(
+                    &computed,
+                    "root",
+                    expression,
+                    method_provenance,
+                );
+                graph.roots.insert(computed, root);
             }
         }
         graph
@@ -259,6 +288,78 @@ impl ExpressionGraph {
         id
     }
 
+    fn insert_computed_expression(
+        &mut self,
+        owner: &SemanticId,
+        path: &str,
+        expression: &ComputedExpression,
+        owner_provenance: &SourceProvenance,
+    ) -> SemanticId {
+        let id = owner.expression(path);
+        let child = |graph: &mut Self, child_path: &str, child: &ComputedExpression| {
+            graph.insert_computed_expression(owner, child_path, child, owner_provenance)
+        };
+        let kind = match &expression.kind {
+            ComputedExpressionKind::Literal(value) => ExpressionNodeKind::Literal(value.clone()),
+            ComputedExpressionKind::ThisMember(name) => {
+                ExpressionNodeKind::ThisMember { name: name.clone() }
+            }
+            ComputedExpressionKind::MemberAccess { object, property } => {
+                ExpressionNodeKind::MemberAccess {
+                    object: child(self, &format!("{path}.0"), object),
+                    property: property.clone(),
+                }
+            }
+            ComputedExpressionKind::Arithmetic {
+                left,
+                right,
+                operator,
+            } => ExpressionNodeKind::Arithmetic {
+                left: child(self, &format!("{path}.0"), left),
+                right: child(self, &format!("{path}.1"), right),
+                operator: *operator,
+            },
+            ComputedExpressionKind::Comparison {
+                left,
+                right,
+                operator,
+            } => ExpressionNodeKind::Comparison {
+                left: child(self, &format!("{path}.0"), left),
+                right: child(self, &format!("{path}.1"), right),
+                operator: *operator,
+            },
+            ComputedExpressionKind::Logical {
+                left,
+                right,
+                operator,
+            } => ExpressionNodeKind::Logical {
+                left: child(self, &format!("{path}.0"), left),
+                right: child(self, &format!("{path}.1"), right),
+                operator: *operator,
+            },
+            ComputedExpressionKind::NullishCoalescing { left, right } => {
+                ExpressionNodeKind::NullishCoalescing {
+                    left: child(self, &format!("{path}.0"), left),
+                    right: child(self, &format!("{path}.1"), right),
+                }
+            }
+            ComputedExpressionKind::Unary { operand, operator } => ExpressionNodeKind::Unary {
+                operand: child(self, &format!("{path}.0"), operand),
+                operator: *operator,
+            },
+        };
+        self.nodes.insert(
+            id.clone(),
+            ExpressionNode {
+                id: id.clone(),
+                owner: owner.clone(),
+                kind,
+                provenance: SourceProvenance::new(&owner_provenance.path, expression.span),
+            },
+        );
+        id
+    }
+
     fn expression_for(&self, owner: &SemanticId) -> Option<ConstantExpression> {
         self.expression_from_node(self.root_for(owner)?)
     }
@@ -268,6 +369,9 @@ impl ExpressionGraph {
         let kind = match &node.kind {
             ExpressionNodeKind::Literal(value) => ConstantExpressionKind::Literal(value.clone()),
             ExpressionNodeKind::Boolean(value) => ConstantExpressionKind::Boolean(*value),
+            ExpressionNodeKind::ThisMember { .. } | ExpressionNodeKind::MemberAccess { .. } => {
+                return None;
+            }
             ExpressionNodeKind::Arithmetic {
                 left,
                 right,
@@ -341,7 +445,8 @@ impl ExpressionGraph {
 
 #[cfg(test)]
 mod tests {
-    use crate::{build_application_semantic_model, SerializableValue};
+    use crate::component_graph::UnaryOperator;
+    use crate::{build_application_semantic_model, ExpressionNodeKind, SerializableValue};
 
     #[test]
     fn shares_one_canonical_graph_for_lowered_expression_nodes() {
@@ -382,5 +487,95 @@ class Graph extends Component {
                 && root.provenance.span.start <= node.provenance.span.start
                 && node.provenance.span.end <= root.provenance.span.end
         }));
+    }
+
+    #[test]
+    fn lowers_supported_computed_getter_expressions_without_resolving_reads() {
+        let parsed = ezc_parser::parse_file(
+            "src/ComputedExpressions.tsx",
+            r#"
+@component("x-computed-expressions")
+class ComputedExpressions extends Component {
+  count = state(1);
+
+  @computed()
+  get doubled(): number { return this.count * 2; }
+
+  @computed()
+  get adjusted(): number { return +this.doubled - -1; }
+
+  @computed()
+  get visible(): boolean {
+    return ((this.doubled >= 2 && !this.profile.hidden) ?? false) || true;
+  }
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let component = &asm.components[0];
+        let doubled = component.id.computed("doubled");
+        let visible = component.id.computed("visible");
+        assert!(asm.expression_graph.root_for(&doubled).is_some());
+        let root = asm
+            .expression_graph
+            .root_for(&visible)
+            .expect("computed expression root");
+
+        assert_eq!(root.as_str(), "module:src/ComputedExpressions.tsx/component:x-computed-expressions/computed:visible/expression:root");
+        assert!(asm
+            .expression_graph
+            .nodes_for(&visible)
+            .iter()
+            .all(|node| node.owner == visible));
+        assert!(asm.expression_graph.nodes.values().any(|node| {
+            matches!(&node.kind, ExpressionNodeKind::ThisMember { name } if name == "count")
+        }));
+        assert!(asm.expression_graph.nodes.values().any(|node| {
+            matches!(&node.kind, ExpressionNodeKind::ThisMember { name } if name == "doubled")
+        }));
+        assert!(asm.expression_graph.nodes.values().any(|node| {
+            matches!(&node.kind, ExpressionNodeKind::ThisMember { name } if name == "profile")
+        }));
+        assert!(asm.expression_graph.nodes.values().any(|node| {
+            matches!(&node.kind, ExpressionNodeKind::MemberAccess { property, .. } if property == "hidden")
+        }));
+        assert!(asm
+            .expression_graph
+            .nodes
+            .values()
+            .any(|node| { matches!(node.kind, ExpressionNodeKind::Arithmetic { .. }) }));
+        assert!(asm
+            .expression_graph
+            .nodes
+            .values()
+            .any(|node| { matches!(node.kind, ExpressionNodeKind::Comparison { .. }) }));
+        assert!(asm
+            .expression_graph
+            .nodes
+            .values()
+            .any(|node| { matches!(node.kind, ExpressionNodeKind::Logical { .. }) }));
+        assert!(asm
+            .expression_graph
+            .nodes
+            .values()
+            .any(|node| { matches!(node.kind, ExpressionNodeKind::NullishCoalescing { .. }) }));
+        let unary_operators = asm
+            .expression_graph
+            .nodes
+            .values()
+            .filter_map(|node| match node.kind {
+                ExpressionNodeKind::Unary { operator, .. } => Some(operator),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert!(unary_operators.contains(&UnaryOperator::Not));
+        assert!(unary_operators.contains(&UnaryOperator::Plus));
+        assert!(unary_operators.contains(&UnaryOperator::Minus));
+        assert!(asm
+            .expression_graph
+            .nodes_for(&visible)
+            .iter()
+            .all(|node| !asm.semantic_types.assignments.contains_key(&node.id)));
+        assert!(asm.references.is_empty());
     }
 }

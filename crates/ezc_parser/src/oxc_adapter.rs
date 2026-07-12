@@ -16,11 +16,12 @@ use oxc_span::{GetSpan, SourceType, Span};
 use crate::model::{
     ParseDiagnostic, ParseLabel, ParseSeverity, ParsedArithmeticExpression,
     ParsedArithmeticExpressionKind, ParsedArithmeticOperator, ParsedClass,
-    ParsedComparisonOperator, ParsedConstantExpression, ParsedConstantExpressionKind,
-    ParsedDecorator, ParsedEventHandler, ParsedExport, ParsedExportKind, ParsedExportSpecifier,
-    ParsedFile, ParsedImport, ParsedImportSpecifier, ParsedJsxAttribute, ParsedJsxAttributeValue,
-    ParsedJsxChild, ParsedJsxConditional, ParsedJsxElement, ParsedJsxFragment, ParsedJsxList,
-    ParsedJsxNode, ParsedLocalVariable, ParsedLogicalOperator, ParsedMethod, ParsedMethodParameter,
+    ParsedComparisonOperator, ParsedComputedExpression, ParsedComputedExpressionKind,
+    ParsedConstantExpression, ParsedConstantExpressionKind, ParsedDecorator, ParsedEventHandler,
+    ParsedExport, ParsedExportKind, ParsedExportSpecifier, ParsedFile, ParsedImport,
+    ParsedImportSpecifier, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild,
+    ParsedJsxConditional, ParsedJsxElement, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode,
+    ParsedLocalVariable, ParsedLogicalOperator, ParsedMethod, ParsedMethodParameter,
     ParsedProperty, ParsedSerializableValue, ParsedStateOperation, ParsedStateUpdate,
     ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator, SourceSpan,
 };
@@ -402,6 +403,11 @@ fn parsed_type_annotation(span: Span, source: &str) -> ParsedTypeAnnotation {
 
 fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Option<ParsedMethod> {
     let name = property_key_name(&method.key)?;
+    let decorators = method
+        .decorators
+        .iter()
+        .filter_map(|decorator| parse_decorator(decorator, source))
+        .collect::<Vec<_>>();
 
     let mut jsx_roots = Vec::new();
     let mut bindings = Vec::new();
@@ -439,14 +445,23 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
         }
     }
 
+    let computed_expression = (method.kind == oxc_ast::ast::MethodDefinitionKind::Get
+        && decorators
+            .iter()
+            .any(|decorator| decorator.name == "computed"))
+    .then(|| {
+        let body = method.value.body.as_ref()?;
+        let [Statement::ReturnStatement(return_statement)] = body.statements.as_slice() else {
+            return None;
+        };
+        parsed_computed_expression(return_statement.argument.as_ref()?, source)
+    })
+    .flatten();
+
     Some(ParsedMethod {
         name,
         span: source_span(source, method.span),
-        decorators: method
-            .decorators
-            .iter()
-            .filter_map(|decorator| parse_decorator(decorator, source))
-            .collect(),
+        decorators,
         is_getter: method.kind == oxc_ast::ast::MethodDefinitionKind::Get,
         is_async: method.value.r#async,
         jsx_roots,
@@ -460,7 +475,145 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
             .as_ref()
             .map(|annotation| parsed_type_annotation(annotation.span, source)),
         return_values,
+        computed_expression,
     })
+}
+
+fn parsed_computed_expression(
+    expression: &Expression<'_>,
+    source: &str,
+) -> Option<ParsedComputedExpression> {
+    if let Expression::ParenthesizedExpression(parenthesized) = expression {
+        return parsed_computed_expression(&parenthesized.expression, source);
+    }
+
+    if let Some(value) = serializable_value_from_expression(expression) {
+        return Some(ParsedComputedExpression {
+            kind: ParsedComputedExpressionKind::Literal(value),
+            span: source_span(source, expression.span()),
+        });
+    }
+
+    match expression {
+        Expression::StaticMemberExpression(member) => {
+            let property = member.property.name.to_string();
+            let kind = if matches!(&member.object, Expression::ThisExpression(_)) {
+                ParsedComputedExpressionKind::ThisMember(property)
+            } else {
+                ParsedComputedExpressionKind::MemberAccess {
+                    object: Box::new(parsed_computed_expression(&member.object, source)?),
+                    property,
+                }
+            };
+            Some(ParsedComputedExpression {
+                kind,
+                span: source_span(source, member.span),
+            })
+        }
+        Expression::BinaryExpression(binary) => {
+            let operator = match binary.operator.as_str() {
+                "+" => ParsedComputedExpressionKind::Arithmetic {
+                    left: Box::new(parsed_computed_expression(&binary.left, source)?),
+                    right: Box::new(parsed_computed_expression(&binary.right, source)?),
+                    operator: ParsedArithmeticOperator::Add,
+                },
+                "-" => ParsedComputedExpressionKind::Arithmetic {
+                    left: Box::new(parsed_computed_expression(&binary.left, source)?),
+                    right: Box::new(parsed_computed_expression(&binary.right, source)?),
+                    operator: ParsedArithmeticOperator::Subtract,
+                },
+                "*" => ParsedComputedExpressionKind::Arithmetic {
+                    left: Box::new(parsed_computed_expression(&binary.left, source)?),
+                    right: Box::new(parsed_computed_expression(&binary.right, source)?),
+                    operator: ParsedArithmeticOperator::Multiply,
+                },
+                "/" => ParsedComputedExpressionKind::Arithmetic {
+                    left: Box::new(parsed_computed_expression(&binary.left, source)?),
+                    right: Box::new(parsed_computed_expression(&binary.right, source)?),
+                    operator: ParsedArithmeticOperator::Divide,
+                },
+                "%" => ParsedComputedExpressionKind::Arithmetic {
+                    left: Box::new(parsed_computed_expression(&binary.left, source)?),
+                    right: Box::new(parsed_computed_expression(&binary.right, source)?),
+                    operator: ParsedArithmeticOperator::Remainder,
+                },
+                "===" => ParsedComputedExpressionKind::Comparison {
+                    left: Box::new(parsed_computed_expression(&binary.left, source)?),
+                    right: Box::new(parsed_computed_expression(&binary.right, source)?),
+                    operator: ParsedComparisonOperator::Equal,
+                },
+                "!==" => ParsedComputedExpressionKind::Comparison {
+                    left: Box::new(parsed_computed_expression(&binary.left, source)?),
+                    right: Box::new(parsed_computed_expression(&binary.right, source)?),
+                    operator: ParsedComparisonOperator::NotEqual,
+                },
+                "<" => ParsedComputedExpressionKind::Comparison {
+                    left: Box::new(parsed_computed_expression(&binary.left, source)?),
+                    right: Box::new(parsed_computed_expression(&binary.right, source)?),
+                    operator: ParsedComparisonOperator::LessThan,
+                },
+                "<=" => ParsedComputedExpressionKind::Comparison {
+                    left: Box::new(parsed_computed_expression(&binary.left, source)?),
+                    right: Box::new(parsed_computed_expression(&binary.right, source)?),
+                    operator: ParsedComparisonOperator::LessThanOrEqual,
+                },
+                ">" => ParsedComputedExpressionKind::Comparison {
+                    left: Box::new(parsed_computed_expression(&binary.left, source)?),
+                    right: Box::new(parsed_computed_expression(&binary.right, source)?),
+                    operator: ParsedComparisonOperator::GreaterThan,
+                },
+                ">=" => ParsedComputedExpressionKind::Comparison {
+                    left: Box::new(parsed_computed_expression(&binary.left, source)?),
+                    right: Box::new(parsed_computed_expression(&binary.right, source)?),
+                    operator: ParsedComparisonOperator::GreaterThanOrEqual,
+                },
+                _ => return None,
+            };
+            Some(ParsedComputedExpression {
+                kind: operator,
+                span: source_span(source, binary.span),
+            })
+        }
+        Expression::LogicalExpression(logical) => {
+            let kind = match logical.operator.as_str() {
+                "&&" => ParsedComputedExpressionKind::Logical {
+                    left: Box::new(parsed_computed_expression(&logical.left, source)?),
+                    right: Box::new(parsed_computed_expression(&logical.right, source)?),
+                    operator: ParsedLogicalOperator::And,
+                },
+                "||" => ParsedComputedExpressionKind::Logical {
+                    left: Box::new(parsed_computed_expression(&logical.left, source)?),
+                    right: Box::new(parsed_computed_expression(&logical.right, source)?),
+                    operator: ParsedLogicalOperator::Or,
+                },
+                "??" => ParsedComputedExpressionKind::NullishCoalescing {
+                    left: Box::new(parsed_computed_expression(&logical.left, source)?),
+                    right: Box::new(parsed_computed_expression(&logical.right, source)?),
+                },
+                _ => return None,
+            };
+            Some(ParsedComputedExpression {
+                kind,
+                span: source_span(source, logical.span),
+            })
+        }
+        Expression::UnaryExpression(unary) => {
+            let operator = match unary.operator.as_str() {
+                "!" => ParsedUnaryOperator::Not,
+                "+" => ParsedUnaryOperator::Plus,
+                "-" => ParsedUnaryOperator::Minus,
+                _ => return None,
+            };
+            Some(ParsedComputedExpression {
+                kind: ParsedComputedExpressionKind::Unary {
+                    operand: Box::new(parsed_computed_expression(&unary.argument, source)?),
+                    operator,
+                },
+                span: source_span(source, unary.span),
+            })
+        }
+        _ => None,
+    }
 }
 
 fn parsed_return_value(statement: &Statement<'_>) -> Option<ParsedSerializableValue> {

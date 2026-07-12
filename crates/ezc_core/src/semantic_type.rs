@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::path::PathBuf;
 
@@ -705,15 +705,34 @@ impl SemanticTypeModel {
         self
     }
 
-    /// Attaches inferred types to every canonical expression node in `graph`.
+    /// Attaches inferred types to canonical state-initializer expression nodes.
     ///
     /// # Panics
     ///
     /// Panics when the graph's node index contains an ID that does not resolve
     /// to an expression node.
     #[must_use]
-    pub fn with_expression_types(mut self, graph: &ExpressionGraph) -> Self {
-        let nodes = graph.nodes.keys().cloned().collect::<Vec<_>>();
+    pub fn with_expression_types(
+        mut self,
+        graph: &ExpressionGraph,
+        components: &[ComponentNode],
+    ) -> Self {
+        let computed_owners = components
+            .iter()
+            .flat_map(|component| {
+                component
+                    .methods
+                    .iter()
+                    .filter(|method| method.is_computed())
+                    .map(|method| component.id.computed(&method.name))
+            })
+            .collect::<BTreeSet<_>>();
+        let nodes = graph
+            .nodes
+            .values()
+            .filter(|node| !computed_owners.contains(&node.owner))
+            .map(|node| node.id.clone())
+            .collect::<Vec<_>>();
         for id in nodes {
             let semantic_type = expression_semantic_type(&id, graph, &self.assignments);
             let node = graph.node(&id).expect("expression graph node");
@@ -1091,6 +1110,9 @@ fn expression_semantic_type(
     match &node.kind {
         ExpressionNodeKind::Literal(value) => state_initializer_value_type(value),
         ExpressionNodeKind::Boolean(value) => SemanticType::BooleanLiteral(*value),
+        ExpressionNodeKind::ThisMember { .. } | ExpressionNodeKind::MemberAccess { .. } => {
+            SemanticType::Unknown
+        }
         ExpressionNodeKind::Arithmetic {
             left,
             right,

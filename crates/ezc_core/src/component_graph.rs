@@ -10,10 +10,11 @@ use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
 
 use ezc_parser::{
     ParsedArithmeticExpression, ParsedArithmeticExpressionKind, ParsedArithmeticOperator,
-    ParsedClass, ParsedComparisonOperator, ParsedConstantExpression, ParsedConstantExpressionKind,
-    ParsedEventHandler, ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild,
-    ParsedJsxConditional, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLogicalOperator,
-    ParsedMethod, ParsedSerializableValue, ParsedStateOperation, ParsedUnaryOperator, SourceSpan,
+    ParsedClass, ParsedComparisonOperator, ParsedComputedExpression, ParsedComputedExpressionKind,
+    ParsedConstantExpression, ParsedConstantExpressionKind, ParsedEventHandler, ParsedFile,
+    ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional,
+    ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLogicalOperator, ParsedMethod,
+    ParsedSerializableValue, ParsedStateOperation, ParsedUnaryOperator, SourceSpan,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -85,6 +86,47 @@ pub enum ArithmeticEvaluationError {
 pub struct ConstantExpression {
     pub kind: ConstantExpressionKind,
     pub span: SourceSpan,
+}
+
+/// A compiler-owned supported expression lowered from an `@computed()` getter.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ComputedExpression {
+    pub kind: ComputedExpressionKind,
+    pub span: SourceSpan,
+}
+
+/// Expression forms accepted by the E2 computed getter lowering slice.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ComputedExpressionKind {
+    Literal(SerializableValue),
+    ThisMember(String),
+    MemberAccess {
+        object: Box<ComputedExpression>,
+        property: String,
+    },
+    Arithmetic {
+        left: Box<ComputedExpression>,
+        right: Box<ComputedExpression>,
+        operator: ArithmeticOperator,
+    },
+    Comparison {
+        left: Box<ComputedExpression>,
+        right: Box<ComputedExpression>,
+        operator: ComparisonOperator,
+    },
+    Logical {
+        left: Box<ComputedExpression>,
+        right: Box<ComputedExpression>,
+        operator: LogicalOperator,
+    },
+    NullishCoalescing {
+        left: Box<ComputedExpression>,
+        right: Box<ComputedExpression>,
+    },
+    Unary {
+        operand: Box<ComputedExpression>,
+        operator: UnaryOperator,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -471,6 +513,7 @@ pub struct ComponentMethod {
     pub parameters: Vec<MethodParameter>,
     pub declared_return_type: Option<DeclaredStateType>,
     pub return_values: Vec<SerializableValue>,
+    pub computed_expression: Option<ComputedExpression>,
 }
 
 /// Additional semantic role carried by a compiler-owned method declaration.
@@ -764,13 +807,21 @@ fn component_method_from_parsed(
     component_id: &SemanticId,
 ) -> ComponentMethod {
     let id = component_id.method(&method.name);
+    let semantic_role = method_semantic_role(method);
+    let computed_expression = match semantic_role {
+        MethodSemanticRole::Computed => method
+            .computed_expression
+            .as_ref()
+            .map(computed_expression_from_parsed),
+        MethodSemanticRole::Standard | MethodSemanticRole::Action => None,
+    };
     ComponentMethod {
         id: id.clone(),
         owner: SemanticOwner::entity(component_id.clone()),
         name: method.name.clone(),
         is_getter: method.is_getter,
         is_async: method.is_async,
-        semantic_role: method_semantic_role(method),
+        semantic_role,
         local_variables: method
             .local_variables
             .iter()
@@ -813,6 +864,7 @@ fn component_method_from_parsed(
             .iter()
             .map(serializable_value_from_parsed)
             .collect(),
+        computed_expression,
     }
 }
 
@@ -938,6 +990,71 @@ fn constant_expression_from_parsed(expression: &ParsedConstantExpression) -> Con
     };
 
     ConstantExpression {
+        kind,
+        span: expression.span,
+    }
+}
+
+fn computed_expression_from_parsed(expression: &ParsedComputedExpression) -> ComputedExpression {
+    let kind = match &expression.kind {
+        ParsedComputedExpressionKind::Literal(value) => {
+            ComputedExpressionKind::Literal(serializable_value_from_parsed(value))
+        }
+        ParsedComputedExpressionKind::ThisMember(name) => {
+            ComputedExpressionKind::ThisMember(name.clone())
+        }
+        ParsedComputedExpressionKind::MemberAccess { object, property } => {
+            ComputedExpressionKind::MemberAccess {
+                object: Box::new(computed_expression_from_parsed(object)),
+                property: property.clone(),
+            }
+        }
+        ParsedComputedExpressionKind::Arithmetic {
+            left,
+            right,
+            operator,
+        } => ComputedExpressionKind::Arithmetic {
+            left: Box::new(computed_expression_from_parsed(left)),
+            right: Box::new(computed_expression_from_parsed(right)),
+            operator: arithmetic_operator_from_parsed(*operator),
+        },
+        ParsedComputedExpressionKind::Comparison {
+            left,
+            right,
+            operator,
+        } => ComputedExpressionKind::Comparison {
+            left: Box::new(computed_expression_from_parsed(left)),
+            right: Box::new(computed_expression_from_parsed(right)),
+            operator: comparison_operator_from_parsed(*operator),
+        },
+        ParsedComputedExpressionKind::Logical {
+            left,
+            right,
+            operator,
+        } => ComputedExpressionKind::Logical {
+            left: Box::new(computed_expression_from_parsed(left)),
+            right: Box::new(computed_expression_from_parsed(right)),
+            operator: logical_operator_from_parsed(*operator),
+        },
+        ParsedComputedExpressionKind::NullishCoalescing { left, right } => {
+            ComputedExpressionKind::NullishCoalescing {
+                left: Box::new(computed_expression_from_parsed(left)),
+                right: Box::new(computed_expression_from_parsed(right)),
+            }
+        }
+        ParsedComputedExpressionKind::Unary { operand, operator } => {
+            ComputedExpressionKind::Unary {
+                operand: Box::new(computed_expression_from_parsed(operand)),
+                operator: match operator {
+                    ParsedUnaryOperator::Not => UnaryOperator::Not,
+                    ParsedUnaryOperator::Plus => UnaryOperator::Plus,
+                    ParsedUnaryOperator::Minus => UnaryOperator::Minus,
+                },
+            }
+        }
+    };
+
+    ComputedExpression {
         kind,
         span: expression.span,
     }

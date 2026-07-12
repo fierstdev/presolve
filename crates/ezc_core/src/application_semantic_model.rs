@@ -478,7 +478,7 @@ pub fn build_application_semantic_model_from_component_graph(
         ExpressionGraph::from_components(&component_graph.components, &component_graph.provenance);
     let semantic_types =
         SemanticTypeModel::from_components(&component_graph.components, &provenance)
-            .with_expression_types(&expression_graph)
+            .with_expression_types(&expression_graph, &component_graph.components)
             .with_template_binding_types(&template_entities, &references)
             .normalized();
 
@@ -583,7 +583,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         &type_aliases,
         bindings,
     )
-    .with_expression_types(&expression_graph)
+    .with_expression_types(&expression_graph, &components)
     .with_template_binding_types(&template_entities, &references)
     .normalized();
 

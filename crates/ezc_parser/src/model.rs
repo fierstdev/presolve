@@ -156,6 +156,47 @@ pub enum ParsedConstantExpressionKind {
     },
 }
 
+/// A supported expression retained from one `@computed()` getter body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedComputedExpression {
+    pub kind: ParsedComputedExpressionKind,
+    pub span: SourceSpan,
+}
+
+/// Parsed computed getter expression forms accepted by the E2 lowering slice.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParsedComputedExpressionKind {
+    Literal(ParsedSerializableValue),
+    ThisMember(String),
+    MemberAccess {
+        object: Box<ParsedComputedExpression>,
+        property: String,
+    },
+    Arithmetic {
+        left: Box<ParsedComputedExpression>,
+        right: Box<ParsedComputedExpression>,
+        operator: ParsedArithmeticOperator,
+    },
+    Comparison {
+        left: Box<ParsedComputedExpression>,
+        right: Box<ParsedComputedExpression>,
+        operator: ParsedComparisonOperator,
+    },
+    Logical {
+        left: Box<ParsedComputedExpression>,
+        right: Box<ParsedComputedExpression>,
+        operator: ParsedLogicalOperator,
+    },
+    NullishCoalescing {
+        left: Box<ParsedComputedExpression>,
+        right: Box<ParsedComputedExpression>,
+    },
+    Unary {
+        operand: Box<ParsedComputedExpression>,
+        operator: ParsedUnaryOperator,
+    },
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParsedComparisonOperator {
     Equal,
@@ -193,6 +234,7 @@ pub struct ParsedMethod {
     pub parameters: Vec<ParsedMethodParameter>,
     pub return_type_annotation: Option<ParsedTypeAnnotation>,
     pub return_values: Vec<ParsedSerializableValue>,
+    pub computed_expression: Option<ParsedComputedExpression>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -58,10 +58,11 @@ pub use component_graph::{
     build_component_graph, build_component_graph_for_module, ArithmeticEvaluationError,
     ArithmeticExpression, ArithmeticExpressionKind, ArithmeticOperator, ComparisonOperator,
     ComponentAction, ComponentDiagnostic, ComponentGraph, ComponentMethod, ComponentNode,
-    ConstantEvaluationError, ConstantExpression, ConstantExpressionKind, DeclaredStateType,
-    DeclaredStateTypeKind, LogicalOperator, MethodLocalVariable, MethodParameter, RenderAttribute,
-    RenderAttributeValue, RenderChild, RenderEventHandler, RenderFragment, RenderList, RenderModel,
-    SerializableValue, StateField, StateOperation,
+    ComputedExpression, ComputedExpressionKind, ConstantEvaluationError, ConstantExpression,
+    ConstantExpressionKind, DeclaredStateType, DeclaredStateTypeKind, LogicalOperator,
+    MethodLocalVariable, MethodParameter, RenderAttribute, RenderAttributeValue, RenderChild,
+    RenderEventHandler, RenderFragment, RenderList, RenderModel, SerializableValue, StateField,
+    StateOperation,
 };
 pub use computed_value::{
     collect_computed_values, ComputedCachePolicy, ComputedPurity, ComputedValue,
@@ -1201,6 +1202,7 @@ class Counter extends Component {
                     parameters: Vec::new(),
                     return_type_annotation: None,
                     return_values: Vec::new(),
+                    computed_expression: None,
                 }],
             }],
         };
