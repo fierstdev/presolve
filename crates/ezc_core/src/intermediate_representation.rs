@@ -71,6 +71,14 @@ pub struct IrDomText {
     pub provenance: SourceProvenance,
 }
 
+/// A value-driven DOM update target, independent of backend rendering syntax.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrDomBinding {
+    pub node: IrDomNodeId,
+    pub value: IrValueId,
+    pub provenance: SourceProvenance,
+}
+
 /// Lowers application component ownership into deterministic IR module structure.
 #[must_use]
 pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateRepresentation {
