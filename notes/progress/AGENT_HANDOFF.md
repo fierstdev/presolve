@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: e5a6d51 Infer semantic method-local types
-* Working tree: C14 source, test, and documentation changes are present and uncommitted
+* Latest commit: c80673f Lower typed method parameters
+* Working tree: C15 source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: C14 - Method parameter typing
-* Summary: Lowered typed method parameters into canonical parameter entities and declared semantic assignments.
-* Key files: crates/ezc_parser/src/model.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/application_semantic_model.rs
-* New behavior: Parameter annotations retain source text/provenance, each parameter has a stable method-scoped ID and ownership, and supported annotations resolve through the canonical type model.
-* Tests added or changed: Parser/core coverage verifies annotation retention plus typed parameter entity, ownership, and assignment lowering; CLI expectations now include C10's canonical collection diagnostics.
+* Slice: C15 - Return type semantics
+* Summary: Lowered declared method return annotations and inferred the existing serializable return values.
+* Key files: crates/ezc_parser/src/model.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/semantic_type.rs
+* New behavior: Method entities receive declared canonical return types when annotated, otherwise inferred types from top-level serializable returns.
+* Tests added or changed: Core coverage verifies declared string and inferred number method return types.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C14 - Method parameter typing
+* Slice: C15 - Return type semantics
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C14
-* Remaining: Phase C15 - return type semantics.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C15
+* Remaining: Phase C16 - assignment compatibility.
 
 Verification
 
@@ -100,6 +100,10 @@ Architecture decisions made
 * Decision: Method parameters are first-class method-owned semantic entities with declaration annotations lowered through the canonical type model.
 * Reason: Action, computed, IDE, and type-query consumers can address a stable parameter entity rather than interpret method metadata ad hoc.
 * Tradeoff: C14 supports currently retained identifier parameters and supported annotations only. Defaults, destructuring, rest, optionality semantics, parameter value flow, and call-site validation remain later work.
+
+* Decision: Method semantic type assignments represent their return contract, declared when annotated and inferred from currently supported serializable returns otherwise.
+* Reason: Derived values, loaders, actions, and tooling can query one canonical method result contract before their dedicated phases add richer producers.
+* Tradeoff: C15 considers only top-level serializable return expressions. JSX, state/local expressions, async promises, branches, throws, implicit returns, and return compatibility diagnostics remain later work.
 
 * Decision: Browser runtime integration tests acquire one process-wide lock before creating a Chrome probe, and the probe deadline allows 20 seconds for a cold Chrome start.
 * Reason: Cargo's workspace runner schedules tests concurrently, and the previous five-second harness deadline could kill an otherwise healthy cold-start probe with SIGKILL.
@@ -414,11 +418,11 @@ Known limitations
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
-* Item: C14 types supported annotated identifier parameters only. Return semantics, defaults, destructuring, rest, optionality semantics, parameter flow, call-site validation, templates/actions beyond existing references, normalization, and final type diagnostic families remain later Phase C work.
+* Item: C15 types explicit annotations and currently supported top-level serializable returns only. JSX, state/local expressions, async promises, branches, throws, implicit returns, return compatibility diagnostics, parameter flow, normalization, and final type diagnostic families remain later Phase C work.
 
 Exact next step
 
-Continue automatically with C15 - return type semantics, committing the completed C14 slice first.
+Continue automatically with C16 - assignment compatibility, committing the completed C15 slice first.
 
 Useful commands
 

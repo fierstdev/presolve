@@ -771,6 +771,42 @@ class Parameters extends Component {
     }
 
     #[test]
+    fn lowers_declared_and_inferred_method_return_types() {
+        let parsed = ezc_parser::parse_file(
+            "src/Returns.tsx",
+            r#"
+@component("x-returns")
+class Returns extends Component {
+  declared(): string { return "EdgeZero"; }
+  inferred() { return 1; }
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        let methods = &asm.components[0].methods;
+        let declared = &methods[0];
+        let inferred = &methods[1];
+
+        assert_eq!(
+            asm.semantic_types.assignments[&declared.id].semantic_type,
+            crate::SemanticType::String
+        );
+        assert_eq!(
+            asm.semantic_types.assignments[&declared.id].status,
+            crate::SemanticTypeStatus::Declared
+        );
+        assert_eq!(
+            asm.semantic_types.assignments[&inferred.id].semantic_type,
+            crate::SemanticType::Number
+        );
+        assert_eq!(
+            asm.semantic_types.assignments[&inferred.id].status,
+            crate::SemanticTypeStatus::Inferred
+        );
+    }
+
+    #[test]
     fn lowers_supported_literal_state_annotations_into_canonical_types() {
         let parsed = ezc_parser::parse_file(
             "src/LiteralTypes.tsx",

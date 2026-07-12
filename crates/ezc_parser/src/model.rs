@@ -188,6 +188,8 @@ pub struct ParsedMethod {
     pub state_updates: Vec<ParsedStateUpdate>,
     pub local_variables: Vec<ParsedLocalVariable>,
     pub parameters: Vec<ParsedMethodParameter>,
+    pub return_type_annotation: Option<ParsedTypeAnnotation>,
+    pub return_values: Vec<ParsedSerializableValue>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

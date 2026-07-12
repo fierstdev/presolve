@@ -407,6 +407,7 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
     let mut bindings = Vec::new();
     let mut state_updates = Vec::new();
     let mut local_variables = Vec::new();
+    let mut return_values = Vec::new();
     let parameters = method
         .value
         .params
@@ -432,6 +433,9 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
                 state_updates.push(update);
             }
             local_variables.extend(parsed_local_variables(statement, source));
+            if let Some(value) = parsed_return_value(statement) {
+                return_values.push(value);
+            }
         }
     }
 
@@ -443,7 +447,20 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
         state_updates,
         local_variables,
         parameters,
+        return_type_annotation: method
+            .value
+            .return_type
+            .as_ref()
+            .map(|annotation| parsed_type_annotation(annotation.span, source)),
+        return_values,
     })
+}
+
+fn parsed_return_value(statement: &Statement<'_>) -> Option<ParsedSerializableValue> {
+    let Statement::ReturnStatement(return_statement) = statement else {
+        return None;
+    };
+    serializable_value_from_expression(return_statement.argument.as_ref()?)
 }
 
 fn parsed_local_variables(statement: &Statement<'_>, source: &str) -> Vec<ParsedLocalVariable> {

@@ -1209,6 +1209,8 @@ class Counter extends Component {
                     state_updates: Vec::new(),
                     local_variables: Vec::new(),
                     parameters: Vec::new(),
+                    return_type_annotation: None,
+                    return_values: Vec::new(),
                 }],
             }],
         };

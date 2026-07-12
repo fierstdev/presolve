@@ -226,6 +226,13 @@ impl SemanticTypeModel {
 
         extend_with_local_type_assignments(&mut assignments, components, provenance);
         extend_with_parameter_type_assignments(&mut assignments, components, &aliases, bindings);
+        extend_with_method_return_type_assignments(
+            &mut assignments,
+            components,
+            provenance,
+            &aliases,
+            bindings,
+        );
 
         Self {
             assignments,
@@ -341,6 +348,92 @@ fn extend_with_parameter_type_assignments(
                 provenance: declared_type.provenance.clone(),
             },
         );
+    }
+}
+
+fn extend_with_method_return_type_assignments(
+    assignments: &mut BTreeMap<SemanticId, SemanticTypeAssignment>,
+    components: &[ComponentNode],
+    provenance: &BTreeMap<SemanticId, SourceProvenance>,
+    aliases: &BTreeMap<SemanticId, SemanticTypeAlias>,
+    bindings: Option<&BindingTable>,
+) {
+    let aliases_by_path_and_name = aliases
+        .values()
+        .map(|alias| ((alias.provenance.path.clone(), alias.name.clone()), alias))
+        .collect::<BTreeMap<_, _>>();
+
+    for method in components.iter().flat_map(|component| &component.methods) {
+        let declared = method.declared_return_type.as_ref();
+        let (semantic_type, origin, status, assignment_provenance) =
+            if let Some(declared) = declared {
+                let alias = aliases_by_path_and_name
+                    .get(&(declared.provenance.path.clone(), declared.text.clone()))
+                    .copied()
+                    .or_else(|| {
+                        bindings
+                            .and_then(|bindings| {
+                                bindings.resolve_import(&declared.provenance.path, &declared.text)
+                            })
+                            .and_then(|binding| match &binding.target {
+                                ImportBindingTarget::Symbol(symbol)
+                                    if symbol.kind == SymbolKind::TypeAlias =>
+                                {
+                                    aliases.get(&symbol.id)
+                                }
+                                _ => None,
+                            })
+                    });
+                let Some(semantic_type) = alias
+                    .map(|alias| alias.semantic_type.clone())
+                    .or_else(|| semantic_type_from_annotation(&declared.text))
+                else {
+                    continue;
+                };
+                (
+                    semantic_type,
+                    alias.map_or_else(|| method.id.clone(), |alias| alias.id.clone()),
+                    SemanticTypeStatus::Declared,
+                    declared.provenance.clone(),
+                )
+            } else {
+                let Some(return_type) = inferred_return_type(&method.return_values) else {
+                    continue;
+                };
+                let Some(method_provenance) = provenance.get(&method.id) else {
+                    continue;
+                };
+                (
+                    return_type,
+                    method.id.clone(),
+                    SemanticTypeStatus::Inferred,
+                    method_provenance.clone(),
+                )
+            };
+        assignments.insert(
+            method.id.clone(),
+            SemanticTypeAssignment {
+                id: SemanticTypeId::for_subject(&method.id),
+                subject: method.id.clone(),
+                semantic_type,
+                origin,
+                status,
+                provenance: assignment_provenance,
+            },
+        );
+    }
+}
+
+fn inferred_return_type(values: &[SerializableValue]) -> Option<SemanticType> {
+    let mut types = values
+        .iter()
+        .map(semantic_type_from_serializable_value)
+        .collect::<Vec<_>>();
+    match types.as_slice() {
+        [] => None,
+        [semantic_type] => Some(semantic_type.clone()),
+        _ if types.windows(2).all(|window| window[0] == window[1]) => types.pop(),
+        _ => Some(SemanticType::Union(types)),
     }
 }
 

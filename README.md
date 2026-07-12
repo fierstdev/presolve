@@ -158,6 +158,11 @@ entities. Their authored annotations lower to declared semantic types with
 stable identity and provenance; defaults, destructuring, rest parameters,
 optionality semantics, and call-site validation remain future work.
 
+Method return annotations lower to declared semantic result types, while the
+current top-level serializable `return` forms infer a result type when unannotated.
+JSX, state/local expressions, async promises, branching, and return diagnostics
+remain future work.
+
 Constant state expressions are lowered without evaluation, then folded by an
 immutable compiler pass over the ASM. The pass produces a new canonical model
 with folded state values and diagnostics, which backend products consume. The

@@ -466,6 +466,8 @@ pub struct ComponentMethod {
     pub name: String,
     pub local_variables: Vec<MethodLocalVariable>,
     pub parameters: Vec<MethodParameter>,
+    pub declared_return_type: Option<DeclaredStateType>,
+    pub return_values: Vec<SerializableValue>,
 }
 
 /// A compiler-owned declaration of a supported method parameter.
@@ -783,6 +785,18 @@ fn component_method_from_parsed(
                     }
                 }),
             })
+            .collect(),
+        declared_return_type: method.return_type_annotation.as_ref().map(|annotation| {
+            DeclaredStateType {
+                kind: declared_state_type_kind(&annotation.text),
+                text: annotation.text.clone(),
+                provenance: SourceProvenance::new(path, annotation.span),
+            }
+        }),
+        return_values: method
+            .return_values
+            .iter()
+            .map(serializable_value_from_parsed)
             .collect(),
     }
 }
