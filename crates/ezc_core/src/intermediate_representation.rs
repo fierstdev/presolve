@@ -203,6 +203,43 @@ impl IrUpdateScheduler {
         }
         order
     }
+
+    #[must_use]
+    pub fn update_batches(&self) -> Vec<Vec<String>> {
+        let mut incoming = self
+            .graph
+            .nodes
+            .keys()
+            .cloned()
+            .map(|id| (id, 0_usize))
+            .collect::<BTreeMap<_, _>>();
+        for edge in &self.graph.edges {
+            if let Some(count) = incoming.get_mut(&edge.target) {
+                *count += 1;
+            }
+        }
+        let mut ready = incoming
+            .iter()
+            .filter(|(_, count)| **count == 0)
+            .map(|(id, _)| id.clone())
+            .collect::<BTreeSet<_>>();
+        let mut batches = Vec::new();
+        while !ready.is_empty() {
+            let batch = std::mem::take(&mut ready).into_iter().collect::<Vec<_>>();
+            for id in &batch {
+                for edge in self.graph.dependents_of(id) {
+                    if let Some(count) = incoming.get_mut(&edge.target) {
+                        *count -= 1;
+                        if *count == 0 {
+                            ready.insert(edge.target.clone());
+                        }
+                    }
+                }
+            }
+            batches.push(batch);
+        }
+        batches
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
