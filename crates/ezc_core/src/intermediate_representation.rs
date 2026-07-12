@@ -1252,6 +1252,48 @@ impl IrOptimizationPass for IrInstructionSimplificationPass {
     }
 }
 
+/// Immutable cleanup pass that removes unreachable canonical CFG artifacts.
+pub struct IrCfgCleanupPass;
+
+impl IrOptimizationPass for IrCfgCleanupPass {
+    fn name(&self) -> &'static str {
+        "cfg-cleanup"
+    }
+
+    fn run(&self, input: &IntermediateRepresentation) -> IntermediateRepresentation {
+        let mut output = input.clone();
+        for module in &mut output.modules {
+            for function in &mut module.functions {
+                let reachable = analyze_reachability(function)
+                    .reachable
+                    .into_iter()
+                    .collect::<BTreeSet<_>>();
+                function
+                    .blocks
+                    .retain(|block| reachable.contains(&block.id));
+                function
+                    .branch_edges
+                    .retain(|edge| reachable.contains(&edge.from) && reachable.contains(&edge.to));
+                function
+                    .loops
+                    .retain(|loop_region| reachable.contains(&loop_region.header));
+                let instructions = function
+                    .blocks
+                    .iter()
+                    .flat_map(|block| {
+                        block
+                            .instructions
+                            .iter()
+                            .map(|instruction| instruction.id.clone())
+                    })
+                    .collect::<BTreeSet<_>>();
+                function.values.retain(|_, value| !matches!(&value.definition, IrValueDefinition::Instruction(instruction) if !instructions.contains(instruction)));
+            }
+        }
+        output
+    }
+}
+
 fn replace_copy_operands(kind: &mut IrInstructionKind, copies: &BTreeMap<IrValueId, IrOperand>) {
     let resolve = |operand: &mut IrOperand| {
         while let IrOperand::Value(value) = operand {

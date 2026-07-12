@@ -70,7 +70,7 @@ pub use intermediate_representation::{
     analyze_liveness, analyze_reachability, analyze_use_definitions, compute_dominators,
     compute_post_dominators, lower_components_to_ir, validate_intermediate_representation,
     IntermediateRepresentation, IrBinaryOperation, IrBlock, IrBlockId, IrBranchArm, IrBranchEdge,
-    IrCommonSubexpressionEliminationPass, IrConstant, IrConstantFoldingPass,
+    IrCfgCleanupPass, IrCommonSubexpressionEliminationPass, IrConstant, IrConstantFoldingPass,
     IrConstantPropagationAnalysis, IrCopyPropagationPass, IrDeadAssignmentAnalysis,
     IrDeadCodeEliminationPass, IrDefinitionUseAnalysis, IrDominatorTree, IrFunction, IrInstruction,
     IrInstructionId, IrInstructionKind, IrInstructionSimplificationPass, IrLivenessAnalysis,
