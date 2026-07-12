@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: 61c626f Evaluate semantic serialization compatibility
-* Working tree: C27 source, test, and documentation changes are present and uncommitted
+* Latest commit: df5eb45 Evaluate execution boundary compatibility
+* Working tree: C28 source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: C27 - Server/client boundary compatibility
-* Summary: Added canonical compatibility evaluation for values crossing client/server boundaries.
-* Key files: crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/lib.rs
-* New behavior: Serializable ordinary values cross boundaries; resources must be shared and serializable; client-only/server-only resources cannot cross to the opposing side.
-* Tests added or changed: Core coverage verifies a serializable string crossing server-to-client and a client-only resource rejection.
+* Slice: C28 - Type normalization
+* Summary: Canonicalized equivalent semantic type forms before ASM consumers observe them.
+* Key files: crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/application_semantic_model.rs
+* New behavior: Nested unions flatten; duplicates and `never` disappear; singleton unions collapse; union members sort deterministically; derived type contracts normalize too.
+* Tests added or changed: Core coverage verifies union flattening, deduplication, `never` elimination, and canonical ordering.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C27 - Server/client boundary compatibility
+* Slice: C28 - Type normalization
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C27
-* Remaining: Phase C28 - type normalization.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C28
+* Remaining: Phase C29 - assignability engine.
 
 Verification
 
@@ -152,6 +152,10 @@ Architecture decisions made
 * Decision: Cross-boundary compatibility is a canonical query layered on serialization compatibility, with resource execution boundaries enforced explicitly.
 * Reason: Backend planning and resumability can reject impossible crossings before code generation without inspecting runtime values.
 * Tradeoff: C27 provides query semantics only. Source boundary annotations, diagnostics, backend enforcement, and resource declaration lowering remain later work.
+
+* Decision: Semantic types normalize before ASM consumers observe assignments, aliases, scopes, accesses, computed values, and action signatures.
+* Reason: Equality, caching, inspection, and later assignability operate on one deterministic representation rather than authored union order or nesting.
+* Tradeoff: C28 defines canonical representation only. General assignability remains C29, and source aliases retain their separate identities/provenance.
 
 * Decision: Browser runtime integration tests acquire one process-wide lock before creating a Chrome probe, and the probe deadline allows 20 seconds for a cold Chrome start.
 * Reason: Cargo's workspace runner schedules tests concurrently, and the previous five-second harness deadline could kill an otherwise healthy cold-start probe with SIGKILL.
@@ -466,11 +470,11 @@ Known limitations
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
-* Item: C27 defines boundary compatibility only. Source annotations, diagnostics, backend enforcement, resource declaration lowering, normalization, and final type diagnostic families remain later Phase C work.
+* Item: C28 defines canonical representation only. General assignability, source diagnostics, backend enforcement, resource declaration lowering, and final type diagnostic families remain later Phase C work.
 
 Exact next step
 
-Continue automatically with C28 - type normalization, committing the completed C27 slice first.
+Continue automatically with C29 - assignability engine, committing the completed C28 slice first.
 
 Useful commands
 

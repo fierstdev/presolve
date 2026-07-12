@@ -143,6 +143,57 @@ pub fn boundary_compatibility(
     }
 }
 
+/// Canonicalizes equivalent semantic type forms for stable equality and output.
+#[must_use]
+pub fn normalize_semantic_type(semantic_type: SemanticType) -> SemanticType {
+    match semantic_type {
+        SemanticType::Array(element) => {
+            SemanticType::Array(Box::new(normalize_semantic_type(*element)))
+        }
+        SemanticType::Tuple(items) => {
+            SemanticType::Tuple(items.into_iter().map(normalize_semantic_type).collect())
+        }
+        SemanticType::Object(object) => SemanticType::Object(ObjectType {
+            properties: object
+                .properties
+                .into_iter()
+                .map(|(name, semantic_type)| (name, normalize_semantic_type(semantic_type)))
+                .collect(),
+        }),
+        SemanticType::Union(members) => normalize_union(members),
+        SemanticType::Resource(resource) => SemanticType::Resource(ResourceType {
+            data: Box::new(normalize_semantic_type(*resource.data)),
+            error: Box::new(normalize_semantic_type(*resource.error)),
+            pending: resource.pending,
+            serializable: resource.serializable,
+            execution_boundary: resource.execution_boundary,
+        }),
+        semantic_type => semantic_type,
+    }
+}
+
+fn normalize_union(members: Vec<SemanticType>) -> SemanticType {
+    let mut flattened = Vec::new();
+    for member in members {
+        match normalize_semantic_type(member) {
+            SemanticType::Union(items) => flattened.extend(items),
+            SemanticType::Never => {}
+            member => flattened.push(member),
+        }
+    }
+    flattened.sort_by_key(semantic_type_sort_key);
+    flattened.dedup();
+    match flattened.as_slice() {
+        [] => SemanticType::Never,
+        [member] => member.clone(),
+        _ => SemanticType::Union(flattened),
+    }
+}
+
+fn semantic_type_sort_key(semantic_type: &SemanticType) -> String {
+    format!("{semantic_type:?}")
+}
+
 /// Determines structural serialization compatibility for a canonical type.
 #[must_use]
 pub fn serialization_compatibility(semantic_type: &SemanticType) -> SerializationCompatibility {
@@ -483,6 +534,39 @@ impl SemanticTypeModel {
                     is_async: method.is_async,
                 },
             );
+        }
+        self
+    }
+
+    #[must_use]
+    pub fn normalized(mut self) -> Self {
+        for assignment in self.assignments.values_mut() {
+            assignment.semantic_type = normalize_semantic_type(assignment.semantic_type.clone());
+        }
+        for alias in self.aliases.values_mut() {
+            alias.semantic_type = normalize_semantic_type(alias.semantic_type.clone());
+        }
+        for scope in self.list_scopes.values_mut() {
+            scope.item_type = normalize_semantic_type(scope.item_type.clone());
+            if let Some(index_type) = &mut scope.index_type {
+                *index_type = normalize_semantic_type(index_type.clone());
+            }
+        }
+        for access in self.member_accesses.values_mut() {
+            if let Some(semantic_type) = &mut access.semantic_type {
+                *semantic_type = normalize_semantic_type(semantic_type.clone());
+            }
+        }
+        for computed in self.computed_values.values_mut() {
+            computed.semantic_type = normalize_semantic_type(computed.semantic_type.clone());
+        }
+        for action in self.action_signatures.values_mut() {
+            for (_, input) in &mut action.input {
+                *input = normalize_semantic_type(input.clone());
+            }
+            if let Some(output) = &mut action.output {
+                *output = normalize_semantic_type(output.clone());
+            }
         }
         self
     }
@@ -1237,10 +1321,10 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::{
-        boundary_compatibility, operator_result_type, serialization_compatibility,
-        BoundaryCompatibility, ExecutionBoundary, ObjectType, ResourceExecutionBoundary,
-        ResourceType, SemanticOperator, SemanticType, SemanticTypeAssignment, SemanticTypeId,
-        SemanticTypeStatus, SerializationCompatibility,
+        boundary_compatibility, normalize_semantic_type, operator_result_type,
+        serialization_compatibility, BoundaryCompatibility, ExecutionBoundary, ObjectType,
+        ResourceExecutionBoundary, ResourceType, SemanticOperator, SemanticType,
+        SemanticTypeAssignment, SemanticTypeId, SemanticTypeStatus, SerializationCompatibility,
     };
     use crate::{
         component_graph::UnaryOperator, ArithmeticOperator, ComparisonOperator, LogicalOperator,
@@ -1367,6 +1451,23 @@ mod tests {
                 ExecutionBoundary::Server,
             ),
             BoundaryCompatibility::Incompatible
+        );
+    }
+
+    #[test]
+    fn normalizes_equivalent_union_forms_deterministically() {
+        assert_eq!(
+            normalize_semantic_type(SemanticType::Union(vec![
+                SemanticType::String,
+                SemanticType::Never,
+                SemanticType::Union(vec![SemanticType::String, SemanticType::Null]),
+                SemanticType::Null,
+            ])),
+            SemanticType::Union(vec![SemanticType::Null, SemanticType::String])
+        );
+        assert_eq!(
+            normalize_semantic_type(SemanticType::Union(vec![SemanticType::Never])),
+            SemanticType::Never
         );
     }
 

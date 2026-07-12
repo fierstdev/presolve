@@ -395,7 +395,8 @@ pub fn build_application_semantic_model_from_component_graph(
         &component_graph.provenance,
     )
     .with_expression_types(&expression_graph)
-    .with_template_binding_types(&template_entities, &references);
+    .with_template_binding_types(&template_entities, &references)
+    .normalized();
 
     ApplicationSemanticModel {
         expression_graph,
@@ -487,7 +488,8 @@ fn build_application_semantic_model_from_files_with_bindings(
         bindings,
     )
     .with_expression_types(&expression_graph)
-    .with_template_binding_types(&template_entities, &references);
+    .with_template_binding_types(&template_entities, &references)
+    .normalized();
 
     ApplicationSemanticModel {
         expression_graph,
@@ -1001,21 +1003,21 @@ class UnionTypes extends Component {
         assert_eq!(
             asm.semantic_types.assignments[&fields[0].id].semantic_type,
             crate::SemanticType::Union(vec![
-                crate::SemanticType::StringLiteral("all".to_string()),
                 crate::SemanticType::StringLiteral("active".to_string()),
+                crate::SemanticType::StringLiteral("all".to_string()),
                 crate::SemanticType::StringLiteral("completed".to_string()),
             ])
         );
         assert_eq!(
             asm.semantic_types.assignments[&fields[1].id].semantic_type,
             crate::SemanticType::Union(vec![
+                crate::SemanticType::Null,
                 crate::SemanticType::Object(crate::ObjectType {
                     properties: std::collections::BTreeMap::from([(
                         "id".to_string(),
                         crate::SemanticType::String,
                     )]),
                 }),
-                crate::SemanticType::Null,
             ])
         );
     }
@@ -1055,8 +1057,8 @@ class Aliases extends Component {
         assert_eq!(
             filter.semantic_type,
             crate::SemanticType::Union(vec![
-                crate::SemanticType::StringLiteral("all".to_string()),
                 crate::SemanticType::StringLiteral("active".to_string()),
+                crate::SemanticType::StringLiteral("all".to_string()),
                 crate::SemanticType::StringLiteral("completed".to_string()),
             ])
         );
@@ -1103,8 +1105,8 @@ class App extends Component {
         assert_eq!(
             assignment.semantic_type,
             crate::SemanticType::Union(vec![
-                crate::SemanticType::StringLiteral("all".to_string()),
                 crate::SemanticType::StringLiteral("active".to_string()),
+                crate::SemanticType::StringLiteral("all".to_string()),
                 crate::SemanticType::StringLiteral("completed".to_string()),
             ])
         );
