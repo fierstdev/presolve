@@ -164,6 +164,23 @@ pub enum IrReactiveEdgeKind {
     Invalidates,
 }
 
+impl IrReactiveGraph {
+    #[must_use]
+    pub fn computed_dependencies(&self, computed: &str) -> Vec<&IrReactiveEdge> {
+        matches!(
+            self.nodes.get(computed).map(|node| node.kind),
+            Some(IrReactiveNodeKind::Computed)
+        )
+        .then(|| {
+            self.edges
+                .iter()
+                .filter(|edge| edge.source == computed && edge.kind == IrReactiveEdgeKind::Reads)
+                .collect()
+        })
+        .unwrap_or_default()
+    }
+}
+
 #[must_use]
 pub fn inspect_dom_nodes(nodes: Vec<IrDomNode>) -> IrDomInspection {
     IrDomInspection {
