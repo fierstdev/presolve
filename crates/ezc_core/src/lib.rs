@@ -10,6 +10,7 @@ pub mod binding_table;
 pub mod compilation_unit;
 pub mod compiler_pass;
 pub mod component_graph;
+pub mod computed_value;
 pub mod explain;
 pub mod expression_graph;
 pub mod html_codegen;
@@ -61,6 +62,9 @@ pub use component_graph::{
     DeclaredStateTypeKind, LogicalOperator, MethodLocalVariable, MethodParameter, RenderAttribute,
     RenderAttributeValue, RenderChild, RenderEventHandler, RenderFragment, RenderList, RenderModel,
     SerializableValue, StateField, StateOperation,
+};
+pub use computed_value::{
+    collect_computed_values, ComputedCachePolicy, ComputedPurity, ComputedValue,
 };
 pub use explain::{explain_json, explain_text};
 pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};

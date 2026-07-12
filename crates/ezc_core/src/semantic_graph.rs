@@ -29,6 +29,7 @@ pub enum SemanticGraphNodeKind {
     Component,
     StateField,
     Method,
+    Computed,
     Parameter,
     LocalVariable,
     Action,
@@ -175,6 +176,7 @@ fn semantic_graph_node_kind(entity: SemanticEntity<'_>) -> SemanticGraphNodeKind
         SemanticEntity::Component(_) => SemanticGraphNodeKind::Component,
         SemanticEntity::StateField(_) => SemanticGraphNodeKind::StateField,
         SemanticEntity::Method(_) => SemanticGraphNodeKind::Method,
+        SemanticEntity::Computed(_) => SemanticGraphNodeKind::Computed,
         SemanticEntity::Parameter(_) => SemanticGraphNodeKind::Parameter,
         SemanticEntity::LocalVariable(_) => SemanticGraphNodeKind::LocalVariable,
         SemanticEntity::Action(_) => SemanticGraphNodeKind::Action,
@@ -271,5 +273,33 @@ class Counter extends Component {
             serde_json::from_str(&first).expect("semantic graph JSON should parse");
         assert_eq!(document["schema_version"], 1);
         assert_eq!(document["nodes"][0]["kind"], "component");
+    }
+
+    #[test]
+    fn exports_first_class_computed_nodes() {
+        let parsed = ezc_parser::parse_file(
+            "src/Computed.tsx",
+            r#"
+@component("x-computed")
+class Computed extends Component {
+  @computed()
+  get remainingCount(): number { return 1; }
+
+  render() { return <p />; }
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let computed_id = asm.components[0].id.computed("remainingCount");
+        let graph = build_semantic_graph(&asm);
+
+        assert!(graph.nodes.iter().any(|node| {
+            node.id == computed_id && node.kind == super::SemanticGraphNodeKind::Computed
+        }));
+        assert!(graph.edges.iter().any(|edge| {
+            edge.kind == SemanticGraphEdgeKind::Ownership
+                && edge.source == asm.components[0].id
+                && edge.target == computed_id
+        }));
     }
 }

@@ -73,6 +73,11 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn computed(&self, name: &str) -> Self {
+        self.child("computed", name)
+    }
+
+    #[must_use]
     pub fn action(&self, method: &str, index: usize) -> Self {
         self.child("action", &format!("{method}:{index}"))
     }
@@ -170,6 +175,10 @@ mod tests {
         assert_eq!(
             component.method("increment").as_str(),
             "component:x-counter/method:increment"
+        );
+        assert_eq!(
+            component.computed("remainingCount").as_str(),
+            "component:x-counter/computed:remainingCount"
         );
         assert_eq!(
             component.action("increment", 0).as_str(),

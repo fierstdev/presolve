@@ -8,6 +8,7 @@ use crate::component_graph::{
     build_component_graph_for_module, render_event_handlers, ComponentAction, ComponentDiagnostic,
     ComponentMethod, ComponentNode, MethodLocalVariable, RenderEventHandler, StateField,
 };
+use crate::computed_value::{collect_computed_values, ComputedValue};
 use crate::expression_graph::{ExpressionGraph, ExpressionNode};
 use crate::semantic_id::{SemanticId, SemanticOwner};
 use crate::semantic_provenance::SourceProvenance;
@@ -25,6 +26,7 @@ pub struct ApplicationSemanticModel {
     pub expression_graph: ExpressionGraph,
     pub semantic_types: SemanticTypeModel,
     pub components: Vec<ComponentNode>,
+    pub computed_values: BTreeMap<SemanticId, ComputedValue>,
     pub templates: Vec<TemplateNode>,
     pub template_entities: Vec<TemplateSemanticEntity>,
     pub diagnostics: Vec<ComponentDiagnostic>,
@@ -38,6 +40,7 @@ pub enum SemanticEntity<'a> {
     Component(&'a ComponentNode),
     StateField(&'a StateField),
     Method(&'a ComponentMethod),
+    Computed(&'a ComputedValue),
     Parameter(&'a crate::MethodParameter),
     LocalVariable(&'a MethodLocalVariable),
     Action(&'a ComponentAction),
@@ -51,6 +54,7 @@ pub enum SemanticEntityKind {
     Component,
     StateField,
     Method,
+    Computed,
     Parameter,
     LocalVariable,
     Action,
@@ -66,6 +70,7 @@ impl SemanticEntity<'_> {
             Self::Component(_) => SemanticEntityKind::Component,
             Self::StateField(_) => SemanticEntityKind::StateField,
             Self::Method(_) => SemanticEntityKind::Method,
+            Self::Computed(_) => SemanticEntityKind::Computed,
             Self::Parameter(_) => SemanticEntityKind::Parameter,
             Self::LocalVariable(_) => SemanticEntityKind::LocalVariable,
             Self::Action(_) => SemanticEntityKind::Action,
@@ -118,6 +123,10 @@ impl ApplicationSemanticModel {
             }
         }
 
+        if let Some(computed) = self.computed_values.get(id) {
+            return Some(SemanticEntity::Computed(computed));
+        }
+
         if let Some(template) = self.templates.iter().find(|template| template.id == *id) {
             return Some(SemanticEntity::Template(template));
         }
@@ -136,6 +145,11 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub fn template(&self, id: &SemanticId) -> Option<&TemplateNode> {
         self.templates.iter().find(|template| template.id == *id)
+    }
+
+    #[must_use]
+    pub fn computed_value(&self, id: &SemanticId) -> Option<&ComputedValue> {
+        self.computed_values.get(id)
     }
 
     #[must_use]
@@ -429,7 +443,20 @@ pub fn build_application_semantic_model_from_component_graph(
 ) -> ApplicationSemanticModel {
     let templates = build_template_graph(component_graph).templates;
     let template_entities = build_template_semantic_entities(&templates);
-    let ownership = collect_ownership(&component_graph.components, &templates, &template_entities);
+    let computed_values =
+        collect_computed_values(&component_graph.components, &component_graph.provenance);
+    let mut provenance = component_graph.provenance.clone();
+    provenance.extend(
+        computed_values
+            .iter()
+            .map(|(id, computed)| (id.clone(), computed.provenance.clone())),
+    );
+    let ownership = collect_ownership(
+        &component_graph.components,
+        &computed_values,
+        &templates,
+        &template_entities,
+    );
     let mut references = component_graph.references.clone();
     references.extend(build_template_state_references(
         &component_graph.components,
@@ -449,24 +476,23 @@ pub fn build_application_semantic_model_from_component_graph(
 
     let expression_graph =
         ExpressionGraph::from_components(&component_graph.components, &component_graph.provenance);
-    let semantic_types = SemanticTypeModel::from_components(
-        &component_graph.components,
-        &component_graph.provenance,
-    )
-    .with_expression_types(&expression_graph)
-    .with_template_binding_types(&template_entities, &references)
-    .normalized();
+    let semantic_types =
+        SemanticTypeModel::from_components(&component_graph.components, &provenance)
+            .with_expression_types(&expression_graph)
+            .with_template_binding_types(&template_entities, &references)
+            .normalized();
 
     ApplicationSemanticModel {
         expression_graph,
         semantic_types,
         components: component_graph.components.clone(),
+        computed_values,
         templates,
         template_entities,
         diagnostics: component_graph.diagnostics.clone(),
         ownership,
         references,
-        provenance: component_graph.provenance.clone(),
+        provenance,
     }
 }
 
@@ -521,7 +547,18 @@ fn build_application_semantic_model_from_files_with_bindings(
         );
     }
 
-    let ownership = collect_ownership(&components, &templates, &template_entities);
+    let computed_values = collect_computed_values(&components, &provenance);
+    provenance.extend(
+        computed_values
+            .iter()
+            .map(|(id, computed)| (id.clone(), computed.provenance.clone())),
+    );
+    let ownership = collect_ownership(
+        &components,
+        &computed_values,
+        &templates,
+        &template_entities,
+    );
 
     references.extend(build_template_state_references(
         &components,
@@ -554,6 +591,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         expression_graph,
         semantic_types,
         components,
+        computed_values,
         templates,
         template_entities,
         diagnostics,
@@ -696,6 +734,7 @@ fn this_member_name(expression: &str) -> Option<&str> {
 
 fn collect_ownership(
     components: &[ComponentNode],
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
     templates: &[TemplateNode],
     template_entities: &[TemplateSemanticEntity],
 ) -> BTreeMap<SemanticId, SemanticOwner> {
@@ -724,6 +763,12 @@ fn collect_ownership(
             for local in &method.local_variables {
                 ownership.insert(local.id.clone(), SemanticOwner::entity(method.id.clone()));
             }
+        }
+        for computed in computed_values
+            .values()
+            .filter(|computed| computed.owner.entity_id() == Some(&component.id))
+        {
+            ownership.insert(computed.id.clone(), computed.owner.clone());
         }
         for action in &component.actions {
             ownership.insert(
@@ -767,7 +812,7 @@ mod tests {
     };
     use crate::{
         build_component_graph_for_module, build_template_graph, build_template_semantic_entities,
-        CompilationUnit, SemanticEntityKind, SemanticOwner, SemanticReferenceKind,
+        CompilationUnit, SemanticEntity, SemanticEntityKind, SemanticOwner, SemanticReferenceKind,
         TemplateSemanticKind,
     };
 
@@ -907,6 +952,8 @@ class Returns extends Component {
 class Computed extends Component {
   @computed()
   get remainingCount(): number { return 1; }
+
+  render() { return <p />; }
 }
 "#,
         );
@@ -918,10 +965,41 @@ class Computed extends Component {
             .computed_values
             .get(&method.id)
             .expect("computed type contract");
+        let computed_id = asm.components[0].id.computed("remainingCount");
+        let computed_entity = asm
+            .computed_value(&computed_id)
+            .expect("first-class computed entity");
 
         assert!(method.is_getter);
         assert!(method.is_computed());
         assert_eq!(computed.semantic_type, crate::SemanticType::Number);
+        assert_eq!(computed_entity.method, method.id);
+        assert_eq!(
+            computed_entity.owner,
+            crate::SemanticOwner::entity(asm.components[0].id.clone())
+        );
+        assert_eq!(
+            computed_entity.cache_policy,
+            crate::ComputedCachePolicy::Memoized
+        );
+        assert_eq!(computed_entity.purity, crate::ComputedPurity::Unclassified);
+        assert_eq!(
+            computed_entity.execution_boundary,
+            crate::ExecutionBoundary::Client
+        );
+        assert_eq!(
+            asm.entity(&computed_id),
+            Some(SemanticEntity::Computed(computed_entity))
+        );
+        assert_eq!(
+            asm.owner(&computed_id),
+            Some(&crate::SemanticOwner::entity(asm.components[0].id.clone()))
+        );
+        assert_eq!(asm.provenance(&computed_id), asm.provenance(&method.id));
+        assert_eq!(
+            asm.entities_of_kind(SemanticEntityKind::Computed),
+            vec![&computed_id]
+        );
     }
 
     #[test]
@@ -1342,8 +1420,12 @@ class Counter extends Component {
             .owner = SemanticOwner::Application;
         templates[0].owner = SemanticOwner::Application;
 
-        let ownership =
-            collect_ownership(&component_graph.components, &templates, &template_entities);
+        let ownership = collect_ownership(
+            &component_graph.components,
+            &std::collections::BTreeMap::new(),
+            &templates,
+            &template_entities,
+        );
         assert_eq!(ownership[&component_id], SemanticOwner::Application);
         assert_eq!(
             ownership[&state_id],

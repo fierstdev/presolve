@@ -3,32 +3,39 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: D7-E - scheduler inspection
-* Working tree: clean after the D7-E commit
-* Date: 2026-07-11
+* Latest completed slice: E1 - canonical computed entities
+* Working tree: clean after the E1 commit
+* Date: 2026-07-12
 
 Last completed slice
 
-* Slice: D7-E - scheduler inspection
-* Summary: Added read-only scheduler plan inspection.
-* Key files: crates/ezc_core/src/intermediate_representation.rs
-* New behavior: Scheduler inspection returns dependency order, update batches, and detected cyclic nodes.
-* Fixtures added or changed: none.
+* Slice: E1 - canonical computed entities
+* Summary: Added first-class compiler-owned ASM entities for `@computed()` getters.
+* Key files: crates/ezc_core/src/computed_value.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/semantic_id.rs
+* New behavior: Computed getters now have stable computed semantic IDs, component ownership, method linkage, source provenance, a memoized cache policy, unclassified purity, and a client execution boundary.
+* Fixtures added or changed: focused core unit coverage for computed entity collection, ASM ownership/provenance lookup, and semantic-graph export.
 
 Current in-progress slice
 
-* Slice: D7-E - scheduler inspection
+* Slice: E1 - canonical computed entities
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D7-E (Phase D complete)
-* Remaining: Phase E, not started by instruction.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1
+* Remaining: E2 - computed expression lowering.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo clippy --workspace --all-targets -- -D warnings: pass
-* cargo test -p ezc_core: pass
+* cargo test -p ezc_core computed: pass
+* cargo test -p ezc_core semantic_graph::tests::exports_first_class_computed_nodes: pass
+* cargo check -p ezc_cli: pass
+* cargo clippy -p ezc_core --all-targets -- -D warnings: pass
+* cargo clippy -p ezc_cli --bin ezc_cli -- -D warnings: pass
 
 Architecture decisions made
+
+* Decision: A decorator-marked computed getter has a distinct ASM entity whose stable ID is derived from its component ID and getter name, while its existing method entity remains the authored execution declaration.
+* Reason: Dependencies, runtime records, IR lowering, and inspection can address one compiler-owned derived value without conflating it with the method syntax that declares it.
+* Tradeoff: E1 establishes identity and static policy metadata only. Getter bodies are not lowered, reads are not resolved, purity remains unclassified, and no reactive/runtime behavior is emitted.
 
 * Decision: State initializer expressions have stable graph roots and recursively keyed canonical nodes in the ASM.
 * Reason: Folding and inspection now consume the same compiler-owned topology instead of independently traversing field-local lowering structures.
@@ -541,7 +548,7 @@ Known limitations
 
 Exact next step
 
-Phase D is complete. Do not begin Phase E without explicit user direction.
+Next is E2: computed expression lowering. Lower only the roadmap's initially supported getter-body forms into the canonical expression graph; do not resolve semantic reads, infer computed types, or add purity/runtime behavior yet.
 
 Useful commands
 
@@ -572,4 +579,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the D2-G6 commit.
+* None after the E1 commit.
