@@ -76,6 +76,25 @@ pub enum SemanticType {
     Tuple(Vec<SemanticType>),
     Object(ObjectType),
     Union(Vec<SemanticType>),
+    Resource(ResourceType),
+}
+
+/// Compiler-owned resource contract with explicit data, error, and boundary semantics.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResourceType {
+    pub data: Box<SemanticType>,
+    pub error: Box<SemanticType>,
+    pub pending: bool,
+    pub serializable: bool,
+    pub execution_boundary: ResourceExecutionBoundary,
+}
+
+/// Execution boundary declared by a canonical resource contract.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResourceExecutionBoundary {
+    Client,
+    Server,
+    Shared,
 }
 
 /// Structural object shape in the canonical semantic type algebra.
@@ -1092,6 +1111,13 @@ pub fn is_state_initializer_assignable(source: &SemanticType, target: &SemanticT
                     .is_some_and(|source| is_state_initializer_assignable(source, target))
             })
         }
+        (SemanticType::Resource(source), SemanticType::Resource(target)) => {
+            source.pending == target.pending
+                && source.serializable == target.serializable
+                && source.execution_boundary == target.execution_boundary
+                && is_state_initializer_assignable(&source.data, &target.data)
+                && is_state_initializer_assignable(&source.error, &target.error)
+        }
         (SemanticType::Union(source), target) => source
             .iter()
             .all(|source| is_state_initializer_assignable(source, target)),
@@ -1129,8 +1155,8 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::{
-        operator_result_type, ObjectType, SemanticOperator, SemanticType, SemanticTypeAssignment,
-        SemanticTypeId, SemanticTypeStatus,
+        operator_result_type, ObjectType, ResourceExecutionBoundary, ResourceType,
+        SemanticOperator, SemanticType, SemanticTypeAssignment, SemanticTypeId, SemanticTypeStatus,
     };
     use crate::{
         component_graph::UnaryOperator, ArithmeticOperator, ComparisonOperator, LogicalOperator,
@@ -1159,9 +1185,16 @@ mod tests {
             SemanticType::Tuple(vec![SemanticType::String, SemanticType::Number]),
             todo,
             SemanticType::Union(vec![SemanticType::String, SemanticType::Null]),
+            SemanticType::Resource(ResourceType {
+                data: Box::new(SemanticType::String),
+                error: Box::new(SemanticType::Unknown),
+                pending: true,
+                serializable: true,
+                execution_boundary: ResourceExecutionBoundary::Shared,
+            }),
         ];
 
-        assert_eq!(types.len(), 13);
+        assert_eq!(types.len(), 14);
     }
 
     #[test]

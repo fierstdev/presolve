@@ -501,7 +501,8 @@ fn is_text_renderable(semantic_type: &crate::SemanticType) -> bool {
         crate::SemanticType::Never
         | crate::SemanticType::Array(_)
         | crate::SemanticType::Tuple(_)
-        | crate::SemanticType::Object(_) => false,
+        | crate::SemanticType::Object(_)
+        | crate::SemanticType::Resource(_) => false,
     }
 }
 
@@ -526,6 +527,7 @@ fn state_initializer_type_name(semantic_type: &crate::SemanticType) -> &'static 
         crate::SemanticType::Tuple(_) => "tuple",
         crate::SemanticType::Object(_) => "object",
         crate::SemanticType::Union(_) => "union",
+        crate::SemanticType::Resource(_) => "resource",
     }
 }
 
