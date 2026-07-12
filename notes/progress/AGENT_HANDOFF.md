@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: 020ed57 Add canonical expression graph queries
-* Working tree: C1 source, test, and documentation changes are present and uncommitted
+* Latest commit: f8f4c98 Add canonical semantic type model
+* Working tree: C2 source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: C1 - Canonical semantic type model
-* Summary: Added the compiler-owned semantic type algebra and its canonical empty ASM assignment container.
-* Key files: crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/lib.rs
-* New behavior: ASM now owns `SemanticType` forms for unknown, never, null, primitive, array, object, and union types. The assignment model starts empty until later slices lower declarations and inference into it.
-* Tests added or changed: Core coverage verifies the complete type algebra representation and that ASM initialization keeps legacy declared-type metadata separate from the canonical empty type model.
+* Slice: C2 - Type identities and provenance
+* Summary: Added stable identities, semantic origins, declared-or-inferred status, and source provenance to canonical type assignments.
+* Key files: crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/lib.rs
+* New behavior: Every future populated canonical type assignment carries a deterministic `SemanticTypeId`, subject, origin, status, and source location; C2 deliberately leaves lowering and inference empty.
+* Tests added or changed: Core coverage verifies deterministic type-assignment IDs and retained origin, declared status, and provenance.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C1 - Canonical semantic type model
+* Slice: C2 - Type identities and provenance
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1
-* Remaining: Phase C2 - type identities and provenance, within the expanded C1-C35 plan in `notes/progress/2026-W28.md`.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C2
+* Remaining: Phase C3 - primitive and literal types.
 
 Verification
 
@@ -48,6 +48,10 @@ Architecture decisions made
 * Decision: `SemanticType` is a compiler-owned algebra with an initially empty ASM assignment model, separate from legacy raw declared-type metadata.
 * Reason: Later inference, alias resolution, assignability, and tooling can share one canonical semantic representation without prematurely treating TypeScript text as type semantics.
 * Tradeoff: C1 lowers no annotations, infers no values or expressions, and adds no type diagnostics, identities, provenance, normalization, or query APIs.
+
+* Decision: Canonical type assignments identify the typed subject and separately retain the semantic origin, declared-or-inferred status, and source provenance.
+* Reason: Aliases, imported types, and inferred expressions will need stable attribution without collapsing their type meaning into raw TypeScript text.
+* Tradeoff: C2 defines metadata only; no assignment is populated from source, and identity does not yet model named aliases or cross-module declarations.
 
 * Decision: Browser runtime integration tests acquire one process-wide lock before creating a Chrome probe, and the probe deadline allows 20 seconds for a cold Chrome start.
 * Reason: Cargo's workspace runner schedules tests concurrently, and the previous five-second harness deadline could kill an otherwise healthy cold-start probe with SIGKILL.
@@ -362,11 +366,11 @@ Known limitations
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
-* Item: C1 provides semantic type representation only. The canonical type assignment model is empty; declared/inferred status, type provenance and identity, literals, tuples, structural object lowering, aliases, imports, inference, compatibility, and all type diagnostics remain later Phase C work.
+* Item: C2 provides semantic type representation and assignment metadata only. The canonical assignment model is empty; primitive/literal lowering, tuples, structural object lowering, aliases, imports, inference, compatibility, and type diagnostics remain later Phase C work.
 
 Exact next step
 
-Do not begin C2 automatically. When explicitly requested, start C2 - type identities and provenance, following the expanded C1-C35 Phase C plan in `notes/progress/2026-W28.md`.
+Continue automatically with C3 - primitive and literal types, committing the completed C2 slice first.
 
 Useful commands
 

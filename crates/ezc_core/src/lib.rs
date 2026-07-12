@@ -84,7 +84,10 @@ pub use semantic_graph::{
 pub use semantic_id::{SemanticId, SemanticOwner};
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
-pub use semantic_type::{ObjectType, SemanticType, SemanticTypeModel};
+pub use semantic_type::{
+    ObjectType, SemanticType, SemanticTypeAssignment, SemanticTypeId, SemanticTypeModel,
+    SemanticTypeStatus,
+};
 pub use summarize::summarize_source;
 pub use symbol_table::{
     build_symbol_table, ModuleSymbol, ModuleSymbolTable, SymbolDiagnostic, SymbolKind, SymbolTable,

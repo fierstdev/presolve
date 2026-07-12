@@ -80,6 +80,11 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn semantic_type(&self) -> Self {
+        self.child("type", "semantic")
+    }
+
+    #[must_use]
     pub fn event_handler(&self, event: &str, index: usize) -> Self {
         self.child("event", &format!("{event}:{index}"))
     }

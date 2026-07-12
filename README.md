@@ -172,6 +172,10 @@ string, array, object, and union forms plus an initially empty canonical type
 assignment model. Parsing type annotations, inference, assignability, and type
 diagnostics are intentionally deferred to later Phase C slices.
 
+Each future type assignment has a stable canonical identity, a semantic origin,
+declared-or-inferred status, and source provenance. C2 establishes this metadata
+shape without lowering authored annotations into assignments yet.
+
 ## Repository rules
 
 - No major feature without an issue.
