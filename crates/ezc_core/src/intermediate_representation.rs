@@ -859,7 +859,8 @@ fn validate_instruction(
 fn instruction_operands(kind: &IrInstructionKind) -> Vec<&IrOperand> {
     match kind {
         IrInstructionKind::StoreStorage { value, .. }
-        | IrInstructionKind::Unary { operand: value, .. } => vec![value],
+        | IrInstructionKind::Unary { operand: value, .. }
+        | IrInstructionKind::Copy { source: value } => vec![value],
         IrInstructionKind::Binary { left, right, .. } => vec![left, right],
         IrInstructionKind::Nop
         | IrInstructionKind::Constant { .. }
@@ -875,6 +876,7 @@ fn instruction_storages(kind: &IrInstructionKind) -> Vec<&IrStorageId> {
         | IrInstructionKind::StoreStorage { storage, .. } => vec![storage],
         IrInstructionKind::Nop
         | IrInstructionKind::Constant { .. }
+        | IrInstructionKind::Copy { .. }
         | IrInstructionKind::Binary { .. }
         | IrInstructionKind::Unary { .. } => Vec::new(),
     }
@@ -1130,6 +1132,9 @@ pub enum IrInstructionKind {
     Constant {
         value: IrConstant,
     },
+    Copy {
+        source: IrOperand,
+    },
     InitializeStorage {
         storage: IrStorageId,
     },
@@ -1149,6 +1154,58 @@ pub enum IrInstructionKind {
         operation: IrUnaryOperation,
         operand: IrOperand,
     },
+}
+
+/// Immutable copy-propagation pass for canonical IR operands.
+pub struct IrCopyPropagationPass;
+
+impl IrOptimizationPass for IrCopyPropagationPass {
+    fn name(&self) -> &'static str {
+        "copy-propagation"
+    }
+
+    fn run(&self, input: &IntermediateRepresentation) -> IntermediateRepresentation {
+        let mut output = input.clone();
+        for module in &mut output.modules {
+            for function in &mut module.functions {
+                let mut copies = BTreeMap::new();
+                for block in &mut function.blocks {
+                    for instruction in &mut block.instructions {
+                        replace_copy_operands(&mut instruction.kind, &copies);
+                        if let (Some(result), IrInstructionKind::Copy { source }) =
+                            (&instruction.result, &instruction.kind)
+                        {
+                            copies.insert(result.clone(), source.clone());
+                        }
+                    }
+                }
+            }
+        }
+        output
+    }
+}
+
+fn replace_copy_operands(kind: &mut IrInstructionKind, copies: &BTreeMap<IrValueId, IrOperand>) {
+    let resolve = |operand: &mut IrOperand| {
+        while let IrOperand::Value(value) = operand {
+            let Some(replacement) = copies.get(value) else {
+                break;
+            };
+            *operand = replacement.clone();
+        }
+    };
+    match kind {
+        IrInstructionKind::Copy { source }
+        | IrInstructionKind::StoreStorage { value: source, .. }
+        | IrInstructionKind::Unary {
+            operand: source, ..
+        } => resolve(source),
+        IrInstructionKind::Binary { left, right, .. } => {
+            resolve(left);
+            resolve(right);
+        }
+        _ => {}
+    }
 }
 
 /// Immutable primitive constant-folding pass for canonical IR.
