@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: D2-B - Branch edges
-* Working tree: clean after the D2-B commit
+* Latest completed slice: D2-C - Loop representation
+* Working tree: clean after the D2-C commit
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: D2-B - Branch edges
-* Summary: Added backend-neutral, source-provenanced conditional branch edges between canonical basic blocks.
+* Slice: D2-C - Loop representation
+* Summary: Added first-class canonical natural-loop regions to IR functions.
 * Key files: crates/ezc_core/src/intermediate_representation.rs
-* New behavior: `IrFunction` owns ordered `IrBranchEdge` records, each identifying its source block, target block, true/false arm, and authored provenance.
-* Tests added or changed: Core coverage locks deterministic block IDs and true-branch edge representation with provenance.
+* New behavior: `IrLoop` records a stable ID, header, body, latches, exits, and source provenance, all in terms of canonical basic-block IDs.
+* Tests added or changed: Core coverage locks stable loop IDs and natural-loop header, latch, body, and exit topology.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: D2-B - Branch edges
+* Slice: D2-C - Loop representation
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D2-B
-* Remaining: D2-C - loop representation.
+* Completed: Phase C1 through C35; Phase D1-A through D2-C
+* Remaining: D2-D - dominators.
 
 Verification
 
@@ -42,6 +42,10 @@ Architecture decisions made
 * Decision: Conditional branch arms are represented as source-provenanced directed edges owned by the enclosing IR function.
 * Reason: Later condition lowering and CFG analyses can use structural true/false connectivity without coupling to a backend or recovering topology from source control-flow syntax.
 * Tradeoff: D2-B models edge shape only. No source branches are lowered, conditions are not represented as operands, and unconditional/loop edges remain later work.
+
+* Decision: Natural loops are explicit function-owned regions with stable loop IDs and canonical block topology.
+* Reason: Dominator, post-dominator, liveness, and scheduling consumers can reason about loop boundaries without recognizing source syntax or inferring loops from backend artifacts.
+* Tradeoff: D2-C stores loop structure only. It does not derive regions from CFG edges, validate natural-loop invariants, lower source loops, or assign loop-specific instructions.
 
 * Decision: Expression graph nodes own `SourceProvenance` rather than an unqualified source span.
 * Reason: Tooling and diagnostics need the canonical expression node itself to provide a path-aware authored location without reconstructing it from a state field.
@@ -497,11 +501,11 @@ Known limitations
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
 * Item: C30 exposes direct ASM type queries only. CLI inspection output, source diagnostics, backend enforcement, resource declaration lowering, and final type diagnostic families remain later Phase C work.
-* Item: Canonical IR functions currently contain only empty entry basic blocks and optional structural conditional branch edges. There are no source-lowered branches, condition operands, terminators, loop regions, CFG analyses, or statement instructions yet.
+* Item: Canonical IR functions currently contain only empty entry basic blocks plus structural branch-edge and natural-loop records. There are no source-lowered branches or loops, condition operands, terminators, CFG analyses, or statement instructions yet.
 
 Exact next step
 
-Continue automatically with D2-C - loop representation, committing the completed D2-B slice first.
+Continue automatically with D2-D - dominators, committing the completed D2-C slice first.
 
 Useful commands
 
@@ -532,4 +536,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the D2-B commit.
+* None after the D2-C commit.
