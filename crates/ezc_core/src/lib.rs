@@ -66,7 +66,8 @@ pub use explain::{explain_json, explain_text};
 pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 pub use html_codegen::generate_static_html;
 pub use intermediate_representation::{
-    IntermediateRepresentation, IrBlock, IrFunction, IrInstruction, IrInstructionKind, IrModule,
+    lower_components_to_ir, IntermediateRepresentation, IrBlock, IrFunction, IrInstruction,
+    IrInstructionKind, IrModule,
 };
 pub use model::{
     ClassSummary, DecoratorSummary, Diagnostic, RenderMethodSummary, Severity, SourceSummary, Span,

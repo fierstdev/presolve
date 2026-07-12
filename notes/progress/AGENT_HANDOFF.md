@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: cc0e0b6 Complete Phase C type-system audit
-* Working tree: D1-A source, test, and documentation changes are present and uncommitted
+* Latest commit: 6b53603 Introduce canonical IR model
+* Working tree: D1-B source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: D1-A - Canonical IR model
-* Summary: Introduced the compiler-owned backend-neutral IR data model.
+* Slice: D1-B - Component module lowering
+* Summary: Lowered component ownership into deterministic IR module structure.
 * Key files: crates/ezc_core/src/intermediate_representation.rs
-* New behavior: IR modules, functions, blocks, and instructions now have stable owned structure and provenance, without lowering.
-* Tests added or changed: Core coverage constructs a provenance-preserving IR hierarchy.
+* New behavior: Every component is grouped under its source-path IR module; functions remain empty.
+* Tests added or changed: Core coverage locks component-to-module lowering.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: D1-A - Canonical IR model
+* Slice: D1-B - Component module lowering
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A
-* Remaining: D1-B - lower components into IR modules.
+* Completed: Phase C1 through C35; Phase D1-A through D1-B
+* Remaining: D1-C - lower methods into IR functions.
 
 Verification
 

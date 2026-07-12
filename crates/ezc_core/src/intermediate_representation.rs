@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::{SemanticId, SourceProvenance};
+use crate::{ApplicationSemanticModel, SemanticId, SourceProvenance};
 
 /// Compiler-owned intermediate representation, independent of backend output.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -12,7 +12,31 @@ pub struct IntermediateRepresentation {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IrModule {
     pub path: PathBuf,
+    pub components: Vec<SemanticId>,
     pub functions: Vec<IrFunction>,
+}
+
+/// Lowers application component ownership into deterministic IR module structure.
+#[must_use]
+pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateRepresentation {
+    let mut modules = std::collections::BTreeMap::<PathBuf, IrModule>::new();
+    for component in &model.components {
+        let Some(provenance) = model.provenance(&component.id) else {
+            continue;
+        };
+        modules
+            .entry(provenance.path.clone())
+            .or_insert_with(|| IrModule {
+                path: provenance.path.clone(),
+                components: Vec::new(),
+                functions: Vec::new(),
+            })
+            .components
+            .push(component.id.clone());
+    }
+    IntermediateRepresentation {
+        modules: modules.into_values().collect(),
+    }
 }
 
 /// One compiler-owned executable function.
@@ -49,7 +73,8 @@ pub enum IrInstructionKind {
 #[cfg(test)]
 mod tests {
     use super::{
-        IntermediateRepresentation, IrBlock, IrFunction, IrInstruction, IrInstructionKind, IrModule,
+        lower_components_to_ir, IntermediateRepresentation, IrBlock, IrFunction, IrInstruction,
+        IrInstructionKind, IrModule,
     };
     use crate::{SemanticId, SourceProvenance};
 
@@ -81,10 +106,28 @@ mod tests {
         let ir = IntermediateRepresentation {
             modules: vec![IrModule {
                 path: "src/Counter.tsx".into(),
+                components: vec![SemanticId::component(Some("x-counter"), "Counter")],
                 functions: vec![function],
             }],
         };
 
         assert_eq!(ir.modules[0].functions[0].blocks[0].instructions.len(), 1);
+    }
+
+    #[test]
+    fn lowers_components_into_modules_without_functions() {
+        let parsed = ezc_parser::parse_file(
+            "src/Counter.tsx",
+            "@component(\"x-counter\") class Counter extends Component {}",
+        );
+        let model = crate::build_application_semantic_model(&parsed);
+        let ir = lower_components_to_ir(&model);
+
+        assert_eq!(ir.modules.len(), 1);
+        assert_eq!(
+            ir.modules[0].components,
+            vec![model.components[0].id.clone()]
+        );
+        assert!(ir.modules[0].functions.is_empty());
     }
 }
