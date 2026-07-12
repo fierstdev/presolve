@@ -1185,6 +1185,45 @@ impl IrOptimizationPass for IrCopyPropagationPass {
     }
 }
 
+/// Immutable common-subexpression-elimination pass for current pure expressions.
+pub struct IrCommonSubexpressionEliminationPass;
+
+impl IrOptimizationPass for IrCommonSubexpressionEliminationPass {
+    fn name(&self) -> &'static str {
+        "common-subexpression-elimination"
+    }
+
+    fn run(&self, input: &IntermediateRepresentation) -> IntermediateRepresentation {
+        let mut output = input.clone();
+        for module in &mut output.modules {
+            for function in &mut module.functions {
+                let mut expressions = BTreeMap::<String, IrValueId>::new();
+                for block in &mut function.blocks {
+                    for instruction in &mut block.instructions {
+                        let Some(result) = instruction.result.clone() else {
+                            continue;
+                        };
+                        let key = match &instruction.kind {
+                            IrInstructionKind::Unary { .. } | IrInstructionKind::Binary { .. } => {
+                                format!("{:?}", instruction.kind)
+                            }
+                            _ => continue,
+                        };
+                        if let Some(existing) = expressions.get(&key) {
+                            instruction.kind = IrInstructionKind::Copy {
+                                source: IrOperand::Value(existing.clone()),
+                            };
+                        } else {
+                            expressions.insert(key, result);
+                        }
+                    }
+                }
+            }
+        }
+        output
+    }
+}
+
 fn replace_copy_operands(kind: &mut IrInstructionKind, copies: &BTreeMap<IrValueId, IrOperand>) {
     let resolve = |operand: &mut IrOperand| {
         while let IrOperand::Value(value) = operand {
