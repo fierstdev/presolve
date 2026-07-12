@@ -202,6 +202,22 @@ impl IrReactiveGraph {
             .filter(|edge| edge.source == source && edge.kind == IrReactiveEdgeKind::Invalidates)
             .collect()
     }
+
+    #[must_use]
+    pub fn dependencies_of(&self, target: &str) -> Vec<&IrReactiveEdge> {
+        self.edges
+            .iter()
+            .filter(|edge| edge.target == target)
+            .collect()
+    }
+
+    #[must_use]
+    pub fn dependents_of(&self, source: &str) -> Vec<&IrReactiveEdge> {
+        self.edges
+            .iter()
+            .filter(|edge| edge.source == source)
+            .collect()
+    }
 }
 
 #[must_use]
