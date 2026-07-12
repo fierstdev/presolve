@@ -22,6 +22,44 @@ pub enum SemanticOperator {
     Unary(crate::component_graph::UnaryOperator),
 }
 
+/// Whether a supported DOM binding writes an HTML attribute or a DOM property.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DomBindingKind {
+    Attribute,
+    Property,
+}
+
+/// Compiler-owned type contract for one supported DOM binding name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DomBindingContract {
+    pub name: &'static str,
+    pub kind: DomBindingKind,
+    pub semantic_type: SemanticType,
+}
+
+/// Returns the contract for the currently supported dynamic DOM bindings.
+#[must_use]
+pub fn dom_binding_contract(name: &str) -> Option<DomBindingContract> {
+    match name {
+        "disabled" => Some(DomBindingContract {
+            name: "disabled",
+            kind: DomBindingKind::Property,
+            semantic_type: SemanticType::Boolean,
+        }),
+        "href" => Some(DomBindingContract {
+            name: "href",
+            kind: DomBindingKind::Attribute,
+            semantic_type: SemanticType::String,
+        }),
+        "value" => Some(DomBindingContract {
+            name: "value",
+            kind: DomBindingKind::Property,
+            semantic_type: SemanticType::Union(vec![SemanticType::String, SemanticType::Number]),
+        }),
+        _ => None,
+    }
+}
+
 /// Compiler-owned semantic type algebra independent of TypeScript spelling.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SemanticType {
@@ -278,10 +316,12 @@ impl SemanticTypeModel {
         entities: &[TemplateSemanticEntity],
         references: &[SemanticReference],
     ) -> Self {
-        for entity in entities
-            .iter()
-            .filter(|entity| entity.kind == TemplateSemanticKind::Binding)
-        {
+        for entity in entities.iter().filter(|entity| {
+            matches!(
+                entity.kind,
+                TemplateSemanticKind::Binding | TemplateSemanticKind::AttributeBinding
+            )
+        }) {
             let Some(reference) = references.iter().find(|reference| {
                 reference.source == entity.id
                     && matches!(

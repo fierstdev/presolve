@@ -12,6 +12,7 @@ pub struct TemplateSemanticEntity {
     pub owner: SemanticOwner,
     pub kind: TemplateSemanticKind,
     pub scope: TemplateSemanticScope,
+    pub attribute_name: Option<String>,
     pub expression: Option<String>,
     pub provenance: SourceProvenance,
 }
@@ -114,6 +115,10 @@ fn collect_element(
             expression,
             span,
         );
+        entities
+            .last_mut()
+            .expect("attribute semantic entity was just inserted")
+            .attribute_name = Some(attribute.name.clone());
     }
 
     collect_children(&element.children, template, path, scope, entities);
@@ -260,6 +265,7 @@ fn push_entity(
         owner: SemanticOwner::entity(template.id.clone()),
         kind,
         scope,
+        attribute_name: None,
         expression,
         provenance: SourceProvenance::new(&template.provenance.path, span),
     });

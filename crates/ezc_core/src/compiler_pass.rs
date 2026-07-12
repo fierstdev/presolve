@@ -142,6 +142,9 @@ impl ImmutableAsmPass for ConstantFoldingPass {
             if let Some(diagnostic) = template_binding_type_diagnostic(&folded, entity) {
                 push_diagnostic_once(&mut folded.diagnostics, diagnostic);
             }
+            if let Some(diagnostic) = attribute_binding_type_diagnostic(&folded, entity) {
+                push_diagnostic_once(&mut folded.diagnostics, diagnostic);
+            }
         }
 
         let graph = ComponentGraph {
@@ -376,6 +379,34 @@ fn template_binding_type_diagnostic(
             state_initializer_type_name(&assignment.semantic_type)
         ),
     })
+}
+
+fn attribute_binding_type_diagnostic(
+    model: &ApplicationSemanticModel,
+    entity: &crate::TemplateSemanticEntity,
+) -> Option<ComponentDiagnostic> {
+    if entity.kind != crate::TemplateSemanticKind::AttributeBinding {
+        return None;
+    }
+    let name = entity.attribute_name.as_deref()?;
+    let contract = crate::dom_binding_contract(name)?;
+    let assignment = model.semantic_types.assignments.get(&entity.id)?;
+    (!crate::is_state_initializer_assignable(&assignment.semantic_type, &contract.semantic_type))
+        .then(|| ComponentDiagnostic {
+            provenance: Some(entity.provenance.clone()),
+            code: "EZC1028".to_string(),
+            message: format!(
+                "{} binding `{}` requires {}, but expression `{}` has {}",
+                match contract.kind {
+                    crate::DomBindingKind::Attribute => "attribute",
+                    crate::DomBindingKind::Property => "property",
+                },
+                name,
+                state_initializer_type_name(&contract.semantic_type),
+                entity.expression.as_deref().unwrap_or("<unknown>"),
+                state_initializer_type_name(&assignment.semantic_type)
+            ),
+        })
 }
 
 fn is_text_renderable(semantic_type: &crate::SemanticType) -> bool {
@@ -615,6 +646,51 @@ class NonRenderableBinding extends Component {
             .diagnostics
             .iter()
             .any(|diagnostic| diagnostic.message.contains("this.label")));
+    }
+
+    #[test]
+    fn validates_typed_dom_attribute_and_property_bindings() {
+        let parsed = ezc_parser::parse_file(
+            "src/TypedAttributes.tsx",
+            r#"
+@component("x-typed-attributes")
+class TypedAttributes extends Component {
+  enabled = state(true);
+  label = state("EdgeZero");
+  count = state(1);
+
+  render() {
+    return <><button disabled={this.label} value={this.count}>Save</button><a href={this.enabled}>Link</a></>;
+  }
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let value_binding = asm
+            .template_entities
+            .iter()
+            .find(|entity| entity.attribute_name.as_deref() == Some("value"))
+            .expect("value binding");
+        assert_eq!(
+            asm.semantic_types.assignments[&value_binding.id].semantic_type,
+            crate::SemanticType::Number
+        );
+
+        let folded = ConstantFoldingPass.transform(&asm);
+        let diagnostics = folded
+            .diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.code == "EZC1028")
+            .collect::<Vec<_>>();
+        assert_eq!(diagnostics.len(), 2);
+        assert!(diagnostics.iter().any(|diagnostic| {
+            diagnostic.message.contains("property binding `disabled`")
+                && diagnostic.message.contains("string")
+        }));
+        assert!(diagnostics.iter().any(|diagnostic| {
+            diagnostic.message.contains("attribute binding `href`")
+                && diagnostic.message.contains("boolean")
+        }));
     }
 
     #[test]
