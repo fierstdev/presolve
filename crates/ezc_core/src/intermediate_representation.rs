@@ -318,6 +318,194 @@ pub struct IrValue {
     pub semantic_origin: Option<SemanticId>,
 }
 
+/// A structural integrity failure in canonical IR value and operand metadata.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrValidationDiagnostic {
+    pub code: &'static str,
+    pub message: String,
+}
+
+/// Validates identity, definition, operand, and storage-reference integrity for canonical IR.
+#[must_use]
+pub fn validate_intermediate_representation(
+    representation: &IntermediateRepresentation,
+) -> Vec<IrValidationDiagnostic> {
+    let storage_ids = representation
+        .modules
+        .iter()
+        .flat_map(|module| module.storages.iter().map(|storage| storage.id.clone()))
+        .collect::<BTreeSet<_>>();
+    let mut diagnostics = Vec::new();
+    let mut instruction_ids = BTreeSet::new();
+
+    for module in &representation.modules {
+        for instruction in &module.storage_initializers {
+            validate_instruction(
+                instruction,
+                None,
+                &BTreeSet::new(),
+                &storage_ids,
+                &mut instruction_ids,
+                &mut diagnostics,
+            );
+        }
+        for function in &module.functions {
+            let function_instruction_ids = function
+                .blocks
+                .iter()
+                .flat_map(|block| {
+                    block
+                        .instructions
+                        .iter()
+                        .map(|instruction| instruction.id.clone())
+                })
+                .collect::<BTreeSet<_>>();
+            for block in &function.blocks {
+                for instruction in &block.instructions {
+                    validate_instruction(
+                        instruction,
+                        Some(function),
+                        &function_instruction_ids,
+                        &storage_ids,
+                        &mut instruction_ids,
+                        &mut diagnostics,
+                    );
+                }
+            }
+            for (id, value) in &function.values {
+                if id != &value.id {
+                    diagnostics.push(IrValidationDiagnostic {
+                        code: "EZIR1001",
+                        message: format!(
+                            "value registry key {id} does not match value ID {}",
+                            value.id
+                        ),
+                    });
+                }
+                match &value.definition {
+                    IrValueDefinition::Instruction(instruction) => {
+                        if !function_instruction_ids.contains(instruction) {
+                            diagnostics.push(IrValidationDiagnostic {
+                                code: "EZIR1002",
+                                message: format!("value {id} references missing defining instruction {instruction}"),
+                            });
+                        }
+                    }
+                    IrValueDefinition::Parameter {
+                        function: owner, ..
+                    } if owner != &function.id => {
+                        diagnostics.push(IrValidationDiagnostic {
+                            code: "EZIR1003",
+                            message: format!(
+                                "value {id} belongs to parameter function {owner}, not {}",
+                                function.id
+                            ),
+                        });
+                    }
+                    IrValueDefinition::BlockParameter { block, .. }
+                        if function.block(block).is_none() =>
+                    {
+                        diagnostics.push(IrValidationDiagnostic {
+                            code: "EZIR1004",
+                            message: format!(
+                                "value {id} references missing block parameter owner {block}"
+                            ),
+                        });
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    diagnostics
+}
+
+fn validate_instruction(
+    instruction: &IrInstruction,
+    function: Option<&IrFunction>,
+    function_instruction_ids: &BTreeSet<IrInstructionId>,
+    storage_ids: &BTreeSet<IrStorageId>,
+    instruction_ids: &mut BTreeSet<IrInstructionId>,
+    diagnostics: &mut Vec<IrValidationDiagnostic>,
+) {
+    if !instruction_ids.insert(instruction.id.clone()) {
+        diagnostics.push(IrValidationDiagnostic {
+            code: "EZIR1005",
+            message: format!("duplicate instruction ID {}", instruction.id),
+        });
+    }
+    if let (Some(function), Some(result)) = (function, &instruction.result) {
+        match function.values.get(result) {
+            Some(value)
+                if value.definition == IrValueDefinition::Instruction(instruction.id.clone()) => {}
+            _ => diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1006",
+                message: format!(
+                    "instruction {} result {result} lacks a matching value definition",
+                    instruction.id
+                ),
+            }),
+        }
+    }
+    for operand in instruction_operands(&instruction.kind) {
+        if let IrOperand::Value(value) = operand {
+            if function.is_none_or(|function| !function.values.contains_key(value)) {
+                diagnostics.push(IrValidationDiagnostic {
+                    code: "EZIR1007",
+                    message: format!(
+                        "instruction {} references unknown value {value}",
+                        instruction.id
+                    ),
+                });
+            }
+        }
+    }
+    for storage in instruction_storages(&instruction.kind) {
+        if !storage_ids.contains(storage) {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1008",
+                message: format!(
+                    "instruction {} references unknown storage {storage}",
+                    instruction.id
+                ),
+            });
+        }
+    }
+    if let Some(result) = &instruction.result {
+        if !function_instruction_ids.contains(&instruction.id) {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1009",
+                message: format!(
+                    "module instruction {} must not produce value {result}",
+                    instruction.id
+                ),
+            });
+        }
+    }
+}
+
+fn instruction_operands(kind: &IrInstructionKind) -> Vec<&IrOperand> {
+    match kind {
+        IrInstructionKind::StoreStorage { value, .. }
+        | IrInstructionKind::Unary { operand: value, .. } => vec![value],
+        IrInstructionKind::Binary { left, right, .. } => vec![left, right],
+        IrInstructionKind::Nop
+        | IrInstructionKind::InitializeStorage { .. }
+        | IrInstructionKind::LoadStorage { .. } => Vec::new(),
+    }
+}
+
+fn instruction_storages(kind: &IrInstructionKind) -> Vec<&IrStorageId> {
+    match kind {
+        IrInstructionKind::InitializeStorage { storage }
+        | IrInstructionKind::LoadStorage { storage }
+        | IrInstructionKind::StoreStorage { storage, .. } => vec![storage],
+        IrInstructionKind::Nop
+        | IrInstructionKind::Binary { .. }
+        | IrInstructionKind::Unary { .. } => Vec::new(),
+    }
+}
+
 /// A stable compiler-owned loop identity within an IR function.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct IrLoopId(String);
@@ -606,9 +794,10 @@ pub enum IrUnaryOperation {
 mod tests {
     use super::{
         compute_dominators, compute_post_dominators, lower_components_to_ir,
-        IntermediateRepresentation, IrBlock, IrBlockId, IrBranchArm, IrBranchEdge, IrConstant,
-        IrFunction, IrInstruction, IrInstructionId, IrInstructionKind, IrLoop, IrLoopId, IrModule,
-        IrOperand, IrStorageId, IrValue, IrValueDefinition, IrValueId,
+        validate_intermediate_representation, IntermediateRepresentation, IrBlock, IrBlockId,
+        IrBranchArm, IrBranchEdge, IrConstant, IrFunction, IrInstruction, IrInstructionId,
+        IrInstructionKind, IrLoop, IrLoopId, IrModule, IrOperand, IrStorageId, IrValue,
+        IrValueDefinition, IrValueId,
     };
     use crate::{SemanticId, SemanticType, SourceProvenance};
     use std::collections::BTreeMap;
@@ -1117,5 +1306,31 @@ mod tests {
                 .expect("render")
                 .id
         );
+    }
+
+    #[test]
+    fn validates_result_value_definitions_and_storage_references() {
+        let parsed = ezc_parser::parse_file(
+            "src/Counter.tsx",
+            "@component(\"x-counter\") class Counter extends Component { count = state(0); increment() {} }",
+        );
+        let model = crate::build_application_semantic_model(&parsed);
+        let mut representation = lower_components_to_ir(&model);
+        assert!(validate_intermediate_representation(&representation).is_empty());
+
+        let storage = representation.modules[0].storages[0].id.clone();
+        let function = &mut representation.modules[0].functions[0];
+        let result = IrValueId::for_function(&function.id, 0);
+        function.blocks[0].instructions.push(IrInstruction {
+            id: IrInstructionId::for_block(&function.entry_block, 0),
+            provenance: function.provenance.clone(),
+            result: Some(result),
+            semantic_origin: None,
+            kind: IrInstructionKind::LoadStorage { storage },
+        });
+
+        assert!(validate_intermediate_representation(&representation)
+            .iter()
+            .any(|diagnostic| diagnostic.code == "EZIR1006"));
     }
 }

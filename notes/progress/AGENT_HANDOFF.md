@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: D2-G5 - storage registry
-* Working tree: clean after the D2-G5 commit
+* Latest completed slice: D2-G6 - IR value validation
+* Working tree: clean after the D2-G6 commit
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: D2-G5 - storage registry
-* Summary: Lowered authored state fields to distinct IR storage-slot records.
+* Slice: D2-G6 - IR value validation
+* Summary: Added deterministic structural validation for canonical IR identity, values, operands, and storage references.
 * Key files: crates/ezc_core/src/intermediate_representation.rs
-* New behavior: `IrStorage` records a distinct storage ID, semantic origin, type, initial value, and provenance; initialization instructions now refer to storage IDs.
-* Tests added or changed: Core coverage locks state storage identity and initialization-origin linkage.
+* New behavior: `validate_intermediate_representation` checks duplicate instruction IDs, value definitions, value operands, storage operands, and definition ownership.
+* Tests added or changed: Core coverage locks clean lowered IR plus a result value missing from its registry.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: D2-G5 - storage registry
+* Slice: D2-G6 - IR value validation
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D2-G5
-* Remaining: D2-G6 - IR value validation.
+* Completed: Phase C1 through C35; Phase D1-A through D2-G6
+* Remaining: D3-A - definition/use chains.
 
 Verification
 
@@ -78,6 +78,10 @@ Architecture decisions made
 * Decision: State fields lower to `IrStorage` slots separate from both semantic identity and transient values.
 * Reason: Storage reads, writes, promotion, resumability, and reactive partitioning can evolve without treating an authored field as a runtime slot or computed value.
 * Tradeoff: D2-G5 only lowers storage declarations and initialization references; load/store source lowering and storage validation remain deferred.
+
+* Decision: IR integrity is validated as an immutable compiler-owned query over canonical IR, before data-flow consumers run.
+* Reason: Definition/use and optimization passes can reject malformed IDs, dangling operands, missing result records, and invalid storage references instead of silently producing misleading analysis.
+* Tradeoff: D2-G6 validates current structural contracts only; it does not yet validate source lowering coverage, type operation compatibility, terminators, or loop invariants.
 
 * Decision: Expression graph nodes own `SourceProvenance` rather than an unqualified source span.
 * Reason: Tooling and diagnostics need the canonical expression node itself to provide a path-aware authored location without reconstructing it from a state field.
@@ -534,11 +538,11 @@ Known limitations
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
 * Item: C30 exposes direct ASM type queries only. CLI inspection output, source diagnostics, backend enforcement, resource declaration lowering, and final type diagnostic families remain later Phase C work.
 * Item: Canonical IR functions currently contain only empty entry basic blocks plus structural branch-edge and natural-loop records. Dominator and post-dominator results include only declared conditional edges; there are no source-lowered branches or loops, condition operands, explicit terminators, or statement instructions yet.
-* Item: Function value registries remain empty during current source lowering, and storage slots are not yet loaded or stored by method instructions. D2-G6 validation is still required before D3 definition/use analysis begins.
+* Item: Source lowering still creates empty function value registries and no method load/store instructions. D3-A can analyze manually constructed canonical IR now; subsequent lowering slices must populate values before source data-flow results become non-empty.
 
 Exact next step
 
-Continue automatically with D2-G6 - IR value validation, committing the completed D2-G5 slice first.
+Continue automatically with D3-A - definition/use chains, committing the completed D2-G6 slice first.
 
 Useful commands
 
@@ -569,4 +573,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the D2-G5 commit.
+* None after the D2-G6 commit.
