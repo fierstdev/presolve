@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: 29b9df3 Resolve method locals in the ASM
-* Working tree: B9 source, test, fixture, and documentation changes are present and uncommitted
+* Latest commit: 946a9ae Fold state expressions through the ASM
+* Working tree: B10 source, test, fixture, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: B9 - Immutable constant folding pass
-* Summary: Moved supported state-expression evaluation into an immutable ASM pass and routed backend products through its canonical result.
-* Key files: crates/ezc_core/src/compiler_pass.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_cli/src/main.rs
-* New behavior: Parser lowering retains constant expression trees without evaluating them. `ConstantFoldingPass` creates a new ASM with evaluated values, source-provenanced diagnostics, and refreshed template values; CLI graph/template/HTML/manifest/build products consume the folded model.
-* Tests added or changed: Core raw-vs-folded immutability, idempotence, canonical value, diagnostic, and HTML coverage; CLI backend fixture coverage.
-* Fixtures added or changed: fixtures/0040-immutable-constant-folding.
+* Slice: B10 - Canonical expression graph
+* Summary: Added one compiler-owned graph of stable expression nodes shared by folding and ASM inspection.
+* Key files: crates/ezc_core/src/expression_graph.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/compiler_pass.rs, crates/ezc_cli/src/main.rs
+* New behavior: State initializer lowering builds one canonical graph with stable roots and recursively keyed nodes. `ConstantFoldingPass` and ASM inspection consume that graph; legacy field-local trees remain compatibility data only.
+* Tests added or changed: Core graph construction, stable-root, evaluation, and rendering coverage; CLI fixture inspection coverage; browser integration tests serialize Chrome access for stable workspace execution.
+* Fixtures added or changed: fixtures/0041-canonical-expression-graph.
 
 Current in-progress slice
 
-* Slice: B9 - Immutable constant folding pass
+* Slice: B10 - Canonical expression graph
 * Status: Complete
 * Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B9
-* Remaining: Phase B10 - canonical expression graph.
+* Remaining: Phase B11 - expression provenance.
 
 Verification
 
@@ -32,6 +32,14 @@ Verification
 * just e2e: pass
 
 Architecture decisions made
+
+* Decision: State initializer expressions have stable graph roots and recursively keyed canonical nodes in the ASM.
+* Reason: Folding and inspection now consume the same compiler-owned topology instead of independently traversing field-local lowering structures.
+* Tradeoff: B10 retains legacy field-local trees only as lowering compatibility data; every semantic consumer added in this phase reads the canonical graph. Canonical path-aware node provenance is B11 work.
+
+* Decision: Browser runtime integration tests acquire one process-wide lock before creating a Chrome probe, and the probe deadline allows 20 seconds for a cold Chrome start.
+* Reason: Cargo's workspace runner schedules tests concurrently, and the previous five-second harness deadline could kill an otherwise healthy cold-start probe with SIGKILL.
+* Tradeoff: The browser test binary runs serially under both workspace and dedicated e2e commands; independent non-browser tests remain parallel, while an actually hung probe still has a bounded deadline.
 
 * Decision: Constant evaluation is an idempotent immutable transformation from raw ASM to a newly constructed folded ASM, rather than a side effect of parser or component-graph lowering.
 * Reason: Compiler services and backend products now share one canonical evaluated result while retaining authored expression trees and preserving a read-only input model for optimization.
@@ -340,11 +348,12 @@ Known limitations
 * Item: Constant `state(...)` initializers use one compiler-owned expression model. Numeric arithmetic, comparisons, boolean logic, nullish coalescing, and unary `!`, `+`, and `-` evaluate statically. State reads, local variables, calls, coercions, truthiness, control flow, and semantic expression typing remain later Phase B work.
 * Item: Method parameters are compiler-owned identifier declarations with canonical source provenance only. They do not execute, close over values, resolve local/template/action references, or support destructuring, defaults, rest declarations, or semantic type checking.
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
-* Item: Constant folding handles only the existing supported state initializer expression language. It does not yet provide one shared expression graph, fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
+* Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
+* Item: The canonical expression graph currently covers supported state initializer expressions only. Node spans are retained for diagnostics, while path-aware canonical provenance, general expression owners, and non-state expressions remain later work.
 
 Exact next step
 
-Start Phase B10 - replace isolated initializer expression structures with one compiler-owned canonical expression graph shared by all semantic consumers.
+Start Phase B11 - attach canonical source provenance to every expression graph node.
 
 Useful commands
 
@@ -395,3 +404,4 @@ Changed but uncommitted files
 * fixtures/0038-constrained-method-parameters/
 * fixtures/0039-method-local-resolution/
 * fixtures/0040-immutable-constant-folding/
+* fixtures/0041-canonical-expression-graph/

@@ -804,6 +804,27 @@ fn immutable_constant_folding_fixture_reaches_html_backends() {
 }
 
 #[test]
+fn asm_command_inspects_canonical_expression_graph_fixture() {
+    let path = "fixtures/0041-canonical-expression-graph/input/ExpressionGraph.tsx";
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["asm", path, "--format", "json"])
+        .output()
+        .expect("failed to inspect expression graph fixture");
+    assert!(output.status.success());
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("ASM JSON");
+    let state = document["entities"]
+        .as_array()
+        .and_then(|entities| {
+            entities
+                .iter()
+                .find(|entity| entity["kind"] == "state-field")
+        })
+        .expect("state field entity");
+    assert_eq!(state["initial_expression"], "((1 + 2) * 3)");
+}
+
+#[test]
 fn asm_command_reports_primitive_declared_state_type_mismatches() {
     let repo_root = repo_root();
     let path = "fixtures/0027-declared-state-type-diagnostics/input/InvalidTypedState.tsx";

@@ -2,8 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::application_semantic_model::{ApplicationSemanticModel, SemanticEntityKind};
 use crate::component_graph::{
-    ComponentDiagnostic, ComponentGraph, ConstantExpressionKind, DeclaredStateTypeKind,
-    SerializableValue, StateOperation,
+    ComponentDiagnostic, ComponentGraph, DeclaredStateTypeKind, SerializableValue, StateOperation,
 };
 use crate::semantic_id::SemanticId;
 use crate::semantic_provenance::SourceProvenance;
@@ -84,11 +83,21 @@ impl ImmutableAsmPass for ConstantFoldingPass {
 
         for component in &mut folded.components {
             for field in &mut component.state_fields {
-                let Some(expression) = field.initial_expression.as_ref() else {
+                let Some(result) = folded.expression_graph.evaluate(&field.id) else {
                     continue;
                 };
 
-                match expression.evaluate() {
+                let root = folded
+                    .expression_graph
+                    .root_for(&field.id)
+                    .expect("expression evaluation should have a graph root");
+                let expression = folded
+                    .expression_graph
+                    .nodes
+                    .get(root)
+                    .expect("expression graph root should be a node");
+
+                match result {
                     Ok(value) => {
                         field.initial_value = Some(value);
                         if let Some(diagnostic) =
@@ -103,11 +112,12 @@ impl ImmutableAsmPass for ConstantFoldingPass {
                             provenance: folded.provenance.get(&field.id).map(|provenance| {
                                 SourceProvenance::new(&provenance.path, expression.span)
                             }),
-                            code: constant_expression_diagnostic_code(&expression.kind).to_string(),
+                            code: constant_expression_diagnostic_code_from_node(&expression.kind)
+                                .to_string(),
                             message: format!(
                                 "state field `{}` has an invalid {} initializer: {error}",
                                 field.name,
-                                constant_expression_kind_name(&expression.kind)
+                                constant_expression_kind_name_from_node(&expression.kind)
                             ),
                         },
                     ),
@@ -123,6 +133,32 @@ impl ImmutableAsmPass for ConstantFoldingPass {
         };
         folded.templates = build_template_graph(&graph).templates;
         folded
+    }
+}
+
+fn constant_expression_diagnostic_code_from_node(kind: &crate::ExpressionNodeKind) -> &'static str {
+    match kind {
+        crate::ExpressionNodeKind::Arithmetic { .. } => "EZC1022",
+        crate::ExpressionNodeKind::Comparison { .. } => "EZC1023",
+        crate::ExpressionNodeKind::Boolean(_) | crate::ExpressionNodeKind::Logical { .. } => {
+            "EZC1024"
+        }
+        crate::ExpressionNodeKind::Literal(_)
+        | crate::ExpressionNodeKind::NullishCoalescing { .. } => "EZC1025",
+        crate::ExpressionNodeKind::Unary { .. } => "EZC1026",
+    }
+}
+
+fn constant_expression_kind_name_from_node(kind: &crate::ExpressionNodeKind) -> &'static str {
+    match kind {
+        crate::ExpressionNodeKind::Arithmetic { .. } => "arithmetic",
+        crate::ExpressionNodeKind::Comparison { .. } => "comparison",
+        crate::ExpressionNodeKind::Boolean(_) | crate::ExpressionNodeKind::Logical { .. } => {
+            "logical"
+        }
+        crate::ExpressionNodeKind::Literal(_)
+        | crate::ExpressionNodeKind::NullishCoalescing { .. } => "nullish-coalescing",
+        crate::ExpressionNodeKind::Unary { .. } => "unary",
     }
 }
 
@@ -164,30 +200,6 @@ impl ImmutableAsmPass for ConstantEvaluationPass {
             }
         }
         ConstantEvaluation { values }
-    }
-}
-
-fn constant_expression_diagnostic_code(kind: &ConstantExpressionKind) -> &'static str {
-    match kind {
-        ConstantExpressionKind::Arithmetic(_) => "EZC1022",
-        ConstantExpressionKind::Comparison { .. } => "EZC1023",
-        ConstantExpressionKind::Boolean(_) | ConstantExpressionKind::Logical { .. } => "EZC1024",
-        ConstantExpressionKind::Literal(_) | ConstantExpressionKind::NullishCoalescing { .. } => {
-            "EZC1025"
-        }
-        ConstantExpressionKind::Unary { .. } => "EZC1026",
-    }
-}
-
-fn constant_expression_kind_name(kind: &ConstantExpressionKind) -> &'static str {
-    match kind {
-        ConstantExpressionKind::Arithmetic(_) => "arithmetic",
-        ConstantExpressionKind::Comparison { .. } => "comparison",
-        ConstantExpressionKind::Boolean(_) | ConstantExpressionKind::Logical { .. } => "logical",
-        ConstantExpressionKind::Literal(_) | ConstantExpressionKind::NullishCoalescing { .. } => {
-            "nullish-coalescing"
-        }
-        ConstantExpressionKind::Unary { .. } => "unary",
     }
 }
 

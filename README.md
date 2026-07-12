@@ -157,6 +157,10 @@ immutable compiler pass over the ASM. The pass produces a new canonical model
 with folded state values and diagnostics, which backend products consume. The
 parser and browser runtime do not evaluate these expressions.
 
+The ASM owns a canonical expression graph: state fields resolve to stable graph
+roots, and folding and inspection read the same graph nodes rather than
+reinterpreting field-local expression trees.
+
 ## Repository rules
 
 - No major feature without an issue.

@@ -497,7 +497,7 @@ fn asm_inspection_json(
                     owner: semantic_owner_id(owner),
                     provenance: provenance.into(),
                     declared_type: declared_state_type(entity),
-                    initial_expression: initial_expression(entity),
+                    initial_expression: initial_expression(asm, entity),
                     local_variables: method_local_variables(entity),
                     parameters: method_parameters(entity, provenance),
                 }
@@ -655,7 +655,7 @@ fn asm_entity_inspection_json(
             owner: semantic_owner_id(asm.owner(id).expect("ASM entities have owners")),
             provenance: provenance.into(),
             declared_type: declared_state_type(entity),
-            initial_expression: initial_expression(entity),
+            initial_expression: initial_expression(asm, entity),
             local_variables: method_local_variables(entity),
             parameters: method_parameters(entity, provenance),
         },
@@ -1001,12 +1001,14 @@ fn declared_state_type(entity: SemanticEntity<'_>) -> Option<AsmInspectionDeclar
     })
 }
 
-fn initial_expression(entity: SemanticEntity<'_>) -> Option<String> {
+fn initial_expression(
+    asm: &ApplicationSemanticModel,
+    entity: SemanticEntity<'_>,
+) -> Option<String> {
     let SemanticEntity::StateField(field) = entity else {
         return None;
     };
-
-    field.initial_expression.as_ref().map(ToString::to_string)
+    asm.expression_graph.render(&field.id)
 }
 
 fn method_local_variables(entity: SemanticEntity<'_>) -> Option<Vec<String>> {

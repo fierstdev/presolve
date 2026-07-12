@@ -8,6 +8,7 @@ use crate::component_graph::{
     build_component_graph_for_module, render_event_handlers, ComponentAction, ComponentDiagnostic,
     ComponentMethod, ComponentNode, MethodLocalVariable, RenderEventHandler, StateField,
 };
+use crate::expression_graph::ExpressionGraph;
 use crate::semantic_id::{SemanticId, SemanticOwner};
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
@@ -20,6 +21,7 @@ use crate::template_semantics::{
 /// Application-level semantic data assembled from the compiler's existing graphs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ApplicationSemanticModel {
+    pub expression_graph: ExpressionGraph,
     pub components: Vec<ComponentNode>,
     pub templates: Vec<TemplateNode>,
     pub template_entities: Vec<TemplateSemanticEntity>,
@@ -329,6 +331,7 @@ pub fn build_application_semantic_model_from_component_graph(
     ));
 
     ApplicationSemanticModel {
+        expression_graph: ExpressionGraph::from_components(&component_graph.components),
         components: component_graph.components.clone(),
         templates,
         template_entities,
@@ -391,6 +394,7 @@ fn build_application_semantic_model_from_files(files: &[ParsedFile]) -> Applicat
     ));
 
     ApplicationSemanticModel {
+        expression_graph: ExpressionGraph::from_components(&components),
         components,
         templates,
         template_entities,

@@ -5,10 +5,19 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Arc,
+    Arc, Mutex, MutexGuard, OnceLock, PoisonError,
 };
 use std::thread;
 use std::time::{Duration, Instant};
+
+static BROWSER_TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+fn browser_test_guard() -> MutexGuard<'static, ()> {
+    BROWSER_TEST_LOCK
+        .get_or_init(|| Mutex::new(()))
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+}
 
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -64,11 +73,12 @@ fn run_chrome_probe(chrome: PathBuf, user_data_dir: &str, probe_url: &str) -> Ou
     args.push(probe_url.to_string());
 
     let arg_refs = args.iter().map(String::as_str).collect::<Vec<_>>();
-    run_chrome_with_timeout(chrome, &arg_refs, Duration::from_secs(5))
+    run_chrome_with_timeout(chrome, &arg_refs, Duration::from_secs(20))
 }
 
 #[test]
 fn double_binding_counter_increments_in_a_real_browser() {
+    let _guard = browser_test_guard();
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/double-binding-counter");
 
@@ -127,6 +137,7 @@ fn double_binding_counter_increments_in_a_real_browser() {
 
 #[test]
 fn decrement_counter_decrements_in_a_real_browser() {
+    let _guard = browser_test_guard();
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/decrement-counter");
 
@@ -185,6 +196,7 @@ fn decrement_counter_decrements_in_a_real_browser() {
 
 #[test]
 fn add_subtract_assign_counter_updates_in_a_real_browser() {
+    let _guard = browser_test_guard();
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/add-subtract-assign");
 
@@ -243,6 +255,7 @@ fn add_subtract_assign_counter_updates_in_a_real_browser() {
 
 #[test]
 fn direct_assignment_counter_resets_in_a_real_browser() {
+    let _guard = browser_test_guard();
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/direct-assignment");
 
@@ -301,6 +314,7 @@ fn direct_assignment_counter_resets_in_a_real_browser() {
 
 #[test]
 fn boolean_toggle_flips_in_a_real_browser() {
+    let _guard = browser_test_guard();
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/boolean-toggle");
 
@@ -359,6 +373,7 @@ fn boolean_toggle_flips_in_a_real_browser() {
 
 #[test]
 fn multi_step_action_runs_all_steps_in_a_real_browser() {
+    let _guard = browser_test_guard();
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/multi-step-action");
 
@@ -417,6 +432,7 @@ fn multi_step_action_runs_all_steps_in_a_real_browser() {
 
 #[test]
 fn dynamic_attributes_update_in_a_real_browser() {
+    let _guard = browser_test_guard();
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/dynamic-attributes");
 
@@ -475,6 +491,7 @@ fn dynamic_attributes_update_in_a_real_browser() {
 
 #[test]
 fn fragments_preserve_sibling_identity_in_a_real_browser() {
+    let _guard = browser_test_guard();
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/fragments");
 
@@ -533,6 +550,7 @@ fn fragments_preserve_sibling_identity_in_a_real_browser() {
 
 #[test]
 fn conditional_branches_switch_in_a_real_browser() {
+    let _guard = browser_test_guard();
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/conditional-rendering");
 
@@ -591,6 +609,7 @@ fn conditional_branches_switch_in_a_real_browser() {
 
 #[test]
 fn logical_and_conditional_switches_to_empty_branch_in_a_real_browser() {
+    let _guard = browser_test_guard();
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/logical-and-conditional");
 
@@ -649,6 +668,7 @@ fn logical_and_conditional_switches_to_empty_branch_in_a_real_browser() {
 
 #[test]
 fn keyed_lists_reconcile_in_a_real_browser() {
+    let _guard = browser_test_guard();
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/keyed-list-reconciliation");
 
@@ -706,6 +726,7 @@ fn keyed_lists_reconcile_in_a_real_browser() {
 
 #[test]
 fn object_keyed_lists_reconcile_in_a_real_browser() {
+    let _guard = browser_test_guard();
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/object-keyed-list-reconciliation");
 
@@ -763,6 +784,7 @@ fn object_keyed_lists_reconcile_in_a_real_browser() {
 
 #[test]
 fn dynamic_list_items_refresh_in_a_real_browser() {
+    let _guard = browser_test_guard();
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/dynamic-list-item-behavior");
 
@@ -820,6 +842,7 @@ fn dynamic_list_items_refresh_in_a_real_browser() {
 
 #[test]
 fn runtime_contract_diagnostics_report_manifest_boot_failures_in_a_real_browser() {
+    let _guard = browser_test_guard();
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/runtime-contract");
 
@@ -908,6 +931,7 @@ fn runtime_contract_diagnostics_report_manifest_boot_failures_in_a_real_browser(
 
 #[test]
 fn string_state_initializes_in_a_real_browser() {
+    let _guard = browser_test_guard();
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/string-greeting");
 
@@ -966,6 +990,7 @@ fn string_state_initializes_in_a_real_browser() {
 
 #[test]
 fn boolean_state_initializes_in_a_real_browser() {
+    let _guard = browser_test_guard();
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/boolean-flags");
 
@@ -1024,6 +1049,7 @@ fn boolean_state_initializes_in_a_real_browser() {
 
 #[test]
 fn null_state_initializes_in_a_real_browser() {
+    let _guard = browser_test_guard();
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-browser-test/null-selection");
 

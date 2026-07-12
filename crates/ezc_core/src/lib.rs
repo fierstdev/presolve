@@ -11,6 +11,7 @@ pub mod compilation_unit;
 pub mod compiler_pass;
 pub mod component_graph;
 pub mod explain;
+pub mod expression_graph;
 pub mod html_codegen;
 pub mod layout_graph;
 pub mod lazy_action_chunks;
@@ -60,6 +61,7 @@ pub use component_graph::{
     SerializableValue, StateField, StateOperation,
 };
 pub use explain::{explain_json, explain_text};
+pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 pub use html_codegen::generate_static_html;
 pub use model::{
     ClassSummary, DecoratorSummary, Diagnostic, RenderMethodSummary, Severity, SourceSummary, Span,

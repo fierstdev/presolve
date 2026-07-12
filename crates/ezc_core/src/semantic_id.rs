@@ -75,6 +75,11 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn expression(&self, path: &str) -> Self {
+        self.child("expression", path)
+    }
+
+    #[must_use]
     pub fn event_handler(&self, event: &str, index: usize) -> Self {
         self.child("event", &format!("{event}:{index}"))
     }
