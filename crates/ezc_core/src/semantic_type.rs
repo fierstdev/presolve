@@ -224,6 +224,8 @@ impl SemanticTypeModel {
             );
         }
 
+        extend_with_local_type_assignments(&mut assignments, components, provenance);
+
         Self {
             assignments,
             aliases,
@@ -255,6 +257,33 @@ impl SemanticTypeModel {
             );
         }
         self
+    }
+}
+
+fn extend_with_local_type_assignments(
+    assignments: &mut BTreeMap<SemanticId, SemanticTypeAssignment>,
+    components: &[ComponentNode],
+    provenance: &BTreeMap<SemanticId, SourceProvenance>,
+) {
+    for local in components
+        .iter()
+        .flat_map(|component| &component.methods)
+        .flat_map(|method| &method.local_variables)
+    {
+        let Some(local_provenance) = provenance.get(&local.id) else {
+            continue;
+        };
+        assignments.insert(
+            local.id.clone(),
+            SemanticTypeAssignment {
+                id: SemanticTypeId::for_subject(&local.id),
+                subject: local.id.clone(),
+                semantic_type: semantic_type_from_serializable_value(&local.value),
+                origin: local.id.clone(),
+                status: SemanticTypeStatus::Inferred,
+                provenance: local_provenance.clone(),
+            },
+        );
     }
 }
 

@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: 615a31f Propagate semantic expression types
-* Working tree: C12 source, test, and documentation changes are present and uncommitted
+* Latest commit: a3483c3 Define semantic operator typing
+* Working tree: C13 source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: C12 - Operator typing
-* Summary: Centralized explicit operand and result contracts for the current canonical expression operators.
-* Key files: crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/lib.rs
-* New behavior: Arithmetic, comparison, logical, unary, and nullish-coalescing typing now uses one compiler-owned operator relation; invalid operands resolve to `unknown` pending C32 diagnostics.
-* Tests added or changed: Core coverage verifies valid results and invalid arithmetic/logical operand combinations.
+* Slice: C13 - Local variable typing
+* Summary: Added inferred canonical types for existing method-local declaration entities.
+* Key files: crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/application_semantic_model.rs
+* New behavior: Each lowered serializable method local has an inferred ASM assignment keyed by its existing local identity and source provenance; template-local references continue to target that entity.
+* Tests added or changed: Core coverage verifies a render-local's type, inferred status, provenance, ownership, and template reference edges.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C12 - Operator typing
+* Slice: C13 - Local variable typing
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C12
-* Remaining: Phase C13 - local variable typing.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C13
+* Remaining: Phase C14 - method parameter typing.
 
 Verification
 
@@ -92,6 +92,10 @@ Architecture decisions made
 * Decision: Operator typing is one compiler-owned relation over semantic operands and returns an explicit result or invalidity.
 * Reason: Expression propagation, later diagnostics, and future optimizations can share defined EdgeZero semantics rather than inheriting JavaScript coercion behavior.
 * Tradeoff: C12 covers only the current constant-expression operators. Invalid operations become `unknown` without new diagnostics until C32; strings, truthiness, calls, and non-state expression forms remain unsupported.
+
+* Decision: Existing method-local declaration entities receive inferred type assignments directly from their lowered serializable values.
+* Reason: Local bindings, template references, and tooling now meet at one canonical typed entity without inventing a second local-variable model.
+* Tradeoff: C13 covers the currently lowered serializable `const` forms. Local expressions, state reads, annotations, flow, mutation, destructuring, and action/local references require later language lowering.
 
 * Decision: Browser runtime integration tests acquire one process-wide lock before creating a Chrome probe, and the probe deadline allows 20 seconds for a cold Chrome start.
 * Reason: Cargo's workspace runner schedules tests concurrently, and the previous five-second harness deadline could kill an otherwise healthy cold-start probe with SIGKILL.
@@ -406,11 +410,11 @@ Known limitations
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
-* Item: C12 defines result types for the current state-initializer operators only. Invalid operators propagate `unknown` without diagnostics until C32; state reads, locals, templates, actions, general assignments, normalization, and final type diagnostic families remain later Phase C work.
+* Item: C13 types only currently supported serializable method locals. Local expressions, state reads, annotations, flow, mutation, destructuring, templates beyond existing local references, actions, normalization, and final type diagnostic families remain later Phase C work.
 
 Exact next step
 
-Continue automatically with C13 - local variable typing, committing the completed C12 slice first.
+Continue automatically with C14 - method parameter typing, committing the completed C13 slice first.
 
 Useful commands
 

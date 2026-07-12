@@ -148,9 +148,10 @@ support destructuring, defaults, or rest declarations.
 Supported `render()` locals may be referenced by exact identifier in normal
 template bindings and dynamic attributes. The compiler resolves those references
 to canonical local-variable ASM entities, emits `template-local` edges, and uses
-the known serializable value for initial static HTML. List-item scopes, duplicate
-local names, member access, calls, runtime updates, and closure capture remain
-unresolved.
+the known serializable value for initial static HTML. Those existing serializable
+local entities also receive inferred canonical semantic types. List-item scopes,
+duplicate local names, member access, calls, runtime updates, closure capture,
+and non-serializable local expressions remain unresolved.
 
 Constant state expressions are lowered without evaluation, then folded by an
 immutable compiler pass over the ASM. The pass produces a new canonical model

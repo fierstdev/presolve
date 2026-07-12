@@ -1423,6 +1423,11 @@ class LocalResolution extends Component {
             .expect("render method");
         let local = &render.local_variables[0];
         let references = asm.references_of_kind(SemanticReferenceKind::TemplateLocal);
+        let assignment = asm
+            .semantic_types
+            .assignments
+            .get(&local.id)
+            .expect("canonical inferred local type");
 
         assert_eq!(
             asm.owner(&local.id),
@@ -1437,6 +1442,9 @@ class LocalResolution extends Component {
             reference.target == local.id
                 && reference.provenance.path == std::path::Path::new("src/LocalResolution.tsx")
         }));
+        assert_eq!(assignment.semantic_type, crate::SemanticType::String);
+        assert_eq!(assignment.status, crate::SemanticTypeStatus::Inferred);
+        assert_eq!(assignment.provenance.span, local.span);
 
         let semantic_graph = crate::build_semantic_graph(&asm);
         assert!(semantic_graph.nodes.iter().any(|node| {
