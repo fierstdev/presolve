@@ -74,10 +74,11 @@ pub use intermediate_representation::{
     IrConstantPropagationAnalysis, IrCopyPropagationPass, IrDeadAssignmentAnalysis,
     IrDeadCodeEliminationPass, IrDefinitionUseAnalysis, IrDominatorTree, IrFunction, IrInstruction,
     IrInstructionId, IrInstructionKind, IrInstructionSimplificationPass, IrLivenessAnalysis,
-    IrLoop, IrLoopId, IrModule, IrOperand, IrOptimizationPass, IrOptimizationPipeline,
-    IrPassManager, IrPostDominatorTree, IrReachabilityAnalysis, IrStorage, IrStorageId,
-    IrTemplateEntrypoint, IrUnaryOperation, IrUse, IrUseDefinition, IrValidationDiagnostic,
-    IrValue, IrValueDefinition, IrValueId,
+    IrLoop, IrLoopId, IrModule, IrOperand, IrOptimizationMetrics, IrOptimizationPass,
+    IrOptimizationPassReport, IrOptimizationPipeline, IrOptimizationReport, IrPassManager,
+    IrPostDominatorTree, IrReachabilityAnalysis, IrStorage, IrStorageId, IrTemplateEntrypoint,
+    IrUnaryOperation, IrUse, IrUseDefinition, IrValidationDiagnostic, IrValue, IrValueDefinition,
+    IrValueId,
 };
 pub use model::{
     ClassSummary, DecoratorSummary, Diagnostic, RenderMethodSummary, Severity, SourceSummary, Span,

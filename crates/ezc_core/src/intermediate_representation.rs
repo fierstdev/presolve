@@ -431,6 +431,72 @@ impl IrOptimizationPipeline {
             .iter()
             .fold(input.clone(), |current, pass| pass.run(&current))
     }
+
+    #[must_use]
+    pub fn run_with_report(&self, input: &IntermediateRepresentation) -> IrOptimizationReport {
+        let mut current = input.clone();
+        let mut passes = Vec::new();
+        for pass in &self.passes {
+            let before = optimization_metrics(&current);
+            current = pass.run(&current);
+            passes.push(IrOptimizationPassReport {
+                name: pass.name(),
+                before,
+                after: optimization_metrics(&current),
+            });
+        }
+        IrOptimizationReport {
+            output: current,
+            passes,
+        }
+    }
+}
+
+/// Compact structural metrics for one canonical IR snapshot.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrOptimizationMetrics {
+    pub blocks: usize,
+    pub instructions: usize,
+    pub values: usize,
+}
+
+/// One pass's observable before/after optimization result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrOptimizationPassReport {
+    pub name: &'static str,
+    pub before: IrOptimizationMetrics,
+    pub after: IrOptimizationMetrics,
+}
+
+/// The output IR and ordered reports from one immutable pipeline run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrOptimizationReport {
+    pub output: IntermediateRepresentation,
+    pub passes: Vec<IrOptimizationPassReport>,
+}
+
+fn optimization_metrics(representation: &IntermediateRepresentation) -> IrOptimizationMetrics {
+    IrOptimizationMetrics {
+        blocks: representation
+            .modules
+            .iter()
+            .flat_map(|module| &module.functions)
+            .map(|function| function.blocks.len())
+            .sum(),
+        instructions: representation
+            .modules
+            .iter()
+            .flat_map(|module| &module.functions)
+            .flat_map(|function| &function.blocks)
+            .map(|block| block.instructions.len())
+            .sum(),
+        values: representation
+            .modules
+            .iter()
+            .flat_map(|module| &module.functions)
+            .map(|function| function.values.len())
+            .sum(),
+    }
 }
 
 /// Detects dead result assignments without treating storage effects as removable.
