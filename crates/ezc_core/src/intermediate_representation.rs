@@ -179,6 +179,21 @@ impl IrReactiveGraph {
         })
         .unwrap_or_default()
     }
+
+    #[must_use]
+    pub fn action_dependencies(&self, action: &str) -> Vec<&IrReactiveEdge> {
+        matches!(
+            self.nodes.get(action).map(|node| node.kind),
+            Some(IrReactiveNodeKind::Action)
+        )
+        .then(|| {
+            self.edges
+                .iter()
+                .filter(|edge| edge.source == action && edge.kind == IrReactiveEdgeKind::Reads)
+                .collect()
+        })
+        .unwrap_or_default()
+    }
 }
 
 #[must_use]
