@@ -303,6 +303,42 @@ pub fn build_application_semantic_model(parsed: &ParsedFile) -> ApplicationSeman
     build_application_semantic_model_from_files(std::slice::from_ref(parsed))
 }
 
+/// Assemble canonical ASM from an existing component graph while preserving its identity mode.
+#[must_use]
+pub fn build_application_semantic_model_from_component_graph(
+    component_graph: &crate::component_graph::ComponentGraph,
+) -> ApplicationSemanticModel {
+    let templates = build_template_graph(component_graph).templates;
+    let template_entities = build_template_semantic_entities(&templates);
+    let ownership = collect_ownership(&component_graph.components, &templates, &template_entities);
+    let mut references = component_graph.references.clone();
+    references.extend(build_template_state_references(
+        &component_graph.components,
+        &template_entities,
+        &ownership,
+    ));
+    references.extend(build_template_event_references(
+        &component_graph.components,
+        &template_entities,
+        &ownership,
+    ));
+    references.extend(build_template_local_references(
+        &component_graph.components,
+        &template_entities,
+        &ownership,
+    ));
+
+    ApplicationSemanticModel {
+        components: component_graph.components.clone(),
+        templates,
+        template_entities,
+        diagnostics: component_graph.diagnostics.clone(),
+        ownership,
+        references,
+        provenance: component_graph.provenance.clone(),
+    }
+}
+
 #[must_use]
 pub fn build_application_semantic_model_for_unit(
     unit: &CompilationUnit,

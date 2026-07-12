@@ -152,6 +152,11 @@ the known serializable value for initial static HTML. List-item scopes, duplicat
 local names, member access, calls, runtime updates, and closure capture remain
 unresolved.
 
+Constant state expressions are lowered without evaluation, then folded by an
+immutable compiler pass over the ASM. The pass produces a new canonical model
+with folded state values and diagnostics, which backend products consume. The
+parser and browser runtime do not evaluate these expressions.
+
 ## Repository rules
 
 - No major feature without an issue.

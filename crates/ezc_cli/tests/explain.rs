@@ -783,6 +783,27 @@ fn asm_command_resolves_supported_method_local_bindings() {
 }
 
 #[test]
+fn immutable_constant_folding_fixture_reaches_html_backends() {
+    let repo_root = repo_root();
+    let input = "fixtures/0040-immutable-constant-folding/input/FoldedState.tsx";
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["html", input])
+        .output()
+        .expect("failed to render folded constant fixture");
+    assert!(output.status.success());
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    let expected = std::fs::read_to_string(
+        repo_root.join("fixtures/0040-immutable-constant-folding/expected/html.html"),
+    )
+    .expect("failed to read folded constant HTML expectation");
+    assert_eq!(
+        normalize_html_for_fixture(&actual),
+        normalize_html_for_fixture(&expected)
+    );
+}
+
+#[test]
 fn asm_command_reports_primitive_declared_state_type_mismatches() {
     let repo_root = repo_root();
     let path = "fixtures/0027-declared-state-type-diagnostics/input/InvalidTypedState.tsx";

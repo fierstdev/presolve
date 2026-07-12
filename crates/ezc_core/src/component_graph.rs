@@ -671,7 +671,6 @@ fn build_component_node(
 
     let state_fields = state_fields_from_class(class, path, &id);
 
-    collect_constant_initializer_diagnostics(&state_fields, path, diagnostics);
     collect_declared_state_type_diagnostics(&state_fields, &class.name, diagnostics);
     collect_declared_state_action_type_diagnostics(class, &state_fields, path, diagnostics);
     collect_declared_state_toggle_type_diagnostics(class, &state_fields, path, diagnostics);
@@ -779,12 +778,7 @@ fn state_fields_from_class(class: &ParsedClass, path: &Path, id: &SemanticId) ->
             let initial_value = property
                 .state_initial_value
                 .as_ref()
-                .map(serializable_value_from_parsed)
-                .or_else(|| {
-                    initial_expression
-                        .as_ref()
-                        .and_then(|expression| expression.evaluate().ok())
-                });
+                .map(serializable_value_from_parsed);
 
             StateField {
                 id: id.state_field(&property.name),
@@ -904,40 +898,6 @@ fn logical_operator_from_parsed(operator: ParsedLogicalOperator) -> LogicalOpera
     match operator {
         ParsedLogicalOperator::And => LogicalOperator::And,
         ParsedLogicalOperator::Or => LogicalOperator::Or,
-    }
-}
-
-fn collect_constant_initializer_diagnostics(
-    state_fields: &[StateField],
-    path: &Path,
-    diagnostics: &mut Vec<ComponentDiagnostic>,
-) {
-    for field in state_fields {
-        let Some(expression) = &field.initial_expression else {
-            continue;
-        };
-        let Err(error) = expression.evaluate() else {
-            continue;
-        };
-
-        let (code, initializer_kind) = match &expression.kind {
-            ConstantExpressionKind::Arithmetic(_) => ("EZC1022", "arithmetic"),
-            ConstantExpressionKind::Comparison { .. } => ("EZC1023", "comparison"),
-            ConstantExpressionKind::Boolean(_) | ConstantExpressionKind::Logical { .. } => {
-                ("EZC1024", "logical")
-            }
-            ConstantExpressionKind::Literal(_)
-            | ConstantExpressionKind::NullishCoalescing { .. } => ("EZC1025", "nullish-coalescing"),
-            ConstantExpressionKind::Unary { .. } => ("EZC1026", "unary"),
-        };
-        diagnostics.push(ComponentDiagnostic {
-            provenance: Some(SourceProvenance::new(path, expression.span)),
-            code: code.to_string(),
-            message: format!(
-                "state field `{}` has an invalid {initializer_kind} initializer: {error}",
-                field.name
-            ),
-        });
     }
 }
 

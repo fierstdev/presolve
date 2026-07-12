@@ -37,7 +37,8 @@ pub mod template_semantics;
 
 pub use application_semantic_model::{
     build_application_semantic_model, build_application_semantic_model_for_unit,
-    ApplicationSemanticModel, SemanticEntity, SemanticEntityKind,
+    build_application_semantic_model_from_component_graph, ApplicationSemanticModel,
+    SemanticEntity, SemanticEntityKind,
 };
 pub use asm_validation::{validate_application_semantic_model, AsmValidationDiagnostic};
 pub use binding_table::{
@@ -46,8 +47,8 @@ pub use binding_table::{
 };
 pub use compilation_unit::CompilationUnit;
 pub use compiler_pass::{
-    AnalysisPass, ConstantEvaluation, ConstantEvaluationPass, DependencyAnalysis,
-    DependencyAnalysisPass, ImmutableAsmPass,
+    fold_component_graph, AnalysisPass, ConstantEvaluation, ConstantEvaluationPass,
+    ConstantFoldingPass, DependencyAnalysis, DependencyAnalysisPass, ImmutableAsmPass,
 };
 pub use component_graph::{
     build_component_graph, build_component_graph_for_module, ArithmeticEvaluationError,
@@ -336,7 +337,7 @@ class Parameters extends Component {
 "#,
         );
 
-        let graph = build_component_graph_for_module(&parsed);
+        let graph = fold_component_graph(&build_component_graph_for_module(&parsed));
         let method = &graph.components[0].methods[0];
 
         assert_eq!(method.name, "save");
@@ -444,7 +445,7 @@ class Panel extends Component {
 "#,
         );
 
-        let graph = build_component_graph_for_module(&parsed);
+        let graph = fold_component_graph(&build_component_graph_for_module(&parsed));
         let graph_type = graph.components[0].state_fields[0]
             .declared_type
             .as_ref()
@@ -481,7 +482,7 @@ class ArithmeticState extends Component {
 }
 "#,
         );
-        let graph = build_component_graph_for_module(&parsed);
+        let graph = fold_component_graph(&build_component_graph_for_module(&parsed));
         let field = &graph.components[0].state_fields[0];
 
         assert_eq!(
@@ -522,7 +523,7 @@ class ArithmeticState extends Component {
 }
 "#,
         );
-        let graph = build_component_graph_for_module(&parsed);
+        let graph = fold_component_graph(&build_component_graph_for_module(&parsed));
         let diagnostic = graph
             .diagnostics
             .iter()
@@ -559,7 +560,7 @@ class ComparisonState extends Component {
 }
 "#,
         );
-        let graph = build_component_graph_for_module(&parsed);
+        let graph = fold_component_graph(&build_component_graph_for_module(&parsed));
         let fields = &graph.components[0].state_fields;
 
         assert_eq!(
@@ -595,7 +596,7 @@ class ComparisonState extends Component {
 }
 "#,
         );
-        let graph = build_component_graph_for_module(&parsed);
+        let graph = fold_component_graph(&build_component_graph_for_module(&parsed));
         let diagnostic = graph
             .diagnostics
             .iter()
@@ -630,7 +631,7 @@ class LogicalState extends Component {
 }
 "#,
         );
-        let graph = build_component_graph_for_module(&parsed);
+        let graph = fold_component_graph(&build_component_graph_for_module(&parsed));
         let fields = &graph.components[0].state_fields;
 
         assert_eq!(
@@ -667,7 +668,7 @@ class LogicalState extends Component {
 }
 "#,
         );
-        let graph = build_component_graph_for_module(&parsed);
+        let graph = fold_component_graph(&build_component_graph_for_module(&parsed));
         let diagnostic = graph
             .diagnostics
             .iter()
@@ -700,7 +701,7 @@ class NullishState extends Component {
 }
 "#,
         );
-        let graph = build_component_graph_for_module(&parsed);
+        let graph = fold_component_graph(&build_component_graph_for_module(&parsed));
         let fields = &graph.components[0].state_fields;
 
         assert_eq!(
@@ -735,7 +736,7 @@ class UnaryState extends Component {
 }
 "#,
         );
-        let graph = build_component_graph_for_module(&parsed);
+        let graph = fold_component_graph(&build_component_graph_for_module(&parsed));
         assert_eq!(
             graph.components[0].state_fields[0].initial_value,
             Some(SerializableValue::Boolean(false))
@@ -757,7 +758,7 @@ class NullishState extends Component {
 }
 "#,
         );
-        let graph = build_component_graph_for_module(&parsed);
+        let graph = fold_component_graph(&build_component_graph_for_module(&parsed));
         let diagnostic = graph
             .diagnostics
             .iter()

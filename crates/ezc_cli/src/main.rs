@@ -8,12 +8,13 @@ use std::process;
 use ezc_core::{
     build_application_semantic_model_for_unit, build_component_graph, build_semantic_graph,
     build_template_graph, build_template_manifest, explain_json, explain_text,
-    generate_runtime_stub, generate_standalone_page, generate_static_html, semantic_graph_json,
-    summarize_source, template_manifest_json, validate_application_semantic_model,
-    ApplicationSemanticModel, AsmValidationDiagnostic, AttributeValue, CompilationUnit,
-    ComponentGraph, DeclaredStateTypeKind, RenderAttribute, RenderAttributeValue, SemanticEntity,
-    SemanticEntityKind, SemanticId, SemanticOwner, SemanticReferenceKind, SerializableValue,
-    SourceProvenance, StateOperation, TemplateChild, TemplateGraph, TemplateSemanticKind,
+    fold_component_graph, generate_runtime_stub, generate_standalone_page, generate_static_html,
+    semantic_graph_json, summarize_source, template_manifest_json,
+    validate_application_semantic_model, ApplicationSemanticModel, AsmValidationDiagnostic,
+    AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
+    ImmutableAsmPass, RenderAttribute, RenderAttributeValue, SemanticEntity, SemanticEntityKind,
+    SemanticId, SemanticOwner, SemanticReferenceKind, SerializableValue, SourceProvenance,
+    StateOperation, TemplateChild, TemplateGraph, TemplateSemanticKind,
 };
 use ezc_parser::{
     parse_file, ParseDiagnostic, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
@@ -96,7 +97,7 @@ fn run_graph(mut args: Vec<String>) {
     });
 
     let parsed = parse_file(&path, &source);
-    let graph = build_component_graph(&parsed);
+    let graph = fold_component_graph(&build_component_graph(&parsed));
 
     print_component_graph(&path, &graph);
 }
@@ -124,6 +125,7 @@ fn run_asm_inspection(inputs: AsmInputs) {
         .map(|file| file.path.clone())
         .collect::<Vec<_>>();
     let asm = build_application_semantic_model_for_unit(&unit);
+    let asm = ConstantFoldingPass.transform(&asm);
     let validation = validate_application_semantic_model(&asm);
 
     if inputs.format == "graph" {
@@ -187,6 +189,7 @@ fn run_check(args: &[String]) {
         .collect::<Vec<_>>();
     let unit = CompilationUnit::parse_sources(sources);
     let asm = build_application_semantic_model_for_unit(&unit);
+    let asm = ConstantFoldingPass.transform(&asm);
     let validation = validate_application_semantic_model(&asm);
     let parser_diagnostic_count = unit
         .files()
@@ -1189,7 +1192,7 @@ fn run_template(mut args: Vec<String>) {
     });
 
     let parsed = parse_file(&path, &source);
-    let component_graph = build_component_graph(&parsed);
+    let component_graph = fold_component_graph(&build_component_graph(&parsed));
     let template_graph = build_template_graph(&component_graph);
 
     print_template_graph(&path, &template_graph);
@@ -1209,7 +1212,7 @@ fn run_html(mut args: Vec<String>) {
     });
 
     let parsed = parse_file(&path, &source);
-    let component_graph = build_component_graph(&parsed);
+    let component_graph = fold_component_graph(&build_component_graph(&parsed));
     let template_graph = build_template_graph(&component_graph);
     let html = generate_static_html(&template_graph);
 
@@ -1230,7 +1233,7 @@ fn run_manifest(mut args: Vec<String>) {
     });
 
     let parsed = parse_file(&path, &source);
-    let component_graph = build_component_graph(&parsed);
+    let component_graph = fold_component_graph(&build_component_graph(&parsed));
     let template_graph = build_template_graph(&component_graph);
     let manifest = build_template_manifest(&component_graph, &template_graph);
 
@@ -1252,7 +1255,7 @@ fn run_build(mut args: Vec<String>) {
     });
 
     let parsed = parse_file(&input_path, &source);
-    let component_graph = build_component_graph(&parsed);
+    let component_graph = fold_component_graph(&build_component_graph(&parsed));
     let template_graph = build_template_graph(&component_graph);
     let html_fragment = generate_static_html(&template_graph);
     let manifest = build_template_manifest(&component_graph, &template_graph);
