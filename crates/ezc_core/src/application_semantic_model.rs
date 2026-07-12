@@ -727,6 +727,54 @@ class LiteralTypes extends Component {
     }
 
     #[test]
+    fn lowers_array_and_tuple_state_annotations_into_canonical_types() {
+        let parsed = ezc_parser::parse_file(
+            "src/CollectionTypes.tsx",
+            r#"
+@component("x-collection-types")
+class CollectionTypes extends Component {
+  names: string[] = state([]);
+  todos: Todo[] = state([]);
+  pair: [string, number] = state(["EdgeZero", 1]);
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        let types = asm.components[0]
+            .state_fields
+            .iter()
+            .map(|field| {
+                (
+                    field.name.as_str(),
+                    &asm.semantic_types.assignments[&field.id].semantic_type,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            types,
+            vec![
+                (
+                    "names",
+                    &crate::SemanticType::Array(Box::new(crate::SemanticType::String)),
+                ),
+                (
+                    "todos",
+                    &crate::SemanticType::Array(Box::new(crate::SemanticType::Unknown)),
+                ),
+                (
+                    "pair",
+                    &crate::SemanticType::Tuple(vec![
+                        crate::SemanticType::String,
+                        crate::SemanticType::Number,
+                    ]),
+                ),
+            ]
+        );
+    }
+
+    #[test]
     fn derives_component_ownership_without_legacy_owner_fields() {
         let parsed = ezc_parser::parse_file(
             "src/Counter.tsx",

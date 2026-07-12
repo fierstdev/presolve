@@ -16,6 +16,7 @@ pub enum SemanticType {
     NumberLiteral(String),
     StringLiteral(String),
     Array(Box<SemanticType>),
+    Tuple(Vec<SemanticType>),
     Object(ObjectType),
     Union(Vec<SemanticType>),
 }
@@ -112,6 +113,23 @@ impl SemanticTypeModel {
 }
 
 fn semantic_type_from_annotation(text: &str) -> Option<SemanticType> {
+    let text = text.trim();
+    if let Some(element) = text.strip_suffix("[]") {
+        return Some(SemanticType::Array(Box::new(
+            semantic_type_from_annotation(element).unwrap_or(SemanticType::Unknown),
+        )));
+    }
+    if text.starts_with('[') && text.ends_with(']') {
+        let items = &text[1..text.len() - 1];
+        return Some(SemanticType::Tuple(
+            items
+                .split(',')
+                .filter(|item| !item.trim().is_empty())
+                .map(|item| semantic_type_from_annotation(item).unwrap_or(SemanticType::Unknown))
+                .collect(),
+        ));
+    }
+
     match text {
         "string" => Some(SemanticType::String),
         "number" => Some(SemanticType::Number),
@@ -164,11 +182,12 @@ mod tests {
             SemanticType::NumberLiteral("42".to_string()),
             SemanticType::StringLiteral("all".to_string()),
             SemanticType::Array(Box::new(SemanticType::Number)),
+            SemanticType::Tuple(vec![SemanticType::String, SemanticType::Number]),
             todo,
             SemanticType::Union(vec![SemanticType::String, SemanticType::Null]),
         ];
 
-        assert_eq!(types.len(), 12);
+        assert_eq!(types.len(), 13);
     }
 
     #[test]

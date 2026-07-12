@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: 5c00c2b Add type identities and provenance
-* Working tree: C3 source, test, and documentation changes are present and uncommitted
+* Latest commit: ee2c4ed Lower primitive and literal semantic types
+* Working tree: C4 source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: C3 - Primitive and literal types
-* Summary: Lowered supported primitive and literal state annotations into canonical semantic type assignments.
+* Slice: C4 - Array and tuple types
+* Summary: Added canonical tuple types and lowered supported array and tuple state annotations.
 * Key files: crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/application_semantic_model.rs
-* New behavior: Declared state annotations now produce canonical `string`, `number`, `boolean`, `null`, string-literal, numeric-literal, and boolean-literal types with C2 metadata.
-* Tests added or changed: Core coverage verifies primitive and literal annotation lowering, canonical assignment identity, status, and provenance.
+* New behavior: `T[]` annotations lower to arrays, while `[T, U]` annotations lower to ordered tuple types. Unresolved array element names are retained as `unknown` until alias/import resolution.
+* Tests added or changed: Core coverage verifies primitive arrays, unresolved-name arrays, and ordered tuple annotations.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C3 - Primitive and literal types
+* Slice: C4 - Array and tuple types
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C3
-* Remaining: Phase C4 - array and tuple types.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C4
+* Remaining: Phase C5 - object structural types.
 
 Verification
 
@@ -56,6 +56,10 @@ Architecture decisions made
 * Decision: C3 lowers only exact primitive and literal state annotation text into canonical semantic types.
 * Reason: The compiler gains durable primitive and literal semantics while later slices add structured parsing for arrays, tuples, objects, unions, aliases, and imports.
 * Tradeoff: Unsupported annotation text produces no canonical assignment or diagnostic yet; C3 does not infer from initial values or alter existing compatibility diagnostics.
+
+* Decision: C4 represents tuples directly and lowers unresolved array element names as `unknown` rather than raw TypeScript names.
+* Reason: Collection topology is canonical now, while alias and import slices can later replace unknown element meaning without revising the array contract.
+* Tradeoff: Tuple parsing is limited to comma-separated current annotation forms; object elements, nested delimiter-aware parsing, and named-type resolution remain later work.
 
 * Decision: Browser runtime integration tests acquire one process-wide lock before creating a Chrome probe, and the probe deadline allows 20 seconds for a cold Chrome start.
 * Reason: Cargo's workspace runner schedules tests concurrently, and the previous five-second harness deadline could kill an otherwise healthy cold-start probe with SIGKILL.
@@ -370,11 +374,11 @@ Known limitations
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
-* Item: C3 recognizes only exact primitive and literal state annotations. Arrays, tuples, objects, unions, aliases, imports, inference, compatibility, and type diagnostics remain later Phase C work.
+* Item: C4 recognizes supported array and tuple annotation forms. Structural object elements, unions, aliases, imports, inference, compatibility, and type diagnostics remain later Phase C work.
 
 Exact next step
 
-Continue automatically with C4 - array and tuple types, committing the completed C3 slice first.
+Continue automatically with C5 - object structural types, committing the completed C4 slice first.
 
 Useful commands
 
