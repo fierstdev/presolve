@@ -11,6 +11,7 @@ pub struct TemplateSemanticEntity {
     pub id: SemanticId,
     pub owner: SemanticOwner,
     pub kind: TemplateSemanticKind,
+    pub scope: TemplateSemanticScope,
     pub expression: Option<String>,
     pub provenance: SourceProvenance,
 }
@@ -28,16 +29,35 @@ pub enum TemplateSemanticKind {
     List,
 }
 
+/// The lexical template scope in which an authored template entity appears.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TemplateSemanticScope {
+    Render,
+    ListItem,
+}
+
 #[must_use]
 pub fn build_template_semantic_entities(templates: &[TemplateNode]) -> Vec<TemplateSemanticEntity> {
     let mut entities = Vec::new();
 
     for template in templates {
         if let Some(root) = &template.root {
-            collect_element(root, template, "root", &mut entities);
+            collect_element(
+                root,
+                template,
+                "root",
+                TemplateSemanticScope::Render,
+                &mut entities,
+            );
         }
         if let Some(root) = &template.root_fragment {
-            collect_fragment(root, template, "root", &mut entities);
+            collect_fragment(
+                root,
+                template,
+                "root",
+                TemplateSemanticScope::Render,
+                &mut entities,
+            );
         }
     }
 
@@ -48,12 +68,14 @@ fn collect_element(
     element: &ElementNode,
     template: &TemplateNode,
     path: &str,
+    scope: TemplateSemanticScope,
     entities: &mut Vec<TemplateSemanticEntity>,
 ) {
     push_entity(
         entities,
         template,
         TemplateSemanticKind::Element,
+        scope,
         "element",
         path,
         None,
@@ -82,6 +104,7 @@ fn collect_element(
             entities,
             template,
             kind,
+            scope,
             match kind {
                 TemplateSemanticKind::AttributeBinding => "attribute-binding",
                 TemplateSemanticKind::EventAttribute => "event-attribute",
@@ -93,31 +116,34 @@ fn collect_element(
         );
     }
 
-    collect_children(&element.children, template, path, entities);
+    collect_children(&element.children, template, path, scope, entities);
 }
 
 fn collect_fragment(
     fragment: &FragmentNode,
     template: &TemplateNode,
     path: &str,
+    scope: TemplateSemanticScope,
     entities: &mut Vec<TemplateSemanticEntity>,
 ) {
     push_entity(
         entities,
         template,
         TemplateSemanticKind::Fragment,
+        scope,
         "fragment",
         path,
         None,
         fragment.span,
     );
-    collect_children(&fragment.children, template, path, entities);
+    collect_children(&fragment.children, template, path, scope, entities);
 }
 
 fn collect_children(
     children: &[TemplateChild],
     template: &TemplateNode,
     parent_path: &str,
+    scope: TemplateSemanticScope,
     entities: &mut Vec<TemplateSemanticEntity>,
 ) {
     for (index, child) in children.iter().enumerate() {
@@ -127,6 +153,7 @@ fn collect_children(
                 entities,
                 template,
                 TemplateSemanticKind::Text,
+                scope,
                 "text",
                 &path,
                 None,
@@ -138,19 +165,22 @@ fn collect_children(
                 entities,
                 template,
                 TemplateSemanticKind::Binding,
+                scope,
                 "binding",
                 &path,
                 Some(expression.clone()),
                 *span,
             ),
-            TemplateChild::Element(element) => collect_element(element, template, &path, entities),
+            TemplateChild::Element(element) => {
+                collect_element(element, template, &path, scope, entities);
+            }
             TemplateChild::Fragment(fragment) => {
-                collect_fragment(fragment, template, &path, entities);
+                collect_fragment(fragment, template, &path, scope, entities);
             }
             TemplateChild::Conditional(conditional) => {
-                collect_conditional(conditional, template, &path, entities);
+                collect_conditional(conditional, template, &path, scope, entities);
             }
-            TemplateChild::List(list) => collect_list(list, template, &path, entities),
+            TemplateChild::List(list) => collect_list(list, template, &path, scope, entities),
         }
     }
 }
@@ -159,12 +189,14 @@ fn collect_conditional(
     conditional: &ConditionalNode,
     template: &TemplateNode,
     path: &str,
+    scope: TemplateSemanticScope,
     entities: &mut Vec<TemplateSemanticEntity>,
 ) {
     push_entity(
         entities,
         template,
         TemplateSemanticKind::Conditional,
+        scope,
         "conditional",
         path,
         Some(conditional.condition.clone()),
@@ -174,12 +206,14 @@ fn collect_conditional(
         &conditional.when_true,
         template,
         &format!("{path}.true"),
+        scope,
         entities,
     );
     collect_children(
         &conditional.when_false,
         template,
         &format!("{path}.false"),
+        scope,
         entities,
     );
 }
@@ -188,12 +222,14 @@ fn collect_list(
     list: &ListNode,
     template: &TemplateNode,
     path: &str,
+    scope: TemplateSemanticScope,
     entities: &mut Vec<TemplateSemanticEntity>,
 ) {
     push_entity(
         entities,
         template,
         TemplateSemanticKind::List,
+        scope,
         "list",
         path,
         Some(list.iterable.clone()),
@@ -203,14 +239,17 @@ fn collect_list(
         &list.item_template,
         template,
         &format!("{path}.item"),
+        TemplateSemanticScope::ListItem,
         entities,
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 fn push_entity(
     entities: &mut Vec<TemplateSemanticEntity>,
     template: &TemplateNode,
     kind: TemplateSemanticKind,
+    scope: TemplateSemanticScope,
     id_kind: &str,
     path: &str,
     expression: Option<String>,
@@ -220,6 +259,7 @@ fn push_entity(
         id: template.id.template_entity(id_kind, path),
         owner: SemanticOwner::entity(template.id.clone()),
         kind,
+        scope,
         expression,
         provenance: SourceProvenance::new(&template.provenance.path, span),
     });

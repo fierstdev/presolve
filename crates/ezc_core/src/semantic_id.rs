@@ -153,7 +153,10 @@ mod tests {
             "component:x-counter/action:increment:0"
         );
         assert_eq!(
-            component.method("render").local_variable("title", 0).as_str(),
+            component
+                .method("render")
+                .local_variable("title", 0)
+                .as_str(),
             "component:x-counter/method:render/local:title:0"
         );
         assert_eq!(

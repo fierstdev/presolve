@@ -1,7 +1,7 @@
 use crate::component_graph::{
-    ComponentGraph, RenderAttribute, RenderAttributeValue, RenderChild, RenderConditional,
-    RenderElement, RenderEventHandler, RenderFragment, RenderList, RenderModel, SerializableValue,
-    StateField,
+    ComponentGraph, MethodLocalVariable, RenderAttribute, RenderAttributeValue, RenderChild,
+    RenderConditional, RenderElement, RenderEventHandler, RenderFragment, RenderList, RenderModel,
+    SerializableValue, StateField,
 };
 use ezc_parser::SourceSpan;
 
@@ -140,25 +140,38 @@ pub fn build_template_graph(component_graph: &ComponentGraph) -> TemplateGraph {
     let templates = component_graph
         .components
         .iter()
-        .map(|component| TemplateNode {
-            id: component.id.template(),
-            owner: SemanticOwner::entity(component.id.clone()),
-            provenance: component_graph
-                .provenance
-                .get(&component.id.template())
-                .or_else(|| component_graph.provenance.get(&component.id))
-                .cloned()
-                .expect("component semantic provenance should exist"),
-            component_name: component.class_name.clone(),
-            root: component
-                .render
-                .as_ref()
-                .and_then(|render| element_from_render(render, &component.state_fields, &mut ids)),
-            root_fragment: component.render.as_ref().and_then(|render| {
-                render.root_fragment.as_ref().map(|fragment| {
-                    fragment_from_render_fragment(fragment, &component.state_fields, &mut ids, None)
-                })
-            }),
+        .map(|component| {
+            let local_variables = component
+                .methods
+                .iter()
+                .find(|method| method.name == "render")
+                .map_or(&[][..], |method| method.local_variables.as_slice());
+
+            TemplateNode {
+                id: component.id.template(),
+                owner: SemanticOwner::entity(component.id.clone()),
+                provenance: component_graph
+                    .provenance
+                    .get(&component.id.template())
+                    .or_else(|| component_graph.provenance.get(&component.id))
+                    .cloned()
+                    .expect("component semantic provenance should exist"),
+                component_name: component.class_name.clone(),
+                root: component.render.as_ref().and_then(|render| {
+                    element_from_render(render, &component.state_fields, local_variables, &mut ids)
+                }),
+                root_fragment: component.render.as_ref().and_then(|render| {
+                    render.root_fragment.as_ref().map(|fragment| {
+                        fragment_from_render_fragment(
+                            fragment,
+                            &component.state_fields,
+                            local_variables,
+                            &mut ids,
+                            None,
+                        )
+                    })
+                }),
+            }
         })
         .collect::<Vec<_>>();
 
@@ -168,6 +181,7 @@ pub fn build_template_graph(component_graph: &ComponentGraph) -> TemplateGraph {
 fn element_from_render(
     render: &RenderModel,
     state_fields: &[StateField],
+    local_variables: &[MethodLocalVariable],
     ids: &mut TemplateIdAllocator,
 ) -> Option<ElementNode> {
     let tag_name = render.root_element.clone()?;
@@ -181,6 +195,7 @@ fn element_from_render(
         &render.event_handlers,
         &direct_bindings,
         state_fields,
+        local_variables,
         ids,
         None,
     );
@@ -188,7 +203,7 @@ fn element_from_render(
     let children = render
         .children
         .iter()
-        .map(|child| template_child_from_render(child, state_fields, ids, None))
+        .map(|child| template_child_from_render(child, state_fields, local_variables, ids, None))
         .collect::<Vec<_>>();
 
     Some(ElementNode {
@@ -203,6 +218,7 @@ fn element_from_render(
 fn element_from_render_element(
     element: &RenderElement,
     state_fields: &[StateField],
+    local_variables: &[MethodLocalVariable],
     ids: &mut TemplateIdAllocator,
     list_scope: Option<ListItemTemplateScope<'_>>,
 ) -> ElementNode {
@@ -217,13 +233,16 @@ fn element_from_render_element(
             &element.event_handlers,
             &collect_direct_bindings_from_children(&element.children),
             state_fields,
+            local_variables,
             ids,
             list_scope,
         ),
         children: element
             .children
             .iter()
-            .map(|child| template_child_from_render(child, state_fields, ids, list_scope))
+            .map(|child| {
+                template_child_from_render(child, state_fields, local_variables, ids, list_scope)
+            })
             .collect::<Vec<_>>(),
     }
 }
@@ -231,6 +250,7 @@ fn element_from_render_element(
 fn fragment_from_render_fragment(
     fragment: &RenderFragment,
     state_fields: &[StateField],
+    local_variables: &[MethodLocalVariable],
     ids: &mut TemplateIdAllocator,
     list_scope: Option<ListItemTemplateScope<'_>>,
 ) -> FragmentNode {
@@ -240,7 +260,9 @@ fn fragment_from_render_fragment(
         children: fragment
             .children
             .iter()
-            .map(|child| template_child_from_render(child, state_fields, ids, list_scope))
+            .map(|child| {
+                template_child_from_render(child, state_fields, local_variables, ids, list_scope)
+            })
             .collect(),
     }
 }
@@ -250,6 +272,7 @@ fn template_attributes(
     event_handlers: &[RenderEventHandler],
     bindings: &[String],
     state_fields: &[StateField],
+    local_variables: &[MethodLocalVariable],
     ids: &mut TemplateIdAllocator,
     list_scope: Option<ListItemTemplateScope<'_>>,
 ) -> Vec<TemplateAttribute> {
@@ -275,6 +298,8 @@ fn template_attributes(
                 if !is_event_attribute(&attribute.name)
                     && attribute.name != "key"
                     && (expression.strip_prefix("this.").is_some()
+                        || (list_scope.is_none()
+                            && unique_local_variable(local_variables, expression).is_some())
                         || list_scope
                             .is_some_and(|scope| list_item_expression(expression, scope))) =>
             {
@@ -283,7 +308,12 @@ fn template_attributes(
                     value: AttributeValue::Binding {
                         id: ids.alloc(),
                         expression: expression.clone(),
-                        initial_value: binding_initial_value(expression, state_fields),
+                        initial_value: binding_initial_value(
+                            expression,
+                            state_fields,
+                            local_variables,
+                            list_scope.is_none(),
+                        ),
                     },
                     span: Some(attribute.span),
                 });
@@ -352,6 +382,7 @@ fn collect_direct_bindings_from_children(children: &[RenderChild]) -> Vec<String
 fn template_child_from_render(
     child: &RenderChild,
     state_fields: &[StateField],
+    local_variables: &[MethodLocalVariable],
     ids: &mut TemplateIdAllocator,
     list_scope: Option<ListItemTemplateScope<'_>>,
 ) -> TemplateChild {
@@ -364,34 +395,51 @@ fn template_child_from_render(
         RenderChild::Binding { expression, span } => TemplateChild::Binding {
             id: ids.alloc(),
             expression: expression.clone(),
-            initial_value: binding_initial_value(expression, state_fields),
+            initial_value: binding_initial_value(
+                expression,
+                state_fields,
+                local_variables,
+                list_scope.is_none(),
+            ),
             span: *span,
         },
 
         RenderChild::Element(element) => TemplateChild::Element(element_from_render_element(
             element,
             state_fields,
+            local_variables,
             ids,
             list_scope,
         )),
         RenderChild::Fragment(fragment) => TemplateChild::Fragment(fragment_from_render_fragment(
             fragment,
             state_fields,
+            local_variables,
             ids,
             list_scope,
         )),
-        RenderChild::Conditional(conditional) => TemplateChild::Conditional(
-            conditional_from_render_conditional(conditional, state_fields, ids, list_scope),
-        ),
-        RenderChild::List(list) => {
-            TemplateChild::List(list_from_render_list(list, state_fields, ids))
+        RenderChild::Conditional(conditional) => {
+            TemplateChild::Conditional(conditional_from_render_conditional(
+                conditional,
+                state_fields,
+                local_variables,
+                ids,
+                list_scope,
+            ))
         }
+        RenderChild::List(list) => TemplateChild::List(list_from_render_list(
+            list,
+            state_fields,
+            local_variables,
+            ids,
+        )),
     }
 }
 
 fn list_from_render_list(
     list: &RenderList,
     state_fields: &[StateField],
+    local_variables: &[MethodLocalVariable],
     ids: &mut TemplateIdAllocator,
 ) -> ListNode {
     ListNode {
@@ -399,7 +447,7 @@ fn list_from_render_list(
         start_id: ids.alloc(),
         end_id: ids.alloc(),
         iterable: list.iterable.clone(),
-        initial_value: binding_initial_value(&list.iterable, state_fields),
+        initial_value: binding_initial_value(&list.iterable, state_fields, local_variables, false),
         item_variable: list.item_variable.clone(),
         index_variable: list.index_variable.clone(),
         key_expression: list.key_expression.clone(),
@@ -411,6 +459,7 @@ fn list_from_render_list(
                 template_child_from_render(
                     child,
                     state_fields,
+                    local_variables,
                     ids,
                     Some(ListItemTemplateScope {
                         item_variable: &list.item_variable,
@@ -425,6 +474,7 @@ fn list_from_render_list(
 fn conditional_from_render_conditional(
     conditional: &RenderConditional,
     state_fields: &[StateField],
+    local_variables: &[MethodLocalVariable],
     ids: &mut TemplateIdAllocator,
     list_scope: Option<ListItemTemplateScope<'_>>,
 ) -> ConditionalNode {
@@ -433,17 +483,26 @@ fn conditional_from_render_conditional(
         start_id: ids.alloc(),
         end_id: ids.alloc(),
         condition: conditional.condition.clone(),
-        initial_value: binding_initial_value(&conditional.condition, state_fields),
+        initial_value: binding_initial_value(
+            &conditional.condition,
+            state_fields,
+            local_variables,
+            false,
+        ),
         span: conditional.span,
         when_true: conditional
             .when_true
             .iter()
-            .map(|child| template_child_from_render(child, state_fields, ids, list_scope))
+            .map(|child| {
+                template_child_from_render(child, state_fields, local_variables, ids, list_scope)
+            })
             .collect(),
         when_false: conditional
             .when_false
             .iter()
-            .map(|child| template_child_from_render(child, state_fields, ids, list_scope))
+            .map(|child| {
+                template_child_from_render(child, state_fields, local_variables, ids, list_scope)
+            })
             .collect(),
     }
 }
@@ -451,11 +510,28 @@ fn conditional_from_render_conditional(
 fn binding_initial_value(
     expression: &str,
     state_fields: &[StateField],
+    local_variables: &[MethodLocalVariable],
+    allow_local: bool,
 ) -> Option<SerializableValue> {
-    let field_name = expression.strip_prefix("this.")?;
+    if let Some(field_name) = expression.strip_prefix("this.") {
+        return state_fields
+            .iter()
+            .find(|field| field.name == field_name)
+            .and_then(|field| field.initial_value.clone());
+    }
 
-    state_fields
-        .iter()
-        .find(|field| field.name == field_name)
-        .and_then(|field| field.initial_value.clone())
+    if allow_local {
+        return unique_local_variable(local_variables, expression).map(|local| local.value.clone());
+    }
+
+    None
+}
+
+fn unique_local_variable<'a>(
+    local_variables: &'a [MethodLocalVariable],
+    name: &str,
+) -> Option<&'a MethodLocalVariable> {
+    let mut locals = local_variables.iter().filter(|local| local.name == name);
+    let local = locals.next()?;
+    locals.next().is_none().then_some(local)
 }

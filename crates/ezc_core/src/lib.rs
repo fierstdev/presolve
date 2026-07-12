@@ -54,9 +54,9 @@ pub use component_graph::{
     ArithmeticExpression, ArithmeticExpressionKind, ArithmeticOperator, ComparisonOperator,
     ComponentAction, ComponentDiagnostic, ComponentGraph, ComponentMethod, ComponentNode,
     ConstantEvaluationError, ConstantExpression, ConstantExpressionKind, DeclaredStateType,
-    DeclaredStateTypeKind, LogicalOperator, MethodParameter, RenderAttribute, RenderAttributeValue,
-    RenderChild, RenderEventHandler, RenderFragment, RenderList, RenderModel, SerializableValue,
-    StateField, StateOperation,
+    DeclaredStateTypeKind, LogicalOperator, MethodLocalVariable, MethodParameter, RenderAttribute,
+    RenderAttributeValue, RenderChild, RenderEventHandler, RenderFragment, RenderList, RenderModel,
+    SerializableValue, StateField, StateOperation,
 };
 pub use explain::{explain_json, explain_text};
 pub use html_codegen::generate_static_html;
@@ -95,6 +95,7 @@ pub use template_manifest::{
 };
 pub use template_semantics::{
     build_template_semantic_entities, TemplateSemanticEntity, TemplateSemanticKind,
+    TemplateSemanticScope,
 };
 
 #[cfg(test)]

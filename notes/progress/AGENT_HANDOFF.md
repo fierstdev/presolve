@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: cli: add asm inspection filters
-* Working tree: C8-D/A2/A3/A4/A5/B1/B2/B3/B4/B5/B6/B7 source, test, fixture, and documentation changes are present and uncommitted
+* Latest commit: bb6d2d4 Add fixture coverage for class methods
+* Working tree: B8 source, test, fixture, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: B7 - Constrained method parameters
-* Summary: Added compiler-owned identifier method parameters with canonical lowering, source provenance, and ASM inspection.
-* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_cli/src/main.rs
-* New behavior: Direct identifier parameters are retained in authored order, lowered onto their owning canonical method, and exposed as `parameters` with source provenance in ASM JSON. They add no runtime or JavaScript execution semantics.
-* Tests added or changed: Parser constraint and source-span coverage; core canonical-lowering coverage; CLI ASM JSON provenance coverage.
-* Fixtures added or changed: fixtures/0038-constrained-method-parameters.
+* Slice: B8 - Local variable resolution
+* Summary: Added deterministic, compiler-owned resolution from normal render-template expressions to supported method-local constants.
+* Key files: crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/template_semantics.rs, crates/ezc_cli/tests/explain.rs
+* New behavior: Supported locals are first-class ASM entities owned by their method. Exact, uniquely declared `render()` locals resolve from normal template bindings and dynamic attributes through `template-local` edges, and their serializable values seed static HTML without runtime evaluation.
+* Tests added or changed: Core ASM ownership, reference, semantic-graph, and static-HTML coverage; CLI ASM and HTML fixture coverage.
+* Fixtures added or changed: fixtures/0039-method-local-resolution.
 
 Current in-progress slice
 
-* Slice: B7 - Constrained method parameters
+* Slice: B8 - Local variable resolution
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B7
-* Remaining: Phase B8 - constrained local-variable resolution.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B8
+* Remaining: Phase B9 - immutable constant folding pass.
 
 Verification
 
@@ -32,6 +32,10 @@ Verification
 * just e2e: pass
 
 Architecture decisions made
+
+* Decision: Method locals receive stable method-child semantic IDs and resolve only from normal `render()` template scope through `template-local` references.
+* Reason: Tooling and later optimizations need canonical declaration and use edges, while lexical resolution must not guess across list callback scopes, duplicate declarations, member access, calls, or closures.
+* Tradeoff: Exact, uniquely declared identifiers are the only resolved form. Their known serializable values may seed static output, but runtime binding evaluation and all broader JavaScript scope behavior remain intentionally absent.
 
 * Decision: Constrained method parameters are method-owned canonical metadata rather than runtime slots or standalone semantic entities.
 * Reason: Parameter declarations need deterministic ownership and provenance for compiler services now, while B7 deliberately establishes no execution, closure, or binding-resolution behavior.
@@ -331,10 +335,11 @@ Known limitations
 * Item: Canonical ASM ownership now drives template entity lookup, template dependency lowering, and dead-action analysis. Legacy ComponentGraph, TemplateSemanticEntity construction, and SymbolTable records still carry owner fields as compatibility/lowering data; their removal or migration requires a later dedicated frontend/backend compatibility slice.
 * Item: Constant `state(...)` initializers use one compiler-owned expression model. Numeric arithmetic, comparisons, boolean logic, nullish coalescing, and unary `!`, `+`, and `-` evaluate statically. State reads, local variables, calls, coercions, truthiness, control flow, and semantic expression typing remain later Phase B work.
 * Item: Method parameters are compiler-owned identifier declarations with canonical source provenance only. They do not execute, close over values, resolve local/template/action references, or support destructuring, defaults, rest declarations, or semantic type checking.
+* Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 
 Exact next step
 
-Start Phase B8 - resolve supported method-local references deterministically from the canonical method-owned declarations without adding JavaScript execution, closures, or destructuring.
+Start Phase B9 - introduce an immutable compiler constant-folding pass over canonical expression and local-resolution products without moving evaluation into parser or runtime code.
 
 Useful commands
 
@@ -383,3 +388,4 @@ Changed but uncommitted files
 * fixtures/0036-constant-unary-state-initializer/
 * fixtures/0037-method-local-constants/
 * fixtures/0038-constrained-method-parameters/
+* fixtures/0039-method-local-resolution/

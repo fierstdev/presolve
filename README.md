@@ -145,6 +145,13 @@ names and source provenance into the owning method's ASM metadata in authored
 order. Parameters do not execute, close over values, resolve bindings, or
 support destructuring, defaults, or rest declarations.
 
+Supported `render()` locals may be referenced by exact identifier in normal
+template bindings and dynamic attributes. The compiler resolves those references
+to canonical local-variable ASM entities, emits `template-local` edges, and uses
+the known serializable value for initial static HTML. List-item scopes, duplicate
+local names, member access, calls, runtime updates, and closure capture remain
+unresolved.
+
 ## Repository rules
 
 - No major feature without an issue.

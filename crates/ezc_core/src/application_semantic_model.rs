@@ -14,6 +14,7 @@ use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
 use crate::template_graph::{build_template_graph, TemplateNode};
 use crate::template_semantics::{
     build_template_semantic_entities, TemplateSemanticEntity, TemplateSemanticKind,
+    TemplateSemanticScope,
 };
 
 /// Application-level semantic data assembled from the compiler's existing graphs.
@@ -434,16 +435,16 @@ fn build_template_local_references(
         .filter(|entity| {
             matches!(
                 entity.kind,
-                TemplateSemanticKind::Binding
-                    | TemplateSemanticKind::AttributeBinding
-                    | TemplateSemanticKind::Conditional
-                    | TemplateSemanticKind::List
-            )
+                TemplateSemanticKind::Binding | TemplateSemanticKind::AttributeBinding
+            ) && entity.scope == TemplateSemanticScope::Render
         })
         .filter_map(|entity| {
             let name = entity.expression.as_deref()?;
             let component = template_entity_component(components, ownership, entity)?;
-            let render = component.methods.iter().find(|method| method.name == "render")?;
+            let render = component
+                .methods
+                .iter()
+                .find(|method| method.name == "render")?;
             let local = unique_local_variable(render, name)?;
 
             Some(SemanticReference {
@@ -461,7 +462,10 @@ fn build_template_local_references(
     references
 }
 
-fn unique_local_variable<'a>(method: &'a ComponentMethod, name: &str) -> Option<&'a MethodLocalVariable> {
+fn unique_local_variable<'a>(
+    method: &'a ComponentMethod,
+    name: &str,
+) -> Option<&'a MethodLocalVariable> {
     let mut locals = method
         .local_variables
         .iter()
@@ -898,5 +902,67 @@ class Counter extends Component {
             std::path::Path::new("src/Counter.tsx")
         );
         assert_eq!(reference.provenance.span.line, 11);
+    }
+
+    #[test]
+    fn resolves_render_template_bindings_to_unique_method_locals() {
+        let parsed = ezc_parser::parse_file(
+            "src/LocalResolution.tsx",
+            r#"
+@component("x-local-resolution")
+class LocalResolution extends Component {
+  render() {
+    const title = "EdgeZero";
+    return <output title={title}>{title}</output>;
+  }
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        let component = &asm.components[0];
+        let render = component
+            .methods
+            .iter()
+            .find(|method| method.name == "render")
+            .expect("render method");
+        let local = &render.local_variables[0];
+        let references = asm.references_of_kind(SemanticReferenceKind::TemplateLocal);
+
+        assert_eq!(
+            asm.owner(&local.id),
+            Some(&SemanticOwner::entity(render.id.clone()))
+        );
+        assert_eq!(
+            asm.entities_of_kind(SemanticEntityKind::LocalVariable),
+            vec![&local.id]
+        );
+        assert_eq!(references.len(), 2);
+        assert!(references.iter().all(|reference| {
+            reference.target == local.id
+                && reference.provenance.path == std::path::Path::new("src/LocalResolution.tsx")
+        }));
+
+        let semantic_graph = crate::build_semantic_graph(&asm);
+        assert!(semantic_graph.nodes.iter().any(|node| {
+            node.kind == crate::SemanticGraphNodeKind::LocalVariable && node.id == local.id
+        }));
+        assert_eq!(
+            semantic_graph
+                .edges
+                .iter()
+                .filter(|edge| {
+                    edge.kind == crate::SemanticGraphEdgeKind::TemplateLocal
+                        && edge.target == local.id
+                })
+                .count(),
+            2
+        );
+
+        let template_graph = build_template_graph(&build_component_graph_for_module(&parsed));
+        assert_eq!(
+            crate::generate_static_html(&template_graph),
+            "<output data-ez-node=\"n0\" title=\"EdgeZero\" data-ez-bindings=\"title\"><!-- ez-binding:n2:title -->EdgeZero</output>\n"
+        );
     }
 }

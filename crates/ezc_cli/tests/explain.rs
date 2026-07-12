@@ -744,6 +744,45 @@ fn asm_command_exposes_constrained_method_parameters() {
 }
 
 #[test]
+fn asm_command_resolves_supported_method_local_bindings() {
+    let path = "fixtures/0039-method-local-resolution/input/LocalResolution.tsx";
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["asm", path, "--format", "json"])
+        .output()
+        .expect("failed to inspect local-variable resolution");
+    assert!(output.status.success());
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("ASM JSON");
+    let local_id = document["entities"]
+        .as_array()
+        .and_then(|entities| {
+            entities.iter().find_map(|entity| {
+                (entity["kind"] == "local-variable").then(|| entity["id"].as_str())?
+            })
+        })
+        .expect("local variable entity");
+    let references = document["references"].as_array().expect("ASM references");
+    assert_eq!(
+        references
+            .iter()
+            .filter(|reference| reference["kind"] == "template-local")
+            .map(|reference| reference["target"].as_str())
+            .collect::<Vec<_>>(),
+        vec![Some(local_id), Some(local_id)]
+    );
+
+    let html = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["html", path])
+        .output()
+        .expect("failed to render local-variable fixture");
+    assert!(html.status.success());
+    assert!(String::from_utf8(html.stdout)
+        .expect("HTML output")
+        .contains("title=\"EdgeZero\""));
+}
+
+#[test]
 fn asm_command_reports_primitive_declared_state_type_mismatches() {
     let repo_root = repo_root();
     let path = "fixtures/0027-declared-state-type-diagnostics/input/InvalidTypedState.tsx";
