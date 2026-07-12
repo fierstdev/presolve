@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: 54401b2 Lower components into IR modules
-* Working tree: D1-C source, test, and documentation changes are present and uncommitted
+* Latest commit: 4fb5cb2 Lower methods into IR functions
+* Working tree: D1-D source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: D1-C - Method function lowering
-* Summary: Lowered methods into provenance-preserving IR functions.
+* Slice: D1-D - State storage lowering
+* Summary: Lowered state fields into module-level explicit storage initialization instructions.
 * Key files: crates/ezc_core/src/intermediate_representation.rs
-* New behavior: Component methods now appear as empty IR functions in their source module.
-* Tests added or changed: Core coverage locks method ID, name, provenance, and empty blocks.
+* New behavior: Each state field produces `InitializeStorage` with canonical ID and provenance.
+* Tests added or changed: Core coverage locks storage instruction lowering.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: D1-C - Method function lowering
+* Slice: D1-D - State storage lowering
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D1-C
-* Remaining: D1-D - lower state fields into explicit storage operations.
+* Completed: Phase C1 through C35; Phase D1-A through D1-D
+* Remaining: D1-E - lower template entrypoints into IR.
 
 Verification
 

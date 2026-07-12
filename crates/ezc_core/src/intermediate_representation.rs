@@ -13,6 +13,7 @@ pub struct IntermediateRepresentation {
 pub struct IrModule {
     pub path: PathBuf,
     pub components: Vec<SemanticId>,
+    pub storage_initializers: Vec<IrInstruction>,
     pub functions: Vec<IrFunction>,
 }
 
@@ -29,9 +30,21 @@ pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateR
             .or_insert_with(|| IrModule {
                 path: provenance.path.clone(),
                 components: Vec::new(),
+                storage_initializers: Vec::new(),
                 functions: Vec::new(),
             });
         module.components.push(component.id.clone());
+        module
+            .storage_initializers
+            .extend(component.state_fields.iter().filter_map(|field| {
+                model.provenance(&field.id).map(|provenance| IrInstruction {
+                    id: format!("storage:{}", field.id),
+                    provenance: provenance.clone(),
+                    kind: IrInstructionKind::InitializeStorage {
+                        field: field.id.clone(),
+                    },
+                })
+            }));
         module
             .functions
             .extend(component.methods.iter().filter_map(|method| {
@@ -77,6 +90,7 @@ pub struct IrInstruction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IrInstructionKind {
     Nop,
+    InitializeStorage { field: SemanticId },
 }
 
 #[cfg(test)]
@@ -116,6 +130,7 @@ mod tests {
             modules: vec![IrModule {
                 path: "src/Counter.tsx".into(),
                 components: vec![SemanticId::component(Some("x-counter"), "Counter")],
+                storage_initializers: Vec::new(),
                 functions: vec![function],
             }],
         };
@@ -127,7 +142,7 @@ mod tests {
     fn lowers_components_into_modules_without_functions() {
         let parsed = ezc_parser::parse_file(
             "src/Counter.tsx",
-            "@component(\"x-counter\") class Counter extends Component { increment() {} }",
+            "@component(\"x-counter\") class Counter extends Component { count = state(0); increment() {} }",
         );
         let model = crate::build_application_semantic_model(&parsed);
         let ir = lower_components_to_ir(&model);
@@ -139,5 +154,9 @@ mod tests {
         );
         assert_eq!(ir.modules[0].functions[0].name, "increment");
         assert!(ir.modules[0].functions[0].blocks.is_empty());
+        assert!(matches!(
+            ir.modules[0].storage_initializers[0].kind,
+            IrInstructionKind::InitializeStorage { .. }
+        ));
     }
 }
