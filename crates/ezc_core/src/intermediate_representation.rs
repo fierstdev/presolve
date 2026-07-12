@@ -79,6 +79,21 @@ pub struct IrDomBinding {
     pub provenance: SourceProvenance,
 }
 
+/// A static or value-driven DOM attribute independent of backend serialization.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrDomAttribute {
+    pub node: IrDomNodeId,
+    pub name: String,
+    pub value: IrDomAttributeValue,
+    pub provenance: SourceProvenance,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IrDomAttributeValue {
+    Static(String),
+    Binding(IrValueId),
+}
+
 /// Lowers application component ownership into deterministic IR module structure.
 #[must_use]
 pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateRepresentation {
