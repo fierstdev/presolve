@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: 4fb5cb2 Lower methods into IR functions
-* Working tree: D1-D source, test, and documentation changes are present and uncommitted
+* Latest commit: a6bb4c7 Lower state storage into IR
+* Working tree: D1-E source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: D1-D - State storage lowering
-* Summary: Lowered state fields into module-level explicit storage initialization instructions.
+* Slice: D1-E - Template entrypoint lowering
+* Summary: Lowered render templates into canonical IR entrypoint records.
 * Key files: crates/ezc_core/src/intermediate_representation.rs
-* New behavior: Each state field produces `InitializeStorage` with canonical ID and provenance.
-* Tests added or changed: Core coverage locks storage instruction lowering.
+* New behavior: Each render template links its canonical template ID to its render-method ID and provenance; no DOM instructions are emitted.
+* Tests added or changed: Core coverage locks template-to-render entrypoint lowering.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: D1-D - State storage lowering
+* Slice: D1-E - Template entrypoint lowering
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D1-D
-* Remaining: D1-E - lower template entrypoints into IR.
+* Completed: Phase C1 through C35; Phase D1-A through D1-E
+* Remaining: D2-A - basic blocks.
 
 Verification
 

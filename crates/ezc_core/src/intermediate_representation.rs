@@ -14,7 +14,15 @@ pub struct IrModule {
     pub path: PathBuf,
     pub components: Vec<SemanticId>,
     pub storage_initializers: Vec<IrInstruction>,
+    pub template_entrypoints: Vec<IrTemplateEntrypoint>,
     pub functions: Vec<IrFunction>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrTemplateEntrypoint {
+    pub template: SemanticId,
+    pub render_method: SemanticId,
+    pub provenance: SourceProvenance,
 }
 
 /// Lowers application component ownership into deterministic IR module structure.
@@ -31,6 +39,7 @@ pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateR
                 path: provenance.path.clone(),
                 components: Vec::new(),
                 storage_initializers: Vec::new(),
+                template_entrypoints: Vec::new(),
                 functions: Vec::new(),
             });
         module.components.push(component.id.clone());
@@ -45,6 +54,22 @@ pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateR
                     },
                 })
             }));
+        if let (Some(template), Some(render)) = (
+            model
+                .templates
+                .iter()
+                .find(|template| template.component_name == component.class_name),
+            component
+                .methods
+                .iter()
+                .find(|method| method.name == "render"),
+        ) {
+            module.template_entrypoints.push(IrTemplateEntrypoint {
+                template: template.id.clone(),
+                render_method: render.id.clone(),
+                provenance: template.provenance.clone(),
+            });
+        }
         module
             .functions
             .extend(component.methods.iter().filter_map(|method| {
@@ -131,6 +156,7 @@ mod tests {
                 path: "src/Counter.tsx".into(),
                 components: vec![SemanticId::component(Some("x-counter"), "Counter")],
                 storage_initializers: Vec::new(),
+                template_entrypoints: Vec::new(),
                 functions: vec![function],
             }],
         };
@@ -142,7 +168,7 @@ mod tests {
     fn lowers_components_into_modules_without_functions() {
         let parsed = ezc_parser::parse_file(
             "src/Counter.tsx",
-            "@component(\"x-counter\") class Counter extends Component { count = state(0); increment() {} }",
+            "@component(\"x-counter\") class Counter extends Component { count = state(0); increment() {} render() { return <p>{this.count}</p>; } }",
         );
         let model = crate::build_application_semantic_model(&parsed);
         let ir = lower_components_to_ir(&model);
@@ -158,5 +184,15 @@ mod tests {
             ir.modules[0].storage_initializers[0].kind,
             IrInstructionKind::InitializeStorage { .. }
         ));
+        assert_eq!(ir.modules[0].template_entrypoints.len(), 1);
+        assert_eq!(
+            ir.modules[0].template_entrypoints[0].render_method,
+            model.components[0]
+                .methods
+                .iter()
+                .find(|method| method.name == "render")
+                .expect("render")
+                .id
+        );
     }
 }

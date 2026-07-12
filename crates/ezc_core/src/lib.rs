@@ -67,7 +67,7 @@ pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 pub use html_codegen::generate_static_html;
 pub use intermediate_representation::{
     lower_components_to_ir, IntermediateRepresentation, IrBlock, IrFunction, IrInstruction,
-    IrInstructionKind, IrModule,
+    IrInstructionKind, IrModule, IrTemplateEntrypoint,
 };
 pub use model::{
     ClassSummary, DecoratorSummary, Diagnostic, RenderMethodSummary, Severity, SourceSummary, Span,
