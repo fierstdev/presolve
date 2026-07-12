@@ -3,14 +3,14 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: D3-F - dead assignment detection
+* Latest completed slice: D4-A - pass manager
 * Working tree: clean after the D2-G6 commit
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: D3-F - dead assignment detection
-* Summary: Added immutable detection of unused pure instruction results.
+* Slice: D4-A - pass manager
+* Summary: Added ordered compiler-owned optimization pass execution.
 * Key files: crates/ezc_core/src/intermediate_representation.rs
 * New behavior: `analyze_reachability` partitions canonical blocks into entry-reachable and unreachable sets.
 * Fixtures added or changed: none.
@@ -20,7 +20,7 @@ Current in-progress slice
 * Slice: D3-D - reachability
 * Status: Complete
 * Completed: Phase C1 through C35; Phase D1-A through D3-D
-* Remaining: D4-A - pass manager.
+* Remaining: D4-B - immutable optimization pipeline.
 
 Verification
 

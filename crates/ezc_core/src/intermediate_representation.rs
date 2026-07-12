@@ -374,6 +374,41 @@ pub struct IrDeadAssignmentAnalysis {
     pub instructions: Vec<IrInstructionId>,
 }
 
+/// A compiler-owned transformation over canonical IR.
+pub trait IrOptimizationPass {
+    fn name(&self) -> &'static str;
+    fn run(&self, input: &IntermediateRepresentation) -> IntermediateRepresentation;
+}
+
+/// Ordered owner and executor for canonical IR optimization passes.
+#[derive(Default)]
+pub struct IrPassManager {
+    passes: Vec<Box<dyn IrOptimizationPass>>,
+}
+
+impl IrPassManager {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn register(&mut self, pass: Box<dyn IrOptimizationPass>) {
+        self.passes.push(pass);
+    }
+
+    #[must_use]
+    pub fn pass_names(&self) -> Vec<&'static str> {
+        self.passes.iter().map(|pass| pass.name()).collect()
+    }
+
+    #[must_use]
+    pub fn run(&self, input: &IntermediateRepresentation) -> IntermediateRepresentation {
+        self.passes
+            .iter()
+            .fold(input.clone(), |current, pass| pass.run(&current))
+    }
+}
+
 /// Detects dead result assignments without treating storage effects as removable.
 #[must_use]
 pub fn analyze_dead_assignments(function: &IrFunction) -> IrDeadAssignmentAnalysis {
