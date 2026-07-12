@@ -63,6 +63,14 @@ pub enum IrDomNodeKind {
     },
 }
 
+/// Text semantics owned by canonical DOM IR rather than a backend renderer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrDomText {
+    pub node: IrDomNodeId,
+    pub value: String,
+    pub provenance: SourceProvenance,
+}
+
 /// Lowers application component ownership into deterministic IR module structure.
 #[must_use]
 pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateRepresentation {

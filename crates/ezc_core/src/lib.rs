@@ -73,7 +73,7 @@ pub use intermediate_representation::{
     IrCfgCleanupPass, IrCommonSubexpressionEliminationPass, IrConstant, IrConstantFoldingPass,
     IrConstantPropagationAnalysis, IrCopyPropagationPass, IrDeadAssignmentAnalysis,
     IrDeadCodeEliminationPass, IrDefinitionUseAnalysis, IrDomNode, IrDomNodeId, IrDomNodeKind,
-    IrDominatorTree, IrFunction, IrInstruction, IrInstructionId, IrInstructionKind,
+    IrDomText, IrDominatorTree, IrFunction, IrInstruction, IrInstructionId, IrInstructionKind,
     IrInstructionSimplificationPass, IrLivenessAnalysis, IrLoop, IrLoopId, IrModule, IrOperand,
     IrOptimizationMetrics, IrOptimizationPass, IrOptimizationPassReport, IrOptimizationPipeline,
     IrOptimizationReport, IrPassManager, IrPostDominatorTree, IrReachabilityAnalysis, IrStorage,
