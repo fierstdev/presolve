@@ -164,6 +164,14 @@ pub struct IrUpdateScheduler {
     pub graph: IrReactiveGraph,
 }
 
+/// Read-only summary of one compiler-generated update plan.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrSchedulerInspection {
+    pub order: Vec<String>,
+    pub batches: Vec<Vec<String>>,
+    pub cycles: Vec<String>,
+}
+
 impl IrUpdateScheduler {
     #[must_use]
     pub fn new(graph: IrReactiveGraph) -> Self {
@@ -250,6 +258,15 @@ impl IrUpdateScheduler {
             .filter(|id| !ordered.contains(*id))
             .cloned()
             .collect()
+    }
+
+    #[must_use]
+    pub fn inspect(&self) -> IrSchedulerInspection {
+        IrSchedulerInspection {
+            order: self.dependency_order(),
+            batches: self.update_batches(),
+            cycles: self.cyclic_nodes(),
+        }
     }
 }
 

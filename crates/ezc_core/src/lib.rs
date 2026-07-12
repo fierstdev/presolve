@@ -79,8 +79,8 @@ pub use intermediate_representation::{
     IrLoop, IrLoopId, IrModule, IrOperand, IrOptimizationMetrics, IrOptimizationPass,
     IrOptimizationPassReport, IrOptimizationPipeline, IrOptimizationReport, IrPassManager,
     IrPostDominatorTree, IrReachabilityAnalysis, IrReactiveEdge, IrReactiveEdgeKind,
-    IrReactiveGraph, IrReactiveNode, IrReactiveNodeKind, IrStorage, IrStorageId,
-    IrTemplateEntrypoint, IrUnaryOperation, IrUpdateScheduler, IrUse, IrUseDefinition,
+    IrReactiveGraph, IrReactiveNode, IrReactiveNodeKind, IrSchedulerInspection, IrStorage,
+    IrStorageId, IrTemplateEntrypoint, IrUnaryOperation, IrUpdateScheduler, IrUse, IrUseDefinition,
     IrValidationDiagnostic, IrValue, IrValueDefinition, IrValueId,
 };
 pub use model::{

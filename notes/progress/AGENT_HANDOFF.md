@@ -3,24 +3,24 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: D7-D - cycle detection
-* Working tree: clean after the D2-G6 commit
+* Latest completed slice: D7-E - scheduler inspection
+* Working tree: clean after the D7-E commit
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: D7-D - cycle detection
-* Summary: Added ordered compiler-owned optimization pass execution.
+* Slice: D7-E - scheduler inspection
+* Summary: Added read-only scheduler plan inspection.
 * Key files: crates/ezc_core/src/intermediate_representation.rs
-* New behavior: `analyze_reachability` partitions canonical blocks into entry-reachable and unreachable sets.
+* New behavior: Scheduler inspection returns dependency order, update batches, and detected cyclic nodes.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: D3-D - reachability
+* Slice: D7-E - scheduler inspection
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D3-D
-* Remaining: D7-E - scheduler inspection.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E (Phase D complete)
+* Remaining: Phase E, not started by instruction.
 
 Verification
 
@@ -541,7 +541,7 @@ Known limitations
 
 Exact next step
 
-Continue automatically with D3-E - constant propagation, committing the completed D3-D slice first.
+Phase D is complete. Do not begin Phase E without explicit user direction.
 
 Useful commands
 
