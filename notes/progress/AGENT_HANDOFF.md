@@ -3,14 +3,14 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: D3-E - constant propagation
+* Latest completed slice: D3-F - dead assignment detection
 * Working tree: clean after the D2-G6 commit
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: D3-E - constant propagation
-* Summary: Added immutable primitive constant propagation.
+* Slice: D3-F - dead assignment detection
+* Summary: Added immutable detection of unused pure instruction results.
 * Key files: crates/ezc_core/src/intermediate_representation.rs
 * New behavior: `analyze_reachability` partitions canonical blocks into entry-reachable and unreachable sets.
 * Fixtures added or changed: none.
@@ -20,7 +20,7 @@ Current in-progress slice
 * Slice: D3-D - reachability
 * Status: Complete
 * Completed: Phase C1 through C35; Phase D1-A through D3-D
-* Remaining: D3-F - dead assignment detection.
+* Remaining: D4-A - pass manager.
 
 Verification
 

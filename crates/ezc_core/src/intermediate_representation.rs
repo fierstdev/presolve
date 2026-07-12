@@ -368,6 +368,36 @@ pub struct IrConstantPropagationAnalysis {
     pub constants: BTreeMap<IrValueId, IrConstant>,
 }
 
+/// Side-effect-free instructions whose produced values have no canonical uses.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrDeadAssignmentAnalysis {
+    pub instructions: Vec<IrInstructionId>,
+}
+
+/// Detects dead result assignments without treating storage effects as removable.
+#[must_use]
+pub fn analyze_dead_assignments(function: &IrFunction) -> IrDeadAssignmentAnalysis {
+    let uses = analyze_definition_uses(function).uses;
+    let instructions = function
+        .blocks
+        .iter()
+        .flat_map(|block| block.instructions.iter())
+        .filter(|instruction| {
+            instruction.result.as_ref().is_some_and(|result| {
+                uses.get(result).is_some_and(Vec::is_empty)
+                    && matches!(
+                        instruction.kind,
+                        IrInstructionKind::LoadStorage { .. }
+                            | IrInstructionKind::Binary { .. }
+                            | IrInstructionKind::Unary { .. }
+                    )
+            })
+        })
+        .map(|instruction| instruction.id.clone())
+        .collect();
+    IrDeadAssignmentAnalysis { instructions }
+}
+
 /// Propagates inline primitive constants through the current unary and binary IR operations.
 #[must_use]
 pub fn analyze_constant_propagation(function: &IrFunction) -> IrConstantPropagationAnalysis {

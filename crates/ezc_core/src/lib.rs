@@ -66,15 +66,15 @@ pub use explain::{explain_json, explain_text};
 pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 pub use html_codegen::generate_static_html;
 pub use intermediate_representation::{
-    analyze_constant_propagation, analyze_definition_uses, analyze_liveness, analyze_reachability,
-    analyze_use_definitions, compute_dominators, compute_post_dominators, lower_components_to_ir,
-    validate_intermediate_representation, IntermediateRepresentation, IrBinaryOperation, IrBlock,
-    IrBlockId, IrBranchArm, IrBranchEdge, IrConstant, IrConstantPropagationAnalysis,
-    IrDefinitionUseAnalysis, IrDominatorTree, IrFunction, IrInstruction, IrInstructionId,
-    IrInstructionKind, IrLivenessAnalysis, IrLoop, IrLoopId, IrModule, IrOperand,
-    IrPostDominatorTree, IrReachabilityAnalysis, IrStorage, IrStorageId, IrTemplateEntrypoint,
-    IrUnaryOperation, IrUse, IrUseDefinition, IrValidationDiagnostic, IrValue, IrValueDefinition,
-    IrValueId,
+    analyze_constant_propagation, analyze_dead_assignments, analyze_definition_uses,
+    analyze_liveness, analyze_reachability, analyze_use_definitions, compute_dominators,
+    compute_post_dominators, lower_components_to_ir, validate_intermediate_representation,
+    IntermediateRepresentation, IrBinaryOperation, IrBlock, IrBlockId, IrBranchArm, IrBranchEdge,
+    IrConstant, IrConstantPropagationAnalysis, IrDeadAssignmentAnalysis, IrDefinitionUseAnalysis,
+    IrDominatorTree, IrFunction, IrInstruction, IrInstructionId, IrInstructionKind,
+    IrLivenessAnalysis, IrLoop, IrLoopId, IrModule, IrOperand, IrPostDominatorTree,
+    IrReachabilityAnalysis, IrStorage, IrStorageId, IrTemplateEntrypoint, IrUnaryOperation, IrUse,
+    IrUseDefinition, IrValidationDiagnostic, IrValue, IrValueDefinition, IrValueId,
 };
 pub use model::{
     ClassSummary, DecoratorSummary, Diagnostic, RenderMethodSummary, Severity, SourceSummary, Span,
