@@ -1181,6 +1181,38 @@ impl IrOptimizationPass for IrConstantFoldingPass {
     }
 }
 
+/// Immutable dead-code-elimination pass for unused pure instruction results.
+pub struct IrDeadCodeEliminationPass;
+
+impl IrOptimizationPass for IrDeadCodeEliminationPass {
+    fn name(&self) -> &'static str {
+        "dead-code-elimination"
+    }
+
+    fn run(&self, input: &IntermediateRepresentation) -> IntermediateRepresentation {
+        let mut output = input.clone();
+        for module in &mut output.modules {
+            for function in &mut module.functions {
+                loop {
+                    let dead = analyze_dead_assignments(function)
+                        .instructions
+                        .into_iter()
+                        .collect::<BTreeSet<_>>();
+                    if dead.is_empty() {
+                        break;
+                    }
+                    for block in &mut function.blocks {
+                        block
+                            .instructions
+                            .retain(|instruction| !dead.contains(&instruction.id));
+                    }
+                }
+            }
+        }
+        output
+    }
+}
+
 /// A binary operation with value-producing IR semantics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IrBinaryOperation {
