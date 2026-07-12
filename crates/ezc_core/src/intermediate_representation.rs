@@ -138,7 +138,16 @@ pub struct IrReactiveGraph {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IrReactiveNode {
     pub id: String,
+    pub kind: IrReactiveNodeKind,
     pub provenance: SourceProvenance,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IrReactiveNodeKind {
+    State,
+    Computed,
+    Action,
+    Template,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
