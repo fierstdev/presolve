@@ -68,8 +68,8 @@ pub use html_codegen::generate_static_html;
 pub use intermediate_representation::{
     compute_dominators, compute_post_dominators, lower_components_to_ir,
     IntermediateRepresentation, IrBlock, IrBlockId, IrBranchArm, IrBranchEdge, IrDominatorTree,
-    IrFunction, IrInstruction, IrInstructionKind, IrLoop, IrLoopId, IrModule, IrPostDominatorTree,
-    IrTemplateEntrypoint,
+    IrFunction, IrInstruction, IrInstructionId, IrInstructionKind, IrLoop, IrLoopId, IrModule,
+    IrPostDominatorTree, IrStorageId, IrTemplateEntrypoint, IrValueId,
 };
 pub use model::{
     ClassSummary, DecoratorSummary, Diagnostic, RenderMethodSummary, Severity, SourceSummary, Span,
