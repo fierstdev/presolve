@@ -9,6 +9,16 @@ use crate::{
 use crate::{ExpressionGraph, ExpressionNodeKind};
 use ezc_parser::ParsedTypeAlias;
 
+/// A compiler-owned operator category used by semantic expression typing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SemanticOperator {
+    Arithmetic(crate::ArithmeticOperator),
+    Comparison(crate::ComparisonOperator),
+    Logical(crate::LogicalOperator),
+    NullishCoalescing,
+    Unary(crate::component_graph::UnaryOperator),
+}
+
 /// Compiler-owned semantic type algebra independent of TypeScript spelling.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SemanticType {
@@ -264,24 +274,160 @@ fn expression_semantic_type(
     match &node.kind {
         ExpressionNodeKind::Literal(value) => state_initializer_value_type(value),
         ExpressionNodeKind::Boolean(value) => SemanticType::BooleanLiteral(*value),
-        ExpressionNodeKind::Arithmetic { .. } => SemanticType::Number,
-        ExpressionNodeKind::Comparison { .. } | ExpressionNodeKind::Logical { .. } => {
-            SemanticType::Boolean
+        ExpressionNodeKind::Arithmetic {
+            left,
+            right,
+            operator,
+        } => operator_result_type(
+            SemanticOperator::Arithmetic(*operator),
+            &[child_type(left), child_type(right)],
+        )
+        .unwrap_or(SemanticType::Unknown),
+        ExpressionNodeKind::Comparison {
+            left,
+            right,
+            operator,
+        } => operator_result_type(
+            SemanticOperator::Comparison(*operator),
+            &[child_type(left), child_type(right)],
+        )
+        .unwrap_or(SemanticType::Unknown),
+        ExpressionNodeKind::Logical {
+            left,
+            right,
+            operator,
+        } => operator_result_type(
+            SemanticOperator::Logical(*operator),
+            &[child_type(left), child_type(right)],
+        )
+        .unwrap_or(SemanticType::Unknown),
+        ExpressionNodeKind::NullishCoalescing { left, right } => operator_result_type(
+            SemanticOperator::NullishCoalescing,
+            &[child_type(left), child_type(right)],
+        )
+        .unwrap_or(SemanticType::Unknown),
+        ExpressionNodeKind::Unary { operand, operator } => {
+            operator_result_type(SemanticOperator::Unary(*operator), &[child_type(operand)])
+                .unwrap_or(SemanticType::Unknown)
         }
-        ExpressionNodeKind::NullishCoalescing { left, right } => {
-            let left = child_type(left);
-            let right = child_type(right);
-            if left == right {
-                left
+    }
+}
+
+/// Returns the result type for one valid semantic operator application.
+///
+/// An absent result means the supplied operand types are not valid for that
+/// operator. Unknown operands deliberately propagate `unknown` rather than
+/// being treated as a valid concrete operation.
+#[must_use]
+pub fn operator_result_type(
+    operator: SemanticOperator,
+    operands: &[SemanticType],
+) -> Option<SemanticType> {
+    match operator {
+        SemanticOperator::Arithmetic(_) | SemanticOperator::Comparison(_) => {
+            let [left, right] = operands else {
+                return None;
+            };
+            if left == &SemanticType::Unknown || right == &SemanticType::Unknown {
+                Some(SemanticType::Unknown)
+            } else if is_number_like(left) && is_number_like(right) {
+                Some(match operator {
+                    SemanticOperator::Arithmetic(_) => SemanticType::Number,
+                    SemanticOperator::Comparison(_) => SemanticType::Boolean,
+                    _ => unreachable!("operator category was matched above"),
+                })
             } else {
-                SemanticType::Union(vec![left, right])
+                None
             }
         }
-        ExpressionNodeKind::Unary { operator, .. } => match operator {
-            crate::component_graph::UnaryOperator::Not => SemanticType::Boolean,
+        SemanticOperator::Logical(_) => {
+            let [left, right] = operands else {
+                return None;
+            };
+            if left == &SemanticType::Unknown || right == &SemanticType::Unknown {
+                Some(SemanticType::Unknown)
+            } else if is_boolean_like(left) && is_boolean_like(right) {
+                Some(SemanticType::Boolean)
+            } else {
+                None
+            }
+        }
+        SemanticOperator::NullishCoalescing => {
+            let [left, right] = operands else {
+                return None;
+            };
+            if left == &SemanticType::Unknown || right == &SemanticType::Unknown {
+                return Some(SemanticType::Unknown);
+            }
+            let left = remove_null(left);
+            if left == SemanticType::Never {
+                Some(right.clone())
+            } else if left == *right {
+                Some(left)
+            } else {
+                Some(SemanticType::Union(vec![left, right.clone()]))
+            }
+        }
+        SemanticOperator::Unary(crate::component_graph::UnaryOperator::Not) => {
+            let [operand] = operands else {
+                return None;
+            };
+            if operand == &SemanticType::Unknown {
+                Some(SemanticType::Unknown)
+            } else if is_boolean_like(operand) {
+                Some(SemanticType::Boolean)
+            } else {
+                None
+            }
+        }
+        SemanticOperator::Unary(
             crate::component_graph::UnaryOperator::Plus
-            | crate::component_graph::UnaryOperator::Minus => SemanticType::Number,
-        },
+            | crate::component_graph::UnaryOperator::Minus,
+        ) => {
+            let [operand] = operands else {
+                return None;
+            };
+            if operand == &SemanticType::Unknown {
+                Some(SemanticType::Unknown)
+            } else if is_number_like(operand) {
+                Some(SemanticType::Number)
+            } else {
+                None
+            }
+        }
+    }
+}
+
+fn is_number_like(semantic_type: &SemanticType) -> bool {
+    matches!(
+        semantic_type,
+        SemanticType::Number | SemanticType::NumberLiteral(_)
+    )
+}
+
+fn is_boolean_like(semantic_type: &SemanticType) -> bool {
+    matches!(
+        semantic_type,
+        SemanticType::Boolean | SemanticType::BooleanLiteral(_)
+    )
+}
+
+fn remove_null(semantic_type: &SemanticType) -> SemanticType {
+    match semantic_type {
+        SemanticType::Null => SemanticType::Never,
+        SemanticType::Union(members) => {
+            let members = members
+                .iter()
+                .map(remove_null)
+                .filter(|member| member != &SemanticType::Never)
+                .collect::<Vec<_>>();
+            match members.as_slice() {
+                [] => SemanticType::Never,
+                [member] => member.clone(),
+                _ => SemanticType::Union(members),
+            }
+        }
+        _ => semantic_type.clone(),
     }
 }
 
@@ -488,9 +634,13 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::{
-        ObjectType, SemanticType, SemanticTypeAssignment, SemanticTypeId, SemanticTypeStatus,
+        operator_result_type, ObjectType, SemanticOperator, SemanticType, SemanticTypeAssignment,
+        SemanticTypeId, SemanticTypeStatus,
     };
-    use crate::{SemanticId, SourceProvenance};
+    use crate::{
+        component_graph::UnaryOperator, ArithmeticOperator, ComparisonOperator, LogicalOperator,
+        SemanticId, SourceProvenance,
+    };
 
     #[test]
     fn represents_core_compiler_owned_type_forms() {
@@ -548,6 +698,71 @@ mod tests {
         assert_eq!(
             assignment.provenance.path,
             std::path::Path::new("src/Counter.tsx")
+        );
+    }
+
+    #[test]
+    fn defines_explicit_operand_and_result_contracts_for_operators() {
+        assert_eq!(
+            operator_result_type(
+                SemanticOperator::Arithmetic(ArithmeticOperator::Add),
+                &[
+                    SemanticType::NumberLiteral("1".to_string()),
+                    SemanticType::Number,
+                ],
+            ),
+            Some(SemanticType::Number)
+        );
+        assert_eq!(
+            operator_result_type(
+                SemanticOperator::Comparison(ComparisonOperator::LessThan),
+                &[
+                    SemanticType::Number,
+                    SemanticType::NumberLiteral("2".to_string())
+                ],
+            ),
+            Some(SemanticType::Boolean)
+        );
+        assert_eq!(
+            operator_result_type(
+                SemanticOperator::Logical(LogicalOperator::And),
+                &[SemanticType::BooleanLiteral(true), SemanticType::Boolean],
+            ),
+            Some(SemanticType::Boolean)
+        );
+        assert_eq!(
+            operator_result_type(
+                SemanticOperator::Unary(UnaryOperator::Not),
+                &[SemanticType::BooleanLiteral(false)],
+            ),
+            Some(SemanticType::Boolean)
+        );
+        assert_eq!(
+            operator_result_type(
+                SemanticOperator::NullishCoalescing,
+                &[
+                    SemanticType::Union(vec![SemanticType::String, SemanticType::Null]),
+                    SemanticType::StringLiteral("fallback".to_string()),
+                ],
+            ),
+            Some(SemanticType::Union(vec![
+                SemanticType::String,
+                SemanticType::StringLiteral("fallback".to_string()),
+            ]))
+        );
+        assert_eq!(
+            operator_result_type(
+                SemanticOperator::Arithmetic(ArithmeticOperator::Add),
+                &[SemanticType::String, SemanticType::Number],
+            ),
+            None
+        );
+        assert_eq!(
+            operator_result_type(
+                SemanticOperator::Logical(LogicalOperator::Or),
+                &[SemanticType::Number, SemanticType::Boolean],
+            ),
+            None
         );
     }
 }

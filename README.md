@@ -172,9 +172,10 @@ annotations, arrays, tuples, structural objects, unions, local/imported type
 aliases, inferred direct state values, state-initializer compatibility, and the
 existing canonical state-initializer expression graph. Each assignment retains
 its stable subject identity, origin, declared-or-inferred status, and source
-provenance. General operator diagnostics, state reads, locals, templates,
-actions, normalization, and the final general assignability engine remain
-later Phase C work.
+provenance. Arithmetic, comparison, logical, unary, and nullish operators use
+explicit compiler-owned operand and result contracts. Operator diagnostics,
+state reads, locals, templates, actions, normalization, and the final general
+assignability engine remain later Phase C work.
 
 Each future type assignment has a stable canonical identity, a semantic origin,
 declared-or-inferred status, and source provenance. C2 establishes this metadata

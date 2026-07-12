@@ -85,9 +85,9 @@ pub use semantic_id::{SemanticId, SemanticOwner};
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
 pub use semantic_type::{
-    is_state_initializer_assignable, state_initializer_value_type, ObjectType, SemanticType,
-    SemanticTypeAlias, SemanticTypeAssignment, SemanticTypeId, SemanticTypeModel,
-    SemanticTypeStatus,
+    is_state_initializer_assignable, operator_result_type, state_initializer_value_type,
+    ObjectType, SemanticOperator, SemanticType, SemanticTypeAlias, SemanticTypeAssignment,
+    SemanticTypeId, SemanticTypeModel, SemanticTypeStatus,
 };
 pub use summarize::summarize_source;
 pub use symbol_table::{
