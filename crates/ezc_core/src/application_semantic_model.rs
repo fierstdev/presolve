@@ -221,6 +221,65 @@ impl ApplicationSemanticModel {
     }
 
     #[must_use]
+    pub fn semantic_type_of(&self, id: &SemanticId) -> Option<&crate::SemanticType> {
+        self.semantic_types
+            .assignments
+            .get(id)
+            .map(|assignment| &assignment.semantic_type)
+    }
+
+    #[must_use]
+    pub fn expression_type(&self, id: &SemanticId) -> Option<&crate::SemanticType> {
+        self.expression_graph
+            .node(id)
+            .and_then(|_| self.semantic_type_of(id))
+    }
+
+    #[must_use]
+    pub fn type_declarations(
+        &self,
+        semantic_type: &crate::SemanticType,
+    ) -> Vec<&crate::SemanticTypeAssignment> {
+        self.semantic_types
+            .assignments
+            .values()
+            .filter(|assignment| {
+                assignment.status == crate::SemanticTypeStatus::Declared
+                    && assignment.semantic_type == *semantic_type
+            })
+            .collect()
+    }
+
+    #[must_use]
+    pub fn type_usages(
+        &self,
+        semantic_type: &crate::SemanticType,
+    ) -> Vec<&crate::SemanticTypeAssignment> {
+        self.semantic_types
+            .assignments
+            .values()
+            .filter(|assignment| assignment.semantic_type == *semantic_type)
+            .collect()
+    }
+
+    #[must_use]
+    pub fn serialization_compatibility_of(
+        &self,
+        id: &SemanticId,
+    ) -> Option<crate::SerializationCompatibility> {
+        self.semantic_type_of(id)
+            .map(crate::serialization_compatibility)
+    }
+
+    #[must_use]
+    pub fn is_type_assignable(&self, source: &SemanticId, target: &SemanticId) -> Option<bool> {
+        Some(crate::is_assignable(
+            self.semantic_type_of(source)?,
+            self.semantic_type_of(target)?,
+        ))
+    }
+
+    #[must_use]
     pub fn expressions_in_file(&self, path: &Path) -> Vec<&ExpressionNode> {
         self.expression_graph.nodes_in_file(path)
     }
@@ -739,6 +798,35 @@ class TypedState extends Component {
             assignment.provenance,
             field.declared_type.as_ref().unwrap().provenance
         );
+    }
+
+    #[test]
+    fn queries_canonical_type_information_from_the_asm() {
+        let parsed = ezc_parser::parse_file(
+            "src/TypeQueries.tsx",
+            r#"
+@component("x-type-queries")
+class TypeQueries extends Component {
+  count: number = state(0);
+  label = state("EdgeZero");
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let count = &asm.components[0].state_fields[0];
+        let label = &asm.components[0].state_fields[1];
+
+        assert_eq!(
+            asm.semantic_type_of(&count.id),
+            Some(&crate::SemanticType::Number)
+        );
+        assert_eq!(asm.type_declarations(&crate::SemanticType::Number).len(), 1);
+        assert_eq!(asm.type_usages(&crate::SemanticType::String).len(), 1);
+        assert_eq!(
+            asm.serialization_compatibility_of(&count.id),
+            Some(crate::SerializationCompatibility::Serializable)
+        );
+        assert_eq!(asm.is_type_assignable(&label.id, &count.id), Some(false));
     }
 
     #[test]

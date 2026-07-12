@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: 5591dc0 Normalize canonical semantic types
-* Working tree: C29 source, test, and documentation changes are present and uncommitted
+* Latest commit: 00e662c Centralize semantic assignability
+* Working tree: C30 source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: C29 - Assignability engine
-* Summary: Promoted one normalized canonical assignability engine for compiler consumers.
-* Key files: crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/compiler_pass.rs
-* New behavior: `is_assignable(source, target)` now centralizes primitive, literal, tuple, array, object, union, and resource compatibility; compiler validation routes through it.
-* Tests added or changed: Core coverage verifies literal-union, tuple-array, and incompatible primitive relations.
+* Slice: C30 - Type query APIs
+* Summary: Added canonical ASM queries for semantic type knowledge and compatibility.
+* Key files: crates/ezc_core/src/application_semantic_model.rs
+* New behavior: ASM clients can query entity/expression types, declared type assignments, usages, serialization compatibility, and assignability between typed IDs.
+* Tests added or changed: Core coverage verifies all query families against declared and inferred state types.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C29 - Assignability engine
+* Slice: C30 - Type query APIs
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C29
-* Remaining: Phase C30 - type query APIs.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C30
+* Remaining: Phase C31 - type inspection output.
 
 Verification
 
@@ -160,6 +160,10 @@ Architecture decisions made
 * Decision: One normalized `is_assignable` engine owns semantic compatibility, while the C10 state-initializer API remains a forwarding compatibility surface.
 * Reason: Diagnostics, templates, actions, and future consumers no longer scatter independent type relations.
 * Tradeoff: C29 centralizes existing supported forms only. Generic variance, functions, conditional types, and language-level subtyping remain outside the current model.
+
+* Decision: Type knowledge is exposed through read-only ASM queries rather than backend/parser-specific lookup paths.
+* Reason: IDE, language services, inspection, and later optimization can consume the same canonical type facts.
+* Tradeoff: C30 exposes direct queries only. CLI inspection output, richer type-declaration navigation, and composite predicates remain later work.
 
 * Decision: Browser runtime integration tests acquire one process-wide lock before creating a Chrome probe, and the probe deadline allows 20 seconds for a cold Chrome start.
 * Reason: Cargo's workspace runner schedules tests concurrently, and the previous five-second harness deadline could kill an otherwise healthy cold-start probe with SIGKILL.
@@ -474,11 +478,11 @@ Known limitations
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
-* Item: C29 centralizes compatibility for current semantic forms only. Type query APIs, source diagnostics, backend enforcement, resource declaration lowering, and final type diagnostic families remain later Phase C work.
+* Item: C30 exposes direct ASM type queries only. CLI inspection output, source diagnostics, backend enforcement, resource declaration lowering, and final type diagnostic families remain later Phase C work.
 
 Exact next step
 
-Continue automatically with C30 - type query APIs, committing the completed C29 slice first.
+Continue automatically with C31 - type inspection output, committing the completed C30 slice first.
 
 Useful commands
 
