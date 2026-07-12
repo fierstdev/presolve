@@ -3,13 +3,13 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: D7-C - batch planning
+* Latest completed slice: D7-D - cycle detection
 * Working tree: clean after the D2-G6 commit
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: D7-C - batch planning
+* Slice: D7-D - cycle detection
 * Summary: Added ordered compiler-owned optimization pass execution.
 * Key files: crates/ezc_core/src/intermediate_representation.rs
 * New behavior: `analyze_reachability` partitions canonical blocks into entry-reachable and unreachable sets.
@@ -20,7 +20,7 @@ Current in-progress slice
 * Slice: D3-D - reachability
 * Status: Complete
 * Completed: Phase C1 through C35; Phase D1-A through D3-D
-* Remaining: D7-D - cycle detection.
+* Remaining: D7-E - scheduler inspection.
 
 Verification
 

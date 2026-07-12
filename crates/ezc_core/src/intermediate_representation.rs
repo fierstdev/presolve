@@ -240,6 +240,17 @@ impl IrUpdateScheduler {
         }
         batches
     }
+
+    #[must_use]
+    pub fn cyclic_nodes(&self) -> Vec<String> {
+        let ordered = self.dependency_order().into_iter().collect::<BTreeSet<_>>();
+        self.graph
+            .nodes
+            .keys()
+            .filter(|id| !ordered.contains(*id))
+            .cloned()
+            .collect()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
