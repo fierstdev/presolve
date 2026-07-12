@@ -154,7 +154,14 @@ pub enum IrReactiveNodeKind {
 pub struct IrReactiveEdge {
     pub source: String,
     pub target: String,
+    pub kind: IrReactiveEdgeKind,
     pub provenance: SourceProvenance,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IrReactiveEdgeKind {
+    Reads,
+    Invalidates,
 }
 
 #[must_use]
