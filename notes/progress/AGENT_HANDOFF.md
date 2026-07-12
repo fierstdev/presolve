@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: 00e662c Centralize semantic assignability
-* Working tree: C30 source, test, and documentation changes are present and uncommitted
+* Latest commit: b4b1298 Expose ASM type queries
+* Working tree: C31 source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: C30 - Type query APIs
-* Summary: Added canonical ASM queries for semantic type knowledge and compatibility.
-* Key files: crates/ezc_core/src/application_semantic_model.rs
-* New behavior: ASM clients can query entity/expression types, declared type assignments, usages, serialization compatibility, and assignability between typed IDs.
-* Tests added or changed: Core coverage verifies all query families against declared and inferred state types.
+* Slice: C31 - Type inspection output
+* Summary: Added stable canonical type inspection to ASM and entity explain output.
+* Key files: crates/ezc_core/src/semantic_type.rs; crates/ezc_cli/src/main.rs
+* New behavior: `ezc asm` and entity-scoped `ezc explain` expose a type's stable text, declared/inferred status, semantic origin, and source provenance.
+* Tests added or changed: CLI coverage locks text/JSON output, provenance, and the `explain --entity` inspection route; full CLI regressions are reconciled.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C30 - Type query APIs
+* Slice: C31 - Type inspection output
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C30
-* Remaining: Phase C31 - type inspection output.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C31
+* Remaining: Phase C32 - type diagnostics.
 
 Verification
 
@@ -164,6 +164,10 @@ Architecture decisions made
 * Decision: Type knowledge is exposed through read-only ASM queries rather than backend/parser-specific lookup paths.
 * Reason: IDE, language services, inspection, and later optimization can consume the same canonical type facts.
 * Tradeoff: C30 exposes direct queries only. CLI inspection output, richer type-declaration navigation, and composite predicates remain later work.
+
+* Decision: Type inspection uses compiler-owned stable type text and attaches assignment provenance, status, and origin to ASM entities.
+* Reason: Tooling can explain canonical type facts without decoding Rust debug output or re-deriving inference attribution from parser metadata.
+* Tradeoff: C31 exposes assignment-backed entity types only. It does not add a standalone type-declaration browser, alias navigation UI, or source-summary type inference outside entity-scoped ASM inspection.
 
 * Decision: Browser runtime integration tests acquire one process-wide lock before creating a Chrome probe, and the probe deadline allows 20 seconds for a cold Chrome start.
 * Reason: Cargo's workspace runner schedules tests concurrently, and the previous five-second harness deadline could kill an otherwise healthy cold-start probe with SIGKILL.

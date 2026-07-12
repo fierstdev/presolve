@@ -168,7 +168,7 @@ fn asm_command_reports_text_summary() {
 
     assert_eq!(
         String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8"),
-        "File: fixtures/0001-source-summary/input/Counter.tsx\nApplicationSemanticModel:\n  components: 1\n  templates: 1\n  ownership: 11\n  references: 4\n  provenance: 11\n  diagnostics: 0\n  validation: 0\n"
+        "File: fixtures/0001-source-summary/input/Counter.tsx\nApplicationSemanticModel:\n  components: 1\n  templates: 1\n  ownership: 11\n  references: 4\n  provenance: 11\n  semantic types: 2\n  diagnostics: 0\n  validation: 0\n"
     );
 }
 
@@ -353,6 +353,8 @@ fn asm_command_inspects_one_semantic_entity() {
     assert_eq!(document["schema_version"], 1);
     assert_eq!(document["entity"]["id"], entity_id);
     assert_eq!(document["entity"]["kind"], "state-field");
+    assert_eq!(document["entity"]["semantic_type"]["type_text"], "number");
+    assert_eq!(document["entity"]["semantic_type"]["status"], "inferred");
     assert_eq!(
         document["parents"],
         serde_json::json!([
@@ -376,8 +378,23 @@ fn asm_command_inspects_one_semantic_entity() {
     let text = String::from_utf8(text_output.stdout).expect("entity text");
     assert!(text.contains(&format!("ASM Entity: {entity_id}\n")));
     assert!(text.contains("  kind: state-field\n"));
+    assert!(text.contains("  semantic type: number\n"));
+    assert!(text.contains("    status: inferred\n"));
     assert!(text.contains("  parents: 1\n"));
     assert!(text.contains("  incoming references: 2\n"));
+
+    let explain_output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["explain", path, "--entity", entity_id, "--format", "json"])
+        .output()
+        .expect("failed to inspect ASM entity through explain");
+    assert!(explain_output.status.success());
+    let explain_document: serde_json::Value =
+        serde_json::from_slice(&explain_output.stdout).expect("explain entity JSON");
+    assert_eq!(
+        explain_document["entity"]["semantic_type"]["type_text"],
+        "number"
+    );
 }
 
 #[test]
@@ -564,6 +581,13 @@ fn asm_command_exposes_declared_state_types() {
                 "column": 8,
             }
         })
+    );
+    assert_eq!(count["semantic_type"]["type_text"], "number");
+    assert_eq!(count["semantic_type"]["status"], "declared");
+    assert_eq!(count["semantic_type"]["provenance"]["path"], path);
+    assert_eq!(
+        count["semantic_type"]["origin"],
+        "module:fixtures/0025-typed-state-annotations/input/TypedState.tsx/component:x-typed-state/state:count"
     );
 
     let status = document["entities"]
@@ -913,7 +937,7 @@ fn asm_command_reports_primitive_action_type_mismatches() {
         .as_array()
         .expect("ASM inspection diagnostics");
 
-    assert_eq!(diagnostics.len(), 5);
+    assert_eq!(diagnostics.len(), 7);
     assert!(diagnostics.iter().any(|diagnostic| {
         diagnostic["code"] == "EZC1016"
             && diagnostic["message"]
@@ -925,7 +949,7 @@ fn asm_command_reports_primitive_action_type_mismatches() {
             .iter()
             .filter(|diagnostic| diagnostic["code"] == "EZC1017")
             .count(),
-        4
+        6
     );
     assert!(diagnostics
         .iter()
@@ -966,7 +990,7 @@ fn asm_command_reports_non_boolean_primitive_toggle_actions() {
         .as_array()
         .expect("ASM inspection diagnostics");
 
-    assert_eq!(diagnostics.len(), 3);
+    assert_eq!(diagnostics.len(), 4);
     assert!(diagnostics.iter().all(|diagnostic| {
         diagnostic["code"] == "EZC1018"
             && diagnostic["message"]
@@ -1007,7 +1031,7 @@ fn asm_command_reports_non_numeric_primitive_increment_and_decrement_actions() {
         .as_array()
         .expect("ASM inspection diagnostics");
 
-    assert_eq!(diagnostics.len(), 3);
+    assert_eq!(diagnostics.len(), 4);
     assert!(diagnostics.iter().all(|diagnostic| {
         diagnostic["code"] == "EZC1019"
             && diagnostic["message"]
@@ -1048,7 +1072,7 @@ fn asm_command_reports_compound_numeric_action_target_and_operand_mismatches() {
         .as_array()
         .expect("ASM inspection diagnostics");
 
-    assert_eq!(diagnostics.len(), 5);
+    assert_eq!(diagnostics.len(), 7);
     assert!(diagnostics
         .iter()
         .all(|diagnostic| diagnostic["code"] == "EZC1020" || diagnostic["code"] == "EZC1021"));
@@ -1119,7 +1143,7 @@ fn check_command_fails_for_compiler_diagnostics() {
 
     assert!(!output.status.success());
     let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
-    assert!(actual.contains("  compiler diagnostics: 5\n"));
+    assert!(actual.contains("  compiler diagnostics: 7\n"));
     assert!(actual.contains("    EZC1020: state field `title`"));
 }
 
@@ -1134,7 +1158,7 @@ fn check_command_emits_json_diagnostics() {
     assert_eq!(document["schema_version"], 1);
     assert_eq!(
         document["compiler_diagnostics"].as_array().map(Vec::len),
-        Some(5)
+        Some(7)
     );
     assert_eq!(document["fail_on"], "Error");
     let title_diagnostic = document["compiler_diagnostics"]
@@ -1191,7 +1215,7 @@ fn check_command_filters_displayed_diagnostic_categories_without_changing_failur
         .output().expect("failed to run ezc_cli check");
     assert!(!output.status.success());
     let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("check JSON");
-    assert_eq!(document["summary"]["compiler_diagnostics"], 5);
+    assert_eq!(document["summary"]["compiler_diagnostics"], 7);
     assert_eq!(document["categories"], serde_json::json!(["parser"]));
     assert_eq!(document["compiler_diagnostics"], serde_json::json!([]));
 }

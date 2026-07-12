@@ -79,6 +79,53 @@ pub enum SemanticType {
     Resource(ResourceType),
 }
 
+/// Renders a canonical semantic type using the stable inspection spelling.
+#[must_use]
+pub fn semantic_type_text(semantic_type: &SemanticType) -> String {
+    match semantic_type {
+        SemanticType::Unknown => "unknown".to_string(),
+        SemanticType::Never => "never".to_string(),
+        SemanticType::Null => "null".to_string(),
+        SemanticType::Boolean => "boolean".to_string(),
+        SemanticType::Number => "number".to_string(),
+        SemanticType::String => "string".to_string(),
+        SemanticType::BooleanLiteral(value) => value.to_string(),
+        SemanticType::NumberLiteral(value) => value.clone(),
+        SemanticType::StringLiteral(value) => format!("{value:?}"),
+        SemanticType::Array(element) => format!("{}[]", semantic_type_text(element)),
+        SemanticType::Tuple(items) => format!(
+            "[{}]",
+            items
+                .iter()
+                .map(semantic_type_text)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        SemanticType::Object(object) => format!(
+            "{{ {} }}",
+            object
+                .properties
+                .iter()
+                .map(|(name, semantic_type)| format!(
+                    "{name}: {}",
+                    semantic_type_text(semantic_type)
+                ))
+                .collect::<Vec<_>>()
+                .join("; ")
+        ),
+        SemanticType::Union(members) => members
+            .iter()
+            .map(semantic_type_text)
+            .collect::<Vec<_>>()
+            .join(" | "),
+        SemanticType::Resource(resource) => format!(
+            "Resource<{}, {}>",
+            semantic_type_text(&resource.data),
+            semantic_type_text(&resource.error)
+        ),
+    }
+}
+
 /// Compiler-owned resource contract with explicit data, error, and boundary semantics.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResourceType {
@@ -748,6 +795,9 @@ impl SemanticTypeModel {
 fn member_access_type(semantic_type: &SemanticType, path: &str) -> Option<SemanticType> {
     let mut current = semantic_type;
     for member in path.split('.') {
+        if matches!(current, SemanticType::Unknown) {
+            return Some(SemanticType::Unknown);
+        }
         let SemanticType::Object(object) = current else {
             return None;
         };

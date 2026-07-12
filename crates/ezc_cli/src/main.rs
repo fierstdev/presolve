@@ -9,7 +9,7 @@ use ezc_core::{
     build_application_semantic_model_for_unit, build_component_graph, build_semantic_graph,
     build_template_graph, build_template_manifest, explain_json, explain_text,
     fold_component_graph, generate_runtime_stub, generate_standalone_page, generate_static_html,
-    semantic_graph_json, summarize_source, template_manifest_json,
+    semantic_graph_json, semantic_type_text, summarize_source, template_manifest_json,
     validate_application_semantic_model, ApplicationSemanticModel, AsmValidationDiagnostic,
     AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
     ImmutableAsmPass, RenderAttribute, RenderAttributeValue, SemanticEntity, SemanticEntityKind,
@@ -374,6 +374,7 @@ fn print_asm_text(
     println!("  ownership: {}", asm.ownership.len());
     println!("  references: {}", asm.references.len());
     println!("  provenance: {}", asm.provenance.len());
+    println!("  semantic types: {}", asm.semantic_types.assignments.len());
     println!("  diagnostics: {}", asm.diagnostics.len());
     println!("  validation: {}", validation.len());
 
@@ -500,6 +501,7 @@ fn asm_inspection_json(
                     initial_expression: initial_expression(asm, entity),
                     local_variables: method_local_variables(entity),
                     parameters: method_parameters(entity, provenance),
+                    semantic_type: asm_semantic_type(asm, id),
                 }
             })
             .collect(),
@@ -592,6 +594,11 @@ fn print_asm_entity_text(
         provenance.span.start,
         provenance.span.end
     );
+    if let Some(semantic_type) = asm_semantic_type(asm, id) {
+        println!("  semantic type: {}", semantic_type.type_text);
+        println!("    status: {}", semantic_type.status);
+        println!("    origin: {}", semantic_type.origin);
+    }
     let parents = asm.ancestors_of(id);
     println!("  parents: {}", parents.len());
     for parent in parents {
@@ -658,6 +665,7 @@ fn asm_entity_inspection_json(
             initial_expression: initial_expression(asm, entity),
             local_variables: method_local_variables(entity),
             parameters: method_parameters(entity, provenance),
+            semantic_type: asm_semantic_type(asm, id),
         },
         parents: asm
             .ancestors_of(id)
@@ -1003,6 +1011,22 @@ fn declared_state_type(entity: SemanticEntity<'_>) -> Option<AsmInspectionDeclar
     })
 }
 
+fn asm_semantic_type(
+    asm: &ApplicationSemanticModel,
+    id: &SemanticId,
+) -> Option<AsmInspectionSemanticType> {
+    let assignment = asm.semantic_types.assignments.get(id)?;
+    Some(AsmInspectionSemanticType {
+        type_text: semantic_type_text(&assignment.semantic_type),
+        origin: assignment.origin.as_str().to_string(),
+        status: match assignment.status {
+            ezc_core::SemanticTypeStatus::Declared => "declared",
+            ezc_core::SemanticTypeStatus::Inferred => "inferred",
+        },
+        provenance: (&assignment.provenance).into(),
+    })
+}
+
 fn initial_expression(
     asm: &ApplicationSemanticModel,
     entity: SemanticEntity<'_>,
@@ -1093,6 +1117,16 @@ struct AsmInspectionEntity<'a> {
     local_variables: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     parameters: Option<Vec<AsmInspectionMethodParameter<'a>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    semantic_type: Option<AsmInspectionSemanticType>,
+}
+
+#[derive(Serialize)]
+struct AsmInspectionSemanticType {
+    type_text: String,
+    origin: String,
+    status: &'static str,
+    provenance: AsmInspectionProvenance,
 }
 
 #[derive(Serialize)]
