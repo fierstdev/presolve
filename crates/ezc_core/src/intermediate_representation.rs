@@ -106,6 +106,40 @@ pub struct IrFunction {
     pub loops: Vec<IrLoop>,
 }
 
+impl IrFunction {
+    #[must_use]
+    pub fn block(&self, id: &IrBlockId) -> Option<&IrBlock> {
+        self.blocks.iter().find(|block| block.id == *id)
+    }
+
+    #[must_use]
+    pub fn successor_blocks(&self, id: &IrBlockId) -> Vec<IrBlockId> {
+        self.branch_edges
+            .iter()
+            .filter(|edge| edge.from == *id)
+            .map(|edge| edge.to.clone())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect()
+    }
+
+    #[must_use]
+    pub fn predecessor_blocks(&self, id: &IrBlockId) -> Vec<IrBlockId> {
+        self.branch_edges
+            .iter()
+            .filter(|edge| edge.to == *id)
+            .map(|edge| edge.from.clone())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect()
+    }
+
+    #[must_use]
+    pub fn is_exit_block(&self, id: &IrBlockId) -> bool {
+        self.block(id).is_some() && self.successor_blocks(id).is_empty()
+    }
+}
+
 /// A stable compiler-owned basic-block identity within an IR function.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct IrBlockId(String);
@@ -197,11 +231,37 @@ pub struct IrDominatorTree {
     pub dominators: BTreeMap<IrBlockId, Vec<IrBlockId>>,
 }
 
+impl IrDominatorTree {
+    #[must_use]
+    pub fn dominators_of(&self, block: &IrBlockId) -> Option<&[IrBlockId]> {
+        self.dominators.get(block).map(Vec::as_slice)
+    }
+
+    #[must_use]
+    pub fn dominates(&self, dominator: &IrBlockId, block: &IrBlockId) -> bool {
+        self.dominators_of(block)
+            .is_some_and(|dominators| dominators.contains(dominator))
+    }
+}
+
 /// The immutable post-dominator relation derived from one canonical IR function.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IrPostDominatorTree {
     pub function: SemanticId,
     pub post_dominators: BTreeMap<IrBlockId, Vec<IrBlockId>>,
+}
+
+impl IrPostDominatorTree {
+    #[must_use]
+    pub fn post_dominators_of(&self, block: &IrBlockId) -> Option<&[IrBlockId]> {
+        self.post_dominators.get(block).map(Vec::as_slice)
+    }
+
+    #[must_use]
+    pub fn post_dominates(&self, post_dominator: &IrBlockId, block: &IrBlockId) -> bool {
+        self.post_dominators_of(block)
+            .is_some_and(|post_dominators| post_dominators.contains(post_dominator))
+    }
 }
 
 /// Computes dominators from the function's entry block and canonical branch edges.
@@ -624,6 +684,58 @@ mod tests {
         assert_eq!(tree.function, id);
         assert_eq!(tree.post_dominators[&merge], vec![merge.clone()]);
         assert_eq!(tree.post_dominators[&entry], vec![entry, merge]);
+    }
+
+    #[test]
+    fn queries_canonical_cfg_connectivity_and_dominance() {
+        let provenance = SourceProvenance::new(
+            "src/Counter.tsx",
+            ezc_parser::SourceSpan {
+                start: 0,
+                end: 1,
+                line: 1,
+                column: 1,
+            },
+        );
+        let id = SemanticId::component(Some("x-counter"), "Counter").method("render");
+        let entry = IrBlockId::entry_for(&id);
+        let exit = IrBlockId::for_function(&id, "exit");
+        let function = IrFunction {
+            id,
+            name: "render".to_string(),
+            provenance: provenance.clone(),
+            entry_block: entry.clone(),
+            blocks: [entry.clone(), exit.clone()]
+                .into_iter()
+                .map(|id| IrBlock {
+                    id,
+                    provenance: provenance.clone(),
+                    instructions: Vec::new(),
+                })
+                .collect(),
+            branch_edges: vec![IrBranchEdge {
+                from: entry.clone(),
+                to: exit.clone(),
+                arm: IrBranchArm::True,
+                provenance,
+            }],
+            loops: Vec::new(),
+        };
+        let dominators = compute_dominators(&function);
+        let post_dominators = compute_post_dominators(&function);
+
+        assert_eq!(function.block(&entry).expect("entry").id, entry);
+        assert_eq!(
+            function.successor_blocks(&function.entry_block),
+            vec![exit.clone()]
+        );
+        assert_eq!(
+            function.predecessor_blocks(&exit),
+            vec![function.entry_block.clone()]
+        );
+        assert!(function.is_exit_block(&exit));
+        assert!(dominators.dominates(&function.entry_block, &exit));
+        assert!(post_dominators.post_dominates(&exit, &function.entry_block));
     }
 
     #[test]

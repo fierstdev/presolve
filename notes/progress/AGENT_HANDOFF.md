@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: D2-E - Post-dominators
-* Working tree: clean after the D2-E commit
+* Latest completed slice: D2-F - CFG queries
+* Working tree: clean after the D2-F commit
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: D2-E - Post-dominators
-* Summary: Added immutable post-dominator analysis over canonical IR blocks and branch edges.
+* Slice: D2-F - CFG queries
+* Summary: Added read-only connectivity, exit, dominator, and post-dominator queries for canonical CFGs.
 * Key files: crates/ezc_core/src/intermediate_representation.rs
-* New behavior: `compute_post_dominators` produces deterministic `IrPostDominatorTree` mappings rooted at each branch-graph exit block.
-* Tests added or changed: Core coverage locks exit and entry post-dominator relationships across a canonical conditional merge.
+* New behavior: `IrFunction` exposes deterministic block, predecessor, successor, and exit lookup; analysis trees expose `dominates` and `post_dominates` predicates.
+* Tests added or changed: Core coverage locks connectivity, exit detection, and both dominance predicates on a canonical two-block CFG.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: D2-E - Post-dominators
+* Slice: D2-F - CFG queries
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D2-E
-* Remaining: D2-F - CFG queries.
+* Completed: Phase C1 through C35; Phase D1-A through D2-F
+* Remaining: D3-A - definition/use chains, pending an IR value/operand identity decision.
 
 Verification
 
@@ -54,6 +54,10 @@ Architecture decisions made
 * Decision: Post-dominators are derived immutably in reverse from blocks without declared branch successors.
 * Reason: Later code motion, control-dependence, and cleanup passes gain a deterministic reverse-flow relation without requiring backend code generation or mutating canonical IR.
 * Tradeoff: D2-E treats blocks without declared branch successors as exits. It does not model explicit terminators, non-terminating control flow, loop-back/unconditional edges, or post-dominator query helpers yet.
+
+* Decision: CFG connectivity and dominance are exposed through read-only function and analysis-tree queries.
+* Reason: Future data-flow and optimization consumers can navigate compiler-owned control flow without indexing public vectors directly or rebuilding predecessor/successor relationships.
+* Tradeoff: D2-F exposes only current branch-edge topology. Loop-region membership, edge filtering, explicit terminators, reachability, and data-flow queries remain later work.
 
 * Decision: Expression graph nodes own `SourceProvenance` rather than an unqualified source span.
 * Reason: Tooling and diagnostics need the canonical expression node itself to provide a path-aware authored location without reconstructing it from a state field.
@@ -510,10 +514,11 @@ Known limitations
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
 * Item: C30 exposes direct ASM type queries only. CLI inspection output, source diagnostics, backend enforcement, resource declaration lowering, and final type diagnostic families remain later Phase C work.
 * Item: Canonical IR functions currently contain only empty entry basic blocks plus structural branch-edge and natural-loop records. Dominator and post-dominator results include only declared conditional edges; there are no source-lowered branches or loops, condition operands, explicit terminators, or statement instructions yet.
+* Item: D3 definition/use analysis cannot start safely until canonical IR defines value-producing instruction results and operand references. Reusing `SemanticId` would conflate authored entities with transient IR values, while introducing value IDs changes the IR contract and needs an explicit decision.
 
 Exact next step
 
-Continue automatically with D2-F - CFG queries, committing the completed D2-E slice first.
+Resolve the D3-A canonical IR value/operand identity design, then implement definition/use chains as the next slice.
 
 Useful commands
 
@@ -544,4 +549,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the D2-E commit.
+* None after the D2-F commit.
