@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: D2-D - Dominators
-* Working tree: clean after the D2-D commit
+* Latest completed slice: D2-E - Post-dominators
+* Working tree: clean after the D2-E commit
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: D2-D - Dominators
-* Summary: Added immutable dominator analysis over canonical IR blocks and branch edges.
+* Slice: D2-E - Post-dominators
+* Summary: Added immutable post-dominator analysis over canonical IR blocks and branch edges.
 * Key files: crates/ezc_core/src/intermediate_representation.rs
-* New behavior: `compute_dominators` produces deterministic `IrDominatorTree` block-to-dominator mappings rooted at each function's entry block.
-* Tests added or changed: Core coverage locks entry and merge dominator relationships across a canonical conditional branch shape.
+* New behavior: `compute_post_dominators` produces deterministic `IrPostDominatorTree` mappings rooted at each branch-graph exit block.
+* Tests added or changed: Core coverage locks exit and entry post-dominator relationships across a canonical conditional merge.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: D2-D - Dominators
+* Slice: D2-E - Post-dominators
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D2-D
-* Remaining: D2-E - post-dominators.
+* Completed: Phase C1 through C35; Phase D1-A through D2-E
+* Remaining: D2-F - CFG queries.
 
 Verification
 
@@ -50,6 +50,10 @@ Architecture decisions made
 * Decision: Dominators are derived immutably from IR block and branch-edge topology rather than stored as mutable IR state.
 * Reason: CFG analysis remains repeatable and backend-independent, and later optimization passes can consume deterministic analysis output without changing canonical lowering artifacts.
 * Tradeoff: D2-D considers only declared conditional branch edges and entry reachability. It does not validate malformed CFGs, include loop-back/unconditional edges, or expose higher-level dominance query helpers yet.
+
+* Decision: Post-dominators are derived immutably in reverse from blocks without declared branch successors.
+* Reason: Later code motion, control-dependence, and cleanup passes gain a deterministic reverse-flow relation without requiring backend code generation or mutating canonical IR.
+* Tradeoff: D2-E treats blocks without declared branch successors as exits. It does not model explicit terminators, non-terminating control flow, loop-back/unconditional edges, or post-dominator query helpers yet.
 
 * Decision: Expression graph nodes own `SourceProvenance` rather than an unqualified source span.
 * Reason: Tooling and diagnostics need the canonical expression node itself to provide a path-aware authored location without reconstructing it from a state field.
@@ -505,11 +509,11 @@ Known limitations
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
 * Item: C30 exposes direct ASM type queries only. CLI inspection output, source diagnostics, backend enforcement, resource declaration lowering, and final type diagnostic families remain later Phase C work.
-* Item: Canonical IR functions currently contain only empty entry basic blocks plus structural branch-edge and natural-loop records. Dominator results include only declared conditional edges; there are no source-lowered branches or loops, condition operands, terminators, post-dominator results, or statement instructions yet.
+* Item: Canonical IR functions currently contain only empty entry basic blocks plus structural branch-edge and natural-loop records. Dominator and post-dominator results include only declared conditional edges; there are no source-lowered branches or loops, condition operands, explicit terminators, or statement instructions yet.
 
 Exact next step
 
-Continue automatically with D2-E - post-dominators, committing the completed D2-D slice first.
+Continue automatically with D2-F - CFG queries, committing the completed D2-E slice first.
 
 Useful commands
 
@@ -540,4 +544,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the D2-D commit.
+* None after the D2-E commit.

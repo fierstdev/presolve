@@ -197,6 +197,13 @@ pub struct IrDominatorTree {
     pub dominators: BTreeMap<IrBlockId, Vec<IrBlockId>>,
 }
 
+/// The immutable post-dominator relation derived from one canonical IR function.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrPostDominatorTree {
+    pub function: SemanticId,
+    pub post_dominators: BTreeMap<IrBlockId, Vec<IrBlockId>>,
+}
+
 /// Computes dominators from the function's entry block and canonical branch edges.
 #[must_use]
 pub fn compute_dominators(function: &IrFunction) -> IrDominatorTree {
@@ -263,6 +270,76 @@ pub fn compute_dominators(function: &IrFunction) -> IrDominatorTree {
     }
 }
 
+/// Computes post-dominators from canonical branch edges and their CFG exit blocks.
+#[must_use]
+pub fn compute_post_dominators(function: &IrFunction) -> IrPostDominatorTree {
+    let block_ids = function
+        .blocks
+        .iter()
+        .map(|block| block.id.clone())
+        .collect::<BTreeSet<_>>();
+    let mut successors = block_ids
+        .iter()
+        .cloned()
+        .map(|block| (block, BTreeSet::new()))
+        .collect::<BTreeMap<_, _>>();
+    for edge in &function.branch_edges {
+        if block_ids.contains(&edge.from) && block_ids.contains(&edge.to) {
+            successors
+                .entry(edge.from.clone())
+                .or_default()
+                .insert(edge.to.clone());
+        }
+    }
+    let exits = successors
+        .iter()
+        .filter_map(|(block, successors)| successors.is_empty().then_some(block.clone()))
+        .collect::<BTreeSet<_>>();
+
+    let mut post_dominators = block_ids
+        .iter()
+        .cloned()
+        .map(|block| {
+            let initial = if exits.contains(&block) {
+                BTreeSet::from([block.clone()])
+            } else {
+                block_ids.clone()
+            };
+            (block, initial)
+        })
+        .collect::<BTreeMap<_, _>>();
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for block in &block_ids {
+            if exits.contains(block) {
+                continue;
+            }
+            let mut next = successors[block]
+                .iter()
+                .filter_map(|successor| post_dominators.get(successor).cloned())
+                .reduce(|mut shared, successor_post_dominators| {
+                    shared.retain(|candidate| successor_post_dominators.contains(candidate));
+                    shared
+                })
+                .unwrap_or_default();
+            next.insert(block.clone());
+            if post_dominators.get(block) != Some(&next) {
+                post_dominators.insert(block.clone(), next);
+                changed = true;
+            }
+        }
+    }
+
+    IrPostDominatorTree {
+        function: function.id.clone(),
+        post_dominators: post_dominators
+            .into_iter()
+            .map(|(block, post_dominators)| (block, post_dominators.into_iter().collect()))
+            .collect(),
+    }
+}
+
 /// One backend-neutral instruction with stable source provenance.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IrInstruction {
@@ -281,9 +358,9 @@ pub enum IrInstructionKind {
 #[cfg(test)]
 mod tests {
     use super::{
-        compute_dominators, lower_components_to_ir, IntermediateRepresentation, IrBlock, IrBlockId,
-        IrBranchArm, IrBranchEdge, IrFunction, IrInstruction, IrInstructionKind, IrLoop, IrLoopId,
-        IrModule,
+        compute_dominators, compute_post_dominators, lower_components_to_ir,
+        IntermediateRepresentation, IrBlock, IrBlockId, IrBranchArm, IrBranchEdge, IrFunction,
+        IrInstruction, IrInstructionKind, IrLoop, IrLoopId, IrModule,
     };
     use crate::{SemanticId, SourceProvenance};
 
@@ -446,24 +523,24 @@ mod tests {
             branch_edges: vec![
                 IrBranchEdge {
                     from: entry.clone(),
-                    to: when_true,
+                    to: when_true.clone(),
                     arm: IrBranchArm::True,
                     provenance: provenance.clone(),
                 },
                 IrBranchEdge {
                     from: entry.clone(),
-                    to: when_false,
+                    to: when_false.clone(),
                     arm: IrBranchArm::False,
                     provenance: provenance.clone(),
                 },
                 IrBranchEdge {
-                    from: entry.clone(),
+                    from: when_true,
                     to: merge.clone(),
                     arm: IrBranchArm::True,
                     provenance: provenance.clone(),
                 },
                 IrBranchEdge {
-                    from: entry.clone(),
+                    from: when_false,
                     to: merge.clone(),
                     arm: IrBranchArm::False,
                     provenance,
@@ -477,6 +554,76 @@ mod tests {
         assert_eq!(tree.function, id);
         assert_eq!(tree.dominators[&entry], vec![entry.clone()]);
         assert_eq!(tree.dominators[&merge], vec![entry, merge]);
+    }
+
+    #[test]
+    fn computes_post_dominators_from_canonical_branch_edges() {
+        let provenance = SourceProvenance::new(
+            "src/Counter.tsx",
+            ezc_parser::SourceSpan {
+                start: 0,
+                end: 1,
+                line: 1,
+                column: 1,
+            },
+        );
+        let id = SemanticId::component(Some("x-counter"), "Counter").method("render");
+        let entry = IrBlockId::entry_for(&id);
+        let when_true = IrBlockId::for_function(&id, "when-true");
+        let when_false = IrBlockId::for_function(&id, "when-false");
+        let merge = IrBlockId::for_function(&id, "merge");
+        let function = IrFunction {
+            id: id.clone(),
+            name: "render".to_string(),
+            provenance: provenance.clone(),
+            entry_block: entry.clone(),
+            blocks: [
+                entry.clone(),
+                when_true.clone(),
+                when_false.clone(),
+                merge.clone(),
+            ]
+            .into_iter()
+            .map(|id| IrBlock {
+                id,
+                provenance: provenance.clone(),
+                instructions: Vec::new(),
+            })
+            .collect(),
+            branch_edges: vec![
+                IrBranchEdge {
+                    from: entry.clone(),
+                    to: when_true.clone(),
+                    arm: IrBranchArm::True,
+                    provenance: provenance.clone(),
+                },
+                IrBranchEdge {
+                    from: entry.clone(),
+                    to: when_false.clone(),
+                    arm: IrBranchArm::False,
+                    provenance: provenance.clone(),
+                },
+                IrBranchEdge {
+                    from: when_true,
+                    to: merge.clone(),
+                    arm: IrBranchArm::True,
+                    provenance: provenance.clone(),
+                },
+                IrBranchEdge {
+                    from: when_false,
+                    to: merge.clone(),
+                    arm: IrBranchArm::False,
+                    provenance,
+                },
+            ],
+            loops: Vec::new(),
+        };
+
+        let tree = compute_post_dominators(&function);
+
+        assert_eq!(tree.function, id);
+        assert_eq!(tree.post_dominators[&merge], vec![merge.clone()]);
+        assert_eq!(tree.post_dominators[&entry], vec![entry, merge]);
     }
 
     #[test]

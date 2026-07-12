@@ -66,9 +66,10 @@ pub use explain::{explain_json, explain_text};
 pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 pub use html_codegen::generate_static_html;
 pub use intermediate_representation::{
-    compute_dominators, lower_components_to_ir, IntermediateRepresentation, IrBlock, IrBlockId,
-    IrBranchArm, IrBranchEdge, IrDominatorTree, IrFunction, IrInstruction, IrInstructionKind,
-    IrLoop, IrLoopId, IrModule, IrTemplateEntrypoint,
+    compute_dominators, compute_post_dominators, lower_components_to_ir,
+    IntermediateRepresentation, IrBlock, IrBlockId, IrBranchArm, IrBranchEdge, IrDominatorTree,
+    IrFunction, IrInstruction, IrInstructionKind, IrLoop, IrLoopId, IrModule, IrPostDominatorTree,
+    IrTemplateEntrypoint,
 };
 pub use model::{
     ClassSummary, DecoratorSummary, Diagnostic, RenderMethodSummary, Severity, SourceSummary, Span,
