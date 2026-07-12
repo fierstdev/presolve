@@ -242,17 +242,15 @@ fn folded_type_mismatch_diagnostic(
     let declared_type = field.declared_type.as_ref()?;
     let target = model.semantic_types.assignments.get(&field.id)?;
     let source = crate::state_initializer_value_type(field.initial_value.as_ref()?);
-    (!crate::is_state_initializer_assignable(&source, &target.semantic_type)).then(|| {
-        ComponentDiagnostic {
-            provenance: Some(declared_type.provenance.clone()),
-            code: "EZC1016".to_string(),
-            message: format!(
-                "state field `{}` in class `{class_name}` declares `{}` but initializes with `{}`",
-                field.name,
-                declared_type.text,
-                state_initializer_type_name(&source)
-            ),
-        }
+    (!crate::is_assignable(&source, &target.semantic_type)).then(|| ComponentDiagnostic {
+        provenance: Some(declared_type.provenance.clone()),
+        code: "EZC1016".to_string(),
+        message: format!(
+            "state field `{}` in class `{class_name}` declares `{}` but initializes with `{}`",
+            field.name,
+            declared_type.text,
+            state_initializer_type_name(&source)
+        ),
     })
 }
 
@@ -271,19 +269,17 @@ fn action_assignment_mismatch_diagnostic(
     let declared_type = field.declared_type.as_ref()?;
     let target = model.semantic_types.assignments.get(&field.id)?;
     let source = crate::state_initializer_value_type(value);
-    (!crate::is_state_initializer_assignable(&source, &target.semantic_type)).then(|| {
-        ComponentDiagnostic {
-            provenance: model.provenance.get(&action.id).cloned(),
-            code: "EZC1017".to_string(),
-            message: format!(
-                "state field `{}` in class `{}` declares `{}` but action `{}` assigns `{}`",
-                field.name,
-                component.class_name,
-                declared_type.text,
-                action.method,
-                state_initializer_type_name(&source)
-            ),
-        }
+    (!crate::is_assignable(&source, &target.semantic_type)).then(|| ComponentDiagnostic {
+        provenance: model.provenance.get(&action.id).cloned(),
+        code: "EZC1017".to_string(),
+        message: format!(
+            "state field `{}` in class `{}` declares `{}` but action `{}` assigns `{}`",
+            field.name,
+            component.class_name,
+            declared_type.text,
+            action.method,
+            state_initializer_type_name(&source)
+        ),
     })
 }
 
@@ -307,11 +303,9 @@ fn compound_mutation_type_diagnostics(
     };
     let provenance = model.provenance.get(&action.id).cloned();
     let number_compatible =
-        crate::is_state_initializer_assignable(&crate::SemanticType::Number, &target.semantic_type);
-    let boolean_compatible = crate::is_state_initializer_assignable(
-        &crate::SemanticType::Boolean,
-        &target.semantic_type,
-    );
+        crate::is_assignable(&crate::SemanticType::Number, &target.semantic_type);
+    let boolean_compatible =
+        crate::is_assignable(&crate::SemanticType::Boolean, &target.semantic_type);
 
     match &action.operation {
         StateOperation::Toggle if !boolean_compatible => vec![ComponentDiagnostic {
@@ -355,7 +349,7 @@ fn compound_mutation_type_diagnostics(
                 });
             }
             let source = crate::state_initializer_value_type(value);
-            if !crate::is_state_initializer_assignable(&source, &crate::SemanticType::Number) {
+            if !crate::is_assignable(&source, &crate::SemanticType::Number) {
                 diagnostics.push(ComponentDiagnostic {
                     provenance,
                     code: "EZC1021".to_string(),
@@ -400,8 +394,8 @@ fn attribute_binding_type_diagnostic(
     let name = entity.attribute_name.as_deref()?;
     let contract = crate::dom_binding_contract(name)?;
     let assignment = model.semantic_types.assignments.get(&entity.id)?;
-    (!crate::is_state_initializer_assignable(&assignment.semantic_type, &contract.semantic_type))
-        .then(|| ComponentDiagnostic {
+    (!crate::is_assignable(&assignment.semantic_type, &contract.semantic_type)).then(|| {
+        ComponentDiagnostic {
             provenance: Some(entity.provenance.clone()),
             code: "EZC1028".to_string(),
             message: format!(
@@ -415,7 +409,8 @@ fn attribute_binding_type_diagnostic(
                 entity.expression.as_deref().unwrap_or("<unknown>"),
                 state_initializer_type_name(&assignment.semantic_type)
             ),
-        })
+        }
+    })
 }
 
 fn conditional_type_diagnostic(

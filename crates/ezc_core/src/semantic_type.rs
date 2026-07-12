@@ -1239,9 +1239,9 @@ fn numeric_literal_type(text: &str) -> Option<SemanticType> {
         .map(|_| SemanticType::NumberLiteral(text.to_string()))
 }
 
-/// C10 compatibility relation for one concrete state initializer value.
+/// Canonical semantic compatibility relation shared by compiler consumers.
 #[must_use]
-pub fn is_state_initializer_assignable(source: &SemanticType, target: &SemanticType) -> bool {
+pub fn is_assignable(source: &SemanticType, target: &SemanticType) -> bool {
     match (source, target) {
         (_, SemanticType::Unknown)
         | (SemanticType::Unknown | SemanticType::Never, _)
@@ -1261,37 +1261,41 @@ pub fn is_state_initializer_assignable(source: &SemanticType, target: &SemanticT
                 && source
                     .iter()
                     .zip(target)
-                    .all(|(source, target)| is_state_initializer_assignable(source, target))
+                    .all(|(source, target)| is_assignable(source, target))
         }
-        (SemanticType::Tuple(source), SemanticType::Array(target)) => source
-            .iter()
-            .all(|source| is_state_initializer_assignable(source, target)),
-        (SemanticType::Array(source), SemanticType::Array(target)) => {
-            is_state_initializer_assignable(source, target)
+        (SemanticType::Tuple(source), SemanticType::Array(target)) => {
+            source.iter().all(|source| is_assignable(source, target))
         }
+        (SemanticType::Array(source), SemanticType::Array(target)) => is_assignable(source, target),
         (SemanticType::Object(source), SemanticType::Object(target)) => {
             target.properties.iter().all(|(name, target)| {
                 source
                     .properties
                     .get(name)
-                    .is_some_and(|source| is_state_initializer_assignable(source, target))
+                    .is_some_and(|source| is_assignable(source, target))
             })
         }
         (SemanticType::Resource(source), SemanticType::Resource(target)) => {
             source.pending == target.pending
                 && source.serializable == target.serializable
                 && source.execution_boundary == target.execution_boundary
-                && is_state_initializer_assignable(&source.data, &target.data)
-                && is_state_initializer_assignable(&source.error, &target.error)
+                && is_assignable(&source.data, &target.data)
+                && is_assignable(&source.error, &target.error)
         }
-        (SemanticType::Union(source), target) => source
-            .iter()
-            .all(|source| is_state_initializer_assignable(source, target)),
-        (source, SemanticType::Union(target)) => target
-            .iter()
-            .any(|target| is_state_initializer_assignable(source, target)),
+        (SemanticType::Union(source), target) => {
+            source.iter().all(|source| is_assignable(source, target))
+        }
+        (source, SemanticType::Union(target)) => {
+            target.iter().any(|target| is_assignable(source, target))
+        }
         _ => false,
     }
+}
+
+/// Compatibility alias retained for C10 callers.
+#[must_use]
+pub fn is_state_initializer_assignable(source: &SemanticType, target: &SemanticType) -> bool {
+    is_assignable(source, target)
 }
 
 #[must_use]
@@ -1321,7 +1325,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::{
-        boundary_compatibility, normalize_semantic_type, operator_result_type,
+        boundary_compatibility, is_assignable, normalize_semantic_type, operator_result_type,
         serialization_compatibility, BoundaryCompatibility, ExecutionBoundary, ObjectType,
         ResourceExecutionBoundary, ResourceType, SemanticOperator, SemanticType,
         SemanticTypeAssignment, SemanticTypeId, SemanticTypeStatus, SerializationCompatibility,
@@ -1469,6 +1473,22 @@ mod tests {
             normalize_semantic_type(SemanticType::Union(vec![SemanticType::Never])),
             SemanticType::Never
         );
+    }
+
+    #[test]
+    fn centralizes_assignability_across_normalized_type_forms() {
+        assert!(is_assignable(
+            &SemanticType::StringLiteral("all".to_string()),
+            &SemanticType::Union(vec![
+                SemanticType::StringLiteral("active".to_string()),
+                SemanticType::StringLiteral("all".to_string()),
+            ])
+        ));
+        assert!(is_assignable(
+            &SemanticType::Tuple(vec![SemanticType::NumberLiteral("1".to_string())]),
+            &SemanticType::Array(Box::new(SemanticType::Number))
+        ));
+        assert!(!is_assignable(&SemanticType::String, &SemanticType::Number));
     }
 
     #[test]

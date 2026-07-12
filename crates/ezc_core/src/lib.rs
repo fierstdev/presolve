@@ -85,7 +85,7 @@ pub use semantic_id::{SemanticId, SemanticOwner};
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
 pub use semantic_type::{
-    boundary_compatibility, dom_binding_contract, is_state_initializer_assignable,
+    boundary_compatibility, dom_binding_contract, is_assignable, is_state_initializer_assignable,
     operator_result_type, serialization_compatibility, state_initializer_value_type,
     BoundaryCompatibility, DomBindingContract, DomBindingKind, ExecutionBoundary, ObjectType,
     ResourceExecutionBoundary, ResourceType, SemanticOperator, SemanticType, SemanticTypeAlias,
