@@ -122,6 +122,22 @@ pub struct IrDomList {
     pub provenance: SourceProvenance,
 }
 
+/// Deterministic read-only lookup surface for canonical DOM nodes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrDomInspection {
+    pub nodes: BTreeMap<IrDomNodeId, IrDomNode>,
+}
+
+#[must_use]
+pub fn inspect_dom_nodes(nodes: Vec<IrDomNode>) -> IrDomInspection {
+    IrDomInspection {
+        nodes: nodes
+            .into_iter()
+            .map(|node| (node.id.clone(), node))
+            .collect(),
+    }
+}
+
 /// Lowers application component ownership into deterministic IR module structure.
 #[must_use]
 pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateRepresentation {
