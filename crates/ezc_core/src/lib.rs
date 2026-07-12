@@ -436,6 +436,19 @@ class Parameters extends Component {
         assert!(codes.contains(&"EZASM1002"));
         assert!(codes.contains(&"EZASM1006"));
 
+        let mut invalid_type = asm.clone();
+        let state_id = component.state_fields[0].id.clone();
+        invalid_type
+            .semantic_types
+            .assignments
+            .get_mut(&state_id)
+            .expect("state type")
+            .id = SemanticTypeId::for_subject(&component.id);
+        let diagnostics = validate_application_semantic_model(&invalid_type);
+        assert!(diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "EZASM1102"));
+
         let dependencies = DependencyAnalysisPass.analyze(&asm);
         assert_eq!(dependencies.dependencies[&component.actions[0].id].len(), 1);
         assert_eq!(
