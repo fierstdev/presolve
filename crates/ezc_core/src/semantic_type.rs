@@ -129,6 +129,9 @@ fn semantic_type_from_annotation(text: &str) -> Option<SemanticType> {
                 .collect(),
         ));
     }
+    if text.starts_with('{') && text.ends_with('}') {
+        return object_type(text);
+    }
 
     match text {
         "string" => Some(SemanticType::String),
@@ -139,6 +142,25 @@ fn semantic_type_from_annotation(text: &str) -> Option<SemanticType> {
         "false" => Some(SemanticType::BooleanLiteral(false)),
         _ => string_literal_type(text).or_else(|| numeric_literal_type(text)),
     }
+}
+
+fn object_type(text: &str) -> Option<SemanticType> {
+    let mut properties = BTreeMap::new();
+    let fields = &text[1..text.len() - 1];
+
+    for field in fields.split(';').filter(|field| !field.trim().is_empty()) {
+        let (name, type_text) = field.split_once(':')?;
+        let name = name.trim();
+        if name.is_empty() {
+            return None;
+        }
+        properties.insert(
+            name.to_string(),
+            semantic_type_from_annotation(type_text).unwrap_or(SemanticType::Unknown),
+        );
+    }
+
+    Some(SemanticType::Object(ObjectType { properties }))
 }
 
 fn string_literal_type(text: &str) -> Option<SemanticType> {

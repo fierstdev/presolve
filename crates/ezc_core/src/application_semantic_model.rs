@@ -775,6 +775,35 @@ class CollectionTypes extends Component {
     }
 
     #[test]
+    fn lowers_structural_object_state_annotations_into_canonical_types() {
+        let parsed = ezc_parser::parse_file(
+            "src/ObjectTypes.tsx",
+            r#"
+@component("x-object-types")
+class ObjectTypes extends Component {
+  todo: { id: string; title: string; completed: boolean } = state({ id: "1", title: "EdgeZero", completed: false });
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        let field = &asm.components[0].state_fields[0];
+        let assignment = &asm.semantic_types.assignments[&field.id];
+        let crate::SemanticType::Object(object) = &assignment.semantic_type else {
+            panic!("expected structural object type");
+        };
+
+        assert_eq!(
+            object.properties,
+            std::collections::BTreeMap::from([
+                ("completed".to_string(), crate::SemanticType::Boolean),
+                ("id".to_string(), crate::SemanticType::String),
+                ("title".to_string(), crate::SemanticType::String),
+            ])
+        );
+    }
+
+    #[test]
     fn derives_component_ownership_without_legacy_owner_fields() {
         let parsed = ezc_parser::parse_file(
             "src/Counter.tsx",
