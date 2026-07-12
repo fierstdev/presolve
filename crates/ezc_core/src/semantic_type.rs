@@ -348,6 +348,76 @@ fn numeric_literal_type(text: &str) -> Option<SemanticType> {
         .map(|_| SemanticType::NumberLiteral(text.to_string()))
 }
 
+/// C10 compatibility relation for one concrete state initializer value.
+#[must_use]
+pub fn is_state_initializer_assignable(source: &SemanticType, target: &SemanticType) -> bool {
+    match (source, target) {
+        (_, SemanticType::Unknown)
+        | (SemanticType::Unknown | SemanticType::Never, _)
+        | (SemanticType::Null, SemanticType::Null)
+        | (SemanticType::Boolean | SemanticType::BooleanLiteral(_), SemanticType::Boolean)
+        | (SemanticType::Number | SemanticType::NumberLiteral(_), SemanticType::Number)
+        | (SemanticType::String | SemanticType::StringLiteral(_), SemanticType::String) => true,
+        (SemanticType::BooleanLiteral(source), SemanticType::BooleanLiteral(target)) => {
+            source == target
+        }
+        (SemanticType::NumberLiteral(source), SemanticType::NumberLiteral(target))
+        | (SemanticType::StringLiteral(source), SemanticType::StringLiteral(target)) => {
+            source == target
+        }
+        (SemanticType::Tuple(source), SemanticType::Tuple(target)) => {
+            source.len() == target.len()
+                && source
+                    .iter()
+                    .zip(target)
+                    .all(|(source, target)| is_state_initializer_assignable(source, target))
+        }
+        (SemanticType::Tuple(source), SemanticType::Array(target)) => source
+            .iter()
+            .all(|source| is_state_initializer_assignable(source, target)),
+        (SemanticType::Array(source), SemanticType::Array(target)) => {
+            is_state_initializer_assignable(source, target)
+        }
+        (SemanticType::Object(source), SemanticType::Object(target)) => {
+            target.properties.iter().all(|(name, target)| {
+                source
+                    .properties
+                    .get(name)
+                    .is_some_and(|source| is_state_initializer_assignable(source, target))
+            })
+        }
+        (SemanticType::Union(source), target) => source
+            .iter()
+            .all(|source| is_state_initializer_assignable(source, target)),
+        (source, SemanticType::Union(target)) => target
+            .iter()
+            .any(|target| is_state_initializer_assignable(source, target)),
+        _ => false,
+    }
+}
+
+#[must_use]
+pub fn state_initializer_value_type(value: &SerializableValue) -> SemanticType {
+    match value {
+        SerializableValue::Null => SemanticType::Null,
+        SerializableValue::Number(value) => SemanticType::NumberLiteral(value.clone()),
+        SerializableValue::String(value) => SemanticType::StringLiteral(value.clone()),
+        SerializableValue::Boolean(value) => SemanticType::BooleanLiteral(*value),
+        SerializableValue::Array(values) if values.is_empty() => {
+            SemanticType::Array(Box::new(SemanticType::Unknown))
+        }
+        SerializableValue::Array(values) => {
+            SemanticType::Tuple(values.iter().map(state_initializer_value_type).collect())
+        }
+        SerializableValue::Object(values) => SemanticType::Object(ObjectType {
+            properties: values
+                .iter()
+                .map(|(name, value)| (name.clone(), state_initializer_value_type(value)))
+                .collect(),
+        }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;

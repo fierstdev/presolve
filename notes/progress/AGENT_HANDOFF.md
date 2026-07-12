@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: e4be378 Resolve imported semantic type aliases
-* Working tree: C9 source, test, and documentation changes are present and uncommitted
+* Latest commit: 3de2c43 Infer semantic state types
+* Working tree: C10 source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: C9 - State type inference
-* Summary: Inferred canonical state types from direct serializable state initializers.
-* Key files: crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/application_semantic_model.rs
-* New behavior: Unannotated direct state values receive inferred primitive, array, or object types; empty arrays use the explicit `Array<unknown>` policy.
-* Tests added or changed: Core coverage verifies inferred number, empty/non-empty array, and object state types with inferred status.
+* Slice: C10 - State initializer compatibility
+* Summary: Validated declared state initializers with canonical semantic assignability.
+* Key files: crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/compiler_pass.rs
+* New behavior: Folded compiler diagnostics now validate primitives, literals, arrays, tuples, objects, unions, and nullability against canonical declared state types while retaining `EZC1016`.
+* Tests added or changed: Core coverage verifies valid empty arrays, literal unions, object-or-null state, and an invalid typed array.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C9 - State type inference
+* Slice: C10 - State initializer compatibility
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C9
-* Remaining: Phase C10 - state initializer compatibility.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C10
+* Remaining: Phase C11 - expression type propagation.
 
 Verification
 
@@ -80,6 +80,10 @@ Architecture decisions made
 * Decision: C9 widens direct serializable state literals to primitive semantic types and infers empty arrays as `Array<unknown>`.
 * Reason: State APIs receive useful stable type contracts without prematurely encoding literal-value constraints or assuming an empty collection element type.
 * Tradeoff: C9 infers only direct serializable values; constant expression nodes, actions, and non-serializable values remain later work.
+
+* Decision: C10 uses a canonical state-initializer assignability relation and preserves `EZC1016` for incompatibilities.
+* Reason: Arrays, tuples, objects, unions, and nullability now receive one compiler semantic compatibility check instead of primitive-only special cases.
+* Tradeoff: C10 is limited to state initializers; C29 will establish the final general assignability engine for all compiler consumers.
 
 * Decision: Browser runtime integration tests acquire one process-wide lock before creating a Chrome probe, and the probe deadline allows 20 seconds for a cold Chrome start.
 * Reason: Cargo's workspace runner schedules tests concurrently, and the previous five-second harness deadline could kill an otherwise healthy cold-start probe with SIGKILL.
@@ -394,11 +398,11 @@ Known limitations
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
-* Item: C9 infers only direct serializable state values. Constant-expression inference, aliases beyond C7-C8 resolution, assignability, normalization, and type diagnostics remain later Phase C work.
+* Item: C10 validates only state initializers. Expression propagation, actions, templates, general assignments, normalization, and final type diagnostic families remain later Phase C work.
 
 Exact next step
 
-Continue automatically with C10 - state initializer compatibility, committing the completed C9 slice first.
+Continue automatically with C11 - expression type propagation, committing the completed C10 slice first.
 
 Useful commands
 

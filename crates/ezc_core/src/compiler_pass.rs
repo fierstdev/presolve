@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::application_semantic_model::{ApplicationSemanticModel, SemanticEntityKind};
 use crate::component_graph::{
-    ComponentDiagnostic, ComponentGraph, DeclaredStateTypeKind, SerializableValue, StateOperation,
+    ComponentDiagnostic, ComponentGraph, SerializableValue, StateOperation,
 };
 use crate::semantic_id::SemanticId;
 use crate::semantic_provenance::SourceProvenance;
@@ -100,11 +100,6 @@ impl ImmutableAsmPass for ConstantFoldingPass {
                 match result {
                     Ok(value) => {
                         field.initial_value = Some(value);
-                        if let Some(diagnostic) =
-                            folded_type_mismatch_diagnostic(field, &component.class_name)
-                        {
-                            push_diagnostic_once(&mut folded.diagnostics, diagnostic);
-                        }
                     }
                     Err(error) => push_diagnostic_once(
                         &mut folded.diagnostics,
@@ -119,6 +114,16 @@ impl ImmutableAsmPass for ConstantFoldingPass {
                             ),
                         },
                     ),
+                }
+            }
+        }
+
+        for component in &folded.components {
+            for field in &component.state_fields {
+                if let Some(diagnostic) =
+                    folded_type_mismatch_diagnostic(&folded, field, &component.class_name)
+                {
+                    push_diagnostic_once(&mut folded.diagnostics, diagnostic);
                 }
             }
         }
@@ -202,27 +207,24 @@ impl ImmutableAsmPass for ConstantEvaluationPass {
 }
 
 fn folded_type_mismatch_diagnostic(
+    model: &ApplicationSemanticModel,
     field: &crate::component_graph::StateField,
     class_name: &str,
 ) -> Option<ComponentDiagnostic> {
     let declared_type = field.declared_type.as_ref()?;
-    let declared_kind = declared_type.kind?;
-    let value_kind = match field.initial_value.as_ref()? {
-        SerializableValue::String(_) => DeclaredStateTypeKind::String,
-        SerializableValue::Number(_) => DeclaredStateTypeKind::Number,
-        SerializableValue::Boolean(_) => DeclaredStateTypeKind::Boolean,
-        SerializableValue::Null => DeclaredStateTypeKind::Null,
-        SerializableValue::Array(_) | SerializableValue::Object(_) => return None,
-    };
-    (declared_kind != value_kind).then(|| ComponentDiagnostic {
-        provenance: Some(declared_type.provenance.clone()),
-        code: "EZC1016".to_string(),
-        message: format!(
-            "state field `{}` in class `{class_name}` declares `{}` but initializes with `{}`",
-            field.name,
-            declared_state_type_name(declared_kind),
-            declared_state_type_name(value_kind)
-        ),
+    let target = model.semantic_types.assignments.get(&field.id)?;
+    let source = crate::state_initializer_value_type(field.initial_value.as_ref()?);
+    (!crate::is_state_initializer_assignable(&source, &target.semantic_type)).then(|| {
+        ComponentDiagnostic {
+            provenance: Some(declared_type.provenance.clone()),
+            code: "EZC1016".to_string(),
+            message: format!(
+                "state field `{}` in class `{class_name}` declares `{}` but initializes with `{}`",
+                field.name,
+                declared_type.text,
+                state_initializer_type_name(&source)
+            ),
+        }
     })
 }
 
@@ -235,12 +237,18 @@ fn push_diagnostic_once(
     }
 }
 
-fn declared_state_type_name(kind: DeclaredStateTypeKind) -> &'static str {
-    match kind {
-        DeclaredStateTypeKind::String => "string",
-        DeclaredStateTypeKind::Number => "number",
-        DeclaredStateTypeKind::Boolean => "boolean",
-        DeclaredStateTypeKind::Null => "null",
+fn state_initializer_type_name(semantic_type: &crate::SemanticType) -> &'static str {
+    match semantic_type {
+        crate::SemanticType::Unknown => "unknown",
+        crate::SemanticType::Never => "never",
+        crate::SemanticType::Null => "null",
+        crate::SemanticType::Boolean | crate::SemanticType::BooleanLiteral(_) => "boolean",
+        crate::SemanticType::Number | crate::SemanticType::NumberLiteral(_) => "number",
+        crate::SemanticType::String | crate::SemanticType::StringLiteral(_) => "string",
+        crate::SemanticType::Array(_) => "array",
+        crate::SemanticType::Tuple(_) => "tuple",
+        crate::SemanticType::Object(_) => "object",
+        crate::SemanticType::Union(_) => "union",
     }
 }
 
@@ -394,6 +402,35 @@ class FoldedState extends Component {
         );
         assert_eq!(ConstantFoldingPass.transform(&folded), folded);
         assert_eq!(asm, original);
+    }
+
+    #[test]
+    fn validates_state_initializers_with_canonical_semantic_assignability() {
+        let parsed = ezc_parser::parse_file(
+            "src/StateCompatibility.tsx",
+            r#"
+@component("x-state-compatibility")
+class StateCompatibility extends Component {
+  names: string[] = state([]);
+  filter: "all" | "active" = state("all");
+  user: { id: string } | null = state(null);
+  invalid: string[] = state([1]);
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        let folded = ConstantFoldingPass.transform(&asm);
+        let diagnostics = folded
+            .diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.code == "EZC1016")
+            .collect::<Vec<_>>();
+
+        assert_eq!(diagnostics.len(), 1);
+        assert!(diagnostics[0].message.contains("invalid"));
+        assert!(diagnostics[0].message.contains("declares `string[]`"));
+        assert!(diagnostics[0].message.contains("initializes with `tuple`"));
     }
 
     #[test]
