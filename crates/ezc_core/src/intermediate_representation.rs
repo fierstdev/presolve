@@ -339,6 +339,47 @@ pub struct IrDefinitionUseAnalysis {
     pub uses: BTreeMap<IrValueId, Vec<IrUse>>,
 }
 
+/// A resolved use-to-definition relation for one value-consuming operand.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrUseDefinition {
+    pub value: IrValueId,
+    pub instruction: IrInstructionId,
+    pub operand_index: usize,
+    pub definition: IrValueDefinition,
+}
+
+/// Resolves each canonical value use to its registered definition.
+#[must_use]
+pub fn analyze_use_definitions(function: &IrFunction) -> Vec<IrUseDefinition> {
+    let mut relations = Vec::new();
+    for block in &function.blocks {
+        for instruction in &block.instructions {
+            for (operand_index, operand) in instruction_operands(&instruction.kind)
+                .into_iter()
+                .enumerate()
+            {
+                let IrOperand::Value(value) = operand else {
+                    continue;
+                };
+                let Some(definition) = function
+                    .values
+                    .get(value)
+                    .map(|value| value.definition.clone())
+                else {
+                    continue;
+                };
+                relations.push(IrUseDefinition {
+                    value: value.clone(),
+                    instruction: instruction.id.clone(),
+                    operand_index,
+                    definition,
+                });
+            }
+        }
+    }
+    relations
+}
+
 /// Computes definition and use chains from one function's value registry and instruction operands.
 #[must_use]
 pub fn analyze_definition_uses(function: &IrFunction) -> IrDefinitionUseAnalysis {

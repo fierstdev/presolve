@@ -3,24 +3,24 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: D3-A - definition/use chains
+* Latest completed slice: D3-B - use-definition chains
 * Working tree: clean after the D2-G6 commit
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: D3-A - definition/use chains
-* Summary: Added compiler-owned value definition/use analysis.
+* Slice: D3-B - use-definition chains
+* Summary: Added direct use-to-definition resolution for every value operand.
 * Key files: crates/ezc_core/src/intermediate_representation.rs
-* New behavior: `analyze_definition_uses` records every value definition and exact instruction operand use position.
+* New behavior: `analyze_use_definitions` resolves each value operand to its canonical definition while retaining the operand index.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: D3-A - definition/use chains
+* Slice: D3-B - use-definition chains
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D3-A
-* Remaining: D3-B - use-definition chains.
+* Completed: Phase C1 through C35; Phase D1-A through D3-B
+* Remaining: D3-C - liveness.
 
 Verification
 
@@ -541,7 +541,7 @@ Known limitations
 
 Exact next step
 
-Continue automatically with D3-B - use-definition chains, committing the completed D3-A slice first.
+Continue automatically with D3-C - liveness, committing the completed D3-B slice first.
 
 Useful commands
 
