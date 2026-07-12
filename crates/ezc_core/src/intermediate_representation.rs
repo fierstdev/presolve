@@ -128,6 +128,26 @@ pub struct IrDomInspection {
     pub nodes: BTreeMap<IrDomNodeId, IrDomNode>,
 }
 
+/// Compiler-owned reactive dependency topology.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct IrReactiveGraph {
+    pub nodes: BTreeMap<String, IrReactiveNode>,
+    pub edges: Vec<IrReactiveEdge>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrReactiveNode {
+    pub id: String,
+    pub provenance: SourceProvenance,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrReactiveEdge {
+    pub source: String,
+    pub target: String,
+    pub provenance: SourceProvenance,
+}
+
 #[must_use]
 pub fn inspect_dom_nodes(nodes: Vec<IrDomNode>) -> IrDomInspection {
     IrDomInspection {
