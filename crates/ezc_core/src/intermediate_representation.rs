@@ -233,6 +233,23 @@ impl std::fmt::Display for IrStorageId {
     }
 }
 
+/// An immutable primitive constant embedded directly in an IR operand.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IrConstant {
+    Null,
+    Boolean(bool),
+    Number(String),
+    String(String),
+}
+
+/// A closed set of executable inputs supported by the canonical IR.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IrOperand {
+    Value(IrValueId),
+    Constant(IrConstant),
+    Storage(IrStorageId),
+}
+
 /// A stable compiler-owned loop identity within an IR function.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct IrLoopId(String);
@@ -485,9 +502,9 @@ pub enum IrInstructionKind {
 mod tests {
     use super::{
         compute_dominators, compute_post_dominators, lower_components_to_ir,
-        IntermediateRepresentation, IrBlock, IrBlockId, IrBranchArm, IrBranchEdge, IrFunction,
-        IrInstruction, IrInstructionId, IrInstructionKind, IrLoop, IrLoopId, IrModule, IrStorageId,
-        IrValueId,
+        IntermediateRepresentation, IrBlock, IrBlockId, IrBranchArm, IrBranchEdge, IrConstant,
+        IrFunction, IrInstruction, IrInstructionId, IrInstructionKind, IrLoop, IrLoopId, IrModule,
+        IrOperand, IrStorageId, IrValueId,
     };
     use crate::{SemanticId, SourceProvenance};
 
@@ -589,6 +606,22 @@ mod tests {
         assert_eq!(storage.as_str(), "storage:component:x-counter/state:count");
         assert_ne!(instruction.as_str(), value.as_str());
         assert_ne!(value.as_str(), storage.as_str());
+    }
+
+    #[test]
+    fn represents_closed_ir_operands_without_semantic_identity_operands() {
+        let function = SemanticId::component(Some("x-counter"), "Counter").method("increment");
+        let value = IrOperand::Value(IrValueId::for_function(&function, 0));
+        let constant = IrOperand::Constant(IrConstant::Number("1".to_string()));
+        let storage = IrOperand::Storage(IrStorageId::for_semantic_origin(
+            &SemanticId::component(Some("x-counter"), "Counter").state_field("count"),
+        ));
+
+        assert!(matches!(value, IrOperand::Value(_)));
+        assert!(
+            matches!(constant, IrOperand::Constant(IrConstant::Number(number)) if number == "1")
+        );
+        assert!(matches!(storage, IrOperand::Storage(_)));
     }
 
     #[test]

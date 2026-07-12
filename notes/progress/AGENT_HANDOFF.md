@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: D2-G1 - IR identity domains
-* Working tree: clean after the D2-G1 commit
+* Latest completed slice: D2-G2 - IR operands and constants
+* Working tree: clean after the D2-G2 commit
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: D2-G1 - IR identity domains
-* Summary: Introduced distinct deterministic identities for IR operations, transient values, and storage slots.
+* Slice: D2-G2 - IR operands and constants
+* Summary: Added a closed executable-operand model with inline primitive constants.
 * Key files: crates/ezc_core/src/intermediate_representation.rs
-* New behavior: `IrInstructionId`, `IrValueId`, and `IrStorageId` are non-interchangeable Rust types with stable readable constructors.
-* Tests added or changed: Core coverage locks deterministic construction and confirms instruction, value, and storage text identities remain distinct.
+* New behavior: `IrOperand` accepts only an `IrValueId`, `IrConstant`, or `IrStorageId`; semantic identities cannot enter executable operand positions.
+* Tests added or changed: Core coverage locks value, number constant, and storage operand representation.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: D2-G1 - IR identity domains
+* Slice: D2-G2 - IR operands and constants
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D2-G1
-* Remaining: D2-G2 - IR operands and constants.
+* Completed: Phase C1 through C35; Phase D1-A through D2-G2
+* Remaining: D2-G3 - instruction result contract.
 
 Verification
 
@@ -62,6 +62,10 @@ Architecture decisions made
 * Decision: Authored semantic entities, lowered instructions, transient values, and storage slots use separate typed identity domains.
 * Reason: A single semantic entity may lower to several operations and values, while optimization may rewrite IR artifacts without changing authored meaning or provenance.
 * Tradeoff: D2-G1 defines stable identity only. Existing instructions and state initialization retain their prior representations until later D2-G slices migrate them.
+
+* Decision: Executable operands form a closed enum of value, inline primitive constant, and storage references.
+* Reason: Data-flow can distinguish value uses from storage access while retaining constants inline, without an ambiguous catch-all semantic operand.
+* Tradeoff: D2-G2 excludes function, template, aggregate, and runtime-allocated operands until concrete lowering needs them.
 
 * Decision: Expression graph nodes own `SourceProvenance` rather than an unqualified source span.
 * Reason: Tooling and diagnostics need the canonical expression node itself to provide a path-aware authored location without reconstructing it from a state field.
@@ -518,11 +522,11 @@ Known limitations
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
 * Item: C30 exposes direct ASM type queries only. CLI inspection output, source diagnostics, backend enforcement, resource declaration lowering, and final type diagnostic families remain later Phase C work.
 * Item: Canonical IR functions currently contain only empty entry basic blocks plus structural branch-edge and natural-loop records. Dominator and post-dominator results include only declared conditional edges; there are no source-lowered branches or loops, condition operands, explicit terminators, or statement instructions yet.
-* Item: IR value, instruction, and storage IDs now exist but are not yet attached to instructions or lowered storage. D2-G2 through D2-G6 will add operands, result contracts, registries, and validation before D3 definition/use analysis begins.
+* Item: IR identity and operands now exist but are not yet attached to instruction records or lowered storage. D2-G3 through D2-G6 will add result contracts, registries, and validation before D3 definition/use analysis begins.
 
 Exact next step
 
-Continue automatically with D2-G2 - IR operands and constants, committing the completed D2-G1 slice first.
+Continue automatically with D2-G3 - instruction result contract, committing the completed D2-G2 slice first.
 
 Useful commands
 
@@ -553,4 +557,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the D2-G1 commit.
+* None after the D2-G2 commit.
