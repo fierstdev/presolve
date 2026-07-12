@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::path::Path;
 
 use crate::component_graph::UnaryOperator;
 use crate::{
@@ -50,6 +51,20 @@ pub enum ExpressionNodeKind {
     },
 }
 
+impl ExpressionNode {
+    #[must_use]
+    pub fn dependencies(&self) -> Vec<&SemanticId> {
+        match &self.kind {
+            ExpressionNodeKind::Literal(_) | ExpressionNodeKind::Boolean(_) => Vec::new(),
+            ExpressionNodeKind::Arithmetic { left, right, .. }
+            | ExpressionNodeKind::Comparison { left, right, .. }
+            | ExpressionNodeKind::Logical { left, right, .. }
+            | ExpressionNodeKind::NullishCoalescing { left, right } => vec![left, right],
+            ExpressionNodeKind::Unary { operand, .. } => vec![operand],
+        }
+    }
+}
+
 impl ExpressionGraph {
     /// # Panics
     ///
@@ -79,6 +94,63 @@ impl ExpressionGraph {
     #[must_use]
     pub fn root_for(&self, owner: &SemanticId) -> Option<&SemanticId> {
         self.roots.get(owner)
+    }
+
+    #[must_use]
+    pub fn node(&self, id: &SemanticId) -> Option<&ExpressionNode> {
+        self.nodes.get(id)
+    }
+
+    #[must_use]
+    pub fn nodes_for(&self, owner: &SemanticId) -> Vec<&ExpressionNode> {
+        self.nodes
+            .values()
+            .filter(|node| node.owner == *owner)
+            .collect()
+    }
+
+    #[must_use]
+    pub fn dependencies_of(&self, id: &SemanticId) -> Vec<&SemanticId> {
+        self.node(id)
+            .map_or_else(Vec::new, ExpressionNode::dependencies)
+    }
+
+    #[must_use]
+    pub fn dependents_of(&self, id: &SemanticId) -> Vec<&ExpressionNode> {
+        self.nodes
+            .values()
+            .filter(|node| node.dependencies().contains(&id))
+            .collect()
+    }
+
+    #[must_use]
+    pub fn owner_of(&self, id: &SemanticId) -> Option<&SemanticId> {
+        self.node(id).map(|node| &node.owner)
+    }
+
+    #[must_use]
+    pub fn provenance_of(&self, id: &SemanticId) -> Option<&SourceProvenance> {
+        self.node(id).map(|node| &node.provenance)
+    }
+
+    #[must_use]
+    pub fn nodes_in_file(&self, path: &Path) -> Vec<&ExpressionNode> {
+        self.nodes
+            .values()
+            .filter(|node| node.provenance.path == path)
+            .collect()
+    }
+
+    #[must_use]
+    pub fn nodes_at(&self, path: &Path, offset: usize) -> Vec<&ExpressionNode> {
+        self.nodes
+            .values()
+            .filter(|node| {
+                node.provenance.path == path
+                    && node.provenance.span.start <= offset
+                    && offset < node.provenance.span.end
+            })
+            .collect()
     }
 
     #[must_use]

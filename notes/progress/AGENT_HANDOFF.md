@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: 53557b5 Add canonical expression graph
-* Working tree: B11 source, test, and documentation changes are present and uncommitted
+* Latest commit: e74609d Attach provenance to expression graph nodes
+* Working tree: B12 source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: B11 - Expression provenance
-* Summary: Attached canonical path-aware source provenance to every expression graph node.
-* Key files: crates/ezc_core/src/expression_graph.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/compiler_pass.rs
-* New behavior: Expression lowering derives each node's path and exact authored span from its owning state field. Constant-folding diagnostics now reuse the graph root's provenance directly.
-* Tests added or changed: Core coverage verifies every graph node retains the source path and a span contained by its root expression, and that folding diagnostics reuse the canonical root provenance.
+* Slice: B12 - Expression queries
+* Summary: Added deterministic canonical ASM queries over expression graph topology, ownership, and provenance.
+* Key files: crates/ezc_core/src/expression_graph.rs, crates/ezc_core/src/application_semantic_model.rs
+* New behavior: Compiler services can look up expression nodes and roots, enumerate owner-scoped nodes, follow direct dependency/dependent edges, inspect state-field ownership, and select expression nodes by file or source offset.
+* Tests added or changed: Core coverage verifies deterministic expression lookup, dependencies, reverse dependencies, ownership, provenance, and source selection.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: B11 - Expression provenance
+* Slice: B12 - Expression queries
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B10
-* Remaining: Phase B12 - expression queries.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12
+* Remaining: Phase C - semantic type system.
 
 Verification
 
@@ -40,6 +40,10 @@ Architecture decisions made
 * Decision: Expression graph nodes own `SourceProvenance` rather than an unqualified source span.
 * Reason: Tooling and diagnostics need the canonical expression node itself to provide a path-aware authored location without reconstructing it from a state field.
 * Tradeoff: B11 derives provenance only for the existing state-initializer graph. Template, action, and general JavaScript expressions are not lowered yet.
+
+* Decision: Expression graph queries return compiler-owned references in stable semantic-ID order and expose direct graph edges only.
+* Reason: Language tooling and future optimizations can navigate one canonical graph without reparsing expression trees or inferring ownership from identifier strings.
+* Tradeoff: B12 provides no graph mutation, transitive dependency closure, query language, or non-state expression support.
 
 * Decision: Browser runtime integration tests acquire one process-wide lock before creating a Chrome probe, and the probe deadline allows 20 seconds for a cold Chrome start.
 * Reason: Cargo's workspace runner schedules tests concurrently, and the previous five-second harness deadline could kill an otherwise healthy cold-start probe with SIGKILL.
@@ -353,11 +357,11 @@ Known limitations
 * Item: Method parameters are compiler-owned identifier declarations with canonical source provenance only. They do not execute, close over values, resolve local/template/action references, or support destructuring, defaults, rest declarations, or semantic type checking.
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
-* Item: The canonical expression graph currently covers supported state initializer expressions only. Every current node has path-aware provenance, while general expression owners and non-state expressions remain later work.
+* Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
 
 Exact next step
 
-Start Phase B12 - add canonical expression graph queries.
+Phase B is complete. Do not begin Phase C - semantic type system without an explicit continuation request.
 
 Useful commands
 

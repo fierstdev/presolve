@@ -8,7 +8,7 @@ use crate::component_graph::{
     build_component_graph_for_module, render_event_handlers, ComponentAction, ComponentDiagnostic,
     ComponentMethod, ComponentNode, MethodLocalVariable, RenderEventHandler, StateField,
 };
-use crate::expression_graph::ExpressionGraph;
+use crate::expression_graph::{ExpressionGraph, ExpressionNode};
 use crate::semantic_id::{SemanticId, SemanticOwner};
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
@@ -170,6 +170,51 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub fn provenance(&self, id: &SemanticId) -> Option<&SourceProvenance> {
         self.provenance.get(id)
+    }
+
+    #[must_use]
+    pub fn expression(&self, id: &SemanticId) -> Option<&ExpressionNode> {
+        self.expression_graph.node(id)
+    }
+
+    #[must_use]
+    pub fn expression_root(&self, owner: &SemanticId) -> Option<&SemanticId> {
+        self.expression_graph.root_for(owner)
+    }
+
+    #[must_use]
+    pub fn expressions_for(&self, owner: &SemanticId) -> Vec<&ExpressionNode> {
+        self.expression_graph.nodes_for(owner)
+    }
+
+    #[must_use]
+    pub fn expression_dependencies(&self, id: &SemanticId) -> Vec<&SemanticId> {
+        self.expression_graph.dependencies_of(id)
+    }
+
+    #[must_use]
+    pub fn expression_dependents(&self, id: &SemanticId) -> Vec<&ExpressionNode> {
+        self.expression_graph.dependents_of(id)
+    }
+
+    #[must_use]
+    pub fn expression_owner(&self, id: &SemanticId) -> Option<&SemanticId> {
+        self.expression_graph.owner_of(id)
+    }
+
+    #[must_use]
+    pub fn expression_provenance(&self, id: &SemanticId) -> Option<&SourceProvenance> {
+        self.expression_graph.provenance_of(id)
+    }
+
+    #[must_use]
+    pub fn expressions_in_file(&self, path: &Path) -> Vec<&ExpressionNode> {
+        self.expression_graph.nodes_in_file(path)
+    }
+
+    #[must_use]
+    pub fn expressions_at(&self, path: &Path, offset: usize) -> Vec<&ExpressionNode> {
+        self.expression_graph.nodes_at(path, offset)
     }
 
     #[must_use]
@@ -1006,6 +1051,53 @@ class LocalResolution extends Component {
         assert_eq!(
             crate::generate_static_html(&template_graph),
             "<output data-ez-node=\"n0\" title=\"EdgeZero\" data-ez-bindings=\"title\"><!-- ez-binding:n2:title -->EdgeZero</output>\n"
+        );
+    }
+
+    #[test]
+    fn queries_canonical_expression_graphs_by_dependency_provenance_and_owner() {
+        let parsed = ezc_parser::parse_file(
+            "src/ExpressionQueries.tsx",
+            r#"
+@component("x-expression-queries")
+class ExpressionQueries extends Component {
+  total = state((1 + 2) * 3);
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        let field = &asm.components[0].state_fields[0];
+        let root = asm.expression_root(&field.id).expect("expression root");
+        let left = field.id.expression("root.0");
+        let right = field.id.expression("root.1");
+
+        assert_eq!(asm.expression(root).map(|node| &node.id), Some(root));
+        assert_eq!(asm.expression_owner(root), Some(&field.id));
+        assert_eq!(asm.expression_dependencies(root), vec![&left, &right]);
+        assert_eq!(
+            asm.expression_dependents(&left)
+                .into_iter()
+                .map(|node| &node.id)
+                .collect::<Vec<_>>(),
+            vec![root]
+        );
+        assert_eq!(asm.expressions_for(&field.id).len(), 5);
+
+        let provenance = asm
+            .expression_provenance(root)
+            .expect("expression provenance");
+        assert_eq!(
+            provenance.path,
+            std::path::Path::new("src/ExpressionQueries.tsx")
+        );
+        assert_eq!(asm.expressions_in_file(&provenance.path).len(), 5);
+        assert_eq!(
+            asm.expressions_at(&provenance.path, provenance.span.start)
+                .into_iter()
+                .map(|node| &node.id)
+                .collect::<Vec<_>>(),
+            vec![root]
         );
     }
 }

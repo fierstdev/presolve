@@ -160,7 +160,9 @@ parser and browser runtime do not evaluate these expressions.
 The ASM owns a canonical expression graph: state fields resolve to stable graph
 roots, and folding and inspection read the same graph nodes rather than
 reinterpreting field-local expression trees. Every graph node retains canonical
-source provenance, including its file path and authored expression span.
+source provenance, including its file path and authored expression span. ASM
+queries provide deterministic expression lookup, direct dependencies and
+dependents, owner state fields, and path/offset provenance selection.
 
 ## Repository rules
 
