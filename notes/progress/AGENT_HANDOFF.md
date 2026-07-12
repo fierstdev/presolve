@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: c80673f Lower typed method parameters
-* Working tree: C15 source, test, and documentation changes are present and uncommitted
+* Latest commit: 6c9dcb7 Lower semantic method return types
+* Working tree: C16 source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: C15 - Return type semantics
-* Summary: Lowered declared method return annotations and inferred the existing serializable return values.
-* Key files: crates/ezc_parser/src/model.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/semantic_type.rs
-* New behavior: Method entities receive declared canonical return types when annotated, otherwise inferred types from top-level serializable returns.
-* Tests added or changed: Core coverage verifies declared string and inferred number method return types.
+* Slice: C16 - Assignment compatibility
+* Summary: Moved direct state-action assignment validation to canonical ASM semantic assignability.
+* Key files: crates/ezc_core/src/compiler_pass.rs, crates/ezc_core/src/component_graph.rs
+* New behavior: Immutable ASM folding validates direct action assignments against declared canonical state types, including literal unions and collection shapes, while retaining `EZC1017`.
+* Tests added or changed: Core coverage verifies direct assignment diagnostics through the immutable ASM pass, including union and collection values.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C15 - Return type semantics
+* Slice: C16 - Assignment compatibility
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C15
-* Remaining: Phase C16 - assignment compatibility.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C16
+* Remaining: Phase C17 - compound mutation typing.
 
 Verification
 
@@ -104,6 +104,10 @@ Architecture decisions made
 * Decision: Method semantic type assignments represent their return contract, declared when annotated and inferred from currently supported serializable returns otherwise.
 * Reason: Derived values, loaders, actions, and tooling can query one canonical method result contract before their dedicated phases add richer producers.
 * Tradeoff: C15 considers only top-level serializable return expressions. JSX, state/local expressions, async promises, branches, throws, implicit returns, and return compatibility diagnostics remain later work.
+
+* Decision: Direct action assignment compatibility is evaluated by the immutable ASM folding pass using canonical type assignments.
+* Reason: State initialization and mutation now share the same compiler-owned compatibility relation rather than duplicating primitive frontend checks.
+* Tradeoff: C16 covers only currently lowered direct literal assignments. Compound mutation, arbitrary expressions, parameter/local values, and final general assignability remain later work.
 
 * Decision: Browser runtime integration tests acquire one process-wide lock before creating a Chrome probe, and the probe deadline allows 20 seconds for a cold Chrome start.
 * Reason: Cargo's workspace runner schedules tests concurrently, and the previous five-second harness deadline could kill an otherwise healthy cold-start probe with SIGKILL.
@@ -418,11 +422,11 @@ Known limitations
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
-* Item: C15 types explicit annotations and currently supported top-level serializable returns only. JSX, state/local expressions, async promises, branches, throws, implicit returns, return compatibility diagnostics, parameter flow, normalization, and final type diagnostic families remain later Phase C work.
+* Item: C16 validates only currently lowered direct serializable action assignments through ASM folding. Compound mutation, arbitrary expressions, parameter/local values, return compatibility diagnostics, normalization, and final type diagnostic families remain later Phase C work.
 
 Exact next step
 
-Continue automatically with C16 - assignment compatibility, committing the completed C15 slice first.
+Continue automatically with C17 - compound mutation typing, committing the completed C16 slice first.
 
 Useful commands
 

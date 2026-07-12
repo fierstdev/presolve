@@ -126,6 +126,13 @@ impl ImmutableAsmPass for ConstantFoldingPass {
                     push_diagnostic_once(&mut folded.diagnostics, diagnostic);
                 }
             }
+            for action in &component.actions {
+                if let Some(diagnostic) =
+                    action_assignment_mismatch_diagnostic(&folded, component, action)
+                {
+                    push_diagnostic_once(&mut folded.diagnostics, diagnostic);
+                }
+            }
         }
 
         let graph = ComponentGraph {
@@ -222,6 +229,37 @@ fn folded_type_mismatch_diagnostic(
                 "state field `{}` in class `{class_name}` declares `{}` but initializes with `{}`",
                 field.name,
                 declared_type.text,
+                state_initializer_type_name(&source)
+            ),
+        }
+    })
+}
+
+fn action_assignment_mismatch_diagnostic(
+    model: &ApplicationSemanticModel,
+    component: &crate::component_graph::ComponentNode,
+    action: &crate::component_graph::ComponentAction,
+) -> Option<ComponentDiagnostic> {
+    let StateOperation::Assign(value) = &action.operation else {
+        return None;
+    };
+    let field = component
+        .state_fields
+        .iter()
+        .find(|field| field.name == action.field)?;
+    let declared_type = field.declared_type.as_ref()?;
+    let target = model.semantic_types.assignments.get(&field.id)?;
+    let source = crate::state_initializer_value_type(value);
+    (!crate::is_state_initializer_assignable(&source, &target.semantic_type)).then(|| {
+        ComponentDiagnostic {
+            provenance: model.provenance.get(&action.id).cloned(),
+            code: "EZC1017".to_string(),
+            message: format!(
+                "state field `{}` in class `{}` declares `{}` but action `{}` assigns `{}`",
+                field.name,
+                component.class_name,
+                declared_type.text,
+                action.method,
                 state_initializer_type_name(&source)
             ),
         }

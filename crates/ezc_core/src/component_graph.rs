@@ -677,7 +677,6 @@ fn build_component_node(
     let state_fields = state_fields_from_class(class, path, &id);
 
     collect_declared_state_type_diagnostics(&state_fields, &class.name, diagnostics);
-    collect_declared_state_action_type_diagnostics(class, &state_fields, path, diagnostics);
     collect_declared_state_toggle_type_diagnostics(class, &state_fields, path, diagnostics);
     collect_declared_state_numeric_action_type_diagnostics(class, &state_fields, path, diagnostics);
     collect_declared_state_compound_numeric_action_type_diagnostics(
@@ -978,49 +977,6 @@ fn collect_declared_state_type_diagnostics(
                     declared_state_type_kind_name(initial_value_kind),
                 ),
             });
-        }
-    }
-}
-
-fn collect_declared_state_action_type_diagnostics(
-    class: &ParsedClass,
-    state_fields: &[StateField],
-    path: &Path,
-    diagnostics: &mut Vec<ComponentDiagnostic>,
-) {
-    for method in &class.methods {
-        for update in &method.state_updates {
-            let ParsedStateOperation::Assign(value) = &update.operation else {
-                continue;
-            };
-            let Some(field) = state_fields.iter().find(|field| field.name == update.field) else {
-                continue;
-            };
-            let Some(declared_type) = field.declared_type.as_ref() else {
-                continue;
-            };
-            let Some(declared_type_kind) = declared_type.kind else {
-                continue;
-            };
-            let value = serializable_value_from_parsed(value);
-            let Some(value_kind) = primitive_serializable_value_type_kind(&value) else {
-                continue;
-            };
-
-            if declared_type_kind != value_kind {
-                diagnostics.push(ComponentDiagnostic {
-                    provenance: Some(SourceProvenance::new(path, update.span)),
-                    code: "EZC1017".to_string(),
-                    message: format!(
-                        "state field `{}` in class `{}` declares `{}` but action `{}` assigns `{}`",
-                        field.name,
-                        class.name,
-                        declared_state_type_kind_name(declared_type_kind),
-                        method.name,
-                        declared_state_type_kind_name(value_kind),
-                    ),
-                });
-            }
         }
     }
 }

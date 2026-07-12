@@ -870,35 +870,30 @@ class NullishState extends Component {
             source,
         );
         let graph = build_component_graph_for_module(&parsed);
-        let diagnostics = graph
+        let folded = ConstantFoldingPass.transform(
+            &build_application_semantic_model_from_component_graph(&graph),
+        );
+        let diagnostics = folded
             .diagnostics
             .iter()
+            .filter(|diagnostic| diagnostic.code == "EZC1017")
             .map(|diagnostic| (diagnostic.code.as_str(), diagnostic.message.as_str()))
             .collect::<Vec<_>>();
 
-        assert_eq!(
-            diagnostics,
-            vec![
-                (
-                    "EZC1017",
-                    "state field `count` in class `InvalidTypedActions` declares `number` but action `apply` assigns `string`",
-                ),
-                (
-                    "EZC1017",
-                    "state field `title` in class `InvalidTypedActions` declares `string` but action `apply` assigns `number`",
-                ),
-                (
-                    "EZC1017",
-                    "state field `enabled` in class `InvalidTypedActions` declares `boolean` but action `apply` assigns `null`",
-                ),
-                (
-                    "EZC1017",
-                    "state field `empty` in class `InvalidTypedActions` declares `null` but action `apply` assigns `boolean`",
-                ),
-            ]
-        );
+        assert_eq!(diagnostics.len(), 6);
+        assert!(diagnostics.iter().all(|(code, _)| *code == "EZC1017"));
+        assert!(diagnostics.iter().any(|(_, message)| {
+            message.contains("state field `status`") && message.contains("assigns `number`")
+        }));
+        assert!(diagnostics.iter().any(|(_, message)| {
+            message.contains("state field `collection`") && message.contains("assigns `tuple`")
+        }));
 
-        let provenance = graph.diagnostics[0]
+        let provenance = folded
+            .diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.code == "EZC1017")
+            .expect("action mismatch diagnostic")
             .provenance
             .as_ref()
             .expect("action mismatch diagnostic provenance");
