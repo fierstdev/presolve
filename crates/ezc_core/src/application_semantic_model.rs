@@ -12,6 +12,7 @@ use crate::expression_graph::{ExpressionGraph, ExpressionNode};
 use crate::semantic_id::{SemanticId, SemanticOwner};
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
+use crate::semantic_type::SemanticTypeModel;
 use crate::template_graph::{build_template_graph, TemplateNode};
 use crate::template_semantics::{
     build_template_semantic_entities, TemplateSemanticEntity, TemplateSemanticKind,
@@ -22,6 +23,7 @@ use crate::template_semantics::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ApplicationSemanticModel {
     pub expression_graph: ExpressionGraph,
+    pub semantic_types: SemanticTypeModel,
     pub components: Vec<ComponentNode>,
     pub templates: Vec<TemplateNode>,
     pub template_entities: Vec<TemplateSemanticEntity>,
@@ -380,6 +382,7 @@ pub fn build_application_semantic_model_from_component_graph(
             &component_graph.components,
             &component_graph.provenance,
         ),
+        semantic_types: SemanticTypeModel::default(),
         components: component_graph.components.clone(),
         templates,
         template_entities,
@@ -443,6 +446,7 @@ fn build_application_semantic_model_from_files(files: &[ParsedFile]) -> Applicat
 
     ApplicationSemanticModel {
         expression_graph: ExpressionGraph::from_components(&components, &provenance),
+        semantic_types: SemanticTypeModel::default(),
         components,
         templates,
         template_entities,
@@ -650,6 +654,30 @@ mod tests {
         build_component_graph_for_module, build_template_graph, build_template_semantic_entities,
         SemanticEntityKind, SemanticOwner, SemanticReferenceKind, TemplateSemanticKind,
     };
+
+    #[test]
+    fn initializes_the_canonical_type_model_without_legacy_type_lowering() {
+        let parsed = ezc_parser::parse_file(
+            "src/TypedState.tsx",
+            r#"
+@component("x-typed-state")
+class TypedState extends Component {
+  count: number = state(0);
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+
+        assert!(asm.semantic_types.assignments.is_empty());
+        assert_eq!(
+            asm.components[0].state_fields[0]
+                .declared_type
+                .as_ref()
+                .map(|declared| declared.text.as_str()),
+            Some("number")
+        );
+    }
 
     #[test]
     fn derives_component_ownership_without_legacy_owner_fields() {

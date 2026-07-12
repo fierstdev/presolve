@@ -164,6 +164,14 @@ source provenance, including its file path and authored expression span. ASM
 queries provide deterministic expression lookup, direct dependencies and
 dependents, owner state fields, and path/offset provenance selection.
 
+## Semantic type foundation
+
+The ASM owns a compiler-defined `SemanticType` algebra independent of raw
+TypeScript spelling. C1 establishes unknown, never, null, boolean, number,
+string, array, object, and union forms plus an initially empty canonical type
+assignment model. Parsing type annotations, inference, assignability, and type
+diagnostics are intentionally deferred to later Phase C slices.
+
 ## Repository rules
 
 - No major feature without an issue.

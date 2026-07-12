@@ -30,6 +30,7 @@ pub mod semantic_graph;
 pub mod semantic_id;
 pub mod semantic_provenance;
 pub mod semantic_reference;
+pub mod semantic_type;
 pub mod summarize;
 pub mod symbol_table;
 pub mod template_graph;
@@ -83,6 +84,7 @@ pub use semantic_graph::{
 pub use semantic_id::{SemanticId, SemanticOwner};
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
+pub use semantic_type::{ObjectType, SemanticType, SemanticTypeModel};
 pub use summarize::summarize_source;
 pub use symbol_table::{
     build_symbol_table, ModuleSymbol, ModuleSymbolTable, SymbolDiagnostic, SymbolKind, SymbolTable,
