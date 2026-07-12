@@ -355,6 +355,40 @@ pub struct IrLivenessAnalysis {
     pub live_out: BTreeMap<IrBlockId, Vec<IrValueId>>,
 }
 
+/// The entry-reachable and unreachable block partition for one IR function.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrReachabilityAnalysis {
+    pub reachable: Vec<IrBlockId>,
+    pub unreachable: Vec<IrBlockId>,
+}
+
+/// Computes canonical reachability from a function's entry block.
+#[must_use]
+pub fn analyze_reachability(function: &IrFunction) -> IrReachabilityAnalysis {
+    let mut reachable = BTreeSet::from([function.entry_block.clone()]);
+    let mut pending = vec![function.entry_block.clone()];
+    while let Some(block) = pending.pop() {
+        for successor in function.successor_blocks(&block) {
+            if reachable.insert(successor.clone()) {
+                pending.push(successor);
+            }
+        }
+    }
+    let all_blocks = function
+        .blocks
+        .iter()
+        .map(|block| block.id.clone())
+        .collect::<BTreeSet<_>>();
+    IrReachabilityAnalysis {
+        reachable: reachable
+            .iter()
+            .filter(|block| all_blocks.contains(*block))
+            .cloned()
+            .collect(),
+        unreachable: all_blocks.difference(&reachable).cloned().collect(),
+    }
+}
+
 /// Computes immutable block liveness from value uses, definitions, and CFG successors.
 #[must_use]
 pub fn analyze_liveness(function: &IrFunction) -> IrLivenessAnalysis {
