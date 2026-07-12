@@ -27,6 +27,42 @@ pub struct IrTemplateEntrypoint {
     pub provenance: SourceProvenance,
 }
 
+/// A stable compiler-owned DOM node identity within a template entrypoint.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct IrDomNodeId(String);
+
+impl IrDomNodeId {
+    #[must_use]
+    pub fn for_template(template: &SemanticId, path: &str) -> Self {
+        Self(format!("{template}/dom:{path}"))
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Backend-neutral DOM node semantics.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrDomNode {
+    pub id: IrDomNodeId,
+    pub kind: IrDomNodeKind,
+    pub provenance: SourceProvenance,
+}
+
+/// Structural DOM node forms before text, bindings, attributes, and events are lowered.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IrDomNodeKind {
+    Element {
+        tag: String,
+        children: Vec<IrDomNodeId>,
+    },
+    Fragment {
+        children: Vec<IrDomNodeId>,
+    },
+}
+
 /// Lowers application component ownership into deterministic IR module structure.
 #[must_use]
 pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateRepresentation {
