@@ -112,6 +112,16 @@ pub struct IrDomConditional {
     pub provenance: SourceProvenance,
 }
 
+/// Repeated DOM output driven by one canonical iterable value.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrDomList {
+    pub iterable: IrValueId,
+    pub item: IrValueId,
+    pub index: Option<IrValueId>,
+    pub body: IrDomNodeId,
+    pub provenance: SourceProvenance,
+}
+
 /// Lowers application component ownership into deterministic IR module structure.
 #[must_use]
 pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateRepresentation {
