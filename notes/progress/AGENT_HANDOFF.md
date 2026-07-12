@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: 7d9fbdc Type template text bindings
-* Working tree: C19 source, test, and documentation changes are present and uncommitted
+* Latest commit: a5c7278 Type dynamic DOM bindings
+* Working tree: C20 source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: C19 - Attribute and property typing
-* Summary: Added a compiler-owned typed contract for supported dynamic DOM bindings.
-* Key files: crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/template_semantics.rs, crates/ezc_core/src/compiler_pass.rs
-* New behavior: Attribute bindings are typed canonical entities; `disabled` and `value` validate as DOM properties, `href` validates as an HTML attribute, and mismatches emit `EZC1028`.
-* Tests added or changed: Core coverage verifies `disabled`, `href`, and `value` contract behavior and typed attribute-binding entities.
+* Slice: C20 - Conditional typing
+* Summary: Added boolean-only canonical typing for direct template conditional entities.
+* Key files: crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/compiler_pass.rs
+* New behavior: Conditional entities inherit resolved state types; non-boolean conditions report `EZC1029` rather than relying on JavaScript truthiness.
+* Tests added or changed: Core coverage verifies typed boolean/number conditions and the deterministic number-condition diagnostic.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C19 - Attribute and property typing
+* Slice: C20 - Conditional typing
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C19
-* Remaining: Phase C20 - conditional typing.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C20
+* Remaining: Phase C21 - list iterable typing.
 
 Verification
 
@@ -120,6 +120,10 @@ Architecture decisions made
 * Decision: Supported dynamic DOM bindings use compiler-owned contracts that distinguish HTML attributes from DOM properties.
 * Reason: Template validation and later IDE/schema work share deterministic type expectations without inheriting browser coercions.
 * Tradeoff: C19 covers only `disabled`, `href`, and `value` direct bindings. Element-specific contracts, event payloads, spreads, styles, and arbitrary expressions remain later work.
+
+* Decision: Template conditions are boolean-only compiler semantics and carry the resolved condition type on their canonical entity.
+* Reason: Conditional output is predictable across backends and tooling does not need to reproduce JavaScript truthiness.
+* Tradeoff: C20 covers direct resolved conditions only. Composite expressions, list scope, member access, and custom condition coercions remain later work.
 
 * Decision: Browser runtime integration tests acquire one process-wide lock before creating a Chrome probe, and the probe deadline allows 20 seconds for a cold Chrome start.
 * Reason: Cargo's workspace runner schedules tests concurrently, and the previous five-second harness deadline could kill an otherwise healthy cold-start probe with SIGKILL.
@@ -434,11 +438,11 @@ Known limitations
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
-* Item: C19 validates direct supported attribute/property bindings only. Element-specific contracts, list scope, member access, arbitrary expressions, coercion, normalization, and final type diagnostic families remain later Phase C work.
+* Item: C20 validates direct resolved condition types only. Composite expressions, list scope, member access, arbitrary expressions, coercion, normalization, and final type diagnostic families remain later Phase C work.
 
 Exact next step
 
-Continue automatically with C20 - conditional typing, committing the completed C19 slice first.
+Continue automatically with C21 - list iterable typing, committing the completed C20 slice first.
 
 Useful commands
 

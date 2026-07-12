@@ -319,7 +319,9 @@ impl SemanticTypeModel {
         for entity in entities.iter().filter(|entity| {
             matches!(
                 entity.kind,
-                TemplateSemanticKind::Binding | TemplateSemanticKind::AttributeBinding
+                TemplateSemanticKind::Binding
+                    | TemplateSemanticKind::AttributeBinding
+                    | TemplateSemanticKind::Conditional
             )
         }) {
             let Some(reference) = references.iter().find(|reference| {

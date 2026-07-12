@@ -145,6 +145,9 @@ impl ImmutableAsmPass for ConstantFoldingPass {
             if let Some(diagnostic) = attribute_binding_type_diagnostic(&folded, entity) {
                 push_diagnostic_once(&mut folded.diagnostics, diagnostic);
             }
+            if let Some(diagnostic) = conditional_type_diagnostic(&folded, entity) {
+                push_diagnostic_once(&mut folded.diagnostics, diagnostic);
+            }
         }
 
         let graph = ComponentGraph {
@@ -407,6 +410,35 @@ fn attribute_binding_type_diagnostic(
                 state_initializer_type_name(&assignment.semantic_type)
             ),
         })
+}
+
+fn conditional_type_diagnostic(
+    model: &ApplicationSemanticModel,
+    entity: &crate::TemplateSemanticEntity,
+) -> Option<ComponentDiagnostic> {
+    if entity.kind != crate::TemplateSemanticKind::Conditional {
+        return None;
+    }
+    let assignment = model.semantic_types.assignments.get(&entity.id)?;
+    (!is_boolean_condition(&assignment.semantic_type)).then(|| ComponentDiagnostic {
+        provenance: Some(entity.provenance.clone()),
+        code: "EZC1029".to_string(),
+        message: format!(
+            "conditional expression `{}` requires boolean, but has {}",
+            entity.expression.as_deref().unwrap_or("<unknown>"),
+            state_initializer_type_name(&assignment.semantic_type)
+        ),
+    })
+}
+
+fn is_boolean_condition(semantic_type: &crate::SemanticType) -> bool {
+    match semantic_type {
+        crate::SemanticType::Unknown
+        | crate::SemanticType::Boolean
+        | crate::SemanticType::BooleanLiteral(_) => true,
+        crate::SemanticType::Union(members) => members.iter().all(is_boolean_condition),
+        _ => false,
+    }
 }
 
 fn is_text_renderable(semantic_type: &crate::SemanticType) -> bool {
@@ -691,6 +723,46 @@ class TypedAttributes extends Component {
             diagnostic.message.contains("attribute binding `href`")
                 && diagnostic.message.contains("boolean")
         }));
+    }
+
+    #[test]
+    fn requires_boolean_canonical_template_conditions() {
+        let parsed = ezc_parser::parse_file(
+            "src/TypedConditions.tsx",
+            r#"
+@component("x-typed-conditions")
+class TypedConditions extends Component {
+  enabled = state(true);
+  count = state(1);
+
+  render() {
+    return <>{this.enabled ? <p>On</p> : <p>Off</p>}{this.count ? <p>Count</p> : <p>Empty</p>}</>;
+  }
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let count_condition = asm
+            .template_entities
+            .iter()
+            .find(|entity| {
+                entity.kind == crate::TemplateSemanticKind::Conditional
+                    && entity.expression.as_deref() == Some("this.count")
+            })
+            .expect("count conditional");
+        assert_eq!(
+            asm.semantic_types.assignments[&count_condition.id].semantic_type,
+            crate::SemanticType::Number
+        );
+
+        let folded = ConstantFoldingPass.transform(&asm);
+        let diagnostics = folded
+            .diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.code == "EZC1029")
+            .collect::<Vec<_>>();
+        assert_eq!(diagnostics.len(), 1);
+        assert!(diagnostics[0].message.contains("this.count"));
     }
 
     #[test]
