@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: 3821542 Establish canonical type diagnostics
-* Working tree: C33 source, test, and documentation changes are present and uncommitted
+* Latest commit: d46fe75 Validate canonical semantic types
+* Working tree: C34 source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: C33 - Type-system validation pass
-* Summary: Validated canonical semantic type assignments and alias identities as ASM integrity.
-* Key files: crates/ezc_core/src/asm_validation.rs
-* New behavior: Validation rejects mismatched assignment subjects/type IDs, missing typed subjects, provenance inconsistencies, unresolved origins, and malformed alias identities.
-* Tests added or changed: Core coverage corrupts a canonical type ID and verifies deterministic ASM validation output.
+* Slice: C34 - Type-system fixture suite
+* Summary: Added a multi-module end-to-end semantic type fixture.
+* Key files: fixtures/0042-semantic-type-system; crates/ezc_cli/tests/explain.rs
+* New behavior: Public ASM inspection is locked across imported aliases, structural arrays, unions, action input/output, templates, lists, and missing-member diagnostics.
+* Tests added or changed: CLI fixture coverage asserts canonical type output and expected diagnostics across two modules.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C33 - Type-system validation pass
+* Slice: C34 - Type-system fixture suite
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C33
-* Remaining: Phase C34 - type-system fixture suite.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C34
+* Remaining: Phase C35 - Phase C stability audit.
 
 Verification
 

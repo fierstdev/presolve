@@ -604,6 +604,46 @@ fn asm_command_exposes_declared_state_types() {
 }
 
 #[test]
+fn asm_command_covers_the_semantic_type_system_fixture_across_modules() {
+    let root = repo_root();
+    let paths = [
+        "fixtures/0042-semantic-type-system/input/TypeSystem.tsx",
+        "fixtures/0042-semantic-type-system/input/types.ts",
+    ];
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&root)
+        .args(["asm", paths[0], paths[1], "--format", "json"])
+        .output()
+        .expect("failed to inspect semantic type-system fixture");
+    assert!(output.status.success());
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("ASM JSON");
+
+    assert_eq!(document["entities"].as_array().map(Vec::len), Some(20));
+    assert_eq!(
+        document["entities"]
+            .as_array()
+            .expect("entities")
+            .iter()
+            .filter(|entity| entity["semantic_type"].is_object())
+            .count(),
+        10
+    );
+    assert!(document["entities"].as_array().is_some_and(|entities| {
+        entities.iter().any(|entity| {
+            entity["semantic_type"]["type_text"] == "\"active\" | \"all\" | \"completed\""
+                && entity["semantic_type"]["status"] == "declared"
+        })
+    }));
+    let diagnostics = document["diagnostics"].as_array().expect("diagnostics");
+    assert!(diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic["code"] == "EZC1031"));
+    assert!(!diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic["code"] == "EZC1032"));
+}
+
+#[test]
 fn asm_command_exposes_constant_state_initializers() {
     let path = "fixtures/0032-arithmetic-state-initializer/input/ArithmeticState.tsx";
 
