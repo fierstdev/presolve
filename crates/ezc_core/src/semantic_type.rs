@@ -114,6 +114,17 @@ impl SemanticTypeModel {
 
 fn semantic_type_from_annotation(text: &str) -> Option<SemanticType> {
     let text = text.trim();
+    let union_members = split_top_level(text, '|');
+    if union_members.len() > 1 {
+        return Some(SemanticType::Union(
+            union_members
+                .into_iter()
+                .map(|member| {
+                    semantic_type_from_annotation(member).unwrap_or(SemanticType::Unknown)
+                })
+                .collect(),
+        ));
+    }
     if let Some(element) = text.strip_suffix("[]") {
         return Some(SemanticType::Array(Box::new(
             semantic_type_from_annotation(element).unwrap_or(SemanticType::Unknown),
@@ -122,8 +133,8 @@ fn semantic_type_from_annotation(text: &str) -> Option<SemanticType> {
     if text.starts_with('[') && text.ends_with(']') {
         let items = &text[1..text.len() - 1];
         return Some(SemanticType::Tuple(
-            items
-                .split(',')
+            split_top_level(items, ',')
+                .into_iter()
                 .filter(|item| !item.trim().is_empty())
                 .map(|item| semantic_type_from_annotation(item).unwrap_or(SemanticType::Unknown))
                 .collect(),
@@ -148,7 +159,10 @@ fn object_type(text: &str) -> Option<SemanticType> {
     let mut properties = BTreeMap::new();
     let fields = &text[1..text.len() - 1];
 
-    for field in fields.split(';').filter(|field| !field.trim().is_empty()) {
+    for field in split_top_level(fields, ';')
+        .into_iter()
+        .filter(|field| !field.trim().is_empty())
+    {
         let (name, type_text) = field.split_once(':')?;
         let name = name.trim();
         if name.is_empty() {
@@ -161,6 +175,26 @@ fn object_type(text: &str) -> Option<SemanticType> {
     }
 
     Some(SemanticType::Object(ObjectType { properties }))
+}
+
+fn split_top_level(text: &str, delimiter: char) -> Vec<&str> {
+    let mut depth = 0usize;
+    let mut start = 0usize;
+    let mut parts = Vec::new();
+
+    for (index, character) in text.char_indices() {
+        match character {
+            '{' | '[' | '(' => depth += 1,
+            '}' | ']' | ')' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+        if character == delimiter && depth == 0 {
+            parts.push(&text[start..index]);
+            start = index + character.len_utf8();
+        }
+    }
+    parts.push(&text[start..]);
+    parts
 }
 
 fn string_literal_type(text: &str) -> Option<SemanticType> {

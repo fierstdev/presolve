@@ -804,6 +804,43 @@ class ObjectTypes extends Component {
     }
 
     #[test]
+    fn lowers_union_and_nullable_state_annotations_into_canonical_types() {
+        let parsed = ezc_parser::parse_file(
+            "src/UnionTypes.tsx",
+            r#"
+@component("x-union-types")
+class UnionTypes extends Component {
+  filter: "all" | "active" | "completed" = state("all");
+  user: { id: string } | null = state(null);
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        let fields = &asm.components[0].state_fields;
+        assert_eq!(
+            asm.semantic_types.assignments[&fields[0].id].semantic_type,
+            crate::SemanticType::Union(vec![
+                crate::SemanticType::StringLiteral("all".to_string()),
+                crate::SemanticType::StringLiteral("active".to_string()),
+                crate::SemanticType::StringLiteral("completed".to_string()),
+            ])
+        );
+        assert_eq!(
+            asm.semantic_types.assignments[&fields[1].id].semantic_type,
+            crate::SemanticType::Union(vec![
+                crate::SemanticType::Object(crate::ObjectType {
+                    properties: std::collections::BTreeMap::from([(
+                        "id".to_string(),
+                        crate::SemanticType::String,
+                    )]),
+                }),
+                crate::SemanticType::Null,
+            ])
+        );
+    }
+
+    #[test]
     fn derives_component_ownership_without_legacy_owner_fields() {
         let parsed = ezc_parser::parse_file(
             "src/Counter.tsx",

@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: fda664e Lower array and tuple semantic types
-* Working tree: C5 source, test, and documentation changes are present and uncommitted
+* Latest commit: 59c8f2b Lower structural object semantic types
+* Working tree: C6 source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: C5 - Object structural types
-* Summary: Lowered supported structural object state annotations into canonical object property maps.
+* Slice: C6 - Union and nullable types
+* Summary: Lowered top-level union and nullable state annotations into canonical union members.
 * Key files: crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/application_semantic_model.rs
-* New behavior: `{ name: Type; ... }` state annotations now create deterministic object shapes with canonical property types.
-* Tests added or changed: Core coverage verifies object property names and primitive property types.
+* New behavior: `T | U` annotations retain authored member order as canonical unions, including nullable and literal-union forms.
+* Tests added or changed: Core coverage verifies literal unions and object-or-null unions.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C5 - Object structural types
+* Slice: C6 - Union and nullable types
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C5
-* Remaining: Phase C6 - union and nullable types.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C6
+* Remaining: Phase C7 - type aliases.
 
 Verification
 
@@ -64,6 +64,10 @@ Architecture decisions made
 * Decision: C5 lowers semicolon-separated structural object properties into deterministic maps.
 * Reason: Object shape is canonical before template member resolution and list-item typing need it.
 * Tradeoff: Object-property declarations have no individual identity or provenance yet; nested delimiter-aware syntax and member-access validation remain later work.
+
+* Decision: C6 preserves top-level union member order without normalizing or deduplicating.
+* Reason: The compiler can represent authored unions now while C28 later defines the one canonical normalization policy.
+* Tradeoff: Literal parsing inside union members is supported, but aliases, imports, and diagnostics remain later work.
 
 * Decision: Browser runtime integration tests acquire one process-wide lock before creating a Chrome probe, and the probe deadline allows 20 seconds for a cold Chrome start.
 * Reason: Cargo's workspace runner schedules tests concurrently, and the previous five-second harness deadline could kill an otherwise healthy cold-start probe with SIGKILL.
@@ -378,11 +382,11 @@ Known limitations
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
-* Item: C5 recognizes supported semicolon-separated structural object annotations. Unions, aliases, imports, inference, compatibility, property provenance, and type diagnostics remain later Phase C work.
+* Item: C6 recognizes top-level union and nullable annotations. Aliases, imports, inference, compatibility, property provenance, normalization, and type diagnostics remain later Phase C work.
 
 Exact next step
 
-Continue automatically with C6 - union and nullable types, committing the completed C5 slice first.
+Continue automatically with C7 - type aliases, committing the completed C6 slice first.
 
 Useful commands
 
