@@ -3,25 +3,25 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest commit: f8f4c98 Add canonical semantic type model
-* Working tree: C2 source, test, and documentation changes are present and uncommitted
+* Latest commit: 5c00c2b Add type identities and provenance
+* Working tree: C3 source, test, and documentation changes are present and uncommitted
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: C2 - Type identities and provenance
-* Summary: Added stable identities, semantic origins, declared-or-inferred status, and source provenance to canonical type assignments.
-* Key files: crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/lib.rs
-* New behavior: Every future populated canonical type assignment carries a deterministic `SemanticTypeId`, subject, origin, status, and source location; C2 deliberately leaves lowering and inference empty.
-* Tests added or changed: Core coverage verifies deterministic type-assignment IDs and retained origin, declared status, and provenance.
+* Slice: C3 - Primitive and literal types
+* Summary: Lowered supported primitive and literal state annotations into canonical semantic type assignments.
+* Key files: crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/application_semantic_model.rs
+* New behavior: Declared state annotations now produce canonical `string`, `number`, `boolean`, `null`, string-literal, numeric-literal, and boolean-literal types with C2 metadata.
+* Tests added or changed: Core coverage verifies primitive and literal annotation lowering, canonical assignment identity, status, and provenance.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: C2 - Type identities and provenance
+* Slice: C3 - Primitive and literal types
 * Status: Complete
-* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C2
-* Remaining: Phase C3 - primitive and literal types.
+* Completed: ASM-1 through ASM-8; Era III-A through III-E; Era IV-A through IV-G; Era V-A through V-C; C1-A through C1-B; C2-A through C2-D; C3-A through C3-D; C4-A through C4-B; C5-A through C5-M; C6-A through C6-G; C7-A through C7-F; C8-A through C8-D; Phase A1 through A5; Phase B1 through B12; Phase C1 through C3
+* Remaining: Phase C4 - array and tuple types.
 
 Verification
 
@@ -52,6 +52,10 @@ Architecture decisions made
 * Decision: Canonical type assignments identify the typed subject and separately retain the semantic origin, declared-or-inferred status, and source provenance.
 * Reason: Aliases, imported types, and inferred expressions will need stable attribution without collapsing their type meaning into raw TypeScript text.
 * Tradeoff: C2 defines metadata only; no assignment is populated from source, and identity does not yet model named aliases or cross-module declarations.
+
+* Decision: C3 lowers only exact primitive and literal state annotation text into canonical semantic types.
+* Reason: The compiler gains durable primitive and literal semantics while later slices add structured parsing for arrays, tuples, objects, unions, aliases, and imports.
+* Tradeoff: Unsupported annotation text produces no canonical assignment or diagnostic yet; C3 does not infer from initial values or alter existing compatibility diagnostics.
 
 * Decision: Browser runtime integration tests acquire one process-wide lock before creating a Chrome probe, and the probe deadline allows 20 seconds for a cold Chrome start.
 * Reason: Cargo's workspace runner schedules tests concurrently, and the previous five-second harness deadline could kill an otherwise healthy cold-start probe with SIGKILL.
@@ -366,11 +370,11 @@ Known limitations
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
 * Item: The canonical expression graph currently covers supported state initializer expressions only. It supports deterministic direct topology, ownership, and provenance queries, while graph mutation, transitive query operators, general expression owners, and non-state expressions remain later work.
-* Item: C2 provides semantic type representation and assignment metadata only. The canonical assignment model is empty; primitive/literal lowering, tuples, structural object lowering, aliases, imports, inference, compatibility, and type diagnostics remain later Phase C work.
+* Item: C3 recognizes only exact primitive and literal state annotations. Arrays, tuples, objects, unions, aliases, imports, inference, compatibility, and type diagnostics remain later Phase C work.
 
 Exact next step
 
-Continue automatically with C3 - primitive and literal types, committing the completed C2 slice first.
+Continue automatically with C4 - array and tuple types, committing the completed C3 slice first.
 
 Useful commands
 

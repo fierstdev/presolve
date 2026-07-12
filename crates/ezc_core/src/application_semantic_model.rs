@@ -382,7 +382,7 @@ pub fn build_application_semantic_model_from_component_graph(
             &component_graph.components,
             &component_graph.provenance,
         ),
-        semantic_types: SemanticTypeModel::default(),
+        semantic_types: SemanticTypeModel::from_components(&component_graph.components),
         components: component_graph.components.clone(),
         templates,
         template_entities,
@@ -446,7 +446,7 @@ fn build_application_semantic_model_from_files(files: &[ParsedFile]) -> Applicat
 
     ApplicationSemanticModel {
         expression_graph: ExpressionGraph::from_components(&components, &provenance),
-        semantic_types: SemanticTypeModel::default(),
+        semantic_types: SemanticTypeModel::from_components(&components),
         components,
         templates,
         template_entities,
@@ -656,7 +656,7 @@ mod tests {
     };
 
     #[test]
-    fn initializes_the_canonical_type_model_without_legacy_type_lowering() {
+    fn lowers_supported_primitive_state_annotations_into_canonical_types() {
         let parsed = ezc_parser::parse_file(
             "src/TypedState.tsx",
             r#"
@@ -669,13 +669,60 @@ class TypedState extends Component {
 
         let asm = build_application_semantic_model(&parsed);
 
-        assert!(asm.semantic_types.assignments.is_empty());
+        let field = &asm.components[0].state_fields[0];
+        let assignment = asm
+            .semantic_types
+            .assignments
+            .get(&field.id)
+            .expect("canonical declared type");
+
+        assert_eq!(assignment.semantic_type, crate::SemanticType::Number);
+        assert_eq!(assignment.status, crate::SemanticTypeStatus::Declared);
         assert_eq!(
-            asm.components[0].state_fields[0]
-                .declared_type
-                .as_ref()
-                .map(|declared| declared.text.as_str()),
-            Some("number")
+            assignment.provenance,
+            field.declared_type.as_ref().unwrap().provenance
+        );
+    }
+
+    #[test]
+    fn lowers_supported_literal_state_annotations_into_canonical_types() {
+        let parsed = ezc_parser::parse_file(
+            "src/LiteralTypes.tsx",
+            r#"
+@component("x-literal-types")
+class LiteralTypes extends Component {
+  filter: "all" = state("all");
+  step: 42 = state(42);
+  enabled: true = state(true);
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        let types = asm.components[0]
+            .state_fields
+            .iter()
+            .map(|field| {
+                (
+                    field.name.as_str(),
+                    &asm.semantic_types.assignments[&field.id].semantic_type,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            types,
+            vec![
+                (
+                    "filter",
+                    &crate::SemanticType::StringLiteral("all".to_string())
+                ),
+                (
+                    "step",
+                    &crate::SemanticType::NumberLiteral("42".to_string())
+                ),
+                ("enabled", &crate::SemanticType::BooleanLiteral(true)),
+            ]
         );
     }
 

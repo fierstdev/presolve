@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
-use crate::{SemanticId, SourceProvenance};
+use crate::{ComponentNode, SemanticId, SourceProvenance};
 
 /// Compiler-owned semantic type algebra independent of TypeScript spelling.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -12,6 +12,9 @@ pub enum SemanticType {
     Boolean,
     Number,
     String,
+    BooleanLiteral(bool),
+    NumberLiteral(String),
+    StringLiteral(String),
     Array(Box<SemanticType>),
     Object(ObjectType),
     Union(Vec<SemanticType>),
@@ -76,6 +79,63 @@ pub struct SemanticTypeAssignment {
     pub provenance: SourceProvenance,
 }
 
+impl SemanticTypeModel {
+    #[must_use]
+    pub fn from_components(components: &[ComponentNode]) -> Self {
+        let mut assignments = BTreeMap::new();
+
+        for field in components
+            .iter()
+            .flat_map(|component| &component.state_fields)
+        {
+            let Some(declared_type) = &field.declared_type else {
+                continue;
+            };
+            let Some(semantic_type) = semantic_type_from_annotation(&declared_type.text) else {
+                continue;
+            };
+            assignments.insert(
+                field.id.clone(),
+                SemanticTypeAssignment {
+                    id: SemanticTypeId::for_subject(&field.id),
+                    subject: field.id.clone(),
+                    semantic_type,
+                    origin: field.id.clone(),
+                    status: SemanticTypeStatus::Declared,
+                    provenance: declared_type.provenance.clone(),
+                },
+            );
+        }
+
+        Self { assignments }
+    }
+}
+
+fn semantic_type_from_annotation(text: &str) -> Option<SemanticType> {
+    match text {
+        "string" => Some(SemanticType::String),
+        "number" => Some(SemanticType::Number),
+        "boolean" => Some(SemanticType::Boolean),
+        "null" => Some(SemanticType::Null),
+        "true" => Some(SemanticType::BooleanLiteral(true)),
+        "false" => Some(SemanticType::BooleanLiteral(false)),
+        _ => string_literal_type(text).or_else(|| numeric_literal_type(text)),
+    }
+}
+
+fn string_literal_type(text: &str) -> Option<SemanticType> {
+    let quote = text.chars().next()?;
+    (matches!(quote, '\'' | '"') && text.ends_with(quote) && text.len() >= 2)
+        .then(|| SemanticType::StringLiteral(text[1..text.len() - 1].to_string()))
+}
+
+fn numeric_literal_type(text: &str) -> Option<SemanticType> {
+    text.parse::<f64>()
+        .ok()
+        .filter(|value| value.is_finite())
+        .map(|_| SemanticType::NumberLiteral(text.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -100,12 +160,15 @@ mod tests {
             SemanticType::Boolean,
             SemanticType::Number,
             SemanticType::String,
+            SemanticType::BooleanLiteral(true),
+            SemanticType::NumberLiteral("42".to_string()),
+            SemanticType::StringLiteral("all".to_string()),
             SemanticType::Array(Box::new(SemanticType::Number)),
             todo,
             SemanticType::Union(vec![SemanticType::String, SemanticType::Null]),
         ];
 
-        assert_eq!(types.len(), 9);
+        assert_eq!(types.len(), 12);
     }
 
     #[test]
