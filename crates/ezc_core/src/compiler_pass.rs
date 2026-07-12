@@ -148,6 +148,9 @@ impl ImmutableAsmPass for ConstantFoldingPass {
             if let Some(diagnostic) = conditional_type_diagnostic(&folded, entity) {
                 push_diagnostic_once(&mut folded.diagnostics, diagnostic);
             }
+            if let Some(diagnostic) = list_iterable_type_diagnostic(&folded, entity) {
+                push_diagnostic_once(&mut folded.diagnostics, diagnostic);
+            }
         }
 
         let graph = ComponentGraph {
@@ -425,6 +428,31 @@ fn conditional_type_diagnostic(
         code: "EZC1029".to_string(),
         message: format!(
             "conditional expression `{}` requires boolean, but has {}",
+            entity.expression.as_deref().unwrap_or("<unknown>"),
+            state_initializer_type_name(&assignment.semantic_type)
+        ),
+    })
+}
+
+fn list_iterable_type_diagnostic(
+    model: &ApplicationSemanticModel,
+    entity: &crate::TemplateSemanticEntity,
+) -> Option<ComponentDiagnostic> {
+    if entity.kind != crate::TemplateSemanticKind::List {
+        return None;
+    }
+    let assignment = model.semantic_types.assignments.get(&entity.id)?;
+    let iterable = matches!(
+        assignment.semantic_type,
+        crate::SemanticType::Array(_)
+            | crate::SemanticType::Tuple(_)
+            | crate::SemanticType::Unknown
+    );
+    (!iterable).then(|| ComponentDiagnostic {
+        provenance: Some(entity.provenance.clone()),
+        code: "EZC1030".to_string(),
+        message: format!(
+            "list iterable `{}` requires an array-like value, but has {}",
             entity.expression.as_deref().unwrap_or("<unknown>"),
             state_initializer_type_name(&assignment.semantic_type)
         ),
@@ -763,6 +791,43 @@ class TypedConditions extends Component {
             .collect::<Vec<_>>();
         assert_eq!(diagnostics.len(), 1);
         assert!(diagnostics[0].message.contains("this.count"));
+    }
+
+    #[test]
+    fn types_list_iterables_and_rejects_non_arrays() {
+        let parsed = ezc_parser::parse_file(
+            "src/TypedLists.tsx",
+            r#"
+@component("x-typed-lists")
+class TypedLists extends Component {
+  items = state([{ id: "a" }]);
+  count = state(1);
+
+  render() {
+    return <><ul>{this.items.map((item, index) => <li key={item.id}>{index}</li>)}</ul><div>{this.count.map((item) => <span>{item}</span>)}</div></>;
+  }
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let item_list = asm
+            .template_entities
+            .iter()
+            .find(|entity| entity.expression.as_deref() == Some("this.items"))
+            .expect("items list");
+        let scope = asm
+            .semantic_types
+            .list_scopes
+            .get(&item_list.id)
+            .expect("typed item list scope");
+        assert_eq!(scope.item_name, "item");
+        assert_eq!(scope.index_type, Some(crate::SemanticType::Number));
+        assert!(matches!(scope.item_type, crate::SemanticType::Object(_)));
+
+        let folded = ConstantFoldingPass.transform(&asm);
+        assert!(folded.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == "EZC1030" && diagnostic.message.contains("this.count")
+        }));
     }
 
     #[test]

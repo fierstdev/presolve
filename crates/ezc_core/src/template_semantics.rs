@@ -13,6 +13,8 @@ pub struct TemplateSemanticEntity {
     pub kind: TemplateSemanticKind,
     pub scope: TemplateSemanticScope,
     pub attribute_name: Option<String>,
+    pub list_item_variable: Option<String>,
+    pub list_index_variable: Option<String>,
     pub expression: Option<String>,
     pub provenance: SourceProvenance,
 }
@@ -240,6 +242,11 @@ fn collect_list(
         Some(list.iterable.clone()),
         list.span,
     );
+    let entity = entities
+        .last_mut()
+        .expect("list semantic entity was just inserted");
+    entity.list_item_variable = Some(list.item_variable.clone());
+    entity.list_index_variable.clone_from(&list.index_variable);
     collect_children(
         &list.item_template,
         template,
@@ -266,6 +273,8 @@ fn push_entity(
         kind,
         scope,
         attribute_name: None,
+        list_item_variable: None,
+        list_index_variable: None,
         expression,
         provenance: SourceProvenance::new(&template.provenance.path, span),
     });

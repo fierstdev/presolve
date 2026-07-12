@@ -96,6 +96,17 @@ pub struct ObjectType {
 pub struct SemanticTypeModel {
     pub assignments: BTreeMap<SemanticId, SemanticTypeAssignment>,
     pub aliases: BTreeMap<SemanticId, SemanticTypeAlias>,
+    pub list_scopes: BTreeMap<SemanticId, ListTemplateScopeType>,
+}
+
+/// Canonical item and index type information for one template list scope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ListTemplateScopeType {
+    pub list: SemanticId,
+    pub item_name: String,
+    pub item_type: SemanticType,
+    pub index_name: Option<String>,
+    pub index_type: Option<SemanticType>,
 }
 
 /// Stable identity for one compiler-owned type assignment.
@@ -278,6 +289,7 @@ impl SemanticTypeModel {
         Self {
             assignments,
             aliases,
+            list_scopes: BTreeMap::new(),
         }
     }
 
@@ -348,7 +360,75 @@ impl SemanticTypeModel {
                 },
             );
         }
+        self.with_list_scope_types(entities, references)
+    }
+
+    fn with_list_scope_types(
+        mut self,
+        entities: &[TemplateSemanticEntity],
+        references: &[SemanticReference],
+    ) -> Self {
+        for entity in entities
+            .iter()
+            .filter(|entity| entity.kind == TemplateSemanticKind::List)
+        {
+            let Some(reference) = references.iter().find(|reference| {
+                reference.source == entity.id
+                    && reference.kind == SemanticReferenceKind::TemplateState
+            }) else {
+                continue;
+            };
+            let Some(iterable) = self.assignments.get(&reference.target) else {
+                continue;
+            };
+            let iterable_type = iterable.semantic_type.clone();
+            let iterable_origin = iterable.origin.clone();
+            self.assignments.insert(
+                entity.id.clone(),
+                SemanticTypeAssignment {
+                    id: SemanticTypeId::for_subject(&entity.id),
+                    subject: entity.id.clone(),
+                    semantic_type: iterable_type.clone(),
+                    origin: iterable_origin,
+                    status: SemanticTypeStatus::Inferred,
+                    provenance: entity.provenance.clone(),
+                },
+            );
+            let Some((item_name, item_type)) = entity
+                .list_item_variable
+                .as_ref()
+                .zip(iterable_element_type(&iterable_type))
+            else {
+                continue;
+            };
+            self.list_scopes.insert(
+                entity.id.clone(),
+                ListTemplateScopeType {
+                    list: entity.id.clone(),
+                    item_name: item_name.clone(),
+                    item_type,
+                    index_name: entity.list_index_variable.clone(),
+                    index_type: entity
+                        .list_index_variable
+                        .as_ref()
+                        .map(|_| SemanticType::Number),
+                },
+            );
+        }
         self
+    }
+}
+
+fn iterable_element_type(semantic_type: &SemanticType) -> Option<SemanticType> {
+    match semantic_type {
+        SemanticType::Array(element) => Some((**element).clone()),
+        SemanticType::Tuple(items) if items.is_empty() => Some(SemanticType::Unknown),
+        SemanticType::Tuple(items) if items.windows(2).all(|pair| pair[0] == pair[1]) => {
+            items.first().cloned()
+        }
+        SemanticType::Tuple(items) => Some(SemanticType::Union(items.clone())),
+        SemanticType::Unknown => Some(SemanticType::Unknown),
+        _ => None,
     }
 }
 
