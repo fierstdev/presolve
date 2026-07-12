@@ -13,6 +13,7 @@ pub mod component_graph;
 pub mod explain;
 pub mod expression_graph;
 pub mod html_codegen;
+pub mod intermediate_representation;
 pub mod layout_graph;
 pub mod lazy_action_chunks;
 pub mod model;
@@ -64,6 +65,9 @@ pub use component_graph::{
 pub use explain::{explain_json, explain_text};
 pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 pub use html_codegen::generate_static_html;
+pub use intermediate_representation::{
+    IntermediateRepresentation, IrBlock, IrFunction, IrInstruction, IrInstructionKind, IrModule,
+};
 pub use model::{
     ClassSummary, DecoratorSummary, Diagnostic, RenderMethodSummary, Severity, SourceSummary, Span,
 };
