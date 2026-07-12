@@ -3,7 +3,8 @@ use std::fmt;
 use std::path::PathBuf;
 
 use crate::{
-    BindingTable, ComponentNode, ImportBindingTarget, SemanticId, SourceProvenance, SymbolKind,
+    BindingTable, ComponentNode, ImportBindingTarget, SemanticId, SerializableValue,
+    SourceProvenance, SymbolKind,
 };
 use ezc_parser::ParsedTypeAlias;
 
@@ -96,21 +97,31 @@ pub struct SemanticTypeAlias {
 
 impl SemanticTypeModel {
     #[must_use]
-    pub fn from_components(components: &[ComponentNode]) -> Self {
-        Self::from_components_with_aliases(components, &[])
+    pub fn from_components(
+        components: &[ComponentNode],
+        provenance: &BTreeMap<SemanticId, SourceProvenance>,
+    ) -> Self {
+        Self::from_components_with_aliases_and_bindings(components, provenance, &[], None)
     }
 
     #[must_use]
     pub fn from_components_with_aliases(
         components: &[ComponentNode],
+        provenance: &BTreeMap<SemanticId, SourceProvenance>,
         parsed_aliases: &[(PathBuf, ParsedTypeAlias)],
     ) -> Self {
-        Self::from_components_with_aliases_and_bindings(components, parsed_aliases, None)
+        Self::from_components_with_aliases_and_bindings(
+            components,
+            provenance,
+            parsed_aliases,
+            None,
+        )
     }
 
     #[must_use]
     pub fn from_components_with_aliases_and_bindings(
         components: &[ComponentNode],
+        provenance: &BTreeMap<SemanticId, SourceProvenance>,
         parsed_aliases: &[(PathBuf, ParsedTypeAlias)],
         bindings: Option<&BindingTable>,
     ) -> Self {
@@ -141,41 +152,63 @@ impl SemanticTypeModel {
             .iter()
             .flat_map(|component| &component.state_fields)
         {
-            let Some(declared_type) = &field.declared_type else {
-                continue;
-            };
-            let alias = aliases_by_path_and_name
-                .get(&(
-                    declared_type.provenance.path.clone(),
-                    declared_type.text.clone(),
-                ))
-                .copied();
-            let imported_alias = bindings
-                .and_then(|bindings| {
-                    bindings.resolve_import(&declared_type.provenance.path, &declared_type.text)
-                })
-                .and_then(|binding| match &binding.target {
-                    ImportBindingTarget::Symbol(symbol) if symbol.kind == SymbolKind::TypeAlias => {
-                        aliases.get(&symbol.id)
-                    }
-                    _ => None,
-                });
-            let alias = alias.or(imported_alias);
-            let semantic_type = alias
-                .map(|alias| alias.semantic_type.clone())
-                .or_else(|| semantic_type_from_annotation(&declared_type.text));
-            let Some(semantic_type) = semantic_type else {
-                continue;
-            };
+            let (semantic_type, origin, status, assignment_provenance) =
+                if let Some(declared_type) = &field.declared_type {
+                    let alias = aliases_by_path_and_name
+                        .get(&(
+                            declared_type.provenance.path.clone(),
+                            declared_type.text.clone(),
+                        ))
+                        .copied();
+                    let imported_alias = bindings
+                        .and_then(|bindings| {
+                            bindings
+                                .resolve_import(&declared_type.provenance.path, &declared_type.text)
+                        })
+                        .and_then(|binding| match &binding.target {
+                            ImportBindingTarget::Symbol(symbol)
+                                if symbol.kind == SymbolKind::TypeAlias =>
+                            {
+                                aliases.get(&symbol.id)
+                            }
+                            _ => None,
+                        });
+                    let alias = alias.or(imported_alias);
+                    let semantic_type = alias
+                        .map(|alias| alias.semantic_type.clone())
+                        .or_else(|| semantic_type_from_annotation(&declared_type.text));
+                    let Some(semantic_type) = semantic_type else {
+                        continue;
+                    };
+                    (
+                        semantic_type,
+                        alias.map_or_else(|| field.id.clone(), |alias| alias.id.clone()),
+                        SemanticTypeStatus::Declared,
+                        declared_type.provenance.clone(),
+                    )
+                } else {
+                    let Some(value) = &field.initial_value else {
+                        continue;
+                    };
+                    let Some(field_provenance) = provenance.get(&field.id) else {
+                        continue;
+                    };
+                    (
+                        semantic_type_from_serializable_value(value),
+                        field.id.clone(),
+                        SemanticTypeStatus::Inferred,
+                        field_provenance.clone(),
+                    )
+                };
             assignments.insert(
                 field.id.clone(),
                 SemanticTypeAssignment {
                     id: SemanticTypeId::for_subject(&field.id),
                     subject: field.id.clone(),
                     semantic_type,
-                    origin: alias.map_or_else(|| field.id.clone(), |alias| alias.id.clone()),
-                    status: SemanticTypeStatus::Declared,
-                    provenance: declared_type.provenance.clone(),
+                    origin,
+                    status,
+                    provenance: assignment_provenance,
                 },
             );
         }
@@ -184,6 +217,36 @@ impl SemanticTypeModel {
             assignments,
             aliases,
         }
+    }
+}
+
+fn semantic_type_from_serializable_value(value: &SerializableValue) -> SemanticType {
+    match value {
+        SerializableValue::Null => SemanticType::Null,
+        SerializableValue::Number(_) => SemanticType::Number,
+        SerializableValue::String(_) => SemanticType::String,
+        SerializableValue::Boolean(_) => SemanticType::Boolean,
+        SerializableValue::Array(values) if values.is_empty() => {
+            SemanticType::Array(Box::new(SemanticType::Unknown))
+        }
+        SerializableValue::Array(values) => {
+            let mut types = values
+                .iter()
+                .map(semantic_type_from_serializable_value)
+                .collect::<Vec<_>>();
+            let element = if types.windows(2).all(|window| window[0] == window[1]) {
+                types.pop().expect("non-empty array should have a type")
+            } else {
+                SemanticType::Union(types)
+            };
+            SemanticType::Array(Box::new(element))
+        }
+        SerializableValue::Object(values) => SemanticType::Object(ObjectType {
+            properties: values
+                .iter()
+                .map(|(name, value)| (name.clone(), semantic_type_from_serializable_value(value)))
+                .collect(),
+        }),
     }
 }
 

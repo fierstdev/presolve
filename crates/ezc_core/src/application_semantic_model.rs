@@ -382,7 +382,10 @@ pub fn build_application_semantic_model_from_component_graph(
             &component_graph.components,
             &component_graph.provenance,
         ),
-        semantic_types: SemanticTypeModel::from_components(&component_graph.components),
+        semantic_types: SemanticTypeModel::from_components(
+            &component_graph.components,
+            &component_graph.provenance,
+        ),
         components: component_graph.components.clone(),
         templates,
         template_entities,
@@ -466,6 +469,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         expression_graph: ExpressionGraph::from_components(&components, &provenance),
         semantic_types: SemanticTypeModel::from_components_with_aliases_and_bindings(
             &components,
+            &provenance,
             &type_aliases,
             bindings,
         ),
@@ -957,6 +961,57 @@ class App extends Component {
         assert_eq!(
             assignment.origin,
             crate::SemanticId::type_alias_in_module("src/types.ts", "Filter")
+        );
+    }
+
+    #[test]
+    fn infers_state_types_from_direct_serializable_initializers() {
+        let parsed = ezc_parser::parse_file(
+            "src/InferredState.tsx",
+            r#"
+@component("x-inferred-state")
+class InferredState extends Component {
+  count = state(0);
+  todos = state([]);
+  tags = state(["EdgeZero"]);
+  todo = state({ id: "1", completed: false });
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        let fields = &asm.components[0].state_fields;
+        let types = fields
+            .iter()
+            .map(|field| {
+                let assignment = &asm.semantic_types.assignments[&field.id];
+                assert_eq!(assignment.status, crate::SemanticTypeStatus::Inferred);
+                (field.name.as_str(), assignment.semantic_type.clone())
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            types,
+            vec![
+                ("count", crate::SemanticType::Number),
+                (
+                    "todos",
+                    crate::SemanticType::Array(Box::new(crate::SemanticType::Unknown)),
+                ),
+                (
+                    "tags",
+                    crate::SemanticType::Array(Box::new(crate::SemanticType::String)),
+                ),
+                (
+                    "todo",
+                    crate::SemanticType::Object(crate::ObjectType {
+                        properties: std::collections::BTreeMap::from([
+                            ("completed".to_string(), crate::SemanticType::Boolean),
+                            ("id".to_string(), crate::SemanticType::String),
+                        ]),
+                    }),
+                ),
+            ]
         );
     }
 
