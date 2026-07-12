@@ -33,6 +33,7 @@ pub enum SymbolKind {
     Component,
     StateField,
     Method,
+    TypeAlias,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -66,6 +67,22 @@ pub fn build_symbol_table(unit: &CompilationUnit) -> SymbolTable {
     for file in unit.files() {
         let graph = build_component_graph_for_module(file);
         let mut symbols = BTreeMap::new();
+
+        for alias in &file.type_aliases {
+            let id = SemanticId::type_alias_in_module(&file.path, &alias.name);
+            insert_symbol(
+                &mut symbols,
+                &mut diagnostics,
+                &file.path,
+                ModuleSymbol {
+                    name: alias.name.clone(),
+                    kind: SymbolKind::TypeAlias,
+                    id,
+                    owner: SemanticOwner::Application,
+                    provenance: SourceProvenance::new(&file.path, alias.type_span),
+                },
+            );
+        }
 
         for component in graph.components {
             insert_symbol(

@@ -236,6 +236,7 @@ fn named_declaration_exports(declaration: &Declaration<'_>) -> Vec<ParsedExportS
         Declaration::FunctionDeclaration(function) => {
             function.id.as_ref().map(|id| id.name.to_string())
         }
+        Declaration::TSTypeAliasDeclaration(alias) => Some(alias.id.name.to_string()),
         Declaration::VariableDeclaration(declaration) => {
             let names = declaration
                 .declarations

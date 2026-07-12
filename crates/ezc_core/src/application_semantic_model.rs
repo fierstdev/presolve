@@ -397,10 +397,20 @@ pub fn build_application_semantic_model_from_component_graph(
 pub fn build_application_semantic_model_for_unit(
     unit: &CompilationUnit,
 ) -> ApplicationSemanticModel {
-    build_application_semantic_model_from_files(unit.files())
+    let symbols = crate::build_symbol_table(unit);
+    let modules = crate::build_module_graph(unit);
+    let bindings = crate::build_binding_table(unit, &symbols, &modules);
+    build_application_semantic_model_from_files_with_bindings(unit.files(), Some(&bindings))
 }
 
 fn build_application_semantic_model_from_files(files: &[ParsedFile]) -> ApplicationSemanticModel {
+    build_application_semantic_model_from_files_with_bindings(files, None)
+}
+
+fn build_application_semantic_model_from_files_with_bindings(
+    files: &[ParsedFile],
+    bindings: Option<&crate::BindingTable>,
+) -> ApplicationSemanticModel {
     let mut components = Vec::new();
     let mut templates = Vec::new();
     let mut diagnostics = Vec::new();
@@ -454,7 +464,11 @@ fn build_application_semantic_model_from_files(files: &[ParsedFile]) -> Applicat
 
     ApplicationSemanticModel {
         expression_graph: ExpressionGraph::from_components(&components, &provenance),
-        semantic_types: SemanticTypeModel::from_components_with_aliases(&components, &type_aliases),
+        semantic_types: SemanticTypeModel::from_components_with_aliases_and_bindings(
+            &components,
+            &type_aliases,
+            bindings,
+        ),
         components,
         templates,
         template_entities,
@@ -657,10 +671,14 @@ fn collect_ownership(
 
 #[cfg(test)]
 mod tests {
-    use super::{build_application_semantic_model, collect_ownership};
+    use super::{
+        build_application_semantic_model, build_application_semantic_model_for_unit,
+        collect_ownership,
+    };
     use crate::{
         build_component_graph_for_module, build_template_graph, build_template_semantic_entities,
-        SemanticEntityKind, SemanticOwner, SemanticReferenceKind, TemplateSemanticKind,
+        CompilationUnit, SemanticEntityKind, SemanticOwner, SemanticReferenceKind,
+        TemplateSemanticKind,
     };
 
     #[test]
@@ -895,6 +913,50 @@ class Aliases extends Component {
         assert_eq!(
             asm.semantic_types.assignments[&fields[1].id].origin,
             filter.id
+        );
+    }
+
+    #[test]
+    fn resolves_imported_type_aliases_through_named_reexports() {
+        let unit = CompilationUnit::parse_sources([
+            (
+                "src/types.ts",
+                r#"export type Filter = "all" | "active" | "completed";"#,
+            ),
+            ("src/index.ts", r#"export { Filter } from "./types";"#),
+            (
+                "src/App.tsx",
+                r#"
+import { Filter } from "./index";
+
+@component("x-app")
+class App extends Component {
+  filter: Filter = state("all");
+}
+"#,
+            ),
+        ]);
+
+        let asm = build_application_semantic_model_for_unit(&unit);
+        let field = &asm
+            .components
+            .iter()
+            .find(|component| component.class_name == "App")
+            .expect("App component")
+            .state_fields[0];
+        let assignment = &asm.semantic_types.assignments[&field.id];
+
+        assert_eq!(
+            assignment.semantic_type,
+            crate::SemanticType::Union(vec![
+                crate::SemanticType::StringLiteral("all".to_string()),
+                crate::SemanticType::StringLiteral("active".to_string()),
+                crate::SemanticType::StringLiteral("completed".to_string()),
+            ])
+        );
+        assert_eq!(
+            assignment.origin,
+            crate::SemanticId::type_alias_in_module("src/types.ts", "Filter")
         );
     }
 

@@ -2,7 +2,9 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::path::PathBuf;
 
-use crate::{ComponentNode, SemanticId, SourceProvenance};
+use crate::{
+    BindingTable, ComponentNode, ImportBindingTarget, SemanticId, SourceProvenance, SymbolKind,
+};
 use ezc_parser::ParsedTypeAlias;
 
 /// Compiler-owned semantic type algebra independent of TypeScript spelling.
@@ -103,6 +105,15 @@ impl SemanticTypeModel {
         components: &[ComponentNode],
         parsed_aliases: &[(PathBuf, ParsedTypeAlias)],
     ) -> Self {
+        Self::from_components_with_aliases_and_bindings(components, parsed_aliases, None)
+    }
+
+    #[must_use]
+    pub fn from_components_with_aliases_and_bindings(
+        components: &[ComponentNode],
+        parsed_aliases: &[(PathBuf, ParsedTypeAlias)],
+        bindings: Option<&BindingTable>,
+    ) -> Self {
         let aliases = parsed_aliases
             .iter()
             .filter_map(|(path, alias)| {
@@ -133,10 +144,23 @@ impl SemanticTypeModel {
             let Some(declared_type) = &field.declared_type else {
                 continue;
             };
-            let alias = aliases_by_path_and_name.get(&(
-                declared_type.provenance.path.clone(),
-                declared_type.text.clone(),
-            ));
+            let alias = aliases_by_path_and_name
+                .get(&(
+                    declared_type.provenance.path.clone(),
+                    declared_type.text.clone(),
+                ))
+                .copied();
+            let imported_alias = bindings
+                .and_then(|bindings| {
+                    bindings.resolve_import(&declared_type.provenance.path, &declared_type.text)
+                })
+                .and_then(|binding| match &binding.target {
+                    ImportBindingTarget::Symbol(symbol) if symbol.kind == SymbolKind::TypeAlias => {
+                        aliases.get(&symbol.id)
+                    }
+                    _ => None,
+                });
+            let alias = alias.or(imported_alias);
             let semantic_type = alias
                 .map(|alias| alias.semantic_type.clone())
                 .or_else(|| semantic_type_from_annotation(&declared_type.text));
