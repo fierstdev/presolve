@@ -80,8 +80,8 @@ pub use intermediate_representation::{
     IrOptimizationPassReport, IrOptimizationPipeline, IrOptimizationReport, IrPassManager,
     IrPostDominatorTree, IrReachabilityAnalysis, IrReactiveEdge, IrReactiveEdgeKind,
     IrReactiveGraph, IrReactiveNode, IrReactiveNodeKind, IrStorage, IrStorageId,
-    IrTemplateEntrypoint, IrUnaryOperation, IrUse, IrUseDefinition, IrValidationDiagnostic,
-    IrValue, IrValueDefinition, IrValueId,
+    IrTemplateEntrypoint, IrUnaryOperation, IrUpdateScheduler, IrUse, IrUseDefinition,
+    IrValidationDiagnostic, IrValue, IrValueDefinition, IrValueId,
 };
 pub use model::{
     ClassSummary, DecoratorSummary, Diagnostic, RenderMethodSummary, Severity, SourceSummary, Span,

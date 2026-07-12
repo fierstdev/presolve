@@ -158,6 +158,19 @@ pub struct IrReactiveEdge {
     pub provenance: SourceProvenance,
 }
 
+/// Compiler-owned foundation for planning reactive updates from dependency topology.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrUpdateScheduler {
+    pub graph: IrReactiveGraph,
+}
+
+impl IrUpdateScheduler {
+    #[must_use]
+    pub fn new(graph: IrReactiveGraph) -> Self {
+        Self { graph }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IrReactiveEdgeKind {
     Reads,
