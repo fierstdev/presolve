@@ -83,6 +83,7 @@ pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateR
                         provenance: provenance.clone(),
                         instructions: Vec::new(),
                     }],
+                    branch_edges: Vec::new(),
                 })
             }));
     }
@@ -99,6 +100,7 @@ pub struct IrFunction {
     pub provenance: SourceProvenance,
     pub entry_block: IrBlockId,
     pub blocks: Vec<IrBlock>,
+    pub branch_edges: Vec<IrBranchEdge>,
 }
 
 /// A stable compiler-owned basic-block identity within an IR function.
@@ -108,7 +110,12 @@ pub struct IrBlockId(String);
 impl IrBlockId {
     #[must_use]
     pub fn entry_for(function: &SemanticId) -> Self {
-        Self(format!("{function}/block:entry"))
+        Self::for_function(function, "entry")
+    }
+
+    #[must_use]
+    pub fn for_function(function: &SemanticId, name: &str) -> Self {
+        Self(format!("{function}/block:{name}"))
     }
 
     #[must_use]
@@ -131,6 +138,22 @@ pub struct IrBlock {
     pub instructions: Vec<IrInstruction>,
 }
 
+/// A directed conditional branch between compiler-owned basic blocks.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrBranchEdge {
+    pub from: IrBlockId,
+    pub to: IrBlockId,
+    pub arm: IrBranchArm,
+    pub provenance: SourceProvenance,
+}
+
+/// The outcome of a conditional branch represented by an IR edge.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IrBranchArm {
+    True,
+    False,
+}
+
 /// One backend-neutral instruction with stable source provenance.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IrInstruction {
@@ -149,8 +172,8 @@ pub enum IrInstructionKind {
 #[cfg(test)]
 mod tests {
     use super::{
-        lower_components_to_ir, IntermediateRepresentation, IrBlock, IrBlockId, IrFunction,
-        IrInstruction, IrInstructionKind, IrModule,
+        lower_components_to_ir, IntermediateRepresentation, IrBlock, IrBlockId, IrBranchArm,
+        IrBranchEdge, IrFunction, IrInstruction, IrInstructionKind, IrModule,
     };
     use crate::{SemanticId, SourceProvenance};
 
@@ -183,6 +206,7 @@ mod tests {
                     kind: IrInstructionKind::Nop,
                 }],
             }],
+            branch_edges: Vec::new(),
         };
         let ir = IntermediateRepresentation {
             modules: vec![IrModule {
@@ -195,6 +219,38 @@ mod tests {
         };
 
         assert_eq!(ir.modules[0].functions[0].blocks[0].instructions.len(), 1);
+    }
+
+    #[test]
+    fn represents_provenanced_conditional_branch_edges() {
+        let provenance = SourceProvenance::new(
+            "src/Counter.tsx",
+            ezc_parser::SourceSpan {
+                start: 0,
+                end: 1,
+                line: 1,
+                column: 1,
+            },
+        );
+        let function = SemanticId::component(Some("x-counter"), "Counter").method("render");
+        let entry = IrBlockId::entry_for(&function);
+        let when_true = IrBlockId::for_function(&function, "when-true");
+        let branch = IrBranchEdge {
+            from: entry,
+            to: when_true,
+            arm: IrBranchArm::True,
+            provenance,
+        };
+
+        assert_eq!(
+            branch.from.as_str(),
+            "component:x-counter/method:render/block:entry"
+        );
+        assert_eq!(
+            branch.to.as_str(),
+            "component:x-counter/method:render/block:when-true"
+        );
+        assert_eq!(branch.arm, IrBranchArm::True);
     }
 
     #[test]
@@ -222,6 +278,7 @@ mod tests {
             format!("{}/block:entry", ir.modules[0].functions[0].id).as_str()
         );
         assert!(ir.modules[0].functions[0].blocks[0].instructions.is_empty());
+        assert!(ir.modules[0].functions[0].branch_edges.is_empty());
         assert!(matches!(
             ir.modules[0].storage_initializers[0].kind,
             IrInstructionKind::InitializeStorage { .. }
