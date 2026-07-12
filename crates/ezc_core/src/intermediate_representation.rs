@@ -348,6 +348,77 @@ pub struct IrUseDefinition {
     pub definition: IrValueDefinition,
 }
 
+/// Block-level live-in and live-out sets for one canonical IR function.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrLivenessAnalysis {
+    pub live_in: BTreeMap<IrBlockId, Vec<IrValueId>>,
+    pub live_out: BTreeMap<IrBlockId, Vec<IrValueId>>,
+}
+
+/// Computes immutable block liveness from value uses, definitions, and CFG successors.
+#[must_use]
+pub fn analyze_liveness(function: &IrFunction) -> IrLivenessAnalysis {
+    let block_ids = function
+        .blocks
+        .iter()
+        .map(|block| block.id.clone())
+        .collect::<BTreeSet<_>>();
+    let mut block_uses = BTreeMap::new();
+    let mut block_definitions = BTreeMap::new();
+    for block in &function.blocks {
+        let mut uses = BTreeSet::new();
+        let mut definitions = BTreeSet::new();
+        for instruction in &block.instructions {
+            for operand in instruction_operands(&instruction.kind) {
+                if let IrOperand::Value(value) = operand {
+                    if !definitions.contains(value) {
+                        uses.insert(value.clone());
+                    }
+                }
+            }
+            if let Some(result) = &instruction.result {
+                definitions.insert(result.clone());
+            }
+        }
+        block_uses.insert(block.id.clone(), uses);
+        block_definitions.insert(block.id.clone(), definitions);
+    }
+    let mut live_in = block_ids
+        .iter()
+        .cloned()
+        .map(|id| (id, BTreeSet::new()))
+        .collect::<BTreeMap<_, _>>();
+    let mut live_out = live_in.clone();
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for block in block_ids.iter().rev() {
+            let next_out = function
+                .successor_blocks(block)
+                .into_iter()
+                .flat_map(|successor| live_in[&successor].clone())
+                .collect::<BTreeSet<_>>();
+            let mut next_in = block_uses[block].clone();
+            next_in.extend(next_out.difference(&block_definitions[block]).cloned());
+            if live_out.get(block) != Some(&next_out) || live_in.get(block) != Some(&next_in) {
+                live_out.insert(block.clone(), next_out);
+                live_in.insert(block.clone(), next_in);
+                changed = true;
+            }
+        }
+    }
+    IrLivenessAnalysis {
+        live_in: live_in
+            .into_iter()
+            .map(|(block, values)| (block, values.into_iter().collect()))
+            .collect(),
+        live_out: live_out
+            .into_iter()
+            .map(|(block, values)| (block, values.into_iter().collect()))
+            .collect(),
+    }
+}
+
 /// Resolves each canonical value use to its registered definition.
 #[must_use]
 pub fn analyze_use_definitions(function: &IrFunction) -> Vec<IrUseDefinition> {

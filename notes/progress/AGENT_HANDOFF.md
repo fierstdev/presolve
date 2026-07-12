@@ -3,24 +3,24 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: D3-B - use-definition chains
+* Latest completed slice: D3-C - liveness
 * Working tree: clean after the D2-G6 commit
 * Date: 2026-07-11
 
 Last completed slice
 
-* Slice: D3-B - use-definition chains
-* Summary: Added direct use-to-definition resolution for every value operand.
+* Slice: D3-C - liveness
+* Summary: Added immutable block-level live-in/live-out analysis.
 * Key files: crates/ezc_core/src/intermediate_representation.rs
-* New behavior: `analyze_use_definitions` resolves each value operand to its canonical definition while retaining the operand index.
+* New behavior: `analyze_liveness` derives live sets from instruction operands/results and CFG successors.
 * Fixtures added or changed: none.
 
 Current in-progress slice
 
-* Slice: D3-B - use-definition chains
+* Slice: D3-C - liveness
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D3-B
-* Remaining: D3-C - liveness.
+* Completed: Phase C1 through C35; Phase D1-A through D3-C
+* Remaining: D3-D - reachability.
 
 Verification
 
@@ -541,7 +541,7 @@ Known limitations
 
 Exact next step
 
-Continue automatically with D3-C - liveness, committing the completed D3-B slice first.
+Continue automatically with D3-D - reachability, committing the completed D3-C slice first.
 
 Useful commands
 
