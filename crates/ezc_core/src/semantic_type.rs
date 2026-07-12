@@ -104,6 +104,45 @@ pub enum SerializationCompatibility {
     NotSerializable,
 }
 
+/// Execution side participating in a compiler/runtime boundary crossing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExecutionBoundary {
+    Client,
+    Server,
+}
+
+/// Whether a semantic type may cross one execution boundary to another.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BoundaryCompatibility {
+    Compatible,
+    Incompatible,
+}
+
+/// Determines whether a type can cross from one execution boundary to another.
+#[must_use]
+pub fn boundary_compatibility(
+    semantic_type: &SemanticType,
+    source: ExecutionBoundary,
+    target: ExecutionBoundary,
+) -> BoundaryCompatibility {
+    if source == target {
+        return BoundaryCompatibility::Compatible;
+    }
+    let compatible = match semantic_type {
+        SemanticType::Resource(resource) => {
+            resource.execution_boundary == ResourceExecutionBoundary::Shared
+                && serialization_compatibility(semantic_type)
+                    == SerializationCompatibility::Serializable
+        }
+        _ => serialization_compatibility(semantic_type) == SerializationCompatibility::Serializable,
+    };
+    if compatible {
+        BoundaryCompatibility::Compatible
+    } else {
+        BoundaryCompatibility::Incompatible
+    }
+}
+
 /// Determines structural serialization compatibility for a canonical type.
 #[must_use]
 pub fn serialization_compatibility(semantic_type: &SemanticType) -> SerializationCompatibility {
@@ -1198,7 +1237,8 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::{
-        operator_result_type, serialization_compatibility, ObjectType, ResourceExecutionBoundary,
+        boundary_compatibility, operator_result_type, serialization_compatibility,
+        BoundaryCompatibility, ExecutionBoundary, ObjectType, ResourceExecutionBoundary,
         ResourceType, SemanticOperator, SemanticType, SemanticTypeAssignment, SemanticTypeId,
         SemanticTypeStatus, SerializationCompatibility,
     };
@@ -1301,6 +1341,32 @@ mod tests {
                 execution_boundary: ResourceExecutionBoundary::Shared,
             })),
             SerializationCompatibility::NotSerializable
+        );
+    }
+
+    #[test]
+    fn determines_server_client_boundary_compatibility() {
+        assert_eq!(
+            boundary_compatibility(
+                &SemanticType::String,
+                ExecutionBoundary::Server,
+                ExecutionBoundary::Client,
+            ),
+            BoundaryCompatibility::Compatible
+        );
+        assert_eq!(
+            boundary_compatibility(
+                &SemanticType::Resource(ResourceType {
+                    data: Box::new(SemanticType::String),
+                    error: Box::new(SemanticType::String),
+                    pending: true,
+                    serializable: true,
+                    execution_boundary: ResourceExecutionBoundary::Client,
+                }),
+                ExecutionBoundary::Client,
+                ExecutionBoundary::Server,
+            ),
+            BoundaryCompatibility::Incompatible
         );
     }
 
