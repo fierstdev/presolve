@@ -362,6 +362,96 @@ pub struct IrReachabilityAnalysis {
     pub unreachable: Vec<IrBlockId>,
 }
 
+/// Statically known transient values derived by canonical IR constant propagation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrConstantPropagationAnalysis {
+    pub constants: BTreeMap<IrValueId, IrConstant>,
+}
+
+/// Propagates inline primitive constants through the current unary and binary IR operations.
+#[must_use]
+pub fn analyze_constant_propagation(function: &IrFunction) -> IrConstantPropagationAnalysis {
+    let mut constants = BTreeMap::new();
+    for block in &function.blocks {
+        for instruction in &block.instructions {
+            let Some(result) = &instruction.result else {
+                continue;
+            };
+            let constant = match &instruction.kind {
+                IrInstructionKind::Unary { operation, operand } => {
+                    resolve_constant(operand, &constants).and_then(|operand| {
+                        match (operation, operand) {
+                            (IrUnaryOperation::Not, IrConstant::Boolean(value)) => {
+                                Some(IrConstant::Boolean(!value))
+                            }
+                            (IrUnaryOperation::Negate, IrConstant::Number(value)) => {
+                                negate_number(&value).map(IrConstant::Number)
+                            }
+                            _ => None,
+                        }
+                    })
+                }
+                IrInstructionKind::Binary {
+                    operation,
+                    left,
+                    right,
+                } => {
+                    let (Some(IrConstant::Number(left)), Some(IrConstant::Number(right))) = (
+                        resolve_constant(left, &constants),
+                        resolve_constant(right, &constants),
+                    ) else {
+                        continue;
+                    };
+                    evaluate_numeric_binary(*operation, &left, &right).map(IrConstant::Number)
+                }
+                _ => None,
+            };
+            if let Some(constant) = constant {
+                constants.insert(result.clone(), constant);
+            }
+        }
+    }
+    IrConstantPropagationAnalysis { constants }
+}
+
+fn resolve_constant(
+    operand: &IrOperand,
+    constants: &BTreeMap<IrValueId, IrConstant>,
+) -> Option<IrConstant> {
+    match operand {
+        IrOperand::Constant(constant) => Some(constant.clone()),
+        IrOperand::Value(value) => constants.get(value).cloned(),
+        IrOperand::Storage(_) => None,
+    }
+}
+
+fn negate_number(value: &str) -> Option<String> {
+    value.parse::<f64>().ok().map(|value| format_number(-value))
+}
+fn evaluate_numeric_binary(
+    operation: IrBinaryOperation,
+    left: &str,
+    right: &str,
+) -> Option<String> {
+    let left = left.parse::<f64>().ok()?;
+    let right = right.parse::<f64>().ok()?;
+    let value = match operation {
+        IrBinaryOperation::Add => left + right,
+        IrBinaryOperation::Subtract => left - right,
+        IrBinaryOperation::Multiply => left * right,
+        IrBinaryOperation::Divide if right != 0.0 => left / right,
+        IrBinaryOperation::Divide => return None,
+    };
+    Some(format_number(value))
+}
+fn format_number(value: f64) -> String {
+    if value.fract() == 0.0 {
+        format!("{value:.0}")
+    } else {
+        value.to_string()
+    }
+}
+
 /// Computes canonical reachability from a function's entry block.
 #[must_use]
 pub fn analyze_reachability(function: &IrFunction) -> IrReachabilityAnalysis {
