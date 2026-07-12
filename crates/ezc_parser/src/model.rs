@@ -183,6 +183,8 @@ pub enum ParsedUnaryOperator {
 pub struct ParsedMethod {
     pub name: String,
     pub span: SourceSpan,
+    pub decorators: Vec<ParsedDecorator>,
+    pub is_getter: bool,
     pub jsx_roots: Vec<ParsedJsxNode>,
     pub bindings: Vec<String>,
     pub state_updates: Vec<ParsedStateUpdate>,

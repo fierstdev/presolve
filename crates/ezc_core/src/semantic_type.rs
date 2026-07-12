@@ -98,6 +98,7 @@ pub struct SemanticTypeModel {
     pub aliases: BTreeMap<SemanticId, SemanticTypeAlias>,
     pub list_scopes: BTreeMap<SemanticId, ListTemplateScopeType>,
     pub member_accesses: BTreeMap<SemanticId, MemberAccessType>,
+    pub computed_values: BTreeMap<SemanticId, ComputedValueType>,
 }
 
 /// Canonical item and index type information for one template list scope.
@@ -116,6 +117,14 @@ pub struct MemberAccessType {
     pub entity: SemanticId,
     pub expression: String,
     pub semantic_type: Option<SemanticType>,
+}
+
+/// Canonical semantic type contract for one computed getter.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ComputedValueType {
+    pub method: SemanticId,
+    pub semantic_type: SemanticType,
+    pub provenance: SourceProvenance,
 }
 
 /// Stable identity for one compiler-owned type assignment.
@@ -296,6 +305,7 @@ impl SemanticTypeModel {
         );
 
         Self::from_assignments_and_aliases(assignments, aliases)
+            .with_computed_value_types(components)
     }
 
     fn from_assignments_and_aliases(
@@ -307,7 +317,29 @@ impl SemanticTypeModel {
             aliases,
             list_scopes: BTreeMap::new(),
             member_accesses: BTreeMap::new(),
+            computed_values: BTreeMap::new(),
         }
+    }
+
+    fn with_computed_value_types(mut self, components: &[ComponentNode]) -> Self {
+        for method in components
+            .iter()
+            .flat_map(|component| &component.methods)
+            .filter(|method| method.is_computed)
+        {
+            let Some(assignment) = self.assignments.get(&method.id) else {
+                continue;
+            };
+            self.computed_values.insert(
+                method.id.clone(),
+                ComputedValueType {
+                    method: method.id.clone(),
+                    semantic_type: assignment.semantic_type.clone(),
+                    provenance: assignment.provenance.clone(),
+                },
+            );
+        }
+        self
     }
 
     /// Attaches inferred types to every canonical expression node in `graph`.

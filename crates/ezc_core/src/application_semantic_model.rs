@@ -809,6 +809,32 @@ class Returns extends Component {
     }
 
     #[test]
+    fn establishes_typed_computed_getter_contracts() {
+        let parsed = ezc_parser::parse_file(
+            "src/Computed.tsx",
+            r#"
+@component("x-computed")
+class Computed extends Component {
+  @computed()
+  get remainingCount(): number { return 1; }
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        let method = &asm.components[0].methods[0];
+        let computed = asm
+            .semantic_types
+            .computed_values
+            .get(&method.id)
+            .expect("computed type contract");
+
+        assert!(method.is_getter);
+        assert!(method.is_computed);
+        assert_eq!(computed.semantic_type, crate::SemanticType::Number);
+    }
+
+    #[test]
     fn lowers_supported_literal_state_annotations_into_canonical_types() {
         let parsed = ezc_parser::parse_file(
             "src/LiteralTypes.tsx",

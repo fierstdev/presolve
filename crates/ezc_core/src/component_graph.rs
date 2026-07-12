@@ -464,6 +464,8 @@ pub struct ComponentMethod {
     pub id: SemanticId,
     pub owner: SemanticOwner,
     pub name: String,
+    pub is_getter: bool,
+    pub is_computed: bool,
     pub local_variables: Vec<MethodLocalVariable>,
     pub parameters: Vec<MethodParameter>,
     pub declared_return_type: Option<DeclaredStateType>,
@@ -747,6 +749,12 @@ fn component_method_from_parsed(
         id: id.clone(),
         owner: SemanticOwner::entity(component_id.clone()),
         name: method.name.clone(),
+        is_getter: method.is_getter,
+        is_computed: method.is_getter
+            && method
+                .decorators
+                .iter()
+                .any(|decorator| decorator.name == "computed"),
         local_variables: method
             .local_variables
             .iter()
