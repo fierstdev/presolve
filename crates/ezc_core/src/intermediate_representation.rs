@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use crate::{ApplicationSemanticModel, SemanticId, SourceProvenance};
+use crate::{ApplicationSemanticModel, SemanticId, SemanticType, SourceProvenance};
 
 /// Compiler-owned intermediate representation, independent of backend output.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -94,6 +94,7 @@ pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateR
                         instructions: Vec::new(),
                     }],
                     branch_edges: Vec::new(),
+                    values: BTreeMap::new(),
                     loops: Vec::new(),
                 })
             }));
@@ -112,6 +113,7 @@ pub struct IrFunction {
     pub entry_block: IrBlockId,
     pub blocks: Vec<IrBlock>,
     pub branch_edges: Vec<IrBranchEdge>,
+    pub values: BTreeMap<IrValueId, IrValue>,
     pub loops: Vec<IrLoop>,
 }
 
@@ -146,6 +148,11 @@ impl IrFunction {
     #[must_use]
     pub fn is_exit_block(&self, id: &IrBlockId) -> bool {
         self.block(id).is_some() && self.successor_blocks(id).is_empty()
+    }
+
+    #[must_use]
+    pub fn value(&self, id: &IrValueId) -> Option<&IrValue> {
+        self.values.get(id)
     }
 }
 
@@ -262,6 +269,24 @@ pub enum IrOperand {
     Value(IrValueId),
     Constant(IrConstant),
     Storage(IrStorageId),
+}
+
+/// The canonical origin of an IR value.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IrValueDefinition {
+    Instruction(IrInstructionId),
+    Parameter { function: SemanticId, index: usize },
+    BlockParameter { block: IrBlockId, index: usize },
+}
+
+/// One function-scoped transient value and its canonical definition metadata.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrValue {
+    pub id: IrValueId,
+    pub definition: IrValueDefinition,
+    pub semantic_type: SemanticType,
+    pub provenance: SourceProvenance,
+    pub semantic_origin: Option<SemanticId>,
 }
 
 /// A stable compiler-owned loop identity within an IR function.
@@ -554,9 +579,10 @@ mod tests {
         compute_dominators, compute_post_dominators, lower_components_to_ir,
         IntermediateRepresentation, IrBlock, IrBlockId, IrBranchArm, IrBranchEdge, IrConstant,
         IrFunction, IrInstruction, IrInstructionId, IrInstructionKind, IrLoop, IrLoopId, IrModule,
-        IrOperand, IrStorageId, IrValueId,
+        IrOperand, IrStorageId, IrValue, IrValueDefinition, IrValueId,
     };
-    use crate::{SemanticId, SourceProvenance};
+    use crate::{SemanticId, SemanticType, SourceProvenance};
+    use std::collections::BTreeMap;
 
     #[test]
     fn represents_backend_neutral_ir_structure_with_provenance() {
@@ -596,6 +622,7 @@ mod tests {
                 }],
             }],
             branch_edges: Vec::new(),
+            values: BTreeMap::new(),
             loops: Vec::new(),
         };
         let ir = IntermediateRepresentation {
@@ -723,6 +750,54 @@ mod tests {
     }
 
     #[test]
+    fn indexes_values_by_function_scoped_value_identity() {
+        let provenance = SourceProvenance::new(
+            "src/Counter.tsx",
+            ezc_parser::SourceSpan {
+                start: 0,
+                end: 1,
+                line: 1,
+                column: 1,
+            },
+        );
+        let id = SemanticId::component(Some("x-counter"), "Counter").method("increment");
+        let entry = IrBlockId::entry_for(&id);
+        let value_id = IrValueId::for_function(&id, 0);
+        let value = IrValue {
+            id: value_id.clone(),
+            definition: IrValueDefinition::Instruction(IrInstructionId::for_block(&entry, 0)),
+            semantic_type: SemanticType::Number,
+            provenance: provenance.clone(),
+            semantic_origin: Some(
+                SemanticId::component(Some("x-counter"), "Counter").state_field("count"),
+            ),
+        };
+        let function = IrFunction {
+            id,
+            name: "increment".to_string(),
+            provenance: provenance.clone(),
+            entry_block: entry.clone(),
+            blocks: vec![IrBlock {
+                id: entry,
+                provenance,
+                instructions: Vec::new(),
+            }],
+            branch_edges: Vec::new(),
+            values: BTreeMap::from([(value_id.clone(), value)]),
+            loops: Vec::new(),
+        };
+
+        assert_eq!(
+            function.value(&value_id).expect("value").semantic_type,
+            SemanticType::Number
+        );
+        assert!(matches!(
+            function.value(&value_id).expect("value").definition,
+            IrValueDefinition::Instruction(_)
+        ));
+    }
+
+    #[test]
     fn represents_natural_loops_with_header_latches_and_exits() {
         let provenance = SourceProvenance::new(
             "src/Counter.tsx",
@@ -827,6 +902,7 @@ mod tests {
                     provenance,
                 },
             ],
+            values: BTreeMap::new(),
             loops: Vec::new(),
         };
 
@@ -897,6 +973,7 @@ mod tests {
                     provenance,
                 },
             ],
+            values: BTreeMap::new(),
             loops: Vec::new(),
         };
 
@@ -940,6 +1017,7 @@ mod tests {
                 arm: IrBranchArm::True,
                 provenance,
             }],
+            values: BTreeMap::new(),
             loops: Vec::new(),
         };
         let dominators = compute_dominators(&function);

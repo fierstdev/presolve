@@ -70,7 +70,7 @@ pub use intermediate_representation::{
     IntermediateRepresentation, IrBinaryOperation, IrBlock, IrBlockId, IrBranchArm, IrBranchEdge,
     IrConstant, IrDominatorTree, IrFunction, IrInstruction, IrInstructionId, IrInstructionKind,
     IrLoop, IrLoopId, IrModule, IrOperand, IrPostDominatorTree, IrStorageId, IrTemplateEntrypoint,
-    IrUnaryOperation, IrValueId,
+    IrUnaryOperation, IrValue, IrValueDefinition, IrValueId,
 };
 pub use model::{
     ClassSummary, DecoratorSummary, Diagnostic, RenderMethodSummary, Severity, SourceSummary, Span,
