@@ -575,7 +575,7 @@ class ComputedExpressions extends Component {
             .expression_graph
             .nodes_for(&visible)
             .iter()
-            .all(|node| !asm.semantic_types.assignments.contains_key(&node.id)));
+            .all(|node| asm.semantic_types.assignments.contains_key(&node.id)));
         assert!(asm.references.iter().any(|reference| {
             reference.kind == crate::SemanticReferenceKind::ComputedState
                 && reference.source == doubled

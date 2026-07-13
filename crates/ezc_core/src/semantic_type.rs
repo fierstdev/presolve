@@ -3,7 +3,7 @@ use std::fmt;
 use std::path::PathBuf;
 
 use crate::{
-    BindingTable, ComponentNode, ImportBindingTarget, SemanticId, SerializableValue,
+    BindingTable, ComponentNode, ComputedValue, ImportBindingTarget, SemanticId, SerializableValue,
     SourceProvenance, SymbolKind,
 };
 use crate::{
@@ -322,8 +322,15 @@ pub struct MemberAccessType {
 /// Canonical semantic type contract for one computed getter.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComputedValueType {
+    pub computed: SemanticId,
     pub method: SemanticId,
     pub semantic_type: SemanticType,
+    pub status: SemanticTypeStatus,
+    pub declared_return_type: Option<SemanticType>,
+    pub declared_return_compatible: Option<bool>,
+    pub serialization: SerializationCompatibility,
+    pub execution_boundary: ExecutionBoundary,
+    pub boundary_compatibility: BoundaryCompatibility,
     pub provenance: SourceProvenance,
 }
 
@@ -601,7 +608,6 @@ impl SemanticTypeModel {
         );
 
         Self::from_assignments_and_aliases(assignments, aliases)
-            .with_computed_value_types(components)
             .with_action_signature_types(components)
     }
 
@@ -619,24 +625,131 @@ impl SemanticTypeModel {
         }
     }
 
-    fn with_computed_value_types(mut self, components: &[ComponentNode]) -> Self {
-        for method in components
+    /// Attaches canonical inferred and declared contracts to computed entities.
+    ///
+    /// # Panics
+    ///
+    /// Panics when a computed expression ID does not resolve in `graph`.
+    #[allow(clippy::too_many_lines)]
+    #[must_use]
+    pub fn with_computed_value_types(
+        mut self,
+        components: &[ComponentNode],
+        computed_values: &BTreeMap<SemanticId, ComputedValue>,
+        graph: &ExpressionGraph,
+        references: &[SemanticReference],
+    ) -> Self {
+        let computed_components = components
             .iter()
-            .flat_map(|component| &component.methods)
-            .filter(|method| method.is_computed())
-        {
-            let Some(assignment) = self.assignments.get(&method.id) else {
-                continue;
-            };
-            self.computed_values.insert(
-                method.id.clone(),
-                ComputedValueType {
-                    method: method.id.clone(),
-                    semantic_type: assignment.semantic_type.clone(),
-                    provenance: assignment.provenance.clone(),
+            .flat_map(|component| {
+                component
+                    .methods
+                    .iter()
+                    .filter(|method| method.is_computed())
+                    .map(move |method| (component.id.computed(&method.name), component))
+            })
+            .collect::<BTreeMap<_, _>>();
+        let mut computed_types = BTreeMap::new();
+        let mut expression_types = BTreeMap::new();
+
+        for computed in computed_values.values() {
+            let mut visiting = BTreeSet::new();
+            infer_computed_type(
+                &computed.id,
+                graph,
+                &self.assignments,
+                &computed_components,
+                computed_values,
+                references,
+                &mut computed_types,
+                &mut expression_types,
+                &mut visiting,
+            );
+        }
+
+        for (id, semantic_type) in expression_types {
+            let node = graph.node(&id).expect("computed expression graph node");
+            self.assignments.insert(
+                id.clone(),
+                SemanticTypeAssignment {
+                    id: SemanticTypeId::for_subject(&id),
+                    subject: id,
+                    semantic_type,
+                    origin: node.owner.clone(),
+                    status: SemanticTypeStatus::Inferred,
+                    provenance: node.provenance.clone(),
                 },
             );
         }
+
+        for computed in computed_values.values() {
+            let has_expression = graph.root_for(&computed.id).is_some();
+            let inferred = computed_types
+                .get(&computed.id)
+                .cloned()
+                .unwrap_or(SemanticType::Unknown);
+            let method_assignment = self.assignments.get(&computed.method);
+            let declared_return_type = method_assignment
+                .filter(|assignment| assignment.status == SemanticTypeStatus::Declared)
+                .map(|assignment| assignment.semantic_type.clone());
+            let declared_return_compatible = declared_return_type
+                .as_ref()
+                .filter(|_| has_expression)
+                .map(|declared| is_assignable(&inferred, declared));
+            let (semantic_type, status, origin) = if has_expression {
+                (
+                    inferred,
+                    SemanticTypeStatus::Inferred,
+                    computed.method.clone(),
+                )
+            } else if let Some(assignment) = method_assignment {
+                (
+                    assignment.semantic_type.clone(),
+                    assignment.status,
+                    assignment.origin.clone(),
+                )
+            } else {
+                (
+                    SemanticType::Unknown,
+                    SemanticTypeStatus::Inferred,
+                    computed.method.clone(),
+                )
+            };
+            let serialization = serialization_compatibility(&semantic_type);
+            let boundary_compatibility = boundary_compatibility(
+                &semantic_type,
+                computed.execution_boundary,
+                ExecutionBoundary::Client,
+            );
+
+            self.assignments.insert(
+                computed.id.clone(),
+                SemanticTypeAssignment {
+                    id: SemanticTypeId::for_subject(&computed.id),
+                    subject: computed.id.clone(),
+                    semantic_type: semantic_type.clone(),
+                    origin,
+                    status,
+                    provenance: computed.provenance.clone(),
+                },
+            );
+            self.computed_values.insert(
+                computed.id.clone(),
+                ComputedValueType {
+                    computed: computed.id.clone(),
+                    method: computed.method.clone(),
+                    semantic_type,
+                    status,
+                    declared_return_type,
+                    declared_return_compatible,
+                    serialization,
+                    execution_boundary: computed.execution_boundary,
+                    boundary_compatibility,
+                    provenance: computed.provenance.clone(),
+                },
+            );
+        }
+
         self
     }
 
@@ -1149,6 +1262,221 @@ fn expression_semantic_type(
             operator_result_type(SemanticOperator::Unary(*operator), &[child_type(operand)])
                 .unwrap_or(SemanticType::Unknown)
         }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn infer_computed_type(
+    computed: &SemanticId,
+    graph: &ExpressionGraph,
+    assignments: &BTreeMap<SemanticId, SemanticTypeAssignment>,
+    computed_components: &BTreeMap<SemanticId, &ComponentNode>,
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    references: &[SemanticReference],
+    computed_types: &mut BTreeMap<SemanticId, SemanticType>,
+    expression_types: &mut BTreeMap<SemanticId, SemanticType>,
+    visiting: &mut BTreeSet<SemanticId>,
+) -> SemanticType {
+    if let Some(semantic_type) = computed_types.get(computed) {
+        return semantic_type.clone();
+    }
+    if !visiting.insert(computed.clone()) {
+        return SemanticType::Unknown;
+    }
+
+    let semantic_type = graph
+        .root_for(computed)
+        .map_or(SemanticType::Unknown, |root| {
+            infer_computed_expression_type(
+                root,
+                graph,
+                assignments,
+                computed_components,
+                computed_values,
+                references,
+                computed_types,
+                expression_types,
+                visiting,
+            )
+        });
+    visiting.remove(computed);
+    computed_types.insert(computed.clone(), semantic_type.clone());
+    semantic_type
+}
+
+#[allow(clippy::too_many_arguments)]
+fn infer_computed_expression_type(
+    id: &SemanticId,
+    graph: &ExpressionGraph,
+    assignments: &BTreeMap<SemanticId, SemanticTypeAssignment>,
+    computed_components: &BTreeMap<SemanticId, &ComponentNode>,
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    references: &[SemanticReference],
+    computed_types: &mut BTreeMap<SemanticId, SemanticType>,
+    expression_types: &mut BTreeMap<SemanticId, SemanticType>,
+    visiting: &mut BTreeSet<SemanticId>,
+) -> SemanticType {
+    if let Some(semantic_type) = expression_types.get(id) {
+        return semantic_type.clone();
+    }
+
+    let node = graph.node(id).expect("computed expression graph node");
+    let child_type = |child: &SemanticId,
+                      expression_types: &mut BTreeMap<SemanticId, SemanticType>,
+                      computed_types: &mut BTreeMap<SemanticId, SemanticType>,
+                      visiting: &mut BTreeSet<SemanticId>| {
+        infer_computed_expression_type(
+            child,
+            graph,
+            assignments,
+            computed_components,
+            computed_values,
+            references,
+            computed_types,
+            expression_types,
+            visiting,
+        )
+    };
+    let semantic_type = match &node.kind {
+        ExpressionNodeKind::Literal(value) => state_initializer_value_type(value),
+        ExpressionNodeKind::Boolean(value) => SemanticType::BooleanLiteral(*value),
+        ExpressionNodeKind::ThisMember { name } => infer_computed_read_type(
+            &node.owner,
+            name,
+            assignments,
+            computed_components,
+            computed_values,
+            references,
+            graph,
+            computed_types,
+            expression_types,
+            visiting,
+        ),
+        ExpressionNodeKind::MemberAccess { object, property } => {
+            let object = child_type(object, expression_types, computed_types, visiting);
+            computed_member_access_type(&object, property)
+        }
+        ExpressionNodeKind::Arithmetic {
+            left,
+            right,
+            operator,
+        } => operator_result_type(
+            SemanticOperator::Arithmetic(*operator),
+            &[
+                child_type(left, expression_types, computed_types, visiting),
+                child_type(right, expression_types, computed_types, visiting),
+            ],
+        )
+        .unwrap_or(SemanticType::Unknown),
+        ExpressionNodeKind::Comparison {
+            left,
+            right,
+            operator,
+        } => operator_result_type(
+            SemanticOperator::Comparison(*operator),
+            &[
+                child_type(left, expression_types, computed_types, visiting),
+                child_type(right, expression_types, computed_types, visiting),
+            ],
+        )
+        .unwrap_or(SemanticType::Unknown),
+        ExpressionNodeKind::Logical {
+            left,
+            right,
+            operator,
+        } => operator_result_type(
+            SemanticOperator::Logical(*operator),
+            &[
+                child_type(left, expression_types, computed_types, visiting),
+                child_type(right, expression_types, computed_types, visiting),
+            ],
+        )
+        .unwrap_or(SemanticType::Unknown),
+        ExpressionNodeKind::NullishCoalescing { left, right } => operator_result_type(
+            SemanticOperator::NullishCoalescing,
+            &[
+                child_type(left, expression_types, computed_types, visiting),
+                child_type(right, expression_types, computed_types, visiting),
+            ],
+        )
+        .unwrap_or(SemanticType::Unknown),
+        ExpressionNodeKind::Unary { operand, operator } => operator_result_type(
+            SemanticOperator::Unary(*operator),
+            &[child_type(
+                operand,
+                expression_types,
+                computed_types,
+                visiting,
+            )],
+        )
+        .unwrap_or(SemanticType::Unknown),
+    };
+    expression_types.insert(id.clone(), semantic_type.clone());
+    semantic_type
+}
+
+#[allow(clippy::too_many_arguments)]
+fn infer_computed_read_type(
+    computed: &SemanticId,
+    name: &str,
+    assignments: &BTreeMap<SemanticId, SemanticTypeAssignment>,
+    computed_components: &BTreeMap<SemanticId, &ComponentNode>,
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    references: &[SemanticReference],
+    graph: &ExpressionGraph,
+    computed_types: &mut BTreeMap<SemanticId, SemanticType>,
+    expression_types: &mut BTreeMap<SemanticId, SemanticType>,
+    visiting: &mut BTreeSet<SemanticId>,
+) -> SemanticType {
+    let Some(component) = computed_components.get(computed) else {
+        return SemanticType::Unknown;
+    };
+    let target = component
+        .state_fields
+        .iter()
+        .find(|field| field.name == name)
+        .map(|field| field.id.clone())
+        .or_else(|| {
+            let target = component.id.computed(name);
+            computed_values.contains_key(&target).then_some(target)
+        });
+    let Some(target) = target else {
+        return SemanticType::Unknown;
+    };
+    if !references
+        .iter()
+        .any(|reference| reference.source == *computed && reference.target == target)
+    {
+        return SemanticType::Unknown;
+    }
+    if computed_values.contains_key(&target) {
+        return infer_computed_type(
+            &target,
+            graph,
+            assignments,
+            computed_components,
+            computed_values,
+            references,
+            computed_types,
+            expression_types,
+            visiting,
+        );
+    }
+    assignments
+        .get(&target)
+        .map_or(SemanticType::Unknown, |assignment| {
+            assignment.semantic_type.clone()
+        })
+}
+
+fn computed_member_access_type(semantic_type: &SemanticType, property: &str) -> SemanticType {
+    match semantic_type {
+        SemanticType::Object(object) => object
+            .properties
+            .get(property)
+            .cloned()
+            .unwrap_or(SemanticType::Unknown),
+        _ => SemanticType::Unknown,
     }
 }
 

@@ -484,6 +484,12 @@ pub fn build_application_semantic_model_from_component_graph(
     let semantic_types =
         SemanticTypeModel::from_components(&component_graph.components, &provenance)
             .with_expression_types(&expression_graph, &component_graph.components)
+            .with_computed_value_types(
+                &component_graph.components,
+                &computed_values,
+                &expression_graph,
+                &references,
+            )
             .with_template_binding_types(&template_entities, &references)
             .normalized();
 
@@ -594,6 +600,12 @@ fn build_application_semantic_model_from_files_with_bindings(
         bindings,
     )
     .with_expression_types(&expression_graph, &components)
+    .with_computed_value_types(
+        &components,
+        &computed_values,
+        &expression_graph,
+        &references,
+    )
     .with_template_binding_types(&template_entities, &references)
     .normalized();
 
@@ -1023,19 +1035,27 @@ class Computed extends Component {
 
         let asm = build_application_semantic_model(&parsed);
         let method = &asm.components[0].methods[0];
+        let computed_id = asm.components[0].id.computed("remainingCount");
         let computed = asm
             .semantic_types
             .computed_values
-            .get(&method.id)
+            .get(&computed_id)
             .expect("computed type contract");
-        let computed_id = asm.components[0].id.computed("remainingCount");
         let computed_entity = asm
             .computed_value(&computed_id)
             .expect("first-class computed entity");
 
         assert!(method.is_getter);
         assert!(method.is_computed());
-        assert_eq!(computed.semantic_type, crate::SemanticType::Number);
+        assert_eq!(
+            computed.semantic_type,
+            crate::SemanticType::NumberLiteral("1".to_string())
+        );
+        assert_eq!(
+            computed.declared_return_type,
+            Some(crate::SemanticType::Number)
+        );
+        assert_eq!(computed.declared_return_compatible, Some(true));
         assert_eq!(computed_entity.method, method.id);
         assert_eq!(
             computed_entity.owner,
@@ -1122,6 +1142,77 @@ class ComputedReads extends Component {
             .references
             .iter()
             .all(|reference| { asm.provenance(&reference.source) == Some(&reference.provenance) }));
+    }
+
+    #[test]
+    fn assigns_inferred_computed_types_and_validates_declared_returns() {
+        let parsed = ezc_parser::parse_file(
+            "src/ComputedTypes.tsx",
+            r#"
+@component("x-computed-types")
+class ComputedTypes extends Component {
+  count: number = state(1);
+  profile = state({ label: "EdgeZero" });
+
+  @computed()
+  get doubled(): number { return this.count * 2; }
+
+  @computed()
+  get chained() { return this.doubled + 1; }
+
+  @computed()
+  get label(): string { return this.profile.label; }
+
+  @computed()
+  get invalid(): number { return "wrong"; }
+
+  @computed()
+  get unresolved() { return this.missing; }
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let component = &asm.components[0];
+        let doubled = component.id.computed("doubled");
+        let chained = component.id.computed("chained");
+        let label = component.id.computed("label");
+        let invalid = component.id.computed("invalid");
+        let unresolved = component.id.computed("unresolved");
+
+        let types = &asm.semantic_types.computed_values;
+        assert_eq!(types[&doubled].semantic_type, crate::SemanticType::Number);
+        assert_eq!(types[&chained].semantic_type, crate::SemanticType::Number);
+        assert_eq!(types[&label].semantic_type, crate::SemanticType::String);
+        assert_eq!(
+            types[&invalid].semantic_type,
+            crate::SemanticType::StringLiteral("wrong".to_string())
+        );
+        assert_eq!(types[&invalid].declared_return_compatible, Some(false));
+        assert_eq!(types[&doubled].declared_return_compatible, Some(true));
+        assert_eq!(
+            types[&unresolved].semantic_type,
+            crate::SemanticType::Unknown
+        );
+        assert_eq!(
+            types[&unresolved].serialization,
+            crate::SerializationCompatibility::NotSerializable
+        );
+        assert_eq!(
+            types[&doubled].boundary_compatibility,
+            crate::BoundaryCompatibility::Compatible
+        );
+        assert_eq!(
+            types[&doubled].execution_boundary,
+            crate::ExecutionBoundary::Client
+        );
+        assert_eq!(
+            asm.semantic_type_of(&doubled),
+            Some(&crate::SemanticType::Number)
+        );
+        assert_eq!(
+            asm.serialization_compatibility_of(&chained),
+            Some(crate::SerializationCompatibility::Serializable)
+        );
     }
 
     #[test]

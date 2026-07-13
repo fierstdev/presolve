@@ -111,10 +111,11 @@ pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
 pub use semantic_type::{
     boundary_compatibility, dom_binding_contract, is_assignable, is_state_initializer_assignable,
     operator_result_type, semantic_type_text, serialization_compatibility,
-    state_initializer_value_type, BoundaryCompatibility, DomBindingContract, DomBindingKind,
-    ExecutionBoundary, ObjectType, ResourceExecutionBoundary, ResourceType, SemanticOperator,
-    SemanticType, SemanticTypeAlias, SemanticTypeAssignment, SemanticTypeId, SemanticTypeModel,
-    SemanticTypeStatus, SerializationCompatibility, TypeDiagnosticCode, TypeDiagnosticFamily,
+    state_initializer_value_type, BoundaryCompatibility, ComputedValueType, DomBindingContract,
+    DomBindingKind, ExecutionBoundary, ObjectType, ResourceExecutionBoundary, ResourceType,
+    SemanticOperator, SemanticType, SemanticTypeAlias, SemanticTypeAssignment, SemanticTypeId,
+    SemanticTypeModel, SemanticTypeStatus, SerializationCompatibility, TypeDiagnosticCode,
+    TypeDiagnosticFamily,
 };
 pub use summarize::summarize_source;
 pub use symbol_table::{
