@@ -10,6 +10,7 @@ use crate::component_graph::{
 };
 use crate::computed_value::{collect_computed_values, ComputedValue};
 use crate::expression_graph::{ExpressionGraph, ExpressionNode};
+use crate::intermediate_representation::IrReactiveGraph;
 use crate::semantic_id::{SemanticId, SemanticOwner};
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
@@ -27,6 +28,7 @@ pub struct ApplicationSemanticModel {
     pub semantic_types: SemanticTypeModel,
     pub components: Vec<ComponentNode>,
     pub computed_values: BTreeMap<SemanticId, ComputedValue>,
+    pub reactive_graph: IrReactiveGraph,
     pub templates: Vec<TemplateNode>,
     pub template_entities: Vec<TemplateSemanticEntity>,
     pub diagnostics: Vec<ComponentDiagnostic>,
@@ -483,6 +485,12 @@ pub fn build_application_semantic_model_from_component_graph(
         &template_entities,
         &ownership,
     ));
+    let reactive_graph = crate::build_reactive_graph(
+        &component_graph.components,
+        &computed_values,
+        &references,
+        &provenance,
+    );
 
     let semantic_types =
         SemanticTypeModel::from_components(&component_graph.components, &provenance)
@@ -501,6 +509,7 @@ pub fn build_application_semantic_model_from_component_graph(
         semantic_types,
         components: component_graph.components.clone(),
         computed_values,
+        reactive_graph,
         templates,
         template_entities,
         diagnostics: component_graph
@@ -605,6 +614,8 @@ fn build_application_semantic_model_from_files_with_bindings(
         &template_entities,
         &ownership,
     ));
+    let reactive_graph =
+        crate::build_reactive_graph(&components, &computed_values, &references, &provenance);
 
     let semantic_types = SemanticTypeModel::from_components_with_aliases_and_bindings(
         &components,
@@ -627,6 +638,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         semantic_types,
         components,
         computed_values,
+        reactive_graph,
         templates,
         template_entities,
         diagnostics,
@@ -1324,6 +1336,63 @@ class ComputedReads extends Component {
             .references
             .iter()
             .all(|reference| { asm.provenance(&reference.source) == Some(&reference.provenance) }));
+    }
+
+    #[test]
+    fn populates_reactive_graph_from_direct_computed_reads() {
+        let parsed = ezc_parser::parse_file(
+            "src/ComputedReactiveGraph.tsx",
+            r#"
+@component("x-computed-reactive-graph")
+class ComputedReactiveGraph extends Component {
+  count = state(1);
+
+  @computed()
+  get doubled() { return this.count * 2; }
+
+  @computed()
+  get label() { return this.doubled + 1; }
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let component = &asm.components[0];
+        let count = component.id.state_field("count");
+        let doubled = component.id.computed("doubled");
+        let label = component.id.computed("label");
+        let graph = &asm.reactive_graph;
+
+        assert_eq!(graph.nodes.len(), 3);
+        assert_eq!(
+            graph.nodes[count.as_str()].kind,
+            crate::IrReactiveNodeKind::State
+        );
+        assert_eq!(
+            graph.nodes[doubled.as_str()].kind,
+            crate::IrReactiveNodeKind::Computed
+        );
+        assert_eq!(
+            graph.nodes[label.as_str()].kind,
+            crate::IrReactiveNodeKind::Computed
+        );
+
+        let doubled_dependencies = graph.computed_dependencies(doubled.as_str());
+        assert_eq!(doubled_dependencies.len(), 1);
+        assert_eq!(doubled_dependencies[0].target, count.as_str());
+        let label_dependencies = graph.computed_dependencies(label.as_str());
+        assert_eq!(label_dependencies.len(), 1);
+        assert_eq!(label_dependencies[0].target, doubled.as_str());
+
+        let count_invalidations = graph.invalidations_from(count.as_str());
+        assert_eq!(count_invalidations.len(), 1);
+        assert_eq!(count_invalidations[0].target, doubled.as_str());
+        let doubled_invalidations = graph.invalidations_from(doubled.as_str());
+        assert_eq!(doubled_invalidations.len(), 1);
+        assert_eq!(doubled_invalidations[0].target, label.as_str());
+        assert!(graph
+            .invalidations_from(count.as_str())
+            .iter()
+            .all(|edge| { edge.target != label.as_str() }));
     }
 
     #[test]

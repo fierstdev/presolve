@@ -73,8 +73,8 @@ pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 pub use html_codegen::generate_static_html;
 pub use intermediate_representation::{
     analyze_constant_propagation, analyze_dead_assignments, analyze_definition_uses,
-    analyze_liveness, analyze_reachability, analyze_use_definitions, compute_dominators,
-    compute_post_dominators, inspect_dom_nodes, lower_components_to_ir,
+    analyze_liveness, analyze_reachability, analyze_use_definitions, build_reactive_graph,
+    compute_dominators, compute_post_dominators, inspect_dom_nodes, lower_components_to_ir,
     validate_intermediate_representation, IntermediateRepresentation, IrBinaryOperation, IrBlock,
     IrBlockId, IrBranchArm, IrBranchEdge, IrCfgCleanupPass, IrCommonSubexpressionEliminationPass,
     IrConstant, IrConstantFoldingPass, IrConstantPropagationAnalysis, IrCopyPropagationPass,

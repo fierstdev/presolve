@@ -1,7 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use crate::{ApplicationSemanticModel, SemanticId, SemanticType, SourceProvenance};
+use crate::{
+    ApplicationSemanticModel, ComponentNode, ComputedValue, SemanticId, SemanticReference,
+    SemanticReferenceKind, SemanticType, SourceProvenance,
+};
 
 /// Compiler-owned intermediate representation, independent of backend output.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -133,6 +136,87 @@ pub struct IrDomInspection {
 pub struct IrReactiveGraph {
     pub nodes: BTreeMap<String, IrReactiveNode>,
     pub edges: Vec<IrReactiveEdge>,
+}
+
+/// Build compiler-owned reactive topology from canonical state, computed, and
+/// computed-reference products.
+///
+/// # Panics
+///
+/// Panics when a state field has no canonical source provenance.
+#[must_use]
+pub fn build_reactive_graph(
+    components: &[ComponentNode],
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    references: &[SemanticReference],
+    provenance: &BTreeMap<SemanticId, SourceProvenance>,
+) -> IrReactiveGraph {
+    let mut nodes = BTreeMap::new();
+    for component in components {
+        for field in &component.state_fields {
+            let id = field.id.as_str().to_string();
+            nodes.insert(
+                id.clone(),
+                IrReactiveNode {
+                    id,
+                    kind: IrReactiveNodeKind::State,
+                    provenance: provenance
+                        .get(&field.id)
+                        .expect("state field should have canonical provenance")
+                        .clone(),
+                },
+            );
+        }
+    }
+    for computed in computed_values.values() {
+        let id = computed.id.as_str().to_string();
+        nodes.insert(
+            id.clone(),
+            IrReactiveNode {
+                id,
+                kind: IrReactiveNodeKind::Computed,
+                provenance: computed.provenance.clone(),
+            },
+        );
+    }
+
+    let mut edges = Vec::new();
+    for reference in references.iter().filter(|reference| {
+        matches!(
+            reference.kind,
+            SemanticReferenceKind::ComputedState | SemanticReferenceKind::ComputedComputed
+        )
+    }) {
+        let source = reference.source.as_str().to_string();
+        let target = reference.target.as_str().to_string();
+        if !nodes.contains_key(&source) || !nodes.contains_key(&target) {
+            continue;
+        }
+        edges.push(IrReactiveEdge {
+            source: source.clone(),
+            target: target.clone(),
+            kind: IrReactiveEdgeKind::Reads,
+            provenance: reference.provenance.clone(),
+        });
+        edges.push(IrReactiveEdge {
+            source: target,
+            target: source,
+            kind: IrReactiveEdgeKind::Invalidates,
+            provenance: reference.provenance.clone(),
+        });
+    }
+    edges.sort_by(|left, right| {
+        (left.kind, left.source.as_str(), left.target.as_str()).cmp(&(
+            right.kind,
+            right.source.as_str(),
+            right.target.as_str(),
+        ))
+    });
+    edges.dedup_by(|left, right| {
+        left.kind == right.kind && left.source == right.source && left.target == right.target
+    });
+
+    IrReactiveGraph { nodes, edges }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -270,7 +354,7 @@ impl IrUpdateScheduler {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum IrReactiveEdgeKind {
     Reads,
     Invalidates,

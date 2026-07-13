@@ -3,35 +3,38 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: E5 - computed purity
-* Working tree: clean after the E5 commit
+* Latest completed slice: E6 - computed reactive graph
+* Working tree: clean after the E6 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: E5 - computed purity
-* Summary: Classified computed getters as pure or impure and rejected unsupported behavior with deterministic diagnostics.
-* Key files: crates/ezc_parser/src/model.rs; crates/ezc_parser/src/oxc_adapter.rs; crates/ezc_core/src/computed_value.rs; crates/ezc_core/src/application_semantic_model.rs
-* New behavior: Computed values retain ordered purity violations and emit `EZC1034` diagnostics for state mutation, actions, effects, async, resources, arbitrary calls, and nondeterministic operations.
-* Fixtures added or changed: focused parser/core coverage for pure getters and every E5 unsupported-behavior category.
+* Slice: E6 - computed reactive graph
+* Summary: Projected canonical computed read references into a compiler-owned direct reactive graph.
+* Key files: crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/intermediate_representation.rs; crates/ezc_core/src/lib.rs
+* New behavior: The ASM now exposes deterministic state/computed reactive nodes, direct `Reads` edges from computed declarations to their dependencies, and reverse `Invalidates` edges from dependencies to direct computed dependents.
+* Fixtures added or changed: focused core coverage for state-to-computed and computed-to-computed direct reads and invalidations.
 
 Current in-progress slice
 
-* Slice: E5 - computed purity
+* Slice: E6 - computed reactive graph
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E5
-* Remaining: E6 - populate reactive graph.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E6
+* Remaining: E7 - compute transitive reactive dependencies and dependents.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_parser: pass
+* cargo test -p ezc_core reactive_graph: pass
 * cargo test -p ezc_core computed: pass
 * cargo check -p ezc_cli: pass
-* cargo clippy -p ezc_parser --all-targets -- -D warnings: pass
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 
 Architecture decisions made
+
+* Decision: The reactive graph is an immutable compiler-owned projection of canonical computed semantic references: `Reads` goes from a computed value to a direct state/computed dependency, and `Invalidates` is the reverse edge with the same relation provenance.
+* Reason: Later dependency analysis and scheduler consumers can query one deterministic topology without rediscovering getter reads or relying on runtime observation.
+* Tradeoff: E6 records only direct state/computed topology. It computes no transitive closures, detects no cycles, plans no updates, and adds no action/template/runtime edges; E7 owns transitive dependency and dependent analysis.
 
 * Decision: Purity is a compiler-owned computed-value classification with ordered violation records, while `EZC1034` diagnostics project each violation using its source provenance.
 * Reason: The compiler can reject behavior before any reactive or runtime product consumes the getter, and later tooling can query canonical purity facts rather than reanalyzing method bodies.
