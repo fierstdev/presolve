@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: G2 - Context Provider entities
-* Working tree: G2 is complete and ready for its commit. The Phase G roadmap file is user-provided and untracked.
+* Working tree: G2 is committed. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-13
 
 Last completed slice
@@ -18,7 +18,7 @@ Last completed slice
 Current in-progress slice
 
 * Slice: G3 - Context Consumer lowering
-* Status: Ready to begin after the G2 commit.
+* Status: Blocked pending an explicit authored Consumer declaration contract.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2
 * Remaining: G3 through G20.
 
@@ -45,6 +45,10 @@ Architecture decisions made
 * Decision: G2 Provider syntax is a non-static `@provide(ComponentSymbol.contextField)` field with one exact static designator, an explicit type, and one initializer in the existing canonical expression subset.
 * Reason: Resolving the symbol/designator through local component facts and the existing import binding table yields an immutable Provider-to-Context relation without evaluating decorator arguments, using strings, reflecting runtime classes, or searching a component tree.
 * Tradeoff: Provider values are expression roots only. They create no State/Computed entities, reactive edges, visibility facts, runtime slots, or execution behavior; unsupported forms create no valid Provider, while same-component duplicate targets retain one deterministic duplicate declaration fact.
+
+* Decision needed before G3: define the authored Consumer declaration syntax, its canonical Context designator/reference form, requested-type contract, owning scope, and provenance anchor.
+* Reason: The G3 roadmap identifies Consumer products but supplies no source construct that creates a Consumer. Choosing a decorator, field helper, parameter form, template read, method call, or implicit Context name would invent language semantics and predetermine later resolution/type behavior.
+* Tradeoff: G2 remains complete and committed. No Consumer entity, Context read, Provider selection, visibility analysis, runtime binding, or runtime lookup has been added.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.
@@ -729,7 +733,7 @@ Known limitations
 
 Exact next step
 
-Begin G3: define and lower canonical Context Consumer declarations. Do not resolve Consumers to Providers or introduce runtime lookup.
+Await an explicit G3 authored Consumer declaration contract before beginning Consumer lowering. Do not infer Consumers from fields, templates, methods, or Provider declarations.
 
 Useful commands
 
