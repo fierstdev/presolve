@@ -78,6 +78,11 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn effect(&self, name: &str) -> Self {
+        self.child("effect", name)
+    }
+
+    #[must_use]
     pub fn action(&self, method: &str, index: usize) -> Self {
         self.child("action", &format!("{method}:{index}"))
     }
@@ -179,6 +184,10 @@ mod tests {
         assert_eq!(
             component.computed("remainingCount").as_str(),
             "component:x-counter/computed:remainingCount"
+        );
+        assert_eq!(
+            component.effect("syncTitle").as_str(),
+            "component:x-counter/effect:syncTitle"
         );
         assert_eq!(
             component.action("increment", 0).as_str(),

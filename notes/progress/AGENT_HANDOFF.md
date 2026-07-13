@@ -3,38 +3,40 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: E21 - Phase E stability audit
-* Working tree: clean after the E21 commit
+* Latest completed slice: F1 - canonical effect entities
+* Working tree: clean after the F1 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: E21 - Phase E stability audit
-* Summary: Phase E is complete: canonical computed ownership, reactive/scheduler consumption, IR validation, inspection v2, and unsupported-semantics documentation have been audited and frozen.
-* Key files: crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_cli/src/main.rs; README.md
-* New behavior: ASM validation now recognizes canonical expression-graph nodes as valid typed subjects through their own provenance, so computed ASMs validate cleanly without incorrectly requiring expression nodes to be generic semantic entities. Shared computed-diagnostic assembly and the inspection schema-v2 constant remove duplicate paths.
-* Fixtures added or changed: no new fixtures; E20's computed suite was exercised across the full compiler and browser matrix.
+* Slice: F1 - canonical effect entities
+* Summary: Introduced first-class compiler-owned `Effect` entities for `@effect()` methods. Each has a stable effect ID, component ownership, authored method identity and provenance, client execution boundary, and fixed execution policy: after initial rendering and after a completed action batch.
+* Key files: crates/ezc_core/src/effect.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/component_graph.rs; crates/ezc_core/src/semantic_id.rs; crates/ezc_core/src/semantic_graph.rs; crates/ezc_cli/src/main.rs
+* New behavior: Effects participate in the existing ASM ownership/provenance navigation and generic semantic graph/CLI entity-kind projections. Their body, references, types, reactive graph relations, scheduler placement, IR, registry records, and runtime behavior are intentionally absent.
+* Fixtures added or changed: no fixture files; focused core tests cover collection and ASM integration.
 
 Current in-progress slice
 
-* Slice: E21 - Phase E stability audit
+* Slice: F1 - canonical effect entities
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21 (Phase E complete)
-* Remaining: no Phase E slices remain; await the next explicit roadmap.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1
+* Remaining: F2 - effect body lowering, then F3 through F20.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_parser: pass
 * cargo test -p ezc_core: pass
-* cargo test -p ezc_cli: pass
 * cargo clippy --workspace --all-targets -- -D warnings: pass
-* RUST_TEST_THREADS=1 cargo test -p ezc_cli --test runtime_browser -- --nocapture: pass
-* pnpm test:e2e: pass
-* just e2e: pass
-* RUST_TEST_THREADS=1 cargo test --workspace: pass
 
 Architecture decisions made
+
+* Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
+* Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.
+* Tradeoff: F1 only establishes entity metadata. It deliberately creates no effect body lowering, references, types, reactive edges, scheduler entries, IR, optimization, runtime records, or diagnostics; F2 through F18 own those products.
+
+* Decision: Every F1 effect is client-bound with one compiler policy, `AfterInitialRenderAndCompletedActionBatch`.
+* Reason: Initial execution and post-batch execution are language timing semantics, not an opt-in runtime convention. Storing the complete policy on the entity prevents a later runtime layer from choosing timing dynamically.
+* Tradeoff: F1 does not yet determine whether a particular completed batch triggers an effect or execute it. F6--F9 will derive trigger and scheduler placement from canonical dependency products.
 
 * Decision: ASM validation resolves typed subjects through either canonical semantic entities or canonical expression-graph nodes, using the subject's authoritative provenance in either case.
 * Reason: Expression nodes are first-class compiler products with stable IDs and spans, but are intentionally not modeled as generic semantic entities. Validation must preserve that separation while accepting their canonical type assignments.

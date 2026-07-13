@@ -531,6 +531,7 @@ pub struct MethodCall {
 pub enum MethodSemanticRole {
     Standard,
     Computed,
+    Effect,
     Action,
 }
 
@@ -543,6 +544,11 @@ impl ComponentMethod {
     #[must_use]
     pub const fn is_action(&self) -> bool {
         matches!(self.semantic_role, MethodSemanticRole::Action)
+    }
+
+    #[must_use]
+    pub const fn is_effect(&self) -> bool {
+        matches!(self.semantic_role, MethodSemanticRole::Effect)
     }
 }
 
@@ -823,7 +829,9 @@ fn component_method_from_parsed(
             .computed_expression
             .as_ref()
             .map(computed_expression_from_parsed),
-        MethodSemanticRole::Standard | MethodSemanticRole::Action => None,
+        MethodSemanticRole::Standard | MethodSemanticRole::Effect | MethodSemanticRole::Action => {
+            None
+        }
     };
     ComponentMethod {
         id: id.clone(),
@@ -899,6 +907,12 @@ fn method_semantic_role(method: &ParsedMethod) -> MethodSemanticRole {
             .any(|decorator| decorator.name == "computed")
     {
         MethodSemanticRole::Computed
+    } else if method
+        .decorators
+        .iter()
+        .any(|decorator| decorator.name == "effect")
+    {
+        MethodSemanticRole::Effect
     } else if method
         .decorators
         .iter()

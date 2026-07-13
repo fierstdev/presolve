@@ -9,6 +9,7 @@ use crate::component_graph::{
     ComponentMethod, ComponentNode, MethodLocalVariable, RenderEventHandler, StateField,
 };
 use crate::computed_value::{collect_computed_values, ComputedDiagnosticCode, ComputedValue};
+use crate::effect::{collect_effects, Effect};
 use crate::expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 use crate::intermediate_representation::{
     IrComputedEvaluationPlan, IrReactiveCycleAnalysis, IrReactiveGraph,
@@ -31,6 +32,7 @@ pub struct ApplicationSemanticModel {
     pub semantic_types: SemanticTypeModel,
     pub components: Vec<ComponentNode>,
     pub computed_values: BTreeMap<SemanticId, ComputedValue>,
+    pub effects: BTreeMap<SemanticId, Effect>,
     pub reactive_graph: IrReactiveGraph,
     pub reactive_transitive_analysis: IrReactiveTransitiveAnalysis,
     pub reactive_cycle_analysis: IrReactiveCycleAnalysis,
@@ -49,6 +51,7 @@ pub enum SemanticEntity<'a> {
     StateField(&'a StateField),
     Method(&'a ComponentMethod),
     Computed(&'a ComputedValue),
+    Effect(&'a Effect),
     Parameter(&'a crate::MethodParameter),
     LocalVariable(&'a MethodLocalVariable),
     Action(&'a ComponentAction),
@@ -63,6 +66,7 @@ pub enum SemanticEntityKind {
     StateField,
     Method,
     Computed,
+    Effect,
     Parameter,
     LocalVariable,
     Action,
@@ -79,6 +83,7 @@ impl SemanticEntity<'_> {
             Self::StateField(_) => SemanticEntityKind::StateField,
             Self::Method(_) => SemanticEntityKind::Method,
             Self::Computed(_) => SemanticEntityKind::Computed,
+            Self::Effect(_) => SemanticEntityKind::Effect,
             Self::Parameter(_) => SemanticEntityKind::Parameter,
             Self::LocalVariable(_) => SemanticEntityKind::LocalVariable,
             Self::Action(_) => SemanticEntityKind::Action,
@@ -134,6 +139,9 @@ impl ApplicationSemanticModel {
         if let Some(computed) = self.computed_values.get(id) {
             return Some(SemanticEntity::Computed(computed));
         }
+        if let Some(effect) = self.effects.get(id) {
+            return Some(SemanticEntity::Effect(effect));
+        }
 
         if let Some(template) = self.templates.iter().find(|template| template.id == *id) {
             return Some(SemanticEntity::Template(template));
@@ -158,6 +166,11 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub fn computed_value(&self, id: &SemanticId) -> Option<&ComputedValue> {
         self.computed_values.get(id)
+    }
+
+    #[must_use]
+    pub fn effect(&self, id: &SemanticId) -> Option<&Effect> {
+        self.effects.get(id)
     }
 
     #[must_use]
@@ -456,16 +469,14 @@ pub fn build_application_semantic_model_from_component_graph(
         collect_computed_values(&component_graph.components, &component_graph.provenance),
         &component_graph.provenance,
     );
+    let effects = collect_effects(&component_graph.components, &component_graph.provenance);
     let mut provenance = component_graph.provenance.clone();
     extend_template_entity_provenance(&mut provenance, &template_entities);
-    provenance.extend(
-        computed_values
-            .iter()
-            .map(|(id, computed)| (id.clone(), computed.provenance.clone())),
-    );
+    extend_derived_entity_provenance(&mut provenance, &computed_values, &effects);
     let ownership = collect_ownership(
         &component_graph.components,
         &computed_values,
+        &effects,
         &templates,
         &template_entities,
     );
@@ -520,6 +531,7 @@ pub fn build_application_semantic_model_from_component_graph(
         semantic_types,
         components: component_graph.components.clone(),
         computed_values,
+        effects,
         reactive_graph,
         reactive_transitive_analysis,
         reactive_cycle_analysis,
@@ -581,15 +593,13 @@ fn build_application_semantic_model_from_files_with_bindings(
         collect_computed_values(&components, &provenance),
         &provenance,
     );
+    let effects = collect_effects(&components, &provenance);
     diagnostics.extend(computed_diagnostics);
-    provenance.extend(
-        computed_values
-            .iter()
-            .map(|(id, computed)| (id.clone(), computed.provenance.clone())),
-    );
+    extend_derived_entity_provenance(&mut provenance, &computed_values, &effects);
     let ownership = collect_ownership(
         &components,
         &computed_values,
+        &effects,
         &templates,
         &template_entities,
     );
@@ -640,6 +650,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         semantic_types,
         components,
         computed_values,
+        effects,
         reactive_graph,
         reactive_transitive_analysis,
         reactive_cycle_analysis,
@@ -661,6 +672,23 @@ fn extend_template_entity_provenance(
         template_entities
             .iter()
             .map(|entity| (entity.id.clone(), entity.provenance.clone())),
+    );
+}
+
+fn extend_derived_entity_provenance(
+    provenance: &mut BTreeMap<SemanticId, SourceProvenance>,
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    effects: &BTreeMap<SemanticId, Effect>,
+) {
+    provenance.extend(
+        computed_values
+            .iter()
+            .map(|(id, computed)| (id.clone(), computed.provenance.clone())),
+    );
+    provenance.extend(
+        effects
+            .iter()
+            .map(|(id, effect)| (id.clone(), effect.provenance.clone())),
     );
 }
 
@@ -1362,6 +1390,7 @@ fn this_member_name(expression: &str) -> Option<&str> {
 fn collect_ownership(
     components: &[ComponentNode],
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    effects: &BTreeMap<SemanticId, Effect>,
     templates: &[TemplateNode],
     template_entities: &[TemplateSemanticEntity],
 ) -> BTreeMap<SemanticId, SemanticOwner> {
@@ -1396,6 +1425,12 @@ fn collect_ownership(
             .filter(|computed| computed.owner.entity_id() == Some(&component.id))
         {
             ownership.insert(computed.id.clone(), computed.owner.clone());
+        }
+        for effect in effects
+            .values()
+            .filter(|effect| effect.owner.entity_id() == Some(&component.id))
+        {
+            ownership.insert(effect.id.clone(), effect.owner.clone());
         }
         for action in &component.actions {
             ownership.insert(
@@ -2713,6 +2748,7 @@ class Counter extends Component {
 
         let ownership = collect_ownership(
             &component_graph.components,
+            &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &templates,
             &template_entities,

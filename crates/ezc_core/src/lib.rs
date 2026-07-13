@@ -11,6 +11,7 @@ pub mod compilation_unit;
 pub mod compiler_pass;
 pub mod component_graph;
 pub mod computed_value;
+pub mod effect;
 pub mod explain;
 pub mod expression_graph;
 pub mod html_codegen;
@@ -70,6 +71,7 @@ pub use computed_value::{
     collect_computed_values, ComputedCachePolicy, ComputedDiagnosticCode, ComputedPurity,
     ComputedPurityViolation, ComputedPurityViolationKind, ComputedValue,
 };
+pub use effect::{collect_effects, Effect, EffectExecutionPolicy};
 pub use explain::{explain_json, explain_text};
 pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 pub use html_codegen::generate_static_html;
