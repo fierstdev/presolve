@@ -10,7 +10,9 @@ use crate::component_graph::{
 };
 use crate::computed_value::{collect_computed_values, ComputedValue};
 use crate::expression_graph::{ExpressionGraph, ExpressionNode};
-use crate::intermediate_representation::{IrReactiveGraph, IrReactiveTransitiveAnalysis};
+use crate::intermediate_representation::{
+    IrReactiveCycleAnalysis, IrReactiveGraph, IrReactiveTransitiveAnalysis,
+};
 use crate::semantic_id::{SemanticId, SemanticOwner};
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
@@ -30,6 +32,7 @@ pub struct ApplicationSemanticModel {
     pub computed_values: BTreeMap<SemanticId, ComputedValue>,
     pub reactive_graph: IrReactiveGraph,
     pub reactive_transitive_analysis: IrReactiveTransitiveAnalysis,
+    pub reactive_cycle_analysis: IrReactiveCycleAnalysis,
     pub templates: Vec<TemplateNode>,
     pub template_entities: Vec<TemplateSemanticEntity>,
     pub diagnostics: Vec<ComponentDiagnostic>,
@@ -471,28 +474,21 @@ pub fn build_application_semantic_model_from_component_graph(
         &computed_values,
         &expression_graph,
     ));
-    references.extend(build_template_state_references(
+    extend_template_references(
+        &mut references,
         &component_graph.components,
         &template_entities,
         &ownership,
-    ));
-    references.extend(build_template_event_references(
-        &component_graph.components,
-        &template_entities,
-        &ownership,
-    ));
-    references.extend(build_template_local_references(
-        &component_graph.components,
-        &template_entities,
-        &ownership,
-    ));
-    let reactive_graph = crate::build_reactive_graph(
-        &component_graph.components,
-        &computed_values,
-        &references,
-        &provenance,
     );
-    let reactive_transitive_analysis = crate::analyze_reactive_transitive_graph(&reactive_graph);
+    let (reactive_graph, reactive_transitive_analysis, reactive_cycle_analysis) =
+        build_computed_reactive_products(
+            &component_graph.components,
+            &computed_values,
+            &references,
+            &provenance,
+        );
+    let computed_cycle_diagnostics =
+        collect_computed_cycle_diagnostics(&reactive_cycle_analysis, &computed_values);
 
     let semantic_types =
         SemanticTypeModel::from_components(&component_graph.components, &provenance)
@@ -513,6 +509,7 @@ pub fn build_application_semantic_model_from_component_graph(
         computed_values,
         reactive_graph,
         reactive_transitive_analysis,
+        reactive_cycle_analysis,
         templates,
         template_entities,
         diagnostics: component_graph
@@ -520,6 +517,7 @@ pub fn build_application_semantic_model_from_component_graph(
             .iter()
             .cloned()
             .chain(computed_diagnostics)
+            .chain(computed_cycle_diagnostics)
             .collect(),
         ownership,
         references,
@@ -596,30 +594,15 @@ fn build_application_semantic_model_from_files_with_bindings(
         &template_entities,
     );
     let expression_graph = ExpressionGraph::from_components(&components, &provenance);
-
     references.extend(build_computed_references(
         &components,
         &computed_values,
         &expression_graph,
     ));
-    references.extend(build_template_state_references(
-        &components,
-        &template_entities,
-        &ownership,
-    ));
-    references.extend(build_template_event_references(
-        &components,
-        &template_entities,
-        &ownership,
-    ));
-    references.extend(build_template_local_references(
-        &components,
-        &template_entities,
-        &ownership,
-    ));
-    let reactive_graph =
-        crate::build_reactive_graph(&components, &computed_values, &references, &provenance);
-    let reactive_transitive_analysis = crate::analyze_reactive_transitive_graph(&reactive_graph);
+    extend_template_references(&mut references, &components, &template_entities, &ownership);
+    let (reactive_graph, reactive_transitive_analysis, reactive_cycle_analysis) =
+        build_computed_reactive_products(&components, &computed_values, &references, &provenance);
+    append_computed_cycle_diagnostics(&mut diagnostics, &reactive_cycle_analysis, &computed_values);
 
     let semantic_types = SemanticTypeModel::from_components_with_aliases_and_bindings(
         &components,
@@ -644,6 +627,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         computed_values,
         reactive_graph,
         reactive_transitive_analysis,
+        reactive_cycle_analysis,
         templates,
         template_entities,
         diagnostics,
@@ -765,6 +749,80 @@ fn classify_computed_values(
     }
 
     (computed_values, diagnostics)
+}
+
+fn collect_computed_cycle_diagnostics(
+    analysis: &IrReactiveCycleAnalysis,
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+) -> Vec<ComponentDiagnostic> {
+    analysis
+        .cycles
+        .iter()
+        .filter_map(|cycle| {
+            let first = cycle.nodes.first()?;
+            let computed = computed_values
+                .values()
+                .find(|computed| computed.id.as_str() == first)?;
+            Some(ComponentDiagnostic {
+                code: "EZC1035".to_string(),
+                message: format!(
+                    "computed dependency cycle detected among: {}",
+                    cycle.nodes.join(", ")
+                ),
+                provenance: Some(computed.provenance.clone()),
+            })
+        })
+        .collect()
+}
+
+fn build_computed_reactive_products(
+    components: &[ComponentNode],
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    references: &[SemanticReference],
+    provenance: &BTreeMap<SemanticId, SourceProvenance>,
+) -> (
+    IrReactiveGraph,
+    IrReactiveTransitiveAnalysis,
+    IrReactiveCycleAnalysis,
+) {
+    let graph = crate::build_reactive_graph(components, computed_values, references, provenance);
+    let transitive_analysis = crate::analyze_reactive_transitive_graph(&graph);
+    let cycle_analysis = crate::analyze_reactive_cycles(&graph);
+    (graph, transitive_analysis, cycle_analysis)
+}
+
+fn extend_template_references(
+    references: &mut Vec<SemanticReference>,
+    components: &[ComponentNode],
+    template_entities: &[TemplateSemanticEntity],
+    ownership: &BTreeMap<SemanticId, SemanticOwner>,
+) {
+    references.extend(build_template_state_references(
+        components,
+        template_entities,
+        ownership,
+    ));
+    references.extend(build_template_event_references(
+        components,
+        template_entities,
+        ownership,
+    ));
+    references.extend(build_template_local_references(
+        components,
+        template_entities,
+        ownership,
+    ));
+}
+
+fn append_computed_cycle_diagnostics(
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+    analysis: &IrReactiveCycleAnalysis,
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+) {
+    diagnostics.extend(collect_computed_cycle_diagnostics(
+        analysis,
+        computed_values,
+    ));
 }
 
 fn computed_call_purity_kind(
@@ -1447,6 +1505,75 @@ class ComputedTransitiveReactiveGraph extends Component {
             vec![label.as_str().to_string()]
         );
         assert_eq!(analysis.dependents_of(label.as_str()), Vec::<String>::new());
+    }
+
+    #[test]
+    fn detects_computed_dependency_cycles_with_stable_diagnostics() {
+        let parsed = ezc_parser::parse_file(
+            "src/ComputedDependencyCycles.tsx",
+            r#"
+@component("x-computed-dependency-cycles")
+class ComputedDependencyCycles extends Component {
+  @computed()
+  get alpha() { return this.beta; }
+
+  @computed()
+  get beta() { return this.alpha; }
+
+  @computed()
+  get selfLoop() { return this.selfLoop; }
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let component = &asm.components[0];
+        let alpha = component.id.computed("alpha");
+        let beta = component.id.computed("beta");
+        let self_loop = component.id.computed("selfLoop");
+
+        assert_eq!(
+            asm.reactive_cycle_analysis.cycles,
+            vec![
+                crate::IrReactiveCycle {
+                    nodes: vec![alpha.as_str().to_string(), beta.as_str().to_string()],
+                },
+                crate::IrReactiveCycle {
+                    nodes: vec![self_loop.as_str().to_string()],
+                },
+            ]
+        );
+        let diagnostics = asm
+            .diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.code == "EZC1035")
+            .collect::<Vec<_>>();
+        assert_eq!(diagnostics.len(), 2);
+        assert_eq!(
+            diagnostics[0].message,
+            format!("computed dependency cycle detected among: {alpha}, {beta}")
+        );
+        assert_eq!(
+            diagnostics[0].provenance,
+            Some(
+                asm.computed_value(&alpha)
+                    .expect("alpha computed value")
+                    .provenance
+                    .clone()
+            )
+        );
+        assert_eq!(
+            diagnostics[1].message,
+            format!("computed dependency cycle detected among: {self_loop}")
+        );
+        assert_eq!(
+            diagnostics[1].provenance,
+            Some(
+                asm.computed_value(&self_loop)
+                    .expect("self-loop computed value")
+                    .provenance
+                    .clone()
+            )
+        );
     }
 
     #[test]

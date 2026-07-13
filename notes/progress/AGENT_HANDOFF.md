@@ -3,28 +3,29 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: E7 - computed transitive dependency analysis
-* Working tree: clean after the E7 commit
+* Latest completed slice: E8 - computed dependency cycle detection
+* Working tree: clean after the E8 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: E7 - computed transitive dependency analysis
-* Summary: Derived deterministic transitive dependency and dependent maps from the canonical direct reactive graph.
+* Slice: E8 - computed dependency cycle detection
+* Summary: Detected canonical strongly connected computed dependency groups and emitted deterministic cycle diagnostics.
 * Key files: crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/intermediate_representation.rs; crates/ezc_core/src/lib.rs
-* New behavior: The ASM now exposes compiler-owned immutable transitive analysis for every reactive node, covering both `Reads` dependency closure and `Invalidates` dependent closure in stable ID order.
-* Fixtures added or changed: focused core coverage for a state -> computed -> computed chain and its full dependency/dependent closures.
+* New behavior: The ASM now exposes immutable computed-cycle analysis from direct `Reads` topology and emits one stable `EZC1035` diagnostic per cycle, provenanced to the cycle's first semantic ID.
+* Fixtures added or changed: focused core coverage for a two-node computed cycle, a self-cycle, deterministic cycle ordering, diagnostic text, and provenance.
 
 Current in-progress slice
 
-* Slice: E7 - computed transitive dependency analysis
+* Slice: E8 - computed dependency cycle detection
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E7
-* Remaining: E8 - detect computed dependency cycles.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E8
+* Remaining: E9 - generate deterministic computed evaluation plans.
 
 Verification
 
 * cargo fmt --all --check: pass
+* cargo test -p ezc_core dependency_cycles: pass
 * cargo test -p ezc_core transitive_reactive: pass
 * cargo test -p ezc_core reactive_graph: pass
 * cargo test -p ezc_core computed: pass
@@ -32,6 +33,10 @@ Verification
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 
 Architecture decisions made
+
+* Decision: Computed cycles are canonical strongly connected components of direct computed `Reads` edges, with node membership and cycle ordering derived in stable semantic-ID order.
+* Reason: Diagnostics and later scheduling can consume one immutable compiler-owned cycle product without treating state invalidation edges, source names, or runtime observation as cycle authority.
+* Tradeoff: E8 reports one `EZC1035` diagnostic per cycle at the first member's provenance. It does not reject or alter graph construction, infer an evaluation order, create update batches, lower computed IR, or add runtime behavior; E9 owns planning.
 
 * Decision: Transitive reactive topology is an immutable ASM analysis with deterministic dependency and dependent adjacency maps for every canonical reactive node.
 * Reason: Later cycle detection, scheduler, runtime, and inspection consumers can query compiler-produced closures without traversing source expressions or rediscovering reactive paths.
@@ -565,14 +570,14 @@ Known limitations
 * Item: Method parameters are compiler-owned identifier declarations with canonical source provenance only. They do not execute, close over values, resolve local/template/action references, or support destructuring, defaults, rest declarations, or semantic type checking.
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
-* Item: The canonical expression graph covers supported state initializer expressions and direct supported computed getter returns. Computed expression nodes and entities have inferred canonical types through resolved state/computed reads; computed values are pure or impure with `EZC1034` purity diagnostics, and compiler-owned direct/transitive reactive topology is available. Cycle diagnostics, scheduling, evaluation, and runtime behavior remain later work.
+* Item: The canonical expression graph covers supported state initializer expressions and direct supported computed getter returns. Computed expression nodes and entities have inferred canonical types through resolved state/computed reads; computed values are pure or impure with `EZC1034` purity diagnostics, compiler-owned direct/transitive reactive topology is available, and computed cycles emit `EZC1035`. Evaluation scheduling, execution, and runtime behavior remain later work.
 * Item: C30 exposes direct ASM type queries only. CLI inspection output, source diagnostics, backend enforcement, resource declaration lowering, and final type diagnostic families remain later Phase C work.
 * Item: Canonical IR functions currently contain only empty entry basic blocks plus structural branch-edge and natural-loop records. Dominator and post-dominator results include only declared conditional edges; there are no source-lowered branches or loops, condition operands, explicit terminators, or statement instructions yet.
 * Item: Source lowering still creates empty function value registries and no method load/store instructions. D3-A can analyze manually constructed canonical IR now; subsequent lowering slices must populate values before source data-flow results become non-empty.
 
 Exact next step
 
-Next is E8: detect computed dependency cycles with deterministic diagnostics. Do not plan evaluation/update batches, lower computed IR, or add runtime behavior.
+Next is E9: generate deterministic evaluation order and update batches using the Phase D scheduler. Do not lower computed IR or add runtime behavior.
 
 Useful commands
 

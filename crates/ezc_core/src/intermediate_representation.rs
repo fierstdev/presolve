@@ -146,6 +146,19 @@ pub struct IrReactiveTransitiveAnalysis {
     pub dependents: BTreeMap<String, Vec<String>>,
 }
 
+/// One strongly connected group of computed reactive nodes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrReactiveCycle {
+    pub nodes: Vec<String>,
+}
+
+/// Immutable computed dependency-cycle analysis derived from a canonical
+/// reactive graph.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct IrReactiveCycleAnalysis {
+    pub cycles: Vec<IrReactiveCycle>,
+}
+
 /// Derive deterministic transitive reactive dependency and dependent maps.
 ///
 /// This analysis preserves direct graph topology and deliberately makes no
@@ -176,6 +189,115 @@ pub fn analyze_reactive_transitive_graph(graph: &IrReactiveGraph) -> IrReactiveT
     IrReactiveTransitiveAnalysis {
         dependencies,
         dependents,
+    }
+}
+
+/// Detect deterministic computed dependency cycles from direct reactive reads.
+#[must_use]
+pub fn analyze_reactive_cycles(graph: &IrReactiveGraph) -> IrReactiveCycleAnalysis {
+    let computed = graph
+        .nodes
+        .iter()
+        .filter(|(_, node)| node.kind == IrReactiveNodeKind::Computed)
+        .map(|(id, _)| id.clone())
+        .collect::<BTreeSet<_>>();
+    let adjacency = computed
+        .iter()
+        .map(|id| {
+            let targets = graph
+                .edges
+                .iter()
+                .filter(|edge| {
+                    edge.source == *id
+                        && edge.kind == IrReactiveEdgeKind::Reads
+                        && computed.contains(&edge.target)
+                })
+                .map(|edge| edge.target.clone())
+                .collect();
+            (id.clone(), targets)
+        })
+        .collect::<BTreeMap<String, BTreeSet<String>>>();
+    let reverse_adjacency = reverse_reactive_adjacency(&adjacency);
+    let mut visited = BTreeSet::new();
+    let mut finish_order = Vec::new();
+    for node in &computed {
+        visit_reactive_node(node, &adjacency, &mut visited, &mut finish_order);
+    }
+
+    let mut cycles = Vec::new();
+    visited.clear();
+    for node in finish_order.into_iter().rev() {
+        if !visited.insert(node.clone()) {
+            continue;
+        }
+        let mut members = BTreeSet::new();
+        collect_reactive_component(&node, &reverse_adjacency, &mut visited, &mut members);
+        let is_self_cycle = members.len() == 1
+            && adjacency
+                .get(&node)
+                .is_some_and(|targets| targets.contains(&node));
+        if members.len() > 1 || is_self_cycle {
+            cycles.push(IrReactiveCycle {
+                nodes: members.into_iter().collect(),
+            });
+        }
+    }
+    cycles.sort_by(|left, right| left.nodes.cmp(&right.nodes));
+
+    IrReactiveCycleAnalysis { cycles }
+}
+
+fn reverse_reactive_adjacency(
+    adjacency: &BTreeMap<String, BTreeSet<String>>,
+) -> BTreeMap<String, BTreeSet<String>> {
+    let mut reversed = adjacency
+        .keys()
+        .cloned()
+        .map(|node| (node, BTreeSet::new()))
+        .collect::<BTreeMap<_, _>>();
+    for (source, targets) in adjacency {
+        for target in targets {
+            reversed
+                .get_mut(target)
+                .expect("computed dependency target should be a reactive node")
+                .insert(source.clone());
+        }
+    }
+    reversed
+}
+
+fn visit_reactive_node(
+    node: &str,
+    adjacency: &BTreeMap<String, BTreeSet<String>>,
+    visited: &mut BTreeSet<String>,
+    finish_order: &mut Vec<String>,
+) {
+    if !visited.insert(node.to_string()) {
+        return;
+    }
+    for target in adjacency
+        .get(node)
+        .expect("computed reactive node should have adjacency")
+    {
+        visit_reactive_node(target, adjacency, visited, finish_order);
+    }
+    finish_order.push(node.to_string());
+}
+
+fn collect_reactive_component(
+    node: &str,
+    adjacency: &BTreeMap<String, BTreeSet<String>>,
+    visited: &mut BTreeSet<String>,
+    members: &mut BTreeSet<String>,
+) {
+    members.insert(node.to_string());
+    for target in adjacency
+        .get(node)
+        .expect("computed reactive node should have reverse adjacency")
+    {
+        if visited.insert(target.clone()) {
+            collect_reactive_component(target, adjacency, visited, members);
+        }
     }
 }
 
