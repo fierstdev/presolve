@@ -67,8 +67,8 @@ pub use component_graph::{
     StateOperation,
 };
 pub use computed_value::{
-    collect_computed_values, ComputedCachePolicy, ComputedPurity, ComputedPurityViolation,
-    ComputedPurityViolationKind, ComputedValue,
+    collect_computed_values, ComputedCachePolicy, ComputedDiagnosticCode, ComputedPurity,
+    ComputedPurityViolation, ComputedPurityViolationKind, ComputedValue,
 };
 pub use explain::{explain_json, explain_text};
 pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};

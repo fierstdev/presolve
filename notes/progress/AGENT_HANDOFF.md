@@ -3,34 +3,37 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: E18 - computed inspection and queries
-* Working tree: clean after the E18 commit
+* Latest completed slice: E19 - computed diagnostics
+* Working tree: clean after the E19 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: E18 - computed inspection and queries
-* Summary: ASM and selected-entity explain inspection now expose canonical computed metadata in schema v2.
-* Key files: crates/ezc_cli/src/main.rs; crates/ezc_cli/tests/explain.rs; README.md
-* New behavior: Computed records expose canonical type, E7 transitive dependencies and dependents, zero-based E9 evaluation positions, E5 purity, E4 serializability, and E10 IR function identity. `asm` and selector-driven `explain` use the same deterministic document and text rendering.
-* Fixtures added or changed: focused CLI regression coverage reuses the existing RuntimeComputed fixture; no fixture-suite expansion.
+* Slice: E19 - computed diagnostics
+* Summary: Computed semantics now emit stable compiler diagnostics from canonical ASM products.
+* Key files: crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/computed_value.rs; README.md
+* New behavior: `EZC1034` through `EZC1040` cover purity violations, dependency cycles, invalid declarations, unsupported bodies, unresolved reads, declared-return type mismatches, and non-serializable results. Every computed diagnostic is deterministic and carries canonical source provenance.
+* Fixtures added or changed: focused core regression coverage uses an inline parser case; E20 fixture-suite expansion remains untouched.
 
 Current in-progress slice
 
-* Slice: E18 - computed inspection and queries
+* Slice: E19 - computed diagnostics
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E18
-* Remaining: E19 - computed diagnostics.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E19
+* Remaining: E20 - computed fixture suite.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_cli asm_and_explain_inspect_canonical_computed_metadata: pass
-* cargo test -p ezc_cli asm_command_emits_deterministic_json_inspection: pass
-* cargo test -p ezc_cli asm_command_inspects_one_semantic_entity: pass
-* cargo clippy -p ezc_cli --all-targets -- -D warnings: pass
+* cargo test -p ezc_core reports_stable_diagnostics_for_computed_semantics: pass
+* cargo test -p ezc_core computed: pass
+* cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 
 Architecture decisions made
+
+* Decision: `ComputedDiagnosticCode` centralizes the stable `EZC1034`--`EZC1040` catalog, while E19 projects invalid declarations, unsupported bodies, unresolved reads, type compatibility, and serialization from existing canonical ASM products.
+* Reason: Diagnostics share the same computed entities, expression graph, purity facts, reactive cycle analysis, and semantic type model used by the rest of the compiler; no runtime observation or CLI-specific analysis determines an error.
+* Tradeoff: E19 reports only behavior already represented by the current parser and semantic products. It does not widen E2 getter-body support, add runtime validation, or create the comprehensive fixture matrix; E20 owns that fixture work.
 
 * Decision: ASM inspection schema v2 adds a computed-only record that projects existing E4/E5/E7/E9/E10 compiler products without reconstructing source facts.
 * Reason: Inspection consumers receive deterministic computed type, transitive topology, schedule placement, purity, boundary compatibility, and IR identity from the same canonical products used by later compiler stages.
@@ -615,7 +618,7 @@ Known limitations
 
 Exact next step
 
-Next is E19: add stable computed diagnostics for invalid declarations, unsupported bodies, unresolved reads, purity violations, type mismatches, dependency cycles, and serialization violations. Do not begin the fixture suite, stability audit, or runtime extensions.
+Next is E20: add the comprehensive computed compiler and browser fixture suite for arithmetic, chains, diamonds, batching, template bindings, cycles, compile-time folding, serialization, and multi-file cases. Do not begin the stability audit or runtime extensions.
 
 Useful commands
 

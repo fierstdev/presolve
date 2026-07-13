@@ -53,6 +53,12 @@ reliable source locations include optional JSON `provenance` using `path`,
 location omit that field. Check policy is currently selected per command; no
 project configuration file is interpreted yet.
 
+Computed diagnostics use stable compiler codes: `EZC1034` purity violations,
+`EZC1035` dependency cycles, `EZC1036` invalid declarations, `EZC1037`
+unsupported bodies, `EZC1038` unresolved reads, `EZC1039` declared-return type
+mismatches, and `EZC1040` non-serializable results. Every computed diagnostic
+is derived from canonical compiler products and includes source provenance.
+
 ## ASM entity inspection
 
 Inspect one canonical semantic entity with its ownership, provenance,

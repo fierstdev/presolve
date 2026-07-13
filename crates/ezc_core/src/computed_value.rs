@@ -16,6 +16,33 @@ pub enum ComputedPurity {
     Impure,
 }
 
+/// Stable compiler diagnostics emitted for computed declarations and values.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ComputedDiagnosticCode {
+    PurityViolation,
+    DependencyCycle,
+    InvalidDeclaration,
+    UnsupportedBody,
+    UnresolvedRead,
+    TypeMismatch,
+    SerializationViolation,
+}
+
+impl ComputedDiagnosticCode {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::PurityViolation => "EZC1034",
+            Self::DependencyCycle => "EZC1035",
+            Self::InvalidDeclaration => "EZC1036",
+            Self::UnsupportedBody => "EZC1037",
+            Self::UnresolvedRead => "EZC1038",
+            Self::TypeMismatch => "EZC1039",
+            Self::SerializationViolation => "EZC1040",
+        }
+    }
+}
+
 /// Unsupported behavior that makes a computed getter impure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ComputedPurityViolationKind {

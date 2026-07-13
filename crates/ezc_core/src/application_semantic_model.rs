@@ -8,8 +8,8 @@ use crate::component_graph::{
     build_component_graph_for_module, render_event_handlers, ComponentAction, ComponentDiagnostic,
     ComponentMethod, ComponentNode, MethodLocalVariable, RenderEventHandler, StateField,
 };
-use crate::computed_value::{collect_computed_values, ComputedValue};
-use crate::expression_graph::{ExpressionGraph, ExpressionNode};
+use crate::computed_value::{collect_computed_values, ComputedDiagnosticCode, ComputedValue};
+use crate::expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 use crate::intermediate_representation::{
     IrComputedEvaluationPlan, IrReactiveCycleAnalysis, IrReactiveGraph,
     IrReactiveTransitiveAnalysis,
@@ -497,17 +497,21 @@ pub fn build_application_semantic_model_from_component_graph(
     let computed_cycle_diagnostics =
         collect_computed_cycle_diagnostics(&reactive_cycle_analysis, &computed_values);
 
-    let semantic_types =
-        SemanticTypeModel::from_components(&component_graph.components, &provenance)
-            .with_expression_types(&expression_graph, &component_graph.components)
-            .with_computed_value_types(
-                &component_graph.components,
-                &computed_values,
-                &expression_graph,
-                &references,
-            )
-            .with_template_binding_types(&template_entities, &references)
-            .normalized();
+    let semantic_types = finalize_semantic_types(
+        SemanticTypeModel::from_components(&component_graph.components, &provenance),
+        &component_graph.components,
+        &computed_values,
+        &expression_graph,
+        &references,
+        &template_entities,
+    );
+    let computed_semantic_diagnostics = collect_computed_semantic_diagnostics(
+        &component_graph.components,
+        &computed_values,
+        &expression_graph,
+        &semantic_types,
+        &provenance,
+    );
 
     ApplicationSemanticModel {
         expression_graph,
@@ -526,6 +530,7 @@ pub fn build_application_semantic_model_from_component_graph(
             .cloned()
             .chain(computed_diagnostics)
             .chain(computed_cycle_diagnostics)
+            .chain(computed_semantic_diagnostics)
             .collect(),
         ownership,
         references,
@@ -551,13 +556,10 @@ fn build_application_semantic_model_from_files_with_bindings(
     files: &[ParsedFile],
     bindings: Option<&crate::BindingTable>,
 ) -> ApplicationSemanticModel {
-    let mut components = Vec::new();
-    let mut templates = Vec::new();
-    let mut diagnostics = Vec::new();
-    let mut references = Vec::new();
-    let mut provenance = BTreeMap::new();
-    let mut template_entities = Vec::new();
-    let mut type_aliases = Vec::new();
+    let (mut components, mut templates, mut diagnostics, mut references) =
+        (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    let (mut provenance, mut template_entities, mut type_aliases) =
+        (BTreeMap::new(), Vec::new(), Vec::new());
 
     for parsed in files {
         let component_graph = build_component_graph_for_module(parsed);
@@ -622,21 +624,26 @@ fn build_application_semantic_model_from_files_with_bindings(
     ) = build_computed_reactive_products(&components, &computed_values, &references, &provenance);
     append_computed_cycle_diagnostics(&mut diagnostics, &reactive_cycle_analysis, &computed_values);
 
-    let semantic_types = SemanticTypeModel::from_components_with_aliases_and_bindings(
-        &components,
-        &provenance,
-        &type_aliases,
-        bindings,
-    )
-    .with_expression_types(&expression_graph, &components)
-    .with_computed_value_types(
+    let semantic_types = finalize_semantic_types(
+        SemanticTypeModel::from_components_with_aliases_and_bindings(
+            &components,
+            &provenance,
+            &type_aliases,
+            bindings,
+        ),
         &components,
         &computed_values,
         &expression_graph,
         &references,
-    )
-    .with_template_binding_types(&template_entities, &references)
-    .normalized();
+        &template_entities,
+    );
+    diagnostics.extend(collect_computed_semantic_diagnostics(
+        &components,
+        &computed_values,
+        &expression_graph,
+        &semantic_types,
+        &provenance,
+    ));
 
     ApplicationSemanticModel {
         expression_graph,
@@ -654,6 +661,21 @@ fn build_application_semantic_model_from_files_with_bindings(
         references,
         provenance,
     }
+}
+
+fn finalize_semantic_types(
+    semantic_types: SemanticTypeModel,
+    components: &[ComponentNode],
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    expression_graph: &ExpressionGraph,
+    references: &[SemanticReference],
+    template_entities: &[TemplateSemanticEntity],
+) -> SemanticTypeModel {
+    semantic_types
+        .with_expression_types(expression_graph, components)
+        .with_computed_value_types(components, computed_values, expression_graph, references)
+        .with_template_binding_types(template_entities, references)
+        .normalized()
 }
 
 fn classify_computed_values(
@@ -756,7 +778,7 @@ fn classify_computed_values(
         computed.purity_violations = violations;
         diagnostics.extend(computed.purity_violations.iter().map(|violation| {
             ComponentDiagnostic {
-                code: "EZC1034".to_string(),
+                code: ComputedDiagnosticCode::PurityViolation.as_str().to_string(),
                 message: format!(
                     "computed getter `{}` is impure: {}",
                     computed.name,
@@ -783,7 +805,7 @@ fn collect_computed_cycle_diagnostics(
                 .values()
                 .find(|computed| computed.id.as_str() == first)?;
             Some(ComponentDiagnostic {
-                code: "EZC1035".to_string(),
+                code: ComputedDiagnosticCode::DependencyCycle.as_str().to_string(),
                 message: format!(
                     "computed dependency cycle detected among: {}",
                     cycle.nodes.join(", ")
@@ -792,6 +814,201 @@ fn collect_computed_cycle_diagnostics(
             })
         })
         .collect()
+}
+
+fn collect_computed_semantic_diagnostics(
+    components: &[ComponentNode],
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    expression_graph: &ExpressionGraph,
+    semantic_types: &SemanticTypeModel,
+    provenance: &BTreeMap<SemanticId, SourceProvenance>,
+) -> Vec<ComponentDiagnostic> {
+    let mut diagnostics = collect_invalid_computed_declaration_diagnostics(components, provenance);
+    diagnostics.extend(collect_computed_body_and_read_diagnostics(
+        components,
+        computed_values,
+        expression_graph,
+    ));
+    diagnostics.extend(collect_computed_type_diagnostics(
+        computed_values,
+        semantic_types,
+    ));
+    sort_computed_diagnostics(&mut diagnostics);
+    diagnostics
+}
+
+fn collect_invalid_computed_declaration_diagnostics(
+    components: &[ComponentNode],
+    provenance: &BTreeMap<SemanticId, SourceProvenance>,
+) -> Vec<ComponentDiagnostic> {
+    components
+        .iter()
+        .flat_map(|component| &component.methods)
+        .filter(|method| {
+            method
+                .decorators
+                .iter()
+                .any(|decorator| decorator == "computed")
+                && !method.is_getter
+        })
+        .map(|method| ComponentDiagnostic {
+            code: ComputedDiagnosticCode::InvalidDeclaration
+                .as_str()
+                .to_string(),
+            message: format!(
+                "@computed() declaration `{}` must decorate a getter",
+                method.name
+            ),
+            provenance: Some(
+                provenance
+                    .get(&method.id)
+                    .expect("component methods should have canonical provenance")
+                    .clone(),
+            ),
+        })
+        .collect()
+}
+
+fn collect_computed_body_and_read_diagnostics(
+    components: &[ComponentNode],
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    expression_graph: &ExpressionGraph,
+) -> Vec<ComponentDiagnostic> {
+    let mut diagnostics = Vec::new();
+
+    for computed in computed_values.values() {
+        let component_id = computed
+            .owner
+            .entity_id()
+            .expect("computed values should have component owners");
+        let component = components
+            .iter()
+            .find(|component| component.id == *component_id)
+            .expect("computed values should have owning components");
+        let method = component
+            .methods
+            .iter()
+            .find(|method| method.id == computed.method)
+            .expect("computed values should have authored methods");
+
+        if method.computed_expression.is_none() {
+            diagnostics.push(ComponentDiagnostic {
+                code: ComputedDiagnosticCode::UnsupportedBody.as_str().to_string(),
+                message: format!(
+                    "computed getter `{}` has an unsupported body",
+                    computed.name
+                ),
+                provenance: Some(computed.provenance.clone()),
+            });
+        }
+
+        diagnostics.extend(
+            expression_graph
+                .nodes_for(&computed.id)
+                .into_iter()
+                .filter_map(|node| {
+                    unresolved_computed_read_diagnostic(component, computed_values, computed, node)
+                }),
+        );
+    }
+
+    diagnostics
+}
+
+fn unresolved_computed_read_diagnostic(
+    component: &ComponentNode,
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    computed: &ComputedValue,
+    node: &ExpressionNode,
+) -> Option<ComponentDiagnostic> {
+    let ExpressionNodeKind::ThisMember { name } = &node.kind else {
+        return None;
+    };
+    let resolved = component
+        .state_fields
+        .iter()
+        .any(|field| field.name == *name)
+        || computed_values.contains_key(&component.id.computed(name));
+    (!resolved).then(|| ComponentDiagnostic {
+        code: ComputedDiagnosticCode::UnresolvedRead.as_str().to_string(),
+        message: format!(
+            "computed getter `{}` reads unresolved member `this.{name}`",
+            computed.name
+        ),
+        provenance: Some(node.provenance.clone()),
+    })
+}
+
+fn collect_computed_type_diagnostics(
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    semantic_types: &SemanticTypeModel,
+) -> Vec<ComponentDiagnostic> {
+    let mut diagnostics = Vec::new();
+
+    for computed_type in semantic_types.computed_values.values() {
+        let computed = computed_values
+            .get(&computed_type.computed)
+            .expect("computed type records should have computed entities");
+        if computed_type.declared_return_compatible == Some(false) {
+            let declared = computed_type
+                .declared_return_type
+                .as_ref()
+                .expect("incompatible computed return types should be declared");
+            diagnostics.push(ComponentDiagnostic {
+                code: ComputedDiagnosticCode::TypeMismatch.as_str().to_string(),
+                message: format!(
+                    "computed getter `{}` returns `{}` but declares `{}`",
+                    computed.name,
+                    crate::semantic_type_text(&computed_type.semantic_type),
+                    crate::semantic_type_text(declared)
+                ),
+                provenance: Some(computed_type.provenance.clone()),
+            });
+        }
+        if computed_type.serialization == crate::SerializationCompatibility::NotSerializable {
+            diagnostics.push(ComponentDiagnostic {
+                code: ComputedDiagnosticCode::SerializationViolation
+                    .as_str()
+                    .to_string(),
+                message: format!(
+                    "computed getter `{}` has a non-serializable result",
+                    computed.name
+                ),
+                provenance: Some(computed_type.provenance.clone()),
+            });
+        }
+    }
+
+    diagnostics
+}
+
+fn sort_computed_diagnostics(diagnostics: &mut [ComponentDiagnostic]) {
+    diagnostics.sort_by(|left, right| {
+        (
+            left.code.as_str(),
+            left.provenance.as_ref().map(|provenance| &provenance.path),
+            left.provenance
+                .as_ref()
+                .map(|provenance| provenance.span.start),
+            left.provenance
+                .as_ref()
+                .map(|provenance| provenance.span.end),
+            left.message.as_str(),
+        )
+            .cmp(&(
+                right.code.as_str(),
+                right.provenance.as_ref().map(|provenance| &provenance.path),
+                right
+                    .provenance
+                    .as_ref()
+                    .map(|provenance| provenance.span.start),
+                right
+                    .provenance
+                    .as_ref()
+                    .map(|provenance| provenance.span.end),
+                right.message.as_str(),
+            ))
+    });
 }
 
 fn build_computed_reactive_products(
@@ -1785,6 +2002,101 @@ class ComputedTypes extends Component {
             asm.serialization_compatibility_of(&chained),
             Some(crate::SerializationCompatibility::Serializable)
         );
+    }
+
+    #[test]
+    fn reports_stable_diagnostics_for_computed_semantics() {
+        let parsed = ezc_parser::parse_file(
+            "src/ComputedDiagnostics.tsx",
+            r#"
+@component("x-computed-diagnostics")
+class ComputedDiagnostics extends Component {
+  count = state(1);
+
+  @computed()
+  invalidDeclaration() { return 1; }
+
+  @computed()
+  get unsupportedBody() {
+    const value = this.count;
+    return value;
+  }
+
+  @computed()
+  get unresolvedRead() { return this.missing; }
+
+  @computed()
+  get mismatch(): number { return "wrong"; }
+
+  @computed()
+  get impure() { return helper(); }
+
+  @computed()
+  get cycleA() { return this.cycleB; }
+
+  @computed()
+  get cycleB() { return this.cycleA; }
+
+  render() { return <div />; }
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        let repeated = build_application_semantic_model(&parsed);
+        assert_eq!(asm.diagnostics, repeated.diagnostics);
+
+        let component_graph = crate::build_component_graph(&parsed);
+        let asm_from_component_graph =
+            super::build_application_semantic_model_from_component_graph(&component_graph);
+
+        let codes = asm
+            .diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.code.as_str())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            codes,
+            std::collections::BTreeSet::from([
+                "EZC1034", "EZC1035", "EZC1036", "EZC1037", "EZC1038", "EZC1039", "EZC1040",
+            ])
+        );
+        assert_eq!(
+            asm_from_component_graph
+                .diagnostics
+                .iter()
+                .map(|diagnostic| diagnostic.code.as_str())
+                .collect::<std::collections::BTreeSet<_>>(),
+            codes
+        );
+        assert!(asm
+            .diagnostics
+            .iter()
+            .all(|diagnostic| diagnostic.provenance.is_some()));
+        assert!(asm.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == crate::ComputedDiagnosticCode::InvalidDeclaration.as_str()
+                && diagnostic.message
+                    == "@computed() declaration `invalidDeclaration` must decorate a getter"
+        }));
+        assert!(asm.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == crate::ComputedDiagnosticCode::UnsupportedBody.as_str()
+                && diagnostic.message == "computed getter `unsupportedBody` has an unsupported body"
+        }));
+        assert!(asm.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == crate::ComputedDiagnosticCode::UnresolvedRead.as_str()
+                && diagnostic.message
+                    == "computed getter `unresolvedRead` reads unresolved member `this.missing`"
+        }));
+        assert!(asm.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == crate::ComputedDiagnosticCode::TypeMismatch.as_str()
+                && diagnostic.message
+                    == "computed getter `mismatch` returns `\"wrong\"` but declares `number`"
+        }));
+        assert!(asm.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == crate::ComputedDiagnosticCode::SerializationViolation.as_str()
+                && diagnostic.message
+                    == "computed getter `unresolvedRead` has a non-serializable result"
+        }));
     }
 
     #[test]
