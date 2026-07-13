@@ -345,7 +345,7 @@ fn computed_programs(
         .collect()
 }
 
-fn runtime_instruction(
+pub(crate) fn runtime_instruction(
     instruction: &crate::IrInstruction,
 ) -> Option<RuntimeComputedArtifactInstruction> {
     let result = instruction.result.as_ref()?.as_str().to_string();

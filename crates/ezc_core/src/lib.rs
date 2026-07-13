@@ -33,6 +33,7 @@ pub mod runtime_codegen;
 pub mod runtime_computed;
 pub mod runtime_computed_artifact;
 pub mod runtime_effect;
+pub mod runtime_effect_artifact;
 pub mod semantic_graph;
 pub mod semantic_id;
 pub mod semantic_provenance;
@@ -140,6 +141,15 @@ pub use runtime_computed_artifact::{
 pub use runtime_effect::{
     build_runtime_effect_registry, RuntimeActionBatchEffectTrigger, RuntimeEffectRecord,
     RuntimeEffectRegistry, RuntimeInitialEffectTrigger,
+};
+pub use runtime_effect_artifact::{
+    build_runtime_effect_artifact, runtime_effect_artifact_json, RuntimeEffectArtifact,
+    RuntimeEffectArtifactActionTrigger, RuntimeEffectArtifactCapabilityInstructionKind,
+    RuntimeEffectArtifactCapabilityOperation, RuntimeEffectArtifactEffect,
+    RuntimeEffectArtifactExecutionBoundary, RuntimeEffectArtifactExecutionPolicy,
+    RuntimeEffectArtifactInitialTrigger, RuntimeEffectArtifactInstruction,
+    RuntimeEffectArtifactPrerequisiteBatch, RuntimeEffectArtifactProgram,
+    RuntimeEffectArtifactRenderBoundary, RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION,
 };
 pub use semantic_graph::{
     build_semantic_graph, semantic_graph_json, SemanticGraph, SemanticGraphEdge,

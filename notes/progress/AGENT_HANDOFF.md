@@ -3,29 +3,29 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: F12 - runtime effect registry
-* Working tree: clean after the F12 commit
+* Latest completed slice: F13 - runtime effect artifact
+* Working tree: clean after the F13 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: F12 - runtime effect registry
-* Summary: F10/F11-lowered effects now receive deterministic compiler-owned runtime records containing their execution function, compiler timing policy, initial and completed-action trigger metadata, required computed prerequisites, capability IDs, client boundary, and provenance.
-* Key files: crates/ezc_core/src/runtime_effect.rs; crates/ezc_core/src/lib.rs
-* New behavior: Registry membership is anchored exclusively to canonical `IrEffectExecution` records. Each record projects F8 matched-state evidence and F9 scheduled prerequisite batches per effect, retains F10 capability operation order, and excludes invalid or unlowered effects without reading effect source or executing anything.
-* Fixtures added or changed: Core coverage proves deterministic semantic-ID registry ordering, F11-optimized IR consumption, initial render metadata, action-batch membership/evidence, per-effect computed prerequisite filtering, capability identities, provenance/boundary retention, and invalid-effect exclusion. No runtime fixture is needed because F12 adds metadata only.
+* Slice: F13 - runtime effect artifact
+* Summary: The compiler now emits a deterministic schema-v1 effect artifact from F12 records and F10/F11 IR, containing explicit trigger metadata, stable capability operation/lowering IDs, and ordered executable programs.
+* Key files: crates/ezc_core/src/runtime_effect_artifact.rs; crates/ezc_core/src/runtime_computed_artifact.rs; crates/ezc_core/src/lib.rs
+* New behavior: Effect operands reuse the existing computed-artifact instruction encoding. F10 `CapabilityCall` and `CapabilityAssign` become explicit ordered artifact roots with the F4 operation ID and corresponding registry runtime-lowering ID; F8/F9/F12 trigger details serialize as canonical semantic IDs only.
+* Fixtures added or changed: Core coverage proves F11-optimized IR consumption, initial/action trigger serialization, stable capability program ordering and lowerings, invalid-effect exclusion, deterministic JSON, and absence of source-path/provenance fields from emitted programs. No runtime fixture is needed because F13 emits but does not execute the artifact.
 
 Current in-progress slice
 
-* Slice: F13 - runtime effect artifact
-* Status: Ready after F12 commit
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F12
-* Remaining: F13 through F20. F13 must emit a versioned compiler-generated artifact from F9 plans, F10/F11 IR, and F12 records without source-path matching or execution.
+* Slice: F14 - initial effect runtime execution
+* Status: Ready after F13 commit
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F13
+* Remaining: F14 through F20. F14 must consume the F13 artifact and execute each initial effect once after initial rendering, without action-batch execution or runtime discovery.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core --lib: pass (162 tests)
+* cargo test -p ezc_core --lib: pass (163 tests)
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 
 Architecture decisions made
@@ -85,6 +85,10 @@ Architecture decisions made
 * Decision: F12 keys runtime effect records exclusively by canonical `IrEffectExecution` membership, then projects F8 trigger evidence and F9 scheduled prerequisite data into each effect record.
 * Reason: F10 lowering is the authoritative executable-membership boundary. Intersecting existing F7 computed dependencies with F9's already-selected scheduled prerequisites yields record-local prerequisite metadata without rereading bodies, rebuilding dependency closures, or assigning scheduler positions.
 * Tradeoff: An unplanned or invalid effect has no runtime record even if earlier semantic products mention it. F12 is metadata only: it does not produce a serialized artifact, interpret IR, dispatch capabilities, run initial or action-batch effects, compare values, or introduce runtime dependency discovery; F13 owns the artifact.
+
+* Decision: F13 emits schema-v1 effect programs by reusing the existing computed-artifact encoding for pure IR instructions and adding only explicit F10 capability instruction roots.
+* Reason: A shared operand/value instruction encoding keeps F10/F11 IR lowering canonical across computed and effect artifacts. Capability operation IDs resolve to runtime-lowering IDs only through the immutable F4 registry, so no emitted field or runtime path matcher depends on authored static member paths.
+* Tradeoff: The artifact carries canonical IDs and executable programs, not source provenance or raw paths. F13 emits no page integration or execution behavior, does not recompute F8/F9 products, and does not perform runtime discovery; F14 owns one-time initial execution.
 
 * Decision needed before F8: define the canonical identity for a completed action batch when one authored action method lowers to multiple `ComponentAction` state-write records.
 * Reason: Effects run once per completed action batch, but existing component actions are individual state operations. F8 must either map effects to method/batch identity and deduplicate changed dependencies there, or map effects to individual writes and require F9/runtime layers to reconstruct the batch. The choice determines trigger metadata, F9 ordering, F12 registry identity, and F15 batching behavior.
