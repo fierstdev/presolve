@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use crate::{
     BindingTable, CapabilityOperationId, CapabilityOperationKind, CapabilityParameters,
     CapabilityValueContract, ComponentNode, ComputedValue, ContextEntity, Effect, EffectStatement,
-    EffectStatementKind, ExpressionGraph, ExpressionNodeKind, ImportBindingTarget, SemanticId,
-    SerializableValue, SourceProvenance, SymbolKind, EFFECT_CAPABILITY_REGISTRY,
+    EffectStatementKind, ExpressionGraph, ExpressionNodeKind, ImportBindingTarget, ProviderEntity,
+    SemanticId, SerializableValue, SourceProvenance, SymbolKind, EFFECT_CAPABILITY_REGISTRY,
 };
 use crate::{
     SemanticReference, SemanticReferenceKind, TemplateSemanticEntity, TemplateSemanticKind,
@@ -684,6 +684,44 @@ impl SemanticTypeModel {
                     origin: subject,
                     status: SemanticTypeStatus::Declared,
                     provenance: context.provenance.clone(),
+                },
+            );
+        }
+        self
+    }
+
+    /// Attaches explicit G2 Provider declaration contracts without deciding
+    /// provider-value or Context compatibility.
+    #[must_use]
+    pub fn with_provider_types(
+        mut self,
+        providers: &BTreeMap<crate::ProviderId, ProviderEntity>,
+    ) -> Self {
+        for provider in providers.values() {
+            let semantic_type = self
+                .aliases
+                .values()
+                .find(|alias| {
+                    alias.provenance.path == provider.declared_type.provenance.path
+                        && alias.name == provider.declared_type.text
+                })
+                .map_or_else(
+                    || {
+                        semantic_type_from_annotation(&provider.declared_type.text)
+                            .unwrap_or(SemanticType::Unknown)
+                    },
+                    |alias| alias.semantic_type.clone(),
+                );
+            let subject = provider.id.as_semantic_id().clone();
+            self.assignments.insert(
+                subject.clone(),
+                SemanticTypeAssignment {
+                    id: provider.declared_type_id.clone(),
+                    subject: subject.clone(),
+                    semantic_type,
+                    origin: subject,
+                    status: SemanticTypeStatus::Declared,
+                    provenance: provider.provenance.clone(),
                 },
             );
         }

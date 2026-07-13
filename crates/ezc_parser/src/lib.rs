@@ -12,8 +12,8 @@ pub use model::{
     ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional, ParsedJsxElement,
     ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLocalVariable, ParsedLogicalOperator,
     ParsedMethod, ParsedMethodCall, ParsedMethodParameter, ParsedProperty, ParsedSerializableValue,
-    ParsedStateOperation, ParsedStateUpdate, ParsedTypeAlias, ParsedTypeAnnotation,
-    ParsedUnaryOperator, ParsedUnsupportedEffectStatementKind, SourceSpan,
+    ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator, ParsedTypeAlias,
+    ParsedTypeAnnotation, ParsedUnaryOperator, ParsedUnsupportedEffectStatementKind, SourceSpan,
 };
 pub use oxc_adapter::parse_file;
 
@@ -41,6 +41,29 @@ class AppShell extends Component {
         assert!(!property.is_static);
         assert_eq!(property.span.start, source.find("@context()").unwrap());
         assert!(property.span.end > property.initializer_span.unwrap().end);
+    }
+
+    #[test]
+    fn retains_static_member_provider_designators_and_value_expressions() {
+        let parsed = parse_file(
+            "src/AppShell.tsx",
+            r#"
+@component("x-app-shell")
+class AppShell extends Component {
+  @provide(AppShell.theme)
+  providedTheme: string = this.theme ?? "light";
+}
+"#,
+        );
+        let property = &parsed.classes[0].properties[0];
+        let decorator = &property.decorators[0];
+        let designator = decorator.static_member_argument.as_ref().unwrap();
+
+        assert_eq!(decorator.name, "provide");
+        assert_eq!(decorator.argument_count, 1);
+        assert_eq!(designator.object, "AppShell");
+        assert_eq!(designator.member, "theme");
+        assert!(property.initializer_expression.is_some());
     }
 
     #[test]

@@ -16,7 +16,8 @@ use ezc_parser::{
     ParsedEventHandler, ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild,
     ParsedJsxConditional, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLogicalOperator,
     ParsedMethod, ParsedMethodCall, ParsedSerializableValue, ParsedStateOperation,
-    ParsedUnaryOperator, ParsedUnsupportedEffectStatementKind, SourceSpan,
+    ParsedStaticMemberDesignator, ParsedUnaryOperator, ParsedUnsupportedEffectStatementKind,
+    SourceSpan,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,6 +37,7 @@ pub struct ComponentNode {
     pub route_path: Option<String>,
     pub state_fields: Vec<StateField>,
     pub context_declarations: Vec<ContextDeclaration>,
+    pub provider_declarations: Vec<ProviderDeclaration>,
     pub methods: Vec<ComponentMethod>,
     pub actions: Vec<ComponentAction>,
     pub render: Option<RenderModel>,
@@ -62,6 +64,29 @@ pub struct ContextDeclaration {
     pub name: String,
     pub declared_type: DeclaredStateType,
     pub default_expression: Option<ConstantExpression>,
+    pub decorator_provenance: SourceProvenance,
+    pub name_provenance: SourceProvenance,
+    pub provenance: SourceProvenance,
+}
+
+/// A compiler-retained, compile-time-only Context designator.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContextDesignator {
+    pub component_symbol: String,
+    pub context_member: String,
+    pub provenance: SourceProvenance,
+    pub component_provenance: SourceProvenance,
+    pub member_provenance: SourceProvenance,
+}
+
+/// Authored source facts for one valid G2 `@provide()` component field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderDeclaration {
+    pub authored_field: SemanticId,
+    pub name: String,
+    pub context_designator: ContextDesignator,
+    pub declared_type: DeclaredStateType,
+    pub value_expression: ComputedExpression,
     pub decorator_provenance: SourceProvenance,
     pub name_provenance: SourceProvenance,
     pub provenance: SourceProvenance,
@@ -894,6 +919,7 @@ fn build_component_node(
 
     let state_fields = state_fields_from_class(class, path, &id);
     let context_declarations = context_declarations_from_class(class, path, &id);
+    let provider_declarations = provider_declarations_from_class(class, path, &id);
 
     let methods = class
         .methods
@@ -953,6 +979,7 @@ fn build_component_node(
         route_path,
         state_fields,
         context_declarations,
+        provider_declarations,
         methods,
         actions,
         render,
@@ -1076,7 +1103,7 @@ fn state_fields_from_class(class: &ParsedClass, path: &Path, id: &SemanticId) ->
                 && !property
                     .decorators
                     .iter()
-                    .any(|decorator| decorator.name == "context")
+                    .any(|decorator| matches!(decorator.name.as_str(), "context" | "provide"))
         })
         .map(|property| {
             let initial_expression = property
@@ -1123,6 +1150,10 @@ fn context_declarations_from_class(
 
             (decorator.argument_count == 0
                 && !property.is_static
+                && !property
+                    .decorators
+                    .iter()
+                    .any(|decorator| decorator.name == "provide")
                 && property
                     .initializer
                     .as_ref()
@@ -1151,6 +1182,60 @@ fn context_declarations_from_class(
             })
         })
         .collect()
+}
+
+fn provider_declarations_from_class(
+    class: &ParsedClass,
+    path: &Path,
+    id: &SemanticId,
+) -> Vec<ProviderDeclaration> {
+    class
+        .properties
+        .iter()
+        .filter_map(|property| {
+            let decorator = property
+                .decorators
+                .iter()
+                .find(|decorator| decorator.name == "provide")?;
+            let designator = decorator.static_member_argument.as_ref()?;
+            let declared_type = property.type_annotation.as_ref()?;
+            let value_expression = property.initializer_expression.as_ref()?;
+
+            (decorator.argument_count == 1
+                && !property.is_static
+                && !property
+                    .decorators
+                    .iter()
+                    .any(|decorator| decorator.name == "context"))
+            .then(|| ProviderDeclaration {
+                authored_field: id.provider_field(&property.name),
+                name: property.name.clone(),
+                context_designator: context_designator_from_parsed(designator, path),
+                declared_type: DeclaredStateType {
+                    kind: declared_state_type_kind(&declared_type.text),
+                    text: declared_type.text.clone(),
+                    provenance: SourceProvenance::new(path, declared_type.span),
+                },
+                value_expression: computed_expression_from_parsed(value_expression),
+                decorator_provenance: SourceProvenance::new(path, decorator.span),
+                name_provenance: SourceProvenance::new(path, property.name_span),
+                provenance: SourceProvenance::new(path, property.span),
+            })
+        })
+        .collect()
+}
+
+fn context_designator_from_parsed(
+    designator: &ParsedStaticMemberDesignator,
+    path: &Path,
+) -> ContextDesignator {
+    ContextDesignator {
+        component_symbol: designator.object.clone(),
+        context_member: designator.member.clone(),
+        provenance: SourceProvenance::new(path, designator.span),
+        component_provenance: SourceProvenance::new(path, designator.object_span),
+        member_provenance: SourceProvenance::new(path, designator.member_span),
+    }
 }
 
 fn arithmetic_expression_from_parsed(

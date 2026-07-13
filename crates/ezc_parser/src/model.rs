@@ -69,7 +69,18 @@ pub struct ParsedDecorator {
     pub name: String,
     pub argument: Option<String>,
     pub argument_count: usize,
+    pub static_member_argument: Option<ParsedStaticMemberDesignator>,
     pub span: SourceSpan,
+}
+
+/// A source-faithful `ComponentSymbol.contextField` decorator argument.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedStaticMemberDesignator {
+    pub object: String,
+    pub member: String,
+    pub span: SourceSpan,
+    pub object_span: SourceSpan,
+    pub member_span: SourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -78,6 +89,7 @@ pub struct ParsedProperty {
     pub decorators: Vec<ParsedDecorator>,
     pub initializer: Option<String>,
     pub initializer_literal: Option<ParsedSerializableValue>,
+    pub initializer_expression: Option<ParsedComputedExpression>,
     pub initializer_span: Option<SourceSpan>,
     pub state_initial_value: Option<ParsedSerializableValue>,
     pub state_initial_expression: Option<ParsedConstantExpression>,

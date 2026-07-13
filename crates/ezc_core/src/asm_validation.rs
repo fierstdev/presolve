@@ -80,6 +80,7 @@ pub fn validate_application_semantic_model(
 
     validate_semantic_types(model, &mut diagnostics);
     validate_contexts(model, &mut diagnostics);
+    validate_providers(model, &mut diagnostics);
     validate_effect_statement_types(model, &mut diagnostics);
     validate_effect_execution_plan(model, &mut diagnostics);
     validate_component_diagnostic_metadata(model, &mut diagnostics);
@@ -168,6 +169,123 @@ fn validate_contexts(
             diagnostics.push(AsmValidationDiagnostic {
                 code: "EZASM1143".to_string(),
                 message: format!("context `{}` has an invalid default expression", context.id),
+            });
+        }
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+fn validate_providers(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    for provider in model.providers.values() {
+        let Some(component_id) = provider.owner.entity_id() else {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1144".to_string(),
+                message: format!("provider `{}` is not component-owned", provider.id),
+            });
+            continue;
+        };
+        let Some(component) = model.component(component_id) else {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1145".to_string(),
+                message: format!("provider `{}` has a missing component owner", provider.id),
+            });
+            continue;
+        };
+        if provider.id != crate::ProviderId::for_component(component_id, &provider.name) {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1146".to_string(),
+                message: format!("provider `{}` has a non-canonical identity", provider.id),
+            });
+        }
+        if provider.authored_field != component.id.provider_field(&provider.name) {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1147".to_string(),
+                message: format!(
+                    "provider `{}` has a non-canonical authored field",
+                    provider.id
+                ),
+            });
+        }
+        let context = model.context(&provider.context);
+        if context.is_none() {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1148".to_string(),
+                message: format!("provider `{}` targets a missing Context", provider.id),
+            });
+        }
+        if context.is_some_and(|context| {
+            context.name != provider.context_designator.context_member
+                || context
+                    .owner
+                    .entity_id()
+                    .and_then(|owner| model.component(owner))
+                    .is_none_or(|owner| {
+                        owner.class_name != provider.context_designator.component_symbol
+                    })
+        }) {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1149".to_string(),
+                message: format!(
+                    "provider `{}` has a mismatched Context designator",
+                    provider.id
+                ),
+            });
+        }
+        if provider.declared_type.text.is_empty() {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1150".to_string(),
+                message: format!(
+                    "provider `{}` is missing an explicit declared type",
+                    provider.id
+                ),
+            });
+        }
+        if model.expression_root(provider.id.as_semantic_id()) != Some(&provider.value_expression) {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1151".to_string(),
+                message: format!("provider `{}` has an invalid value expression", provider.id),
+            });
+        }
+        if provider.execution_boundary != crate::ExecutionBoundary::Client {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1152".to_string(),
+                message: format!(
+                    "provider `{}` has a non-client execution boundary",
+                    provider.id
+                ),
+            });
+        }
+        if component
+            .state_fields
+            .iter()
+            .any(|field| field.name == provider.name)
+            || component
+                .context_declarations
+                .iter()
+                .any(|context| context.name == provider.name)
+        {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1153".to_string(),
+                message: format!(
+                    "provider `{}` has a conflicting semantic primitive",
+                    provider.id
+                ),
+            });
+        }
+        let declaration = component
+            .provider_declarations
+            .iter()
+            .find(|declaration| declaration.authored_field == provider.authored_field);
+        if declaration.is_none_or(|declaration| declaration.provenance != provider.provenance) {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1154".to_string(),
+                message: format!(
+                    "provider `{}` has non-canonical field provenance",
+                    provider.id
+                ),
             });
         }
     }

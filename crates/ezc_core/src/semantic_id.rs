@@ -38,6 +38,11 @@ pub struct EffectStatementId(SemanticId);
 #[serde(transparent)]
 pub struct ContextId(SemanticId);
 
+/// Stable identity for one compiler-owned Context Provider semantic entity.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ProviderId(SemanticId);
+
 /// Direct owner of a semantic entity within one compiled application.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SemanticOwner {
@@ -115,6 +120,16 @@ impl SemanticId {
     #[must_use]
     pub fn context_field(&self, name: &str) -> Self {
         self.child("context-field", name)
+    }
+
+    #[must_use]
+    pub fn provider(&self, name: &str) -> Self {
+        self.child("provider", name)
+    }
+
+    #[must_use]
+    pub fn provider_field(&self, name: &str) -> Self {
+        self.child("provider-field", name)
     }
 
     #[must_use]
@@ -223,6 +238,23 @@ impl ContextId {
     }
 }
 
+impl ProviderId {
+    #[must_use]
+    pub fn for_component(component: &SemanticId, name: &str) -> Self {
+        Self(component.provider(name))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 fn normalized_module_path(path: &Path) -> String {
     let mut segments = Vec::new();
     let absolute = path.is_absolute();
@@ -273,9 +305,15 @@ impl fmt::Display for ContextId {
     }
 }
 
+impl fmt::Display for ProviderId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{ContextId, SemanticId, SemanticOwner};
+    use super::{ContextId, ProviderId, SemanticId, SemanticOwner};
 
     #[test]
     fn derives_component_scoped_ids() {
@@ -301,6 +339,10 @@ mod tests {
         assert_eq!(
             ContextId::for_component(&component, "theme").as_str(),
             "component:x-counter/context:theme"
+        );
+        assert_eq!(
+            ProviderId::for_component(&component, "providedTheme").as_str(),
+            "component:x-counter/provider:providedTheme"
         );
         assert_eq!(
             component.effect_activation_slot("syncTitle").as_str(),

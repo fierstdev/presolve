@@ -113,6 +113,16 @@ impl ExpressionGraph {
                 );
                 graph.roots.insert(context_id, root);
             }
+            for provider in &component.provider_declarations {
+                let provider_id = component.id.provider(&provider.name);
+                let root = graph.insert_computed_expression(
+                    &provider_id,
+                    "value",
+                    &provider.value_expression,
+                    &provider.provenance,
+                );
+                graph.roots.insert(provider_id, root);
+            }
             for method in component
                 .methods
                 .iter()

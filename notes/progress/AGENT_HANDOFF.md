@@ -3,33 +3,32 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: G1 - canonical Context entities
-* Working tree: G1 is committed. The Phase G roadmap file is user-provided and untracked.
+* Latest completed slice: G2 - Context Provider entities
+* Working tree: G2 is complete and ready for its commit. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-13
 
 Last completed slice
 
-* Slice: G1 - canonical Context entities
-* Summary: Zero-argument `@context()` instance fields with explicit declared types now lower to first-class compiler-owned Context entities. Each has a stable component-qualified `ContextId`, an authored-field relation, direct component ownership, a declared semantic-type identity, client boundary, and full decorated-field provenance.
-* Key files: crates/ezc_parser/src/model.rs; crates/ezc_parser/src/oxc_adapter.rs; crates/ezc_core/src/context.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/expression_graph.rs; crates/ezc_core/src/semantic_graph.rs
-* New behavior: Literal (`string`, `number`, `boolean`, `null`) defaults lower through the shared expression graph under their Context entity and do not create providers. The semantic graph advances to schema v2 to expose Context metadata and ownership.
-* Unsupported semantics: G1 has no Provider or Consumer entities, visibility/resolution, lookup, dependency graph, scheduling, IR, runtime slots/artifacts, execution, resumability, Context diagnostics, or runtime provider discovery. Nonliteral defaults, decorator arguments, static fields, missing types, and method misuse create no valid Context entity.
+* Slice: G2 - Context Provider entities
+* Summary: `@provide(ComponentSymbol.contextField)` non-static component fields with explicit declared types and supported initializers now lower to first-class compiler-owned Provider entities. Each has a component-qualified `ProviderId`, owned authored-field relation, resolved target `ContextId`, declared-type identity, Provider-owned value-expression root, client boundary, and full decorated-field provenance.
+* Key files: crates/ezc_parser/src/model.rs; crates/ezc_parser/src/oxc_adapter.rs; crates/ezc_core/src/provider.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/expression_graph.rs; crates/ezc_core/src/semantic_graph.rs
+* New behavior: Provider Context designators resolve only through canonical local component symbols or the existing import binding table. The semantic graph advances to schema v3 with Provider metadata, Component ownership edges, and `provides-context` relations.
+* Unsupported semantics: G2 has no Consumer entities/resolution, visibility/nearest-provider analysis, Provider compatibility checks, lifetime/dependency graph, scheduling, IR, runtime slots/artifacts, execution, resumability, Context diagnostics, or runtime provider discovery. Duplicate same-component providers retain one deterministic source fact and no ambiguous entity pair.
 
 Current in-progress slice
 
-* Slice: G2 - Context Provider lowering
-* Status: Blocked pending an explicit authored Provider declaration contract.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1
-* Remaining: G2 through G20.
+* Slice: G3 - Context Consumer lowering
+* Status: Ready to begin after the G2 commit.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2
+* Remaining: G3 through G20.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_parser: pass (28 tests)
-* cargo test -p ezc_core context: pass (5 focused tests)
-* cargo test -p ezc_core semantic_graph: pass (3 focused tests)
-* cargo test -p ezc_core asm_validation: pass (1 focused test)
-* cargo test -p ezc_core --lib: pass (176 tests; shared ASM infrastructure)
+* cargo test -p ezc_parser: pass (29 tests)
+* cargo test -p ezc_core provider: pass (5 focused tests)
+* cargo test -p ezc_core semantic_graph: pass (4 focused tests)
+* cargo test -p ezc_core --lib: pass (181 tests; shared ASM infrastructure)
 * cargo test -p ezc_cli --test explain: pass (123 tests)
 * cargo clippy -p ezc_parser -p ezc_core -p ezc_cli --all-targets -- -D warnings: pass
 
@@ -42,6 +41,10 @@ Architecture decisions made
 * Decision needed before G2: define the authored Provider declaration syntax, its Context target reference, provided-value expression contract, and full declaration provenance anchor.
 * Reason: The G2 roadmap identifies required Provider products but supplies no source construct that creates one. Choosing a decorator, JSX wrapper, component field, method, implicit default, or name-based lookup would invent language semantics and determine the Context-to-Provider relationship, expression ownership, and later Consumer resolution behavior.
 * Tradeoff: G1 remains complete and committed. No Provider entity, Context reference, value expression, ownership inference, consumer resolution, execution, runtime artifact, or runtime lookup has been added.
+
+* Decision: G2 Provider syntax is a non-static `@provide(ComponentSymbol.contextField)` field with one exact static designator, an explicit type, and one initializer in the existing canonical expression subset.
+* Reason: Resolving the symbol/designator through local component facts and the existing import binding table yields an immutable Provider-to-Context relation without evaluating decorator arguments, using strings, reflecting runtime classes, or searching a component tree.
+* Tradeoff: Provider values are expression roots only. They create no State/Computed entities, reactive edges, visibility facts, runtime slots, or execution behavior; unsupported forms create no valid Provider, while same-component duplicate targets retain one deterministic duplicate declaration fact.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.
@@ -726,7 +729,7 @@ Known limitations
 
 Exact next step
 
-Await an explicit G2 authored Provider declaration contract before beginning Provider lowering. Do not infer a Provider form from Context defaults or runtime component structure.
+Begin G3: define and lower canonical Context Consumer declarations. Do not resolve Consumers to Providers or introduce runtime lookup.
 
 Useful commands
 

@@ -24,8 +24,8 @@ use crate::model::{
     ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional, ParsedJsxElement,
     ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLocalVariable, ParsedLogicalOperator,
     ParsedMethod, ParsedMethodCall, ParsedMethodParameter, ParsedProperty, ParsedSerializableValue,
-    ParsedStateOperation, ParsedStateUpdate, ParsedTypeAlias, ParsedTypeAnnotation,
-    ParsedUnaryOperator, ParsedUnsupportedEffectStatementKind, SourceSpan,
+    ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator, ParsedTypeAlias,
+    ParsedTypeAnnotation, ParsedUnaryOperator, ParsedUnsupportedEffectStatementKind, SourceSpan,
 };
 
 pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
@@ -349,12 +349,36 @@ fn parse_decorator(
     };
 
     let argument = call.arguments.first().and_then(argument_string_value);
+    let static_member_argument = call
+        .arguments
+        .first()
+        .and_then(|argument| parsed_static_member_designator(argument, source));
 
     Some(ParsedDecorator {
         name: callee.name.to_string(),
         argument,
         argument_count: call.arguments.len(),
+        static_member_argument,
         span: source_span(source, decorator.span),
+    })
+}
+
+fn parsed_static_member_designator(
+    argument: &Argument<'_>,
+    source: &str,
+) -> Option<ParsedStaticMemberDesignator> {
+    let Expression::StaticMemberExpression(member) = argument.as_expression()? else {
+        return None;
+    };
+    let Expression::Identifier(object) = &member.object else {
+        return None;
+    };
+    Some(ParsedStaticMemberDesignator {
+        object: object.name.to_string(),
+        member: member.property.name.to_string(),
+        span: source_span(source, member.span),
+        object_span: source_span(source, object.span),
+        member_span: source_span(source, member.property.span),
     })
 }
 
@@ -379,6 +403,10 @@ fn parse_property(
 
     let initializer = property.value.as_ref().and_then(expression_summary);
     let initializer_literal = property.value.as_ref().and_then(parsed_serializable_value);
+    let initializer_expression = property
+        .value
+        .as_ref()
+        .and_then(|expression| parsed_computed_expression(expression, source));
     let initializer_span = property
         .value
         .as_ref()
@@ -407,6 +435,7 @@ fn parse_property(
         decorators,
         initializer,
         initializer_literal,
+        initializer_expression,
         initializer_span,
         state_initial_value,
         state_initial_expression,

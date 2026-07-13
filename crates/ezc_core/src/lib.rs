@@ -26,6 +26,7 @@ pub mod lazy_action_chunks;
 pub mod model;
 pub mod module_graph;
 pub mod page_codegen;
+pub mod provider;
 pub mod resume_boot;
 pub mod resume_diagnostics;
 pub mod resume_explain;
@@ -70,11 +71,12 @@ pub use component_graph::{
     ComponentAction, ComponentDiagnostic, ComponentDiagnosticSeverity, ComponentGraph,
     ComponentMethod, ComponentNode, ComputedExpression, ComputedExpressionKind,
     ConstantEvaluationError, ConstantExpression, ConstantExpressionKind, ContextDeclaration,
-    DeclaredStateType, DeclaredStateTypeKind, DiagnosticSecondaryLabel, EffectBodySyntax,
-    EffectExpression, EffectExpressionKind, EffectStatementSyntax, EffectStatementSyntaxKind,
-    LogicalOperator, MethodCall, MethodLocalVariable, MethodParameter, RenderAttribute,
-    RenderAttributeValue, RenderChild, RenderEventHandler, RenderFragment, RenderList, RenderModel,
-    SerializableValue, StateField, StateOperation, UnsupportedEffectStatementKind,
+    ContextDesignator, DeclaredStateType, DeclaredStateTypeKind, DiagnosticSecondaryLabel,
+    EffectBodySyntax, EffectExpression, EffectExpressionKind, EffectStatementSyntax,
+    EffectStatementSyntaxKind, LogicalOperator, MethodCall, MethodLocalVariable, MethodParameter,
+    RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler, RenderFragment,
+    RenderList, RenderModel, SerializableValue, StateField, StateOperation,
+    UnsupportedEffectStatementKind,
 };
 pub use computed_value::{
     collect_computed_values, ComputedCachePolicy, ComputedDiagnosticCode, ComputedPurity,
@@ -147,6 +149,7 @@ pub use page_codegen::{
     generate_standalone_page, generate_standalone_page_with_computed_runtime,
     generate_standalone_page_with_effect_runtime,
 };
+pub use provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
 pub use resume_manifest::{
     build_resume_manifest, resume_manifest_json, validate_resume_manifest, ResumeManifest,
     ResumeManifestEffectRecord, ResumeManifestValidationDiagnostic, RESUME_MANIFEST_SCHEMA_VERSION,
@@ -179,9 +182,11 @@ pub use runtime_effect_artifact::{
 pub use semantic_graph::{
     build_semantic_graph, semantic_graph_json, SemanticGraph, SemanticGraphContext,
     SemanticGraphEdge, SemanticGraphEdgeKind, SemanticGraphNode, SemanticGraphNodeKind,
-    SemanticGraphProvenance, SEMANTIC_GRAPH_SCHEMA_VERSION,
+    SemanticGraphProvenance, SemanticGraphProvider, SEMANTIC_GRAPH_SCHEMA_VERSION,
 };
-pub use semantic_id::{ContextId, EffectId, EffectStatementId, SemanticId, SemanticOwner};
+pub use semantic_id::{
+    ContextId, EffectId, EffectStatementId, ProviderId, SemanticId, SemanticOwner,
+};
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
 pub use semantic_type::{
@@ -1246,6 +1251,7 @@ class Counter extends Component {
                     name: "component".to_string(),
                     argument: Some("x-duplicate-event".to_string()),
                     argument_count: 1,
+                    static_member_argument: None,
                     span: test_span(),
                 }],
                 properties: Vec::new(),
