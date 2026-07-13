@@ -3,39 +3,41 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: F20 - effect stability audit
-* Working tree: Phase G roadmap supplied; no compiler changes. The roadmap file is user-provided and untracked.
-* Date: 2026-07-12
+* Latest completed slice: G1 - canonical Context entities
+* Working tree: G1 is complete and ready for its commit. The Phase G roadmap file is user-provided and untracked.
+* Date: 2026-07-13
 
 Last completed slice
 
-* Slice: F20 - effect stability audit
-* Summary: Phase F is complete. The audit confirms every effect behavior derives from canonical compiler products: semantic entities/bodies/types, the shared reactive graph and scheduler, canonical/optimized IR, the runtime registry/artifact, the template action-batch bridge, diagnostics, inspection, and resumability planning.
-* Key files: crates/ezc_core/src/effect_capability.rs; crates/ezc_core/src/effect.rs; crates/ezc_core/src/intermediate_representation.rs; crates/ezc_core/src/runtime_effect*.rs; crates/ezc_core/src/runtime_codegen.rs; crates/ezc_core/src/effect_diagnostics.rs; crates/ezc_core/src/effect_inspection.rs
-* New behavior: No code change. The audited contracts are frozen at capability registry v1, template/resume schema v2, runtime-effect artifact schema v1, check JSON schema v2, and ASM inspection schema v4.
-* Unsupported semantics: Effects are synchronous terminal consumers. They cannot mutate reactive state, invoke component actions/effects/methods as reactive work, return cleanup/value callbacks, use async behavior, become template event handlers, or discover dependencies/capabilities/action batches at runtime.
+* Slice: G1 - canonical Context entities
+* Summary: Zero-argument `@context()` instance fields with explicit declared types now lower to first-class compiler-owned Context entities. Each has a stable component-qualified `ContextId`, an authored-field relation, direct component ownership, a declared semantic-type identity, client boundary, and full decorated-field provenance.
+* Key files: crates/ezc_parser/src/model.rs; crates/ezc_parser/src/oxc_adapter.rs; crates/ezc_core/src/context.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/expression_graph.rs; crates/ezc_core/src/semantic_graph.rs
+* New behavior: Literal (`string`, `number`, `boolean`, `null`) defaults lower through the shared expression graph under their Context entity and do not create providers. The semantic graph advances to schema v2 to expose Context metadata and ownership.
+* Unsupported semantics: G1 has no Provider or Consumer entities, visibility/resolution, lookup, dependency graph, scheduling, IR, runtime slots/artifacts, execution, resumability, Context diagnostics, or runtime provider discovery. Nonliteral defaults, decorator arguments, static fields, missing types, and method misuse create no valid Context entity.
 
 Current in-progress slice
 
-* Slice: G1 - canonical Context entities
-* Status: Blocked pending an explicit authored Context declaration contract.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20
-* Remaining: G1 through G20, beginning only after the source-level Context form is defined.
+* Slice: G2 - Context Provider lowering
+* Status: Ready to begin after the G1 commit.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1
+* Remaining: G2 through G20.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core --lib: pass (171 tests)
+* cargo test -p ezc_parser: pass (28 tests)
+* cargo test -p ezc_core context: pass (5 focused tests)
+* cargo test -p ezc_core semantic_graph: pass (3 focused tests)
+* cargo test -p ezc_core asm_validation: pass (1 focused test)
+* cargo test -p ezc_core --lib: pass (176 tests; shared ASM infrastructure)
 * cargo test -p ezc_cli --test explain: pass (123 tests)
-* cargo test -p ezc_cli --test runtime_browser initial_effects_execute_once_from_compiler_generated_runtime_programs -- --exact: pass
-* cargo test -p ezc_cli --test runtime_browser completed_action_batches_execute_compiler_planned_effects_once -- --exact: pass
-* cargo clippy --workspace --all-targets -- -D warnings: pass
+* cargo clippy -p ezc_parser -p ezc_core -p ezc_cli --all-targets -- -D warnings: pass
 
 Architecture decisions made
 
-* Decision needed before G1: define the authored Context declaration syntax and its canonical source anchor.
-* Reason: The Phase G roadmap requires every authored declaration to lower into an owned Context entity with a stable ContextId and provenance, but it specifies neither a source construct nor an existing Context construct in the parser/component graph. Choosing a decorator, field helper, class form, or global declaration would invent language semantics and determine later provider/consumer identity, ownership, type, and diagnostics behavior.
-* Tradeoff: No G1 compiler, ASM, semantic-graph, runtime, or fixture behavior has been added. Phase G cannot safely begin until the contract states the exact declaration syntax (including its name/arguments and owning scope) and the source span that serves as the entity provenance.
+* Decision: G1 Context syntax is a zero-argument `@context()` decorated non-static component field with an explicit declared type. It lowers to a distinct component-qualified `ContextId` and remains separate from the authored field identity.
+* Reason: One exact field form makes name, ownership, declared type, provenance, and later Provider/Consumer targets compiler-owned facts without accepting runtime constructors, decorator naming, or implicit globals.
+* Tradeoff: Only literal defaults are retained as Context-owned shared expression roots. They are not state, providers, runtime storage, or reactive edges; invalid/missing-type/argument/static/nonliteral forms create no valid Context entity and no new user-facing diagnostic catalog.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.
@@ -720,7 +722,7 @@ Known limitations
 
 Exact next step
 
-Await an explicit Phase G authored Context declaration contract before beginning G1. Do not infer syntax or create placeholder Context entities.
+Begin G2: define and lower canonical Context Provider declarations. Do not resolve consumers, infer ownership, execute providers, or introduce runtime lookup.
 
 Useful commands
 

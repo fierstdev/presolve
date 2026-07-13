@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use crate::{
     BindingTable, CapabilityOperationId, CapabilityOperationKind, CapabilityParameters,
-    CapabilityValueContract, ComponentNode, ComputedValue, Effect, EffectStatement,
+    CapabilityValueContract, ComponentNode, ComputedValue, ContextEntity, Effect, EffectStatement,
     EffectStatementKind, ExpressionGraph, ExpressionNodeKind, ImportBindingTarget, SemanticId,
     SerializableValue, SourceProvenance, SymbolKind, EFFECT_CAPABILITY_REGISTRY,
 };
@@ -650,6 +650,44 @@ impl SemanticTypeModel {
 
         Self::from_assignments_and_aliases(assignments, aliases)
             .with_action_signature_types(components)
+    }
+
+    /// Attaches explicit G1 Context declaration contracts without performing
+    /// provider/consumer compatibility analysis.
+    #[must_use]
+    pub fn with_context_types(
+        mut self,
+        contexts: &BTreeMap<crate::ContextId, ContextEntity>,
+    ) -> Self {
+        for context in contexts.values() {
+            let semantic_type = self
+                .aliases
+                .values()
+                .find(|alias| {
+                    alias.provenance.path == context.declared_type.provenance.path
+                        && alias.name == context.declared_type.text
+                })
+                .map_or_else(
+                    || {
+                        semantic_type_from_annotation(&context.declared_type.text)
+                            .unwrap_or(SemanticType::Unknown)
+                    },
+                    |alias| alias.semantic_type.clone(),
+                );
+            let subject = context.id.as_semantic_id().clone();
+            self.assignments.insert(
+                subject.clone(),
+                SemanticTypeAssignment {
+                    id: context.declared_type_id.clone(),
+                    subject: subject.clone(),
+                    semantic_type,
+                    origin: subject,
+                    status: SemanticTypeStatus::Declared,
+                    provenance: context.provenance.clone(),
+                },
+            );
+        }
+        self
     }
 
     fn from_assignments_and_aliases(

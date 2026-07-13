@@ -353,6 +353,7 @@ fn parse_decorator(
     Some(ParsedDecorator {
         name: callee.name.to_string(),
         argument,
+        argument_count: call.arguments.len(),
         span: source_span(source, decorator.span),
     })
 }
@@ -370,25 +371,50 @@ fn parse_property(
 ) -> Option<ParsedProperty> {
     let name = property_key_name(&property.key)?;
 
+    let decorators = property
+        .decorators
+        .iter()
+        .filter_map(|decorator| parse_decorator(decorator, source))
+        .collect::<Vec<_>>();
+
     let initializer = property.value.as_ref().and_then(expression_summary);
+    let initializer_literal = property.value.as_ref().and_then(parsed_serializable_value);
+    let initializer_span = property
+        .value
+        .as_ref()
+        .map(|value| source_span(source, value.span()));
 
     let state_initial_value = property.value.as_ref().and_then(state_initial_value);
     let state_initial_expression = property
         .value
         .as_ref()
         .and_then(|expression| state_initial_constant_expression(expression, source));
-    let state_type_annotation = (initializer.as_deref() == Some("state(...)"))
-        .then_some(property.type_annotation.as_ref())
-        .flatten()
+    let type_annotation = property
+        .type_annotation
+        .as_ref()
         .map(|annotation| parsed_type_annotation(annotation.span, source));
+    let state_type_annotation = (initializer.as_deref() == Some("state(...)"))
+        .then_some(type_annotation.clone())
+        .flatten();
+    let declaration_start = decorators
+        .first()
+        .map_or(property.span.start as usize, |decorator| {
+            decorator.span.start
+        });
 
     Some(ParsedProperty {
         name,
+        decorators,
         initializer,
+        initializer_literal,
+        initializer_span,
         state_initial_value,
         state_initial_expression,
         state_type_annotation,
-        span: source_span(source, property.span),
+        type_annotation,
+        name_span: source_span(source, property.key.span()),
+        is_static: property.r#static,
+        span: source_span_from_offsets(source, declaration_start, property.span.end as usize),
     })
 }
 
@@ -1465,6 +1491,22 @@ fn state_initial_value(expression: &Expression<'_>) -> Option<ParsedSerializable
     }
 
     call.arguments.first().and_then(state_argument_literal)
+}
+
+fn parsed_serializable_value(expression: &Expression<'_>) -> Option<ParsedSerializableValue> {
+    match expression {
+        Expression::NullLiteral(_) => Some(ParsedSerializableValue::Null),
+        Expression::BooleanLiteral(literal) => {
+            Some(ParsedSerializableValue::Boolean(literal.value))
+        }
+        Expression::NumericLiteral(literal) => Some(ParsedSerializableValue::Number(
+            literal.raw.as_ref()?.to_string(),
+        )),
+        Expression::StringLiteral(literal) => {
+            Some(ParsedSerializableValue::String(literal.value.to_string()))
+        }
+        _ => None,
+    }
 }
 
 fn state_initial_constant_expression(

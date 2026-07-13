@@ -22,6 +22,28 @@ mod tests {
     use super::{parse_file, ParsedEffectStatementKind, ParsedUnsupportedEffectStatementKind};
 
     #[test]
+    fn retains_decorated_context_field_declaration_facts() {
+        let source = r#"
+@component("x-app-shell")
+class AppShell extends Component {
+  @context()
+  locale: string = "en";
+}
+"#;
+        let parsed = parse_file("src/AppShell.tsx", source);
+        let property = &parsed.classes[0].properties[0];
+
+        assert_eq!(property.name, "locale");
+        assert_eq!(property.decorators[0].name, "context");
+        assert_eq!(property.decorators[0].argument_count, 0);
+        assert_eq!(property.type_annotation.as_ref().unwrap().text, "string");
+        assert!(property.initializer_literal.is_some());
+        assert!(!property.is_static);
+        assert_eq!(property.span.start, source.find("@context()").unwrap());
+        assert!(property.span.end > property.initializer_span.unwrap().end);
+    }
+
+    #[test]
     fn retains_ordered_effect_statement_syntax_and_unsupported_forms() {
         let parsed = parse_file(
             "src/Effects.tsx",

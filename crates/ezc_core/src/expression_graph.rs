@@ -82,6 +82,7 @@ impl ExpressionGraph {
     /// # Panics
     ///
     /// Panics when an expression owner has no canonical source provenance.
+    #[allow(clippy::too_many_lines)]
     #[must_use]
     pub fn from_components(
         components: &[ComponentNode],
@@ -98,6 +99,19 @@ impl ExpressionGraph {
                     .expect("state fields with expressions should have source provenance");
                 let root = graph.insert_expression(&field.id, "root", expression, field_provenance);
                 graph.roots.insert(field.id.clone(), root);
+            }
+            for context in &component.context_declarations {
+                let Some(expression) = &context.default_expression else {
+                    continue;
+                };
+                let context_id = component.id.context(&context.name);
+                let root = graph.insert_expression(
+                    &context_id,
+                    "default",
+                    expression,
+                    &context.provenance,
+                );
+                graph.roots.insert(context_id, root);
             }
             for method in component
                 .methods

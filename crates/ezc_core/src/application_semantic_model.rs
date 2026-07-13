@@ -10,12 +10,13 @@ use crate::component_graph::{
     RenderEventHandler, StateField,
 };
 use crate::computed_value::{collect_computed_values, ComputedDiagnosticCode, ComputedValue};
+use crate::context::{collect_context_entities, ContextEntity};
 use crate::expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 use crate::intermediate_representation::{
     IrComputedEvaluationPlan, IrReactiveCycleAnalysis, IrReactiveGraph,
     IrReactiveTransitiveAnalysis,
 };
-use crate::semantic_id::{SemanticId, SemanticOwner};
+use crate::semantic_id::{ContextId, SemanticId, SemanticOwner};
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
 use crate::semantic_type::{EffectStatementTypeRecord, SemanticTypeModel};
@@ -36,6 +37,7 @@ pub struct ApplicationSemanticModel {
     pub expression_graph: ExpressionGraph,
     pub semantic_types: SemanticTypeModel,
     pub components: Vec<ComponentNode>,
+    pub contexts: BTreeMap<ContextId, ContextEntity>,
     pub computed_values: BTreeMap<SemanticId, ComputedValue>,
     pub effects: BTreeMap<SemanticId, Effect>,
     pub effect_reactive_analysis: BTreeMap<SemanticId, EffectReactiveAnalysis>,
@@ -60,6 +62,7 @@ pub enum SemanticEntity<'a> {
     Component(&'a ComponentNode),
     StateField(&'a StateField),
     Method(&'a ComponentMethod),
+    Context(&'a ContextEntity),
     Computed(&'a ComputedValue),
     Effect(&'a Effect),
     Parameter(&'a crate::MethodParameter),
@@ -75,6 +78,7 @@ pub enum SemanticEntityKind {
     Component,
     StateField,
     Method,
+    Context,
     Computed,
     Effect,
     Parameter,
@@ -92,6 +96,7 @@ impl SemanticEntity<'_> {
             Self::Component(_) => SemanticEntityKind::Component,
             Self::StateField(_) => SemanticEntityKind::StateField,
             Self::Method(_) => SemanticEntityKind::Method,
+            Self::Context(_) => SemanticEntityKind::Context,
             Self::Computed(_) => SemanticEntityKind::Computed,
             Self::Effect(_) => SemanticEntityKind::Effect,
             Self::Parameter(_) => SemanticEntityKind::Parameter,
@@ -149,6 +154,13 @@ impl ApplicationSemanticModel {
         if let Some(computed) = self.computed_values.get(id) {
             return Some(SemanticEntity::Computed(computed));
         }
+        if let Some(context) = self
+            .contexts
+            .values()
+            .find(|context| context.id.as_semantic_id() == id)
+        {
+            return Some(SemanticEntity::Context(context));
+        }
         if let Some(effect) = self.effects.get(id) {
             return Some(SemanticEntity::Effect(effect));
         }
@@ -176,6 +188,33 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub fn computed_value(&self, id: &SemanticId) -> Option<&ComputedValue> {
         self.computed_values.get(id)
+    }
+
+    #[must_use]
+    pub fn contexts(&self) -> Vec<&ContextEntity> {
+        self.contexts.values().collect()
+    }
+
+    #[must_use]
+    pub fn context(&self, id: &ContextId) -> Option<&ContextEntity> {
+        self.contexts.get(id)
+    }
+
+    #[must_use]
+    pub fn contexts_owned_by(&self, component: &SemanticId) -> Vec<&ContextId> {
+        self.contexts
+            .iter()
+            .filter_map(|(id, context)| {
+                (context.owner.entity_id() == Some(component)).then_some(id)
+            })
+            .collect()
+    }
+
+    #[must_use]
+    pub fn context_for_authored_field(&self, field: &SemanticId) -> Option<&ContextId> {
+        self.contexts
+            .iter()
+            .find_map(|(id, context)| (&context.authored_field == field).then_some(id))
     }
 
     #[must_use]
@@ -515,18 +554,20 @@ pub fn build_application_semantic_model_from_component_graph(
         &component_graph.provenance,
     );
     let effects = collect_effects(&component_graph.components, &component_graph.provenance);
+    let expression_graph =
+        ExpressionGraph::from_components(&component_graph.components, &component_graph.provenance);
+    let contexts = collect_context_entities(&component_graph.components, &expression_graph);
     let mut provenance = component_graph.provenance.clone();
     extend_template_entity_provenance(&mut provenance, &template_entities);
-    extend_derived_entity_provenance(&mut provenance, &computed_values, &effects);
+    extend_derived_entity_provenance(&mut provenance, &contexts, &computed_values, &effects);
     let ownership = collect_ownership(
         &component_graph.components,
+        &contexts,
         &computed_values,
         &effects,
         &templates,
         &template_entities,
     );
-    let expression_graph =
-        ExpressionGraph::from_components(&component_graph.components, &component_graph.provenance);
     let (effect_bodies, effect_statements) =
         lower_effect_bodies(&component_graph.components, &effects, &expression_graph);
     let mut references = component_graph.references.clone();
@@ -551,6 +592,7 @@ pub fn build_application_semantic_model_from_component_graph(
     let semantic_types = finalize_semantic_types(
         SemanticTypeModel::from_components(&component_graph.components, &provenance),
         &component_graph.components,
+        &contexts,
         &computed_values,
         &effects,
         &effect_statements,
@@ -611,6 +653,7 @@ pub fn build_application_semantic_model_from_component_graph(
         expression_graph,
         semantic_types,
         components: component_graph.components.clone(),
+        contexts,
         computed_values,
         effects,
         effect_reactive_analysis,
@@ -685,16 +728,18 @@ fn build_application_semantic_model_from_files_with_bindings(
         &provenance,
     );
     let effects = collect_effects(&components, &provenance);
+    let expression_graph = ExpressionGraph::from_components(&components, &provenance);
+    let contexts = collect_context_entities(&components, &expression_graph);
     diagnostics.extend(computed_diagnostics);
-    extend_derived_entity_provenance(&mut provenance, &computed_values, &effects);
+    extend_derived_entity_provenance(&mut provenance, &contexts, &computed_values, &effects);
     let ownership = collect_ownership(
         &components,
+        &contexts,
         &computed_values,
         &effects,
         &templates,
         &template_entities,
     );
-    let expression_graph = ExpressionGraph::from_components(&components, &provenance);
     let (effect_bodies, effect_statements) =
         lower_effect_bodies(&components, &effects, &expression_graph);
     references.extend(build_computed_references(
@@ -723,6 +768,7 @@ fn build_application_semantic_model_from_files_with_bindings(
             bindings,
         ),
         &components,
+        &contexts,
         &computed_values,
         &effects,
         &effect_statements,
@@ -776,6 +822,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         expression_graph,
         semantic_types,
         components,
+        contexts,
         computed_values,
         effects,
         effect_reactive_analysis,
@@ -813,9 +860,16 @@ fn extend_template_entity_provenance(
 
 fn extend_derived_entity_provenance(
     provenance: &mut BTreeMap<SemanticId, SourceProvenance>,
+    contexts: &BTreeMap<ContextId, ContextEntity>,
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
     effects: &BTreeMap<SemanticId, Effect>,
 ) {
+    provenance.extend(contexts.values().map(|context| {
+        (
+            context.id.as_semantic_id().clone(),
+            context.provenance.clone(),
+        )
+    }));
     provenance.extend(
         computed_values
             .iter()
@@ -832,6 +886,7 @@ fn extend_derived_entity_provenance(
 fn finalize_semantic_types(
     semantic_types: SemanticTypeModel,
     components: &[ComponentNode],
+    contexts: &BTreeMap<ContextId, ContextEntity>,
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
     effects: &BTreeMap<SemanticId, Effect>,
     effect_statements: &BTreeMap<SemanticId, EffectStatement>,
@@ -840,6 +895,7 @@ fn finalize_semantic_types(
     template_entities: &[TemplateSemanticEntity],
 ) -> SemanticTypeModel {
     semantic_types
+        .with_context_types(contexts)
         .with_expression_types(expression_graph, components)
         .with_computed_value_types(components, computed_values, expression_graph, references)
         .with_effect_statement_types(components, effects, effect_statements, expression_graph)
@@ -1623,6 +1679,7 @@ fn this_member_name(expression: &str) -> Option<&str> {
 
 fn collect_ownership(
     components: &[ComponentNode],
+    contexts: &BTreeMap<ContextId, ContextEntity>,
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
     effects: &BTreeMap<SemanticId, Effect>,
     templates: &[TemplateNode],
@@ -1659,6 +1716,12 @@ fn collect_ownership(
             .filter(|computed| computed.owner.entity_id() == Some(&component.id))
         {
             ownership.insert(computed.id.clone(), computed.owner.clone());
+        }
+        for context in contexts
+            .values()
+            .filter(|context| context.owner.entity_id() == Some(&component.id))
+        {
+            ownership.insert(context.id.as_semantic_id().clone(), context.owner.clone());
         }
         for effect in effects
             .values()
@@ -2982,6 +3045,7 @@ class Counter extends Component {
 
         let ownership = collect_ownership(
             &component_graph.components,
+            &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &templates,

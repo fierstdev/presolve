@@ -68,16 +68,23 @@ pub struct ParsedClass {
 pub struct ParsedDecorator {
     pub name: String,
     pub argument: Option<String>,
+    pub argument_count: usize,
     pub span: SourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedProperty {
     pub name: String,
+    pub decorators: Vec<ParsedDecorator>,
     pub initializer: Option<String>,
+    pub initializer_literal: Option<ParsedSerializableValue>,
+    pub initializer_span: Option<SourceSpan>,
     pub state_initial_value: Option<ParsedSerializableValue>,
     pub state_initial_expression: Option<ParsedConstantExpression>,
     pub state_type_annotation: Option<ParsedTypeAnnotation>,
+    pub type_annotation: Option<ParsedTypeAnnotation>,
+    pub name_span: SourceSpan,
+    pub is_static: bool,
     pub span: SourceSpan,
 }
 

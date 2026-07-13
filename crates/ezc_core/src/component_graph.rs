@@ -35,6 +35,7 @@ pub struct ComponentNode {
     pub element_name: Option<String>,
     pub route_path: Option<String>,
     pub state_fields: Vec<StateField>,
+    pub context_declarations: Vec<ContextDeclaration>,
     pub methods: Vec<ComponentMethod>,
     pub actions: Vec<ComponentAction>,
     pub render: Option<RenderModel>,
@@ -48,6 +49,22 @@ pub struct StateField {
     pub initial_value: Option<SerializableValue>,
     pub initial_expression: Option<ConstantExpression>,
     pub declared_type: Option<DeclaredStateType>,
+}
+
+/// Authored source facts for one valid G1 `@context()` component field.
+///
+/// This is deliberately declaration syntax rather than the later canonical
+/// Context entity. ASM lowering owns the semantic identity and exposes it to
+/// future provider and consumer products.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContextDeclaration {
+    pub authored_field: SemanticId,
+    pub name: String,
+    pub declared_type: DeclaredStateType,
+    pub default_expression: Option<ConstantExpression>,
+    pub decorator_provenance: SourceProvenance,
+    pub name_provenance: SourceProvenance,
+    pub provenance: SourceProvenance,
 }
 
 /// A compiler-owned numeric arithmetic expression lowered from a state initializer.
@@ -876,6 +893,7 @@ fn build_component_node(
     }
 
     let state_fields = state_fields_from_class(class, path, &id);
+    let context_declarations = context_declarations_from_class(class, path, &id);
 
     let methods = class
         .methods
@@ -934,6 +952,7 @@ fn build_component_node(
         element_name,
         route_path,
         state_fields,
+        context_declarations,
         methods,
         actions,
         render,
@@ -1052,7 +1071,13 @@ fn state_fields_from_class(class: &ParsedClass, path: &Path, id: &SemanticId) ->
     class
         .properties
         .iter()
-        .filter(|property| property.initializer.as_deref() == Some("state(...)"))
+        .filter(|property| {
+            property.initializer.as_deref() == Some("state(...)")
+                && !property
+                    .decorators
+                    .iter()
+                    .any(|decorator| decorator.name == "context")
+        })
         .map(|property| {
             let initial_expression = property
                 .state_initial_expression
@@ -1077,6 +1102,53 @@ fn state_fields_from_class(class: &ParsedClass, path: &Path, id: &SemanticId) ->
                     }
                 }),
             }
+        })
+        .collect()
+}
+
+fn context_declarations_from_class(
+    class: &ParsedClass,
+    path: &Path,
+    id: &SemanticId,
+) -> Vec<ContextDeclaration> {
+    class
+        .properties
+        .iter()
+        .filter_map(|property| {
+            let decorator = property
+                .decorators
+                .iter()
+                .find(|decorator| decorator.name == "context")?;
+            let declared_type = property.type_annotation.as_ref()?;
+
+            (decorator.argument_count == 0
+                && !property.is_static
+                && property
+                    .initializer
+                    .as_ref()
+                    .is_none_or(|_| property.initializer_literal.is_some()))
+            .then(|| ContextDeclaration {
+                authored_field: id.context_field(&property.name),
+                name: property.name.clone(),
+                declared_type: DeclaredStateType {
+                    kind: declared_state_type_kind(&declared_type.text),
+                    text: declared_type.text.clone(),
+                    provenance: SourceProvenance::new(path, declared_type.span),
+                },
+                default_expression: property.initializer_literal.as_ref().map(|value| {
+                    ConstantExpression {
+                        kind: ConstantExpressionKind::Literal(serializable_value_from_parsed(
+                            value,
+                        )),
+                        span: property
+                            .initializer_span
+                            .expect("literal context defaults should retain a source span"),
+                    }
+                }),
+                decorator_provenance: SourceProvenance::new(path, decorator.span),
+                name_provenance: SourceProvenance::new(path, property.name_span),
+                provenance: SourceProvenance::new(path, property.span),
+            })
         })
         .collect()
 }

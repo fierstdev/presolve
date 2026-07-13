@@ -11,6 +11,7 @@ pub mod compilation_unit;
 pub mod compiler_pass;
 pub mod component_graph;
 pub mod computed_value;
+pub mod context;
 pub mod effect;
 pub mod effect_capability;
 pub mod effect_diagnostics;
@@ -68,17 +69,18 @@ pub use component_graph::{
     ArithmeticExpression, ArithmeticExpressionKind, ArithmeticOperator, ComparisonOperator,
     ComponentAction, ComponentDiagnostic, ComponentDiagnosticSeverity, ComponentGraph,
     ComponentMethod, ComponentNode, ComputedExpression, ComputedExpressionKind,
-    ConstantEvaluationError, ConstantExpression, ConstantExpressionKind, DeclaredStateType,
-    DeclaredStateTypeKind, DiagnosticSecondaryLabel, EffectBodySyntax, EffectExpression,
-    EffectExpressionKind, EffectStatementSyntax, EffectStatementSyntaxKind, LogicalOperator,
-    MethodCall, MethodLocalVariable, MethodParameter, RenderAttribute, RenderAttributeValue,
-    RenderChild, RenderEventHandler, RenderFragment, RenderList, RenderModel, SerializableValue,
-    StateField, StateOperation, UnsupportedEffectStatementKind,
+    ConstantEvaluationError, ConstantExpression, ConstantExpressionKind, ContextDeclaration,
+    DeclaredStateType, DeclaredStateTypeKind, DiagnosticSecondaryLabel, EffectBodySyntax,
+    EffectExpression, EffectExpressionKind, EffectStatementSyntax, EffectStatementSyntaxKind,
+    LogicalOperator, MethodCall, MethodLocalVariable, MethodParameter, RenderAttribute,
+    RenderAttributeValue, RenderChild, RenderEventHandler, RenderFragment, RenderList, RenderModel,
+    SerializableValue, StateField, StateOperation, UnsupportedEffectStatementKind,
 };
 pub use computed_value::{
     collect_computed_values, ComputedCachePolicy, ComputedDiagnosticCode, ComputedPurity,
     ComputedPurityViolation, ComputedPurityViolationKind, ComputedValue,
 };
+pub use context::{collect_context_entities, ContextEntity};
 pub use effect::{
     analyze_effect_reactivity, collect_effects, derive_effect_trigger_plan, lower_effect_bodies,
     plan_effect_execution, validate_effects, ActionBatch, ActionBatchEffectTrigger,
@@ -175,11 +177,11 @@ pub use runtime_effect_artifact::{
     RuntimeEffectArtifactRenderBoundary, RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION,
 };
 pub use semantic_graph::{
-    build_semantic_graph, semantic_graph_json, SemanticGraph, SemanticGraphEdge,
-    SemanticGraphEdgeKind, SemanticGraphNode, SemanticGraphNodeKind, SemanticGraphProvenance,
-    SEMANTIC_GRAPH_SCHEMA_VERSION,
+    build_semantic_graph, semantic_graph_json, SemanticGraph, SemanticGraphContext,
+    SemanticGraphEdge, SemanticGraphEdgeKind, SemanticGraphNode, SemanticGraphNodeKind,
+    SemanticGraphProvenance, SEMANTIC_GRAPH_SCHEMA_VERSION,
 };
-pub use semantic_id::{EffectId, EffectStatementId, SemanticId, SemanticOwner};
+pub use semantic_id::{ContextId, EffectId, EffectStatementId, SemanticId, SemanticOwner};
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
 pub use semantic_type::{
@@ -1243,6 +1245,7 @@ class Counter extends Component {
                 decorators: vec![ezc_parser::ParsedDecorator {
                     name: "component".to_string(),
                     argument: Some("x-duplicate-event".to_string()),
+                    argument_count: 1,
                     span: test_span(),
                 }],
                 properties: Vec::new(),

@@ -79,12 +79,98 @@ pub fn validate_application_semantic_model(
     }
 
     validate_semantic_types(model, &mut diagnostics);
+    validate_contexts(model, &mut diagnostics);
     validate_effect_statement_types(model, &mut diagnostics);
     validate_effect_execution_plan(model, &mut diagnostics);
     validate_component_diagnostic_metadata(model, &mut diagnostics);
     validate_template_action_bindings(model, &mut diagnostics);
 
     diagnostics
+}
+
+fn validate_contexts(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    for context in model.contexts.values() {
+        let Some(component_id) = context.owner.entity_id() else {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1135".to_string(),
+                message: format!("context `{}` is not component-owned", context.id),
+            });
+            continue;
+        };
+        let Some(component) = model.component(component_id) else {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1136".to_string(),
+                message: format!("context `{}` has a missing component owner", context.id),
+            });
+            continue;
+        };
+        if context.id != crate::ContextId::for_component(component_id, &context.name) {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1137".to_string(),
+                message: format!("context `{}` has a non-canonical identity", context.id),
+            });
+        }
+        if context.authored_field != component.id.context_field(&context.name) {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1138".to_string(),
+                message: format!(
+                    "context `{}` has a non-canonical authored field",
+                    context.id
+                ),
+            });
+        }
+        if context.declared_type.text.is_empty() {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1139".to_string(),
+                message: format!(
+                    "context `{}` is missing an explicit declared type",
+                    context.id
+                ),
+            });
+        }
+        if context.execution_boundary != crate::ExecutionBoundary::Client {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1140".to_string(),
+                message: format!(
+                    "context `{}` has a non-client execution boundary",
+                    context.id
+                ),
+            });
+        }
+        if component
+            .state_fields
+            .iter()
+            .any(|field| field.name == context.name)
+        {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1141".to_string(),
+                message: format!("context `{}` also lowered as state", context.id),
+            });
+        }
+        let declaration = component
+            .context_declarations
+            .iter()
+            .find(|declaration| declaration.authored_field == context.authored_field);
+        if declaration.is_none_or(|declaration| declaration.provenance != context.provenance) {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1142".to_string(),
+                message: format!(
+                    "context `{}` has non-canonical field provenance",
+                    context.id
+                ),
+            });
+        }
+        if context.default_expression != model.expression_root(context.id.as_semantic_id()).cloned()
+        {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1143".to_string(),
+                message: format!("context `{}` has an invalid default expression", context.id),
+            });
+        }
+    }
 }
 
 fn validate_component_diagnostic_metadata(
