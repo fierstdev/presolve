@@ -5,7 +5,7 @@ use crate::{
     SemanticOwner, SemanticReferenceKind, SourceProvenance, TemplateSemanticKind,
 };
 
-pub const SEMANTIC_GRAPH_SCHEMA_VERSION: u32 = 4;
+pub const SEMANTIC_GRAPH_SCHEMA_VERSION: u32 = 5;
 
 /// A stable, backend-independent graph projection of the canonical ASM.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -115,6 +115,7 @@ pub enum SemanticGraphEdgeKind {
     EffectComputed,
     ProvidesContext,
     ConsumesContext,
+    ResolvesToProvider,
     EventMethod,
     TemplateState,
     TemplateComputed,
@@ -222,6 +223,7 @@ impl SemanticGraphEdgeKind {
             Self::EffectComputed => "effect-computed",
             Self::ProvidesContext => "provides-context",
             Self::ConsumesContext => "consumes-context",
+            Self::ResolvesToProvider => "resolves-to-provider",
             Self::EventMethod => "event-method",
             Self::TemplateState => "template-state",
             Self::TemplateComputed => "template-computed",
@@ -341,6 +343,7 @@ fn semantic_graph_edge_kind(kind: SemanticReferenceKind) -> SemanticGraphEdgeKin
         SemanticReferenceKind::EffectComputed => SemanticGraphEdgeKind::EffectComputed,
         SemanticReferenceKind::ProvidesContext => SemanticGraphEdgeKind::ProvidesContext,
         SemanticReferenceKind::ConsumesContext => SemanticGraphEdgeKind::ConsumesContext,
+        SemanticReferenceKind::ResolvesToProvider => SemanticGraphEdgeKind::ResolvesToProvider,
         SemanticReferenceKind::EventMethod => SemanticGraphEdgeKind::EventMethod,
         SemanticReferenceKind::TemplateState => SemanticGraphEdgeKind::TemplateState,
         SemanticReferenceKind::TemplateComputed => SemanticGraphEdgeKind::TemplateComputed,
@@ -464,6 +467,39 @@ class Toolbar extends Component {
     }
 
     #[test]
+    fn exports_compiler_resolved_consumer_provider_edges() {
+        let parsed = ezc_parser::parse_file(
+            "src/toolbar.tsx",
+            r#"
+@component("x-app-shell")
+class AppShell extends Component {
+  @context()
+  theme!: Theme;
+  render() { return <main />; }
+}
+@component("x-toolbar")
+class Toolbar extends Component {
+  @provide(AppShell.theme)
+  providedTheme: Theme = this.localTheme;
+  @consume(AppShell.theme)
+  theme!: Theme;
+  render() { return <main />; }
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let graph = build_semantic_graph(&asm);
+        let consumer = asm.consumers()[0];
+        let provider = asm.resolved_provider(&consumer.id).unwrap();
+
+        assert!(graph.edges.iter().any(|edge| {
+            edge.kind == SemanticGraphEdgeKind::ResolvesToProvider
+                && edge.source == *consumer.id.as_semantic_id()
+                && edge.target == *provider.as_semantic_id()
+        }));
+    }
+
+    #[test]
     fn exports_a_deterministic_canonical_semantic_graph() {
         let parsed = ezc_parser::parse_file(
             "src/Counter.tsx",
@@ -486,7 +522,7 @@ class Counter extends Component {
         let graph = build_semantic_graph(&asm);
         let component = &asm.components[0];
 
-        assert_eq!(graph.schema_version, 4);
+        assert_eq!(graph.schema_version, 5);
         assert_eq!(graph.roots, vec![component.id.clone()]);
         assert_eq!(graph.nodes.len(), asm.ownership.len());
         assert!(graph
@@ -522,7 +558,7 @@ class Counter extends Component {
         assert_eq!(first, second);
         let document: serde_json::Value =
             serde_json::from_str(&first).expect("semantic graph JSON should parse");
-        assert_eq!(document["schema_version"], 4);
+        assert_eq!(document["schema_version"], 5);
         assert_eq!(document["nodes"][0]["kind"], "component");
     }
 

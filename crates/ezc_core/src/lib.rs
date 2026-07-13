@@ -10,9 +10,11 @@ pub mod binding_table;
 pub mod compilation_unit;
 pub mod compiler_pass;
 pub mod component_graph;
+pub mod component_scope;
 pub mod computed_value;
 pub mod consumer;
 pub mod context;
+pub mod context_resolution;
 pub mod effect;
 pub mod effect_capability;
 pub mod effect_diagnostics;
@@ -79,12 +81,16 @@ pub use component_graph::{
     RenderEventHandler, RenderFragment, RenderList, RenderModel, SerializableValue, StateField,
     StateOperation, UnsupportedEffectStatementKind,
 };
+pub use component_scope::{ComponentScopeDiagnostic, ComponentScopeGraph};
 pub use computed_value::{
     collect_computed_values, ComputedCachePolicy, ComputedDiagnosticCode, ComputedPurity,
     ComputedPurityViolation, ComputedPurityViolationKind, ComputedValue,
 };
 pub use consumer::{collect_consumer_entities, ConsumerEntity, ContextResolutionState};
 pub use context::{collect_context_entities, ContextEntity};
+pub use context_resolution::{
+    collect_context_resolutions, ContextResolution, ContextResolutionResult,
+};
 pub use effect::{
     analyze_effect_reactivity, collect_effects, derive_effect_trigger_plan, lower_effect_bodies,
     plan_effect_execution, validate_effects, ActionBatch, ActionBatchEffectTrigger,

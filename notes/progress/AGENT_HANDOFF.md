@@ -3,34 +3,34 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: G3 - Context Consumer entities
-* Working tree: G3 is committed. The Phase G roadmap file is user-provided and untracked.
+* Latest completed slice: G4 - Context Provider visibility and resolution
+* Working tree: G4 is ready to commit. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-13
 
 Last completed slice
 
-* Slice: G3 - Context Consumer entities
-* Summary: `@consume(ComponentSymbol.contextField)` non-static definite-assignment component fields with explicit requested types now lower to first-class compiler-owned Consumer entities. Each has a component-qualified `ConsumerId`, owned authored-field relation, canonical Context resolution state, requested-type identity, client boundary, and full decorated-field provenance.
-* Key files: crates/ezc_parser/src/model.rs; crates/ezc_parser/src/oxc_adapter.rs; crates/ezc_core/src/consumer.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/semantic_graph.rs
-* New behavior: Consumer Context designators resolve only through canonical local component symbols or the existing import binding table. The semantic graph advances to schema v4 with Consumer metadata, Component ownership edges, and `consumes-context` relations for resolved Context targets.
-* Unsupported semantics: G3 has no Consumer-to-Provider resolution, visibility/nearest-provider analysis, Context-default selection, Provider/Consumer compatibility checks, lifetime/dependency graph, scheduling, IR, runtime slots/artifacts, execution, resumability, Context diagnostics, or runtime provider discovery.
+* Slice: G4 - Context Provider visibility and resolution
+* Summary: Every canonical Consumer now receives an immutable `ContextResolution`: explicit Provider, Context default fallback, unresolved, ambiguity, or invalid Context reference. The resolution uses only an immutable component scope graph and canonical Context/Provider/Consumer products.
+* Key files: crates/ezc_core/src/component_scope.rs; crates/ezc_core/src/context_resolution.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_core/src/semantic_graph.rs
+* New behavior: Phase G’s scope baseline is reflexive self-scope, so same-component Providers resolve at distance zero while cross-component Providers remain invisible without a canonical parent edge. Context defaults are explicit fallbacks, and semantic graph schema v5 emits `resolves-to-provider` edges only for explicit selections.
+* Unsupported semantics: G4 has no type compatibility filtering, lifetime/dependency graph, scheduling, IR, runtime slots/artifacts, execution, resumability, Context diagnostics, runtime provider discovery, source/import/lexical ancestry inference, or component-tree reconstruction.
 
 Current in-progress slice
 
-* Slice: G4 - Consumer Provider resolution
-* Status: Blocked pending an explicit Provider visibility, selection, and default-fallback contract.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3
-* Remaining: G4 through G20.
+* Slice: G5 - Context type validation
+* Status: Ready to inspect the roadmap contract after the G4 commit checkpoint.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4
+* Remaining: G5 through G20.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_parser: pass (29 tests)
-* cargo test -p ezc_core consumer: pass (4 focused tests)
-* cargo test -p ezc_core semantic_graph: pass (5 focused tests)
-* cargo test -p ezc_core --lib: pass (186 tests; shared ASM infrastructure)
+* cargo test -p ezc_core context_resolution: pass (6 focused tests)
+* cargo test -p ezc_core component_scope: pass (3 focused tests)
+* cargo test -p ezc_core semantic_graph: pass (6 focused tests)
+* cargo test -p ezc_core --lib: pass (195 tests; shared ASM infrastructure)
 * cargo test -p ezc_cli --test explain: pass (123 tests)
-* cargo clippy -p ezc_parser -p ezc_core -p ezc_cli --all-targets -- -D warnings: pass
+* cargo clippy -p ezc_core -p ezc_cli --all-targets -- -D warnings: pass
 
 Architecture decisions made
 
@@ -57,6 +57,10 @@ Architecture decisions made
 * Decision needed before G4: define the canonical component-composition/ancestry product that establishes Provider visibility; the deterministic selection rule when several visible Providers target one Context; whether same-component Providers participate; and whether, when, and how a Context default becomes an explicit fallback result.
 * Reason: The G4 roadmap says only to resolve every Consumer to exactly one Provider or retain an unresolved fact. The existing compiler has component/module ownership but no canonical component-composition ancestry or Provider visibility semantics. Selecting globally, by source order, import order, lexical nesting, or runtime-tree traversal would invent language semantics and violate the compiler-only authority invariant.
 * Tradeoff: G3 remains complete and committed. No Consumer-to-Provider relation, nearest-provider result, Context default fallback, ownership-graph reconstruction, runtime binding, or runtime lookup has been added.
+
+* Decision: G4 uses one compiler-owned `ComponentScopeGraph` as the sole Provider-visibility input. Phase G populates it reflexively only; future compiler-owned composition lowering may add validated parent edges without changing the nearest-scope algorithm.
+* Reason: This gives Consumers deterministic binding results without inferring ancestry from imports, source order, lexical nesting, templates, or runtime parent traversal. Explicit Providers take precedence by nearest scope; canonical Context defaults are distinct fallback results rather than hidden Providers.
+* Tradeoff: Without a canonical composition edge, cross-component Providers are intentionally invisible. G4 records immutable resolution facts and `resolves-to-provider` edges only; it adds no type compatibility, runtime slot, scheduling, IR, execution, or runtime discovery behavior.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.

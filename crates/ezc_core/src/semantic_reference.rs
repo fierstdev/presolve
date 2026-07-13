@@ -19,6 +19,7 @@ pub enum SemanticReferenceKind {
     EffectComputed,
     ProvidesContext,
     ConsumesContext,
+    ResolvesToProvider,
     EventMethod,
     TemplateState,
     TemplateComputed,

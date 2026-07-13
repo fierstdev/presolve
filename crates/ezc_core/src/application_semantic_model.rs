@@ -9,9 +9,13 @@ use crate::component_graph::{
     ComponentDiagnosticSeverity, ComponentMethod, ComponentNode, MethodLocalVariable,
     RenderEventHandler, StateField,
 };
+use crate::component_scope::ComponentScopeGraph;
 use crate::computed_value::{collect_computed_values, ComputedDiagnosticCode, ComputedValue};
 use crate::consumer::{collect_consumer_entities, ConsumerEntity, ContextResolutionState};
 use crate::context::{collect_context_entities, ContextEntity};
+use crate::context_resolution::{
+    collect_context_resolutions, ContextResolution, ContextResolutionResult,
+};
 use crate::expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 use crate::intermediate_representation::{
     IrComputedEvaluationPlan, IrReactiveCycleAnalysis, IrReactiveGraph,
@@ -42,6 +46,8 @@ pub struct ApplicationSemanticModel {
     pub contexts: BTreeMap<ContextId, ContextEntity>,
     pub providers: BTreeMap<ProviderId, ProviderEntity>,
     pub consumers: BTreeMap<ConsumerId, ConsumerEntity>,
+    pub component_scope: ComponentScopeGraph,
+    pub context_resolutions: BTreeMap<ConsumerId, ContextResolution>,
     pub duplicate_provider_declarations: Vec<DuplicateProviderDeclaration>,
     pub computed_values: BTreeMap<SemanticId, ComputedValue>,
     pub effects: BTreeMap<SemanticId, Effect>,
@@ -287,6 +293,12 @@ impl ApplicationSemanticModel {
         self.consumers.get(id)
     }
 
+    pub(crate) fn consumer_for_semantic_id(&self, id: &SemanticId) -> Option<&ConsumerEntity> {
+        self.consumers
+            .values()
+            .find(|consumer| consumer.id.as_semantic_id() == id)
+    }
+
     #[must_use]
     pub fn consumers_owned_by(&self, component: &SemanticId) -> Vec<&ConsumerId> {
         self.consumers
@@ -310,6 +322,63 @@ impl ApplicationSemanticModel {
         self.consumers
             .iter()
             .find_map(|(id, consumer)| (&consumer.authored_field == field).then_some(id))
+    }
+
+    #[must_use]
+    pub fn context_resolution(&self, consumer: &ConsumerId) -> Option<&ContextResolution> {
+        self.context_resolutions.get(consumer)
+    }
+
+    #[must_use]
+    pub fn resolved_provider(&self, consumer: &ConsumerId) -> Option<&ProviderId> {
+        let ContextResolutionResult::Provider { provider, .. } =
+            &self.context_resolution(consumer)?.result
+        else {
+            return None;
+        };
+        Some(provider)
+    }
+
+    #[must_use]
+    pub fn consumers_resolved_to(&self, provider: &ProviderId) -> Vec<&ConsumerId> {
+        self.context_resolutions
+            .iter()
+            .filter_map(|(consumer, resolution)| {
+                matches!(
+                    &resolution.result,
+                    ContextResolutionResult::Provider {
+                        provider: resolved, ..
+                    } if resolved == provider
+                )
+                .then_some(consumer)
+            })
+            .collect()
+    }
+
+    #[must_use]
+    pub fn consumers_using_default(&self, context: &ContextId) -> Vec<&ConsumerId> {
+        self.context_resolutions
+            .iter()
+            .filter_map(|(consumer, resolution)| {
+                matches!(
+                    &resolution.result,
+                    ContextResolutionResult::ContextDefault {
+                        context: resolved, ..
+                    } if resolved == context
+                )
+                .then_some(consumer)
+            })
+            .collect()
+    }
+
+    #[must_use]
+    pub fn unresolved_context_consumers(&self) -> Vec<&ConsumerId> {
+        self.context_resolutions
+            .iter()
+            .filter_map(|(consumer, resolution)| {
+                matches!(resolution.result, ContextResolutionResult::Unresolved).then_some(consumer)
+            })
+            .collect()
     }
 
     #[must_use]
@@ -659,6 +728,14 @@ pub fn build_application_semantic_model_from_component_graph(
         None,
     );
     let consumers = collect_consumer_entities(&component_graph.components, &contexts, None);
+    let component_scope = ComponentScopeGraph::reflexive(&component_graph.components);
+    let context_resolutions = collect_context_resolutions(
+        &consumers,
+        &contexts,
+        &providers,
+        &expression_graph,
+        &component_scope,
+    );
     let mut provenance = component_graph.provenance.clone();
     extend_template_entity_provenance(&mut provenance, &template_entities);
     extend_derived_entity_provenance(
@@ -695,6 +772,7 @@ pub fn build_application_semantic_model_from_component_graph(
     ));
     references.extend(build_provider_references(&providers));
     references.extend(build_consumer_references(&consumers));
+    references.extend(build_context_resolution_references(&context_resolutions));
     extend_template_references(
         &mut references,
         &component_graph.components,
@@ -771,6 +849,8 @@ pub fn build_application_semantic_model_from_component_graph(
         contexts,
         providers,
         consumers,
+        component_scope,
+        context_resolutions,
         duplicate_provider_declarations,
         computed_values,
         effects,
@@ -851,6 +931,14 @@ fn build_application_semantic_model_from_files_with_bindings(
     let (providers, duplicate_provider_declarations) =
         collect_provider_entities(&components, &contexts, &expression_graph, bindings);
     let consumers = collect_consumer_entities(&components, &contexts, bindings);
+    let component_scope = ComponentScopeGraph::reflexive(&components);
+    let context_resolutions = collect_context_resolutions(
+        &consumers,
+        &contexts,
+        &providers,
+        &expression_graph,
+        &component_scope,
+    );
     diagnostics.extend(computed_diagnostics);
     extend_derived_entity_provenance(
         &mut provenance,
@@ -885,6 +973,7 @@ fn build_application_semantic_model_from_files_with_bindings(
     ));
     references.extend(build_provider_references(&providers));
     references.extend(build_consumer_references(&consumers));
+    references.extend(build_context_resolution_references(&context_resolutions));
     extend_template_references(
         &mut references,
         &components,
@@ -959,6 +1048,8 @@ fn build_application_semantic_model_from_files_with_bindings(
         contexts,
         providers,
         consumers,
+        component_scope,
+        context_resolutions,
         duplicate_provider_declarations,
         computed_values,
         effects,
@@ -1690,6 +1781,25 @@ fn build_consumer_references(
                 source: consumer.id.as_semantic_id().clone(),
                 target: context.as_semantic_id().clone(),
                 provenance: consumer.provenance.clone(),
+            })
+        })
+        .collect()
+}
+
+fn build_context_resolution_references(
+    resolutions: &BTreeMap<ConsumerId, ContextResolution>,
+) -> Vec<SemanticReference> {
+    resolutions
+        .values()
+        .filter_map(|resolution| {
+            let ContextResolutionResult::Provider { provider, .. } = &resolution.result else {
+                return None;
+            };
+            Some(SemanticReference {
+                kind: SemanticReferenceKind::ResolvesToProvider,
+                source: resolution.consumer.as_semantic_id().clone(),
+                target: provider.as_semantic_id().clone(),
+                provenance: resolution.provenance.clone(),
             })
         })
         .collect()

@@ -63,6 +63,11 @@ pub fn validate_application_semantic_model(
         let source_provenance_matches = model.provenance(&reference.source)
             == Some(&reference.provenance)
             || model
+                .consumer_for_semantic_id(&reference.source)
+                .is_some_and(|consumer| {
+                    consumer.context_designator.provenance == reference.provenance
+                })
+            || model
                 .expression_graph
                 .nodes_for(&reference.source)
                 .iter()
@@ -82,12 +87,207 @@ pub fn validate_application_semantic_model(
     validate_contexts(model, &mut diagnostics);
     validate_providers(model, &mut diagnostics);
     validate_consumers(model, &mut diagnostics);
+    validate_context_resolution(model, &mut diagnostics);
     validate_effect_statement_types(model, &mut diagnostics);
     validate_effect_execution_plan(model, &mut diagnostics);
     validate_component_diagnostic_metadata(model, &mut diagnostics);
     validate_template_action_bindings(model, &mut diagnostics);
 
     diagnostics
+}
+
+#[allow(clippy::too_many_lines)]
+fn validate_context_resolution(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    for scope_diagnostic in model.component_scope.diagnostics() {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1165".to_string(),
+            message: scope_diagnostic.message,
+        });
+    }
+    if model.context_resolutions.len() != model.consumers.len()
+        || model
+            .context_resolutions
+            .keys()
+            .any(|consumer| !model.consumers.contains_key(consumer))
+    {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1166".to_string(),
+            message: "Context resolution records do not exactly cover canonical Consumers"
+                .to_string(),
+        });
+    }
+
+    for (consumer_id, consumer) in &model.consumers {
+        let Some(resolution) = model.context_resolution(consumer_id) else {
+            continue;
+        };
+        if resolution.consumer != *consumer_id
+            || resolution.provenance != consumer.context_designator.provenance
+            || resolution.context != consumer.context().cloned()
+        {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1167".to_string(),
+                message: format!("consumer `{consumer_id}` has a non-canonical resolution record"),
+            });
+        }
+        let expected_scopes = consumer.owner.entity_id().map_or_else(Vec::new, |owner| {
+            model.component_scope.ancestor_chain(owner)
+        });
+        if resolution.searched_scopes != expected_scopes {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1168".to_string(),
+                message: format!(
+                    "consumer `{consumer_id}` searched non-canonical component scopes"
+                ),
+            });
+        }
+
+        match &resolution.result {
+            crate::ContextResolutionResult::Provider {
+                provider,
+                provider_owner,
+                distance,
+            } => {
+                let provider_entity = model.provider(provider);
+                let context_matches = resolution.context.as_ref().is_some_and(|context| {
+                    provider_entity.is_some_and(|provider| &provider.context == context)
+                });
+                let owner_matches = provider_entity.and_then(|provider| provider.owner.entity_id())
+                    == Some(provider_owner);
+                let expected_owner = resolution.searched_scopes.get(*distance as usize);
+                if !context_matches || !owner_matches || expected_owner != Some(provider_owner) {
+                    diagnostics.push(AsmValidationDiagnostic {
+                        code: "EZASM1169".to_string(),
+                        message: format!(
+                            "consumer `{consumer_id}` has an invalid Provider resolution"
+                        ),
+                    });
+                }
+                if (*distance as usize) > resolution.searched_scopes.len()
+                    || resolution.searched_scopes[..*distance as usize]
+                        .iter()
+                        .any(|scope| {
+                            !resolution_candidates(model, scope, resolution.context.as_ref())
+                                .is_empty()
+                        })
+                    || resolution_candidates(model, provider_owner, resolution.context.as_ref())
+                        .len()
+                        != 1
+                {
+                    diagnostics.push(AsmValidationDiagnostic {
+                        code: "EZASM1170".to_string(),
+                        message: format!(
+                            "consumer `{consumer_id}` does not select the nearest Provider"
+                        ),
+                    });
+                }
+            }
+            crate::ContextResolutionResult::ContextDefault {
+                context,
+                expression,
+            } => {
+                let default_is_canonical = model.context(context).is_some_and(|context_entity| {
+                    context_entity.default_expression.is_some()
+                        && model.expression_root(context.as_semantic_id()) == Some(expression)
+                });
+                if resolution.context.as_ref() != Some(context)
+                    || !default_is_canonical
+                    || resolution
+                        .searched_scopes
+                        .iter()
+                        .any(|scope| !resolution_candidates(model, scope, Some(context)).is_empty())
+                {
+                    diagnostics.push(AsmValidationDiagnostic {
+                        code: "EZASM1171".to_string(),
+                        message: format!(
+                            "consumer `{consumer_id}` has an invalid Context default fallback"
+                        ),
+                    });
+                }
+            }
+            crate::ContextResolutionResult::Unresolved => {
+                let has_visible_provider = resolution.searched_scopes.iter().any(|scope| {
+                    !resolution_candidates(model, scope, resolution.context.as_ref()).is_empty()
+                });
+                let has_default = resolution.context.as_ref().is_some_and(|context| {
+                    model
+                        .context(context)
+                        .is_some_and(|entity| entity.default_expression.is_some())
+                });
+                if resolution.context.is_none() || has_visible_provider || has_default {
+                    diagnostics.push(AsmValidationDiagnostic {
+                        code: "EZASM1172".to_string(),
+                        message: format!(
+                            "consumer `{consumer_id}` has an invalid unresolved result"
+                        ),
+                    });
+                }
+            }
+            crate::ContextResolutionResult::Ambiguous {
+                providers,
+                distance,
+            } => {
+                let Some(scope) = resolution.searched_scopes.get(*distance as usize) else {
+                    diagnostics.push(AsmValidationDiagnostic {
+                        code: "EZASM1173".to_string(),
+                        message: format!(
+                            "consumer `{consumer_id}` has an invalid ambiguity distance"
+                        ),
+                    });
+                    continue;
+                };
+                let candidates = resolution_candidates(model, scope, resolution.context.as_ref());
+                if providers.len() < 2
+                    || providers.windows(2).any(|pair| pair[0] >= pair[1])
+                    || *providers != candidates
+                    || resolution.searched_scopes[..*distance as usize]
+                        .iter()
+                        .any(|scope| {
+                            !resolution_candidates(model, scope, resolution.context.as_ref())
+                                .is_empty()
+                        })
+                {
+                    diagnostics.push(AsmValidationDiagnostic {
+                        code: "EZASM1174".to_string(),
+                        message: format!(
+                            "consumer `{consumer_id}` has an invalid ambiguity result"
+                        ),
+                    });
+                }
+            }
+            crate::ContextResolutionResult::InvalidContextReference => {
+                if resolution.context.is_some() || consumer.context().is_some() {
+                    diagnostics.push(AsmValidationDiagnostic {
+                        code: "EZASM1175".to_string(),
+                        message: format!(
+                            "consumer `{consumer_id}` has an invalid Context-reference result"
+                        ),
+                    });
+                }
+            }
+        }
+    }
+}
+
+fn resolution_candidates(
+    model: &ApplicationSemanticModel,
+    scope: &crate::SemanticId,
+    context: Option<&crate::ContextId>,
+) -> Vec<crate::ProviderId> {
+    let Some(context) = context else {
+        return Vec::new();
+    };
+    model
+        .providers
+        .values()
+        .filter(|provider| {
+            provider.owner.entity_id() == Some(scope) && provider.context == *context
+        })
+        .map(|provider| provider.id.clone())
+        .collect()
 }
 
 fn validate_contexts(
