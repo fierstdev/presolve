@@ -9,8 +9,8 @@ pub use model::{
     ParsedExport, ParsedExportKind, ParsedExportSpecifier, ParsedFile, ParsedImport,
     ParsedImportSpecifier, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild,
     ParsedJsxConditional, ParsedJsxElement, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode,
-    ParsedLocalVariable, ParsedLogicalOperator, ParsedMethod, ParsedMethodParameter,
-    ParsedProperty, ParsedSerializableValue, ParsedStateOperation, ParsedStateUpdate,
-    ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator, SourceSpan,
+    ParsedLocalVariable, ParsedLogicalOperator, ParsedMethod, ParsedMethodCall,
+    ParsedMethodParameter, ParsedProperty, ParsedSerializableValue, ParsedStateOperation,
+    ParsedStateUpdate, ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator, SourceSpan,
 };
 pub use oxc_adapter::parse_file;

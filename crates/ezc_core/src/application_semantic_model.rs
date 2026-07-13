@@ -443,8 +443,11 @@ pub fn build_application_semantic_model_from_component_graph(
 ) -> ApplicationSemanticModel {
     let templates = build_template_graph(component_graph).templates;
     let template_entities = build_template_semantic_entities(&templates);
-    let computed_values =
-        collect_computed_values(&component_graph.components, &component_graph.provenance);
+    let (computed_values, computed_diagnostics) = classify_computed_values(
+        &component_graph.components,
+        collect_computed_values(&component_graph.components, &component_graph.provenance),
+        &component_graph.provenance,
+    );
     let mut provenance = component_graph.provenance.clone();
     provenance.extend(
         computed_values
@@ -500,7 +503,12 @@ pub fn build_application_semantic_model_from_component_graph(
         computed_values,
         templates,
         template_entities,
-        diagnostics: component_graph.diagnostics.clone(),
+        diagnostics: component_graph
+            .diagnostics
+            .iter()
+            .cloned()
+            .chain(computed_diagnostics)
+            .collect(),
         ownership,
         references,
         provenance,
@@ -558,7 +566,12 @@ fn build_application_semantic_model_from_files_with_bindings(
         );
     }
 
-    let computed_values = collect_computed_values(&components, &provenance);
+    let (computed_values, computed_diagnostics) = classify_computed_values(
+        &components,
+        collect_computed_values(&components, &provenance),
+        &provenance,
+    );
+    diagnostics.extend(computed_diagnostics);
     provenance.extend(
         computed_values
             .iter()
@@ -621,6 +634,174 @@ fn build_application_semantic_model_from_files_with_bindings(
         references,
         provenance,
     }
+}
+
+fn classify_computed_values(
+    components: &[ComponentNode],
+    mut computed_values: BTreeMap<SemanticId, ComputedValue>,
+    provenance: &BTreeMap<SemanticId, SourceProvenance>,
+) -> (
+    BTreeMap<SemanticId, ComputedValue>,
+    Vec<ComponentDiagnostic>,
+) {
+    let mut diagnostics = Vec::new();
+
+    for computed in computed_values.values_mut() {
+        let Some(component_id) = computed.owner.entity_id() else {
+            continue;
+        };
+        let Some(component) = components
+            .iter()
+            .find(|component| component.id == *component_id)
+        else {
+            continue;
+        };
+        let Some(method) = component
+            .methods
+            .iter()
+            .find(|method| method.id == computed.method)
+        else {
+            continue;
+        };
+        let mut violations = Vec::new();
+
+        if method.is_async {
+            violations.push(crate::ComputedPurityViolation {
+                kind: crate::ComputedPurityViolationKind::Async,
+                provenance: computed.provenance.clone(),
+            });
+        }
+        if method
+            .decorators
+            .iter()
+            .any(|decorator| decorator == "action")
+        {
+            violations.push(crate::ComputedPurityViolation {
+                kind: crate::ComputedPurityViolationKind::Action,
+                provenance: computed.provenance.clone(),
+            });
+        }
+        if method
+            .decorators
+            .iter()
+            .any(|decorator| decorator == "effect")
+        {
+            violations.push(crate::ComputedPurityViolation {
+                kind: crate::ComputedPurityViolationKind::Effect,
+                provenance: computed.provenance.clone(),
+            });
+        }
+        for action in component
+            .actions
+            .iter()
+            .filter(|action| action.method == method.name)
+        {
+            violations.push(crate::ComputedPurityViolation {
+                kind: crate::ComputedPurityViolationKind::StateMutation,
+                provenance: provenance
+                    .get(&action.id)
+                    .expect("computed state update should have canonical provenance")
+                    .clone(),
+            });
+        }
+        for call in &method.calls {
+            let kind = computed_call_purity_kind(component, &call.callee);
+            violations.push(crate::ComputedPurityViolation {
+                kind,
+                provenance: SourceProvenance::new(&computed.provenance.path, call.span),
+            });
+        }
+
+        violations.sort_by(|left, right| {
+            (
+                left.kind,
+                left.provenance.path.as_path(),
+                left.provenance.span.start,
+                left.provenance.span.end,
+            )
+                .cmp(&(
+                    right.kind,
+                    right.provenance.path.as_path(),
+                    right.provenance.span.start,
+                    right.provenance.span.end,
+                ))
+        });
+        violations
+            .dedup_by(|left, right| left.kind == right.kind && left.provenance == right.provenance);
+        computed.purity = if violations.is_empty() {
+            crate::ComputedPurity::Pure
+        } else {
+            crate::ComputedPurity::Impure
+        };
+        computed.purity_violations = violations;
+        diagnostics.extend(computed.purity_violations.iter().map(|violation| {
+            ComponentDiagnostic {
+                code: "EZC1034".to_string(),
+                message: format!(
+                    "computed getter `{}` is impure: {}",
+                    computed.name,
+                    violation.kind.description()
+                ),
+                provenance: Some(violation.provenance.clone()),
+            }
+        }));
+    }
+
+    (computed_values, diagnostics)
+}
+
+fn computed_call_purity_kind(
+    component: &ComponentNode,
+    callee: &str,
+) -> crate::ComputedPurityViolationKind {
+    if matches!(callee, "resource" | "this.resource") {
+        return crate::ComputedPurityViolationKind::Resource;
+    }
+    if matches!(
+        callee,
+        "Math.random"
+            | "Date.now"
+            | "performance.now"
+            | "crypto.randomUUID"
+            | "crypto.getRandomValues"
+    ) {
+        return crate::ComputedPurityViolationKind::NondeterministicOperation;
+    }
+    if callee.starts_with("console.")
+        || matches!(
+            callee,
+            "fetch" | "setTimeout" | "setInterval" | "queueMicrotask"
+        )
+    {
+        return crate::ComputedPurityViolationKind::Effect;
+    }
+    if let Some(name) = callee.strip_prefix("this.") {
+        if let Some(method) = component.methods.iter().find(|method| method.name == name) {
+            if method.is_action()
+                || method
+                    .decorators
+                    .iter()
+                    .any(|decorator| decorator == "action")
+            {
+                return crate::ComputedPurityViolationKind::Action;
+            }
+            if method
+                .decorators
+                .iter()
+                .any(|decorator| decorator == "effect")
+            {
+                return crate::ComputedPurityViolationKind::Effect;
+            }
+            if method
+                .decorators
+                .iter()
+                .any(|decorator| decorator == "resource")
+            {
+                return crate::ComputedPurityViolationKind::Resource;
+            }
+        }
+    }
+    crate::ComputedPurityViolationKind::ArbitraryMethodCall
 }
 
 fn build_computed_references(
@@ -1065,7 +1246,8 @@ class Computed extends Component {
             computed_entity.cache_policy,
             crate::ComputedCachePolicy::Memoized
         );
-        assert_eq!(computed_entity.purity, crate::ComputedPurity::Unclassified);
+        assert_eq!(computed_entity.purity, crate::ComputedPurity::Pure);
+        assert!(computed_entity.purity_violations.is_empty());
         assert_eq!(
             computed_entity.execution_boundary,
             crate::ExecutionBoundary::Client
@@ -1213,6 +1395,102 @@ class ComputedTypes extends Component {
             asm.serialization_compatibility_of(&chained),
             Some(crate::SerializationCompatibility::Serializable)
         );
+    }
+
+    #[test]
+    fn classifies_computed_purity_and_reports_unsupported_behavior() {
+        let mut parsed = ezc_parser::parse_file(
+            "src/ComputedPurity.tsx",
+            r#"
+@component("x-computed-purity")
+class ComputedPurity extends Component {
+  count = state(1);
+
+  @action()
+  save() {}
+
+  @effect()
+  sync() {}
+
+  @computed()
+  get pure() { return this.count; }
+
+  @computed()
+  get mutates() { this.count++; return 1; }
+
+  @computed()
+  get actionCall() { return this.save(); }
+
+  @computed()
+  get effectCall() { console.log("effect"); return 1; }
+
+  @computed()
+  get resourceCall() { return resource(); }
+
+  @computed()
+  get arbitraryCall() { return helper(); }
+
+  @computed()
+  get random() { return Math.random(); }
+
+  @computed()
+  get asyncValue() { return 1; }
+}
+"#,
+        );
+        parsed.classes[0]
+            .methods
+            .iter_mut()
+            .find(|method| method.name == "asyncValue")
+            .expect("async test getter")
+            .is_async = true;
+
+        let asm = build_application_semantic_model(&parsed);
+        let component = &asm.components[0];
+        let pure = component.id.computed("pure");
+        let mutates = component.id.computed("mutates");
+        let action_call = component.id.computed("actionCall");
+        let effect_call = component.id.computed("effectCall");
+        let resource_call = component.id.computed("resourceCall");
+        let arbitrary_call = component.id.computed("arbitraryCall");
+        let random = component.id.computed("random");
+        let async_value = component.id.computed("asyncValue");
+
+        assert_eq!(
+            asm.computed_value(&pure).expect("pure value").purity,
+            crate::ComputedPurity::Pure
+        );
+        for (computed, kind) in [
+            (mutates, crate::ComputedPurityViolationKind::StateMutation),
+            (action_call, crate::ComputedPurityViolationKind::Action),
+            (effect_call, crate::ComputedPurityViolationKind::Effect),
+            (resource_call, crate::ComputedPurityViolationKind::Resource),
+            (
+                arbitrary_call,
+                crate::ComputedPurityViolationKind::ArbitraryMethodCall,
+            ),
+            (
+                random,
+                crate::ComputedPurityViolationKind::NondeterministicOperation,
+            ),
+            (async_value, crate::ComputedPurityViolationKind::Async),
+        ] {
+            let value = asm.computed_value(&computed).expect("computed value");
+            assert_eq!(value.purity, crate::ComputedPurity::Impure);
+            assert!(value
+                .purity_violations
+                .iter()
+                .any(|violation| violation.kind == kind));
+        }
+        let diagnostics = asm
+            .diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.code == "EZC1034")
+            .collect::<Vec<_>>();
+        assert_eq!(diagnostics.len(), 7);
+        assert!(diagnostics
+            .iter()
+            .all(|diagnostic| diagnostic.provenance.is_some()));
     }
 
     #[test]

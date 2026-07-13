@@ -3,34 +3,39 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: E4 - computed typing
-* Working tree: clean after the E4 commit
+* Latest completed slice: E5 - computed purity
+* Working tree: clean after the E5 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: E4 - computed typing
-* Summary: Assigned canonical inferred type contracts to first-class computed entities.
-* Key files: crates/ezc_core/src/semantic_type.rs; crates/ezc_core/src/application_semantic_model.rs
-* New behavior: Computed expressions and computed entities have canonical type assignments; declared return compatibility, serialization compatibility, execution boundary, and boundary compatibility are retained in computed type records.
-* Fixtures added or changed: focused core coverage for state/computed inference, member access, declared compatibility and incompatibility, serializability, and client-boundary metadata.
+* Slice: E5 - computed purity
+* Summary: Classified computed getters as pure or impure and rejected unsupported behavior with deterministic diagnostics.
+* Key files: crates/ezc_parser/src/model.rs; crates/ezc_parser/src/oxc_adapter.rs; crates/ezc_core/src/computed_value.rs; crates/ezc_core/src/application_semantic_model.rs
+* New behavior: Computed values retain ordered purity violations and emit `EZC1034` diagnostics for state mutation, actions, effects, async, resources, arbitrary calls, and nondeterministic operations.
+* Fixtures added or changed: focused parser/core coverage for pure getters and every E5 unsupported-behavior category.
 
 Current in-progress slice
 
-* Slice: E4 - computed typing
+* Slice: E5 - computed purity
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E4
-* Remaining: E5 - computed purity.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E5
+* Remaining: E6 - populate reactive graph.
 
 Verification
 
 * cargo fmt --all --check: pass
+* cargo test -p ezc_parser: pass
 * cargo test -p ezc_core computed: pass
-* cargo test -p ezc_core semantic_type::tests: pass
 * cargo check -p ezc_cli: pass
+* cargo clippy -p ezc_parser --all-targets -- -D warnings: pass
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 
 Architecture decisions made
+
+* Decision: Purity is a compiler-owned computed-value classification with ordered violation records, while `EZC1034` diagnostics project each violation using its source provenance.
+* Reason: The compiler can reject behavior before any reactive or runtime product consumes the getter, and later tooling can query canonical purity facts rather than reanalyzing method bodies.
+* Tradeoff: E5 detects retained direct method-call facts and existing mutation/async metadata only. It does not model arbitrary nested control flow, resource declarations, or full call-graph effects; E19 will extend the diagnostic catalog beyond this purity contract.
 
 * Decision: The computed entity receives the inferred expression type as its canonical typed subject, while the method retains its existing declared return contract for validation.
 * Reason: Runtime, reactive, and template consumers can address one derived-value type without conflating the value's inferred semantics with its authored declaration.
@@ -552,14 +557,14 @@ Known limitations
 * Item: Method parameters are compiler-owned identifier declarations with canonical source provenance only. They do not execute, close over values, resolve local/template/action references, or support destructuring, defaults, rest declarations, or semantic type checking.
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
-* Item: The canonical expression graph covers supported state initializer expressions and direct supported computed getter returns. Computed expression nodes and entities have inferred canonical types through resolved state/computed reads; unresolved reads infer `unknown` and are not serializable, while evaluation and broader semantics remain later work.
+* Item: The canonical expression graph covers supported state initializer expressions and direct supported computed getter returns. Computed expression nodes and entities have inferred canonical types through resolved state/computed reads; computed values are pure or impure with `EZC1034` purity diagnostics, while reactive scheduling and evaluation remain later work.
 * Item: C30 exposes direct ASM type queries only. CLI inspection output, source diagnostics, backend enforcement, resource declaration lowering, and final type diagnostic families remain later Phase C work.
 * Item: Canonical IR functions currently contain only empty entry basic blocks plus structural branch-edge and natural-loop records. Dominator and post-dominator results include only declared conditional edges; there are no source-lowered branches or loops, condition operands, explicit terminators, or statement instructions yet.
 * Item: Source lowering still creates empty function value registries and no method load/store instructions. D3-A can analyze manually constructed canonical IR now; subsequent lowering slices must populate values before source data-flow results become non-empty.
 
 Exact next step
 
-Next is E5: classify computed purity and reject unsupported behavior—mutation, actions, effects, async, resources, arbitrary calls, and nondeterminism—using deterministic compiler diagnostics. Do not populate the reactive graph or add IR/runtime behavior.
+Next is E6: populate the canonical reactive graph from computed declarations using compiler-owned read and invalidation edges. Do not add transitive analysis, cycle diagnostics, scheduler planning, IR, or runtime behavior.
 
 Useful commands
 
@@ -590,4 +595,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the E4 commit.
+* None after the E5 commit.

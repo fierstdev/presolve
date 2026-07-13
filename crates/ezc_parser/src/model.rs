@@ -235,6 +235,14 @@ pub struct ParsedMethod {
     pub return_type_annotation: Option<ParsedTypeAnnotation>,
     pub return_values: Vec<ParsedSerializableValue>,
     pub computed_expression: Option<ParsedComputedExpression>,
+    pub calls: Vec<ParsedMethodCall>,
+}
+
+/// One directly authored method call retained for computed-purity analysis.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedMethodCall {
+    pub callee: String,
+    pub span: SourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

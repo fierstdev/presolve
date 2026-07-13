@@ -14,7 +14,8 @@ use ezc_parser::{
     ParsedConstantExpression, ParsedConstantExpressionKind, ParsedEventHandler, ParsedFile,
     ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional,
     ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLogicalOperator, ParsedMethod,
-    ParsedSerializableValue, ParsedStateOperation, ParsedUnaryOperator, SourceSpan,
+    ParsedMethodCall, ParsedSerializableValue, ParsedStateOperation, ParsedUnaryOperator,
+    SourceSpan,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -508,12 +509,21 @@ pub struct ComponentMethod {
     pub name: String,
     pub is_getter: bool,
     pub is_async: bool,
+    pub decorators: Vec<String>,
     pub semantic_role: MethodSemanticRole,
     pub local_variables: Vec<MethodLocalVariable>,
     pub parameters: Vec<MethodParameter>,
     pub declared_return_type: Option<DeclaredStateType>,
     pub return_values: Vec<SerializableValue>,
     pub computed_expression: Option<ComputedExpression>,
+    pub calls: Vec<MethodCall>,
+}
+
+/// A compiler-owned call fact retained for computed-purity analysis.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MethodCall {
+    pub callee: String,
+    pub span: SourceSpan,
 }
 
 /// Additional semantic role carried by a compiler-owned method declaration.
@@ -821,6 +831,11 @@ fn component_method_from_parsed(
         name: method.name.clone(),
         is_getter: method.is_getter,
         is_async: method.is_async,
+        decorators: method
+            .decorators
+            .iter()
+            .map(|decorator| decorator.name.clone())
+            .collect(),
         semantic_role,
         local_variables: method
             .local_variables
@@ -865,6 +880,14 @@ fn component_method_from_parsed(
             .map(serializable_value_from_parsed)
             .collect(),
         computed_expression,
+        calls: method.calls.iter().map(method_call_from_parsed).collect(),
+    }
+}
+
+fn method_call_from_parsed(call: &ParsedMethodCall) -> MethodCall {
+    MethodCall {
+        callee: call.callee.clone(),
+        span: call.span,
     }
 }
 

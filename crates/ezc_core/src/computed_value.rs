@@ -8,13 +8,46 @@ pub enum ComputedCachePolicy {
     Memoized,
 }
 
-/// Current compiler classification of a computed getter's purity.
-///
-/// E1 records the classification boundary but deliberately does not inspect a
-/// getter body. E5 will replace `Unclassified` with validated classifications.
+/// Compiler classification of a computed getter's purity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ComputedPurity {
     Unclassified,
+    Pure,
+    Impure,
+}
+
+/// Unsupported behavior that makes a computed getter impure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ComputedPurityViolationKind {
+    StateMutation,
+    Action,
+    Effect,
+    Async,
+    Resource,
+    ArbitraryMethodCall,
+    NondeterministicOperation,
+}
+
+impl ComputedPurityViolationKind {
+    #[must_use]
+    pub const fn description(self) -> &'static str {
+        match self {
+            Self::StateMutation => "state mutation",
+            Self::Action => "action invocation",
+            Self::Effect => "effectful operation",
+            Self::Async => "async execution",
+            Self::Resource => "resource access",
+            Self::ArbitraryMethodCall => "arbitrary method call",
+            Self::NondeterministicOperation => "nondeterministic operation",
+        }
+    }
+}
+
+/// One compiler-owned purity violation with its authored location.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ComputedPurityViolation {
+    pub kind: ComputedPurityViolationKind,
+    pub provenance: SourceProvenance,
 }
 
 /// A first-class compiler semantic entity for one `@computed()` getter.
@@ -26,6 +59,7 @@ pub struct ComputedValue {
     pub name: String,
     pub cache_policy: ComputedCachePolicy,
     pub purity: ComputedPurity,
+    pub purity_violations: Vec<ComputedPurityViolation>,
     pub execution_boundary: ExecutionBoundary,
     pub provenance: SourceProvenance,
 }
@@ -62,6 +96,7 @@ pub fn collect_computed_values(
                             name: method.name.clone(),
                             cache_policy: ComputedCachePolicy::Memoized,
                             purity: ComputedPurity::Unclassified,
+                            purity_violations: Vec::new(),
                             execution_boundary: ExecutionBoundary::Client,
                             provenance,
                         },
@@ -105,6 +140,7 @@ class Computed extends Component {
         assert_eq!(computed.owner, component.methods[0].owner);
         assert_eq!(computed.cache_policy, ComputedCachePolicy::Memoized);
         assert_eq!(computed.purity, ComputedPurity::Unclassified);
+        assert!(computed.purity_violations.is_empty());
         assert_eq!(computed.execution_boundary, ExecutionBoundary::Client);
     }
 }

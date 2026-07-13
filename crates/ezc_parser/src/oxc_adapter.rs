@@ -21,9 +21,9 @@ use crate::model::{
     ParsedExport, ParsedExportKind, ParsedExportSpecifier, ParsedFile, ParsedImport,
     ParsedImportSpecifier, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild,
     ParsedJsxConditional, ParsedJsxElement, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode,
-    ParsedLocalVariable, ParsedLogicalOperator, ParsedMethod, ParsedMethodParameter,
-    ParsedProperty, ParsedSerializableValue, ParsedStateOperation, ParsedStateUpdate,
-    ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator, SourceSpan,
+    ParsedLocalVariable, ParsedLogicalOperator, ParsedMethod, ParsedMethodCall,
+    ParsedMethodParameter, ParsedProperty, ParsedSerializableValue, ParsedStateOperation,
+    ParsedStateUpdate, ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator, SourceSpan,
 };
 
 pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
@@ -414,6 +414,7 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
     let mut state_updates = Vec::new();
     let mut local_variables = Vec::new();
     let mut return_values = Vec::new();
+    let mut calls = Vec::new();
     let parameters = method
         .value
         .params
@@ -442,6 +443,7 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
             if let Some(value) = parsed_return_value(statement) {
                 return_values.push(value);
             }
+            collect_method_calls(statement, source, &mut calls);
         }
     }
 
@@ -476,7 +478,61 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
             .map(|annotation| parsed_type_annotation(annotation.span, source)),
         return_values,
         computed_expression,
+        calls,
     })
+}
+
+fn collect_method_calls(
+    statement: &Statement<'_>,
+    source: &str,
+    calls: &mut Vec<ParsedMethodCall>,
+) {
+    let expression = match statement {
+        Statement::ExpressionStatement(statement) => Some(&statement.expression),
+        Statement::ReturnStatement(statement) => statement.argument.as_ref(),
+        _ => None,
+    };
+    if let Some(expression) = expression {
+        collect_calls_from_expression(expression, source, calls);
+    }
+}
+
+fn collect_calls_from_expression(
+    expression: &Expression<'_>,
+    source: &str,
+    calls: &mut Vec<ParsedMethodCall>,
+) {
+    match expression {
+        Expression::ParenthesizedExpression(parenthesized) => {
+            collect_calls_from_expression(&parenthesized.expression, source, calls);
+        }
+        Expression::CallExpression(call) => {
+            if let Some(callee) = expression_summary(&call.callee) {
+                calls.push(ParsedMethodCall {
+                    callee,
+                    span: source_span(source, call.span),
+                });
+            }
+            collect_calls_from_expression(&call.callee, source, calls);
+            for argument in &call.arguments {
+                if let Some(expression) = argument.as_expression() {
+                    collect_calls_from_expression(expression, source, calls);
+                }
+            }
+        }
+        Expression::BinaryExpression(binary) => {
+            collect_calls_from_expression(&binary.left, source, calls);
+            collect_calls_from_expression(&binary.right, source, calls);
+        }
+        Expression::LogicalExpression(logical) => {
+            collect_calls_from_expression(&logical.left, source, calls);
+            collect_calls_from_expression(&logical.right, source, calls);
+        }
+        Expression::UnaryExpression(unary) => {
+            collect_calls_from_expression(&unary.argument, source, calls);
+        }
+        _ => {}
+    }
 }
 
 fn parsed_computed_expression(
