@@ -1,6 +1,11 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use ezc_core::{
+    build_application_semantic_model, build_resume_plan, lower_components_to_ir,
+    optimize_computed_ir, IrConstant, IrInstructionKind, SerializationCompatibility,
+};
+
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
@@ -470,6 +475,154 @@ fn asm_and_explain_inspect_canonical_computed_metadata() {
     assert!(text.contains("  computed:\n"));
     assert!(text.contains("    evaluation order: Some(1)\n"));
     assert!(text.contains("    purity: pure\n"));
+}
+
+#[test]
+fn computed_fixture_suite_covers_arithmetic_diamond_and_cycles() {
+    let repo_root = repo_root();
+    let arithmetic_path = "fixtures/0046-computed-arithmetic/input/ComputedArithmetic.tsx";
+    let arithmetic_component = format!("module:{arithmetic_path}/component:x-computed-arithmetic");
+    let total = format!("{arithmetic_component}/computed:total");
+    let count = format!("{arithmetic_component}/state:count");
+    let offset = format!("{arithmetic_component}/state:offset");
+    let arithmetic = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "asm",
+            arithmetic_path,
+            "--entity",
+            &total,
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("failed to inspect computed arithmetic fixture");
+    assert!(arithmetic.status.success());
+    let arithmetic: serde_json::Value =
+        serde_json::from_slice(&arithmetic.stdout).expect("computed arithmetic fixture JSON");
+    assert_eq!(arithmetic["entity"]["computed"]["computed_type"], "number");
+    assert_eq!(
+        arithmetic["entity"]["computed"]["dependencies"],
+        serde_json::json!([count, offset])
+    );
+
+    let diamond_path = "fixtures/0047-computed-diamond/input/ComputedDiamond.tsx";
+    let diamond_component = format!("module:{diamond_path}/component:x-computed-diamond");
+    let diamond_total = format!("{diamond_component}/computed:total");
+    let diamond = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "asm",
+            diamond_path,
+            "--entity",
+            &diamond_total,
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("failed to inspect computed diamond fixture");
+    assert!(diamond.status.success());
+    let diamond: serde_json::Value =
+        serde_json::from_slice(&diamond.stdout).expect("computed diamond fixture JSON");
+    let dependencies = diamond["entity"]["computed"]["dependencies"]
+        .as_array()
+        .expect("computed diamond dependencies");
+    assert!(dependencies
+        .iter()
+        .any(|dependency| dependency == &format!("{diamond_component}/computed:doubled")));
+    assert!(dependencies
+        .iter()
+        .any(|dependency| dependency == &format!("{diamond_component}/computed:tripled")));
+    assert!(dependencies
+        .iter()
+        .any(|dependency| dependency == &format!("{diamond_component}/state:count")));
+
+    let cycle = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "check",
+            "fixtures/0048-computed-cycle-diagnostics/input/ComputedCycle.tsx",
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("failed to check computed cycle fixture");
+    assert!(!cycle.status.success());
+    let cycle: serde_json::Value =
+        serde_json::from_slice(&cycle.stdout).expect("computed cycle fixture JSON");
+    assert!(cycle["compiler_diagnostics"]
+        .as_array()
+        .is_some_and(|diagnostics| {
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic["code"] == "EZC1035")
+        }));
+}
+
+#[test]
+fn computed_fixture_suite_covers_folding_and_serialization() {
+    let repo_root = repo_root();
+    let folding_path =
+        repo_root.join("fixtures/0049-computed-constant-folding/input/ComputedConstantFolding.tsx");
+    let folding_source =
+        std::fs::read_to_string(&folding_path).expect("failed to read computed folding fixture");
+    let folding_parsed = ezc_parser::parse_file(&folding_path, &folding_source);
+    let folding_asm = build_application_semantic_model(&folding_parsed);
+    let answer = folding_asm.components[0].id.computed("answer");
+    let optimized = optimize_computed_ir(&lower_components_to_ir(&folding_asm));
+    let function = optimized.output.modules[0]
+        .functions
+        .iter()
+        .find(|function| function.id == answer)
+        .expect("optimized computed folding function");
+    assert_eq!(function.blocks[0].instructions.len(), 1);
+    assert!(matches!(
+        function.blocks[0].instructions[0].kind,
+        IrInstructionKind::Constant {
+            value: IrConstant::Number(ref value)
+        } if value == "3"
+    ));
+
+    let serialization_path =
+        repo_root.join("fixtures/0050-computed-serialization/input/ComputedSerialization.tsx");
+    let serialization_source = std::fs::read_to_string(&serialization_path)
+        .expect("failed to read computed serialization fixture");
+    let serialization_parsed = ezc_parser::parse_file(&serialization_path, &serialization_source);
+    let serialization_asm = build_application_semantic_model(&serialization_parsed);
+    let snapshot = serialization_asm.components[0].id.computed("snapshot");
+    assert_eq!(
+        serialization_asm.serialization_compatibility_of(&snapshot),
+        Some(SerializationCompatibility::Serializable)
+    );
+    assert_eq!(
+        build_resume_plan(&serialization_asm).components[0].computed[0].computed,
+        snapshot
+    );
+}
+
+#[test]
+fn computed_fixture_suite_covers_multi_file_identity() {
+    let repo_root = repo_root();
+    let alpha_path = "fixtures/0051-computed-multi-file/input/AlphaComputed.tsx";
+    let beta_path = "fixtures/0051-computed-multi-file/input/BetaComputed.tsx";
+    let multi_file = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["asm", alpha_path, beta_path, "--format", "json"])
+        .output()
+        .expect("failed to inspect computed multi-file fixture");
+    assert!(multi_file.status.success());
+    let multi_file: serde_json::Value =
+        serde_json::from_slice(&multi_file.stdout).expect("computed multi-file fixture JSON");
+    assert_eq!(
+        multi_file["files"],
+        serde_json::json!([alpha_path, beta_path])
+    );
+    assert!(multi_file["entities"].as_array().is_some_and(|entities| {
+        entities.iter().any(|entity| entity["id"]
+            == "module:fixtures/0051-computed-multi-file/input/AlphaComputed.tsx/component:x-alpha-computed/computed:doubled")
+            && entities.iter().any(|entity| entity["id"]
+                == "module:fixtures/0051-computed-multi-file/input/BetaComputed.tsx/component:x-beta-computed/computed:title")
+    }));
 }
 
 #[test]

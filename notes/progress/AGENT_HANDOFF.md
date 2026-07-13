@@ -3,33 +3,38 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: E19 - computed diagnostics
-* Working tree: clean after the E19 commit
+* Latest completed slice: E20 - computed fixture suite
+* Working tree: clean after the E20 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: E19 - computed diagnostics
-* Summary: Computed semantics now emit stable compiler diagnostics from canonical ASM products.
-* Key files: crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/computed_value.rs; README.md
-* New behavior: `EZC1034` through `EZC1040` cover purity violations, dependency cycles, invalid declarations, unsupported bodies, unresolved reads, declared-return type mismatches, and non-serializable results. Every computed diagnostic is deterministic and carries canonical source provenance.
-* Fixtures added or changed: focused core regression coverage uses an inline parser case; E20 fixture-suite expansion remains untouched.
+* Slice: E20 - computed fixture suite
+* Summary: The Phase E fixture suite now covers compiler and browser computed-value contracts end to end.
+* Key files: fixtures/0046-computed-arithmetic; fixtures/0047-computed-diamond; fixtures/0048-computed-cycle-diagnostics; fixtures/0049-computed-constant-folding; fixtures/0050-computed-serialization; fixtures/0051-computed-multi-file; crates/ezc_cli/tests/explain.rs; crates/ezc_cli/tests/runtime_browser.rs
+* New behavior: Compiler fixtures validate arithmetic, diamond topology, cycle diagnostics, immutable folding, structural serialization/resume eligibility, and multi-file IDs. Browser fixtures cover chains, batching, and diamond recomputation from compiler-generated evaluation plans.
+* Fixtures added or changed: added six fixture directories (seven TSX inputs) for E20; existing E13/E15/E16 fixtures continue to cover template bindings, chains, and batching.
 
 Current in-progress slice
 
-* Slice: E19 - computed diagnostics
+* Slice: E20 - computed fixture suite
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E19
-* Remaining: E20 - computed fixture suite.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E20
+* Remaining: E21 - stability audit.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core reports_stable_diagnostics_for_computed_semantics: pass
-* cargo test -p ezc_core computed: pass
-* cargo clippy -p ezc_core --all-targets -- -D warnings: pass
+* cargo test -p ezc_cli computed_fixture_suite: pass
+* cargo test -p ezc_cli asm_command_filters_template_computed_references: pass
+* RUST_TEST_THREADS=1 cargo test -p ezc_cli --test runtime_browser computed -- --nocapture: pass
+* cargo clippy -p ezc_cli --all-targets -- -D warnings: pass
 
 Architecture decisions made
+
+* Decision: E20 adds narrow source fixtures for every roadmap scenario and reuses the existing browser harness only for behaviors that execute at runtime.
+* Reason: Compiler-only contracts (cycles, folding, serialization, and multi-file identity) stay deterministic and cheap to diagnose, while chain, batching, and diamond cache refreshes are proven in a real browser against compiler-generated artifacts.
+* Tradeoff: Fixture coverage validates existing Phase E products; it does not add new language semantics, make computed template bindings dynamically refresh, or introduce runtime dependency discovery. E21 owns the final stability audit and contract freeze.
 
 * Decision: `ComputedDiagnosticCode` centralizes the stable `EZC1034`--`EZC1040` catalog, while E19 projects invalid declarations, unsupported bodies, unresolved reads, type compatibility, and serialization from existing canonical ASM products.
 * Reason: Diagnostics share the same computed entities, expression graph, purity facts, reactive cycle analysis, and semantic type model used by the rest of the compiler; no runtime observation or CLI-specific analysis determines an error.
@@ -618,7 +623,7 @@ Known limitations
 
 Exact next step
 
-Next is E20: add the comprehensive computed compiler and browser fixture suite for arithmetic, chains, diamonds, batching, template bindings, cycles, compile-time folding, serialization, and multi-file cases. Do not begin the stability audit or runtime extensions.
+Next is E21: perform the Phase E stability audit. Remove duplicate logic; verify canonical ASM ownership, reactive graph and scheduler consumption, and IR validation; freeze inspection contracts; document unsupported semantics; then update this handoff and the Progress Log. Do not add new runtime behavior or roadmap features.
 
 Useful commands
 

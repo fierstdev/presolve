@@ -108,6 +108,15 @@ ezc_cli asm <file> --entity <semantic-id> --reference-kind action-state
 `template-state`, `template-computed`, or `template-local`. Filters require an
 entity selector and affect only the returned children or relations.
 
+## Computed fixture suite
+
+The Phase E computed fixtures span `fixtures/0043` through `fixtures/0051`:
+template bindings, runtime chains, batched invalidation, arithmetic, diamond
+dependencies, cycles, immutable constant folding, serialization, and
+multi-file identity. The real-browser cases exercise the runtime chain,
+batching, and diamond fixtures; the remaining cases validate canonical compiler
+products and diagnostics.
+
 ## Semantic graph export
 
 Export the canonical ASM as a stable JSON graph:

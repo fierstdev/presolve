@@ -1208,6 +1208,57 @@ fn multi_step_actions_flush_one_compiler_generated_computed_batch() {
     );
 }
 
+#[test]
+fn diamond_computed_values_recompute_from_compiler_generated_batches() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/computed-diamond");
+
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean previous browser test output");
+    }
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0047-computed-diamond/input/ComputedDiamond.tsx",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("browser test output path was not valid UTF-8"),
+        ])
+        .output()
+        .expect("failed to build computed diamond fixture");
+    assert!(output.status.success());
+
+    write_diamond_computed_probe_page(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile dir");
+    let user_data_dir = format!(
+        "--user-data-dir={}",
+        profile_dir
+            .to_str()
+            .expect("Chrome profile path was not valid UTF-8")
+    );
+    let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
+
+    let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+
+    assert!(
+        stdout.contains("EDGEZERO_COMPUTED_DIAMOND_BROWSER_TEST_PASS"),
+        "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 fn write_computed_runtime_probe_page(out_dir: &Path) {
     let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
     let probe = index.replace(
@@ -1285,6 +1336,44 @@ const computedValue = (name) => window.__EDGEZERO__.computed
     );
 
     fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
+}
+
+fn write_diamond_computed_probe_page(out_dir: &Path) {
+    fs::write(
+        out_dir.join("probe.html"),
+        r#"<!doctype html>
+<html><body><script type="module">
+import "./runtime.js";
+const fail = (message) => { throw new Error(message); };
+const waitFor = async (predicate, label) => {
+  const deadline = Date.now() + 3000;
+  while (!predicate()) {
+    if (Date.now() >= deadline) fail(`timed out waiting for ${label}`);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+};
+const computedValue = (name) => window.__EDGEZERO__.computed
+  .find((entry) => entry.computed.endsWith(`/computed:${name}`))?.value;
+(async () => {
+  await waitFor(() => window.__EDGEZERO__?.ready === true, "runtime readiness");
+  if (computedValue("doubled") !== 2 || computedValue("tripled") !== 3 || computedValue("total") !== 5) {
+    fail("initial computed diamond values were incorrect");
+  }
+  document.querySelector("button")?.click();
+  await waitFor(() => computedValue("total") === 10, "computed diamond update");
+  if (computedValue("doubled") !== 4 || computedValue("tripled") !== 6) fail("diamond prerequisites did not refresh");
+  if (window.__EDGEZERO__.computed_update_runs !== 1) fail("diamond action did not flush one batch");
+  if (window.__EDGEZERO__.computed.some((entry) => entry.dirty)) fail("computed diamond caches remained dirty");
+  if (window.__EDGEZERO__.diagnostics.length !== 0) fail("computed diamond reported diagnostics");
+  document.body.dataset.browserTest = "pass";
+  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_COMPUTED_DIAMOND_BROWSER_TEST_PASS</div>");
+})().catch((error) => {
+  document.body.dataset.browserTest = "fail";
+  document.body.insertAdjacentHTML("beforeend", `<pre>EDGEZERO_COMPUTED_DIAMOND_BROWSER_TEST_FAIL: ${error.message}</pre>`);
+});
+</script></body></html>"#,
+    )
+    .expect("failed to write computed diamond probe page");
 }
 
 fn write_probe_page(out_dir: &Path) {
