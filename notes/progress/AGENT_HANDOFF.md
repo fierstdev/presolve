@@ -3,32 +3,33 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: F19 - effect fixture expansion
-* Working tree: F19 is complete and ready for its commit
+* Latest completed slice: F20 - effect stability audit
+* Working tree: F20 is complete and ready for its commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: F19 - effect fixture expansion
-* Summary: Compiler fixture coverage now exercises valid capability programs, direct and computed dependencies, shared computed prerequisites, action-batch deduplication, dependency-free initial effects, invalid effects/capability failures, and multi-module effect identity. Existing browser fixtures continue to prove initial and completed-action execution in Chrome.
-* Key files: fixtures/0054-effect-fixture-matrix/input/EffectFixtureMatrix.tsx; fixtures/0055-effect-multi-file-identity/input/*.tsx; crates/ezc_cli/tests/explain.rs; crates/ezc_cli/tests/runtime_browser.rs
-* New behavior: No language semantics changed. The matrix fixture freezes expected compiler products through deterministic ASM assertions, while the multi-file fixture proves that effect IDs stay module-qualified.
-* Fixtures added or changed: 0054 is the valid effect capability/dependency/action-batch matrix; 0055 is the multi-file identity matrix. 0052 remains the invalid/capability-failure fixture and 0053 remains the browser initial/post-action runtime fixture.
+* Slice: F20 - effect stability audit
+* Summary: Phase F is complete. The audit confirms every effect behavior derives from canonical compiler products: semantic entities/bodies/types, the shared reactive graph and scheduler, canonical/optimized IR, the runtime registry/artifact, the template action-batch bridge, diagnostics, inspection, and resumability planning.
+* Key files: crates/ezc_core/src/effect_capability.rs; crates/ezc_core/src/effect.rs; crates/ezc_core/src/intermediate_representation.rs; crates/ezc_core/src/runtime_effect*.rs; crates/ezc_core/src/runtime_codegen.rs; crates/ezc_core/src/effect_diagnostics.rs; crates/ezc_core/src/effect_inspection.rs
+* New behavior: No code change. The audited contracts are frozen at capability registry v1, template/resume schema v2, runtime-effect artifact schema v1, check JSON schema v2, and ASM inspection schema v4.
+* Unsupported semantics: Effects are synchronous terminal consumers. They cannot mutate reactive state, invoke component actions/effects/methods as reactive work, return cleanup/value callbacks, use async behavior, become template event handlers, or discover dependencies/capabilities/action batches at runtime.
 
 Current in-progress slice
 
-* Slice: F20 - effect stability audit
-* Status: Ready to begin after the F19 commit
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F17
-* Remaining: F20. Freeze the completed Phase F contracts after auditing canonical ownership, reuse, determinism, diagnostics, inspection, and unsupported semantics.
+* Slice: Phase F - effects
+* Status: Complete; await a new roadmap phase
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20
+* Remaining: No Phase F slices remain.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_cli --test explain: pending final F19 verification
+* cargo test -p ezc_core --lib: pass (171 tests)
+* cargo test -p ezc_cli --test explain: pass (123 tests)
 * cargo test -p ezc_cli --test runtime_browser initial_effects_execute_once_from_compiler_generated_runtime_programs -- --exact: pass
 * cargo test -p ezc_cli --test runtime_browser completed_action_batches_execute_compiler_planned_effects_once -- --exact: pass
-* cargo clippy -p ezc_cli --all-targets -- -D warnings: pending final F19 verification
+* cargo clippy --workspace --all-targets -- -D warnings: pass
 
 Architecture decisions made
 
