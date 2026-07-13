@@ -17,10 +17,10 @@ Last completed slice
 
 Current in-progress slice
 
-* Slice: F1 - canonical effect entities
-* Status: Complete
+* Slice: F2 - effect body lowering
+* Status: Paused awaiting the canonical supported effect-statement contract
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1
-* Remaining: F2 - effect body lowering, then F3 through F20.
+* Remaining: F2 - effect body lowering, then F3 through F20. Do not begin F2 until the body contract below is decided.
 
 Verification
 
@@ -37,6 +37,10 @@ Architecture decisions made
 * Decision: Every F1 effect is client-bound with one compiler policy, `AfterInitialRenderAndCompletedActionBatch`.
 * Reason: Initial execution and post-batch execution are language timing semantics, not an opt-in runtime convention. Storing the complete policy on the entity prevents a later runtime layer from choosing timing dynamically.
 * Tradeoff: F1 does not yet determine whether a particular completed batch triggers an effect or execute it. F6--F9 will derive trigger and scheduler placement from canonical dependency products.
+
+* Decision needed before F2: define the canonical supported effect-statement vocabulary and how its expression operands enter the existing expression graph.
+* Reason: The roadmap requires imperative body lowering and says to reuse the expression graph where appropriate, but does not specify the stable forms for external member assignments (such as `document.title = this.title`), capability calls, returns/cleanup candidates, or unsupported statements. That choice directly shapes F3 reference resolution, F5 diagnostics, F10 IR, and capability metadata.
+* Tradeoff: F1 remains complete and committed, but F2 must not select a body AST or preserve unsupported syntax ad hoc. Await guidance on the supported F2 forms and whether assignment/call operands should receive canonical expression-graph nodes now.
 
 * Decision: ASM validation resolves typed subjects through either canonical semantic entities or canonical expression-graph nodes, using the subject's authoritative provenance in either case.
 * Reason: Expression nodes are first-class compiler products with stable IDs and spans, but are intentionally not modeled as generic semantic entities. Validation must preserve that separation while accepting their canonical type assignments.
