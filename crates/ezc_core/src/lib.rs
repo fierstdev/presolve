@@ -28,6 +28,7 @@ pub mod resume_manifest;
 pub mod resume_plan;
 pub mod route_graph;
 pub mod runtime_codegen;
+pub mod runtime_computed;
 pub mod semantic_graph;
 pub mod semantic_id;
 pub mod semantic_provenance;
@@ -105,6 +106,10 @@ pub use resume_manifest::{
 };
 pub use resume_plan::{build_resume_plan, ResumeComponentPlan, ResumePlan};
 pub use runtime_codegen::generate_runtime_stub;
+pub use runtime_computed::{
+    build_runtime_computed_registry, RuntimeComputedCacheSlot, RuntimeComputedDirtyFlag,
+    RuntimeComputedRecord, RuntimeComputedRegistry,
+};
 pub use semantic_graph::{
     build_semantic_graph, semantic_graph_json, SemanticGraph, SemanticGraphEdge,
     SemanticGraphEdgeKind, SemanticGraphNode, SemanticGraphNodeKind, SemanticGraphProvenance,
