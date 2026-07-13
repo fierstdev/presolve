@@ -13,6 +13,7 @@ pub mod component_graph;
 pub mod computed_value;
 pub mod effect;
 pub mod effect_capability;
+pub mod effect_inspection;
 pub mod effect_resume;
 pub mod explain;
 pub mod expression_graph;
@@ -91,6 +92,15 @@ pub use effect_capability::{
     CapabilityResultPolicy, CapabilitySignature, CapabilityValueContract, EffectCapabilityRegistry,
     RuntimeCapabilityLowering, StaticCapabilityPath, EFFECT_CAPABILITY_REGISTRY,
     EFFECT_CAPABILITY_REGISTRY_VERSION,
+};
+pub use effect_inspection::{
+    build_effect_inspection_registry, validate_effect_inspection_registry, EffectInspection,
+    EffectInspectionActionTrigger, EffectInspectionCapability, EffectInspectionDependencies,
+    EffectInspectionInitialTrigger, EffectInspectionIr, EffectInspectionPrerequisiteBatch,
+    EffectInspectionProvenance, EffectInspectionRegistry, EffectInspectionResumability,
+    EffectInspectionRuntime, EffectInspectionSchedule, EffectInspectionScheduledAction,
+    EffectInspectionUnplanned, EffectInspectionValidation, EffectInspectionValidationDiagnostic,
+    EffectInspectionViolation,
 };
 pub use effect_resume::{
     build_effect_resume_plan, validate_effect_resume_plan, EffectActivationSlotId,

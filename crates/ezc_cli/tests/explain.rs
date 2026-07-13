@@ -204,7 +204,7 @@ fn asm_command_emits_deterministic_json_inspection() {
 
     let document: serde_json::Value =
         serde_json::from_slice(&first.stdout).expect("ASM inspection output was not valid JSON");
-    assert_eq!(document["schema_version"], 2);
+    assert_eq!(document["schema_version"], 3);
     assert_eq!(
         document["file"],
         "fixtures/0001-source-summary/input/Counter.tsx"
@@ -355,7 +355,7 @@ fn asm_command_inspects_one_semantic_entity() {
 
     assert!(output.status.success());
     let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("entity JSON");
-    assert_eq!(document["schema_version"], 2);
+    assert_eq!(document["schema_version"], 3);
     assert_eq!(document["entity"]["id"], entity_id);
     assert_eq!(document["entity"]["kind"], "state-field");
     assert_eq!(document["entity"]["semantic_type"]["type_text"], "number");
@@ -442,7 +442,7 @@ fn asm_and_explain_inspect_canonical_computed_metadata() {
 
     let document: serde_json::Value =
         serde_json::from_slice(&asm.stdout).expect("computed entity inspection JSON");
-    assert_eq!(document["schema_version"], 2);
+    assert_eq!(document["schema_version"], 3);
     assert_eq!(document["entity"]["computed"]["computed_type"], "number");
     assert_eq!(
         document["entity"]["computed"]["dependencies"],
@@ -475,6 +475,91 @@ fn asm_and_explain_inspect_canonical_computed_metadata() {
     assert!(text.contains("  computed:\n"));
     assert!(text.contains("    evaluation order: Some(1)\n"));
     assert!(text.contains("    purity: pure\n"));
+}
+
+#[test]
+fn asm_and_explain_project_one_canonical_effect_inspection_record() {
+    let path = "fixtures/0053-effect-initial-runtime/input/InitialEffectRuntime.tsx";
+    let component = format!("module:{path}/component:x-effect-initial-runtime");
+    let effect = format!("{component}/effect:report");
+    let count = format!("{component}/state:count");
+    let title = format!("{component}/state:title");
+    let doubled = format!("{component}/computed:doubled");
+    let batch = format!("{component}/action-batch:update");
+    let args = [path, "--entity", &effect, "--format", "json"];
+
+    let asm = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .arg("asm")
+        .args(args)
+        .output()
+        .expect("failed to inspect effect through asm");
+    let explain = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .arg("explain")
+        .args(args)
+        .output()
+        .expect("failed to inspect effect through explain");
+    let full = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["asm", path, "--format", "json"])
+        .output()
+        .expect("failed to inspect full ASM document");
+    let text = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["asm", path, "--entity", &effect])
+        .output()
+        .expect("failed to inspect effect text");
+
+    assert!(asm.status.success());
+    assert!(explain.status.success());
+    assert!(full.status.success());
+    assert!(text.status.success());
+    assert_eq!(asm.stdout, explain.stdout);
+
+    let selected: serde_json::Value = serde_json::from_slice(&asm.stdout).expect("effect JSON");
+    let inspection = &selected["entity"]["effect"];
+    assert_eq!(selected["schema_version"], 3);
+    assert_eq!(inspection["validation"]["status"], "valid");
+    assert_eq!(
+        inspection["direct_dependencies"]["state"],
+        serde_json::json!([title])
+    );
+    assert_eq!(
+        inspection["direct_dependencies"]["computed"],
+        serde_json::json!([doubled])
+    );
+    assert_eq!(
+        inspection["transitive_dependencies"]["state"],
+        serde_json::json!([count, title])
+    );
+    assert_eq!(inspection["dependents"], serde_json::json!([]));
+    assert_eq!(
+        inspection["initial_trigger"]["render_boundary"],
+        "after_initial_render"
+    );
+    assert_eq!(inspection["action_triggers"][0]["action_batch_id"], batch);
+    assert_eq!(
+        inspection["action_triggers"][0]["required_computed"],
+        serde_json::json!([doubled])
+    );
+    assert_eq!(inspection["capabilities"].as_array().map(Vec::len), Some(3));
+    assert_eq!(inspection["ir"]["function_id"], effect);
+    assert_eq!(inspection["runtime"]["registered"], true);
+    assert_eq!(inspection["resumability"]["initial_status"], "pending");
+
+    let full: serde_json::Value = serde_json::from_slice(&full.stdout).expect("full effect JSON");
+    let full_entity = full["entities"]
+        .as_array()
+        .expect("full entities")
+        .iter()
+        .find(|entity| entity["id"] == effect)
+        .expect("effect entity in full document");
+    assert_eq!(full_entity["effect"], inspection.clone());
+
+    let text = String::from_utf8(text.stdout).expect("effect text");
+    assert!(text.contains("  Effect:\n"));
+    assert!(text.contains("    Resumability:"));
 }
 
 #[test]

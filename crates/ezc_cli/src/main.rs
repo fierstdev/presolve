@@ -8,17 +8,18 @@ use std::process;
 
 use ezc_core::{
     build_application_semantic_model_for_unit, build_component_graph,
-    build_runtime_computed_artifact, build_runtime_effect_artifact, build_semantic_graph,
-    build_template_graph, build_template_manifest_from_asm, explain_json, explain_text,
-    fold_component_graph, generate_runtime_stub, generate_standalone_page_with_effect_runtime,
-    generate_static_html, lower_components_to_ir, optimize_effect_ir,
-    runtime_computed_artifact_json, runtime_effect_artifact_json, semantic_graph_json,
-    semantic_type_text, summarize_source, template_manifest_json,
-    validate_application_semantic_model, ApplicationSemanticModel, AsmValidationDiagnostic,
-    AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
-    ImmutableAsmPass, RenderAttribute, RenderAttributeValue, SemanticEntity, SemanticEntityKind,
-    SemanticId, SemanticOwner, SemanticReferenceKind, SerializableValue, SourceProvenance,
-    StateOperation, TemplateChild, TemplateGraph, TemplateSemanticKind,
+    build_effect_inspection_registry, build_runtime_computed_artifact,
+    build_runtime_effect_artifact, build_semantic_graph, build_template_graph,
+    build_template_manifest_from_asm, explain_json, explain_text, fold_component_graph,
+    generate_runtime_stub, generate_standalone_page_with_effect_runtime, generate_static_html,
+    lower_components_to_ir, optimize_effect_ir, runtime_computed_artifact_json,
+    runtime_effect_artifact_json, semantic_graph_json, semantic_type_text, summarize_source,
+    template_manifest_json, validate_application_semantic_model, ApplicationSemanticModel,
+    AsmValidationDiagnostic, AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass,
+    DeclaredStateTypeKind, EffectInspection, EffectInspectionRegistry, ImmutableAsmPass,
+    RenderAttribute, RenderAttributeValue, SemanticEntity, SemanticEntityKind, SemanticId,
+    SemanticOwner, SemanticReferenceKind, SerializableValue, SourceProvenance, StateOperation,
+    TemplateChild, TemplateGraph, TemplateSemanticKind,
 };
 use ezc_parser::{
     parse_file, ParseDiagnostic, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
@@ -26,7 +27,7 @@ use ezc_parser::{
 };
 use serde::Serialize;
 
-const ASM_INSPECTION_SCHEMA_VERSION: u32 = 2;
+const ASM_INSPECTION_SCHEMA_VERSION: u32 = 3;
 
 fn main() {
     let mut args = env::args().skip(1).collect::<Vec<_>>();
@@ -441,6 +442,7 @@ fn asm_inspection_json(
     validation: &[AsmValidationDiagnostic],
 ) -> String {
     let computed_functions = computed_evaluation_functions(asm);
+    let effect_inspections = build_effect_inspection_registry(asm);
     let mut references = asm
         .references
         .iter()
@@ -491,7 +493,7 @@ fn asm_inspection_json(
         entities: asm
             .ownership
             .keys()
-            .map(|id| asm_inspection_entity(asm, id, &computed_functions))
+            .map(|id| asm_inspection_entity(asm, id, &computed_functions, &effect_inspections))
             .collect(),
         references,
         diagnostics,
@@ -564,6 +566,7 @@ fn print_asm_entity_text(
     filters: AsmEntityFilters,
 ) {
     let computed_functions = computed_evaluation_functions(asm);
+    let effect_inspections = build_effect_inspection_registry(asm);
     let entity = asm
         .entity(id)
         .expect("ASM ownership should contain entities");
@@ -599,6 +602,9 @@ fn print_asm_entity_text(
         println!("    serializability: {}", computed.serializability);
         println!("    IR function: {:?}", computed.ir_function);
     }
+    if let Some(effect) = effect_inspections.records.get(id) {
+        print_effect_inspection_text(effect);
+    }
     let parents = asm.ancestors_of(id);
     println!("  parents: {}", parents.len());
     for parent in parents {
@@ -633,6 +639,31 @@ fn print_entity_references(label: &str, references: Vec<&ezc_core::SemanticRefer
     }
 }
 
+fn print_effect_inspection_text(effect: &EffectInspection) {
+    println!("  Effect:");
+    println!("    Validation: {}", effect.validation.status);
+    println!("    Violations: {:?}", effect.validation.violations);
+    println!("    Dependencies:");
+    println!("      state: {:?}", effect.direct_dependencies.state);
+    println!("      computed: {:?}", effect.direct_dependencies.computed);
+    println!(
+        "      transitive state: {:?}",
+        effect.transitive_dependencies.state
+    );
+    println!(
+        "      transitive computed: {:?}",
+        effect.transitive_dependencies.computed
+    );
+    println!("      dependents: {:?}", effect.dependents);
+    println!("    Initial trigger: {:?}", effect.initial_trigger);
+    println!("    Action triggers: {:?}", effect.action_triggers);
+    println!("    Schedule: {:?}", effect.schedule);
+    println!("    Capabilities: {:?}", effect.capabilities);
+    println!("    IR: {:?}", effect.ir);
+    println!("    Runtime: {:?}", effect.runtime);
+    println!("    Resumability: {:?}", effect.resumability);
+}
+
 fn print_entity_diagnostics(
     diagnostics: &[ezc_core::ComponentDiagnostic],
     provenance: &SourceProvenance,
@@ -651,10 +682,11 @@ fn asm_entity_inspection_json(
     filters: AsmEntityFilters,
 ) -> String {
     let computed_functions = computed_evaluation_functions(asm);
+    let effect_inspections = build_effect_inspection_registry(asm);
     let provenance = asm.provenance(id).expect("ASM entities have provenance");
     let document = AsmEntityInspectionDocument {
         schema_version: ASM_INSPECTION_SCHEMA_VERSION,
-        entity: asm_inspection_entity(asm, id, &computed_functions),
+        entity: asm_inspection_entity(asm, id, &computed_functions, &effect_inspections),
         parents: asm
             .ancestors_of(id)
             .into_iter()
@@ -1044,6 +1076,7 @@ fn asm_inspection_entity<'a>(
     asm: &'a ApplicationSemanticModel,
     id: &'a SemanticId,
     computed_functions: &BTreeMap<SemanticId, SemanticId>,
+    effect_inspections: &EffectInspectionRegistry,
 ) -> AsmInspectionEntity<'a> {
     let entity = asm
         .entity(id)
@@ -1061,6 +1094,7 @@ fn asm_inspection_entity<'a>(
         parameters: method_parameters(entity, provenance),
         semantic_type: asm_semantic_type(asm, id),
         computed: asm_computed_inspection(asm, id, computed_functions),
+        effect: effect_inspections.records.get(id).cloned(),
     }
 }
 
@@ -1207,6 +1241,8 @@ struct AsmInspectionEntity<'a> {
     semantic_type: Option<AsmInspectionSemanticType>,
     #[serde(skip_serializing_if = "Option::is_none")]
     computed: Option<AsmInspectionComputed>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    effect: Option<EffectInspection>,
 }
 
 #[derive(Serialize)]

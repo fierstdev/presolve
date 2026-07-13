@@ -3,31 +3,31 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: F16 - effect resumability planning
-* Working tree: clean after the F16 commit
+* Latest completed slice: F17 - effect inspection
+* Working tree: clean after the F17 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: F16 - effect resumability planning
-* Summary: Compiler-owned resume plans and schema-v2 resume manifests now project deterministic effect activation metadata from F1/F9/F12 facts. Each initially activatable effect receives a distinct pending activation slot and retains its exact initial plan placement and completed-action batch references.
-* Key files: crates/ezc_core/src/effect_resume.rs; crates/ezc_core/src/semantic_id.rs; crates/ezc_core/src/resume_plan.rs; crates/ezc_core/src/resume_manifest.rs
-* New behavior: `EffectActivationSlotId` is component-qualified and distinct from effect, function, action-batch, cache, and dirty-flag IDs. Plans and manifests store only lifecycle metadata (`pending`/`completed`/`failed`), canonical runtime function IDs, execution facts, and F8 batch references; they do not store or restore browser/capability/DOM state or execute effects.
-* Fixtures added or changed: Focused compiler tests cover stable slots, initial state/computed/dependency-free activation, multiple action batches, invalid-effect omission, malformed plan detection, deterministic manifest output, and legacy-v1 compatibility validation.
+* Slice: F17 - effect inspection
+* Summary: ASM inspection schema v3 now exposes one immutable effect-only record projected from F5 through F16. The same record powers full ASM JSON, selected ASM JSON/text, and selected `explain` output.
+* Key files: crates/ezc_core/src/effect_inspection.rs; crates/ezc_cli/src/main.rs; crates/ezc_cli/tests/explain.rs
+* New behavior: Effect inspection reports validation facts, direct/transitive dependencies, terminal dependents, F8/F9 triggers and schedules, ordered F10/F11 capability use, IR identity/counts, F12 runtime identity, and F16 activation-slot/resume metadata. Invalid or unlowered effects remain explicit with no invented IR/runtime/resume facts.
+* Fixtures added or changed: Core projection coverage proves valid and invalid effects. CLI coverage proves schema v3 determinism and identical effect data across full ASM, selected ASM, and `explain`, including action-trigger, capability, runtime, and resumability facts.
 
 Current in-progress slice
 
-* Slice: F17 - effect inspection
-* Status: Ready to begin after F16 commit
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F16
-* Remaining: F17 through F20. F17 must expose existing compiler-owned effect products without changing diagnostics or runtime behavior.
+* Slice: F18 - effect diagnostics
+* Status: Ready to begin after F17 commit
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F17
+* Remaining: F18 through F20. F18 owns the stable user-facing effect diagnostic catalog; it must project existing F5 facts without creating new semantic validation.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core resume: pass (5 tests)
-* cargo test -p ezc_core effect: pass (14 tests)
-* cargo clippy -p ezc_core --all-targets -- -D warnings: pass
+* cargo test -p ezc_core effect: pass (15 tests)
+* cargo test -p ezc_cli --test explain: pass (120 tests)
+* cargo clippy --workspace --all-targets -- -D warnings: pass
 
 Architecture decisions made
 
@@ -98,6 +98,10 @@ Architecture decisions made
 * Decision: F16 represents initial effect resumability with a separate component-qualified `EffectActivationSlotId` and explicit `Pending`/`Completed`/`Failed` status, projected only from F1 effect facts, F9 plan membership, and F12 runtime records.
 * Reason: Effect identity, executable-function identity, action-batch identity, and mutable initial-activation lifecycle are different compiler domains. A stable activation slot lets a future runtime restore an explicit lifecycle state without inspecting external capability targets, DOM, values, dependencies, or action history.
 * Tradeoff: F16 advances the serialized resume manifest to schema v2 and preserves canonical completed-action batch references, but it neither persists nor restores live browser state, mutates slots at runtime, replays/suppresses effects, captures capability state, changes inspection/diagnostics, or introduces runtime dependency discovery.
+
+* Decision: F17 defines one core `EffectInspection` projection and advances both full and selected ASM inspection documents to schema v3.
+* Reason: Validation, topology, trigger, schedule, IR, runtime, and resumability facts must be observed from their existing compiler-owned products, not reconstructed separately by CLI or explain rendering. A single serializable projection keeps full ASM, selected ASM, and explain byte-consistent.
+* Tradeoff: F17 exposes stable internal violation categories rather than F18 user-facing codes and omits no semantic state by inventing runtime membership. It does not alter validation, schedule, artifacts, runtime behavior, restoration, dependency discovery, or inspection of raw source/capability paths.
 
 * Decision: F15 advances the template manifest to schema v2 and uses each compiler-emitted template action binding as the canonical event-to-F8-batch bridge: `method_id` identifies the implementation and `action_batch_id` identifies the completed action batch.
 * Reason: The template manifest is already the compiler-owned browser event contract. Lowering resolves IDs only through the existing F8 action-batch map, so neither the runtime nor a later phase parses names, observes writes, or rebuilds eligibility/dependencies.
