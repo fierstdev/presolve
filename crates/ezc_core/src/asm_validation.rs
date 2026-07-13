@@ -95,7 +95,10 @@ fn validate_semantic_types(
                 ),
             });
         }
-        if model.entity(&assignment.subject).is_none() {
+        let subject_provenance = model
+            .provenance(&assignment.subject)
+            .or_else(|| model.expression_provenance(&assignment.subject));
+        if subject_provenance.is_none() {
             diagnostics.push(AsmValidationDiagnostic {
                 code: "EZASM1103".to_string(),
                 message: format!(
@@ -104,7 +107,7 @@ fn validate_semantic_types(
                 ),
             });
         }
-        if model.provenance(&assignment.subject) != Some(&assignment.provenance) {
+        if subject_provenance != Some(&assignment.provenance) {
             diagnostics.push(AsmValidationDiagnostic {
                 code: "EZASM1104".to_string(),
                 message: format!(

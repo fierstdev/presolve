@@ -25,6 +25,8 @@ use ezc_parser::{
 };
 use serde::Serialize;
 
+const ASM_INSPECTION_SCHEMA_VERSION: u32 = 2;
+
 fn main() {
     let mut args = env::args().skip(1).collect::<Vec<_>>();
 
@@ -477,7 +479,7 @@ fn asm_inspection_json(
     validation.sort_by(|left, right| (left.code, left.message).cmp(&(right.code, right.message)));
 
     let document = AsmInspectionDocument {
-        schema_version: 2,
+        schema_version: ASM_INSPECTION_SCHEMA_VERSION,
         file: paths[0].display().to_string(),
         files: (paths.len() > 1).then(|| {
             paths
@@ -650,7 +652,7 @@ fn asm_entity_inspection_json(
     let computed_functions = computed_evaluation_functions(asm);
     let provenance = asm.provenance(id).expect("ASM entities have provenance");
     let document = AsmEntityInspectionDocument {
-        schema_version: 2,
+        schema_version: ASM_INSPECTION_SCHEMA_VERSION,
         entity: asm_inspection_entity(asm, id, &computed_functions),
         parents: asm
             .ancestors_of(id)

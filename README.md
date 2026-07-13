@@ -95,6 +95,12 @@ serializability, and canonical IR function identity. Unplanned values use
 `null` for their evaluation positions or IR function identity; the CLI does not
 infer or discover this metadata at runtime.
 
+Computed inspection is frozen at JSON schema v2. The computed record fields
+(`computed_type`, `dependencies`, `dependents`, `evaluation_order`,
+`evaluation_batch`, `purity`, `serializability`, and `ir_function`) are ordered
+compiler products; any incompatible inspection change requires a new schema
+version.
+
 Selected entity inspection supports optional filters:
 
 ```sh
@@ -116,6 +122,25 @@ dependencies, cycles, immutable constant folding, serialization, and
 multi-file identity. The real-browser cases exercise the runtime chain,
 batching, and diamond fixtures; the remaining cases validate canonical compiler
 products and diagnostics.
+
+## Computed values: supported contract and limits
+
+`@computed()` currently applies only to synchronous getters with one supported
+return expression. The compiler supports literals, direct `this.<state>` and
+`this.<computed>` reads, arithmetic, comparison, logical and nullish operators,
+supported unary operators, and supported member access. It owns dependency
+resolution, scheduling, IR lowering, cache metadata, and runtime evaluation
+plans.
+
+State mutation, actions, effects, async work, resources, arbitrary calls, and
+nondeterministic operations are rejected through computed purity diagnostics.
+Unsupported bodies, unresolved reads, incompatible declared returns, cycles,
+and non-serializable results remain explicit compiler diagnostics. The runtime
+does not discover dependencies, parse getters, or infer cache identity.
+
+Current runtime limitations remain explicit: computed template bindings are not
+refreshed from cache changes, computed cache values are not yet persisted or
+restored, and unsupported getter syntax does not receive partial execution.
 
 ## Semantic graph export
 

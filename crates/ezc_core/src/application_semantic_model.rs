@@ -457,6 +457,7 @@ pub fn build_application_semantic_model_from_component_graph(
         &component_graph.provenance,
     );
     let mut provenance = component_graph.provenance.clone();
+    extend_template_entity_provenance(&mut provenance, &template_entities);
     provenance.extend(
         computed_values
             .iter()
@@ -494,9 +495,6 @@ pub fn build_application_semantic_model_from_component_graph(
         &references,
         &provenance,
     );
-    let computed_cycle_diagnostics =
-        collect_computed_cycle_diagnostics(&reactive_cycle_analysis, &computed_values);
-
     let semantic_types = finalize_semantic_types(
         SemanticTypeModel::from_components(&component_graph.components, &provenance),
         &component_graph.components,
@@ -505,11 +503,15 @@ pub fn build_application_semantic_model_from_component_graph(
         &references,
         &template_entities,
     );
-    let computed_semantic_diagnostics = collect_computed_semantic_diagnostics(
+    let mut diagnostics = component_graph.diagnostics.clone();
+    diagnostics.extend(computed_diagnostics);
+    extend_computed_diagnostics(
+        &mut diagnostics,
         &component_graph.components,
         &computed_values,
         &expression_graph,
         &semantic_types,
+        &reactive_cycle_analysis,
         &provenance,
     );
 
@@ -524,14 +526,7 @@ pub fn build_application_semantic_model_from_component_graph(
         computed_evaluation_plan,
         templates,
         template_entities,
-        diagnostics: component_graph
-            .diagnostics
-            .iter()
-            .cloned()
-            .chain(computed_diagnostics)
-            .chain(computed_cycle_diagnostics)
-            .chain(computed_semantic_diagnostics)
-            .collect(),
+        diagnostics,
         ownership,
         references,
         provenance,
@@ -560,7 +555,6 @@ fn build_application_semantic_model_from_files_with_bindings(
         (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     let (mut provenance, mut template_entities, mut type_aliases) =
         (BTreeMap::new(), Vec::new(), Vec::new());
-
     for parsed in files {
         let component_graph = build_component_graph_for_module(parsed);
         let template_graph = build_template_graph(&component_graph);
@@ -571,11 +565,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         diagnostics.extend(component_graph.diagnostics);
         references.extend(component_graph.references);
         provenance.extend(component_graph.provenance);
-        provenance.extend(
-            file_template_entities
-                .iter()
-                .map(|entity| (entity.id.clone(), entity.provenance.clone())),
-        );
+        extend_template_entity_provenance(&mut provenance, &file_template_entities);
         template_entities.extend(file_template_entities);
         type_aliases.extend(
             parsed
@@ -622,8 +612,6 @@ fn build_application_semantic_model_from_files_with_bindings(
         reactive_cycle_analysis,
         computed_evaluation_plan,
     ) = build_computed_reactive_products(&components, &computed_values, &references, &provenance);
-    append_computed_cycle_diagnostics(&mut diagnostics, &reactive_cycle_analysis, &computed_values);
-
     let semantic_types = finalize_semantic_types(
         SemanticTypeModel::from_components_with_aliases_and_bindings(
             &components,
@@ -637,13 +625,15 @@ fn build_application_semantic_model_from_files_with_bindings(
         &references,
         &template_entities,
     );
-    diagnostics.extend(collect_computed_semantic_diagnostics(
+    extend_computed_diagnostics(
+        &mut diagnostics,
         &components,
         &computed_values,
         &expression_graph,
         &semantic_types,
+        &reactive_cycle_analysis,
         &provenance,
-    ));
+    );
 
     ApplicationSemanticModel {
         expression_graph,
@@ -663,6 +653,17 @@ fn build_application_semantic_model_from_files_with_bindings(
     }
 }
 
+fn extend_template_entity_provenance(
+    provenance: &mut BTreeMap<SemanticId, SourceProvenance>,
+    template_entities: &[TemplateSemanticEntity],
+) {
+    provenance.extend(
+        template_entities
+            .iter()
+            .map(|entity| (entity.id.clone(), entity.provenance.clone())),
+    );
+}
+
 fn finalize_semantic_types(
     semantic_types: SemanticTypeModel,
     components: &[ComponentNode],
@@ -676,6 +677,28 @@ fn finalize_semantic_types(
         .with_computed_value_types(components, computed_values, expression_graph, references)
         .with_template_binding_types(template_entities, references)
         .normalized()
+}
+
+fn extend_computed_diagnostics(
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+    components: &[ComponentNode],
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    expression_graph: &ExpressionGraph,
+    semantic_types: &SemanticTypeModel,
+    reactive_cycle_analysis: &IrReactiveCycleAnalysis,
+    provenance: &BTreeMap<SemanticId, SourceProvenance>,
+) {
+    diagnostics.extend(collect_computed_cycle_diagnostics(
+        reactive_cycle_analysis,
+        computed_values,
+    ));
+    diagnostics.extend(collect_computed_semantic_diagnostics(
+        components,
+        computed_values,
+        expression_graph,
+        semantic_types,
+        provenance,
+    ));
 }
 
 fn classify_computed_values(
@@ -1056,17 +1079,6 @@ fn extend_template_references(
         components,
         template_entities,
         ownership,
-    ));
-}
-
-fn append_computed_cycle_diagnostics(
-    diagnostics: &mut Vec<ComponentDiagnostic>,
-    analysis: &IrReactiveCycleAnalysis,
-    computed_values: &BTreeMap<SemanticId, ComputedValue>,
-) {
-    diagnostics.extend(collect_computed_cycle_diagnostics(
-        analysis,
-        computed_values,
     ));
 }
 
@@ -2097,6 +2109,92 @@ class ComputedDiagnostics extends Component {
                 && diagnostic.message
                     == "computed getter `unresolvedRead` has a non-serializable result"
         }));
+    }
+
+    #[test]
+    fn phase_e_audit_preserves_canonical_computed_products() {
+        let path = "fixtures/0047-computed-diamond/input/ComputedDiamond.tsx";
+        let parsed = ezc_parser::parse_file(
+            path,
+            include_str!("../../../fixtures/0047-computed-diamond/input/ComputedDiamond.tsx"),
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let component_graph = crate::build_component_graph(&parsed);
+        let asm_from_component_graph =
+            super::build_application_semantic_model_from_component_graph(&component_graph);
+        let component = &asm.components[0];
+        let count = component.id.state_field("count");
+        let doubled = component.id.computed("doubled");
+        let tripled = component.id.computed("tripled");
+        let total = component.id.computed("total");
+        let expected_owner = crate::SemanticOwner::entity(component.id.clone());
+
+        assert!(crate::validate_application_semantic_model(&asm).is_empty());
+        assert!(crate::validate_application_semantic_model(&asm_from_component_graph).is_empty());
+        for computed in [&doubled, &tripled, &total] {
+            assert!(matches!(
+                asm.entity(computed),
+                Some(crate::SemanticEntity::Computed(_))
+            ));
+            assert_eq!(asm.owner(computed), Some(&expected_owner));
+            assert_eq!(
+                asm.semantic_types
+                    .computed_values
+                    .get(computed)
+                    .map(|computed_type| &computed_type.computed),
+                Some(computed)
+            );
+        }
+
+        let reactive_references = asm
+            .references
+            .iter()
+            .filter(|reference| {
+                matches!(
+                    reference.kind,
+                    crate::SemanticReferenceKind::ComputedState
+                        | crate::SemanticReferenceKind::ComputedComputed
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(reactive_references.len(), 4);
+        for reference in reactive_references {
+            assert!(asm.reactive_graph.edges.iter().any(|edge| {
+                edge.kind == crate::IrReactiveEdgeKind::Reads
+                    && edge.source == reference.source.as_str()
+                    && edge.target == reference.target.as_str()
+                    && edge.provenance == reference.provenance
+            }));
+            assert!(asm.reactive_graph.edges.iter().any(|edge| {
+                edge.kind == crate::IrReactiveEdgeKind::Invalidates
+                    && edge.source == reference.target.as_str()
+                    && edge.target == reference.source.as_str()
+                    && edge.provenance == reference.provenance
+            }));
+        }
+        assert!(asm.reactive_graph.nodes.contains_key(count.as_str()));
+        assert_eq!(
+            asm.computed_evaluation_plan,
+            crate::plan_computed_evaluation(&asm.reactive_graph)
+        );
+        assert_eq!(
+            asm.computed_evaluation_plan.evaluation_order,
+            vec![
+                doubled.as_str().to_string(),
+                tripled.as_str().to_string(),
+                total.as_str().to_string(),
+            ]
+        );
+
+        let ir = crate::lower_components_to_ir(&asm);
+        assert!(crate::validate_intermediate_representation(&ir).is_empty());
+        let evaluations = ir
+            .modules
+            .iter()
+            .flat_map(|module| &module.computed_evaluations)
+            .map(|evaluation| evaluation.computed.clone())
+            .collect::<Vec<_>>();
+        assert_eq!(evaluations, vec![doubled, tripled, total]);
     }
 
     #[test]

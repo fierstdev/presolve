@@ -3,34 +3,46 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: E20 - computed fixture suite
-* Working tree: clean after the E20 commit
+* Latest completed slice: E21 - Phase E stability audit
+* Working tree: clean after the E21 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: E20 - computed fixture suite
-* Summary: The Phase E fixture suite now covers compiler and browser computed-value contracts end to end.
-* Key files: fixtures/0046-computed-arithmetic; fixtures/0047-computed-diamond; fixtures/0048-computed-cycle-diagnostics; fixtures/0049-computed-constant-folding; fixtures/0050-computed-serialization; fixtures/0051-computed-multi-file; crates/ezc_cli/tests/explain.rs; crates/ezc_cli/tests/runtime_browser.rs
-* New behavior: Compiler fixtures validate arithmetic, diamond topology, cycle diagnostics, immutable folding, structural serialization/resume eligibility, and multi-file IDs. Browser fixtures cover chains, batching, and diamond recomputation from compiler-generated evaluation plans.
-* Fixtures added or changed: added six fixture directories (seven TSX inputs) for E20; existing E13/E15/E16 fixtures continue to cover template bindings, chains, and batching.
+* Slice: E21 - Phase E stability audit
+* Summary: Phase E is complete: canonical computed ownership, reactive/scheduler consumption, IR validation, inspection v2, and unsupported-semantics documentation have been audited and frozen.
+* Key files: crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_cli/src/main.rs; README.md
+* New behavior: ASM validation now recognizes canonical expression-graph nodes as valid typed subjects through their own provenance, so computed ASMs validate cleanly without incorrectly requiring expression nodes to be generic semantic entities. Shared computed-diagnostic assembly and the inspection schema-v2 constant remove duplicate paths.
+* Fixtures added or changed: no new fixtures; E20's computed suite was exercised across the full compiler and browser matrix.
 
 Current in-progress slice
 
-* Slice: E20 - computed fixture suite
+* Slice: E21 - Phase E stability audit
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E20
-* Remaining: E21 - stability audit.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21 (Phase E complete)
+* Remaining: no Phase E slices remain; await the next explicit roadmap.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_cli computed_fixture_suite: pass
-* cargo test -p ezc_cli asm_command_filters_template_computed_references: pass
-* RUST_TEST_THREADS=1 cargo test -p ezc_cli --test runtime_browser computed -- --nocapture: pass
-* cargo clippy -p ezc_cli --all-targets -- -D warnings: pass
+* cargo test -p ezc_parser: pass
+* cargo test -p ezc_core: pass
+* cargo test -p ezc_cli: pass
+* cargo clippy --workspace --all-targets -- -D warnings: pass
+* RUST_TEST_THREADS=1 cargo test -p ezc_cli --test runtime_browser -- --nocapture: pass
+* pnpm test:e2e: pass
+* just e2e: pass
+* RUST_TEST_THREADS=1 cargo test --workspace: pass
 
 Architecture decisions made
+
+* Decision: ASM validation resolves typed subjects through either canonical semantic entities or canonical expression-graph nodes, using the subject's authoritative provenance in either case.
+* Reason: Expression nodes are first-class compiler products with stable IDs and spans, but are intentionally not modeled as generic semantic entities. Validation must preserve that separation while accepting their canonical type assignments.
+* Tradeoff: E21 does not add expression nodes to ownership navigation or inspection entity lists. Their type/provenance contracts remain available through the expression graph, preserving the existing semantic-entity inspection surface.
+
+* Decision: Computed cycle and semantic diagnostics now assemble through one shared helper in both ASM construction modes, and ASM inspection schema v2 is represented by one CLI constant.
+* Reason: The canonical build paths and inspection documents cannot drift in ordering or version by maintaining duplicate assembly logic.
+* Tradeoff: Inspection remains frozen at v2. Any incompatible record change requires an explicit schema evolution rather than an implicit CLI variation.
 
 * Decision: E20 adds narrow source fixtures for every roadmap scenario and reuses the existing browser harness only for behaviors that execute at runtime.
 * Reason: Compiler-only contracts (cycles, folding, serialization, and multi-file identity) stay deterministic and cheap to diagnose, while chain, batching, and diamond cache refreshes are proven in a real browser against compiler-generated artifacts.
@@ -623,7 +635,7 @@ Known limitations
 
 Exact next step
 
-Next is E21: perform the Phase E stability audit. Remove duplicate logic; verify canonical ASM ownership, reactive graph and scheduler consumption, and IR validation; freeze inspection contracts; document unsupported semantics; then update this handoff and the Progress Log. Do not add new runtime behavior or roadmap features.
+Phase E is complete. Await a new explicit roadmap slice before adding compiler, runtime, or inspection behavior.
 
 Useful commands
 
