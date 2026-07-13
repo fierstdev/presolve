@@ -13,6 +13,23 @@ use serde::{Deserialize, Serialize};
 #[serde(transparent)]
 pub struct SemanticId(String);
 
+/// Stable semantic identity for the subject of an effect diagnostic.
+///
+/// Effects continue to use `SemanticId` throughout the compiler graph. This
+/// wrapper exists only at the shared diagnostic boundary so consumers cannot
+/// confuse an effect subject with an arbitrary semantic entity.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct EffectId(SemanticId);
+
+/// Stable identity for an authored statement owned by an effect.
+///
+/// This deliberately remains distinct from `SemanticId` in diagnostic output:
+/// statement identity is meaningful only together with its effect subject.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct EffectStatementId(SemanticId);
+
 /// Direct owner of a semantic entity within one compiled application.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SemanticOwner {
@@ -147,6 +164,30 @@ impl SemanticId {
     }
 }
 
+impl EffectId {
+    #[must_use]
+    pub fn from_semantic(id: &SemanticId) -> Self {
+        Self(id.clone())
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl EffectStatementId {
+    #[must_use]
+    pub fn from_semantic(id: &SemanticId) -> Self {
+        Self(id.clone())
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 fn normalized_module_path(path: &Path) -> String {
     let mut segments = Vec::new();
     let absolute = path.is_absolute();
@@ -174,6 +215,18 @@ fn normalized_module_path(path: &Path) -> String {
 }
 
 impl fmt::Display for SemanticId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for EffectId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for EffectStatementId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(formatter)
     }

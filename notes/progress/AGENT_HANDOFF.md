@@ -3,31 +3,32 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: F17 - effect inspection
-* Working tree: clean after the F17 commit
+* Latest completed slice: F18 - effect diagnostics
+* Working tree: F18 is complete and ready for its commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: F17 - effect inspection
-* Summary: ASM inspection schema v3 now exposes one immutable effect-only record projected from F5 through F16. The same record powers full ASM JSON, selected ASM JSON/text, and selected `explain` output.
-* Key files: crates/ezc_core/src/effect_inspection.rs; crates/ezc_cli/src/main.rs; crates/ezc_cli/tests/explain.rs
-* New behavior: Effect inspection reports validation facts, direct/transitive dependencies, terminal dependents, F8/F9 triggers and schedules, ordered F10/F11 capability use, IR identity/counts, F12 runtime identity, and F16 activation-slot/resume metadata. Invalid or unlowered effects remain explicit with no invented IR/runtime/resume facts.
-* Fixtures added or changed: Core projection coverage proves valid and invalid effects. CLI coverage proves schema v3 determinism and identical effect data across full ASM, selected ASM, and `explain`, including action-trigger, capability, runtime, and resumability facts.
+* Slice: F18 - effect diagnostics
+* Summary: The compiler now projects F2-F5 and F9 effect facts into one stable `EZC1041`-`EZC1051` diagnostic catalog without reanalyzing bodies, resolving paths, or changing runtime behavior.
+* Key files: crates/ezc_core/src/effect_diagnostics.rs; crates/ezc_core/src/component_graph.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_cli/src/main.rs; crates/ezc_cli/tests/explain.rs
+* New behavior: Shared `ComponentDiagnostic` records retain severity, optional typed effect/statement identities, and deterministic secondary labels. Validated F5/F9 projections feed the canonical ASM diagnostic list, `check`, full/selected ASM JSON, and selected `explain`. Check JSON advances to schema v2; ASM inspection advances to schema v4.
+* Fixtures added or changed: Core coverage proves stable F5 category mapping, source-provenanced effect metadata, secondary labels, and coalesced F9 unavailable prerequisites. CLI coverage proves check JSON and selected explain share the same effect diagnostic projection.
 
 Current in-progress slice
 
 * Slice: F18 - effect diagnostics
-* Status: Ready to begin after F17 commit
+* Status: Complete; commit this slice before starting F19
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F17
-* Remaining: F18 through F20. F18 owns the stable user-facing effect diagnostic catalog; it must project existing F5 facts without creating new semantic validation.
+* Remaining: F19 through F20. F19 expands fixtures and F20 performs the final stability audit.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core effect: pass (15 tests)
-* cargo test -p ezc_cli --test explain: pass (120 tests)
-* cargo clippy --workspace --all-targets -- -D warnings: pass
+* cargo test -p ezc_core effect: pass (18 tests)
+* cargo test -p ezc_cli --test explain: pass (121 tests)
+* cargo clippy -p ezc_core --all-targets -- -D warnings: pending final F18 verification
+* cargo clippy -p ezc_cli --all-targets -- -D warnings: pending final F18 verification
 
 Architecture decisions made
 
@@ -58,6 +59,10 @@ Architecture decisions made
 * Decision: F5 stores effect legality as canonical `EffectValidation` and ordered `EffectSemanticViolation` facts on the first-class effect entity, while deferring user-facing diagnostic codes to F18.
 * Reason: F5 can reject invalid entities for all future graph, scheduler, IR, and runtime consumers without duplicating validation or prematurely freezing the Phase F diagnostic catalog. It reuses F4's statement records and existing method metadata rather than rereading source or invoking runtime behavior.
 * Tradeoff: F5 produces no new `ComponentDiagnostic` entries yet. F18 will project these immutable violation facts into prescriptive, source-provenanced diagnostics; F6 must consume only valid effects when integrating the reactive graph.
+
+* Decision: `ComponentDiagnostic` is the sole shared compiler diagnostic envelope and now supports severity, optional typed `EffectId`/`EffectStatementId`, and deterministic secondary source labels.
+* Reason: Effect diagnostics are component/compiler diagnostics. A parallel effect envelope would duplicate canonical ordering, serialization, CLI rendering, ASM projection, and future IDE integration.
+* Tradeoff: This is an explicit serialized diagnostic-shape evolution. Check JSON advances from v1 to v2 and ASM inspection advances from v3 to v4; legacy diagnostics remain valid with no effect/statement identity and empty label collections.
 
 * Decision: F6 represents valid effects as terminal `Effect` nodes in the existing reactive graph, with `Reads` to direct state/computed inputs and inverse `Invalidates` edges from those inputs.
 * Reason: Effects need compiler-owned dependency topology for later triggers and scheduling, but may never become reactive producers. Reusing the graph's established read/invalidation direction lets F7 derive closures without a second effect graph or runtime discovery.

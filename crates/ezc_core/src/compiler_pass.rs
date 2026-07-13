@@ -2,7 +2,8 @@ use std::collections::BTreeMap;
 
 use crate::application_semantic_model::{ApplicationSemanticModel, SemanticEntityKind};
 use crate::component_graph::{
-    ComponentDiagnostic, ComponentGraph, SerializableValue, StateOperation,
+    ComponentDiagnostic, ComponentDiagnosticSeverity, ComponentGraph, SerializableValue,
+    StateOperation,
 };
 use crate::semantic_id::SemanticId;
 use crate::semantic_provenance::SourceProvenance;
@@ -104,6 +105,10 @@ impl ImmutableAsmPass for ConstantFoldingPass {
                     Err(error) => push_diagnostic_once(
                         &mut folded.diagnostics,
                         ComponentDiagnostic {
+                            severity: ComponentDiagnosticSeverity::Error,
+                            effect_id: None,
+                            statement_id: None,
+                            secondary_labels: Vec::new(),
                             provenance: Some(expression.provenance.clone()),
                             code: constant_expression_diagnostic_code_from_node(&expression.kind)
                                 .as_str()
@@ -267,6 +272,10 @@ fn folded_type_mismatch_diagnostic(
     let target = model.semantic_types.assignments.get(&field.id)?;
     let source = crate::state_initializer_value_type(field.initial_value.as_ref()?);
     (!crate::is_assignable(&source, &target.semantic_type)).then(|| ComponentDiagnostic {
+        severity: ComponentDiagnosticSeverity::Error,
+        effect_id: None,
+        statement_id: None,
+        secondary_labels: Vec::new(),
         provenance: Some(declared_type.provenance.clone()),
         code: crate::TypeDiagnosticCode::IncompatibleStateInitializer
             .as_str()
@@ -287,6 +296,10 @@ fn unknown_declared_type_diagnostic(
 ) -> Option<ComponentDiagnostic> {
     let declared_type = field.declared_type.as_ref()?;
     (!model.semantic_types.assignments.contains_key(&field.id)).then(|| ComponentDiagnostic {
+        severity: ComponentDiagnosticSeverity::Error,
+        effect_id: None,
+        statement_id: None,
+        secondary_labels: Vec::new(),
         provenance: Some(declared_type.provenance.clone()),
         code: crate::TypeDiagnosticCode::UnknownType.as_str().to_string(),
         message: format!(
@@ -312,6 +325,10 @@ fn action_assignment_mismatch_diagnostic(
     let target = model.semantic_types.assignments.get(&field.id)?;
     let source = crate::state_initializer_value_type(value);
     (!crate::is_assignable(&source, &target.semantic_type)).then(|| ComponentDiagnostic {
+        severity: ComponentDiagnosticSeverity::Error,
+        effect_id: None,
+        statement_id: None,
+        secondary_labels: Vec::new(),
         provenance: model.provenance.get(&action.id).cloned(),
         code: crate::TypeDiagnosticCode::IncompatibleAssignment
             .as_str()
@@ -353,6 +370,10 @@ fn compound_mutation_type_diagnostics(
 
     match &action.operation {
         StateOperation::Toggle if !boolean_compatible => vec![ComponentDiagnostic {
+            severity: ComponentDiagnosticSeverity::Error,
+            effect_id: None,
+            statement_id: None,
+            secondary_labels: Vec::new(),
             provenance,
             code: crate::TypeDiagnosticCode::InvalidToggleTarget
                 .as_str()
@@ -369,6 +390,10 @@ fn compound_mutation_type_diagnostics(
                 "decrement"
             };
             vec![ComponentDiagnostic {
+            severity: ComponentDiagnosticSeverity::Error,
+            effect_id: None,
+            statement_id: None,
+            secondary_labels: Vec::new(),
                 provenance,
                 code: crate::TypeDiagnosticCode::InvalidNumericMutationTarget
                     .as_str()
@@ -388,6 +413,10 @@ fn compound_mutation_type_diagnostics(
             let mut diagnostics = Vec::new();
             if !number_compatible {
                 diagnostics.push(ComponentDiagnostic {
+            severity: ComponentDiagnosticSeverity::Error,
+            effect_id: None,
+            statement_id: None,
+            secondary_labels: Vec::new(),
                     provenance: provenance.clone(),
                     code: crate::TypeDiagnosticCode::InvalidCompoundMutationTarget
                         .as_str()
@@ -401,6 +430,10 @@ fn compound_mutation_type_diagnostics(
             let source = crate::state_initializer_value_type(value);
             if !crate::is_assignable(&source, &crate::SemanticType::Number) {
                 diagnostics.push(ComponentDiagnostic {
+            severity: ComponentDiagnosticSeverity::Error,
+            effect_id: None,
+            statement_id: None,
+            secondary_labels: Vec::new(),
                     provenance,
                     code: crate::TypeDiagnosticCode::InvalidCompoundMutationOperand
                         .as_str()
@@ -426,6 +459,10 @@ fn template_binding_type_diagnostic(
     }
     let assignment = model.semantic_types.assignments.get(&entity.id)?;
     (!is_text_renderable(&assignment.semantic_type)).then(|| ComponentDiagnostic {
+        severity: ComponentDiagnosticSeverity::Error,
+        effect_id: None,
+        statement_id: None,
+        secondary_labels: Vec::new(),
         provenance: Some(entity.provenance.clone()),
         code: crate::TypeDiagnosticCode::NonRenderableValue
             .as_str()
@@ -450,6 +487,10 @@ fn attribute_binding_type_diagnostic(
     let assignment = model.semantic_types.assignments.get(&entity.id)?;
     (!crate::is_assignable(&assignment.semantic_type, &contract.semantic_type)).then(|| {
         ComponentDiagnostic {
+            severity: ComponentDiagnosticSeverity::Error,
+            effect_id: None,
+            statement_id: None,
+            secondary_labels: Vec::new(),
             provenance: Some(entity.provenance.clone()),
             code: crate::TypeDiagnosticCode::InvalidBinding
                 .as_str()
@@ -478,6 +519,10 @@ fn conditional_type_diagnostic(
     }
     let assignment = model.semantic_types.assignments.get(&entity.id)?;
     (!is_boolean_condition(&assignment.semantic_type)).then(|| ComponentDiagnostic {
+        severity: ComponentDiagnosticSeverity::Error,
+        effect_id: None,
+        statement_id: None,
+        secondary_labels: Vec::new(),
         provenance: Some(entity.provenance.clone()),
         code: crate::TypeDiagnosticCode::InvalidCondition
             .as_str()
@@ -505,6 +550,10 @@ fn list_iterable_type_diagnostic(
             | crate::SemanticType::Unknown
     );
     (!iterable).then(|| ComponentDiagnostic {
+        severity: ComponentDiagnosticSeverity::Error,
+        effect_id: None,
+        statement_id: None,
+        secondary_labels: Vec::new(),
         provenance: Some(entity.provenance.clone()),
         code: crate::TypeDiagnosticCode::NonIterableList
             .as_str()
@@ -523,6 +572,10 @@ fn member_access_type_diagnostic(
 ) -> Option<ComponentDiagnostic> {
     let access = model.semantic_types.member_accesses.get(&entity.id)?;
     access.semantic_type.is_none().then(|| ComponentDiagnostic {
+        severity: ComponentDiagnosticSeverity::Error,
+        effect_id: None,
+        statement_id: None,
+        secondary_labels: Vec::new(),
         provenance: Some(entity.provenance.clone()),
         code: crate::TypeDiagnosticCode::MissingMember
             .as_str()

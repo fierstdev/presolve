@@ -1423,6 +1423,11 @@ class AsyncEffect extends Component {
                 .iter()
                 .any(|violation| violation.kind == kind));
         }
-        assert!(asm.diagnostics.is_empty());
+        let codes = asm
+            .diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.code.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(codes, vec!["EZC1042", "EZC1046", "EZC1046"]);
     }
 }

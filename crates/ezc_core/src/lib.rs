@@ -13,6 +13,7 @@ pub mod component_graph;
 pub mod computed_value;
 pub mod effect;
 pub mod effect_capability;
+pub mod effect_diagnostics;
 pub mod effect_inspection;
 pub mod effect_resume;
 pub mod explain;
@@ -65,13 +66,14 @@ pub use compiler_pass::{
 pub use component_graph::{
     build_component_graph, build_component_graph_for_module, ArithmeticEvaluationError,
     ArithmeticExpression, ArithmeticExpressionKind, ArithmeticOperator, ComparisonOperator,
-    ComponentAction, ComponentDiagnostic, ComponentGraph, ComponentMethod, ComponentNode,
-    ComputedExpression, ComputedExpressionKind, ConstantEvaluationError, ConstantExpression,
-    ConstantExpressionKind, DeclaredStateType, DeclaredStateTypeKind, EffectBodySyntax,
-    EffectExpression, EffectExpressionKind, EffectStatementSyntax, EffectStatementSyntaxKind,
-    LogicalOperator, MethodCall, MethodLocalVariable, MethodParameter, RenderAttribute,
-    RenderAttributeValue, RenderChild, RenderEventHandler, RenderFragment, RenderList, RenderModel,
-    SerializableValue, StateField, StateOperation, UnsupportedEffectStatementKind,
+    ComponentAction, ComponentDiagnostic, ComponentDiagnosticSeverity, ComponentGraph,
+    ComponentMethod, ComponentNode, ComputedExpression, ComputedExpressionKind,
+    ConstantEvaluationError, ConstantExpression, ConstantExpressionKind, DeclaredStateType,
+    DeclaredStateTypeKind, DiagnosticSecondaryLabel, EffectBodySyntax, EffectExpression,
+    EffectExpressionKind, EffectStatementSyntax, EffectStatementSyntaxKind, LogicalOperator,
+    MethodCall, MethodLocalVariable, MethodParameter, RenderAttribute, RenderAttributeValue,
+    RenderChild, RenderEventHandler, RenderFragment, RenderList, RenderModel, SerializableValue,
+    StateField, StateOperation, UnsupportedEffectStatementKind,
 };
 pub use computed_value::{
     collect_computed_values, ComputedCachePolicy, ComputedDiagnosticCode, ComputedPurity,
@@ -93,6 +95,7 @@ pub use effect_capability::{
     RuntimeCapabilityLowering, StaticCapabilityPath, EFFECT_CAPABILITY_REGISTRY,
     EFFECT_CAPABILITY_REGISTRY_VERSION,
 };
+pub use effect_diagnostics::{collect_effect_diagnostics, EffectDiagnosticCode};
 pub use effect_inspection::{
     build_effect_inspection_registry, validate_effect_inspection_registry, EffectInspection,
     EffectInspectionActionTrigger, EffectInspectionCapability, EffectInspectionDependencies,
@@ -176,7 +179,7 @@ pub use semantic_graph::{
     SemanticGraphEdgeKind, SemanticGraphNode, SemanticGraphNodeKind, SemanticGraphProvenance,
     SEMANTIC_GRAPH_SCHEMA_VERSION,
 };
-pub use semantic_id::{SemanticId, SemanticOwner};
+pub use semantic_id::{EffectId, EffectStatementId, SemanticId, SemanticOwner};
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
 pub use semantic_type::{

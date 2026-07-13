@@ -204,7 +204,7 @@ fn asm_command_emits_deterministic_json_inspection() {
 
     let document: serde_json::Value =
         serde_json::from_slice(&first.stdout).expect("ASM inspection output was not valid JSON");
-    assert_eq!(document["schema_version"], 3);
+    assert_eq!(document["schema_version"], 4);
     assert_eq!(
         document["file"],
         "fixtures/0001-source-summary/input/Counter.tsx"
@@ -355,7 +355,7 @@ fn asm_command_inspects_one_semantic_entity() {
 
     assert!(output.status.success());
     let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("entity JSON");
-    assert_eq!(document["schema_version"], 3);
+    assert_eq!(document["schema_version"], 4);
     assert_eq!(document["entity"]["id"], entity_id);
     assert_eq!(document["entity"]["kind"], "state-field");
     assert_eq!(document["entity"]["semantic_type"]["type_text"], "number");
@@ -442,7 +442,7 @@ fn asm_and_explain_inspect_canonical_computed_metadata() {
 
     let document: serde_json::Value =
         serde_json::from_slice(&asm.stdout).expect("computed entity inspection JSON");
-    assert_eq!(document["schema_version"], 3);
+    assert_eq!(document["schema_version"], 4);
     assert_eq!(document["entity"]["computed"]["computed_type"], "number");
     assert_eq!(
         document["entity"]["computed"]["dependencies"],
@@ -519,7 +519,7 @@ fn asm_and_explain_project_one_canonical_effect_inspection_record() {
 
     let selected: serde_json::Value = serde_json::from_slice(&asm.stdout).expect("effect JSON");
     let inspection = &selected["entity"]["effect"];
-    assert_eq!(selected["schema_version"], 3);
+    assert_eq!(selected["schema_version"], 4);
     assert_eq!(inspection["validation"]["status"], "valid");
     assert_eq!(
         inspection["direct_dependencies"]["state"],
@@ -1271,11 +1271,11 @@ fn asm_command_reports_primitive_declared_state_type_mismatches() {
         })
         .expect("count mismatch diagnostic");
     assert_eq!(
-        count["provenance"]["path"],
+        count["primary_provenance"]["path"],
         "fixtures/0027-declared-state-type-diagnostics/input/InvalidTypedState.tsx"
     );
-    assert_eq!(count["provenance"]["line"], 3);
-    assert_eq!(count["provenance"]["column"], 8);
+    assert_eq!(count["primary_provenance"]["line"], 3);
+    assert_eq!(count["primary_provenance"]["column"], 8);
 }
 
 #[test]
@@ -1353,9 +1353,9 @@ fn asm_command_reports_primitive_action_type_mismatches() {
                 .is_some_and(|message| message.contains("state field `count`"))
         })
         .expect("count action mismatch diagnostic");
-    assert_eq!(count["provenance"]["path"], path);
-    assert_eq!(count["provenance"]["line"], 11);
-    assert_eq!(count["provenance"]["column"], 5);
+    assert_eq!(count["primary_provenance"]["path"], path);
+    assert_eq!(count["primary_provenance"]["line"], 11);
+    assert_eq!(count["primary_provenance"]["column"], 5);
 }
 
 #[test]
@@ -1393,9 +1393,9 @@ fn asm_command_reports_non_boolean_primitive_toggle_actions() {
                 .is_some_and(|message| message.contains("state field `count`"))
         })
         .expect("count toggle diagnostic");
-    assert_eq!(count["provenance"]["path"], path);
-    assert_eq!(count["provenance"]["line"], 10);
-    assert_eq!(count["provenance"]["column"], 5);
+    assert_eq!(count["primary_provenance"]["path"], path);
+    assert_eq!(count["primary_provenance"]["line"], 10);
+    assert_eq!(count["primary_provenance"]["column"], 5);
 }
 
 #[test]
@@ -1434,9 +1434,9 @@ fn asm_command_reports_non_numeric_primitive_increment_and_decrement_actions() {
                 .is_some_and(|message| message.contains("state field `title`"))
         })
         .expect("title numeric action diagnostic");
-    assert_eq!(title["provenance"]["path"], path);
-    assert_eq!(title["provenance"]["line"], 10);
-    assert_eq!(title["provenance"]["column"], 5);
+    assert_eq!(title["primary_provenance"]["path"], path);
+    assert_eq!(title["primary_provenance"]["line"], 10);
+    assert_eq!(title["primary_provenance"]["column"], 5);
 }
 
 #[test]
@@ -1472,9 +1472,9 @@ fn asm_command_reports_compound_numeric_action_target_and_operand_mismatches() {
                 .is_some_and(|message| message.contains("state field `title`"))
         })
         .expect("title compound action diagnostic");
-    assert_eq!(title["provenance"]["path"], path);
-    assert_eq!(title["provenance"]["line"], 9);
-    assert_eq!(title["provenance"]["column"], 5);
+    assert_eq!(title["primary_provenance"]["path"], path);
+    assert_eq!(title["primary_provenance"]["line"], 9);
+    assert_eq!(title["primary_provenance"]["column"], 5);
 }
 
 #[test]
@@ -1493,8 +1493,8 @@ fn asm_command_text_reports_source_provenanced_compiler_diagnostics() {
 
     let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
     assert!(actual.contains("  compiler diagnostics:\n"));
-    assert!(actual.contains("    EZC1020: state field `title`"));
-    assert!(actual.contains("    EZC1021: action `apply`"));
+    assert!(actual.contains("    error[EZC1020]: state field `title`"));
+    assert!(actual.contains("    error[EZC1021]: action `apply`"));
     assert!(actual.contains(&format!("      at {path}:9:5 span=")));
 }
 
@@ -1531,7 +1531,7 @@ fn check_command_fails_for_compiler_diagnostics() {
     assert!(!output.status.success());
     let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
     assert!(actual.contains("  compiler diagnostics: 7\n"));
-    assert!(actual.contains("    EZC1020: state field `title`"));
+    assert!(actual.contains("    error[EZC1020]: state field `title`"));
 }
 
 #[test]
@@ -1542,7 +1542,7 @@ fn check_command_emits_json_diagnostics() {
         .output().expect("failed to run ezc_cli check");
     assert!(!output.status.success());
     let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("check JSON");
-    assert_eq!(document["schema_version"], 1);
+    assert_eq!(document["schema_version"], 2);
     assert_eq!(
         document["compiler_diagnostics"].as_array().map(Vec::len),
         Some(7)
@@ -1559,7 +1559,7 @@ fn check_command_emits_json_diagnostics() {
         })
         .expect("title diagnostic");
     assert_eq!(
-        title_diagnostic["provenance"],
+        title_diagnostic["primary_provenance"],
         serde_json::json!({
             "path": "fixtures/0031-primitive-compound-action-type-diagnostics/input/InvalidTypedCompoundActions.tsx",
             "start": 261,
@@ -1592,6 +1592,44 @@ fn check_command_omits_unavailable_compiler_diagnostic_provenance_in_json() {
         .find(|diagnostic| diagnostic["code"] == "EZC1001")
         .expect("missing component diagnostic");
     assert!(component_diagnostic.get("provenance").is_none());
+}
+
+#[test]
+fn effect_diagnostics_share_check_and_selected_explain_projection() {
+    let path = "fixtures/0052-effect-body-lowering/input/Effects.tsx";
+    let effect_id = "module:fixtures/0052-effect-body-lowering/input/Effects.tsx/component:x-effects/effect:invalid";
+    let check = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["check", path, "--format", "json"])
+        .output()
+        .expect("failed to run effect check JSON");
+    assert!(!check.status.success());
+    let check: serde_json::Value = serde_json::from_slice(&check.stdout).expect("check JSON");
+    let expected = check["compiler_diagnostics"]
+        .as_array()
+        .expect("compiler diagnostics")
+        .iter()
+        .filter(|diagnostic| diagnostic["effect_id"] == effect_id)
+        .cloned()
+        .collect::<Vec<_>>();
+    assert!(!expected.is_empty());
+    assert!(expected.iter().all(|diagnostic| {
+        diagnostic["severity"] == "error"
+            && diagnostic["statement_id"].is_string()
+            && diagnostic["primary_provenance"].is_object()
+            && diagnostic["secondary_labels"].is_array()
+    }));
+
+    let explain = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["explain", path, "--entity", effect_id, "--format", "json"])
+        .output()
+        .expect("failed to run selected effect explain JSON");
+    assert!(explain.status.success());
+    let explain: serde_json::Value =
+        serde_json::from_slice(&explain.stdout).expect("selected effect explain JSON");
+    assert_eq!(explain["schema_version"], 4);
+    assert_eq!(explain["diagnostics"], serde_json::Value::Array(expected));
 }
 
 #[test]

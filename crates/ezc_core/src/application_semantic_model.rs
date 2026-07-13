@@ -6,7 +6,8 @@ use ezc_parser::ParsedFile;
 use crate::compilation_unit::CompilationUnit;
 use crate::component_graph::{
     build_component_graph_for_module, render_event_handlers, ComponentAction, ComponentDiagnostic,
-    ComponentMethod, ComponentNode, MethodLocalVariable, RenderEventHandler, StateField,
+    ComponentDiagnosticSeverity, ComponentMethod, ComponentNode, MethodLocalVariable,
+    RenderEventHandler, StateField,
 };
 use crate::computed_value::{collect_computed_values, ComputedDiagnosticCode, ComputedValue};
 use crate::expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
@@ -606,8 +607,7 @@ pub fn build_application_semantic_model_from_component_graph(
         &reactive_cycle_analysis,
         &provenance,
     );
-
-    ApplicationSemanticModel {
+    let mut model = ApplicationSemanticModel {
         expression_graph,
         semantic_types,
         components: component_graph.components.clone(),
@@ -628,7 +628,11 @@ pub fn build_application_semantic_model_from_component_graph(
         ownership,
         references,
         provenance,
-    }
+    };
+    model
+        .diagnostics
+        .extend(crate::collect_effect_diagnostics(&model));
+    model
 }
 
 #[must_use]
@@ -768,8 +772,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         &reactive_cycle_analysis,
         &provenance,
     );
-
-    ApplicationSemanticModel {
+    let mut model = ApplicationSemanticModel {
         expression_graph,
         semantic_types,
         components,
@@ -790,7 +793,11 @@ fn build_application_semantic_model_from_files_with_bindings(
         ownership,
         references,
         provenance,
-    }
+    };
+    model
+        .diagnostics
+        .extend(crate::collect_effect_diagnostics(&model));
+    model
 }
 
 fn extend_template_entity_provenance(
@@ -862,6 +869,7 @@ fn extend_computed_diagnostics(
     ));
 }
 
+#[allow(clippy::too_many_lines)]
 fn classify_computed_values(
     components: &[ComponentNode],
     mut computed_values: BTreeMap<SemanticId, ComputedValue>,
@@ -962,6 +970,10 @@ fn classify_computed_values(
         computed.purity_violations = violations;
         diagnostics.extend(computed.purity_violations.iter().map(|violation| {
             ComponentDiagnostic {
+                severity: ComponentDiagnosticSeverity::Error,
+                effect_id: None,
+                statement_id: None,
+                secondary_labels: Vec::new(),
                 code: ComputedDiagnosticCode::PurityViolation.as_str().to_string(),
                 message: format!(
                     "computed getter `{}` is impure: {}",
@@ -989,6 +1001,10 @@ fn collect_computed_cycle_diagnostics(
                 .values()
                 .find(|computed| computed.id.as_str() == first)?;
             Some(ComponentDiagnostic {
+                severity: ComponentDiagnosticSeverity::Error,
+                effect_id: None,
+                statement_id: None,
+                secondary_labels: Vec::new(),
                 code: ComputedDiagnosticCode::DependencyCycle.as_str().to_string(),
                 message: format!(
                     "computed dependency cycle detected among: {}",
@@ -1036,6 +1052,10 @@ fn collect_invalid_computed_declaration_diagnostics(
                 && !method.is_getter
         })
         .map(|method| ComponentDiagnostic {
+            severity: ComponentDiagnosticSeverity::Error,
+            effect_id: None,
+            statement_id: None,
+            secondary_labels: Vec::new(),
             code: ComputedDiagnosticCode::InvalidDeclaration
                 .as_str()
                 .to_string(),
@@ -1077,6 +1097,10 @@ fn collect_computed_body_and_read_diagnostics(
 
         if method.computed_expression.is_none() {
             diagnostics.push(ComponentDiagnostic {
+                severity: ComponentDiagnosticSeverity::Error,
+                effect_id: None,
+                statement_id: None,
+                secondary_labels: Vec::new(),
                 code: ComputedDiagnosticCode::UnsupportedBody.as_str().to_string(),
                 message: format!(
                     "computed getter `{}` has an unsupported body",
@@ -1114,6 +1138,10 @@ fn unresolved_computed_read_diagnostic(
         .any(|field| field.name == *name)
         || computed_values.contains_key(&component.id.computed(name));
     (!resolved).then(|| ComponentDiagnostic {
+        severity: ComponentDiagnosticSeverity::Error,
+        effect_id: None,
+        statement_id: None,
+        secondary_labels: Vec::new(),
         code: ComputedDiagnosticCode::UnresolvedRead.as_str().to_string(),
         message: format!(
             "computed getter `{}` reads unresolved member `this.{name}`",
@@ -1139,6 +1167,10 @@ fn collect_computed_type_diagnostics(
                 .as_ref()
                 .expect("incompatible computed return types should be declared");
             diagnostics.push(ComponentDiagnostic {
+                severity: ComponentDiagnosticSeverity::Error,
+                effect_id: None,
+                statement_id: None,
+                secondary_labels: Vec::new(),
                 code: ComputedDiagnosticCode::TypeMismatch.as_str().to_string(),
                 message: format!(
                     "computed getter `{}` returns `{}` but declares `{}`",
@@ -1151,6 +1183,10 @@ fn collect_computed_type_diagnostics(
         }
         if computed_type.serialization == crate::SerializationCompatibility::NotSerializable {
             diagnostics.push(ComponentDiagnostic {
+                severity: ComponentDiagnosticSeverity::Error,
+                effect_id: None,
+                statement_id: None,
+                secondary_labels: Vec::new(),
                 code: ComputedDiagnosticCode::SerializationViolation
                     .as_str()
                     .to_string(),

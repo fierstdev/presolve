@@ -27,7 +27,7 @@ use ezc_parser::{
 };
 use serde::Serialize;
 
-const ASM_INSPECTION_SCHEMA_VERSION: u32 = 3;
+const ASM_INSPECTION_SCHEMA_VERSION: u32 = 4;
 
 fn main() {
     let mut args = env::args().skip(1).collect::<Vec<_>>();
@@ -313,7 +313,7 @@ fn check_json(
     } else {
         Vec::new()
     };
-    serde_json::to_string_pretty(&serde_json::json!({"schema_version": 1, "files": unit.files().iter().map(|file| file.path.display().to_string()).collect::<Vec<_>>(), "summary": {"parser_diagnostics": parser_count, "compiler_diagnostics": asm.diagnostics.len(), "validation": validation.len()}, "categories": categories, "fail_on": diagnostic_severity_label(fail_on), "parser_diagnostics": parser_diagnostics, "compiler_diagnostics": compiler_diagnostics, "validation": validation_diagnostics})).expect("check document should serialize") + "\n"
+    serde_json::to_string_pretty(&serde_json::json!({"schema_version": 2, "files": unit.files().iter().map(|file| file.path.display().to_string()).collect::<Vec<_>>(), "summary": {"parser_diagnostics": parser_count, "compiler_diagnostics": asm.diagnostics.len(), "validation": validation.len()}, "categories": categories, "fail_on": diagnostic_severity_label(fail_on), "parser_diagnostics": parser_diagnostics, "compiler_diagnostics": compiler_diagnostics, "validation": validation_diagnostics})).expect("check document should serialize") + "\n"
 }
 
 fn parser_diagnostic_json(path: &Path, diagnostic: &ParseDiagnostic) -> serde_json::Value {
@@ -333,14 +333,36 @@ fn parser_diagnostic_json(path: &Path, diagnostic: &ParseDiagnostic) -> serde_js
 fn compiler_diagnostic_json(diagnostic: &ezc_core::ComponentDiagnostic) -> serde_json::Value {
     let mut document = serde_json::Map::new();
     document.insert("code".to_string(), serde_json::json!(diagnostic.code));
+    document.insert(
+        "severity".to_string(),
+        serde_json::json!(diagnostic.severity.as_str()),
+    );
     document.insert("message".to_string(), serde_json::json!(diagnostic.message));
-    if let Some(provenance) = &diagnostic.provenance {
-        document.insert(
-            "provenance".to_string(),
-            serde_json::to_value(AsmInspectionProvenance::from(provenance))
-                .expect("compiler provenance should serialize"),
-        );
-    }
+    document.insert(
+        "primary_provenance".to_string(),
+        diagnostic
+            .provenance
+            .as_ref()
+            .map(AsmInspectionProvenance::from)
+            .map_or(serde_json::Value::Null, |provenance| {
+                serde_json::to_value(provenance).expect("compiler provenance should serialize")
+            }),
+    );
+    document.insert(
+        "effect_id".to_string(),
+        diagnostic
+            .effect_id
+            .as_ref()
+            .map_or(serde_json::Value::Null, |id| serde_json::json!(id.as_str())),
+    );
+    document.insert(
+        "statement_id".to_string(),
+        diagnostic
+            .statement_id
+            .as_ref()
+            .map_or(serde_json::Value::Null, |id| serde_json::json!(id.as_str())),
+    );
+    document.insert("secondary_labels".to_string(), serde_json::Value::Array(diagnostic.secondary_labels.iter().map(|label| serde_json::json!({"provenance": AsmInspectionProvenance::from(&label.provenance), "message": label.message})).collect()));
     serde_json::Value::Object(document)
 }
 
@@ -401,7 +423,12 @@ fn print_compiler_diagnostics(diagnostics: &[ezc_core::ComponentDiagnostic]) {
     if !diagnostics.is_empty() {
         println!("  compiler diagnostics:");
         for diagnostic in diagnostics {
-            println!("    {}: {}", diagnostic.code, diagnostic.message);
+            println!(
+                "    {}[{}]: {}",
+                diagnostic.severity.as_str(),
+                diagnostic.code,
+                diagnostic.message
+            );
             if let Some(provenance) = &diagnostic.provenance {
                 println!(
                     "      at {}:{}:{} span={}..{}",
@@ -410,6 +437,23 @@ fn print_compiler_diagnostics(diagnostics: &[ezc_core::ComponentDiagnostic]) {
                     provenance.span.column,
                     provenance.span.start,
                     provenance.span.end,
+                );
+            }
+            if let Some(effect_id) = &diagnostic.effect_id {
+                println!("      = effect: {effect_id}");
+            }
+            if let Some(statement_id) = &diagnostic.statement_id {
+                println!("      = statement: {statement_id}");
+            }
+            for label in &diagnostic.secondary_labels {
+                println!(
+                    "      = related: {} at {}:{}:{} span={}..{}",
+                    label.message,
+                    label.provenance.path.display(),
+                    label.provenance.span.line,
+                    label.provenance.span.column,
+                    label.provenance.span.start,
+                    label.provenance.span.end,
                 );
             }
         }
@@ -460,14 +504,7 @@ fn asm_inspection_json(
     let mut diagnostics = asm
         .diagnostics
         .iter()
-        .map(|diagnostic| AsmInspectionDiagnostic {
-            code: &diagnostic.code,
-            message: &diagnostic.message,
-            provenance: diagnostic
-                .provenance
-                .as_ref()
-                .map(AsmInspectionProvenance::from),
-        })
+        .map(AsmInspectionDiagnostic::from)
         .collect::<Vec<_>>();
     diagnostics.sort_by(|left, right| (left.code, left.message).cmp(&(right.code, right.message)));
 
@@ -475,8 +512,12 @@ fn asm_inspection_json(
         .iter()
         .map(|diagnostic| AsmInspectionDiagnostic {
             code: &diagnostic.code,
+            severity: None,
             message: &diagnostic.message,
-            provenance: None,
+            primary_provenance: None,
+            effect_id: None,
+            statement_id: None,
+            secondary_labels: Vec::new(),
         })
         .collect::<Vec<_>>();
     validation.sort_by(|left, right| (left.code, left.message).cmp(&(right.code, right.message)));
@@ -1301,20 +1342,56 @@ impl<'a> From<&'a ezc_core::SemanticReference> for AsmInspectionReference<'a> {
 #[derive(Serialize)]
 struct AsmInspectionDiagnostic<'a> {
     code: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    severity: Option<&'static str>,
     message: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
-    provenance: Option<AsmInspectionProvenance>,
+    primary_provenance: Option<AsmInspectionProvenance>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    effect_id: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    statement_id: Option<&'a str>,
+    secondary_labels: Vec<AsmInspectionSecondaryLabel>,
 }
 
 impl<'a> From<&'a ezc_core::ComponentDiagnostic> for AsmInspectionDiagnostic<'a> {
     fn from(diagnostic: &'a ezc_core::ComponentDiagnostic) -> Self {
         Self {
             code: &diagnostic.code,
+            severity: Some(diagnostic.severity.as_str()),
             message: &diagnostic.message,
-            provenance: diagnostic
+            primary_provenance: diagnostic
                 .provenance
                 .as_ref()
                 .map(AsmInspectionProvenance::from),
+            effect_id: diagnostic
+                .effect_id
+                .as_ref()
+                .map(ezc_core::EffectId::as_str),
+            statement_id: diagnostic
+                .statement_id
+                .as_ref()
+                .map(ezc_core::EffectStatementId::as_str),
+            secondary_labels: diagnostic
+                .secondary_labels
+                .iter()
+                .map(AsmInspectionSecondaryLabel::from)
+                .collect(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct AsmInspectionSecondaryLabel {
+    provenance: AsmInspectionProvenance,
+    message: String,
+}
+
+impl From<&ezc_core::DiagnosticSecondaryLabel> for AsmInspectionSecondaryLabel {
+    fn from(label: &ezc_core::DiagnosticSecondaryLabel) -> Self {
+        Self {
+            provenance: (&label.provenance).into(),
+            message: label.message.clone(),
         }
     }
 }

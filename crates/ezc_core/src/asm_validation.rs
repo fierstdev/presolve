@@ -81,9 +81,136 @@ pub fn validate_application_semantic_model(
     validate_semantic_types(model, &mut diagnostics);
     validate_effect_statement_types(model, &mut diagnostics);
     validate_effect_execution_plan(model, &mut diagnostics);
+    validate_component_diagnostic_metadata(model, &mut diagnostics);
     validate_template_action_bindings(model, &mut diagnostics);
 
     diagnostics
+}
+
+fn validate_component_diagnostic_metadata(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    for diagnostic in &model.diagnostics {
+        let effect = diagnostic.effect_id.as_ref().and_then(|effect_id| {
+            model
+                .effects
+                .values()
+                .find(|effect| effect.id.as_str() == effect_id.as_str())
+        });
+        if diagnostic.effect_id.is_some() && effect.is_none() {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1129".to_string(),
+                message: format!(
+                    "compiler diagnostic `{}` references a missing effect subject",
+                    diagnostic.code
+                ),
+            });
+        }
+
+        let statement = diagnostic.statement_id.as_ref().and_then(|statement_id| {
+            model
+                .effect_statements
+                .values()
+                .find(|statement| statement.id.as_str() == statement_id.as_str())
+        });
+        if diagnostic.statement_id.is_some() && diagnostic.effect_id.is_none() {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1130".to_string(),
+                message: format!(
+                    "compiler diagnostic `{}` has an effect statement without an effect subject",
+                    diagnostic.code
+                ),
+            });
+        }
+        if diagnostic.statement_id.is_some()
+            && statement
+                .is_none_or(|statement| effect.is_none_or(|effect| statement.owner != effect.id))
+        {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1131".to_string(),
+                message: format!(
+                    "compiler diagnostic `{}` has a statement that does not belong to its effect",
+                    diagnostic.code
+                ),
+            });
+        }
+
+        let primary_subject = statement
+            .map(|statement| &statement.provenance)
+            .or_else(|| effect.map(|effect| &effect.provenance));
+        if let (Some(primary), Some(subject)) = (&diagnostic.provenance, primary_subject) {
+            if !provenance_contains(subject, primary) {
+                diagnostics.push(AsmValidationDiagnostic {
+                    code: "EZASM1132".to_string(),
+                    message: format!(
+                        "compiler diagnostic `{}` has non-canonical primary provenance",
+                        diagnostic.code
+                    ),
+                });
+            }
+        }
+
+        let mut sorted = diagnostic.secondary_labels.clone();
+        sorted.sort_by(secondary_label_order);
+        sorted.dedup();
+        if sorted != diagnostic.secondary_labels {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1133".to_string(),
+                message: format!(
+                    "compiler diagnostic `{}` has unordered or duplicate secondary labels",
+                    diagnostic.code
+                ),
+            });
+        }
+        for label in &diagnostic.secondary_labels {
+            let canonical = model
+                .provenance
+                .values()
+                .any(|provenance| provenance == &label.provenance)
+                || model
+                    .expression_graph
+                    .nodes
+                    .values()
+                    .any(|expression| expression.provenance == label.provenance);
+            if !canonical {
+                diagnostics.push(AsmValidationDiagnostic {
+                    code: "EZASM1134".to_string(),
+                    message: format!(
+                        "compiler diagnostic `{}` has non-canonical secondary-label provenance",
+                        diagnostic.code
+                    ),
+                });
+            }
+        }
+    }
+}
+
+fn provenance_contains(
+    subject: &crate::SourceProvenance,
+    primary: &crate::SourceProvenance,
+) -> bool {
+    subject.path == primary.path
+        && subject.span.start <= primary.span.start
+        && primary.span.end <= subject.span.end
+}
+
+fn secondary_label_order(
+    left: &crate::DiagnosticSecondaryLabel,
+    right: &crate::DiagnosticSecondaryLabel,
+) -> std::cmp::Ordering {
+    (
+        left.provenance.path.as_path(),
+        left.provenance.span.start,
+        left.provenance.span.end,
+        left.message.as_str(),
+    )
+        .cmp(&(
+            right.provenance.path.as_path(),
+            right.provenance.span.start,
+            right.provenance.span.end,
+            right.message.as_str(),
+        ))
 }
 
 fn validate_template_action_bindings(

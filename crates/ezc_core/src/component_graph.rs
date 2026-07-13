@@ -4,7 +4,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::semantic_id::{SemanticId, SemanticOwner};
+use crate::semantic_id::{EffectId, EffectStatementId, SemanticId, SemanticOwner};
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
 
@@ -763,8 +763,34 @@ pub struct RenderModel {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentDiagnostic {
     pub code: String,
+    pub severity: ComponentDiagnosticSeverity,
     pub message: String,
     pub provenance: Option<SourceProvenance>,
+    pub effect_id: Option<EffectId>,
+    pub statement_id: Option<EffectStatementId>,
+    pub secondary_labels: Vec<DiagnosticSecondaryLabel>,
+}
+
+/// Shared severity classification for compiler diagnostics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ComponentDiagnosticSeverity {
+    Error,
+}
+
+impl ComponentDiagnosticSeverity {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Error => "error",
+        }
+    }
+}
+
+/// A deterministic related authored location for a compiler diagnostic.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiagnosticSecondaryLabel {
+    pub provenance: SourceProvenance,
+    pub message: String,
 }
 
 #[must_use]
@@ -810,6 +836,10 @@ fn build_component_graph_with_identity(
 
     if parsed.classes.is_empty() && parsed.diagnostics.is_empty() {
         diagnostics.push(ComponentDiagnostic {
+            severity: ComponentDiagnosticSeverity::Error,
+            effect_id: None,
+            statement_id: None,
+            secondary_labels: Vec::new(),
             provenance: None,
             code: "EZC1000".to_string(),
             message: "no component classes found".to_string(),
@@ -835,6 +865,10 @@ fn build_component_node(
 
     if element_name.is_none() {
         diagnostics.push(ComponentDiagnostic {
+            severity: ComponentDiagnosticSeverity::Error,
+            effect_id: None,
+            statement_id: None,
+            secondary_labels: Vec::new(),
             provenance: None,
             code: "EZC1001".to_string(),
             message: format!("class `{}` is missing @component(...)", class.name),
@@ -875,6 +909,10 @@ fn build_component_node(
 
     if render.is_none() {
         diagnostics.push(ComponentDiagnostic {
+            severity: ComponentDiagnosticSeverity::Error,
+            effect_id: None,
+            statement_id: None,
+            secondary_labels: Vec::new(),
             provenance: None,
             code: "EZC1002".to_string(),
             message: format!("class `{}` is missing render()", class.name),
@@ -1430,6 +1468,10 @@ fn collect_render_binding_diagnostics(
         if let Some(name) = this_member_name(binding) {
             if !property_names.contains(&name) {
                 diagnostics.push(ComponentDiagnostic {
+            severity: ComponentDiagnosticSeverity::Error,
+            effect_id: None,
+            statement_id: None,
+            secondary_labels: Vec::new(),
                     provenance: None,
                     code: "EZC1003".to_string(),
                     message: format!(
@@ -1456,6 +1498,10 @@ fn collect_render_event_diagnostics(
     for event_handler in render_event_handlers(render) {
         if event_handler.event != "click" {
             diagnostics.push(ComponentDiagnostic {
+                severity: ComponentDiagnosticSeverity::Error,
+                effect_id: None,
+                statement_id: None,
+                secondary_labels: Vec::new(),
                 provenance: None,
                 code: "EZC1005".to_string(),
                 message: format!(
@@ -1468,6 +1514,10 @@ fn collect_render_event_diagnostics(
         if let Some(name) = this_member_name(&event_handler.handler) {
             if !method_names.contains(&name) {
                 diagnostics.push(ComponentDiagnostic {
+                    severity: ComponentDiagnosticSeverity::Error,
+                    effect_id: None,
+                    statement_id: None,
+                    secondary_labels: Vec::new(),
                     provenance: None,
                     code: "EZC1004".to_string(),
                     message: format!(
@@ -1983,6 +2033,10 @@ fn collect_list_diagnostics(
 ) {
     if list.key_expression.is_empty() {
         diagnostics.push(ComponentDiagnostic {
+            severity: ComponentDiagnosticSeverity::Error,
+            effect_id: None,
+            statement_id: None,
+            secondary_labels: Vec::new(),
             provenance: None,
             code: "EZC1011".to_string(),
             message: format!(
@@ -1995,6 +2049,10 @@ fn collect_list_diagnostics(
 
     if list.index_variable.as_deref() == Some(list.key_expression.as_str()) {
         diagnostics.push(ComponentDiagnostic {
+            severity: ComponentDiagnosticSeverity::Error,
+            effect_id: None,
+            statement_id: None,
+            secondary_labels: Vec::new(),
             provenance: None,
             code: "EZC1012".to_string(),
             message: format!(
@@ -2008,6 +2066,10 @@ fn collect_list_diagnostics(
     let member_path = list_member_key_path(list);
     if list.key_expression != list.item_variable && member_path.is_none() {
         diagnostics.push(ComponentDiagnostic {
+            severity: ComponentDiagnosticSeverity::Error,
+            effect_id: None,
+            statement_id: None,
+            secondary_labels: Vec::new(),
             provenance: None,
             code: "EZC1013".to_string(),
             message: format!(
@@ -2034,6 +2096,10 @@ fn collect_list_diagnostics(
         let key_value = member_path.map_or(Some(value), |path| value.member_path_value(path));
         let Some(key) = key_value.and_then(list_key_from_static_value) else {
             diagnostics.push(ComponentDiagnostic {
+            severity: ComponentDiagnosticSeverity::Error,
+            effect_id: None,
+            statement_id: None,
+            secondary_labels: Vec::new(),
                 provenance: None,
                 code: "EZC1015".to_string(),
                 message: member_path.map_or_else(
@@ -2052,6 +2118,10 @@ fn collect_list_diagnostics(
 
         if keys.contains(&key) {
             diagnostics.push(ComponentDiagnostic {
+            severity: ComponentDiagnosticSeverity::Error,
+            effect_id: None,
+            statement_id: None,
+            secondary_labels: Vec::new(),
                 provenance: None,
                 code: "EZC1014".to_string(),
                 message: format!(
@@ -2144,6 +2214,10 @@ fn collect_attribute_diagnostics_for_attributes(
         if !attribute.name.starts_with("on") {
             if seen.contains(&attribute.name.as_str()) {
                 diagnostics.push(ComponentDiagnostic {
+            severity: ComponentDiagnosticSeverity::Error,
+            effect_id: None,
+            statement_id: None,
+            secondary_labels: Vec::new(),
                     provenance: None,
                     code: "EZC1007".to_string(),
                     message: format!(
@@ -2172,6 +2246,10 @@ fn collect_attribute_diagnostics_for_attributes(
                     Some(field_name)
                         if state_fields.iter().any(|field| field.name == field_name) => {}
                     Some(field_name) => diagnostics.push(ComponentDiagnostic {
+            severity: ComponentDiagnosticSeverity::Error,
+            effect_id: None,
+            statement_id: None,
+            secondary_labels: Vec::new(),
                         provenance: None,
                         code: "EZC1003".to_string(),
                         message: format!(
@@ -2180,6 +2258,10 @@ fn collect_attribute_diagnostics_for_attributes(
                         ),
                     }),
                     None => diagnostics.push(ComponentDiagnostic {
+            severity: ComponentDiagnosticSeverity::Error,
+            effect_id: None,
+            statement_id: None,
+            secondary_labels: Vec::new(),
                         provenance: None,
                         code: "EZC1008".to_string(),
                         message: format!(
@@ -2191,6 +2273,10 @@ fn collect_attribute_diagnostics_for_attributes(
             }
             RenderAttributeValue::Spread(_) => {
                 diagnostics.push(ComponentDiagnostic {
+                    severity: ComponentDiagnosticSeverity::Error,
+                    effect_id: None,
+                    statement_id: None,
+                    secondary_labels: Vec::new(),
                     provenance: None,
                     code: "EZC1009".to_string(),
                     message: format!(
@@ -2200,6 +2286,10 @@ fn collect_attribute_diagnostics_for_attributes(
             }
             RenderAttributeValue::Unsupported if !is_event_attribute(&attribute.name) => {
                 diagnostics.push(ComponentDiagnostic {
+                    severity: ComponentDiagnosticSeverity::Error,
+                    effect_id: None,
+                    statement_id: None,
+                    secondary_labels: Vec::new(),
                     provenance: None,
                     code: "EZC1010".to_string(),
                     message: format!(
@@ -2352,6 +2442,10 @@ fn collect_duplicate_events_for_handlers(
     for event_handler in event_handlers {
         if seen.contains(&event_handler.event.as_str()) {
             diagnostics.push(ComponentDiagnostic {
+                severity: ComponentDiagnosticSeverity::Error,
+                effect_id: None,
+                statement_id: None,
+                secondary_labels: Vec::new(),
                 provenance: None,
                 code: "EZC1006".to_string(),
                 message: format!(
