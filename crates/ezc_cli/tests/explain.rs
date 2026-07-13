@@ -1633,6 +1633,126 @@ fn effect_diagnostics_share_check_and_selected_explain_projection() {
 }
 
 #[test]
+fn effect_fixture_matrix_covers_capabilities_dependencies_and_action_batch_deduplication() {
+    let path = "fixtures/0054-effect-fixture-matrix/input/EffectFixtureMatrix.tsx";
+    let first = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["asm", path, "--format", "json"])
+        .output()
+        .expect("failed to inspect effect fixture matrix");
+    assert!(first.status.success());
+    let second = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["asm", path, "--format", "json"])
+        .output()
+        .expect("failed to repeat effect fixture matrix inspection");
+    assert_eq!(first.stdout, second.stdout);
+
+    let document: serde_json::Value = serde_json::from_slice(&first.stdout).expect("matrix JSON");
+    assert!(document["diagnostics"]
+        .as_array()
+        .is_some_and(Vec::is_empty));
+    let component = format!("module:{path}/component:x-effect-fixture-matrix");
+    let effect = |name: &str| {
+        document["entities"]
+            .as_array()
+            .and_then(|entities| {
+                entities
+                    .iter()
+                    .find(|entity| entity["id"] == format!("{component}/effect:{name}"))
+            })
+            .and_then(|entity| entity.get("effect"))
+            .expect("effect inspection")
+    };
+    let increment_batch = format!("{component}/action-batch:incrementTwice");
+    let rename_batch = format!("{component}/action-batch:rename");
+
+    let bootstrap = effect("bootstrap");
+    assert_eq!(
+        bootstrap["direct_dependencies"]["state"],
+        serde_json::json!([])
+    );
+    assert_eq!(
+        bootstrap["direct_dependencies"]["computed"],
+        serde_json::json!([])
+    );
+    assert_eq!(
+        bootstrap["initial_trigger"]["policy"],
+        "after_initial_render"
+    );
+
+    for name in ["persistTotal", "rememberTotal"] {
+        let inspection = effect(name);
+        assert_eq!(
+            inspection["action_triggers"].as_array().map(Vec::len),
+            Some(1)
+        );
+        assert_eq!(
+            inspection["action_triggers"][0]["action_batch_id"],
+            increment_batch
+        );
+        assert_eq!(inspection["action_triggers"][0]["effect_batch_index"], 0);
+        assert_eq!(
+            inspection["action_triggers"][0]["matched_states"]
+                .as_array()
+                .map(Vec::len),
+            Some(1)
+        );
+        assert_eq!(
+            inspection["action_triggers"][0]["required_computed"]
+                .as_array()
+                .map(Vec::len),
+            Some(1)
+        );
+    }
+
+    let title = effect("syncTitle");
+    assert_eq!(title["action_triggers"][0]["action_batch_id"], rename_batch);
+    assert_eq!(
+        title["action_triggers"][0]["required_computed"],
+        serde_json::json!([])
+    );
+    assert!(effect("persistTotal")["capabilities"]
+        .as_array()
+        .is_some_and(|operations| operations.iter().any(
+            |operation| operation["operation_id"] == "builtin.browser.local_storage.set_item"
+        )));
+    assert!(effect("rememberTotal")["capabilities"]
+        .as_array()
+        .is_some_and(|operations| operations.iter().any(
+            |operation| operation["operation_id"] == "builtin.browser.session_storage.set_item"
+        )));
+}
+
+#[test]
+fn multi_file_effect_fixture_keeps_module_qualified_effect_identity() {
+    let alpha = "fixtures/0055-effect-multi-file-identity/input/AlphaEffect.tsx";
+    let beta = "fixtures/0055-effect-multi-file-identity/input/BetaEffect.tsx";
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["asm", alpha, beta, "--format", "json"])
+        .output()
+        .expect("failed to inspect multi-file effect fixture");
+    assert!(output.status.success());
+    let document: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("multi-file JSON");
+    let ids = document["entities"]
+        .as_array()
+        .expect("entities")
+        .iter()
+        .filter(|entity| entity["kind"] == "effect")
+        .filter_map(|entity| entity["id"].as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(ids.len(), 2);
+    assert!(ids
+        .iter()
+        .any(|id| id.starts_with(&format!("module:{alpha}/"))));
+    assert!(ids
+        .iter()
+        .any(|id| id.starts_with(&format!("module:{beta}/"))));
+}
+
+#[test]
 fn check_command_filters_displayed_diagnostic_categories_without_changing_failure() {
     let output = Command::new(ezc_cli_bin())
         .current_dir(repo_root())

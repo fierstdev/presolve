@@ -3,32 +3,32 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: F18 - effect diagnostics
-* Working tree: F18 is complete and ready for its commit
+* Latest completed slice: F19 - effect fixture expansion
+* Working tree: F19 is complete and ready for its commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: F18 - effect diagnostics
-* Summary: The compiler now projects F2-F5 and F9 effect facts into one stable `EZC1041`-`EZC1051` diagnostic catalog without reanalyzing bodies, resolving paths, or changing runtime behavior.
-* Key files: crates/ezc_core/src/effect_diagnostics.rs; crates/ezc_core/src/component_graph.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_cli/src/main.rs; crates/ezc_cli/tests/explain.rs
-* New behavior: Shared `ComponentDiagnostic` records retain severity, optional typed effect/statement identities, and deterministic secondary labels. Validated F5/F9 projections feed the canonical ASM diagnostic list, `check`, full/selected ASM JSON, and selected `explain`. Check JSON advances to schema v2; ASM inspection advances to schema v4.
-* Fixtures added or changed: Core coverage proves stable F5 category mapping, source-provenanced effect metadata, secondary labels, and coalesced F9 unavailable prerequisites. CLI coverage proves check JSON and selected explain share the same effect diagnostic projection.
+* Slice: F19 - effect fixture expansion
+* Summary: Compiler fixture coverage now exercises valid capability programs, direct and computed dependencies, shared computed prerequisites, action-batch deduplication, dependency-free initial effects, invalid effects/capability failures, and multi-module effect identity. Existing browser fixtures continue to prove initial and completed-action execution in Chrome.
+* Key files: fixtures/0054-effect-fixture-matrix/input/EffectFixtureMatrix.tsx; fixtures/0055-effect-multi-file-identity/input/*.tsx; crates/ezc_cli/tests/explain.rs; crates/ezc_cli/tests/runtime_browser.rs
+* New behavior: No language semantics changed. The matrix fixture freezes expected compiler products through deterministic ASM assertions, while the multi-file fixture proves that effect IDs stay module-qualified.
+* Fixtures added or changed: 0054 is the valid effect capability/dependency/action-batch matrix; 0055 is the multi-file identity matrix. 0052 remains the invalid/capability-failure fixture and 0053 remains the browser initial/post-action runtime fixture.
 
 Current in-progress slice
 
-* Slice: F18 - effect diagnostics
-* Status: Complete; commit this slice before starting F19
+* Slice: F20 - effect stability audit
+* Status: Ready to begin after the F19 commit
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F17
-* Remaining: F19 through F20. F19 expands fixtures and F20 performs the final stability audit.
+* Remaining: F20. Freeze the completed Phase F contracts after auditing canonical ownership, reuse, determinism, diagnostics, inspection, and unsupported semantics.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core effect: pass (18 tests)
-* cargo test -p ezc_cli --test explain: pass (121 tests)
-* cargo clippy -p ezc_core --all-targets -- -D warnings: pending final F18 verification
-* cargo clippy -p ezc_cli --all-targets -- -D warnings: pending final F18 verification
+* cargo test -p ezc_cli --test explain: pending final F19 verification
+* cargo test -p ezc_cli --test runtime_browser initial_effects_execute_once_from_compiler_generated_runtime_programs -- --exact: pass
+* cargo test -p ezc_cli --test runtime_browser completed_action_batches_execute_compiler_planned_effects_once -- --exact: pass
+* cargo clippy -p ezc_cli --all-targets -- -D warnings: pending final F19 verification
 
 Architecture decisions made
 
