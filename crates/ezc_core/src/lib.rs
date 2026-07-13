@@ -105,7 +105,7 @@ pub use page_codegen::{generate_standalone_page, generate_standalone_page_with_c
 pub use resume_manifest::{
     build_resume_manifest, resume_manifest_json, ResumeManifest, RESUME_MANIFEST_SCHEMA_VERSION,
 };
-pub use resume_plan::{build_resume_plan, ResumeComponentPlan, ResumePlan};
+pub use resume_plan::{build_resume_plan, ResumeComponentPlan, ResumeComputedPlan, ResumePlan};
 pub use runtime_codegen::generate_runtime_stub;
 pub use runtime_computed::{
     build_runtime_computed_registry, RuntimeComputedCacheSlot, RuntimeComputedDirtyFlag,

@@ -3,36 +3,36 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: E16 - computed batched invalidation
-* Working tree: clean after the E16 commit
+* Latest completed slice: E17 - serializable computed resumability planning
+* Working tree: clean after the E17 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: E16 - computed batched invalidation
-* Summary: Multi-step actions now invalidate and re-evaluate computed values through compiler-generated transitive dependency and batch metadata.
-* Key files: crates/ezc_core/src/runtime_computed_artifact.rs; crates/ezc_core/src/runtime_codegen.rs; crates/ezc_cli/tests/runtime_browser.rs
-* New behavior: `computed.runtime.json` schema v3 emits state-storage-to-computed invalidation tables. Runtime state writes mark only those compiler-specified targets dirty; one flush after the whole action consumes compiler-generated update batches and refreshes caches.
-* Fixtures added or changed: `fixtures/0045-computed-batched-invalidation` plus focused browser coverage for a two-step action producing one computed update run.
+* Slice: E17 - serializable computed resumability planning
+* Summary: Resumability plans and manifests now include compiler-lowered, structurally serializable computed cache identities.
+* Key files: crates/ezc_core/src/resume_plan.rs; crates/ezc_core/src/resume_manifest.rs; crates/ezc_core/src/lib.rs
+* New behavior: Each eligible computed record adds a stable computed ID, cache-slot ID, dirty-flag ID, and initial dirty state to its component resume plan. Eligibility derives from E10/E12 lowering and E4 serialization compatibility.
+* Fixtures added or changed: focused core plan and manifest serialization coverage for eligible versus unresolved computed values.
 
 Current in-progress slice
 
-* Slice: E16 - computed batched invalidation
+* Slice: E17 - serializable computed resumability planning
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E16
-* Remaining: E17 - serializable computed values.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E17
+* Remaining: E18 - computed inspection and queries.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core runtime_computed_artifact: pass
-* cargo test -p ezc_cli build_command_writes_compiler_generated_computed_runtime_metadata: pass
-* RUST_TEST_THREADS=1 cargo test -p ezc_cli --test runtime_browser multi_step_actions_flush_one_compiler_generated_computed_batch -- --nocapture: pass
-* RUST_TEST_THREADS=1 cargo test -p ezc_cli --test runtime_browser double_binding_counter_increments_in_a_real_browser -- --nocapture: pass
+* cargo test -p ezc_core resume: pass
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
-* cargo clippy -p ezc_cli --all-targets -- -D warnings: pass
 
 Architecture decisions made
+
+* Decision: Resume plans include only E12 registry records that are structurally serializable under E4, with stable cache-slot and dirty-flag metadata rather than speculative cache payloads.
+* Reason: Resume and serialization consumers can identify exactly which compiler-lowered caches may cross a resume boundary without treating cyclic, impure, unresolved, unlowered, or non-serializable values as partially resumable.
+* Tradeoff: E17 plans cache capture and restoration but does not persist live values or restore them in the browser runtime. Existing state instance serialization remains unchanged; a runtime snapshot transport/restore protocol requires its own contract.
 
 * Decision: E16 emits a schema-v3 storage-to-transitive-computed invalidation table and consumes the existing E9 update batches only after an action completes.
 * Reason: State writes can mark every compiler-known dependent dirty and execute one scheduler-directed flush without inspecting runtime getter source or rebuilding reverse dependency edges.
@@ -602,14 +602,14 @@ Known limitations
 * Item: Method parameters are compiler-owned identifier declarations with canonical source provenance only. They do not execute, close over values, resolve local/template/action references, or support destructuring, defaults, rest declarations, or semantic type checking.
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
-* Item: The canonical expression graph covers supported state initializer expressions and direct supported computed getter returns. Computed expression nodes and entities have inferred canonical types through resolved state/computed reads; exact template binding uses can resolve to computed entities, but do not evaluate them. Computed values are pure or impure with `EZC1034` purity diagnostics, compiler-owned direct/transitive reactive topology is available, computed cycles emit `EZC1035`, and evaluation plans expose stable order/batches. Pure scheduled E2 expressions lower to canonical IR functions, a separate immutable optimized IR product, and emitted `computed.runtime.json` programs. Runtime state writes mark compiler-emitted transitive dependents dirty and one post-action scheduler flush refreshes caches; template updates and serialization remain later work.
+* Item: The canonical expression graph covers supported state initializer expressions and direct supported computed getter returns. Computed expression nodes and entities have inferred canonical types through resolved state/computed reads; exact template binding uses can resolve to computed entities, but do not evaluate them. Computed values are pure or impure with `EZC1034` purity diagnostics, compiler-owned direct/transitive reactive topology is available, computed cycles emit `EZC1035`, and evaluation plans expose stable order/batches. Pure scheduled E2 expressions lower to canonical IR functions, a separate immutable optimized IR product, and emitted `computed.runtime.json` programs. Runtime state writes mark compiler-emitted transitive dependents dirty and one post-action scheduler flush refreshes caches. Resume plans now identify serializable computed caches, but no live cache snapshot or restore transport exists yet; template updates remain later work.
 * Item: C30 exposes direct ASM type queries only. CLI inspection output, source diagnostics, backend enforcement, resource declaration lowering, and final type diagnostic families remain later Phase C work.
 * Item: Authored method IR functions still contain only empty entry basic blocks plus structural branch-edge and natural-loop records. Computed E10 functions lower the supported E2 expression graph into value-producing instructions, but neither form has source-lowered branches/loops, explicit terminators, or general statement instructions.
 * Item: Authored method lowering still creates empty function value registries and no method load/store instructions. Computed E10 functions register their defining values and resolved state/computed loads; D3-A analyses apply to both canonical forms without adding general source statement lowering.
 
 Exact next step
 
-Next is E17: integrate computed values with resumability and serialization planning. Do not extend inspection APIs, diagnostics, or runtime dependency discovery.
+Next is E18: extend ASM and explain output with computed type, dependencies, dependents, evaluation order, purity, serializability, and IR identity. Do not add new diagnostics, runtime discovery, or fixture-suite expansion.
 
 Useful commands
 
@@ -640,4 +640,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the E16 commit.
+* None after the E17 commit.
