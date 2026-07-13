@@ -2,8 +2,10 @@ const RUNTIME_STUB: &str = r#"(() => {
   "use strict";
 
   const MANIFEST_ELEMENT_ID = "ez-template-manifest";
+  const COMPUTED_ARTIFACT_ELEMENT_ID = "ez-computed-runtime";
   const RUNTIME_VERSION = "0.0.0";
   const SUPPORTED_SCHEMA_VERSION = 1;
+  const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 2;
 
   class EdgeZeroBootError extends Error {
     constructor(code) {
@@ -70,6 +72,58 @@ const RUNTIME_STUB: &str = r#"(() => {
         true
       );
       throw new EdgeZeroBootError("EZR_UNSUPPORTED_SCHEMA");
+    }
+  }
+
+  function readComputedArtifact(diagnostics) {
+    const element = document.getElementById(COMPUTED_ARTIFACT_ELEMENT_ID);
+
+    if (element === null) {
+      return null;
+    }
+
+    if (!(element instanceof HTMLScriptElement)) {
+      reportDiagnostic(
+        diagnostics,
+        "EZR_INVALID_COMPUTED_ARTIFACT",
+        "Computed runtime metadata was not stored in a script element",
+        { artifactElementId: COMPUTED_ARTIFACT_ELEMENT_ID },
+        true
+      );
+      throw new EdgeZeroBootError("EZR_INVALID_COMPUTED_ARTIFACT");
+    }
+
+    try {
+      return JSON.parse(element.textContent ?? "");
+    } catch (error) {
+      reportDiagnostic(
+        diagnostics,
+        "EZR_INVALID_COMPUTED_ARTIFACT",
+        "Computed runtime metadata JSON could not be parsed",
+        { message: error instanceof Error ? error.message : String(error) },
+        true
+      );
+      throw new EdgeZeroBootError("EZR_INVALID_COMPUTED_ARTIFACT");
+    }
+  }
+
+  function validateComputedArtifactSchema(artifact, diagnostics) {
+    if (artifact === null) {
+      return;
+    }
+
+    if (artifact.schema_version !== SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION) {
+      reportDiagnostic(
+        diagnostics,
+        "EZR_UNSUPPORTED_COMPUTED_ARTIFACT_SCHEMA",
+        `Unsupported computed runtime metadata schema version ${String(artifact.schema_version)}`,
+        {
+          schema_version: artifact.schema_version,
+          supported_schema_version: SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION
+        },
+        true
+      );
+      throw new EdgeZeroBootError("EZR_UNSUPPORTED_COMPUTED_ARTIFACT_SCHEMA");
     }
   }
 
@@ -718,15 +772,173 @@ const RUNTIME_STUB: &str = r#"(() => {
     return nextInstances;
   }
 
-  function createRuntimeStore(elementsByNode, diagnostics) {
+  function createRuntimeStore(elementsByNode, diagnostics, computedArtifact) {
+    const computedEvaluations = new Map();
+    const storageValues = new Map();
+    const computedDirty = new Map();
+
+    for (const state of computedArtifact?.state ?? []) {
+      storageValues.set(state.storage, state.initial_value);
+    }
+
+    for (const evaluation of computedArtifact?.evaluations ?? []) {
+      computedEvaluations.set(evaluation.computed, evaluation);
+      computedDirty.set(evaluation.computed, evaluation.dirty_flag?.initial_value === true);
+    }
+
     return {
       components: new Map(),
       bindingsByField: new Map(),
       actionsByMethod: new Map(),
       eventsByType: new Map(),
       elementsByNode,
-      diagnostics
+      diagnostics,
+      computedArtifact,
+      computedEvaluations,
+      computedDirty,
+      computedValues: new Map(),
+      computedCaches: new Map(),
+      storageValues
     };
+  }
+
+  function computedOperandValue(store, values, operand) {
+    if (operand?.kind === "value") {
+      return values.get(operand.value);
+    }
+
+    if (operand?.kind === "constant") {
+      return operand.value;
+    }
+
+    if (operand?.kind === "storage") {
+      return store.storageValues.get(operand.storage);
+    }
+
+    return undefined;
+  }
+
+  function computedBinary(operation, left, right) {
+    switch (operation) {
+      case "add": return left + right;
+      case "subtract": return left - right;
+      case "multiply": return left * right;
+      case "divide": return left / right;
+      case "remainder": return left % right;
+      case "equal": return left === right;
+      case "not-equal": return left !== right;
+      case "less-than": return left < right;
+      case "less-than-or-equal": return left <= right;
+      case "greater-than": return left > right;
+      case "greater-than-or-equal": return left >= right;
+      case "and": return left && right;
+      case "or": return left || right;
+      case "nullish-coalesce": return left ?? right;
+      default: return undefined;
+    }
+  }
+
+  function computedUnary(operation, value) {
+    switch (operation) {
+      case "not": return !value;
+      case "identity": return +value;
+      case "negate": return -value;
+      default: return undefined;
+    }
+  }
+
+  function executeComputedProgram(store, evaluation) {
+    const values = new Map();
+
+    for (const instruction of evaluation.program?.instructions ?? []) {
+      if (instruction.kind === "constant") {
+        values.set(instruction.result, instruction.value);
+        continue;
+      }
+
+      if (instruction.kind === "load-state") {
+        values.set(instruction.result, store.storageValues.get(instruction.storage));
+        continue;
+      }
+
+      if (instruction.kind === "load-computed") {
+        if (store.computedDirty.get(instruction.computed) === true) {
+          reportDiagnostic(
+            store.diagnostics,
+            "EZR_UNPLANNED_COMPUTED_DEPENDENCY",
+            "Computed evaluation depended on a value not yet evaluated by the compiler plan",
+            { computed: evaluation.computed, dependency: instruction.computed }
+          );
+          values.set(instruction.result, undefined);
+        } else {
+          values.set(instruction.result, store.computedValues.get(instruction.computed));
+        }
+        continue;
+      }
+
+      if (instruction.kind === "get-member") {
+        const object = computedOperandValue(store, values, instruction.object);
+        const value = object !== null && typeof object === "object"
+          && Object.prototype.hasOwnProperty.call(object, instruction.property)
+          ? object[instruction.property]
+          : undefined;
+        values.set(instruction.result, value);
+        continue;
+      }
+
+      if (instruction.kind === "binary") {
+        values.set(
+          instruction.result,
+          computedBinary(
+            instruction.operation,
+            computedOperandValue(store, values, instruction.left),
+            computedOperandValue(store, values, instruction.right)
+          )
+        );
+        continue;
+      }
+
+      if (instruction.kind === "unary") {
+        values.set(
+          instruction.result,
+          computedUnary(
+            instruction.operation,
+            computedOperandValue(store, values, instruction.operand)
+          )
+        );
+      }
+    }
+
+    return values.get(evaluation.program?.result);
+  }
+
+  function executeComputedPlan(store) {
+    if (store.computedArtifact === null) {
+      return;
+    }
+
+    for (const computed of store.computedArtifact.evaluation_order ?? []) {
+      const evaluation = store.computedEvaluations.get(computed);
+
+      if (evaluation === undefined) {
+        reportDiagnostic(
+          store.diagnostics,
+          "EZR_UNPLANNED_COMPUTED_DEPENDENCY",
+          "Compiler plan referenced a missing computed evaluation",
+          { computed }
+        );
+        continue;
+      }
+
+      if (store.computedDirty.get(computed) !== true) {
+        continue;
+      }
+
+      const value = executeComputedProgram(store, evaluation);
+      store.computedValues.set(computed, value);
+      store.computedCaches.set(evaluation.cache_slot, value);
+      store.computedDirty.set(computed, false);
+    }
   }
 
   function readField(store, component, field) {
@@ -1133,11 +1345,21 @@ const RUNTIME_STUB: &str = r#"(() => {
     }));
   }
 
+  function debugComputed(store) {
+    return [...store.computedEvaluations.values()].map((evaluation) => ({
+      computed: evaluation.computed,
+      cache_slot: evaluation.cache_slot,
+      dirty: store.computedDirty.get(evaluation.computed) === true,
+      value: store.computedCaches.get(evaluation.cache_slot)
+    }));
+  }
+
   function runtimeState({
     manifest = null,
     missingAnchors = [],
     store = null,
     components = [],
+    computed = [],
     diagnostics
   }) {
     return {
@@ -1147,16 +1369,17 @@ const RUNTIME_STUB: &str = r#"(() => {
       missingAnchors,
       diagnostics,
       store,
-      components
+      components,
+      computed
     };
   }
 
-  function initializeRuntime(manifest, diagnostics) {
+  function initializeRuntime(manifest, computedArtifact, diagnostics) {
     const bindingAnchors = collectBindingAnchors();
     const conditionalAnchors = collectConditionalAnchors();
     const listAnchors = collectListAnchors();
     const elementsByNode = collectElementAnchors();
-    const store = createRuntimeStore(elementsByNode, diagnostics);
+    const store = createRuntimeStore(elementsByNode, diagnostics, computedArtifact);
     const missingAnchors = collectMissingAnchors(
       manifest,
       bindingAnchors,
@@ -1191,6 +1414,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       registerComponentEvents(store, component);
     }
 
+    executeComputedPlan(store);
+
     installDelegatedEventListeners(store);
 
     return runtimeState({
@@ -1198,7 +1423,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       missingAnchors,
       diagnostics,
       store,
-      components: debugComponents(store)
+      components: debugComponents(store),
+      computed: debugComputed(store)
     });
   }
 
@@ -1208,8 +1434,10 @@ const RUNTIME_STUB: &str = r#"(() => {
     try {
       const manifest = readManifest(diagnostics);
       validateManifestSchema(manifest, diagnostics);
+      const computedArtifact = readComputedArtifact(diagnostics);
+      validateComputedArtifactSchema(computedArtifact, diagnostics);
 
-      const state = initializeRuntime(manifest, diagnostics);
+      const state = initializeRuntime(manifest, computedArtifact, diagnostics);
       const status = state.diagnostics.some((diagnostic) => diagnostic.fatal)
         || state.missingAnchors.length > 0
         ? "error"

@@ -1,10 +1,33 @@
-use crate::template_manifest::{template_manifest_json, TemplateManifest};
+use crate::{
+    runtime_computed_artifact_json, template_manifest_json, RuntimeComputedArtifact,
+    TemplateManifest,
+};
 
 #[must_use]
 pub fn generate_standalone_page(
     title: &str,
     body_html: &str,
     manifest: &TemplateManifest,
+) -> String {
+    generate_page(title, body_html, manifest, None)
+}
+
+/// Generate a standalone page with compiler-generated computed runtime data.
+#[must_use]
+pub fn generate_standalone_page_with_computed_runtime(
+    title: &str,
+    body_html: &str,
+    manifest: &TemplateManifest,
+    computed: &RuntimeComputedArtifact,
+) -> String {
+    generate_page(title, body_html, manifest, Some(computed))
+}
+
+fn generate_page(
+    title: &str,
+    body_html: &str,
+    manifest: &TemplateManifest,
+    computed: Option<&RuntimeComputedArtifact>,
 ) -> String {
     let manifest_json = template_manifest_json(manifest);
 
@@ -35,6 +58,15 @@ pub fn generate_standalone_page(
     }
 
     output.push_str("    </script>\n");
+    if let Some(computed) = computed {
+        output.push_str("    <script type=\"application/json\" id=\"ez-computed-runtime\">\n");
+        for line in runtime_computed_artifact_json(computed).lines() {
+            output.push_str("      ");
+            output.push_str(&escape_script_json_line(line));
+            output.push('\n');
+        }
+        output.push_str("    </script>\n");
+    }
     output.push_str("    <script src=\"./runtime.js\" defer></script>\n");
     output.push_str("  </body>\n");
     output.push_str("</html>\n");

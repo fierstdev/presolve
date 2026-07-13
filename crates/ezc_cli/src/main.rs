@@ -7,9 +7,9 @@ use std::process;
 
 use ezc_core::{
     build_application_semantic_model_for_unit, build_component_graph,
-    build_runtime_computed_artifact, build_runtime_computed_registry, build_semantic_graph,
-    build_template_graph, build_template_manifest, explain_json, explain_text,
-    fold_component_graph, generate_runtime_stub, generate_standalone_page, generate_static_html,
+    build_runtime_computed_artifact, build_semantic_graph, build_template_graph,
+    build_template_manifest, explain_json, explain_text, fold_component_graph,
+    generate_runtime_stub, generate_standalone_page_with_computed_runtime, generate_static_html,
     lower_components_to_ir, runtime_computed_artifact_json, semantic_graph_json,
     semantic_type_text, summarize_source, template_manifest_json,
     validate_application_semantic_model, ApplicationSemanticModel, AsmValidationDiagnostic,
@@ -1305,9 +1305,8 @@ fn run_build(mut args: Vec<String>) {
     let parsed = parse_file(&input_path, &source);
     let unit = CompilationUnit::from_parsed_files(vec![parsed.clone()]);
     let asm = ConstantFoldingPass.transform(&build_application_semantic_model_for_unit(&unit));
-    let computed_registry = build_runtime_computed_registry(&asm, &lower_components_to_ir(&asm));
-    let computed_runtime_artifact =
-        build_runtime_computed_artifact(&computed_registry, &asm.computed_evaluation_plan);
+    let computed_ir = lower_components_to_ir(&asm);
+    let computed_runtime_artifact = build_runtime_computed_artifact(&asm, &computed_ir);
     let computed_runtime_json = runtime_computed_artifact_json(&computed_runtime_artifact);
     let component_graph = fold_component_graph(&build_component_graph(&parsed));
     let template_graph = build_template_graph(&component_graph);
@@ -1315,7 +1314,12 @@ fn run_build(mut args: Vec<String>) {
     let manifest = build_template_manifest(&component_graph, &template_graph);
     let manifest_json = template_manifest_json(&manifest);
     let page_title = page_title_from_graph(&template_graph);
-    let page_html = generate_standalone_page(&page_title, &html_fragment, &manifest);
+    let page_html = generate_standalone_page_with_computed_runtime(
+        &page_title,
+        &html_fragment,
+        &manifest,
+        &computed_runtime_artifact,
+    );
     let runtime_js = generate_runtime_stub();
 
     write_build_artifacts(

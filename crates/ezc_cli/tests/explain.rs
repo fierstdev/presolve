@@ -3457,7 +3457,7 @@ fn build_command_writes_compiler_generated_computed_runtime_metadata() {
     let label = format!("{component}/computed:label");
     let visible = format!("{component}/computed:visible");
 
-    assert_eq!(artifact["schema_version"], 1);
+    assert_eq!(artifact["schema_version"], 2);
     assert_eq!(
         artifact["evaluation_order"],
         serde_json::json!([label, visible])
@@ -3475,6 +3475,7 @@ fn build_command_writes_compiler_generated_computed_runtime_metadata() {
                     && evaluation["dirty_flag"]["initial_value"] == true
                     && evaluation["serialization"] == "serializable"
                     && evaluation["dependencies"] == serde_json::json!([])
+                    && evaluation["program"]["instructions"].is_array()
             })
         }));
 }

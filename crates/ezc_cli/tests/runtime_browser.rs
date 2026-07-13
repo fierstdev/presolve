@@ -1106,6 +1106,96 @@ fn null_state_initializes_in_a_real_browser() {
     );
 }
 
+#[test]
+fn computed_values_execute_once_from_compiler_generated_runtime_programs() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/computed-runtime-execution");
+
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean previous browser test output");
+    }
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0044-computed-runtime-execution/input/RuntimeComputed.tsx",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("browser test output path was not valid UTF-8"),
+        ])
+        .output()
+        .expect("failed to build computed runtime fixture");
+    assert!(output.status.success());
+
+    write_computed_runtime_probe_page(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile dir");
+    let user_data_dir = format!(
+        "--user-data-dir={}",
+        profile_dir
+            .to_str()
+            .expect("Chrome profile path was not valid UTF-8")
+    );
+    let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
+
+    let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+
+    assert!(
+        stdout.contains("EDGEZERO_COMPUTED_RUNTIME_BROWSER_TEST_PASS"),
+        "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+fn write_computed_runtime_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
+    let probe = index.replace(
+        "</body>",
+        r#"<script>
+const fail = (message) => { throw new Error(message); };
+const waitFor = (predicate, label) => new Promise((resolve, reject) => {
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    if (predicate()) { resolve(); return; }
+    if (Date.now() > deadline) { reject(new Error(`Timed out waiting for ${label}`)); return; }
+    setTimeout(tick, 20);
+  };
+  tick();
+});
+(async () => {
+  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  const computed = window.__EDGEZERO__.computed;
+  if (!Array.isArray(computed) || computed.length !== 2) fail("computed cache records were missing");
+  const doubled = computed.find((entry) => entry.computed.endsWith("/computed:doubled"));
+  const label = computed.find((entry) => entry.computed.endsWith("/computed:label"));
+  if (doubled?.value !== 2 || label?.value !== 3) fail("computed programs did not evaluate in compiler order");
+  if (doubled?.dirty !== false || label?.dirty !== false) fail("computed caches remained dirty after execution");
+  if (!(window.__EDGEZERO__.store.computedCaches instanceof Map)) fail("computed cache store was not a Map");
+  if (window.__EDGEZERO__.diagnostics.length !== 0) fail("computed execution reported diagnostics");
+  document.body.dataset.browserTest = "pass";
+  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_COMPUTED_RUNTIME_BROWSER_TEST_PASS</div>");
+})().catch((error) => {
+  document.body.dataset.browserTest = "fail";
+  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_COMPUTED_RUNTIME_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  console.error(error);
+});
+</script>
+</body>"#,
+    );
+
+    fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
+}
+
 fn write_probe_page(out_dir: &Path) {
     let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
     let probe = index.replace(
