@@ -1562,6 +1562,40 @@ pub fn optimize_computed_ir(input: &IntermediateRepresentation) -> IrOptimizatio
     computed_optimization_pipeline().run_with_report(input)
 }
 
+/// Run the existing immutable optimization pipeline over F10 effect functions
+/// only, preserving every non-effect IR product verbatim.
+#[must_use]
+pub fn optimize_effect_ir(input: &IntermediateRepresentation) -> IrOptimizationReport {
+    let mut effect_input = input.clone();
+    for module in &mut effect_input.modules {
+        let effect_functions = module
+            .effect_executions
+            .iter()
+            .map(|execution| execution.function.clone())
+            .collect::<BTreeSet<_>>();
+        module
+            .functions
+            .retain(|function| effect_functions.contains(&function.id));
+        module.computed_evaluations.clear();
+    }
+    let mut report = computed_optimization_pipeline().run_with_report(&effect_input);
+    let mut output = input.clone();
+    for (module, optimized) in output.modules.iter_mut().zip(&report.output.modules) {
+        let optimized_functions = optimized
+            .functions
+            .iter()
+            .map(|function| (function.id.clone(), function.clone()))
+            .collect::<BTreeMap<_, _>>();
+        for function in &mut module.functions {
+            if let Some(optimized) = optimized_functions.get(&function.id) {
+                *function = optimized.clone();
+            }
+        }
+    }
+    report.output = output;
+    report
+}
+
 /// Compact structural metrics for one canonical IR snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IrOptimizationMetrics {
@@ -2952,10 +2986,11 @@ pub enum IrUnaryOperation {
 mod tests {
     use super::{
         compute_dominators, compute_post_dominators, lower_components_to_ir, optimize_computed_ir,
-        validate_effect_ir, validate_intermediate_representation, IntermediateRepresentation,
-        IrBinaryOperation, IrBlock, IrBlockId, IrBranchArm, IrBranchEdge, IrConstant, IrFunction,
-        IrInstruction, IrInstructionId, IrInstructionKind, IrLoop, IrLoopId, IrModule, IrOperand,
-        IrStorageId, IrUnaryOperation, IrValue, IrValueDefinition, IrValueId,
+        optimize_effect_ir, validate_effect_ir, validate_intermediate_representation,
+        IntermediateRepresentation, IrBinaryOperation, IrBlock, IrBlockId, IrBranchArm,
+        IrBranchEdge, IrConstant, IrFunction, IrInstruction, IrInstructionId, IrInstructionKind,
+        IrLoop, IrLoopId, IrModule, IrOperand, IrStorageId, IrUnaryOperation, IrValue,
+        IrValueDefinition, IrValueId,
     };
     use crate::{CapabilityOperationId, SemanticId, SemanticType, SourceProvenance};
     use std::collections::BTreeMap;
@@ -3728,6 +3763,108 @@ class EffectIr extends Component {
         assert_eq!(ir.effect_ir_function(&sync), Some(&sync));
         assert!(validate_intermediate_representation(&ir).is_empty());
         assert!(validate_effect_ir(&model, &ir).is_empty());
+    }
+
+    #[test]
+    fn optimizes_effect_operands_without_removing_or_reordering_capabilities() {
+        let parsed = ezc_parser::parse_file(
+            "src/OptimizedEffectIr.tsx",
+            r#"
+@component("x-optimized-effect-ir")
+class OptimizedEffectIr extends Component {
+  title = state("EdgeZero");
+
+  @computed()
+  get unrelated() { return 4 + 5; }
+
+  @effect()
+  report() {
+    console.log(1 + 2);
+    document.title = this.title;
+    console.log("after");
+  }
+
+  render() { return <p />; }
+}
+"#,
+        );
+        let model = crate::build_application_semantic_model(&parsed);
+        let component = &model.components[0];
+        let effect = component.id.effect("report");
+        let computed = component.id.computed("unrelated");
+        let input = lower_components_to_ir(&model);
+        let original_computed = input.modules[0]
+            .functions
+            .iter()
+            .find(|function| function.id == computed)
+            .expect("original computed function")
+            .clone();
+        let report = optimize_effect_ir(&input);
+        let output = &report.output;
+        let optimized_effect = output.modules[0]
+            .functions
+            .iter()
+            .find(|function| function.id == effect)
+            .expect("optimized effect function");
+        let optimized_computed = output.modules[0]
+            .functions
+            .iter()
+            .find(|function| function.id == computed)
+            .expect("preserved computed function");
+        let operations = optimized_effect.blocks[0]
+            .instructions
+            .iter()
+            .filter_map(|instruction| match instruction.kind {
+                IrInstructionKind::CapabilityCall { operation, .. }
+                | IrInstructionKind::CapabilityAssign { operation, .. } => Some(operation),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(input, lower_components_to_ir(&model));
+        assert_eq!(optimized_computed, &original_computed);
+        assert_eq!(
+            operations,
+            vec![
+                CapabilityOperationId("builtin.browser.console.log"),
+                CapabilityOperationId("builtin.browser.document.title.assign"),
+                CapabilityOperationId("builtin.browser.console.log"),
+            ]
+        );
+        assert!(optimized_effect.blocks[0]
+            .instructions
+            .iter()
+            .any(|instruction| {
+                matches!(
+                    instruction.kind,
+                    IrInstructionKind::Constant {
+                        value: IrConstant::Number(ref value)
+                    } if value == "3"
+                )
+            }));
+        assert!(optimized_effect.blocks[0]
+            .instructions
+            .iter()
+            .all(|instruction| {
+                !instruction.kind.is_observable_side_effect() || instruction.result.is_none()
+            }));
+        assert_eq!(
+            report
+                .passes
+                .iter()
+                .map(|pass| pass.name)
+                .collect::<Vec<_>>(),
+            vec![
+                "common-subexpression-elimination",
+                "copy-propagation",
+                "constant-folding",
+                "instruction-simplification",
+                "dead-code-elimination",
+                "cfg-cleanup",
+            ]
+        );
+        assert!(validate_intermediate_representation(output).is_empty());
+        assert!(validate_effect_ir(&model, output).is_empty());
     }
 
     #[test]
