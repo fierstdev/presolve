@@ -32,6 +32,7 @@ pub mod route_graph;
 pub mod runtime_codegen;
 pub mod runtime_computed;
 pub mod runtime_computed_artifact;
+pub mod runtime_effect;
 pub mod semantic_graph;
 pub mod semantic_id;
 pub mod semantic_provenance;
@@ -135,6 +136,10 @@ pub use runtime_computed_artifact::{
     RuntimeComputedArtifactDirtyFlag, RuntimeComputedArtifactEvaluation,
     RuntimeComputedArtifactInvalidation, RuntimeComputedArtifactSerialization,
     RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION,
+};
+pub use runtime_effect::{
+    build_runtime_effect_registry, RuntimeActionBatchEffectTrigger, RuntimeEffectRecord,
+    RuntimeEffectRegistry, RuntimeInitialEffectTrigger,
 };
 pub use semantic_graph::{
     build_semantic_graph, semantic_graph_json, SemanticGraph, SemanticGraphEdge,

@@ -3,29 +3,29 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: F11 - effect IR optimization
-* Working tree: clean after the F11 commit
+* Latest completed slice: F12 - runtime effect registry
+* Working tree: clean after the F12 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: F11 - effect IR optimization
-* Summary: F10 effect functions now pass through the existing immutable optimization pipeline via `optimize_effect_ir`, while the complete input IR remains the output shape.
-* Key files: crates/ezc_core/src/intermediate_representation.rs; crates/ezc_core/src/lib.rs
-* New behavior: The optimizer projects only effect functions into the established pass pipeline, then merges optimized effect functions back by semantic ID. Pure operand work may fold; `CapabilityCall` and `CapabilityAssign` remain ordered, observable, void execution roots. Non-effect functions and computed evaluations remain unchanged.
-* Fixtures added or changed: Core coverage proves a folded capability operand, preserved capability order/observability, unchanged non-effect IR, valid optimized effect IR, and unchanged shared pass ordering. No runtime fixture is needed because F11 adds no execution behavior.
+* Slice: F12 - runtime effect registry
+* Summary: F10/F11-lowered effects now receive deterministic compiler-owned runtime records containing their execution function, compiler timing policy, initial and completed-action trigger metadata, required computed prerequisites, capability IDs, client boundary, and provenance.
+* Key files: crates/ezc_core/src/runtime_effect.rs; crates/ezc_core/src/lib.rs
+* New behavior: Registry membership is anchored exclusively to canonical `IrEffectExecution` records. Each record projects F8 matched-state evidence and F9 scheduled prerequisite batches per effect, retains F10 capability operation order, and excludes invalid or unlowered effects without reading effect source or executing anything.
+* Fixtures added or changed: Core coverage proves deterministic semantic-ID registry ordering, F11-optimized IR consumption, initial render metadata, action-batch membership/evidence, per-effect computed prerequisite filtering, capability identities, provenance/boundary retention, and invalid-effect exclusion. No runtime fixture is needed because F12 adds metadata only.
 
 Current in-progress slice
 
-* Slice: F12 - runtime effect registry
-* Status: Ready after F11 commit
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F11
-* Remaining: F12 through F20. F12 must publish deterministic compiler-owned runtime effect records from F10/F8/F9 products without executing effects.
+* Slice: F13 - runtime effect artifact
+* Status: Ready after F12 commit
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F12
+* Remaining: F13 through F20. F13 must emit a versioned compiler-generated artifact from F9 plans, F10/F11 IR, and F12 records without source-path matching or execution.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core --lib: pass (161 tests)
+* cargo test -p ezc_core --lib: pass (162 tests)
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 
 Architecture decisions made
@@ -81,6 +81,10 @@ Architecture decisions made
 * Decision: F11 reuses `computed_optimization_pipeline` unchanged by projecting only F10 effect functions into its input and merging those optimized functions back into the complete IR by semantic ID.
 * Reason: Effect optimization stays under the existing immutable optimizer and pass ordering, while neither authored-method nor computed IR is accidentally changed by an effect-only slice. Existing capability instruction operands participate in canonical use/liveness tracking; their observable void forms are not candidates for elimination or common-subexpression rewriting.
 * Tradeoff: The optimization report's pass metrics describe the effect-only projection, while its output preserves the full IR. F11 does not alter F9 schedules, add runtime records/artifacts, execute capabilities, or introduce runtime dependency discovery; F12 owns runtime effect registry metadata.
+
+* Decision: F12 keys runtime effect records exclusively by canonical `IrEffectExecution` membership, then projects F8 trigger evidence and F9 scheduled prerequisite data into each effect record.
+* Reason: F10 lowering is the authoritative executable-membership boundary. Intersecting existing F7 computed dependencies with F9's already-selected scheduled prerequisites yields record-local prerequisite metadata without rereading bodies, rebuilding dependency closures, or assigning scheduler positions.
+* Tradeoff: An unplanned or invalid effect has no runtime record even if earlier semantic products mention it. F12 is metadata only: it does not produce a serialized artifact, interpret IR, dispatch capabilities, run initial or action-batch effects, compare values, or introduce runtime dependency discovery; F13 owns the artifact.
 
 * Decision needed before F8: define the canonical identity for a completed action batch when one authored action method lowers to multiple `ComponentAction` state-write records.
 * Reason: Effects run once per completed action batch, but existing component actions are individual state operations. F8 must either map effects to method/batch identity and deduplicate changed dependencies there, or map effects to individual writes and require F9/runtime layers to reconstruct the batch. The choice determines trigger metadata, F9 ordering, F12 registry identity, and F15 batching behavior.
