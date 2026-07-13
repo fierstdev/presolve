@@ -18,7 +18,7 @@ Last completed slice
 Current in-progress slice
 
 * Slice: F15 - completed-action batched effect execution
-* Status: Ready after F14 commit
+* Status: Blocked awaiting a canonical compiler-emitted action-invocation to `ActionBatchId` bridge
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F14
 * Remaining: F15 through F20. F15 must consume the compiler-generated action trigger plans after one completed action and computed flush, without reconstructing eligibility or dependencies at runtime.
 
@@ -95,6 +95,10 @@ Architecture decisions made
 * Decision: F14 groups initial effects only by their compiler-emitted F9 batch index, preserving artifact order within a batch, and dispatches capability operations solely by their compiler-emitted runtime-lowering ID.
 * Reason: F13 already records initial trigger membership and batch position, so grouping consumes explicit compiler products rather than observing dependencies or reconstructing eligibility. Sharing the established pure-IR evaluator ensures effect operands see the completed compiler-generated computed initialization before external synchronization.
 * Tradeoff: Debug evidence records effect and capability IDs, never runtime dependency observations or arbitrary local state. F14 intentionally does not consult action trigger records after an action; F15 owns completed-action batching, computed-flush composition, and exactly-once action-triggered execution.
+
+* Decision needed before F15: define the canonical compiler-emitted bridge from a runtime template action invocation to the F8 authored-method `ActionBatchId`.
+* Reason: The runtime currently receives only `ManifestAction.method` and component display name, while F12/F13 completed-action triggers are keyed exclusively by canonical semantic `ActionBatchId`. Parsing an ID suffix, matching source method names at runtime, or inferring a batch from state writes would violate F8's authored-action identity and the no-runtime-reconstruction invariant.
+* Tradeoff: F14 remains complete and committed. No F15 action-triggered effect execution, action-batch lookup, runtime trigger eligibility derivation, or runtime dependency discovery has been introduced. Guidance must choose whether this bridge belongs on the template action record, the effect artifact, or another existing compiler-owned runtime record, including its schema/versioning contract.
 
 * Decision needed before F8: define the canonical identity for a completed action batch when one authored action method lowers to multiple `ComponentAction` state-write records.
 * Reason: Effects run once per completed action batch, but existing component actions are individual state operations. F8 must either map effects to method/batch identity and deduplicate changed dependencies there, or map effects to individual writes and require F9/runtime layers to reconstruct the batch. The choice determines trigger metadata, F9 ordering, F12 registry identity, and F15 batching behavior.
