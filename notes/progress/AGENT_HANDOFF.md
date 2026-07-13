@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: G3 - Context Consumer entities
-* Working tree: G3 is ready to commit. The Phase G roadmap file is user-provided and untracked.
+* Working tree: G3 is committed. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-13
 
 Last completed slice
@@ -18,7 +18,7 @@ Last completed slice
 Current in-progress slice
 
 * Slice: G4 - Consumer Provider resolution
-* Status: Ready to inspect the roadmap contract after the G3 commit checkpoint.
+* Status: Blocked pending an explicit Provider visibility, selection, and default-fallback contract.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3
 * Remaining: G4 through G20.
 
@@ -53,6 +53,10 @@ Architecture decisions made
 * Decision: G3 Consumer syntax is a non-static, declaration-only definite-assignment `@consume(ComponentSymbol.contextField)` field with one exact static designator and an explicit requested type.
 * Reason: The compiler resolves the designator only to an immutable canonical Context identity through local component facts or the existing import binding table. Consumer identity remains component-qualified by the local binding field, while Context ownership remains unchanged.
 * Tradeoff: Consumers record only `Resolved(ContextId)` or `Unresolved` Context identity state. G3 emits no Provider relation, visibility/nearest-provider analysis, default fallback selection, type compatibility result, runtime slot, scheduling product, IR, or runtime lookup.
+
+* Decision needed before G4: define the canonical component-composition/ancestry product that establishes Provider visibility; the deterministic selection rule when several visible Providers target one Context; whether same-component Providers participate; and whether, when, and how a Context default becomes an explicit fallback result.
+* Reason: The G4 roadmap says only to resolve every Consumer to exactly one Provider or retain an unresolved fact. The existing compiler has component/module ownership but no canonical component-composition ancestry or Provider visibility semantics. Selecting globally, by source order, import order, lexical nesting, or runtime-tree traversal would invent language semantics and violate the compiler-only authority invariant.
+* Tradeoff: G3 remains complete and committed. No Consumer-to-Provider relation, nearest-provider result, Context default fallback, ownership-graph reconstruction, runtime binding, or runtime lookup has been added.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.
