@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: G1 - canonical Context entities
-* Working tree: G1 is complete and ready for its commit. The Phase G roadmap file is user-provided and untracked.
+* Working tree: G1 is committed. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-13
 
 Last completed slice
@@ -18,7 +18,7 @@ Last completed slice
 Current in-progress slice
 
 * Slice: G2 - Context Provider lowering
-* Status: Ready to begin after the G1 commit.
+* Status: Blocked pending an explicit authored Provider declaration contract.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1
 * Remaining: G2 through G20.
 
@@ -38,6 +38,10 @@ Architecture decisions made
 * Decision: G1 Context syntax is a zero-argument `@context()` decorated non-static component field with an explicit declared type. It lowers to a distinct component-qualified `ContextId` and remains separate from the authored field identity.
 * Reason: One exact field form makes name, ownership, declared type, provenance, and later Provider/Consumer targets compiler-owned facts without accepting runtime constructors, decorator naming, or implicit globals.
 * Tradeoff: Only literal defaults are retained as Context-owned shared expression roots. They are not state, providers, runtime storage, or reactive edges; invalid/missing-type/argument/static/nonliteral forms create no valid Context entity and no new user-facing diagnostic catalog.
+
+* Decision needed before G2: define the authored Provider declaration syntax, its Context target reference, provided-value expression contract, and full declaration provenance anchor.
+* Reason: The G2 roadmap identifies required Provider products but supplies no source construct that creates one. Choosing a decorator, JSX wrapper, component field, method, implicit default, or name-based lookup would invent language semantics and determine the Context-to-Provider relationship, expression ownership, and later Consumer resolution behavior.
+* Tradeoff: G1 remains complete and committed. No Provider entity, Context reference, value expression, ownership inference, consumer resolution, execution, runtime artifact, or runtime lookup has been added.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.
@@ -722,7 +726,7 @@ Known limitations
 
 Exact next step
 
-Begin G2: define and lower canonical Context Provider declarations. Do not resolve consumers, infer ownership, execute providers, or introduce runtime lookup.
+Await an explicit G2 authored Provider declaration contract before beginning Provider lowering. Do not infer a Provider form from Context defaults or runtime component structure.
 
 Useful commands
 
