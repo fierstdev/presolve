@@ -1157,6 +1157,57 @@ fn computed_values_execute_once_from_compiler_generated_runtime_programs() {
     );
 }
 
+#[test]
+fn multi_step_actions_flush_one_compiler_generated_computed_batch() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/computed-batched-invalidation");
+
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean previous browser test output");
+    }
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0045-computed-batched-invalidation/input/BatchedComputed.tsx",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("browser test output path was not valid UTF-8"),
+        ])
+        .output()
+        .expect("failed to build computed batching fixture");
+    assert!(output.status.success());
+
+    write_batched_computed_probe_page(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile dir");
+    let user_data_dir = format!(
+        "--user-data-dir={}",
+        profile_dir
+            .to_str()
+            .expect("Chrome profile path was not valid UTF-8")
+    );
+    let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
+
+    let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+
+    assert!(
+        stdout.contains("EDGEZERO_COMPUTED_BATCH_BROWSER_TEST_PASS"),
+        "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 fn write_computed_runtime_probe_page(out_dir: &Path) {
     let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
     let probe = index.replace(
@@ -1187,6 +1238,46 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
   document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_COMPUTED_RUNTIME_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  console.error(error);
+});
+</script>
+</body>"#,
+    );
+
+    fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
+}
+
+fn write_batched_computed_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
+    let probe = index.replace(
+        "</body>",
+        r#"<script>
+const fail = (message) => { throw new Error(message); };
+const waitFor = (predicate, label) => new Promise((resolve, reject) => {
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    if (predicate()) { resolve(); return; }
+    if (Date.now() > deadline) { reject(new Error(`Timed out waiting for ${label}`)); return; }
+    setTimeout(tick, 20);
+  };
+  tick();
+});
+const computedValue = (name) => window.__EDGEZERO__.computed
+  .find((entry) => entry.computed.endsWith(`/computed:${name}`))?.value;
+(async () => {
+  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  if (computedValue("doubled") !== 0 || computedValue("label") !== 1) fail("initial computed caches were incorrect");
+  document.querySelector("button")?.click();
+  await waitFor(() => computedValue("doubled") === 4 && computedValue("label") === 5, "batched computed values");
+  if (window.__EDGEZERO__.components[0].state.count !== 2) fail("multi-step action did not finish both state writes");
+  if (window.__EDGEZERO__.computed_update_runs !== 1) fail("multi-step action triggered more than one computed update run");
+  if (window.__EDGEZERO__.computed.some((entry) => entry.dirty)) fail("computed values remained dirty after the batch");
+  if (window.__EDGEZERO__.diagnostics.length !== 0) fail("computed batching reported diagnostics");
+  document.body.dataset.browserTest = "pass";
+  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_COMPUTED_BATCH_BROWSER_TEST_PASS</div>");
+})().catch((error) => {
+  document.body.dataset.browserTest = "fail";
+  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_COMPUTED_BATCH_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>

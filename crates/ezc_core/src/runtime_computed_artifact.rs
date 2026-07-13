@@ -8,13 +8,14 @@ use crate::{
     SemanticId, SerializableValue, SerializationCompatibility,
 };
 
-pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 2;
+pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 3;
 
 /// Versioned runtime metadata and executable programs emitted from canonical IR.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RuntimeComputedArtifact {
     pub schema_version: u32,
     pub state: Vec<RuntimeComputedArtifactState>,
+    pub invalidations: Vec<RuntimeComputedArtifactInvalidation>,
     pub evaluations: Vec<RuntimeComputedArtifactEvaluation>,
     pub evaluation_order: Vec<String>,
     pub update_batches: Vec<Vec<String>>,
@@ -27,6 +28,13 @@ pub struct RuntimeComputedArtifactState {
     pub field: String,
     pub storage: String,
     pub initial_value: Option<SerializableValue>,
+}
+
+/// Compiler-generated transitive computed invalidations for one state storage.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RuntimeComputedArtifactInvalidation {
+    pub storage: String,
+    pub dependents: Vec<String>,
 }
 
 /// Runtime metadata and canonical instruction program for one computed value.
@@ -145,13 +153,39 @@ pub fn build_runtime_computed_artifact(
     ir: &IntermediateRepresentation,
 ) -> RuntimeComputedArtifact {
     let registry = build_runtime_computed_registry(model, ir);
-    let available = registry
+    let available = registry_ids(&registry);
+    let evaluations = runtime_evaluations(model, &registry, ir);
+    let emitted = evaluations
+        .iter()
+        .map(|evaluation| evaluation.computed.clone())
+        .collect::<BTreeSet<_>>();
+    let state = runtime_state(model);
+
+    RuntimeComputedArtifact {
+        schema_version: RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION,
+        invalidations: runtime_invalidations(model, &state, &emitted),
+        state,
+        evaluations,
+        evaluation_order: planned_evaluations(model, &available, &emitted),
+        update_batches: planned_batches(model, &available, &emitted),
+    }
+}
+
+fn registry_ids(registry: &crate::RuntimeComputedRegistry) -> BTreeSet<String> {
+    registry
         .records
         .keys()
         .map(|computed| computed.as_str().to_string())
-        .collect::<BTreeSet<_>>();
+        .collect()
+}
+
+fn runtime_evaluations(
+    model: &ApplicationSemanticModel,
+    registry: &crate::RuntimeComputedRegistry,
+    ir: &IntermediateRepresentation,
+) -> Vec<RuntimeComputedArtifactEvaluation> {
     let programs = computed_programs(ir);
-    let evaluations = registry
+    registry
         .records
         .values()
         .filter_map(|record| {
@@ -178,57 +212,97 @@ pub fn build_runtime_computed_artifact(
                 program,
             })
         })
-        .collect::<Vec<_>>();
-    let emitted = evaluations
-        .iter()
-        .map(|evaluation| evaluation.computed.clone())
-        .collect::<BTreeSet<_>>();
+        .collect()
+}
 
-    RuntimeComputedArtifact {
-        schema_version: RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION,
-        state: model
-            .components
-            .iter()
-            .flat_map(|component| {
-                component
-                    .state_fields
-                    .iter()
-                    .map(move |field| RuntimeComputedArtifactState {
-                        component: component.class_name.clone(),
-                        field: field.name.clone(),
-                        storage: IrStorageId::for_semantic_origin(&field.id)
-                            .as_str()
-                            .to_string(),
-                        initial_value: field.initial_value.clone(),
+fn runtime_state(model: &ApplicationSemanticModel) -> Vec<RuntimeComputedArtifactState> {
+    model
+        .components
+        .iter()
+        .flat_map(|component| {
+            component
+                .state_fields
+                .iter()
+                .map(move |field| RuntimeComputedArtifactState {
+                    component: component.class_name.clone(),
+                    field: field.name.clone(),
+                    storage: IrStorageId::for_semantic_origin(&field.id)
+                        .as_str()
+                        .to_string(),
+                    initial_value: field.initial_value.clone(),
+                })
+        })
+        .collect()
+}
+
+fn runtime_invalidations(
+    model: &ApplicationSemanticModel,
+    state: &[RuntimeComputedArtifactState],
+    emitted: &BTreeSet<String>,
+) -> Vec<RuntimeComputedArtifactInvalidation> {
+    state
+        .iter()
+        .filter_map(|state| {
+            let field = model.components.iter().find_map(|component| {
+                (component.class_name == state.component)
+                    .then(|| {
+                        component
+                            .state_fields
+                            .iter()
+                            .find(|field| field.name == state.field)
                     })
-            })
-            .collect(),
-        evaluations,
-        evaluation_order: model
-            .computed_evaluation_plan
-            .evaluation_order
-            .iter()
-            .filter(|computed| {
-                available.contains(computed.as_str()) && emitted.contains(computed.as_str())
-            })
-            .cloned()
-            .collect(),
-        update_batches: model
-            .computed_evaluation_plan
-            .update_batches
-            .iter()
-            .map(|batch| {
-                batch
+                    .flatten()
+            })?;
+            Some(RuntimeComputedArtifactInvalidation {
+                storage: state.storage.clone(),
+                dependents: model
+                    .reactive_transitive_analysis
+                    .dependents_of(field.id.as_str())
                     .iter()
-                    .filter(|computed| {
-                        available.contains(computed.as_str()) && emitted.contains(computed.as_str())
-                    })
+                    .filter(|computed| emitted.contains(computed.as_str()))
                     .cloned()
-                    .collect::<Vec<_>>()
+                    .collect(),
             })
-            .filter(|batch| !batch.is_empty())
-            .collect(),
-    }
+        })
+        .collect()
+}
+
+fn planned_evaluations(
+    model: &ApplicationSemanticModel,
+    available: &BTreeSet<String>,
+    emitted: &BTreeSet<String>,
+) -> Vec<String> {
+    model
+        .computed_evaluation_plan
+        .evaluation_order
+        .iter()
+        .filter(|computed| {
+            available.contains(computed.as_str()) && emitted.contains(computed.as_str())
+        })
+        .cloned()
+        .collect()
+}
+
+fn planned_batches(
+    model: &ApplicationSemanticModel,
+    available: &BTreeSet<String>,
+    emitted: &BTreeSet<String>,
+) -> Vec<Vec<String>> {
+    model
+        .computed_evaluation_plan
+        .update_batches
+        .iter()
+        .map(|batch| {
+            batch
+                .iter()
+                .filter(|computed| {
+                    available.contains(computed.as_str()) && emitted.contains(computed.as_str())
+                })
+                .cloned()
+                .collect::<Vec<_>>()
+        })
+        .filter(|batch| !batch.is_empty())
+        .collect()
 }
 
 /// Serialize emitted computed runtime metadata as deterministic, pretty JSON.
@@ -434,6 +508,11 @@ class RuntimeComputedArtifact extends Component {
         );
         assert_eq!(artifact.state.len(), 1);
         assert_eq!(artifact.state[0].field, "count");
+        assert_eq!(artifact.invalidations.len(), 1);
+        assert_eq!(
+            artifact.invalidations[0].dependents,
+            vec![doubled.to_string(), label.to_string()]
+        );
         assert_eq!(artifact.evaluations.len(), 2);
         assert_eq!(artifact.evaluations[0].computed, doubled.as_str());
         assert_eq!(
@@ -459,7 +538,7 @@ class RuntimeComputedArtifact extends Component {
         let second = runtime_computed_artifact_json(&build_runtime_computed_artifact(&model, &ir));
         assert_eq!(first, second);
         let json: serde_json::Value = serde_json::from_str(&first).expect("artifact JSON");
-        assert_eq!(json["schema_version"], 2);
+        assert_eq!(json["schema_version"], 3);
         assert_eq!(
             json["evaluations"][0]["program"]["instructions"][0]["kind"],
             "load-state"

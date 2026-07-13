@@ -5,7 +5,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const COMPUTED_ARTIFACT_ELEMENT_ID = "ez-computed-runtime";
   const RUNTIME_VERSION = "0.0.0";
   const SUPPORTED_SCHEMA_VERSION = 1;
-  const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 2;
+  const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 3;
 
   class EdgeZeroBootError extends Error {
     constructor(code) {
@@ -775,10 +775,20 @@ const RUNTIME_STUB: &str = r#"(() => {
   function createRuntimeStore(elementsByNode, diagnostics, computedArtifact) {
     const computedEvaluations = new Map();
     const storageValues = new Map();
+    const storageByComponentField = new Map();
+    const invalidationsByStorage = new Map();
     const computedDirty = new Map();
 
     for (const state of computedArtifact?.state ?? []) {
       storageValues.set(state.storage, state.initial_value);
+      storageByComponentField.set(
+        componentFieldKey(state.component, state.field),
+        state.storage
+      );
+    }
+
+    for (const invalidation of computedArtifact?.invalidations ?? []) {
+      invalidationsByStorage.set(invalidation.storage, invalidation.dependents ?? []);
     }
 
     for (const evaluation of computedArtifact?.evaluations ?? []) {
@@ -798,7 +808,10 @@ const RUNTIME_STUB: &str = r#"(() => {
       computedDirty,
       computedValues: new Map(),
       computedCaches: new Map(),
-      storageValues
+      storageValues,
+      storageByComponentField,
+      invalidationsByStorage,
+      computedUpdateRuns: 0
     };
   }
 
@@ -941,6 +954,44 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
+  function executeComputedUpdateBatches(store) {
+    if (store.computedArtifact === null) {
+      return;
+    }
+
+    let executed = false;
+
+    for (const batch of store.computedArtifact.update_batches ?? []) {
+      for (const computed of batch) {
+        if (store.computedDirty.get(computed) !== true) {
+          continue;
+        }
+
+        const evaluation = store.computedEvaluations.get(computed);
+
+        if (evaluation === undefined) {
+          reportDiagnostic(
+            store.diagnostics,
+            "EZR_UNPLANNED_COMPUTED_DEPENDENCY",
+            "Compiler update batch referenced a missing computed evaluation",
+            { computed }
+          );
+          continue;
+        }
+
+        const value = executeComputedProgram(store, evaluation);
+        store.computedValues.set(computed, value);
+        store.computedCaches.set(evaluation.cache_slot, value);
+        store.computedDirty.set(computed, false);
+        executed = true;
+      }
+    }
+
+    if (executed) {
+      store.computedUpdateRuns += 1;
+    }
+  }
+
   function readField(store, component, field) {
     if (!(field in component.state)) {
       reportDiagnostic(
@@ -967,6 +1018,16 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
 
     component.state[field] = value;
+    const storage = store.storageByComponentField.get(
+      componentFieldKey(component.name, field)
+    );
+
+    if (storage !== undefined) {
+      store.storageValues.set(storage, value);
+      for (const computed of store.invalidationsByStorage.get(storage) ?? []) {
+        store.computedDirty.set(computed, true);
+      }
+    }
     notifyField(store, component, field);
   }
 
@@ -1286,6 +1347,9 @@ const RUNTIME_STUB: &str = r#"(() => {
     for (const action of actions) {
       executeAction(store, component, action);
     }
+
+    executeComputedUpdateBatches(store);
+    refreshComputedDebugState(store);
   }
 
   function registerComponentEvents(store, component) {
@@ -1354,12 +1418,22 @@ const RUNTIME_STUB: &str = r#"(() => {
     }));
   }
 
+  function refreshComputedDebugState(store) {
+    if (window.__EDGEZERO__?.store !== store) {
+      return;
+    }
+
+    window.__EDGEZERO__.computed = debugComputed(store);
+    window.__EDGEZERO__.computed_update_runs = store.computedUpdateRuns;
+  }
+
   function runtimeState({
     manifest = null,
     missingAnchors = [],
     store = null,
     components = [],
     computed = [],
+    computed_update_runs = 0,
     diagnostics
   }) {
     return {
@@ -1370,7 +1444,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       diagnostics,
       store,
       components,
-      computed
+      computed,
+      computed_update_runs
     };
   }
 
@@ -1424,7 +1499,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       diagnostics,
       store,
       components: debugComponents(store),
-      computed: debugComputed(store)
+      computed: debugComputed(store),
+      computed_update_runs: store.computedUpdateRuns
     });
   }
 

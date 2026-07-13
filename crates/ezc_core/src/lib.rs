@@ -114,7 +114,8 @@ pub use runtime_computed::{
 pub use runtime_computed_artifact::{
     build_runtime_computed_artifact, runtime_computed_artifact_json, RuntimeComputedArtifact,
     RuntimeComputedArtifactDirtyFlag, RuntimeComputedArtifactEvaluation,
-    RuntimeComputedArtifactSerialization, RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION,
+    RuntimeComputedArtifactInvalidation, RuntimeComputedArtifactSerialization,
+    RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION,
 };
 pub use semantic_graph::{
     build_semantic_graph, semantic_graph_json, SemanticGraph, SemanticGraphEdge,
