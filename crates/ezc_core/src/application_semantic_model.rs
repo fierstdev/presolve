@@ -9,7 +9,6 @@ use crate::component_graph::{
     ComponentMethod, ComponentNode, MethodLocalVariable, RenderEventHandler, StateField,
 };
 use crate::computed_value::{collect_computed_values, ComputedDiagnosticCode, ComputedValue};
-use crate::effect::{collect_effects, lower_effect_bodies, Effect, EffectBody, EffectStatement};
 use crate::expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 use crate::intermediate_representation::{
     IrComputedEvaluationPlan, IrReactiveCycleAnalysis, IrReactiveGraph,
@@ -23,6 +22,9 @@ use crate::template_graph::{build_template_graph, TemplateNode};
 use crate::template_semantics::{
     build_template_semantic_entities, TemplateSemanticEntity, TemplateSemanticKind,
     TemplateSemanticScope,
+};
+use crate::{
+    collect_effects, lower_effect_bodies, validate_effects, Effect, EffectBody, EffectStatement,
 };
 
 /// Application-level semantic data assembled from the compiler's existing graphs.
@@ -545,6 +547,12 @@ pub fn build_application_semantic_model_from_component_graph(
         &references,
         &template_entities,
     );
+    let effects = validate_effects(
+        &component_graph.components,
+        effects,
+        &effect_statements,
+        &semantic_types,
+    );
     let mut diagnostics = component_graph.diagnostics.clone();
     diagnostics.extend(computed_diagnostics);
     extend_computed_diagnostics(
@@ -679,6 +687,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         &references,
         &template_entities,
     );
+    let effects = validate_effects(&components, effects, &effect_statements, &semantic_types);
     extend_computed_diagnostics(
         &mut diagnostics,
         &components,

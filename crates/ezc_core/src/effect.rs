@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::{
     ComponentNode, EffectStatementSyntaxKind, ExecutionBoundary, ExpressionGraph, SemanticId,
-    SemanticOwner, SourceProvenance, UnsupportedEffectStatementKind,
+    SemanticOwner, SemanticTypeModel, SourceProvenance, UnsupportedEffectStatementKind,
 };
 
 /// Compiler-owned execution contract for an effect.
@@ -15,6 +15,40 @@ pub enum EffectExecutionPolicy {
     AfterInitialRenderAndCompletedActionBatch,
 }
 
+/// Compiler classification of an effect's language-semantic validity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EffectValidation {
+    Unvalidated,
+    Valid,
+    Invalid,
+}
+
+/// Unsupported behavior that makes an effect ineligible for later lowering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum EffectSemanticViolationKind {
+    Async,
+    ReactiveStateMutation,
+    ActionInvocation,
+    EffectInvocation,
+    ComponentMethodInvocation,
+    UnresolvedComponentCall,
+    UnresolvedComponentAssignment,
+    UnknownExternalCapability,
+    CapabilitySignature,
+    CapabilityBoundary,
+    CapabilitySerialization,
+    ValueReturn,
+    UnsupportedStatement,
+}
+
+/// One compiler-owned effect semantic violation with canonical provenance.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EffectSemanticViolation {
+    pub kind: EffectSemanticViolationKind,
+    pub statement: Option<SemanticId>,
+    pub provenance: SourceProvenance,
+}
+
 /// A first-class compiler semantic entity for one `@effect()` method.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Effect {
@@ -24,6 +58,8 @@ pub struct Effect {
     pub name: String,
     pub execution_boundary: ExecutionBoundary,
     pub execution_policy: EffectExecutionPolicy,
+    pub validation: EffectValidation,
+    pub semantic_violations: Vec<EffectSemanticViolation>,
     pub provenance: SourceProvenance,
 }
 
@@ -94,12 +130,147 @@ pub fn collect_effects(
                             execution_boundary: ExecutionBoundary::Client,
                             execution_policy:
                                 EffectExecutionPolicy::AfterInitialRenderAndCompletedActionBatch,
+                            validation: EffectValidation::Unvalidated,
+                            semantic_violations: Vec::new(),
                             provenance,
                         },
                     )
                 })
         })
         .collect()
+}
+
+/// Classifies effect legality from F4 statement facts without adding diagnostics.
+#[allow(clippy::too_many_lines)]
+#[must_use]
+pub fn validate_effects(
+    components: &[ComponentNode],
+    mut effects: BTreeMap<SemanticId, Effect>,
+    statements: &BTreeMap<SemanticId, EffectStatement>,
+    semantic_types: &SemanticTypeModel,
+) -> BTreeMap<SemanticId, Effect> {
+    for effect in effects.values_mut() {
+        let mut violations = Vec::new();
+        let method = effect
+            .owner
+            .entity_id()
+            .and_then(|component_id| {
+                components
+                    .iter()
+                    .find(|component| component.id == *component_id)
+            })
+            .and_then(|component| {
+                component
+                    .methods
+                    .iter()
+                    .find(|method| method.id == effect.method)
+            });
+        if method.is_some_and(|method| method.is_async) {
+            violations.push(EffectSemanticViolation {
+                kind: EffectSemanticViolationKind::Async,
+                statement: None,
+                provenance: effect.provenance.clone(),
+            });
+        }
+        for statement in statements
+            .values()
+            .filter(|statement| statement.owner == effect.id)
+        {
+            let Some(record) = semantic_types.effect_statements.get(&statement.id) else {
+                continue;
+            };
+            let statement_violation = match record.operation_classification {
+                crate::EffectOperationClassification::ReactiveStateAssignment => {
+                    Some(EffectSemanticViolationKind::ReactiveStateMutation)
+                }
+                crate::EffectOperationClassification::ComponentActionCall => {
+                    Some(EffectSemanticViolationKind::ActionInvocation)
+                }
+                crate::EffectOperationClassification::ComponentEffectCall => {
+                    Some(EffectSemanticViolationKind::EffectInvocation)
+                }
+                crate::EffectOperationClassification::ComponentMethodCall => {
+                    Some(EffectSemanticViolationKind::ComponentMethodInvocation)
+                }
+                crate::EffectOperationClassification::UnresolvedComponentCall => {
+                    Some(EffectSemanticViolationKind::UnresolvedComponentCall)
+                }
+                crate::EffectOperationClassification::UnresolvedComponentAssignment => {
+                    Some(EffectSemanticViolationKind::UnresolvedComponentAssignment)
+                }
+                crate::EffectOperationClassification::UnknownExternalCapability => {
+                    Some(EffectSemanticViolationKind::UnknownExternalCapability)
+                }
+                crate::EffectOperationClassification::ValueReturn => {
+                    Some(EffectSemanticViolationKind::ValueReturn)
+                }
+                crate::EffectOperationClassification::UnsupportedStatement => {
+                    Some(EffectSemanticViolationKind::UnsupportedStatement)
+                }
+                crate::EffectOperationClassification::RecognizedCapability
+                | crate::EffectOperationClassification::BareReturn
+                | crate::EffectOperationClassification::Empty => None,
+            };
+            if let Some(kind) = statement_violation {
+                violations.push(EffectSemanticViolation {
+                    kind,
+                    statement: Some(statement.id.clone()),
+                    provenance: statement.provenance.clone(),
+                });
+            }
+            for (compatibility, kind) in [
+                (
+                    record.signature_compatibility,
+                    EffectSemanticViolationKind::CapabilitySignature,
+                ),
+                (
+                    record.boundary_compatibility,
+                    EffectSemanticViolationKind::CapabilityBoundary,
+                ),
+                (
+                    record.serialization_compatibility,
+                    EffectSemanticViolationKind::CapabilitySerialization,
+                ),
+            ] {
+                if compatibility != crate::EffectCompatibility::Compatible
+                    && record.operation_classification
+                        == crate::EffectOperationClassification::RecognizedCapability
+                {
+                    violations.push(EffectSemanticViolation {
+                        kind,
+                        statement: Some(statement.id.clone()),
+                        provenance: statement.provenance.clone(),
+                    });
+                }
+            }
+        }
+        violations.sort_by(|left, right| {
+            (
+                left.kind,
+                left.provenance.path.as_path(),
+                left.provenance.span.start,
+                left.provenance.span.end,
+            )
+                .cmp(&(
+                    right.kind,
+                    right.provenance.path.as_path(),
+                    right.provenance.span.start,
+                    right.provenance.span.end,
+                ))
+        });
+        violations.dedup_by(|left, right| {
+            left.kind == right.kind
+                && left.statement == right.statement
+                && left.provenance == right.provenance
+        });
+        effect.validation = if violations.is_empty() {
+            EffectValidation::Valid
+        } else {
+            EffectValidation::Invalid
+        };
+        effect.semantic_violations = violations;
+    }
+    effects
 }
 
 /// Lower all authored effect bodies to ordered statement records.
@@ -206,8 +377,9 @@ mod tests {
     use crate::{
         build_application_semantic_model, build_component_graph, build_semantic_graph,
         collect_effects, validate_application_semantic_model, EffectExecutionPolicy,
-        EffectStatementKind, ExecutionBoundary, ExpressionNodeKind, SemanticEntity,
-        SemanticEntityKind, SemanticOwner, SemanticReferenceKind, UnsupportedEffectStatementKind,
+        EffectSemanticViolationKind, EffectStatementKind, EffectValidation, ExecutionBoundary,
+        ExpressionNodeKind, SemanticEntity, SemanticEntityKind, SemanticOwner,
+        SemanticReferenceKind, UnsupportedEffectStatementKind,
     };
 
     #[test]
@@ -493,6 +665,93 @@ class Effects extends Component {
             record(&facts.statements[7]).operation_classification,
             crate::EffectOperationClassification::BareReturn
         );
+        assert_eq!(
+            asm.effect(&component.id.effect("sync"))
+                .expect("valid effect")
+                .validation,
+            EffectValidation::Valid
+        );
+        let violations = &asm
+            .effect(&component.id.effect("facts"))
+            .expect("invalid effect")
+            .semantic_violations;
+        assert_eq!(
+            asm.effect(&component.id.effect("facts"))
+                .expect("invalid effect")
+                .validation,
+            EffectValidation::Invalid
+        );
+        for kind in [
+            EffectSemanticViolationKind::CapabilitySignature,
+            EffectSemanticViolationKind::UnknownExternalCapability,
+            EffectSemanticViolationKind::ReactiveStateMutation,
+            EffectSemanticViolationKind::ActionInvocation,
+            EffectSemanticViolationKind::EffectInvocation,
+            EffectSemanticViolationKind::ComponentMethodInvocation,
+            EffectSemanticViolationKind::UnresolvedComponentCall,
+        ] {
+            assert!(violations.iter().any(|violation| violation.kind == kind));
+        }
         assert_eq!(validate_application_semantic_model(&asm), Vec::new());
+    }
+
+    #[test]
+    fn rejects_async_effects_without_runtime_execution() {
+        let parsed = ezc_parser::parse_file(
+            "src/AsyncEffect.tsx",
+            r#"
+@component("x-async-effect")
+class AsyncEffect extends Component {
+  title = state("EdgeZero");
+
+  @effect()
+  async syncTitle() {
+    document.title = this.title;
+  }
+
+  @effect()
+  invalidValueReturn() {
+    return this.title;
+  }
+
+  @effect()
+  invalidCleanupReturn() {
+    return () => unsubscribe();
+  }
+
+  render() { return <p />; }
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let effect = asm
+            .effect(&asm.components[0].id.effect("syncTitle"))
+            .expect("effect");
+
+        assert_eq!(effect.validation, EffectValidation::Invalid);
+        assert!(effect
+            .semantic_violations
+            .iter()
+            .any(|violation| violation.kind == EffectSemanticViolationKind::Async));
+        for (name, kind) in [
+            (
+                "invalidValueReturn",
+                EffectSemanticViolationKind::ValueReturn,
+            ),
+            (
+                "invalidCleanupReturn",
+                EffectSemanticViolationKind::UnsupportedStatement,
+            ),
+        ] {
+            let effect = asm
+                .effect(&asm.components[0].id.effect(name))
+                .expect("invalid return effect");
+            assert_eq!(effect.validation, EffectValidation::Invalid);
+            assert!(effect
+                .semantic_violations
+                .iter()
+                .any(|violation| violation.kind == kind));
+        }
+        assert!(asm.diagnostics.is_empty());
     }
 }

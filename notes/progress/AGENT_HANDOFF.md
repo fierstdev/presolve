@@ -3,29 +3,29 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: F4 - effect typing and capability registry
-* Working tree: clean after the F4 commit
+* Latest completed slice: F5 - effect semantic validation
+* Working tree: clean after the F5 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: F4 - effect typing and capability registry
-* Summary: A versioned immutable compiler registry now owns the complete initial browser capability vocabulary, and every lowered effect statement receives canonical operand types, capability identity/classification, signature, boundary, and serialization compatibility facts.
-* Key files: crates/ezc_core/src/effect_capability.rs; crates/ezc_core/src/semantic_type.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_core/src/effect.rs
-* New behavior: Exact `document.title`, `console.{log,info,warn,error}`, `localStorage.{setItem,removeItem}`, and `sessionStorage.{setItem,removeItem}` paths resolve through registry v1. Unknown external calls/assignments remain unknown rather than `any`, while arguments and values are still typed. `this` calls classify as action/effect/method/unresolved component calls; reactive state assignments retain type compatibility facts for F5.
-* Fixtures added or changed: Core coverage exercises every initial registry operation plus known/unknown capability, reactive assignment, and component-call classifications. No runtime fixture is needed because F4 adds no execution behavior.
+* Slice: F5 - effect semantic validation
+* Summary: Effects now receive canonical valid/invalid classification and ordered source-provenanced violation facts from F4 statement records and existing method metadata.
+* Key files: crates/ezc_core/src/effect.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/lib.rs
+* New behavior: Validation rejects async effects, reactive state mutation, actions/effects/component-method calls, unresolved component operations, unknown external capabilities, incompatible recognized capability signatures/boundaries/serialization, value returns, and retained unsupported statements. Valid effects are marked ready for later graph/IR consumption; invalid effects carry compiler-owned evidence but no runtime behavior.
+* Fixtures added or changed: Core coverage verifies valid registry-backed effects, all core invalid operation classifications, and async-effect rejection. No runtime fixture is needed because F5 adds no execution behavior.
 
 Current in-progress slice
 
-* Slice: F5 - effect semantic validation
-* Status: Ready to begin after the F4 commit
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F4
-* Remaining: F5 - effect semantic validation, then F6 through F20. Consume F4 records; do not duplicate capability recognition or type/boundary analysis.
+* Slice: F6 - effect reactive graph integration
+* Status: Ready to begin after the F5 commit
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F5
+* Remaining: F6 - effect reactive graph integration, then F7 through F20. Consume canonical effect references and F5 validity; do not reconstruct dependencies or schedule/runtime behavior.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core --lib: pass (157 tests)
+* cargo test -p ezc_core --lib: pass (158 tests)
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 
 Architecture decisions made
@@ -52,7 +52,11 @@ Architecture decisions made
 
 * Decision: F4 consumes registry version 1 as the sole authority for external effect operations.
 * Reason: Stable capability and operation IDs, exact static paths, signatures, client boundaries, argument serialization, and runtime-lowering identities must originate in one immutable compiler product. `EffectStatementTypeRecord` projects its facts by statement identity without browser-global inspection or duplicated recognition in diagnostics/IR/runtime layers.
-* Tradeoff: The initial registry is deliberately limited to `document.title`, console logging, and local/session storage writes. Unknown paths are never `any`; F4 records their typed operands plus incompatible/unknown compatibility evidence, while F5 owns semantic rejection and diagnostics. No capability extensions, reactive edges, scheduler placement, IR, runtime metadata, or execution are added here.
+* Tradeoff: The initial registry is deliberately limited to `document.title`, console logging, and local/session storage writes. Unknown paths are never `any`; F4 records their typed operands plus incompatible/unknown compatibility evidence, while F5 owns semantic rejection. No capability extensions, reactive edges, scheduler placement, IR, runtime metadata, or execution are added here.
+
+* Decision: F5 stores effect legality as canonical `EffectValidation` and ordered `EffectSemanticViolation` facts on the first-class effect entity, while deferring user-facing diagnostic codes to F18.
+* Reason: F5 can reject invalid entities for all future graph, scheduler, IR, and runtime consumers without duplicating validation or prematurely freezing the Phase F diagnostic catalog. It reuses F4's statement records and existing method metadata rather than rereading source or invoking runtime behavior.
+* Tradeoff: F5 produces no new `ComponentDiagnostic` entries yet. F18 will project these immutable violation facts into prescriptive, source-provenanced diagnostics; F6 must consume only valid effects when integrating the reactive graph.
 
 * Decision: ASM validation resolves typed subjects through either canonical semantic entities or canonical expression-graph nodes, using the subject's authoritative provenance in either case.
 * Reason: Expression nodes are first-class compiler products with stable IDs and spans, but are intentionally not modeled as generic semantic entities. Validation must preserve that separation while accepting their canonical type assignments.
