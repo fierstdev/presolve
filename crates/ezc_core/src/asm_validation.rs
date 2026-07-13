@@ -56,7 +56,14 @@ pub fn validate_application_semantic_model(
                 ),
             });
         }
-        if model.provenance(&reference.source) != Some(&reference.provenance) {
+        let source_provenance_matches = model.provenance(&reference.source)
+            == Some(&reference.provenance)
+            || model
+                .expression_graph
+                .nodes_for(&reference.source)
+                .iter()
+                .any(|node| node.provenance == reference.provenance);
+        if !source_provenance_matches {
             diagnostics.push(AsmValidationDiagnostic {
                 code: "EZASM1006".to_string(),
                 message: format!(

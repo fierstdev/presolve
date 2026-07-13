@@ -502,6 +502,12 @@ pub fn build_application_semantic_model_from_component_graph(
         &computed_values,
         &expression_graph,
     ));
+    references.extend(build_effect_references(
+        &component_graph.components,
+        &effects,
+        &computed_values,
+        &expression_graph,
+    ));
     extend_template_references(
         &mut references,
         &component_graph.components,
@@ -575,6 +581,7 @@ fn build_application_semantic_model_from_files(files: &[ParsedFile]) -> Applicat
     build_application_semantic_model_from_files_with_bindings(files, None)
 }
 
+#[allow(clippy::too_many_lines)]
 fn build_application_semantic_model_from_files_with_bindings(
     files: &[ParsedFile],
     bindings: Option<&crate::BindingTable>,
@@ -624,6 +631,12 @@ fn build_application_semantic_model_from_files_with_bindings(
         lower_effect_bodies(&components, &effects, &expression_graph);
     references.extend(build_computed_references(
         &components,
+        &computed_values,
+        &expression_graph,
+    ));
+    references.extend(build_effect_references(
+        &components,
+        &effects,
         &computed_values,
         &expression_graph,
     ));
@@ -1235,6 +1248,69 @@ fn build_computed_references(
     }
 
     references.into_values().collect()
+}
+
+fn build_effect_references(
+    components: &[ComponentNode],
+    effects: &BTreeMap<SemanticId, Effect>,
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    expression_graph: &ExpressionGraph,
+) -> Vec<SemanticReference> {
+    let mut references = Vec::new();
+    for effect in effects.values() {
+        let Some(component_id) = effect.owner.entity_id() else {
+            continue;
+        };
+        let Some(component) = components
+            .iter()
+            .find(|component| component.id == *component_id)
+        else {
+            continue;
+        };
+        for node in expression_graph.nodes_for(&effect.id) {
+            let crate::ExpressionNodeKind::ThisMember { name } = &node.kind else {
+                continue;
+            };
+            let reference = if let Some(field) = component
+                .state_fields
+                .iter()
+                .find(|field| field.name == *name)
+            {
+                SemanticReference {
+                    kind: SemanticReferenceKind::EffectState,
+                    source: effect.id.clone(),
+                    target: field.id.clone(),
+                    provenance: node.provenance.clone(),
+                }
+            } else if let Some(computed) = computed_values.get(&component.id.computed(name)) {
+                SemanticReference {
+                    kind: SemanticReferenceKind::EffectComputed,
+                    source: effect.id.clone(),
+                    target: computed.id.clone(),
+                    provenance: node.provenance.clone(),
+                }
+            } else {
+                continue;
+            };
+            references.push(reference);
+        }
+    }
+    references.sort_by(|left, right| {
+        (
+            left.source.as_str(),
+            left.target.as_str(),
+            left.provenance.span.start,
+        )
+            .cmp(&(
+                right.source.as_str(),
+                right.target.as_str(),
+                right.provenance.span.start,
+            ))
+    });
+    references.dedup_by(|left, right| {
+        left.kind == right.kind && left.source == right.source && left.target == right.target
+    });
+    references
 }
 
 fn build_template_state_references(

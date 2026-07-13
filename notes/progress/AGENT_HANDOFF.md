@@ -3,24 +3,24 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: F2 - effect body lowering
-* Working tree: clean after the F2 commit
+* Latest completed slice: F3 - effect reference resolution
+* Working tree: clean after the F3 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: F2 - effect body lowering
-* Summary: Lowered each `@effect()` body into one ordered `EffectBody` and stable effect-scoped statement records. Assignment targets/values, capability callees/arguments, and supported return values now reuse the canonical expression graph; unsupported syntax remains structured for later diagnostics.
+* Slice: F3 - effect reference resolution
+* Summary: Effect expression `this.<name>` reads now resolve through canonical `EffectState` and `EffectComputed` semantic references.
 * Key files: crates/ezc_parser/src/model.rs; crates/ezc_parser/src/oxc_adapter.rs; crates/ezc_core/src/effect.rs; crates/ezc_core/src/expression_graph.rs; crates/ezc_core/src/component_graph.rs; crates/ezc_core/src/application_semantic_model.rs
 * New behavior: F2 retains static-member assignments, direct static calls, final bare returns, value-return candidates, and unsupported local/branch/loop/block/exception/compound forms in authored order with statement and operand provenance. No reference resolution, type assignments, reactive relations, scheduling, IR, runtime metadata, or execution is produced.
 * Fixtures added or changed: fixtures/0052-effect-body-lowering/input/Effects.tsx, with parser and core lowering coverage.
 
 Current in-progress slice
 
-* Slice: F2 - effect body lowering
+* Slice: F3 - effect reference resolution
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F2
-* Remaining: F3 - effect reference resolution, then F4 through F20.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F3
+* Remaining: F4 - effect typing, then F5 through F20.
 
 Verification
 
@@ -46,6 +46,10 @@ Architecture decisions made
 * Decision: Effect-body expression nodes use the effect ID as their existing expression-graph owner, while statements use a separate `effect/statement:<index>` identity domain.
 * Reason: Values retain one canonical expression topology, but statement ordering and side-effect operations need independently stable identities for later diagnostics and IR lowering.
 * Tradeoff: Effect statement records are compiler-owned body nodes rather than generic ASM semantic entities. F2 exposes them through the owning effect body only; F17 owns dedicated inspection output.
+
+* Decision: F3 emits one deduplicated `EffectState` or `EffectComputed` reference per resolved effect-to-target pair, retaining the first operand provenance.
+* Reason: Effect ownership remains the reactive consumer identity while individual expression spans still support later diagnostics.
+* Tradeoff: F3 resolves only direct `this.<name>` reads. It does not classify call targets, validate assignments, infer types, or build reactive edges.
 
 * Decision: ASM validation resolves typed subjects through either canonical semantic entities or canonical expression-graph nodes, using the subject's authoritative provenance in either case.
 * Reason: Expression nodes are first-class compiler products with stable IDs and spans, but are intentionally not modeled as generic semantic entities. Validation must preserve that separation while accepting their canonical type assignments.

@@ -207,7 +207,7 @@ mod tests {
         build_application_semantic_model, build_component_graph, build_semantic_graph,
         collect_effects, validate_application_semantic_model, EffectExecutionPolicy,
         EffectStatementKind, ExecutionBoundary, ExpressionNodeKind, SemanticEntity,
-        SemanticEntityKind, SemanticOwner, UnsupportedEffectStatementKind,
+        SemanticEntityKind, SemanticOwner, SemanticReferenceKind, UnsupportedEffectStatementKind,
     };
 
     #[test]
@@ -274,7 +274,10 @@ class Effects extends Component {
             asm.entity(&effect_id).map(SemanticEntity::kind),
             Some(SemanticEntityKind::Effect)
         );
-        assert!(asm.references_from(&effect_id).is_empty());
+        assert!(asm.references_from(&effect_id).iter().any(|reference| {
+            reference.kind == SemanticReferenceKind::EffectState
+                && reference.target == component.id.state_field("title")
+        }));
         assert!(asm.semantic_type_of(&effect_id).is_none());
         assert_eq!(validate_application_semantic_model(&asm), Vec::new());
         assert!(build_semantic_graph(&asm)
@@ -328,7 +331,10 @@ class Effects extends Component {
             completion.kind,
             EffectStatementKind::EffectReturn { value: None }
         ));
-        assert!(asm.references_from(&sync).is_empty());
+        assert!(asm.references_from(&sync).iter().any(|reference| {
+            reference.kind == SemanticReferenceKind::EffectState
+                && reference.target == component.id.state_field("title")
+        }));
         assert!(asm
             .semantic_types
             .assignments

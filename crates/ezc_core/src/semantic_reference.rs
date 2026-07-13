@@ -15,6 +15,8 @@ pub enum SemanticReferenceKind {
     ActionState,
     ComputedState,
     ComputedComputed,
+    EffectState,
+    EffectComputed,
     EventMethod,
     TemplateState,
     TemplateComputed,

@@ -1,5 +1,9 @@
 @component("x-effects")
 class Effects extends Component {
+  title = state("EdgeZero");
+  subtotal = state(1);
+  tax = state(2);
+
   @effect()
   sync() {
     document.title = this.title;
