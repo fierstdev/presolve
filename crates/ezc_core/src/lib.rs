@@ -13,6 +13,7 @@ pub mod component_graph;
 pub mod computed_value;
 pub mod effect;
 pub mod effect_capability;
+pub mod effect_resume;
 pub mod explain;
 pub mod expression_graph;
 pub mod html_codegen;
@@ -91,6 +92,11 @@ pub use effect_capability::{
     RuntimeCapabilityLowering, StaticCapabilityPath, EFFECT_CAPABILITY_REGISTRY,
     EFFECT_CAPABILITY_REGISTRY_VERSION,
 };
+pub use effect_resume::{
+    build_effect_resume_plan, validate_effect_resume_plan, EffectActivationSlotId,
+    EffectActivationStatus, EffectInitialResumeMembership, EffectResumePlan, EffectResumeRecord,
+    EffectResumeValidationDiagnostic,
+};
 pub use explain::{explain_json, explain_text};
 pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 pub use html_codegen::generate_static_html;
@@ -127,7 +133,8 @@ pub use page_codegen::{
     generate_standalone_page_with_effect_runtime,
 };
 pub use resume_manifest::{
-    build_resume_manifest, resume_manifest_json, ResumeManifest, RESUME_MANIFEST_SCHEMA_VERSION,
+    build_resume_manifest, resume_manifest_json, validate_resume_manifest, ResumeManifest,
+    ResumeManifestEffectRecord, ResumeManifestValidationDiagnostic, RESUME_MANIFEST_SCHEMA_VERSION,
 };
 pub use resume_plan::{build_resume_plan, ResumeComponentPlan, ResumeComputedPlan, ResumePlan};
 pub use runtime_codegen::generate_runtime_stub;

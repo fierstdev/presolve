@@ -1,7 +1,7 @@
 use std::fmt;
 use std::path::{Component, Path};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Globally stable identity for a compiler semantic entity.
 ///
@@ -9,7 +9,7 @@ use serde::Serialize;
 /// application-facing component identity. Invalid components without an
 /// element declaration fall back to their class name so diagnostics and later
 /// ASM validation can still refer to them deterministically.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct SemanticId(String);
 
@@ -80,6 +80,11 @@ impl SemanticId {
     #[must_use]
     pub fn effect(&self, name: &str) -> Self {
         self.child("effect", name)
+    }
+
+    #[must_use]
+    pub fn effect_activation_slot(&self, name: &str) -> Self {
+        self.child("effect-activation", name)
     }
 
     #[must_use]
@@ -198,6 +203,10 @@ mod tests {
         assert_eq!(
             component.effect("syncTitle").as_str(),
             "component:x-counter/effect:syncTitle"
+        );
+        assert_eq!(
+            component.effect_activation_slot("syncTitle").as_str(),
+            "component:x-counter/effect-activation:syncTitle"
         );
         assert_eq!(
             component.action("increment", 0).as_str(),

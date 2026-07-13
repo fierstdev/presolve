@@ -1,14 +1,18 @@
 use crate::application_semantic_model::ApplicationSemanticModel;
 use crate::component_graph::render_event_handlers;
 use crate::semantic_id::SemanticId;
-use crate::{build_runtime_computed_registry, lower_components_to_ir};
-use serde::Serialize;
+use crate::{
+    build_effect_resume_plan, build_runtime_computed_registry, build_runtime_effect_registry,
+    lower_components_to_ir, optimize_effect_ir, EffectResumePlan,
+};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResumePlan {
     pub components: Vec<ResumeComponentPlan>,
+    pub effects: EffectResumePlan,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResumeComponentPlan {
     pub component: SemanticId,
     pub state: Vec<SemanticId>,
@@ -17,7 +21,7 @@ pub struct ResumeComponentPlan {
 }
 
 /// One serializable, compiler-lowered computed cache available to resumability.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResumeComputedPlan {
     pub computed: SemanticId,
     pub cache_slot: String,
@@ -27,7 +31,9 @@ pub struct ResumeComputedPlan {
 
 #[must_use]
 pub fn build_resume_plan(model: &ApplicationSemanticModel) -> ResumePlan {
-    let registry = build_runtime_computed_registry(model, &lower_components_to_ir(model));
+    let ir = lower_components_to_ir(model);
+    let registry = build_runtime_computed_registry(model, &ir);
+    let effect_registry = build_runtime_effect_registry(model, &optimize_effect_ir(&ir).output);
 
     ResumePlan {
         components: model
@@ -63,6 +69,7 @@ pub fn build_resume_plan(model: &ApplicationSemanticModel) -> ResumePlan {
                 }),
             })
             .collect(),
+        effects: build_effect_resume_plan(model, &effect_registry),
     }
 }
 

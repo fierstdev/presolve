@@ -3,32 +3,31 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: F15 - template action activation bridge
-* Working tree: clean after the F15 commit
+* Latest completed slice: F16 - effect resumability planning
+* Working tree: clean after the F16 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: F15 - template action activation bridge
-* Summary: Schema-v2 template manifests now carry the canonical F8 `ActionBatchId` alongside each action implementation ID. The runtime validates those bindings, executes an action under that exact batch identity, flushes existing computed work, and consumes only the F13 trigger plan for that batch.
-* Key files: crates/ezc_core/src/template_manifest.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_core/src/runtime_codegen.rs; crates/ezc_cli/src/main.rs; crates/ezc_cli/tests/runtime_browser.rs; fixtures/0053-effect-initial-runtime/input/InitialEffectRuntime.tsx
-* New behavior: Compiler lowering reads the existing F8 authored-action-method to batch mapping without recreating it. Browser event records retain both IDs; runtime action completion selects compiler-provided effect batches by exact `action_batch_id`, runs each batch once after the computed flush, and clears active batch state. Legacy v1 manifests remain usable only without F13 action plans.
-* Fixtures added or changed: Core and CLI tests prove schema-v2 binding emission and artifact output. The focused browser fixture proves exact-batch activation, computed-before-effect execution, one completed action effect run, no initial-plan replay, and cleared active batch state.
+* Slice: F16 - effect resumability planning
+* Summary: Compiler-owned resume plans and schema-v2 resume manifests now project deterministic effect activation metadata from F1/F9/F12 facts. Each initially activatable effect receives a distinct pending activation slot and retains its exact initial plan placement and completed-action batch references.
+* Key files: crates/ezc_core/src/effect_resume.rs; crates/ezc_core/src/semantic_id.rs; crates/ezc_core/src/resume_plan.rs; crates/ezc_core/src/resume_manifest.rs
+* New behavior: `EffectActivationSlotId` is component-qualified and distinct from effect, function, action-batch, cache, and dirty-flag IDs. Plans and manifests store only lifecycle metadata (`pending`/`completed`/`failed`), canonical runtime function IDs, execution facts, and F8 batch references; they do not store or restore browser/capability/DOM state or execute effects.
+* Fixtures added or changed: Focused compiler tests cover stable slots, initial state/computed/dependency-free activation, multiple action batches, invalid-effect omission, malformed plan detection, deterministic manifest output, and legacy-v1 compatibility validation.
 
 Current in-progress slice
 
-* Slice: F16 - effect resumability planning
-* Status: Ready to begin after F15 commit
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F14
-* Remaining: F16 through F20. F16 must build on the completed F15 action-batch execution boundary without adding runtime dependency discovery.
+* Slice: F17 - effect inspection
+* Status: Ready to begin after F16 commit
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F16
+* Remaining: F17 through F20. F17 must expose existing compiler-owned effect products without changing diagnostics or runtime behavior.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core --lib: pass (164 tests)
-* cargo test -p ezc_cli --test explain: pass (119 tests)
-* cargo test -p ezc_cli --test runtime_browser completed_action_batches_execute_compiler_planned_effects_once -- --exact --nocapture: pass
-* cargo clippy --workspace --all-targets -- -D warnings: pass
+* cargo test -p ezc_core resume: pass (5 tests)
+* cargo test -p ezc_core effect: pass (14 tests)
+* cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 
 Architecture decisions made
 
@@ -95,6 +94,10 @@ Architecture decisions made
 * Decision: F14 groups initial effects only by their compiler-emitted F9 batch index, preserving artifact order within a batch, and dispatches capability operations solely by their compiler-emitted runtime-lowering ID.
 * Reason: F13 already records initial trigger membership and batch position, so grouping consumes explicit compiler products rather than observing dependencies or reconstructing eligibility. Sharing the established pure-IR evaluator ensures effect operands see the completed compiler-generated computed initialization before external synchronization.
 * Tradeoff: Debug evidence records effect and capability IDs, never runtime dependency observations or arbitrary local state. F14 intentionally does not consult action trigger records after an action; F15 owns completed-action batching, computed-flush composition, and exactly-once action-triggered execution.
+
+* Decision: F16 represents initial effect resumability with a separate component-qualified `EffectActivationSlotId` and explicit `Pending`/`Completed`/`Failed` status, projected only from F1 effect facts, F9 plan membership, and F12 runtime records.
+* Reason: Effect identity, executable-function identity, action-batch identity, and mutable initial-activation lifecycle are different compiler domains. A stable activation slot lets a future runtime restore an explicit lifecycle state without inspecting external capability targets, DOM, values, dependencies, or action history.
+* Tradeoff: F16 advances the serialized resume manifest to schema v2 and preserves canonical completed-action batch references, but it neither persists nor restores live browser state, mutates slots at runtime, replays/suppresses effects, captures capability state, changes inspection/diagnostics, or introduces runtime dependency discovery.
 
 * Decision: F15 advances the template manifest to schema v2 and uses each compiler-emitted template action binding as the canonical event-to-F8-batch bridge: `method_id` identifies the implementation and `action_batch_id` identifies the completed action batch.
 * Reason: The template manifest is already the compiler-owned browser event contract. Lowering resolves IDs only through the existing F8 action-batch map, so neither the runtime nor a later phase parses names, observes writes, or rebuilds eligibility/dependencies.
