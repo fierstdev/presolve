@@ -18,9 +18,9 @@ Last completed slice
 Current in-progress slice
 
 * Slice: F10 - effect IR lowering
-* Status: Ready after F9 commit
+* Status: Paused awaiting canonical effect-IR contract
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F9
-* Remaining: F10 through F20. F10 must consume F9 plans and existing effect statements/capability records; do not add runtime execution or dependency discovery.
+* Remaining: F10 through F20. Do not begin effect IR lowering until the canonical instruction and artifact contract below is resolved.
 
 Verification
 
@@ -73,6 +73,10 @@ Architecture decisions made
 * Decision: F9 uses minimal dependency-complete computed prerequisites. Initial schedules include every executable direct/transitive computed dependency of F8-initial effects; action schedules intersect those dependencies with computed values invalidated by that action batch.
 * Reason: F8 remains the sole eligibility authority and E9 remains the sole computed-ordering authority. F9 filters existing E9 batches, records their source batch indexes, and invokes the Phase D scheduler only for terminal effect batches, so unrelated computed work is neither removed from the global plan nor duplicated for effects.
 * Tradeoff: Effects with unavailable computed prerequisites are explicitly unplanned rather than observing stale values. F9 adds no IR, runtime registry/artifact, execution, value-equality check, or runtime dependency discovery; F10 owns effect IR lowering.
+
+* Decision needed before F10: define the canonical IR representation for valid effect external-member assignments and capability calls, including how F4 registry operation/lowering identities, F2 operand expressions, effect result/terminator semantics, and F9 plan identities enter existing IR modules/functions/instructions.
+* Reason: The available handoff identifies F10 as effect IR lowering but does not specify whether these operations use existing generic instructions, new canonical effect instructions, or a distinct execution-plan linkage. That choice fixes F11 optimization eligibility, F12 runtime registry records, F13 artifact shape, and F15 execution behavior.
+* Tradeoff: F9 remains complete and committed. No F10 IR, optimizer behavior, runtime registry/artifact, execution, or dependency discovery has been introduced; await the canonical F10 contract rather than inventing a future-facing IR form.
 
 * Decision needed before F8: define the canonical identity for a completed action batch when one authored action method lowers to multiple `ComponentAction` state-write records.
 * Reason: Effects run once per completed action batch, but existing component actions are individual state operations. F8 must either map effects to method/batch identity and deduplicate changed dependencies there, or map effects to individual writes and require F9/runtime layers to reconstruct the batch. The choice determines trigger metadata, F9 ordering, F12 registry identity, and F15 batching behavior.
