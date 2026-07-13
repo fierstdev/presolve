@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: G5 - Context typing and compatibility
-* Working tree: G5 is ready to commit. The Phase G roadmap file is user-provided and untracked.
+* Working tree: G5 is committed. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-13
 
 Last completed slice
@@ -18,7 +18,7 @@ Last completed slice
 Current in-progress slice
 
 * Slice: G6 - Context ownership graph
-* Status: Ready to begin after the G5 commit.
+* Status: Blocked pending an explicit ownership-graph contract.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5
 * Remaining: G6 through G20.
 
@@ -68,6 +68,10 @@ Architecture decisions made
 * Decision: A Context declared type is the canonical channel contract. G5 projects the existing type model into immutable records and evaluates Provider values through `value -> Provider declaration -> Context declaration -> Consumer request`; Context defaults independently flow to the Context declaration. Unknown type facts are conservative, and G4 resolution is never reselected.
 * Reason: Existing compiler type, serialization, and boundary products already provide the canonical facts necessary for a complete directed compatibility result. Retaining every intermediate relation lets later diagnostics and runtime lowering consume one compiler-owned answer without evaluating source again or querying Providers at runtime.
 * Tradeoff: G5 records compatibility only. It adds no new type language, diagnostic catalog, Provider visibility rule, source reconstruction, dependency graph, schedule, IR, artifact, runtime slot, or execution behavior.
+
+* Decision needed before G6: define the canonical ownership-graph product: its node and edge domains/directions; whether and how component ancestry relates to the existing `ComponentScopeGraph`; which Context/Provider/Consumer/default/unresolved/ambiguous facts appear; graph invariants, queries, and export/schema requirements; and whether this is a projection or a new authoritative composition product.
+* Reason: The G6 roadmap names owners and ancestry but does not define a graph contract. The compiler already has entity ownership and a G4 visibility scope graph, but choosing an ownership topology or treating scope edges as ownership would invent the semantics that G7 dependency projection, G8 lifetime analysis, and G9 ordering must consume.
+* Tradeoff: G5 remains complete and committed. No G6 ownership graph, inferred ancestry, Provider visibility change, dependency graph, runtime traversal, runtime ownership lookup, or component-tree reconstruction has been added.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.
