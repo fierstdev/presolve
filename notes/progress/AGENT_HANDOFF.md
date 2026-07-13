@@ -17,10 +17,10 @@ Last completed slice
 
 Current in-progress slice
 
-* Slice: F3 - effect reference resolution
-* Status: Complete
+* Slice: F4 - effect typing
+* Status: Paused awaiting the canonical capability type/registry contract
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F3
-* Remaining: F4 - effect typing, then F5 through F20.
+* Remaining: F4 - effect typing, then F5 through F20. Do not begin F4 capability validation until the contract below is decided.
 
 Verification
 
@@ -50,6 +50,10 @@ Architecture decisions made
 * Decision: F3 emits one deduplicated `EffectState` or `EffectComputed` reference per resolved effect-to-target pair, retaining the first operand provenance.
 * Reason: Effect ownership remains the reactive consumer identity while individual expression spans still support later diagnostics.
 * Tradeoff: F3 resolves only direct `this.<name>` reads. It does not classify call targets, validate assignments, infer types, or build reactive edges.
+
+* Decision needed before F4: define the canonical capability registry and its type signatures for static host members and calls.
+* Reason: F4 must type assignment targets and capability call operands and validate execution-boundary/capability compatibility, but current compiler products do not define recognized capabilities, their member signatures, or their client boundary contracts. An ad hoc `document`/`storage`/`analytics` allowlist would become an unowned language authority and predetermine F5, F10, F12, and F13 semantics.
+* Tradeoff: F3 remains complete and committed. Await guidance on the initial recognized capability names/member paths/call signatures and the treatment of unknown static identifiers before assigning effect operand types or capability compatibility results.
 
 * Decision: ASM validation resolves typed subjects through either canonical semantic entities or canonical expression-graph nodes, using the subject's authoritative provenance in either case.
 * Reason: Expression nodes are first-class compiler products with stable IDs and spans, but are intentionally not modeled as generic semantic entities. Validation must preserve that separation while accepting their canonical type assignments.
