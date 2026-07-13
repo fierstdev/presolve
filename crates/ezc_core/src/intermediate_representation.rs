@@ -1342,6 +1342,25 @@ impl IrOptimizationPipeline {
     }
 }
 
+/// Build the immutable optimization pipeline applied to canonical computed IR.
+#[must_use]
+pub fn computed_optimization_pipeline() -> IrOptimizationPipeline {
+    IrOptimizationPipeline::new(vec![
+        Box::new(IrCommonSubexpressionEliminationPass),
+        Box::new(IrCopyPropagationPass),
+        Box::new(IrConstantFoldingPass),
+        Box::new(IrInstructionSimplificationPass),
+        Box::new(IrDeadCodeEliminationPass),
+        Box::new(IrCfgCleanupPass),
+    ])
+}
+
+/// Run the immutable canonical optimization pipeline over computed IR.
+#[must_use]
+pub fn optimize_computed_ir(input: &IntermediateRepresentation) -> IrOptimizationReport {
+    computed_optimization_pipeline().run_with_report(input)
+}
+
 /// Compact structural metrics for one canonical IR snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IrOptimizationMetrics {
@@ -1392,6 +1411,13 @@ fn optimization_metrics(representation: &IntermediateRepresentation) -> IrOptimi
 /// Detects dead result assignments without treating storage effects as removable.
 #[must_use]
 pub fn analyze_dead_assignments(function: &IrFunction) -> IrDeadAssignmentAnalysis {
+    analyze_dead_assignments_preserving(function, &BTreeSet::new())
+}
+
+fn analyze_dead_assignments_preserving(
+    function: &IrFunction,
+    preserved_values: &BTreeSet<IrValueId>,
+) -> IrDeadAssignmentAnalysis {
     let uses = analyze_definition_uses(function).uses;
     let instructions = function
         .blocks
@@ -1399,10 +1425,15 @@ pub fn analyze_dead_assignments(function: &IrFunction) -> IrDeadAssignmentAnalys
         .flat_map(|block| block.instructions.iter())
         .filter(|instruction| {
             instruction.result.as_ref().is_some_and(|result| {
-                uses.get(result).is_some_and(Vec::is_empty)
+                !preserved_values.contains(result)
+                    && uses.get(result).is_some_and(Vec::is_empty)
                     && matches!(
                         instruction.kind,
-                        IrInstructionKind::LoadStorage { .. }
+                        IrInstructionKind::Constant { .. }
+                            | IrInstructionKind::LoadStorage { .. }
+                            | IrInstructionKind::LoadComputed { .. }
+                            | IrInstructionKind::GetMember { .. }
+                            | IrInstructionKind::Copy { .. }
                             | IrInstructionKind::Binary { .. }
                             | IrInstructionKind::Unary { .. }
                     )
@@ -2414,8 +2445,14 @@ impl IrOptimizationPass for IrDeadCodeEliminationPass {
         let mut output = input.clone();
         for module in &mut output.modules {
             for function in &mut module.functions {
+                let preserved_values = module
+                    .computed_evaluations
+                    .iter()
+                    .filter(|evaluation| evaluation.function == function.id)
+                    .map(|evaluation| evaluation.result.clone())
+                    .collect::<BTreeSet<_>>();
                 loop {
-                    let dead = analyze_dead_assignments(function)
+                    let dead = analyze_dead_assignments_preserving(function, &preserved_values)
                         .instructions
                         .into_iter()
                         .collect::<BTreeSet<_>>();
@@ -2427,6 +2464,12 @@ impl IrOptimizationPass for IrDeadCodeEliminationPass {
                             .instructions
                             .retain(|instruction| !dead.contains(&instruction.id));
                     }
+                    function.values.retain(|_, value| {
+                        !matches!(
+                            &value.definition,
+                            IrValueDefinition::Instruction(instruction) if dead.contains(instruction)
+                        )
+                    });
                 }
             }
         }
@@ -2464,7 +2507,7 @@ pub enum IrUnaryOperation {
 #[cfg(test)]
 mod tests {
     use super::{
-        compute_dominators, compute_post_dominators, lower_components_to_ir,
+        compute_dominators, compute_post_dominators, lower_components_to_ir, optimize_computed_ir,
         validate_intermediate_representation, IntermediateRepresentation, IrBinaryOperation,
         IrBlock, IrBlockId, IrBranchArm, IrBranchEdge, IrConstant, IrFunction, IrInstruction,
         IrInstructionId, IrInstructionKind, IrLoop, IrLoopId, IrModule, IrOperand, IrStorageId,
@@ -3103,6 +3146,78 @@ class ComputedIr extends Component {
                 .is_some_and(|function| function.values.contains_key(&evaluation.result))
         }));
         assert!(validate_intermediate_representation(&ir).is_empty());
+    }
+
+    #[test]
+    fn optimizes_computed_ir_immutably_and_preserves_evaluation_results() {
+        let parsed = ezc_parser::parse_file(
+            "src/OptimizedComputedIr.tsx",
+            r#"
+@component("x-optimized-computed-ir")
+class OptimizedComputedIr extends Component {
+  @computed()
+  get total() { return 1 + 2; }
+}
+"#,
+        );
+        let model = crate::build_application_semantic_model(&parsed);
+        let total = model.components[0].id.computed("total");
+        let ir = lower_components_to_ir(&model);
+        let original = ir.modules[0]
+            .functions
+            .iter()
+            .find(|function| function.id == total)
+            .expect("original computed function");
+        assert_eq!(original.blocks[0].instructions.len(), 3);
+        assert!(original.blocks[0].instructions.iter().any(|instruction| {
+            matches!(
+                instruction.kind,
+                IrInstructionKind::Binary {
+                    operation: IrBinaryOperation::Add,
+                    ..
+                }
+            )
+        }));
+
+        let report = optimize_computed_ir(&ir);
+        let optimized_module = &report.output.modules[0];
+        let evaluation = optimized_module
+            .computed_evaluations
+            .iter()
+            .find(|evaluation| evaluation.computed == total)
+            .expect("computed evaluation");
+        let optimized = optimized_module
+            .functions
+            .iter()
+            .find(|function| function.id == total)
+            .expect("optimized computed function");
+
+        assert_eq!(
+            report
+                .passes
+                .iter()
+                .map(|pass| pass.name)
+                .collect::<Vec<_>>(),
+            vec![
+                "common-subexpression-elimination",
+                "copy-propagation",
+                "constant-folding",
+                "instruction-simplification",
+                "dead-code-elimination",
+                "cfg-cleanup",
+            ]
+        );
+        assert_eq!(optimized.blocks[0].instructions.len(), 1);
+        assert!(matches!(
+            optimized.blocks[0].instructions[0].kind,
+            IrInstructionKind::Constant {
+                value: IrConstant::Number(ref value)
+            } if value == "3"
+        ));
+        assert_eq!(optimized.values.len(), 1);
+        assert!(optimized.values.contains_key(&evaluation.result));
+        assert!(validate_intermediate_representation(&ir).is_empty());
+        assert!(validate_intermediate_representation(&report.output).is_empty());
     }
 
     #[test]

@@ -3,28 +3,29 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: E10 - computed IR lowering
-* Working tree: clean after the E10 commit
+* Latest completed slice: E11 - computed IR optimization
+* Working tree: clean after the E11 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: E10 - computed IR lowering
-* Summary: Lowered schedulable pure computed expressions into canonical computed-ID IR functions and result records.
+* Slice: E11 - computed IR optimization
+* Summary: Ran the immutable optimization pipeline over computed IR while preserving canonical evaluation results.
 * Key files: crates/ezc_core/src/intermediate_representation.rs; crates/ezc_core/src/lib.rs
-* New behavior: Each lowerable computed entity owns an IR function and an `IrComputedEvaluation` result record; resolved state/computed reads and all E2 expression forms lower to typed, provenanced IR instructions.
-* Fixtures added or changed: focused IR coverage for computed function identity, storage/computed loads, member access, arithmetic/comparison/logical/nullish/unary operations, result records, and integrity validation.
+* New behavior: `optimize_computed_ir` returns an immutable optimization report containing a separately optimized IR product, stable pass reports, and valid computed evaluation results.
+* Fixtures added or changed: focused IR coverage for immutable computed constant folding, dead-intermediate removal, stable pipeline order, result-root preservation, and optimized IR validation.
 
 Current in-progress slice
 
-* Slice: E10 - computed IR lowering
+* Slice: E11 - computed IR optimization
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E10
-* Remaining: E11 - run immutable optimization over computed IR.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E11
+* Remaining: E12 - introduce runtime computed records.
 
 Verification
 
 * cargo fmt --all --check: pass
+* cargo test -p ezc_core optimizes_computed_ir: pass
 * cargo test -p ezc_core lowers_planned_computed_evaluations: pass
 * cargo test -p ezc_core intermediate_representation::tests: pass
 * cargo test -p ezc_core computed: pass
@@ -32,6 +33,10 @@ Verification
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 
 Architecture decisions made
+
+* Decision: Computed IR optimization runs through one fixed immutable pipeline and returns an `IrOptimizationReport` rather than mutating E10 canonical lowering.
+* Reason: Backends and inspection consumers can compare authored lowering to the compiler-owned optimized product with stable pass metrics, while future runtime artifacts can choose the optimized result explicitly.
+* Tradeoff: E11 optimizes only the current E10 IR operations. Computed evaluation result values are explicit DCE roots, so the pipeline preserves them even when their intermediates fold away; no runtime execution, caching, or metadata is added.
 
 * Decision: A computed evaluation lowers to an IR function keyed by the first-class computed semantic ID, with a separate canonical `IrComputedEvaluation` record naming its result value.
 * Reason: The computed entity—not its authored getter method—is the compiler-owned derived-value subject for scheduling and future runtime records, while the evaluation record makes the produced value inspectable without adding a terminator before the IR roadmap evolves that contract.
@@ -577,14 +582,14 @@ Known limitations
 * Item: Method parameters are compiler-owned identifier declarations with canonical source provenance only. They do not execute, close over values, resolve local/template/action references, or support destructuring, defaults, rest declarations, or semantic type checking.
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
-* Item: The canonical expression graph covers supported state initializer expressions and direct supported computed getter returns. Computed expression nodes and entities have inferred canonical types through resolved state/computed reads; computed values are pure or impure with `EZC1034` purity diagnostics, compiler-owned direct/transitive reactive topology is available, computed cycles emit `EZC1035`, and evaluation plans expose stable order/batches. Pure scheduled E2 expressions now lower to canonical IR functions, but optimization, getter execution, cache allocation, and runtime behavior remain later work.
+* Item: The canonical expression graph covers supported state initializer expressions and direct supported computed getter returns. Computed expression nodes and entities have inferred canonical types through resolved state/computed reads; computed values are pure or impure with `EZC1034` purity diagnostics, compiler-owned direct/transitive reactive topology is available, computed cycles emit `EZC1035`, and evaluation plans expose stable order/batches. Pure scheduled E2 expressions lower to canonical IR functions and a separate immutable optimized IR product; getter execution, cache allocation, and runtime behavior remain later work.
 * Item: C30 exposes direct ASM type queries only. CLI inspection output, source diagnostics, backend enforcement, resource declaration lowering, and final type diagnostic families remain later Phase C work.
 * Item: Authored method IR functions still contain only empty entry basic blocks plus structural branch-edge and natural-loop records. Computed E10 functions lower the supported E2 expression graph into value-producing instructions, but neither form has source-lowered branches/loops, explicit terminators, or general statement instructions.
 * Item: Authored method lowering still creates empty function value registries and no method load/store instructions. Computed E10 functions register their defining values and resolved state/computed loads; D3-A analyses apply to both canonical forms without adding general source statement lowering.
 
 Exact next step
 
-Next is E11: run the immutable optimization pipeline over computed IR. Do not add runtime registry/metadata/behavior.
+Next is E12: introduce compiler-owned runtime computed records for cache slots, dirty flags, dependencies, evaluation functions, and serializability. Do not execute them or add runtime invalidation behavior.
 
 Useful commands
 
