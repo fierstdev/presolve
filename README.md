@@ -91,8 +91,9 @@ ezc_cli asm <file> --entity <semantic-id> --reference-kind action-state
 
 `--child-kind` accepts `component`, `state-field`, `method`, `action`,
 `event-handler`, `template`, or `template-entity`. `--reference-kind` accepts
-`action-state`, `event-method`, or `template-state`. Filters require an entity
-selector and affect only the returned children or relations.
+`action-state`, `computed-state`, `computed-computed`, `event-method`,
+`template-state`, `template-computed`, or `template-local`. Filters require an
+entity selector and affect only the returned children or relations.
 
 ## Semantic graph export
 

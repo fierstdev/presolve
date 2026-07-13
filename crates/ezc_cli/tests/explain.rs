@@ -847,6 +847,40 @@ fn asm_command_resolves_supported_method_local_bindings() {
 }
 
 #[test]
+fn asm_command_filters_template_computed_references() {
+    let path = "fixtures/0043-template-computed-bindings/input/ComputedTemplate.tsx";
+    let computed_id = "module:fixtures/0043-template-computed-bindings/input/ComputedTemplate.tsx/component:x-computed-template/computed:label";
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args([
+            "asm",
+            path,
+            "--entity",
+            computed_id,
+            "--reference-kind",
+            "template-computed",
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("failed to filter template-computed references");
+    assert!(output.status.success());
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("ASM JSON");
+    let references = document["incoming_references"]
+        .as_array()
+        .expect("incoming computed references");
+
+    assert_eq!(references.len(), 2);
+    assert!(references.iter().all(|reference| {
+        reference["kind"] == "template-computed" && reference["target"] == computed_id
+    }));
+    assert_eq!(
+        document["outgoing_references"].as_array().map(Vec::len),
+        Some(0)
+    );
+}
+
+#[test]
 fn immutable_constant_folding_fixture_reaches_html_backends() {
     let repo_root = repo_root();
     let input = "fixtures/0040-immutable-constant-folding/input/FoldedState.tsx";

@@ -71,6 +71,7 @@ pub enum SemanticGraphEdgeKind {
     ComputedComputed,
     EventMethod,
     TemplateState,
+    TemplateComputed,
     TemplateLocal,
 }
 
@@ -170,6 +171,7 @@ impl SemanticGraphEdgeKind {
             Self::ComputedComputed => "computed-computed",
             Self::EventMethod => "event-method",
             Self::TemplateState => "template-state",
+            Self::TemplateComputed => "template-computed",
             Self::TemplateLocal => "template-local",
         }
     }
@@ -209,6 +211,7 @@ fn semantic_graph_edge_kind(kind: SemanticReferenceKind) -> SemanticGraphEdgeKin
         SemanticReferenceKind::ComputedComputed => SemanticGraphEdgeKind::ComputedComputed,
         SemanticReferenceKind::EventMethod => SemanticGraphEdgeKind::EventMethod,
         SemanticReferenceKind::TemplateState => SemanticGraphEdgeKind::TemplateState,
+        SemanticReferenceKind::TemplateComputed => SemanticGraphEdgeKind::TemplateComputed,
         SemanticReferenceKind::TemplateLocal => SemanticGraphEdgeKind::TemplateLocal,
     }
 }

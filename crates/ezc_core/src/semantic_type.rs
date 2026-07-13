@@ -884,7 +884,9 @@ impl SemanticTypeModel {
                 reference.source == entity.id
                     && matches!(
                         reference.kind,
-                        SemanticReferenceKind::TemplateState | SemanticReferenceKind::TemplateLocal
+                        SemanticReferenceKind::TemplateState
+                            | SemanticReferenceKind::TemplateComputed
+                            | SemanticReferenceKind::TemplateLocal
                     )
             }) else {
                 continue;
@@ -919,7 +921,11 @@ impl SemanticTypeModel {
         {
             let Some(reference) = references.iter().find(|reference| {
                 reference.source == entity.id
-                    && reference.kind == SemanticReferenceKind::TemplateState
+                    && matches!(
+                        reference.kind,
+                        SemanticReferenceKind::TemplateState
+                            | SemanticReferenceKind::TemplateComputed
+                    )
             }) else {
                 continue;
             };

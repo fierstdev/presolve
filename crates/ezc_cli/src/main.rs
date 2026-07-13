@@ -894,6 +894,7 @@ fn parse_asm_reference_kind(value: &str) -> SemanticReferenceKind {
         "computed-computed" => SemanticReferenceKind::ComputedComputed,
         "event-method" => SemanticReferenceKind::EventMethod,
         "template-state" => SemanticReferenceKind::TemplateState,
+        "template-computed" => SemanticReferenceKind::TemplateComputed,
         "template-local" => SemanticReferenceKind::TemplateLocal,
         _ => {
             eprintln!("unsupported ASM reference kind: {value}");
@@ -1000,6 +1001,7 @@ fn semantic_reference_kind(kind: SemanticReferenceKind) -> &'static str {
         SemanticReferenceKind::ComputedComputed => "computed-computed",
         SemanticReferenceKind::EventMethod => "event-method",
         SemanticReferenceKind::TemplateState => "template-state",
+        SemanticReferenceKind::TemplateComputed => "template-computed",
         SemanticReferenceKind::TemplateLocal => "template-local",
     }
 }

@@ -479,6 +479,7 @@ pub fn build_application_semantic_model_from_component_graph(
     extend_template_references(
         &mut references,
         &component_graph.components,
+        &computed_values,
         &template_entities,
         &ownership,
     );
@@ -606,7 +607,13 @@ fn build_application_semantic_model_from_files_with_bindings(
         &computed_values,
         &expression_graph,
     ));
-    extend_template_references(&mut references, &components, &template_entities, &ownership);
+    extend_template_references(
+        &mut references,
+        &components,
+        &computed_values,
+        &template_entities,
+        &ownership,
+    );
     let (
         reactive_graph,
         reactive_transitive_analysis,
@@ -808,11 +815,18 @@ fn build_computed_reactive_products(
 fn extend_template_references(
     references: &mut Vec<SemanticReference>,
     components: &[ComponentNode],
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
     template_entities: &[TemplateSemanticEntity],
     ownership: &BTreeMap<SemanticId, SemanticOwner>,
 ) {
     references.extend(build_template_state_references(
         components,
+        template_entities,
+        ownership,
+    ));
+    references.extend(build_template_computed_references(
+        components,
+        computed_values,
         template_entities,
         ownership,
     ));
@@ -974,6 +988,45 @@ fn build_template_state_references(
                 kind: SemanticReferenceKind::TemplateState,
                 source: entity.id.clone(),
                 target: field.id.clone(),
+                provenance: entity.provenance.clone(),
+            })
+        })
+        .collect()
+}
+
+fn build_template_computed_references(
+    components: &[ComponentNode],
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    template_entities: &[TemplateSemanticEntity],
+    ownership: &BTreeMap<SemanticId, SemanticOwner>,
+) -> Vec<SemanticReference> {
+    template_entities
+        .iter()
+        .filter(|entity| {
+            matches!(
+                entity.kind,
+                TemplateSemanticKind::Binding
+                    | TemplateSemanticKind::AttributeBinding
+                    | TemplateSemanticKind::Conditional
+                    | TemplateSemanticKind::List
+            )
+        })
+        .filter_map(|entity| {
+            let computed_name = entity.expression.as_deref().and_then(this_member_name)?;
+            let component = template_entity_component(components, ownership, entity)?;
+            if component
+                .state_fields
+                .iter()
+                .any(|field| field.name == computed_name)
+            {
+                return None;
+            }
+            let computed = computed_values.get(&component.id.computed(computed_name))?;
+
+            Some(SemanticReference {
+                kind: SemanticReferenceKind::TemplateComputed,
+                source: entity.id.clone(),
+                target: computed.id.clone(),
                 provenance: entity.provenance.clone(),
             })
         })
@@ -2411,6 +2464,70 @@ class Panel extends Component {
             asm.template_entity(&reference.source)
                 .is_some_and(|entity| entity.kind == TemplateSemanticKind::Conditional)
         }));
+    }
+
+    #[test]
+    fn resolves_template_bindings_to_canonical_computed_entities() {
+        let parsed = ezc_parser::parse_file(
+            "src/ComputedTemplate.tsx",
+            r#"
+@component("x-computed-template")
+class ComputedTemplate extends Component {
+  @computed()
+  get label(): string { return "Ready"; }
+
+  @computed()
+  get visible(): boolean { return true; }
+
+  render() {
+    return <section title={this.label}>{this.label}{this.visible ? <span>Visible</span> : <span>Hidden</span>}</section>;
+  }
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        let component = &asm.components[0];
+        let label = component.id.computed("label");
+        let visible = component.id.computed("visible");
+        let references = asm.references_of_kind(SemanticReferenceKind::TemplateComputed);
+
+        assert_eq!(references.len(), 3);
+        assert_eq!(
+            references
+                .iter()
+                .filter(|reference| reference.target == label)
+                .count(),
+            2
+        );
+        assert!(references.iter().any(|reference| {
+            reference.target == visible
+                && asm
+                    .template_entity(&reference.source)
+                    .is_some_and(|entity| entity.kind == TemplateSemanticKind::Conditional)
+        }));
+        assert!(references.iter().all(|reference| {
+            asm.provenance(&reference.source) == Some(&reference.provenance)
+                && asm.semantic_type_of(&reference.source)
+                    == asm.semantic_type_of(&reference.target)
+        }));
+        assert_eq!(
+            asm.references_of_kind(SemanticReferenceKind::TemplateState)
+                .into_iter()
+                .filter(|reference| reference.target == label || reference.target == visible)
+                .count(),
+            0
+        );
+
+        let graph = crate::build_semantic_graph(&asm);
+        assert_eq!(
+            graph
+                .edges
+                .iter()
+                .filter(|edge| edge.kind == crate::SemanticGraphEdgeKind::TemplateComputed)
+                .count(),
+            3
+        );
     }
 
     #[test]

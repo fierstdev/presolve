@@ -3,37 +3,38 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: E12 - runtime computed registry
-* Working tree: clean after the E12 commit
+* Latest completed slice: E13 - template computed bindings
+* Working tree: clean after the E13 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: E12 - runtime computed registry
-* Summary: Added compiler-owned runtime metadata records for lowerable computed evaluations.
-* Key files: crates/ezc_core/src/runtime_computed.rs; crates/ezc_core/src/lib.rs
-* New behavior: A deterministic runtime registry now records stable cache slots, dirty flags, direct dependencies, evaluation-function IDs, serialization compatibility, and provenance for every lowered computed evaluation.
-* Fixtures added or changed: focused core coverage for stable cache/dirty identities, direct dependencies, evaluation functions, serialization, and provenance.
+* Slice: E13 - template computed bindings
+* Summary: Resolved direct template uses of computed getters to first-class computed ASM entities.
+* Key files: crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/semantic_reference.rs; crates/ezc_core/src/semantic_type.rs; crates/ezc_core/src/semantic_graph.rs; crates/ezc_cli/src/main.rs
+* New behavior: Direct `this.<computed>` binding, dynamic-attribute, and conditional uses now emit deterministic `template-computed` relations, inherit the computed type, and appear in semantic graph and selected-entity CLI inspection.
+* Fixtures added or changed: `fixtures/0043-template-computed-bindings` plus focused core and CLI coverage for canonical targets, provenance, type projection, graph edges, and relation filtering.
 
 Current in-progress slice
 
-* Slice: E12 - runtime computed registry
+* Slice: E13 - template computed bindings
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E12
-* Remaining: E13 - resolve template bindings to computed semantic entities.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E13
+* Remaining: E14 - emit compiler-generated runtime metadata for computed evaluation.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core runtime_computed: pass
-* cargo test -p ezc_core lowers_planned_computed_evaluations: pass
-* cargo test -p ezc_core optimizes_computed_ir: pass
-* cargo test -p ezc_core intermediate_representation::tests: pass
-* cargo test -p ezc_core computed: pass
-* cargo check -p ezc_cli: pass
+* cargo test -p ezc_core resolves_template_bindings_to_canonical_computed_entities: pass
+* cargo test -p ezc_cli asm_command_filters_template_computed_references: pass
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
+* cargo clippy -p ezc_cli --all-targets -- -D warnings: pass
 
 Architecture decisions made
+
+* Decision: Direct template `this.<name>` uses resolve to a distinct `template-computed` reference only when the owning component has a matching first-class computed entity and no same-named state field.
+* Reason: Template consumers receive a stable declaration-to-use relation and canonical computed type without reparsing source or conflating computed reads with state dependencies; existing state resolution retains its established precedence.
+* Tradeoff: E13 resolves only exact direct member forms in existing binding, dynamic-attribute, conditional, and list positions. Member access, calls, local composition, static HTML evaluation, generated runtime artifacts, cache execution, and invalidation behavior remain outside this slice.
 
 * Decision: Runtime computed metadata is a deterministic registry keyed by computed semantic ID and derived from canonical ASM references plus E10 evaluation records.
 * Reason: Cache slots, dirty flags, direct dependencies, evaluation functions, serialization, and provenance are all compiler-owned before any runtime artifact or runtime discovery exists.
@@ -572,7 +573,7 @@ Known limitations
 * Item: Source spans are available on parser/render/template structures and CLI development output, but runtime manifests intentionally omit source metadata for now.
 * Item: Fragment nodes are visible in compiler/template output but intentionally omitted from runtime manifests until a runtime range-anchor use case appears.
 * Item: Semantic IDs, direct ownership, and provenance cover components, state fields, methods, action steps, rendered templates, event handlers, and authored template descendants. Backend HTML/template-manifest nodes still use local `n*` IDs as a compatibility contract.
-* Item: Resolved references cover action-to-state, event-to-method, and direct text-binding/dynamic-attribute/conditional/keyed-list-iterable-to-state pairs. Routes, member expressions, computed expressions, and unresolved reference attempts have no semantic relation records yet.
+* Item: Resolved references cover action-to-state, event-to-method, and exact direct text-binding/dynamic-attribute/conditional/keyed-list-iterable pairs to state or computed entities. Routes, member expressions, calls, computed evaluation, and unresolved reference attempts have no semantic relation records yet.
 * Item: Canonical compiler products now include module-qualified template entities, direct template state dependencies, and direct template event-method dependencies, while `BindingTable` resolves local/relative re-export chains plus named/default/namespace imports. External and namespace re-exports, external package bindings, tsconfig aliases, source remapping, and type semantics are still absent. Legacy backend graph identity remains a compatibility path.
 * Item: `ezc asm` accepts explicit source files and exposes generic JSON and text inspection. Text includes compiler and ASM validation diagnostic detail when present. Project discovery, tsconfig resolution, source remapping, typed action payloads, and machine-readable backend plans remain future slices.
 * Item: Declared state types include canonical primitive classification, optional ASM JSON `declared_type.kind`, and source-provenanced `EZC1016` through `EZC1021` diagnostics for supported initializer and action forms. Other compiler/ASM diagnostics may omit provenance. Arbitrary action expressions, variable flow, manifests, runtime, imported types, non-state annotations, inference, unions, aliases, generics, and general assignment compatibility remain outside current type validation.
@@ -587,14 +588,14 @@ Known limitations
 * Item: Method parameters are compiler-owned identifier declarations with canonical source provenance only. They do not execute, close over values, resolve local/template/action references, or support destructuring, defaults, rest declarations, or semantic type checking.
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
-* Item: The canonical expression graph covers supported state initializer expressions and direct supported computed getter returns. Computed expression nodes and entities have inferred canonical types through resolved state/computed reads; computed values are pure or impure with `EZC1034` purity diagnostics, compiler-owned direct/transitive reactive topology is available, computed cycles emit `EZC1035`, and evaluation plans expose stable order/batches. Pure scheduled E2 expressions lower to canonical IR functions, a separate immutable optimized IR product, and metadata-only runtime records; getter execution, cache mutation, artifact generation, and runtime behavior remain later work.
+* Item: The canonical expression graph covers supported state initializer expressions and direct supported computed getter returns. Computed expression nodes and entities have inferred canonical types through resolved state/computed reads; exact template binding uses can resolve to computed entities, but do not evaluate them. Computed values are pure or impure with `EZC1034` purity diagnostics, compiler-owned direct/transitive reactive topology is available, computed cycles emit `EZC1035`, and evaluation plans expose stable order/batches. Pure scheduled E2 expressions lower to canonical IR functions, a separate immutable optimized IR product, and metadata-only runtime records; getter execution, cache mutation, artifact generation, and runtime behavior remain later work.
 * Item: C30 exposes direct ASM type queries only. CLI inspection output, source diagnostics, backend enforcement, resource declaration lowering, and final type diagnostic families remain later Phase C work.
 * Item: Authored method IR functions still contain only empty entry basic blocks plus structural branch-edge and natural-loop records. Computed E10 functions lower the supported E2 expression graph into value-producing instructions, but neither form has source-lowered branches/loops, explicit terminators, or general statement instructions.
 * Item: Authored method lowering still creates empty function value registries and no method load/store instructions. Computed E10 functions register their defining values and resolved state/computed loads; D3-A analyses apply to both canonical forms without adding general source statement lowering.
 
 Exact next step
 
-Next is E13: allow template bindings to resolve directly to computed semantic entities. Do not generate runtime artifacts or execute/invalidate computed values.
+Next is E14: emit compiler-generated runtime metadata for computed evaluation. Do not permit runtime dependency discovery or execute/invalidate computed values.
 
 Useful commands
 
@@ -625,4 +626,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the E5 commit.
+* None after the E13 commit.

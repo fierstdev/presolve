@@ -17,5 +17,6 @@ pub enum SemanticReferenceKind {
     ComputedComputed,
     EventMethod,
     TemplateState,
+    TemplateComputed,
     TemplateLocal,
 }
