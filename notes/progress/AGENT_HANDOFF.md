@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: F20 - effect stability audit
-* Working tree: F20 is complete and ready for its commit
+* Working tree: Phase G roadmap supplied; no compiler changes. The roadmap file is user-provided and untracked.
 * Date: 2026-07-12
 
 Last completed slice
@@ -17,10 +17,10 @@ Last completed slice
 
 Current in-progress slice
 
-* Slice: Phase F - effects
-* Status: Complete; await a new roadmap phase
+* Slice: G1 - canonical Context entities
+* Status: Blocked pending an explicit authored Context declaration contract.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20
-* Remaining: No Phase F slices remain.
+* Remaining: G1 through G20, beginning only after the source-level Context form is defined.
 
 Verification
 
@@ -32,6 +32,10 @@ Verification
 * cargo clippy --workspace --all-targets -- -D warnings: pass
 
 Architecture decisions made
+
+* Decision needed before G1: define the authored Context declaration syntax and its canonical source anchor.
+* Reason: The Phase G roadmap requires every authored declaration to lower into an owned Context entity with a stable ContextId and provenance, but it specifies neither a source construct nor an existing Context construct in the parser/component graph. Choosing a decorator, field helper, class form, or global declaration would invent language semantics and determine later provider/consumer identity, ownership, type, and diagnostics behavior.
+* Tradeoff: No G1 compiler, ASM, semantic-graph, runtime, or fixture behavior has been added. Phase G cannot safely begin until the contract states the exact declaration syntax (including its name/arguments and owning scope) and the source span that serves as the entity provenance.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.
@@ -716,7 +720,7 @@ Known limitations
 
 Exact next step
 
-Phase E is complete. Await a new explicit roadmap slice before adding compiler, runtime, or inspection behavior.
+Await an explicit Phase G authored Context declaration contract before beginning G1. Do not infer syntax or create placeholder Context entities.
 
 Useful commands
 
