@@ -5,9 +5,9 @@ use crate::component_graph::{
     ArithmeticOperator, ComparisonOperator, LogicalOperator, UnaryOperator,
 };
 use crate::{
-    ApplicationSemanticModel, ComponentNode, ComputedPurity, ComputedValue, ExpressionNode,
-    ExpressionNodeKind, SemanticId, SemanticReference, SemanticReferenceKind, SemanticType,
-    SerializableValue, SourceProvenance,
+    ApplicationSemanticModel, ComponentNode, ComputedPurity, ComputedValue, Effect,
+    EffectValidation, ExpressionNode, ExpressionNodeKind, SemanticId, SemanticReference,
+    SemanticReferenceKind, SemanticType, SerializableValue, SourceProvenance,
 };
 
 /// Compiler-owned intermediate representation, independent of backend output.
@@ -353,7 +353,7 @@ fn collect_reactive_component(
 }
 
 /// Build compiler-owned reactive topology from canonical state, computed, and
-/// computed-reference products.
+/// valid effect-reference products.
 ///
 /// # Panics
 ///
@@ -362,6 +362,7 @@ fn collect_reactive_component(
 pub fn build_reactive_graph(
     components: &[ComponentNode],
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    effects: &BTreeMap<SemanticId, Effect>,
     references: &[SemanticReference],
     provenance: &BTreeMap<SemanticId, SourceProvenance>,
 ) -> IrReactiveGraph {
@@ -393,12 +394,29 @@ pub fn build_reactive_graph(
             },
         );
     }
+    for effect in effects
+        .values()
+        .filter(|effect| effect.validation == EffectValidation::Valid)
+    {
+        let id = effect.id.as_str().to_string();
+        nodes.insert(
+            id.clone(),
+            IrReactiveNode {
+                id,
+                kind: IrReactiveNodeKind::Effect,
+                provenance: effect.provenance.clone(),
+            },
+        );
+    }
 
     let mut edges = Vec::new();
     for reference in references.iter().filter(|reference| {
         matches!(
             reference.kind,
-            SemanticReferenceKind::ComputedState | SemanticReferenceKind::ComputedComputed
+            SemanticReferenceKind::ComputedState
+                | SemanticReferenceKind::ComputedComputed
+                | SemanticReferenceKind::EffectState
+                | SemanticReferenceKind::EffectComputed
         )
     }) {
         let source = reference.source.as_str().to_string();
@@ -444,6 +462,7 @@ pub struct IrReactiveNode {
 pub enum IrReactiveNodeKind {
     State,
     Computed,
+    Effect,
     Action,
     Template,
 }

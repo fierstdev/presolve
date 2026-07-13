@@ -692,6 +692,23 @@ class Effects extends Component {
         ] {
             assert!(violations.iter().any(|violation| violation.kind == kind));
         }
+        let sync_id = component.id.effect("sync");
+        let facts_id = component.id.effect("facts");
+        assert_eq!(
+            asm.reactive_graph.nodes[sync_id.as_str()].kind,
+            crate::IrReactiveNodeKind::Effect
+        );
+        assert!(!asm.reactive_graph.nodes.contains_key(facts_id.as_str()));
+        assert!(asm.reactive_graph.edges.iter().any(|edge| {
+            edge.source == sync_id.as_str()
+                && edge.target == component.id.state_field("title").as_str()
+                && edge.kind == crate::IrReactiveEdgeKind::Reads
+        }));
+        assert!(asm.reactive_graph.edges.iter().any(|edge| {
+            edge.source == component.id.state_field("title").as_str()
+                && edge.target == sync_id.as_str()
+                && edge.kind == crate::IrReactiveEdgeKind::Invalidates
+        }));
         assert_eq!(validate_application_semantic_model(&asm), Vec::new());
     }
 

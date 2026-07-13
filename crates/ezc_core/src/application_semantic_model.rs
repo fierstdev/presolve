@@ -526,17 +526,6 @@ pub fn build_application_semantic_model_from_component_graph(
         &template_entities,
         &ownership,
     );
-    let (
-        reactive_graph,
-        reactive_transitive_analysis,
-        reactive_cycle_analysis,
-        computed_evaluation_plan,
-    ) = build_computed_reactive_products(
-        &component_graph.components,
-        &computed_values,
-        &references,
-        &provenance,
-    );
     let semantic_types = finalize_semantic_types(
         SemanticTypeModel::from_components(&component_graph.components, &provenance),
         &component_graph.components,
@@ -552,6 +541,18 @@ pub fn build_application_semantic_model_from_component_graph(
         effects,
         &effect_statements,
         &semantic_types,
+    );
+    let (
+        reactive_graph,
+        reactive_transitive_analysis,
+        reactive_cycle_analysis,
+        computed_evaluation_plan,
+    ) = build_computed_reactive_products(
+        &component_graph.components,
+        &computed_values,
+        &effects,
+        &references,
+        &provenance,
     );
     let mut diagnostics = component_graph.diagnostics.clone();
     diagnostics.extend(computed_diagnostics);
@@ -666,12 +667,6 @@ fn build_application_semantic_model_from_files_with_bindings(
         &template_entities,
         &ownership,
     );
-    let (
-        reactive_graph,
-        reactive_transitive_analysis,
-        reactive_cycle_analysis,
-        computed_evaluation_plan,
-    ) = build_computed_reactive_products(&components, &computed_values, &references, &provenance);
     let semantic_types = finalize_semantic_types(
         SemanticTypeModel::from_components_with_aliases_and_bindings(
             &components,
@@ -688,6 +683,18 @@ fn build_application_semantic_model_from_files_with_bindings(
         &template_entities,
     );
     let effects = validate_effects(&components, effects, &effect_statements, &semantic_types);
+    let (
+        reactive_graph,
+        reactive_transitive_analysis,
+        reactive_cycle_analysis,
+        computed_evaluation_plan,
+    ) = build_computed_reactive_products(
+        &components,
+        &computed_values,
+        &effects,
+        &references,
+        &provenance,
+    );
     extend_computed_diagnostics(
         &mut diagnostics,
         &components,
@@ -1124,6 +1131,7 @@ fn sort_computed_diagnostics(diagnostics: &mut [ComponentDiagnostic]) {
 fn build_computed_reactive_products(
     components: &[ComponentNode],
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    effects: &BTreeMap<SemanticId, Effect>,
     references: &[SemanticReference],
     provenance: &BTreeMap<SemanticId, SourceProvenance>,
 ) -> (
@@ -1132,7 +1140,8 @@ fn build_computed_reactive_products(
     IrReactiveCycleAnalysis,
     IrComputedEvaluationPlan,
 ) {
-    let graph = crate::build_reactive_graph(components, computed_values, references, provenance);
+    let graph =
+        crate::build_reactive_graph(components, computed_values, effects, references, provenance);
     let transitive_analysis = crate::analyze_reactive_transitive_graph(&graph);
     let cycle_analysis = crate::analyze_reactive_cycles(&graph);
     let evaluation_plan = crate::plan_computed_evaluation(&graph);

@@ -3,24 +3,24 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: F5 - effect semantic validation
-* Working tree: clean after the F5 commit
+* Latest completed slice: F6 - effect reactive graph integration
+* Working tree: clean after the F6 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: F5 - effect semantic validation
-* Summary: Effects now receive canonical valid/invalid classification and ordered source-provenanced violation facts from F4 statement records and existing method metadata.
-* Key files: crates/ezc_core/src/effect.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/lib.rs
-* New behavior: Validation rejects async effects, reactive state mutation, actions/effects/component-method calls, unresolved component operations, unknown external capabilities, incompatible recognized capability signatures/boundaries/serialization, value returns, and retained unsupported statements. Valid effects are marked ready for later graph/IR consumption; invalid effects carry compiler-owned evidence but no runtime behavior.
-* Fixtures added or changed: Core coverage verifies valid registry-backed effects, all core invalid operation classifications, and async-effect rejection. No runtime fixture is needed because F5 adds no execution behavior.
+* Slice: F6 - effect reactive graph integration
+* Summary: Valid effects are now terminal nodes in the existing canonical reactive graph, projected from F3 effect references and F5 validity facts.
+* Key files: crates/ezc_core/src/intermediate_representation.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/effect.rs
+* New behavior: Each valid effect has compiler-owned `Reads` edges to its resolved state/computed inputs and inverse `Invalidates` edges from those inputs. Invalid effects are excluded. Computed cycle detection and computed scheduling retain their existing computed-only filters, so effects cannot become dependency producers or scheduling cycles.
+* Fixtures added or changed: Core coverage verifies terminal effect node/edge projection and invalid-effect exclusion. No runtime fixture is needed because F6 adds no execution behavior.
 
 Current in-progress slice
 
-* Slice: F6 - effect reactive graph integration
-* Status: Ready to begin after the F5 commit
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F5
-* Remaining: F6 - effect reactive graph integration, then F7 through F20. Consume canonical effect references and F5 validity; do not reconstruct dependencies or schedule/runtime behavior.
+* Slice: F7 - effect transitive analysis
+* Status: Ready to begin after the F6 commit
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F6
+* Remaining: F7 - effect transitive analysis, then F8 through F20. Consume the existing reactive graph and transitive analysis; do not rebuild effect dependencies or introduce scheduling/runtime behavior.
 
 Verification
 
@@ -57,6 +57,10 @@ Architecture decisions made
 * Decision: F5 stores effect legality as canonical `EffectValidation` and ordered `EffectSemanticViolation` facts on the first-class effect entity, while deferring user-facing diagnostic codes to F18.
 * Reason: F5 can reject invalid entities for all future graph, scheduler, IR, and runtime consumers without duplicating validation or prematurely freezing the Phase F diagnostic catalog. It reuses F4's statement records and existing method metadata rather than rereading source or invoking runtime behavior.
 * Tradeoff: F5 produces no new `ComponentDiagnostic` entries yet. F18 will project these immutable violation facts into prescriptive, source-provenanced diagnostics; F6 must consume only valid effects when integrating the reactive graph.
+
+* Decision: F6 represents valid effects as terminal `Effect` nodes in the existing reactive graph, with `Reads` to direct state/computed inputs and inverse `Invalidates` edges from those inputs.
+* Reason: Effects need compiler-owned dependency topology for later triggers and scheduling, but may never become reactive producers. Reusing the graph's established read/invalidation direction lets F7 derive closures without a second effect graph or runtime discovery.
+* Tradeoff: Invalid effects are omitted, and existing cycle/scheduler passes intentionally remain computed-only. F6 creates no trigger classification, scheduler placement, IR, runtime metadata, or execution behavior.
 
 * Decision: ASM validation resolves typed subjects through either canonical semantic entities or canonical expression-graph nodes, using the subject's authoritative provenance in either case.
 * Reason: Expression nodes are first-class compiler products with stable IDs and spans, but are intentionally not modeled as generic semantic entities. Validation must preserve that separation while accepting their canonical type assignments.
