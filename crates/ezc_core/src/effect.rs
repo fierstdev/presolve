@@ -1,8 +1,9 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    ComponentNode, EffectStatementSyntaxKind, ExecutionBoundary, ExpressionGraph, SemanticId,
-    SemanticOwner, SemanticTypeModel, SourceProvenance, UnsupportedEffectStatementKind,
+    ComponentNode, EffectStatementSyntaxKind, ExecutionBoundary, ExpressionGraph,
+    IrReactiveTransitiveAnalysis, SemanticId, SemanticOwner, SemanticTypeModel, SourceProvenance,
+    UnsupportedEffectStatementKind,
 };
 
 /// Compiler-owned execution contract for an effect.
@@ -47,6 +48,14 @@ pub struct EffectSemanticViolation {
     pub kind: EffectSemanticViolationKind,
     pub statement: Option<SemanticId>,
     pub provenance: SourceProvenance,
+}
+
+/// Transitive reactive topology for one valid terminal effect.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EffectReactiveAnalysis {
+    pub effect: SemanticId,
+    pub dependencies: Vec<SemanticId>,
+    pub dependents: Vec<SemanticId>,
 }
 
 /// A first-class compiler semantic entity for one `@effect()` method.
@@ -271,6 +280,43 @@ pub fn validate_effects(
         effect.semantic_violations = violations;
     }
     effects
+}
+
+/// Projects existing reactive transitive analysis into effect-keyed records.
+#[must_use]
+pub fn analyze_effect_reactivity(
+    components: &[ComponentNode],
+    computed_values: &BTreeMap<SemanticId, crate::ComputedValue>,
+    effects: &BTreeMap<SemanticId, Effect>,
+    transitive: &IrReactiveTransitiveAnalysis,
+) -> BTreeMap<SemanticId, EffectReactiveAnalysis> {
+    let identities = components
+        .iter()
+        .flat_map(|component| component.state_fields.iter().map(|field| field.id.clone()))
+        .chain(computed_values.keys().cloned())
+        .chain(effects.keys().cloned())
+        .map(|id| (id.as_str().to_string(), id))
+        .collect::<BTreeMap<_, _>>();
+    effects
+        .values()
+        .filter(|effect| effect.validation == EffectValidation::Valid)
+        .map(|effect| {
+            let map_ids = |ids: Option<&Vec<String>>| {
+                ids.into_iter()
+                    .flatten()
+                    .filter_map(|id| identities.get(id).cloned())
+                    .collect()
+            };
+            (
+                effect.id.clone(),
+                EffectReactiveAnalysis {
+                    effect: effect.id.clone(),
+                    dependencies: map_ids(transitive.dependencies.get(effect.id.as_str())),
+                    dependents: map_ids(transitive.dependents.get(effect.id.as_str())),
+                },
+            )
+        })
+        .collect()
 }
 
 /// Lower all authored effect bodies to ordered statement records.
@@ -709,6 +755,17 @@ class Effects extends Component {
                 && edge.target == sync_id.as_str()
                 && edge.kind == crate::IrReactiveEdgeKind::Invalidates
         }));
+        let analysis = asm
+            .effect_reactive_analysis(&sync_id)
+            .expect("effect reactive analysis");
+        assert!(analysis
+            .dependencies
+            .contains(&component.id.state_field("title")));
+        assert!(analysis
+            .dependencies
+            .contains(&component.id.state_field("total")));
+        assert!(analysis.dependents.is_empty());
+        assert!(asm.effect_reactive_analysis(&facts_id).is_none());
         assert_eq!(validate_application_semantic_model(&asm), Vec::new());
     }
 

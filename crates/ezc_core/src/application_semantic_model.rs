@@ -24,7 +24,8 @@ use crate::template_semantics::{
     TemplateSemanticScope,
 };
 use crate::{
-    collect_effects, lower_effect_bodies, validate_effects, Effect, EffectBody, EffectStatement,
+    analyze_effect_reactivity, collect_effects, lower_effect_bodies, validate_effects, Effect,
+    EffectBody, EffectReactiveAnalysis, EffectStatement,
 };
 
 /// Application-level semantic data assembled from the compiler's existing graphs.
@@ -35,6 +36,7 @@ pub struct ApplicationSemanticModel {
     pub components: Vec<ComponentNode>,
     pub computed_values: BTreeMap<SemanticId, ComputedValue>,
     pub effects: BTreeMap<SemanticId, Effect>,
+    pub effect_reactive_analysis: BTreeMap<SemanticId, EffectReactiveAnalysis>,
     pub effect_bodies: BTreeMap<SemanticId, EffectBody>,
     pub effect_statements: BTreeMap<SemanticId, EffectStatement>,
     pub reactive_graph: IrReactiveGraph,
@@ -180,6 +182,11 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub fn effect_body(&self, effect: &SemanticId) -> Option<&EffectBody> {
         self.effect_bodies.get(effect)
+    }
+
+    #[must_use]
+    pub fn effect_reactive_analysis(&self, effect: &SemanticId) -> Option<&EffectReactiveAnalysis> {
+        self.effect_reactive_analysis.get(effect)
     }
 
     /// Returns F4 typing facts for one canonical effect statement.
@@ -481,6 +488,7 @@ pub fn build_application_semantic_model(parsed: &ParsedFile) -> ApplicationSeman
 }
 
 /// Assemble canonical ASM from an existing component graph while preserving its identity mode.
+#[allow(clippy::too_many_lines)]
 #[must_use]
 pub fn build_application_semantic_model_from_component_graph(
     component_graph: &crate::component_graph::ComponentGraph,
@@ -554,6 +562,12 @@ pub fn build_application_semantic_model_from_component_graph(
         &references,
         &provenance,
     );
+    let effect_reactive_analysis = analyze_effect_reactivity(
+        &component_graph.components,
+        &computed_values,
+        &effects,
+        &reactive_transitive_analysis,
+    );
     let mut diagnostics = component_graph.diagnostics.clone();
     diagnostics.extend(computed_diagnostics);
     extend_computed_diagnostics(
@@ -572,6 +586,7 @@ pub fn build_application_semantic_model_from_component_graph(
         components: component_graph.components.clone(),
         computed_values,
         effects,
+        effect_reactive_analysis,
         effect_bodies,
         effect_statements,
         reactive_graph,
@@ -695,6 +710,12 @@ fn build_application_semantic_model_from_files_with_bindings(
         &references,
         &provenance,
     );
+    let effect_reactive_analysis = analyze_effect_reactivity(
+        &components,
+        &computed_values,
+        &effects,
+        &reactive_transitive_analysis,
+    );
     extend_computed_diagnostics(
         &mut diagnostics,
         &components,
@@ -711,6 +732,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         components,
         computed_values,
         effects,
+        effect_reactive_analysis,
         effect_bodies,
         effect_statements,
         reactive_graph,
