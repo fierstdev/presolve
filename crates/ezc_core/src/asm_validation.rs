@@ -81,6 +81,7 @@ pub fn validate_application_semantic_model(
     validate_semantic_types(model, &mut diagnostics);
     validate_contexts(model, &mut diagnostics);
     validate_providers(model, &mut diagnostics);
+    validate_consumers(model, &mut diagnostics);
     validate_effect_statement_types(model, &mut diagnostics);
     validate_effect_execution_plan(model, &mut diagnostics);
     validate_component_diagnostic_metadata(model, &mut diagnostics);
@@ -285,6 +286,123 @@ fn validate_providers(
                 message: format!(
                     "provider `{}` has non-canonical field provenance",
                     provider.id
+                ),
+            });
+        }
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+fn validate_consumers(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    for consumer in model.consumers.values() {
+        let Some(component_id) = consumer.owner.entity_id() else {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1155".to_string(),
+                message: format!("consumer `{}` is not component-owned", consumer.id),
+            });
+            continue;
+        };
+        let Some(component) = model.component(component_id) else {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1156".to_string(),
+                message: format!("consumer `{}` has a missing component owner", consumer.id),
+            });
+            continue;
+        };
+        if consumer.id != crate::ConsumerId::for_component(component_id, &consumer.name) {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1157".to_string(),
+                message: format!("consumer `{}` has a non-canonical identity", consumer.id),
+            });
+        }
+        if consumer.authored_field != component.id.consumer_field(&consumer.name) {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1158".to_string(),
+                message: format!(
+                    "consumer `{}` has a non-canonical authored field",
+                    consumer.id
+                ),
+            });
+        }
+        if let crate::ContextResolutionState::Resolved(context_id) = &consumer.context_resolution {
+            let context = model.context(context_id);
+            if context.is_none() {
+                diagnostics.push(AsmValidationDiagnostic {
+                    code: "EZASM1159".to_string(),
+                    message: format!("consumer `{}` targets a missing Context", consumer.id),
+                });
+            }
+            if context.is_some_and(|context| {
+                context.name != consumer.context_designator.context_member
+                    || context
+                        .owner
+                        .entity_id()
+                        .and_then(|owner| model.component(owner))
+                        .is_none_or(|owner| {
+                            owner.class_name != consumer.context_designator.component_symbol
+                        })
+            }) {
+                diagnostics.push(AsmValidationDiagnostic {
+                    code: "EZASM1160".to_string(),
+                    message: format!(
+                        "consumer `{}` has a mismatched Context designator",
+                        consumer.id
+                    ),
+                });
+            }
+        }
+        if consumer.requested_type.text.is_empty() {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1161".to_string(),
+                message: format!(
+                    "consumer `{}` is missing an explicit requested type",
+                    consumer.id
+                ),
+            });
+        }
+        if consumer.execution_boundary != crate::ExecutionBoundary::Client {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1162".to_string(),
+                message: format!(
+                    "consumer `{}` has a non-client execution boundary",
+                    consumer.id
+                ),
+            });
+        }
+        if component
+            .state_fields
+            .iter()
+            .any(|field| field.name == consumer.name)
+            || component
+                .context_declarations
+                .iter()
+                .any(|context| context.name == consumer.name)
+            || component
+                .provider_declarations
+                .iter()
+                .any(|provider| provider.name == consumer.name)
+        {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1163".to_string(),
+                message: format!(
+                    "consumer `{}` has a conflicting semantic primitive",
+                    consumer.id
+                ),
+            });
+        }
+        let declaration = component
+            .consumer_declarations
+            .iter()
+            .find(|declaration| declaration.authored_field == consumer.authored_field);
+        if declaration.is_none_or(|declaration| declaration.provenance != consumer.provenance) {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1164".to_string(),
+                message: format!(
+                    "consumer `{}` has non-canonical field provenance",
+                    consumer.id
                 ),
             });
         }

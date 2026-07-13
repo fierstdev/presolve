@@ -247,7 +247,7 @@ fn asm_command_exports_a_deterministic_semantic_graph() {
     let graph: serde_json::Value =
         serde_json::from_slice(&first.stdout).expect("semantic graph output was not valid JSON");
     let component_id = "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter";
-    assert_eq!(graph["schema_version"], 3);
+    assert_eq!(graph["schema_version"], 4);
     assert_eq!(graph["roots"], serde_json::json!([component_id]));
     assert_eq!(graph["nodes"].as_array().map(Vec::len), Some(11));
     assert_eq!(graph["edges"].as_array().map(Vec::len), Some(14));

@@ -38,6 +38,7 @@ pub struct ComponentNode {
     pub state_fields: Vec<StateField>,
     pub context_declarations: Vec<ContextDeclaration>,
     pub provider_declarations: Vec<ProviderDeclaration>,
+    pub consumer_declarations: Vec<ConsumerDeclaration>,
     pub methods: Vec<ComponentMethod>,
     pub actions: Vec<ComponentAction>,
     pub render: Option<RenderModel>,
@@ -87,6 +88,18 @@ pub struct ProviderDeclaration {
     pub context_designator: ContextDesignator,
     pub declared_type: DeclaredStateType,
     pub value_expression: ComputedExpression,
+    pub decorator_provenance: SourceProvenance,
+    pub name_provenance: SourceProvenance,
+    pub provenance: SourceProvenance,
+}
+
+/// Authored source facts for one valid G3 `@consume()` component field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConsumerDeclaration {
+    pub authored_field: SemanticId,
+    pub name: String,
+    pub context_designator: ContextDesignator,
+    pub requested_type: DeclaredStateType,
     pub decorator_provenance: SourceProvenance,
     pub name_provenance: SourceProvenance,
     pub provenance: SourceProvenance,
@@ -920,6 +933,7 @@ fn build_component_node(
     let state_fields = state_fields_from_class(class, path, &id);
     let context_declarations = context_declarations_from_class(class, path, &id);
     let provider_declarations = provider_declarations_from_class(class, path, &id);
+    let consumer_declarations = consumer_declarations_from_class(class, path, &id);
 
     let methods = class
         .methods
@@ -980,6 +994,7 @@ fn build_component_node(
         state_fields,
         context_declarations,
         provider_declarations,
+        consumer_declarations,
         methods,
         actions,
         render,
@@ -1100,10 +1115,9 @@ fn state_fields_from_class(class: &ParsedClass, path: &Path, id: &SemanticId) ->
         .iter()
         .filter(|property| {
             property.initializer.as_deref() == Some("state(...)")
-                && !property
-                    .decorators
-                    .iter()
-                    .any(|decorator| matches!(decorator.name.as_str(), "context" | "provide"))
+                && !property.decorators.iter().any(|decorator| {
+                    matches!(decorator.name.as_str(), "context" | "provide" | "consume")
+                })
         })
         .map(|property| {
             let initial_expression = property
@@ -1153,7 +1167,7 @@ fn context_declarations_from_class(
                 && !property
                     .decorators
                     .iter()
-                    .any(|decorator| decorator.name == "provide")
+                    .any(|decorator| matches!(decorator.name.as_str(), "provide" | "consume"))
                 && property
                     .initializer
                     .as_ref()
@@ -1206,7 +1220,7 @@ fn provider_declarations_from_class(
                 && !property
                     .decorators
                     .iter()
-                    .any(|decorator| decorator.name == "context"))
+                    .any(|decorator| matches!(decorator.name.as_str(), "context" | "consume")))
             .then(|| ProviderDeclaration {
                 authored_field: id.provider_field(&property.name),
                 name: property.name.clone(),
@@ -1221,6 +1235,50 @@ fn provider_declarations_from_class(
                 name_provenance: SourceProvenance::new(path, property.name_span),
                 provenance: SourceProvenance::new(path, property.span),
             })
+        })
+        .collect()
+}
+
+fn consumer_declarations_from_class(
+    class: &ParsedClass,
+    path: &Path,
+    id: &SemanticId,
+) -> Vec<ConsumerDeclaration> {
+    class
+        .properties
+        .iter()
+        .filter_map(|property| {
+            let decorator = property
+                .decorators
+                .iter()
+                .find(|decorator| decorator.name == "consume")?;
+            let designator = decorator.static_member_argument.as_ref()?;
+            let requested_type = property.type_annotation.as_ref()?;
+            let has_conflicting_decorator = property.decorators.iter().any(|decorator| {
+                matches!(
+                    decorator.name.as_str(),
+                    "state" | "context" | "provide" | "computed" | "effect" | "action" | "resource"
+                )
+            });
+
+            (decorator.argument_count == 1
+                && !property.is_static
+                && property.is_definite_assignment
+                && property.initializer.is_none()
+                && !has_conflicting_decorator)
+                .then(|| ConsumerDeclaration {
+                    authored_field: id.consumer_field(&property.name),
+                    name: property.name.clone(),
+                    context_designator: context_designator_from_parsed(designator, path),
+                    requested_type: DeclaredStateType {
+                        kind: declared_state_type_kind(&requested_type.text),
+                        text: requested_type.text.clone(),
+                        provenance: SourceProvenance::new(path, requested_type.span),
+                    },
+                    decorator_provenance: SourceProvenance::new(path, decorator.span),
+                    name_provenance: SourceProvenance::new(path, property.name_span),
+                    provenance: SourceProvenance::new(path, property.span),
+                })
         })
         .collect()
 }

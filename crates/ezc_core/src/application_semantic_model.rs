@@ -10,6 +10,7 @@ use crate::component_graph::{
     RenderEventHandler, StateField,
 };
 use crate::computed_value::{collect_computed_values, ComputedDiagnosticCode, ComputedValue};
+use crate::consumer::{collect_consumer_entities, ConsumerEntity, ContextResolutionState};
 use crate::context::{collect_context_entities, ContextEntity};
 use crate::expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 use crate::intermediate_representation::{
@@ -17,7 +18,7 @@ use crate::intermediate_representation::{
     IrReactiveTransitiveAnalysis,
 };
 use crate::provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
-use crate::semantic_id::{ContextId, ProviderId, SemanticId, SemanticOwner};
+use crate::semantic_id::{ConsumerId, ContextId, ProviderId, SemanticId, SemanticOwner};
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
 use crate::semantic_type::{EffectStatementTypeRecord, SemanticTypeModel};
@@ -40,6 +41,7 @@ pub struct ApplicationSemanticModel {
     pub components: Vec<ComponentNode>,
     pub contexts: BTreeMap<ContextId, ContextEntity>,
     pub providers: BTreeMap<ProviderId, ProviderEntity>,
+    pub consumers: BTreeMap<ConsumerId, ConsumerEntity>,
     pub duplicate_provider_declarations: Vec<DuplicateProviderDeclaration>,
     pub computed_values: BTreeMap<SemanticId, ComputedValue>,
     pub effects: BTreeMap<SemanticId, Effect>,
@@ -67,6 +69,7 @@ pub enum SemanticEntity<'a> {
     Method(&'a ComponentMethod),
     Context(&'a ContextEntity),
     Provider(&'a ProviderEntity),
+    Consumer(&'a ConsumerEntity),
     Computed(&'a ComputedValue),
     Effect(&'a Effect),
     Parameter(&'a crate::MethodParameter),
@@ -84,6 +87,7 @@ pub enum SemanticEntityKind {
     Method,
     Context,
     Provider,
+    Consumer,
     Computed,
     Effect,
     Parameter,
@@ -103,6 +107,7 @@ impl SemanticEntity<'_> {
             Self::Method(_) => SemanticEntityKind::Method,
             Self::Context(_) => SemanticEntityKind::Context,
             Self::Provider(_) => SemanticEntityKind::Provider,
+            Self::Consumer(_) => SemanticEntityKind::Consumer,
             Self::Computed(_) => SemanticEntityKind::Computed,
             Self::Effect(_) => SemanticEntityKind::Effect,
             Self::Parameter(_) => SemanticEntityKind::Parameter,
@@ -173,6 +178,13 @@ impl ApplicationSemanticModel {
             .find(|provider| provider.id.as_semantic_id() == id)
         {
             return Some(SemanticEntity::Provider(provider));
+        }
+        if let Some(consumer) = self
+            .consumers
+            .values()
+            .find(|consumer| consumer.id.as_semantic_id() == id)
+        {
+            return Some(SemanticEntity::Consumer(consumer));
         }
         if let Some(effect) = self.effects.get(id) {
             return Some(SemanticEntity::Effect(effect));
@@ -263,6 +275,41 @@ impl ApplicationSemanticModel {
         self.providers
             .iter()
             .find_map(|(id, provider)| (&provider.authored_field == field).then_some(id))
+    }
+
+    #[must_use]
+    pub fn consumers(&self) -> Vec<&ConsumerEntity> {
+        self.consumers.values().collect()
+    }
+
+    #[must_use]
+    pub fn consumer(&self, id: &ConsumerId) -> Option<&ConsumerEntity> {
+        self.consumers.get(id)
+    }
+
+    #[must_use]
+    pub fn consumers_owned_by(&self, component: &SemanticId) -> Vec<&ConsumerId> {
+        self.consumers
+            .iter()
+            .filter_map(|(id, consumer)| {
+                (consumer.owner.entity_id() == Some(component)).then_some(id)
+            })
+            .collect()
+    }
+
+    #[must_use]
+    pub fn consumers_for_context(&self, context: &ContextId) -> Vec<&ConsumerId> {
+        self.consumers
+            .iter()
+            .filter_map(|(id, consumer)| (consumer.context() == Some(context)).then_some(id))
+            .collect()
+    }
+
+    #[must_use]
+    pub fn consumer_for_authored_field(&self, field: &SemanticId) -> Option<&ConsumerId> {
+        self.consumers
+            .iter()
+            .find_map(|(id, consumer)| (&consumer.authored_field == field).then_some(id))
     }
 
     #[must_use]
@@ -611,12 +658,14 @@ pub fn build_application_semantic_model_from_component_graph(
         &expression_graph,
         None,
     );
+    let consumers = collect_consumer_entities(&component_graph.components, &contexts, None);
     let mut provenance = component_graph.provenance.clone();
     extend_template_entity_provenance(&mut provenance, &template_entities);
     extend_derived_entity_provenance(
         &mut provenance,
         &contexts,
         &providers,
+        &consumers,
         &computed_values,
         &effects,
     );
@@ -624,6 +673,7 @@ pub fn build_application_semantic_model_from_component_graph(
         &component_graph.components,
         &contexts,
         &providers,
+        &consumers,
         &computed_values,
         &effects,
         &templates,
@@ -644,6 +694,7 @@ pub fn build_application_semantic_model_from_component_graph(
         &expression_graph,
     ));
     references.extend(build_provider_references(&providers));
+    references.extend(build_consumer_references(&consumers));
     extend_template_references(
         &mut references,
         &component_graph.components,
@@ -656,6 +707,7 @@ pub fn build_application_semantic_model_from_component_graph(
         &component_graph.components,
         &contexts,
         &providers,
+        &consumers,
         &computed_values,
         &effects,
         &effect_statements,
@@ -718,6 +770,7 @@ pub fn build_application_semantic_model_from_component_graph(
         components: component_graph.components.clone(),
         contexts,
         providers,
+        consumers,
         duplicate_provider_declarations,
         computed_values,
         effects,
@@ -797,11 +850,13 @@ fn build_application_semantic_model_from_files_with_bindings(
     let contexts = collect_context_entities(&components, &expression_graph);
     let (providers, duplicate_provider_declarations) =
         collect_provider_entities(&components, &contexts, &expression_graph, bindings);
+    let consumers = collect_consumer_entities(&components, &contexts, bindings);
     diagnostics.extend(computed_diagnostics);
     extend_derived_entity_provenance(
         &mut provenance,
         &contexts,
         &providers,
+        &consumers,
         &computed_values,
         &effects,
     );
@@ -809,6 +864,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         &components,
         &contexts,
         &providers,
+        &consumers,
         &computed_values,
         &effects,
         &templates,
@@ -828,6 +884,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         &expression_graph,
     ));
     references.extend(build_provider_references(&providers));
+    references.extend(build_consumer_references(&consumers));
     extend_template_references(
         &mut references,
         &components,
@@ -845,6 +902,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         &components,
         &contexts,
         &providers,
+        &consumers,
         &computed_values,
         &effects,
         &effect_statements,
@@ -900,6 +958,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         components,
         contexts,
         providers,
+        consumers,
         duplicate_provider_declarations,
         computed_values,
         effects,
@@ -940,6 +999,7 @@ fn extend_derived_entity_provenance(
     provenance: &mut BTreeMap<SemanticId, SourceProvenance>,
     contexts: &BTreeMap<ContextId, ContextEntity>,
     providers: &BTreeMap<ProviderId, ProviderEntity>,
+    consumers: &BTreeMap<ConsumerId, ConsumerEntity>,
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
     effects: &BTreeMap<SemanticId, Effect>,
 ) {
@@ -953,6 +1013,12 @@ fn extend_derived_entity_provenance(
         (
             provider.id.as_semantic_id().clone(),
             provider.provenance.clone(),
+        )
+    }));
+    provenance.extend(consumers.values().map(|consumer| {
+        (
+            consumer.id.as_semantic_id().clone(),
+            consumer.provenance.clone(),
         )
     }));
     provenance.extend(
@@ -973,6 +1039,7 @@ fn finalize_semantic_types(
     components: &[ComponentNode],
     contexts: &BTreeMap<ContextId, ContextEntity>,
     providers: &BTreeMap<ProviderId, ProviderEntity>,
+    consumers: &BTreeMap<ConsumerId, ConsumerEntity>,
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
     effects: &BTreeMap<SemanticId, Effect>,
     effect_statements: &BTreeMap<SemanticId, EffectStatement>,
@@ -983,6 +1050,7 @@ fn finalize_semantic_types(
     semantic_types
         .with_context_types(contexts)
         .with_provider_types(providers)
+        .with_consumer_types(consumers)
         .with_expression_types(expression_graph, components)
         .with_computed_value_types(components, computed_values, expression_graph, references)
         .with_effect_statement_types(components, effects, effect_statements, expression_graph)
@@ -1608,6 +1676,25 @@ fn build_provider_references(
         .collect()
 }
 
+fn build_consumer_references(
+    consumers: &BTreeMap<ConsumerId, ConsumerEntity>,
+) -> Vec<SemanticReference> {
+    consumers
+        .values()
+        .filter_map(|consumer| {
+            let ContextResolutionState::Resolved(context) = &consumer.context_resolution else {
+                return None;
+            };
+            Some(SemanticReference {
+                kind: SemanticReferenceKind::ConsumesContext,
+                source: consumer.id.as_semantic_id().clone(),
+                target: context.as_semantic_id().clone(),
+                provenance: consumer.provenance.clone(),
+            })
+        })
+        .collect()
+}
+
 fn build_template_state_references(
     components: &[ComponentNode],
     template_entities: &[TemplateSemanticEntity],
@@ -1778,10 +1865,12 @@ fn this_member_name(expression: &str) -> Option<&str> {
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn collect_ownership(
     components: &[ComponentNode],
     contexts: &BTreeMap<ContextId, ContextEntity>,
     providers: &BTreeMap<ProviderId, ProviderEntity>,
+    consumers: &BTreeMap<ConsumerId, ConsumerEntity>,
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
     effects: &BTreeMap<SemanticId, Effect>,
     templates: &[TemplateNode],
@@ -1830,6 +1919,12 @@ fn collect_ownership(
             .filter(|provider| provider.owner.entity_id() == Some(&component.id))
         {
             ownership.insert(provider.id.as_semantic_id().clone(), provider.owner.clone());
+        }
+        for consumer in consumers
+            .values()
+            .filter(|consumer| consumer.owner.entity_id() == Some(&component.id))
+        {
+            ownership.insert(consumer.id.as_semantic_id().clone(), consumer.owner.clone());
         }
         for effect in effects
             .values()
@@ -3153,6 +3248,7 @@ class Counter extends Component {
 
         let ownership = collect_ownership(
             &component_graph.components,
+            &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),

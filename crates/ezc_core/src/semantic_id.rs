@@ -43,6 +43,11 @@ pub struct ContextId(SemanticId);
 #[serde(transparent)]
 pub struct ProviderId(SemanticId);
 
+/// Stable identity for one compiler-owned Context Consumer semantic entity.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ConsumerId(SemanticId);
+
 /// Direct owner of a semantic entity within one compiled application.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SemanticOwner {
@@ -130,6 +135,16 @@ impl SemanticId {
     #[must_use]
     pub fn provider_field(&self, name: &str) -> Self {
         self.child("provider-field", name)
+    }
+
+    #[must_use]
+    pub fn consumer(&self, name: &str) -> Self {
+        self.child("consumer", name)
+    }
+
+    #[must_use]
+    pub fn consumer_field(&self, name: &str) -> Self {
+        self.child("consumer-field", name)
     }
 
     #[must_use]
@@ -255,6 +270,23 @@ impl ProviderId {
     }
 }
 
+impl ConsumerId {
+    #[must_use]
+    pub fn for_component(component: &SemanticId, name: &str) -> Self {
+        Self(component.consumer(name))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 fn normalized_module_path(path: &Path) -> String {
     let mut segments = Vec::new();
     let absolute = path.is_absolute();
@@ -311,9 +343,15 @@ impl fmt::Display for ProviderId {
     }
 }
 
+impl fmt::Display for ConsumerId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{ContextId, ProviderId, SemanticId, SemanticOwner};
+    use super::{ConsumerId, ContextId, ProviderId, SemanticId, SemanticOwner};
 
     #[test]
     fn derives_component_scoped_ids() {
@@ -343,6 +381,10 @@ mod tests {
         assert_eq!(
             ProviderId::for_component(&component, "providedTheme").as_str(),
             "component:x-counter/provider:providedTheme"
+        );
+        assert_eq!(
+            ConsumerId::for_component(&component, "theme").as_str(),
+            "component:x-counter/consumer:theme"
         );
         assert_eq!(
             component.effect_activation_slot("syncTitle").as_str(),

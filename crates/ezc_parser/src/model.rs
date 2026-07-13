@@ -97,6 +97,7 @@ pub struct ParsedProperty {
     pub type_annotation: Option<ParsedTypeAnnotation>,
     pub name_span: SourceSpan,
     pub is_static: bool,
+    pub is_definite_assignment: bool,
     pub span: SourceSpan,
 }
 

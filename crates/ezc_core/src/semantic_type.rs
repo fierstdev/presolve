@@ -4,9 +4,10 @@ use std::path::PathBuf;
 
 use crate::{
     BindingTable, CapabilityOperationId, CapabilityOperationKind, CapabilityParameters,
-    CapabilityValueContract, ComponentNode, ComputedValue, ContextEntity, Effect, EffectStatement,
-    EffectStatementKind, ExpressionGraph, ExpressionNodeKind, ImportBindingTarget, ProviderEntity,
-    SemanticId, SerializableValue, SourceProvenance, SymbolKind, EFFECT_CAPABILITY_REGISTRY,
+    CapabilityValueContract, ComponentNode, ComputedValue, ConsumerEntity, ContextEntity, Effect,
+    EffectStatement, EffectStatementKind, ExpressionGraph, ExpressionNodeKind, ImportBindingTarget,
+    ProviderEntity, SemanticId, SerializableValue, SourceProvenance, SymbolKind,
+    EFFECT_CAPABILITY_REGISTRY,
 };
 use crate::{
     SemanticReference, SemanticReferenceKind, TemplateSemanticEntity, TemplateSemanticKind,
@@ -722,6 +723,44 @@ impl SemanticTypeModel {
                     origin: subject,
                     status: SemanticTypeStatus::Declared,
                     provenance: provider.provenance.clone(),
+                },
+            );
+        }
+        self
+    }
+
+    /// Attaches explicit G3 Consumer requested-type contracts without deciding
+    /// Context, Provider, or Consumer compatibility.
+    #[must_use]
+    pub fn with_consumer_types(
+        mut self,
+        consumers: &BTreeMap<crate::ConsumerId, ConsumerEntity>,
+    ) -> Self {
+        for consumer in consumers.values() {
+            let semantic_type = self
+                .aliases
+                .values()
+                .find(|alias| {
+                    alias.provenance.path == consumer.requested_type.provenance.path
+                        && alias.name == consumer.requested_type.text
+                })
+                .map_or_else(
+                    || {
+                        semantic_type_from_annotation(&consumer.requested_type.text)
+                            .unwrap_or(SemanticType::Unknown)
+                    },
+                    |alias| alias.semantic_type.clone(),
+                );
+            let subject = consumer.id.as_semantic_id().clone();
+            self.assignments.insert(
+                subject.clone(),
+                SemanticTypeAssignment {
+                    id: consumer.requested_type_id.clone(),
+                    subject: subject.clone(),
+                    semantic_type,
+                    origin: subject,
+                    status: SemanticTypeStatus::Declared,
+                    provenance: consumer.provenance.clone(),
                 },
             );
         }

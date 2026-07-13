@@ -11,6 +11,7 @@ pub mod compilation_unit;
 pub mod compiler_pass;
 pub mod component_graph;
 pub mod computed_value;
+pub mod consumer;
 pub mod context;
 pub mod effect;
 pub mod effect_capability;
@@ -70,18 +71,19 @@ pub use component_graph::{
     ArithmeticExpression, ArithmeticExpressionKind, ArithmeticOperator, ComparisonOperator,
     ComponentAction, ComponentDiagnostic, ComponentDiagnosticSeverity, ComponentGraph,
     ComponentMethod, ComponentNode, ComputedExpression, ComputedExpressionKind,
-    ConstantEvaluationError, ConstantExpression, ConstantExpressionKind, ContextDeclaration,
-    ContextDesignator, DeclaredStateType, DeclaredStateTypeKind, DiagnosticSecondaryLabel,
-    EffectBodySyntax, EffectExpression, EffectExpressionKind, EffectStatementSyntax,
-    EffectStatementSyntaxKind, LogicalOperator, MethodCall, MethodLocalVariable, MethodParameter,
-    RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler, RenderFragment,
-    RenderList, RenderModel, SerializableValue, StateField, StateOperation,
-    UnsupportedEffectStatementKind,
+    ConstantEvaluationError, ConstantExpression, ConstantExpressionKind, ConsumerDeclaration,
+    ContextDeclaration, ContextDesignator, DeclaredStateType, DeclaredStateTypeKind,
+    DiagnosticSecondaryLabel, EffectBodySyntax, EffectExpression, EffectExpressionKind,
+    EffectStatementSyntax, EffectStatementSyntaxKind, LogicalOperator, MethodCall,
+    MethodLocalVariable, MethodParameter, RenderAttribute, RenderAttributeValue, RenderChild,
+    RenderEventHandler, RenderFragment, RenderList, RenderModel, SerializableValue, StateField,
+    StateOperation, UnsupportedEffectStatementKind,
 };
 pub use computed_value::{
     collect_computed_values, ComputedCachePolicy, ComputedDiagnosticCode, ComputedPurity,
     ComputedPurityViolation, ComputedPurityViolationKind, ComputedValue,
 };
+pub use consumer::{collect_consumer_entities, ConsumerEntity, ContextResolutionState};
 pub use context::{collect_context_entities, ContextEntity};
 pub use effect::{
     analyze_effect_reactivity, collect_effects, derive_effect_trigger_plan, lower_effect_bodies,
@@ -180,12 +182,13 @@ pub use runtime_effect_artifact::{
     RuntimeEffectArtifactRenderBoundary, RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION,
 };
 pub use semantic_graph::{
-    build_semantic_graph, semantic_graph_json, SemanticGraph, SemanticGraphContext,
-    SemanticGraphEdge, SemanticGraphEdgeKind, SemanticGraphNode, SemanticGraphNodeKind,
-    SemanticGraphProvenance, SemanticGraphProvider, SEMANTIC_GRAPH_SCHEMA_VERSION,
+    build_semantic_graph, semantic_graph_json, SemanticGraph, SemanticGraphConsumer,
+    SemanticGraphContext, SemanticGraphEdge, SemanticGraphEdgeKind, SemanticGraphNode,
+    SemanticGraphNodeKind, SemanticGraphProvenance, SemanticGraphProvider,
+    SEMANTIC_GRAPH_SCHEMA_VERSION,
 };
 pub use semantic_id::{
-    ContextId, EffectId, EffectStatementId, ProviderId, SemanticId, SemanticOwner,
+    ConsumerId, ContextId, EffectId, EffectStatementId, ProviderId, SemanticId, SemanticOwner,
 };
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};

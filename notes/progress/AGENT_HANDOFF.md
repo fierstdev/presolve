@@ -3,32 +3,32 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: G2 - Context Provider entities
-* Working tree: G2 is committed. The Phase G roadmap file is user-provided and untracked.
+* Latest completed slice: G3 - Context Consumer entities
+* Working tree: G3 is ready to commit. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-13
 
 Last completed slice
 
-* Slice: G2 - Context Provider entities
-* Summary: `@provide(ComponentSymbol.contextField)` non-static component fields with explicit declared types and supported initializers now lower to first-class compiler-owned Provider entities. Each has a component-qualified `ProviderId`, owned authored-field relation, resolved target `ContextId`, declared-type identity, Provider-owned value-expression root, client boundary, and full decorated-field provenance.
-* Key files: crates/ezc_parser/src/model.rs; crates/ezc_parser/src/oxc_adapter.rs; crates/ezc_core/src/provider.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/expression_graph.rs; crates/ezc_core/src/semantic_graph.rs
-* New behavior: Provider Context designators resolve only through canonical local component symbols or the existing import binding table. The semantic graph advances to schema v3 with Provider metadata, Component ownership edges, and `provides-context` relations.
-* Unsupported semantics: G2 has no Consumer entities/resolution, visibility/nearest-provider analysis, Provider compatibility checks, lifetime/dependency graph, scheduling, IR, runtime slots/artifacts, execution, resumability, Context diagnostics, or runtime provider discovery. Duplicate same-component providers retain one deterministic source fact and no ambiguous entity pair.
+* Slice: G3 - Context Consumer entities
+* Summary: `@consume(ComponentSymbol.contextField)` non-static definite-assignment component fields with explicit requested types now lower to first-class compiler-owned Consumer entities. Each has a component-qualified `ConsumerId`, owned authored-field relation, canonical Context resolution state, requested-type identity, client boundary, and full decorated-field provenance.
+* Key files: crates/ezc_parser/src/model.rs; crates/ezc_parser/src/oxc_adapter.rs; crates/ezc_core/src/consumer.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/semantic_graph.rs
+* New behavior: Consumer Context designators resolve only through canonical local component symbols or the existing import binding table. The semantic graph advances to schema v4 with Consumer metadata, Component ownership edges, and `consumes-context` relations for resolved Context targets.
+* Unsupported semantics: G3 has no Consumer-to-Provider resolution, visibility/nearest-provider analysis, Context-default selection, Provider/Consumer compatibility checks, lifetime/dependency graph, scheduling, IR, runtime slots/artifacts, execution, resumability, Context diagnostics, or runtime provider discovery.
 
 Current in-progress slice
 
-* Slice: G3 - Context Consumer lowering
-* Status: Blocked pending an explicit authored Consumer declaration contract.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2
-* Remaining: G3 through G20.
+* Slice: G4 - Consumer Provider resolution
+* Status: Ready to inspect the roadmap contract after the G3 commit checkpoint.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3
+* Remaining: G4 through G20.
 
 Verification
 
 * cargo fmt --all --check: pass
 * cargo test -p ezc_parser: pass (29 tests)
-* cargo test -p ezc_core provider: pass (5 focused tests)
-* cargo test -p ezc_core semantic_graph: pass (4 focused tests)
-* cargo test -p ezc_core --lib: pass (181 tests; shared ASM infrastructure)
+* cargo test -p ezc_core consumer: pass (4 focused tests)
+* cargo test -p ezc_core semantic_graph: pass (5 focused tests)
+* cargo test -p ezc_core --lib: pass (186 tests; shared ASM infrastructure)
 * cargo test -p ezc_cli --test explain: pass (123 tests)
 * cargo clippy -p ezc_parser -p ezc_core -p ezc_cli --all-targets -- -D warnings: pass
 
@@ -49,6 +49,10 @@ Architecture decisions made
 * Decision needed before G3: define the authored Consumer declaration syntax, its canonical Context designator/reference form, requested-type contract, owning scope, and provenance anchor.
 * Reason: The G3 roadmap identifies Consumer products but supplies no source construct that creates a Consumer. Choosing a decorator, field helper, parameter form, template read, method call, or implicit Context name would invent language semantics and predetermine later resolution/type behavior.
 * Tradeoff: G2 remains complete and committed. No Consumer entity, Context read, Provider selection, visibility analysis, runtime binding, or runtime lookup has been added.
+
+* Decision: G3 Consumer syntax is a non-static, declaration-only definite-assignment `@consume(ComponentSymbol.contextField)` field with one exact static designator and an explicit requested type.
+* Reason: The compiler resolves the designator only to an immutable canonical Context identity through local component facts or the existing import binding table. Consumer identity remains component-qualified by the local binding field, while Context ownership remains unchanged.
+* Tradeoff: Consumers record only `Resolved(ContextId)` or `Unresolved` Context identity state. G3 emits no Provider relation, visibility/nearest-provider analysis, default fallback selection, type compatibility result, runtime slot, scheduling product, IR, or runtime lookup.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.

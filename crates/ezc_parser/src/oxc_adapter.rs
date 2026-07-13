@@ -443,6 +443,7 @@ fn parse_property(
         type_annotation,
         name_span: source_span(source, property.key.span()),
         is_static: property.r#static,
+        is_definite_assignment: property.definite,
         span: source_span_from_offsets(source, declaration_start, property.span.end as usize),
     })
 }
