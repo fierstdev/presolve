@@ -235,7 +235,91 @@ pub struct ParsedMethod {
     pub return_type_annotation: Option<ParsedTypeAnnotation>,
     pub return_values: Vec<ParsedSerializableValue>,
     pub computed_expression: Option<ParsedComputedExpression>,
+    pub effect_body: Option<ParsedEffectBody>,
     pub calls: Vec<ParsedMethodCall>,
+}
+
+/// Ordered syntax retained from one `@effect()` method body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedEffectBody {
+    pub statements: Vec<ParsedEffectStatement>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedEffectStatement {
+    pub kind: ParsedEffectStatementKind,
+    pub span: SourceSpan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParsedEffectStatementKind {
+    StaticMemberAssignment {
+        target: ParsedEffectExpression,
+        value: ParsedEffectExpression,
+    },
+    CapabilityCall {
+        callee: ParsedEffectExpression,
+        arguments: Vec<ParsedEffectExpression>,
+    },
+    EffectReturn {
+        value: Option<ParsedEffectExpression>,
+    },
+    Empty,
+    Unsupported(ParsedUnsupportedEffectStatementKind),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParsedUnsupportedEffectStatementKind {
+    LocalDeclaration,
+    Branch,
+    Loop,
+    NestedBlock,
+    ExceptionHandling,
+    AsyncOperation,
+    CompoundAssignment,
+    CleanupReturnCandidate,
+    UnsupportedExpression,
+}
+
+/// Expression syntax accepted as an operand of a lowered effect statement.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedEffectExpression {
+    pub kind: ParsedEffectExpressionKind,
+    pub span: SourceSpan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParsedEffectExpressionKind {
+    Literal(ParsedSerializableValue),
+    Identifier(String),
+    ThisMember(String),
+    MemberAccess {
+        object: Box<ParsedEffectExpression>,
+        property: String,
+    },
+    Arithmetic {
+        left: Box<ParsedEffectExpression>,
+        right: Box<ParsedEffectExpression>,
+        operator: ParsedArithmeticOperator,
+    },
+    Comparison {
+        left: Box<ParsedEffectExpression>,
+        right: Box<ParsedEffectExpression>,
+        operator: ParsedComparisonOperator,
+    },
+    Logical {
+        left: Box<ParsedEffectExpression>,
+        right: Box<ParsedEffectExpression>,
+        operator: ParsedLogicalOperator,
+    },
+    NullishCoalescing {
+        left: Box<ParsedEffectExpression>,
+        right: Box<ParsedEffectExpression>,
+    },
+    Unary {
+        operand: Box<ParsedEffectExpression>,
+        operator: ParsedUnaryOperator,
+    },
 }
 
 /// One directly authored method call retained for computed-purity analysis.

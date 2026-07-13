@@ -9,7 +9,7 @@ use crate::component_graph::{
     ComponentMethod, ComponentNode, MethodLocalVariable, RenderEventHandler, StateField,
 };
 use crate::computed_value::{collect_computed_values, ComputedDiagnosticCode, ComputedValue};
-use crate::effect::{collect_effects, Effect};
+use crate::effect::{collect_effects, lower_effect_bodies, Effect, EffectBody, EffectStatement};
 use crate::expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 use crate::intermediate_representation::{
     IrComputedEvaluationPlan, IrReactiveCycleAnalysis, IrReactiveGraph,
@@ -33,6 +33,8 @@ pub struct ApplicationSemanticModel {
     pub components: Vec<ComponentNode>,
     pub computed_values: BTreeMap<SemanticId, ComputedValue>,
     pub effects: BTreeMap<SemanticId, Effect>,
+    pub effect_bodies: BTreeMap<SemanticId, EffectBody>,
+    pub effect_statements: BTreeMap<SemanticId, EffectStatement>,
     pub reactive_graph: IrReactiveGraph,
     pub reactive_transitive_analysis: IrReactiveTransitiveAnalysis,
     pub reactive_cycle_analysis: IrReactiveCycleAnalysis,
@@ -171,6 +173,16 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub fn effect(&self, id: &SemanticId) -> Option<&Effect> {
         self.effects.get(id)
+    }
+
+    #[must_use]
+    pub fn effect_body(&self, effect: &SemanticId) -> Option<&EffectBody> {
+        self.effect_bodies.get(effect)
+    }
+
+    #[must_use]
+    pub fn effect_statement(&self, id: &SemanticId) -> Option<&EffectStatement> {
+        self.effect_statements.get(id)
     }
 
     #[must_use]
@@ -482,6 +494,8 @@ pub fn build_application_semantic_model_from_component_graph(
     );
     let expression_graph =
         ExpressionGraph::from_components(&component_graph.components, &component_graph.provenance);
+    let (effect_bodies, effect_statements) =
+        lower_effect_bodies(&component_graph.components, &effects, &expression_graph);
     let mut references = component_graph.references.clone();
     references.extend(build_computed_references(
         &component_graph.components,
@@ -532,6 +546,8 @@ pub fn build_application_semantic_model_from_component_graph(
         components: component_graph.components.clone(),
         computed_values,
         effects,
+        effect_bodies,
+        effect_statements,
         reactive_graph,
         reactive_transitive_analysis,
         reactive_cycle_analysis,
@@ -604,6 +620,8 @@ fn build_application_semantic_model_from_files_with_bindings(
         &template_entities,
     );
     let expression_graph = ExpressionGraph::from_components(&components, &provenance);
+    let (effect_bodies, effect_statements) =
+        lower_effect_bodies(&components, &effects, &expression_graph);
     references.extend(build_computed_references(
         &components,
         &computed_values,
@@ -651,6 +669,8 @@ fn build_application_semantic_model_from_files_with_bindings(
         components,
         computed_values,
         effects,
+        effect_bodies,
+        effect_statements,
         reactive_graph,
         reactive_transitive_analysis,
         reactive_cycle_analysis,

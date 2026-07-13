@@ -860,6 +860,9 @@ impl ComputedIrLowering<'_> {
             ExpressionNodeKind::Boolean(value) => IrInstructionKind::Constant {
                 value: IrConstant::Boolean(value),
             },
+            ExpressionNodeKind::Identifier(_) => {
+                return None;
+            }
             ExpressionNodeKind::ThisMember { name } => self.lower_this_member(&name)?,
             ExpressionNodeKind::MemberAccess { object, property } => IrInstructionKind::GetMember {
                 object: IrOperand::Value(self.lower_node(&object)?),

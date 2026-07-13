@@ -17,13 +17,15 @@ use crate::model::{
     ParseDiagnostic, ParseLabel, ParseSeverity, ParsedArithmeticExpression,
     ParsedArithmeticExpressionKind, ParsedArithmeticOperator, ParsedClass,
     ParsedComparisonOperator, ParsedComputedExpression, ParsedComputedExpressionKind,
-    ParsedConstantExpression, ParsedConstantExpressionKind, ParsedDecorator, ParsedEventHandler,
-    ParsedExport, ParsedExportKind, ParsedExportSpecifier, ParsedFile, ParsedImport,
-    ParsedImportSpecifier, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild,
-    ParsedJsxConditional, ParsedJsxElement, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode,
-    ParsedLocalVariable, ParsedLogicalOperator, ParsedMethod, ParsedMethodCall,
-    ParsedMethodParameter, ParsedProperty, ParsedSerializableValue, ParsedStateOperation,
-    ParsedStateUpdate, ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator, SourceSpan,
+    ParsedConstantExpression, ParsedConstantExpressionKind, ParsedDecorator, ParsedEffectBody,
+    ParsedEffectExpression, ParsedEffectExpressionKind, ParsedEffectStatement,
+    ParsedEffectStatementKind, ParsedEventHandler, ParsedExport, ParsedExportKind,
+    ParsedExportSpecifier, ParsedFile, ParsedImport, ParsedImportSpecifier, ParsedJsxAttribute,
+    ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional, ParsedJsxElement,
+    ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLocalVariable, ParsedLogicalOperator,
+    ParsedMethod, ParsedMethodCall, ParsedMethodParameter, ParsedProperty, ParsedSerializableValue,
+    ParsedStateOperation, ParsedStateUpdate, ParsedTypeAlias, ParsedTypeAnnotation,
+    ParsedUnaryOperator, ParsedUnsupportedEffectStatementKind, SourceSpan,
 };
 
 pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
@@ -459,6 +461,17 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
         parsed_computed_expression(return_statement.argument.as_ref()?, source)
     })
     .flatten();
+    let effect_body = decorators
+        .iter()
+        .any(|decorator| decorator.name == "effect")
+        .then(|| {
+            method
+                .value
+                .body
+                .as_ref()
+                .map(|body| parsed_effect_body(body, source))
+        })
+        .flatten();
 
     Some(ParsedMethod {
         name,
@@ -478,7 +491,286 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
             .map(|annotation| parsed_type_annotation(annotation.span, source)),
         return_values,
         computed_expression,
+        effect_body,
         calls,
+    })
+}
+
+fn parsed_effect_body(body: &oxc_ast::ast::FunctionBody<'_>, source: &str) -> ParsedEffectBody {
+    let final_statement = body.statements.len().saturating_sub(1);
+    ParsedEffectBody {
+        statements: body
+            .statements
+            .iter()
+            .enumerate()
+            .map(|(index, statement)| {
+                parsed_effect_statement(statement, index == final_statement, source)
+            })
+            .collect(),
+    }
+}
+
+fn parsed_effect_statement(
+    statement: &Statement<'_>,
+    is_final: bool,
+    source: &str,
+) -> ParsedEffectStatement {
+    let span = source_span(source, statement.span());
+    let kind = match statement {
+        Statement::EmptyStatement(_) => ParsedEffectStatementKind::Empty,
+        Statement::ExpressionStatement(statement) => match &statement.expression {
+            Expression::AssignmentExpression(assignment) if assignment.operator.as_str() == "=" => {
+                match (
+                    parsed_effect_assignment_target(&assignment.left, source),
+                    parsed_effect_expression(&assignment.right, source),
+                ) {
+                    (Some(target), Some(value)) => {
+                        ParsedEffectStatementKind::StaticMemberAssignment { target, value }
+                    }
+                    _ => ParsedEffectStatementKind::Unsupported(
+                        ParsedUnsupportedEffectStatementKind::UnsupportedExpression,
+                    ),
+                }
+            }
+            Expression::AssignmentExpression(_) | Expression::UpdateExpression(_) => {
+                ParsedEffectStatementKind::Unsupported(
+                    ParsedUnsupportedEffectStatementKind::CompoundAssignment,
+                )
+            }
+            Expression::CallExpression(call) => match (
+                parsed_effect_expression(&call.callee, source),
+                call.arguments
+                    .iter()
+                    .map(|argument| {
+                        argument
+                            .as_expression()
+                            .and_then(|expression| parsed_effect_expression(expression, source))
+                    })
+                    .collect::<Option<Vec<_>>>(),
+            ) {
+                (Some(callee), Some(arguments)) => {
+                    ParsedEffectStatementKind::CapabilityCall { callee, arguments }
+                }
+                _ => ParsedEffectStatementKind::Unsupported(
+                    ParsedUnsupportedEffectStatementKind::UnsupportedExpression,
+                ),
+            },
+            _ => ParsedEffectStatementKind::Unsupported(
+                ParsedUnsupportedEffectStatementKind::UnsupportedExpression,
+            ),
+        },
+        Statement::ReturnStatement(statement) => match &statement.argument {
+            None if is_final => ParsedEffectStatementKind::EffectReturn { value: None },
+            Some(value) => parsed_effect_expression(value, source).map_or_else(
+                || {
+                    ParsedEffectStatementKind::Unsupported(
+                        ParsedUnsupportedEffectStatementKind::CleanupReturnCandidate,
+                    )
+                },
+                |value| ParsedEffectStatementKind::EffectReturn { value: Some(value) },
+            ),
+            None => ParsedEffectStatementKind::Unsupported(
+                ParsedUnsupportedEffectStatementKind::UnsupportedExpression,
+            ),
+        },
+        statement if statement.as_declaration().is_some() => {
+            ParsedEffectStatementKind::Unsupported(
+                ParsedUnsupportedEffectStatementKind::LocalDeclaration,
+            )
+        }
+        Statement::IfStatement(_) | Statement::SwitchStatement(_) => {
+            ParsedEffectStatementKind::Unsupported(ParsedUnsupportedEffectStatementKind::Branch)
+        }
+        Statement::ForInStatement(_)
+        | Statement::ForOfStatement(_)
+        | Statement::ForStatement(_)
+        | Statement::WhileStatement(_)
+        | Statement::DoWhileStatement(_) => {
+            ParsedEffectStatementKind::Unsupported(ParsedUnsupportedEffectStatementKind::Loop)
+        }
+        Statement::BlockStatement(_) => ParsedEffectStatementKind::Unsupported(
+            ParsedUnsupportedEffectStatementKind::NestedBlock,
+        ),
+        Statement::TryStatement(_) | Statement::ThrowStatement(_) => {
+            ParsedEffectStatementKind::Unsupported(
+                ParsedUnsupportedEffectStatementKind::ExceptionHandling,
+            )
+        }
+        _ => ParsedEffectStatementKind::Unsupported(
+            ParsedUnsupportedEffectStatementKind::UnsupportedExpression,
+        ),
+    };
+    ParsedEffectStatement { kind, span }
+}
+
+fn parsed_effect_assignment_target(
+    target: &AssignmentTarget<'_>,
+    source: &str,
+) -> Option<ParsedEffectExpression> {
+    let AssignmentTarget::StaticMemberExpression(member) = target else {
+        return None;
+    };
+    parsed_effect_static_member(
+        &member.object,
+        member.property.name.as_str(),
+        member.span,
+        source,
+    )
+}
+
+fn parsed_effect_expression(
+    expression: &Expression<'_>,
+    source: &str,
+) -> Option<ParsedEffectExpression> {
+    if let Expression::ParenthesizedExpression(parenthesized) = expression {
+        return parsed_effect_expression(&parenthesized.expression, source);
+    }
+    if let Some(value) = serializable_value_from_expression(expression) {
+        return Some(ParsedEffectExpression {
+            kind: ParsedEffectExpressionKind::Literal(value),
+            span: source_span(source, expression.span()),
+        });
+    }
+    match expression {
+        Expression::Identifier(identifier) => Some(ParsedEffectExpression {
+            kind: ParsedEffectExpressionKind::Identifier(identifier.name.to_string()),
+            span: source_span(source, identifier.span),
+        }),
+        Expression::ThisExpression(this) => Some(ParsedEffectExpression {
+            kind: ParsedEffectExpressionKind::Identifier("this".to_string()),
+            span: source_span(source, this.span),
+        }),
+        Expression::StaticMemberExpression(member) => parsed_effect_static_member(
+            &member.object,
+            member.property.name.as_str(),
+            member.span,
+            source,
+        ),
+        Expression::BinaryExpression(binary) => {
+            let kind = match binary.operator.as_str() {
+                "+" => ParsedEffectExpressionKind::Arithmetic {
+                    left: Box::new(parsed_effect_expression(&binary.left, source)?),
+                    right: Box::new(parsed_effect_expression(&binary.right, source)?),
+                    operator: ParsedArithmeticOperator::Add,
+                },
+                "-" => ParsedEffectExpressionKind::Arithmetic {
+                    left: Box::new(parsed_effect_expression(&binary.left, source)?),
+                    right: Box::new(parsed_effect_expression(&binary.right, source)?),
+                    operator: ParsedArithmeticOperator::Subtract,
+                },
+                "*" => ParsedEffectExpressionKind::Arithmetic {
+                    left: Box::new(parsed_effect_expression(&binary.left, source)?),
+                    right: Box::new(parsed_effect_expression(&binary.right, source)?),
+                    operator: ParsedArithmeticOperator::Multiply,
+                },
+                "/" => ParsedEffectExpressionKind::Arithmetic {
+                    left: Box::new(parsed_effect_expression(&binary.left, source)?),
+                    right: Box::new(parsed_effect_expression(&binary.right, source)?),
+                    operator: ParsedArithmeticOperator::Divide,
+                },
+                "%" => ParsedEffectExpressionKind::Arithmetic {
+                    left: Box::new(parsed_effect_expression(&binary.left, source)?),
+                    right: Box::new(parsed_effect_expression(&binary.right, source)?),
+                    operator: ParsedArithmeticOperator::Remainder,
+                },
+                "===" => ParsedEffectExpressionKind::Comparison {
+                    left: Box::new(parsed_effect_expression(&binary.left, source)?),
+                    right: Box::new(parsed_effect_expression(&binary.right, source)?),
+                    operator: ParsedComparisonOperator::Equal,
+                },
+                "!==" => ParsedEffectExpressionKind::Comparison {
+                    left: Box::new(parsed_effect_expression(&binary.left, source)?),
+                    right: Box::new(parsed_effect_expression(&binary.right, source)?),
+                    operator: ParsedComparisonOperator::NotEqual,
+                },
+                "<" => ParsedEffectExpressionKind::Comparison {
+                    left: Box::new(parsed_effect_expression(&binary.left, source)?),
+                    right: Box::new(parsed_effect_expression(&binary.right, source)?),
+                    operator: ParsedComparisonOperator::LessThan,
+                },
+                "<=" => ParsedEffectExpressionKind::Comparison {
+                    left: Box::new(parsed_effect_expression(&binary.left, source)?),
+                    right: Box::new(parsed_effect_expression(&binary.right, source)?),
+                    operator: ParsedComparisonOperator::LessThanOrEqual,
+                },
+                ">" => ParsedEffectExpressionKind::Comparison {
+                    left: Box::new(parsed_effect_expression(&binary.left, source)?),
+                    right: Box::new(parsed_effect_expression(&binary.right, source)?),
+                    operator: ParsedComparisonOperator::GreaterThan,
+                },
+                ">=" => ParsedEffectExpressionKind::Comparison {
+                    left: Box::new(parsed_effect_expression(&binary.left, source)?),
+                    right: Box::new(parsed_effect_expression(&binary.right, source)?),
+                    operator: ParsedComparisonOperator::GreaterThanOrEqual,
+                },
+                _ => return None,
+            };
+            Some(ParsedEffectExpression {
+                kind,
+                span: source_span(source, binary.span),
+            })
+        }
+        Expression::LogicalExpression(logical) => {
+            let kind = match logical.operator.as_str() {
+                "&&" => ParsedEffectExpressionKind::Logical {
+                    left: Box::new(parsed_effect_expression(&logical.left, source)?),
+                    right: Box::new(parsed_effect_expression(&logical.right, source)?),
+                    operator: ParsedLogicalOperator::And,
+                },
+                "||" => ParsedEffectExpressionKind::Logical {
+                    left: Box::new(parsed_effect_expression(&logical.left, source)?),
+                    right: Box::new(parsed_effect_expression(&logical.right, source)?),
+                    operator: ParsedLogicalOperator::Or,
+                },
+                "??" => ParsedEffectExpressionKind::NullishCoalescing {
+                    left: Box::new(parsed_effect_expression(&logical.left, source)?),
+                    right: Box::new(parsed_effect_expression(&logical.right, source)?),
+                },
+                _ => return None,
+            };
+            Some(ParsedEffectExpression {
+                kind,
+                span: source_span(source, logical.span),
+            })
+        }
+        Expression::UnaryExpression(unary) => {
+            let operator = match unary.operator.as_str() {
+                "!" => ParsedUnaryOperator::Not,
+                "+" => ParsedUnaryOperator::Plus,
+                "-" => ParsedUnaryOperator::Minus,
+                _ => return None,
+            };
+            Some(ParsedEffectExpression {
+                kind: ParsedEffectExpressionKind::Unary {
+                    operand: Box::new(parsed_effect_expression(&unary.argument, source)?),
+                    operator,
+                },
+                span: source_span(source, unary.span),
+            })
+        }
+        _ => None,
+    }
+}
+
+fn parsed_effect_static_member(
+    object: &Expression<'_>,
+    property: &str,
+    span: Span,
+    source: &str,
+) -> Option<ParsedEffectExpression> {
+    let object = parsed_effect_expression(object, source)?;
+    let kind = if matches!(&object.kind, ParsedEffectExpressionKind::Identifier(name) if name == "this")
+    {
+        ParsedEffectExpressionKind::ThisMember(property.to_string())
+    } else {
+        ParsedEffectExpressionKind::MemberAccess {
+            object: Box::new(object),
+            property: property.to_string(),
+        }
+    };
+    Some(ParsedEffectExpression {
+        kind,
+        span: source_span(source, span),
     })
 }
 

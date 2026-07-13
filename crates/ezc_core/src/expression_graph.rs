@@ -4,7 +4,8 @@ use std::path::Path;
 use crate::component_graph::UnaryOperator;
 use crate::{
     ComponentNode, ComputedExpression, ComputedExpressionKind, ConstantEvaluationError,
-    ConstantExpression, ConstantExpressionKind, SemanticId, SerializableValue, SourceProvenance,
+    ConstantExpression, ConstantExpressionKind, EffectExpression, EffectExpressionKind,
+    EffectStatementSyntaxKind, SemanticId, SerializableValue, SourceProvenance,
 };
 
 /// Canonical compiler-owned graph for all lowered state initializer and computed expressions.
@@ -26,6 +27,7 @@ pub struct ExpressionNode {
 pub enum ExpressionNodeKind {
     Literal(SerializableValue),
     Boolean(bool),
+    Identifier(String),
     ThisMember {
         name: String,
     },
@@ -64,6 +66,7 @@ impl ExpressionNode {
         match &self.kind {
             ExpressionNodeKind::Literal(_)
             | ExpressionNodeKind::Boolean(_)
+            | ExpressionNodeKind::Identifier(_)
             | ExpressionNodeKind::ThisMember { .. } => Vec::new(),
             ExpressionNodeKind::MemberAccess { object, .. } => vec![object],
             ExpressionNodeKind::Arithmetic { left, right, .. }
@@ -115,6 +118,61 @@ impl ExpressionGraph {
                     method_provenance,
                 );
                 graph.roots.insert(computed, root);
+            }
+            for method in component.methods.iter().filter(|method| method.is_effect()) {
+                let Some(body) = &method.effect_body else {
+                    continue;
+                };
+                let effect = component.id.effect(&method.name);
+                let provenance = provenance
+                    .get(&method.id)
+                    .expect("effect methods should have canonical provenance");
+                for (index, statement) in body.statements.iter().enumerate() {
+                    let path = format!("statement:{index}");
+                    match &statement.kind {
+                        EffectStatementSyntaxKind::StaticMemberAssignment { target, value } => {
+                            graph.insert_effect_expression(
+                                &effect,
+                                &format!("{path}/target"),
+                                target,
+                                provenance,
+                            );
+                            graph.insert_effect_expression(
+                                &effect,
+                                &format!("{path}/value"),
+                                value,
+                                provenance,
+                            );
+                        }
+                        EffectStatementSyntaxKind::CapabilityCall { callee, arguments } => {
+                            graph.insert_effect_expression(
+                                &effect,
+                                &format!("{path}/callee"),
+                                callee,
+                                provenance,
+                            );
+                            for (argument_index, argument) in arguments.iter().enumerate() {
+                                graph.insert_effect_expression(
+                                    &effect,
+                                    &format!("{path}/argument:{argument_index}"),
+                                    argument,
+                                    provenance,
+                                );
+                            }
+                        }
+                        EffectStatementSyntaxKind::EffectReturn { value: Some(value) } => {
+                            graph.insert_effect_expression(
+                                &effect,
+                                &format!("{path}/return"),
+                                value,
+                                provenance,
+                            );
+                        }
+                        EffectStatementSyntaxKind::EffectReturn { value: None }
+                        | EffectStatementSyntaxKind::Empty
+                        | EffectStatementSyntaxKind::Unsupported(_) => {}
+                    }
+                }
             }
         }
         graph
@@ -360,6 +418,79 @@ impl ExpressionGraph {
         id
     }
 
+    fn insert_effect_expression(
+        &mut self,
+        owner: &SemanticId,
+        path: &str,
+        expression: &EffectExpression,
+        owner_provenance: &SourceProvenance,
+    ) -> SemanticId {
+        let id = owner.expression(path);
+        let child = |graph: &mut Self, child_path: &str, child: &EffectExpression| {
+            graph.insert_effect_expression(owner, child_path, child, owner_provenance)
+        };
+        let kind = match &expression.kind {
+            EffectExpressionKind::Literal(value) => ExpressionNodeKind::Literal(value.clone()),
+            EffectExpressionKind::Identifier(name) => ExpressionNodeKind::Identifier(name.clone()),
+            EffectExpressionKind::ThisMember(name) => {
+                ExpressionNodeKind::ThisMember { name: name.clone() }
+            }
+            EffectExpressionKind::MemberAccess { object, property } => {
+                ExpressionNodeKind::MemberAccess {
+                    object: child(self, &format!("{path}.0"), object),
+                    property: property.clone(),
+                }
+            }
+            EffectExpressionKind::Arithmetic {
+                left,
+                right,
+                operator,
+            } => ExpressionNodeKind::Arithmetic {
+                left: child(self, &format!("{path}.0"), left),
+                right: child(self, &format!("{path}.1"), right),
+                operator: *operator,
+            },
+            EffectExpressionKind::Comparison {
+                left,
+                right,
+                operator,
+            } => ExpressionNodeKind::Comparison {
+                left: child(self, &format!("{path}.0"), left),
+                right: child(self, &format!("{path}.1"), right),
+                operator: *operator,
+            },
+            EffectExpressionKind::Logical {
+                left,
+                right,
+                operator,
+            } => ExpressionNodeKind::Logical {
+                left: child(self, &format!("{path}.0"), left),
+                right: child(self, &format!("{path}.1"), right),
+                operator: *operator,
+            },
+            EffectExpressionKind::NullishCoalescing { left, right } => {
+                ExpressionNodeKind::NullishCoalescing {
+                    left: child(self, &format!("{path}.0"), left),
+                    right: child(self, &format!("{path}.1"), right),
+                }
+            }
+            EffectExpressionKind::Unary { operand, operator } => ExpressionNodeKind::Unary {
+                operand: child(self, &format!("{path}.0"), operand),
+                operator: *operator,
+            },
+        };
+        self.nodes.insert(
+            id.clone(),
+            ExpressionNode {
+                id: id.clone(),
+                owner: owner.clone(),
+                kind,
+                provenance: SourceProvenance::new(&owner_provenance.path, expression.span),
+            },
+        );
+        id
+    }
+
     fn expression_for(&self, owner: &SemanticId) -> Option<ConstantExpression> {
         self.expression_from_node(self.root_for(owner)?)
     }
@@ -369,7 +500,9 @@ impl ExpressionGraph {
         let kind = match &node.kind {
             ExpressionNodeKind::Literal(value) => ConstantExpressionKind::Literal(value.clone()),
             ExpressionNodeKind::Boolean(value) => ConstantExpressionKind::Boolean(*value),
-            ExpressionNodeKind::ThisMember { .. } | ExpressionNodeKind::MemberAccess { .. } => {
+            ExpressionNodeKind::Identifier(_)
+            | ExpressionNodeKind::ThisMember { .. }
+            | ExpressionNodeKind::MemberAccess { .. } => {
                 return None;
             }
             ExpressionNodeKind::Arithmetic {

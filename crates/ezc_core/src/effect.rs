@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
 
-use crate::{ComponentNode, ExecutionBoundary, SemanticId, SemanticOwner, SourceProvenance};
+use crate::{
+    ComponentNode, EffectStatementSyntaxKind, ExecutionBoundary, ExpressionGraph, SemanticId,
+    SemanticOwner, SourceProvenance, UnsupportedEffectStatementKind,
+};
 
 /// Compiler-owned execution contract for an effect.
 ///
@@ -22,6 +25,40 @@ pub struct Effect {
     pub execution_boundary: ExecutionBoundary,
     pub execution_policy: EffectExecutionPolicy,
     pub provenance: SourceProvenance,
+}
+
+/// An ordered, compiler-owned effect body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EffectBody {
+    pub effect: SemanticId,
+    pub statements: Vec<SemanticId>,
+    pub provenance: SourceProvenance,
+}
+
+/// One compiler-owned statement belonging to an effect body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EffectStatement {
+    pub id: SemanticId,
+    pub owner: SemanticId,
+    pub kind: EffectStatementKind,
+    pub provenance: SourceProvenance,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EffectStatementKind {
+    ExternalMemberAssignment {
+        target: SemanticId,
+        value: SemanticId,
+    },
+    CapabilityCall {
+        callee: SemanticId,
+        arguments: Vec<SemanticId>,
+    },
+    EffectReturn {
+        value: Option<SemanticId>,
+    },
+    Empty,
+    Unsupported(UnsupportedEffectStatementKind),
 }
 
 /// Collect canonical effect entities in stable semantic-ID order.
@@ -65,12 +102,112 @@ pub fn collect_effects(
         .collect()
 }
 
+/// Lower all authored effect bodies to ordered statement records.
+#[must_use]
+pub fn lower_effect_bodies(
+    components: &[ComponentNode],
+    effects: &BTreeMap<SemanticId, Effect>,
+    expression_graph: &ExpressionGraph,
+) -> (
+    BTreeMap<SemanticId, EffectBody>,
+    BTreeMap<SemanticId, EffectStatement>,
+) {
+    let mut bodies = BTreeMap::new();
+    let mut statements = BTreeMap::new();
+    for effect in effects.values() {
+        let Some(component_id) = effect.owner.entity_id() else {
+            continue;
+        };
+        let Some(method) = components
+            .iter()
+            .find(|component| component.id == *component_id)
+            .and_then(|component| {
+                component
+                    .methods
+                    .iter()
+                    .find(|method| method.id == effect.method)
+            })
+        else {
+            continue;
+        };
+        let Some(syntax) = &method.effect_body else {
+            continue;
+        };
+        let mut body_statement_ids = Vec::new();
+        for (index, statement) in syntax.statements.iter().enumerate() {
+            let id = effect.id.effect_statement(index);
+            let path = format!("statement:{index}");
+            let expression = |suffix: &str| effect.id.expression(&format!("{path}/{suffix}"));
+            let kind = match &statement.kind {
+                EffectStatementSyntaxKind::StaticMemberAssignment { .. } => {
+                    EffectStatementKind::ExternalMemberAssignment {
+                        target: expression("target"),
+                        value: expression("value"),
+                    }
+                }
+                EffectStatementSyntaxKind::CapabilityCall { arguments, .. } => {
+                    EffectStatementKind::CapabilityCall {
+                        callee: expression("callee"),
+                        arguments: (0..arguments.len())
+                            .map(|argument| expression(&format!("argument:{argument}")))
+                            .collect(),
+                    }
+                }
+                EffectStatementSyntaxKind::EffectReturn { value } => {
+                    EffectStatementKind::EffectReturn {
+                        value: value.as_ref().map(|_| expression("return")),
+                    }
+                }
+                EffectStatementSyntaxKind::Empty => EffectStatementKind::Empty,
+                EffectStatementSyntaxKind::Unsupported(kind) => {
+                    EffectStatementKind::Unsupported(*kind)
+                }
+            };
+            assert_effect_statement_expressions_exist(&kind, expression_graph);
+            body_statement_ids.push(id.clone());
+            statements.insert(
+                id.clone(),
+                EffectStatement {
+                    id,
+                    owner: effect.id.clone(),
+                    kind,
+                    provenance: SourceProvenance::new(&effect.provenance.path, statement.span),
+                },
+            );
+        }
+        bodies.insert(
+            effect.id.clone(),
+            EffectBody {
+                effect: effect.id.clone(),
+                statements: body_statement_ids,
+                provenance: effect.provenance.clone(),
+            },
+        );
+    }
+    (bodies, statements)
+}
+
+fn assert_effect_statement_expressions_exist(kind: &EffectStatementKind, graph: &ExpressionGraph) {
+    let expressions = match kind {
+        EffectStatementKind::ExternalMemberAssignment { target, value } => vec![target, value],
+        EffectStatementKind::CapabilityCall { callee, arguments } => {
+            let mut expressions = vec![callee];
+            expressions.extend(arguments);
+            expressions
+        }
+        EffectStatementKind::EffectReturn { value } => value.iter().collect(),
+        EffectStatementKind::Empty | EffectStatementKind::Unsupported(_) => Vec::new(),
+    };
+    assert!(expressions.iter().all(|id| graph.node(id).is_some()));
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
         build_application_semantic_model, build_component_graph, build_semantic_graph,
         collect_effects, validate_application_semantic_model, EffectExecutionPolicy,
-        ExecutionBoundary, SemanticEntity, SemanticEntityKind, SemanticOwner,
+        EffectStatementKind, ExecutionBoundary, ExpressionNodeKind, SemanticEntity,
+        SemanticEntityKind, SemanticOwner, UnsupportedEffectStatementKind,
     };
 
     #[test]
@@ -144,5 +281,86 @@ class Effects extends Component {
             .nodes
             .iter()
             .any(|node| node.id == effect_id));
+    }
+
+    #[test]
+    fn lowers_ordered_effect_statements_and_expression_operands_without_resolution() {
+        let parsed = ezc_parser::parse_file(
+            "src/Effects.tsx",
+            include_str!("../../../fixtures/0052-effect-body-lowering/input/Effects.tsx"),
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let component = &asm.components[0];
+        let sync = component.id.effect("sync");
+        let body = asm.effect_body(&sync).expect("effect body");
+
+        assert_eq!(body.statements.len(), 3);
+        let assignment = asm
+            .effect_statement(&body.statements[0])
+            .expect("assignment");
+        let call = asm.effect_statement(&body.statements[1]).expect("call");
+        let completion = asm.effect_statement(&body.statements[2]).expect("return");
+        let EffectStatementKind::ExternalMemberAssignment { target, value } = &assignment.kind
+        else {
+            panic!("expected static member assignment");
+        };
+        assert!(matches!(
+            asm.expression(target).map(|node| &node.kind),
+            Some(ExpressionNodeKind::MemberAccess { property, .. }) if property == "title"
+        ));
+        assert!(matches!(
+            asm.expression(value).map(|node| &node.kind),
+            Some(ExpressionNodeKind::ThisMember { name }) if name == "title"
+        ));
+        let EffectStatementKind::CapabilityCall { callee, arguments } = &call.kind else {
+            panic!("expected capability call");
+        };
+        assert_eq!(arguments.len(), 2);
+        assert!(matches!(
+            asm.expression(callee).map(|node| &node.kind),
+            Some(ExpressionNodeKind::MemberAccess { property, .. }) if property == "track"
+        ));
+        assert!(matches!(
+            asm.expression(&arguments[1]).map(|node| &node.kind),
+            Some(ExpressionNodeKind::Arithmetic { .. })
+        ));
+        assert!(matches!(
+            completion.kind,
+            EffectStatementKind::EffectReturn { value: None }
+        ));
+        assert!(asm.references_from(&sync).is_empty());
+        assert!(asm
+            .semantic_types
+            .assignments
+            .keys()
+            .all(|id| id != target && id != value));
+
+        let invalid = asm
+            .effect_body(&component.id.effect("invalid"))
+            .expect("invalid body");
+        assert!(matches!(
+            asm.effect_statement(&invalid.statements[0])
+                .map(|statement| &statement.kind),
+            Some(EffectStatementKind::ExternalMemberAssignment { .. })
+        ));
+        assert!(matches!(
+            asm.effect_statement(&invalid.statements[1])
+                .map(|statement| &statement.kind),
+            Some(EffectStatementKind::CapabilityCall { .. })
+        ));
+        assert!(matches!(
+            asm.effect_statement(&invalid.statements[2])
+                .map(|statement| &statement.kind),
+            Some(EffectStatementKind::Unsupported(
+                UnsupportedEffectStatementKind::CleanupReturnCandidate
+            ))
+        ));
+        assert!(matches!(
+            asm.effect_statement(&invalid.statements[3])
+                .map(|statement| &statement.kind),
+            Some(EffectStatementKind::Unsupported(
+                UnsupportedEffectStatementKind::LocalDeclaration
+            ))
+        ));
     }
 }

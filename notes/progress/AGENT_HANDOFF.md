@@ -3,28 +3,29 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: F1 - canonical effect entities
-* Working tree: clean after the F1 commit
+* Latest completed slice: F2 - effect body lowering
+* Working tree: clean after the F2 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: F1 - canonical effect entities
-* Summary: Introduced first-class compiler-owned `Effect` entities for `@effect()` methods. Each has a stable effect ID, component ownership, authored method identity and provenance, client execution boundary, and fixed execution policy: after initial rendering and after a completed action batch.
-* Key files: crates/ezc_core/src/effect.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/component_graph.rs; crates/ezc_core/src/semantic_id.rs; crates/ezc_core/src/semantic_graph.rs; crates/ezc_cli/src/main.rs
-* New behavior: Effects participate in the existing ASM ownership/provenance navigation and generic semantic graph/CLI entity-kind projections. Their body, references, types, reactive graph relations, scheduler placement, IR, registry records, and runtime behavior are intentionally absent.
-* Fixtures added or changed: no fixture files; focused core tests cover collection and ASM integration.
+* Slice: F2 - effect body lowering
+* Summary: Lowered each `@effect()` body into one ordered `EffectBody` and stable effect-scoped statement records. Assignment targets/values, capability callees/arguments, and supported return values now reuse the canonical expression graph; unsupported syntax remains structured for later diagnostics.
+* Key files: crates/ezc_parser/src/model.rs; crates/ezc_parser/src/oxc_adapter.rs; crates/ezc_core/src/effect.rs; crates/ezc_core/src/expression_graph.rs; crates/ezc_core/src/component_graph.rs; crates/ezc_core/src/application_semantic_model.rs
+* New behavior: F2 retains static-member assignments, direct static calls, final bare returns, value-return candidates, and unsupported local/branch/loop/block/exception/compound forms in authored order with statement and operand provenance. No reference resolution, type assignments, reactive relations, scheduling, IR, runtime metadata, or execution is produced.
+* Fixtures added or changed: fixtures/0052-effect-body-lowering/input/Effects.tsx, with parser and core lowering coverage.
 
 Current in-progress slice
 
 * Slice: F2 - effect body lowering
-* Status: Paused awaiting the canonical supported effect-statement contract
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1
-* Remaining: F2 - effect body lowering, then F3 through F20. Do not begin F2 until the body contract below is decided.
+* Status: Complete
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F2
+* Remaining: F3 - effect reference resolution, then F4 through F20.
 
 Verification
 
 * cargo fmt --all --check: pass
+* cargo test -p ezc_parser: pass
 * cargo test -p ezc_core: pass
 * cargo clippy --workspace --all-targets -- -D warnings: pass
 
@@ -39,8 +40,12 @@ Architecture decisions made
 * Tradeoff: F1 does not yet determine whether a particular completed batch triggers an effect or execute it. F6--F9 will derive trigger and scheduler placement from canonical dependency products.
 
 * Decision needed before F2: define the canonical supported effect-statement vocabulary and how its expression operands enter the existing expression graph.
-* Reason: The roadmap requires imperative body lowering and says to reuse the expression graph where appropriate, but does not specify the stable forms for external member assignments (such as `document.title = this.title`), capability calls, returns/cleanup candidates, or unsupported statements. That choice directly shapes F3 reference resolution, F5 diagnostics, F10 IR, and capability metadata.
-* Tradeoff: F1 remains complete and committed, but F2 must not select a body AST or preserve unsupported syntax ad hoc. Await guidance on the supported F2 forms and whether assignment/call operands should receive canonical expression-graph nodes now.
+* Resolution: The supplied F2 contract defines a flat, ordered body vocabulary: static-member assignments, direct static calls, final bare returns, and structured unsupported forms. All statement operands use the existing expression graph; statement IDs remain distinct and scoped to their owning effect.
+* Tradeoff: F2 deliberately retains unresolved identifiers, `this` reads, member paths, cleanup-return candidates, and prohibited forms without classifying them. F3 owns references, F4/F5 own typing/validation, and F6 onward own reactive and runtime products.
+
+* Decision: Effect-body expression nodes use the effect ID as their existing expression-graph owner, while statements use a separate `effect/statement:<index>` identity domain.
+* Reason: Values retain one canonical expression topology, but statement ordering and side-effect operations need independently stable identities for later diagnostics and IR lowering.
+* Tradeoff: Effect statement records are compiler-owned body nodes rather than generic ASM semantic entities. F2 exposes them through the owning effect body only; F17 owns dedicated inspection output.
 
 * Decision: ASM validation resolves typed subjects through either canonical semantic entities or canonical expression-graph nodes, using the subject's authoritative provenance in either case.
 * Reason: Expression nodes are first-class compiler products with stable IDs and spans, but are intentionally not modeled as generic semantic entities. Validation must preserve that separation while accepting their canonical type assignments.

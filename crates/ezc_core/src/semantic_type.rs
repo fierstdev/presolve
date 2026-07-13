@@ -830,20 +830,14 @@ impl SemanticTypeModel {
         graph: &ExpressionGraph,
         components: &[ComponentNode],
     ) -> Self {
-        let computed_owners = components
+        let state_owners = components
             .iter()
-            .flat_map(|component| {
-                component
-                    .methods
-                    .iter()
-                    .filter(|method| method.is_computed())
-                    .map(|method| component.id.computed(&method.name))
-            })
+            .flat_map(|component| component.state_fields.iter().map(|field| field.id.clone()))
             .collect::<BTreeSet<_>>();
         let nodes = graph
             .nodes
             .values()
-            .filter(|node| !computed_owners.contains(&node.owner))
+            .filter(|node| state_owners.contains(&node.owner))
             .map(|node| node.id.clone())
             .collect::<Vec<_>>();
         for id in nodes {
@@ -1229,9 +1223,9 @@ fn expression_semantic_type(
     match &node.kind {
         ExpressionNodeKind::Literal(value) => state_initializer_value_type(value),
         ExpressionNodeKind::Boolean(value) => SemanticType::BooleanLiteral(*value),
-        ExpressionNodeKind::ThisMember { .. } | ExpressionNodeKind::MemberAccess { .. } => {
-            SemanticType::Unknown
-        }
+        ExpressionNodeKind::Identifier(_)
+        | ExpressionNodeKind::ThisMember { .. }
+        | ExpressionNodeKind::MemberAccess { .. } => SemanticType::Unknown,
         ExpressionNodeKind::Arithmetic {
             left,
             right,
@@ -1346,6 +1340,7 @@ fn infer_computed_expression_type(
     let semantic_type = match &node.kind {
         ExpressionNodeKind::Literal(value) => state_initializer_value_type(value),
         ExpressionNodeKind::Boolean(value) => SemanticType::BooleanLiteral(*value),
+        ExpressionNodeKind::Identifier(_) => SemanticType::Unknown,
         ExpressionNodeKind::ThisMember { name } => infer_computed_read_type(
             &node.owner,
             name,

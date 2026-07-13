@@ -62,16 +62,20 @@ pub use component_graph::{
     ArithmeticExpression, ArithmeticExpressionKind, ArithmeticOperator, ComparisonOperator,
     ComponentAction, ComponentDiagnostic, ComponentGraph, ComponentMethod, ComponentNode,
     ComputedExpression, ComputedExpressionKind, ConstantEvaluationError, ConstantExpression,
-    ConstantExpressionKind, DeclaredStateType, DeclaredStateTypeKind, LogicalOperator, MethodCall,
-    MethodLocalVariable, MethodParameter, RenderAttribute, RenderAttributeValue, RenderChild,
-    RenderEventHandler, RenderFragment, RenderList, RenderModel, SerializableValue, StateField,
-    StateOperation,
+    ConstantExpressionKind, DeclaredStateType, DeclaredStateTypeKind, EffectBodySyntax,
+    EffectExpression, EffectExpressionKind, EffectStatementSyntax, EffectStatementSyntaxKind,
+    LogicalOperator, MethodCall, MethodLocalVariable, MethodParameter, RenderAttribute,
+    RenderAttributeValue, RenderChild, RenderEventHandler, RenderFragment, RenderList, RenderModel,
+    SerializableValue, StateField, StateOperation, UnsupportedEffectStatementKind,
 };
 pub use computed_value::{
     collect_computed_values, ComputedCachePolicy, ComputedDiagnosticCode, ComputedPurity,
     ComputedPurityViolation, ComputedPurityViolationKind, ComputedValue,
 };
-pub use effect::{collect_effects, Effect, EffectExecutionPolicy};
+pub use effect::{
+    collect_effects, lower_effect_bodies, Effect, EffectBody, EffectExecutionPolicy,
+    EffectStatement, EffectStatementKind,
+};
 pub use explain::{explain_json, explain_text};
 pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 pub use html_codegen::generate_static_html;
@@ -1223,6 +1227,7 @@ class Counter extends Component {
                     return_type_annotation: None,
                     return_values: Vec::new(),
                     computed_expression: None,
+                    effect_body: None,
                     calls: Vec::new(),
                 }],
             }],

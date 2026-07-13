@@ -11,11 +11,12 @@ use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
 use ezc_parser::{
     ParsedArithmeticExpression, ParsedArithmeticExpressionKind, ParsedArithmeticOperator,
     ParsedClass, ParsedComparisonOperator, ParsedComputedExpression, ParsedComputedExpressionKind,
-    ParsedConstantExpression, ParsedConstantExpressionKind, ParsedEventHandler, ParsedFile,
-    ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional,
-    ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLogicalOperator, ParsedMethod,
-    ParsedMethodCall, ParsedSerializableValue, ParsedStateOperation, ParsedUnaryOperator,
-    SourceSpan,
+    ParsedConstantExpression, ParsedConstantExpressionKind, ParsedEffectBody,
+    ParsedEffectExpression, ParsedEffectExpressionKind, ParsedEffectStatementKind,
+    ParsedEventHandler, ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild,
+    ParsedJsxConditional, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLogicalOperator,
+    ParsedMethod, ParsedMethodCall, ParsedSerializableValue, ParsedStateOperation,
+    ParsedUnaryOperator, ParsedUnsupportedEffectStatementKind, SourceSpan,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -126,6 +127,89 @@ pub enum ComputedExpressionKind {
     },
     Unary {
         operand: Box<ComputedExpression>,
+        operator: UnaryOperator,
+    },
+}
+
+/// Ordered source syntax retained from one `@effect()` body before semantic resolution.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EffectBodySyntax {
+    pub statements: Vec<EffectStatementSyntax>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EffectStatementSyntax {
+    pub kind: EffectStatementSyntaxKind,
+    pub span: SourceSpan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EffectStatementSyntaxKind {
+    StaticMemberAssignment {
+        target: EffectExpression,
+        value: EffectExpression,
+    },
+    CapabilityCall {
+        callee: EffectExpression,
+        arguments: Vec<EffectExpression>,
+    },
+    EffectReturn {
+        value: Option<EffectExpression>,
+    },
+    Empty,
+    Unsupported(UnsupportedEffectStatementKind),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnsupportedEffectStatementKind {
+    LocalDeclaration,
+    Branch,
+    Loop,
+    NestedBlock,
+    ExceptionHandling,
+    AsyncOperation,
+    CompoundAssignment,
+    CleanupReturnCandidate,
+    UnsupportedExpression,
+}
+
+/// An expression operand retained from an effect statement before resolution.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EffectExpression {
+    pub kind: EffectExpressionKind,
+    pub span: SourceSpan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EffectExpressionKind {
+    Literal(SerializableValue),
+    Identifier(String),
+    ThisMember(String),
+    MemberAccess {
+        object: Box<EffectExpression>,
+        property: String,
+    },
+    Arithmetic {
+        left: Box<EffectExpression>,
+        right: Box<EffectExpression>,
+        operator: ArithmeticOperator,
+    },
+    Comparison {
+        left: Box<EffectExpression>,
+        right: Box<EffectExpression>,
+        operator: ComparisonOperator,
+    },
+    Logical {
+        left: Box<EffectExpression>,
+        right: Box<EffectExpression>,
+        operator: LogicalOperator,
+    },
+    NullishCoalescing {
+        left: Box<EffectExpression>,
+        right: Box<EffectExpression>,
+    },
+    Unary {
+        operand: Box<EffectExpression>,
         operator: UnaryOperator,
     },
 }
@@ -516,6 +600,7 @@ pub struct ComponentMethod {
     pub declared_return_type: Option<DeclaredStateType>,
     pub return_values: Vec<SerializableValue>,
     pub computed_expression: Option<ComputedExpression>,
+    pub effect_body: Option<EffectBodySyntax>,
     pub calls: Vec<MethodCall>,
 }
 
@@ -888,6 +973,7 @@ fn component_method_from_parsed(
             .map(serializable_value_from_parsed)
             .collect(),
         computed_expression,
+        effect_body: method.effect_body.as_ref().map(effect_body_from_parsed),
         calls: method.calls.iter().map(method_call_from_parsed).collect(),
     }
 }
@@ -1092,6 +1178,145 @@ fn computed_expression_from_parsed(expression: &ParsedComputedExpression) -> Com
     };
 
     ComputedExpression {
+        kind,
+        span: expression.span,
+    }
+}
+
+fn effect_body_from_parsed(body: &ParsedEffectBody) -> EffectBodySyntax {
+    EffectBodySyntax {
+        statements: body
+            .statements
+            .iter()
+            .map(|statement| EffectStatementSyntax {
+                kind: effect_statement_syntax_kind_from_parsed(&statement.kind),
+                span: statement.span,
+            })
+            .collect(),
+    }
+}
+
+fn effect_statement_syntax_kind_from_parsed(
+    kind: &ParsedEffectStatementKind,
+) -> EffectStatementSyntaxKind {
+    match kind {
+        ParsedEffectStatementKind::StaticMemberAssignment { target, value } => {
+            EffectStatementSyntaxKind::StaticMemberAssignment {
+                target: effect_expression_from_parsed(target),
+                value: effect_expression_from_parsed(value),
+            }
+        }
+        ParsedEffectStatementKind::CapabilityCall { callee, arguments } => {
+            EffectStatementSyntaxKind::CapabilityCall {
+                callee: effect_expression_from_parsed(callee),
+                arguments: arguments
+                    .iter()
+                    .map(effect_expression_from_parsed)
+                    .collect(),
+            }
+        }
+        ParsedEffectStatementKind::EffectReturn { value } => {
+            EffectStatementSyntaxKind::EffectReturn {
+                value: value.as_ref().map(effect_expression_from_parsed),
+            }
+        }
+        ParsedEffectStatementKind::Empty => EffectStatementSyntaxKind::Empty,
+        ParsedEffectStatementKind::Unsupported(kind) => EffectStatementSyntaxKind::Unsupported(
+            unsupported_effect_statement_kind_from_parsed(*kind),
+        ),
+    }
+}
+
+fn unsupported_effect_statement_kind_from_parsed(
+    kind: ParsedUnsupportedEffectStatementKind,
+) -> UnsupportedEffectStatementKind {
+    match kind {
+        ParsedUnsupportedEffectStatementKind::LocalDeclaration => {
+            UnsupportedEffectStatementKind::LocalDeclaration
+        }
+        ParsedUnsupportedEffectStatementKind::Branch => UnsupportedEffectStatementKind::Branch,
+        ParsedUnsupportedEffectStatementKind::Loop => UnsupportedEffectStatementKind::Loop,
+        ParsedUnsupportedEffectStatementKind::NestedBlock => {
+            UnsupportedEffectStatementKind::NestedBlock
+        }
+        ParsedUnsupportedEffectStatementKind::ExceptionHandling => {
+            UnsupportedEffectStatementKind::ExceptionHandling
+        }
+        ParsedUnsupportedEffectStatementKind::AsyncOperation => {
+            UnsupportedEffectStatementKind::AsyncOperation
+        }
+        ParsedUnsupportedEffectStatementKind::CompoundAssignment => {
+            UnsupportedEffectStatementKind::CompoundAssignment
+        }
+        ParsedUnsupportedEffectStatementKind::CleanupReturnCandidate => {
+            UnsupportedEffectStatementKind::CleanupReturnCandidate
+        }
+        ParsedUnsupportedEffectStatementKind::UnsupportedExpression => {
+            UnsupportedEffectStatementKind::UnsupportedExpression
+        }
+    }
+}
+
+fn effect_expression_from_parsed(expression: &ParsedEffectExpression) -> EffectExpression {
+    let kind = match &expression.kind {
+        ParsedEffectExpressionKind::Literal(value) => {
+            EffectExpressionKind::Literal(serializable_value_from_parsed(value))
+        }
+        ParsedEffectExpressionKind::Identifier(name) => {
+            EffectExpressionKind::Identifier(name.clone())
+        }
+        ParsedEffectExpressionKind::ThisMember(name) => {
+            EffectExpressionKind::ThisMember(name.clone())
+        }
+        ParsedEffectExpressionKind::MemberAccess { object, property } => {
+            EffectExpressionKind::MemberAccess {
+                object: Box::new(effect_expression_from_parsed(object)),
+                property: property.clone(),
+            }
+        }
+        ParsedEffectExpressionKind::Arithmetic {
+            left,
+            right,
+            operator,
+        } => EffectExpressionKind::Arithmetic {
+            left: Box::new(effect_expression_from_parsed(left)),
+            right: Box::new(effect_expression_from_parsed(right)),
+            operator: arithmetic_operator_from_parsed(*operator),
+        },
+        ParsedEffectExpressionKind::Comparison {
+            left,
+            right,
+            operator,
+        } => EffectExpressionKind::Comparison {
+            left: Box::new(effect_expression_from_parsed(left)),
+            right: Box::new(effect_expression_from_parsed(right)),
+            operator: comparison_operator_from_parsed(*operator),
+        },
+        ParsedEffectExpressionKind::Logical {
+            left,
+            right,
+            operator,
+        } => EffectExpressionKind::Logical {
+            left: Box::new(effect_expression_from_parsed(left)),
+            right: Box::new(effect_expression_from_parsed(right)),
+            operator: logical_operator_from_parsed(*operator),
+        },
+        ParsedEffectExpressionKind::NullishCoalescing { left, right } => {
+            EffectExpressionKind::NullishCoalescing {
+                left: Box::new(effect_expression_from_parsed(left)),
+                right: Box::new(effect_expression_from_parsed(right)),
+            }
+        }
+        ParsedEffectExpressionKind::Unary { operand, operator } => EffectExpressionKind::Unary {
+            operand: Box::new(effect_expression_from_parsed(operand)),
+            operator: match operator {
+                ParsedUnaryOperator::Not => UnaryOperator::Not,
+                ParsedUnaryOperator::Plus => UnaryOperator::Plus,
+                ParsedUnaryOperator::Minus => UnaryOperator::Minus,
+            },
+        },
+    };
+    EffectExpression {
         kind,
         span: expression.span,
     }
