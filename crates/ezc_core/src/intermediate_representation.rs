@@ -5,9 +5,11 @@ use crate::component_graph::{
     ArithmeticOperator, ComparisonOperator, LogicalOperator, UnaryOperator,
 };
 use crate::{
-    ApplicationSemanticModel, ComponentNode, ComputedPurity, ComputedValue, Effect,
+    ApplicationSemanticModel, CapabilityOperationId, CapabilityOperationKind, ComponentNode,
+    ComputedPurity, ComputedValue, Effect, EffectCompatibility, EffectStatementKind,
     EffectValidation, ExpressionNode, ExpressionNodeKind, SemanticId, SemanticReference,
     SemanticReferenceKind, SemanticType, SerializableValue, SourceProvenance,
+    EFFECT_CAPABILITY_REGISTRY,
 };
 
 /// Compiler-owned intermediate representation, independent of backend output.
@@ -26,6 +28,7 @@ pub struct IrModule {
     pub template_entrypoints: Vec<IrTemplateEntrypoint>,
     pub functions: Vec<IrFunction>,
     pub computed_evaluations: Vec<IrComputedEvaluation>,
+    pub effect_executions: Vec<IrEffectExecution>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,6 +45,35 @@ pub struct IrComputedEvaluation {
     pub function: SemanticId,
     pub result: IrValueId,
     pub provenance: SourceProvenance,
+}
+
+/// Compiler-owned executable record for one schedulable effect entity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrEffectExecution {
+    pub effect: SemanticId,
+    pub function: SemanticId,
+    pub entry_block: IrBlockId,
+    pub completion: IrEffectCompletion,
+    pub capability_operations: Vec<CapabilityOperationId>,
+    pub provenance: SourceProvenance,
+}
+
+/// F10 effects complete normally and produce no semantic result value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IrEffectCompletion {
+    Normal,
+}
+
+impl IntermediateRepresentation {
+    /// Resolves the canonical F10 function identity for one lowered effect.
+    #[must_use]
+    pub fn effect_ir_function(&self, effect: &SemanticId) -> Option<&SemanticId> {
+        self.modules
+            .iter()
+            .flat_map(|module| &module.effect_executions)
+            .find(|execution| execution.effect == *effect)
+            .map(|execution| &execution.function)
+    }
 }
 
 /// A stable compiler-owned DOM node identity within a template entrypoint.
@@ -712,6 +744,7 @@ pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateR
                 template_entrypoints: Vec::new(),
                 functions: Vec::new(),
                 computed_evaluations: Vec::new(),
+                effect_executions: Vec::new(),
             });
         lower_component_to_ir(model, component, module);
     }
@@ -720,6 +753,7 @@ pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateR
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn lower_component_to_ir(
     model: &ApplicationSemanticModel,
     component: &ComponentNode,
@@ -819,6 +853,23 @@ fn lower_component_to_ir(
             module.computed_evaluations.push(evaluation);
         }
     }
+    let executable_computed = module
+        .computed_evaluations
+        .iter()
+        .map(|evaluation| evaluation.computed.clone())
+        .collect::<BTreeSet<_>>();
+    for effect in model.effects.values().filter(|effect| {
+        effect.owner.entity_id() == Some(&component.id)
+            && effect.validation == EffectValidation::Valid
+            && effect_is_scheduled(model, &effect.id)
+    }) {
+        if let Some((function, execution)) =
+            lower_effect_execution(model, component, effect, &executable_computed)
+        {
+            module.functions.push(function);
+            module.effect_executions.push(execution);
+        }
+    }
 }
 
 fn lower_computed_evaluation(
@@ -828,13 +879,15 @@ fn lower_computed_evaluation(
 ) -> Option<(IrFunction, IrComputedEvaluation)> {
     let root = model.expression_graph.root_for(&computed.id)?.clone();
     let entry_block = IrBlockId::entry_for(&computed.id);
-    let mut lowering = ComputedIrLowering {
+    let mut lowering = ExpressionIrLowering {
         model,
         component,
-        computed,
+        function: &computed.id,
+        reference_owner: &computed.id,
         entry_block: entry_block.clone(),
         instructions: Vec::new(),
         values: BTreeMap::new(),
+        executable_computed: None,
     };
     let result = lowering.lower_node(&root)?;
     let function = IrFunction {
@@ -860,16 +913,126 @@ fn lower_computed_evaluation(
     Some((function, evaluation))
 }
 
-struct ComputedIrLowering<'a> {
+fn lower_effect_execution(
+    model: &ApplicationSemanticModel,
+    component: &ComponentNode,
+    effect: &Effect,
+    executable_computed: &BTreeSet<SemanticId>,
+) -> Option<(IrFunction, IrEffectExecution)> {
+    let body = model.effect_body(&effect.id)?;
+    let entry_block = IrBlockId::entry_for(&effect.id);
+    let mut lowering = ExpressionIrLowering {
+        model,
+        component,
+        function: &effect.id,
+        reference_owner: &effect.id,
+        entry_block: entry_block.clone(),
+        instructions: Vec::new(),
+        values: BTreeMap::new(),
+        executable_computed: Some(executable_computed),
+    };
+    let mut capability_operations = Vec::new();
+    for statement_id in &body.statements {
+        let statement = model.effect_statement(statement_id)?;
+        let record = model.effect_statement_type(statement_id)?;
+        match &statement.kind {
+            EffectStatementKind::ExternalMemberAssignment { value, .. } => {
+                let operation =
+                    effect_capability_operation(record, CapabilityOperationKind::MemberAssignment)?;
+                let value = lowering.lower_node(value)?;
+                lowering.emit_effect(
+                    statement,
+                    IrInstructionKind::CapabilityAssign {
+                        operation: operation.id,
+                        value,
+                    },
+                );
+                capability_operations.push(operation.id);
+            }
+            EffectStatementKind::CapabilityCall { arguments, .. } => {
+                let operation =
+                    effect_capability_operation(record, CapabilityOperationKind::MethodCall)?;
+                let arguments = arguments
+                    .iter()
+                    .map(|argument| lowering.lower_node(argument))
+                    .collect::<Option<Vec<_>>>()?;
+                lowering.emit_effect(
+                    statement,
+                    IrInstructionKind::CapabilityCall {
+                        operation: operation.id,
+                        arguments,
+                    },
+                );
+                capability_operations.push(operation.id);
+            }
+            EffectStatementKind::EffectReturn { value: None } | EffectStatementKind::Empty => {}
+            EffectStatementKind::EffectReturn { value: Some(_) }
+            | EffectStatementKind::Unsupported(_) => return None,
+        }
+    }
+    let function = IrFunction {
+        id: effect.id.clone(),
+        name: effect.name.clone(),
+        provenance: effect.provenance.clone(),
+        entry_block: entry_block.clone(),
+        blocks: vec![IrBlock {
+            id: entry_block.clone(),
+            provenance: effect.provenance.clone(),
+            instructions: lowering.instructions,
+        }],
+        branch_edges: Vec::new(),
+        values: lowering.values,
+        loops: Vec::new(),
+    };
+    Some((
+        function,
+        IrEffectExecution {
+            effect: effect.id.clone(),
+            function: effect.id.clone(),
+            entry_block,
+            completion: IrEffectCompletion::Normal,
+            capability_operations,
+            provenance: effect.provenance.clone(),
+        },
+    ))
+}
+
+fn effect_is_scheduled(model: &ApplicationSemanticModel, effect: &SemanticId) -> bool {
+    model
+        .effect_execution_plan
+        .initial
+        .effect_batches
+        .iter()
+        .chain(
+            model
+                .effect_execution_plan
+                .actions
+                .iter()
+                .flat_map(|action| action.effect_batches.iter()),
+        )
+        .any(|batch| batch.effects.contains(effect))
+}
+
+fn effect_capability_operation(
+    record: &crate::EffectStatementTypeRecord,
+    kind: CapabilityOperationKind,
+) -> Option<&'static crate::CapabilityOperation> {
+    let operation = EFFECT_CAPABILITY_REGISTRY.operation(record.capability_operation?)?;
+    (operation.kind == kind).then_some(operation)
+}
+
+struct ExpressionIrLowering<'a> {
     model: &'a ApplicationSemanticModel,
     component: &'a ComponentNode,
-    computed: &'a ComputedValue,
+    function: &'a SemanticId,
+    reference_owner: &'a SemanticId,
     entry_block: IrBlockId,
     instructions: Vec<IrInstruction>,
     values: BTreeMap<IrValueId, IrValue>,
+    executable_computed: Option<&'a BTreeSet<SemanticId>>,
 }
 
-impl ComputedIrLowering<'_> {
+impl ExpressionIrLowering<'_> {
     fn lower_node(&mut self, id: &SemanticId) -> Option<IrValueId> {
         let node = self.model.expression_graph.node(id)?.clone();
         let kind = match node.kind.clone() {
@@ -940,10 +1103,9 @@ impl ComputedIrLowering<'_> {
                     .get(&self.component.id.computed(name))
                     .map(|computed| computed.id.clone())
             })?;
-        self.model
-            .references
-            .iter()
-            .find(|reference| reference.source == self.computed.id && reference.target == target)?;
+        self.model.references.iter().find(|reference| {
+            reference.source == *self.reference_owner && reference.target == target
+        })?;
         if self
             .component
             .state_fields
@@ -954,12 +1116,18 @@ impl ComputedIrLowering<'_> {
                 storage: IrStorageId::for_semantic_origin(&target),
             })
         } else {
+            if self
+                .executable_computed
+                .is_some_and(|computed| !computed.contains(&target))
+            {
+                return None;
+            }
             Some(IrInstructionKind::LoadComputed { computed: target })
         }
     }
 
     fn emit(&mut self, node: ExpressionNode, kind: IrInstructionKind) -> IrValueId {
-        let value = IrValueId::for_function(&self.computed.id, self.values.len());
+        let value = IrValueId::for_function(self.function, self.values.len());
         let instruction = IrInstructionId::for_block(&self.entry_block, self.instructions.len());
         self.values.insert(
             value.clone(),
@@ -983,6 +1151,17 @@ impl ComputedIrLowering<'_> {
             kind,
         });
         value
+    }
+
+    fn emit_effect(&mut self, statement: &crate::EffectStatement, kind: IrInstructionKind) {
+        let instruction = IrInstructionId::for_block(&self.entry_block, self.instructions.len());
+        self.instructions.push(IrInstruction {
+            id: instruction,
+            provenance: statement.provenance.clone(),
+            result: None,
+            semantic_origin: Some(statement.id.clone()),
+            kind,
+        });
     }
 }
 
@@ -1596,8 +1775,8 @@ pub fn analyze_liveness(function: &IrFunction) -> IrLivenessAnalysis {
         for instruction in &block.instructions {
             for operand in instruction_operands(&instruction.kind) {
                 if let IrOperand::Value(value) = operand {
-                    if !definitions.contains(value) {
-                        uses.insert(value.clone());
+                    if !definitions.contains(&value) {
+                        uses.insert(value);
                     }
                 }
             }
@@ -1659,13 +1838,13 @@ pub fn analyze_use_definitions(function: &IrFunction) -> Vec<IrUseDefinition> {
                 };
                 let Some(definition) = function
                     .values
-                    .get(value)
+                    .get(&value)
                     .map(|value| value.definition.clone())
                 else {
                     continue;
                 };
                 relations.push(IrUseDefinition {
-                    value: value.clone(),
+                    value,
                     instruction: instruction.id.clone(),
                     operand_index,
                     definition,
@@ -1697,7 +1876,7 @@ pub fn analyze_definition_uses(function: &IrFunction) -> IrDefinitionUseAnalysis
                 .enumerate()
             {
                 if let IrOperand::Value(value) = operand {
-                    uses.entry(value.clone()).or_default().push(IrUse {
+                    uses.entry(value).or_default().push(IrUse {
                         instruction: instruction.id.clone(),
                         operand_index,
                     });
@@ -1730,6 +1909,7 @@ pub fn validate_intermediate_representation(
         .collect::<BTreeSet<_>>();
     let mut diagnostics = Vec::new();
     let mut instruction_ids = BTreeSet::new();
+    let mut effect_ids = BTreeSet::new();
 
     for module in &representation.modules {
         for instruction in &module.storage_initializers {
@@ -1753,6 +1933,146 @@ pub fn validate_intermediate_representation(
             );
         }
         validate_computed_evaluations(module, &mut diagnostics);
+        validate_effect_executions(module, &mut effect_ids, &mut diagnostics);
+    }
+    diagnostics
+}
+
+/// Validates F10 effect-IR records against the canonical ASM products without
+/// re-running capability matching or semantic validation.
+#[allow(clippy::too_many_lines)]
+#[must_use]
+pub fn validate_effect_ir(
+    model: &ApplicationSemanticModel,
+    representation: &IntermediateRepresentation,
+) -> Vec<IrValidationDiagnostic> {
+    let mut diagnostics = validate_intermediate_representation(representation);
+    let lowered = representation
+        .modules
+        .iter()
+        .flat_map(|module| &module.effect_executions)
+        .map(|execution| execution.effect.clone())
+        .collect::<BTreeSet<_>>();
+    for execution in representation.modules.iter().flat_map(|module| {
+        module
+            .effect_executions
+            .iter()
+            .map(move |execution| (module, execution))
+    }) {
+        let (module, execution) = execution;
+        let Some(effect) = model.effects.get(&execution.effect) else {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1020",
+                message: format!(
+                    "effect execution references missing effect {}",
+                    execution.effect
+                ),
+            });
+            continue;
+        };
+        if effect.validation != EffectValidation::Valid || !effect_is_scheduled(model, &effect.id) {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1021",
+                message: format!(
+                    "effect execution {} is invalid or F9-unplanned",
+                    execution.effect
+                ),
+            });
+        }
+        let Some(body) = model.effect_body(&effect.id) else {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1022",
+                message: format!(
+                    "effect execution {} has no canonical body",
+                    execution.effect
+                ),
+            });
+            continue;
+        };
+        let Some(function) = module
+            .functions
+            .iter()
+            .find(|function| function.id == execution.function)
+        else {
+            continue;
+        };
+        let statement_positions = body
+            .statements
+            .iter()
+            .enumerate()
+            .map(|(index, statement)| (statement, index))
+            .collect::<BTreeMap<_, _>>();
+        let mut previous_statement = None;
+        for instruction in function.blocks.iter().flat_map(|block| &block.instructions) {
+            let (operation, expected_kind) = match &instruction.kind {
+                IrInstructionKind::CapabilityCall { operation, .. } => {
+                    (*operation, CapabilityOperationKind::MethodCall)
+                }
+                IrInstructionKind::CapabilityAssign { operation, .. } => {
+                    (*operation, CapabilityOperationKind::MemberAssignment)
+                }
+                _ => continue,
+            };
+            let Some(statement) = instruction.semantic_origin.as_ref() else {
+                diagnostics.push(IrValidationDiagnostic {
+                    code: "EZIR1023",
+                    message: format!(
+                        "capability instruction {} lacks an effect statement origin",
+                        instruction.id
+                    ),
+                });
+                continue;
+            };
+            let Some(record) = model.effect_statement_type(statement) else {
+                diagnostics.push(IrValidationDiagnostic {
+                    code: "EZIR1024",
+                    message: format!(
+                        "capability instruction {} has unknown statement {statement}",
+                        instruction.id
+                    ),
+                });
+                continue;
+            };
+            let registry_operation = EFFECT_CAPABILITY_REGISTRY.operation(operation);
+            if record.capability_operation != Some(operation)
+                || registry_operation.is_none_or(|candidate| candidate.kind != expected_kind)
+                || record.signature_compatibility != EffectCompatibility::Compatible
+                || record.boundary_compatibility != EffectCompatibility::Compatible
+                || record.serialization_compatibility != EffectCompatibility::Compatible
+                || instruction.result.is_some()
+                || instruction.provenance != record.provenance
+            {
+                diagnostics.push(IrValidationDiagnostic {
+                    code: "EZIR1025",
+                    message: format!(
+                        "capability instruction {} conflicts with canonical F4 facts",
+                        instruction.id
+                    ),
+                });
+            }
+            let position = statement_positions.get(statement).copied();
+            if position.is_none() || previous_statement.is_some_and(|prior| position <= Some(prior))
+            {
+                diagnostics.push(IrValidationDiagnostic {
+                    code: "EZIR1026",
+                    message: format!(
+                        "effect instruction {} does not preserve statement order",
+                        instruction.id
+                    ),
+                });
+            }
+            previous_statement = position;
+        }
+    }
+    for effect in model.effects.values() {
+        if (effect.validation != EffectValidation::Valid || !effect_is_scheduled(model, &effect.id))
+            && lowered.contains(&effect.id)
+        {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1027",
+                message: format!("invalid or unplanned effect {} has IR", effect.id),
+            });
+        }
     }
     diagnostics
 }
@@ -1876,6 +2196,67 @@ fn validate_computed_evaluations(module: &IrModule, diagnostics: &mut Vec<IrVali
     }
 }
 
+fn validate_effect_executions(
+    module: &IrModule,
+    effect_ids: &mut BTreeSet<SemanticId>,
+    diagnostics: &mut Vec<IrValidationDiagnostic>,
+) {
+    for execution in &module.effect_executions {
+        if !effect_ids.insert(execution.effect.clone()) || execution.effect != execution.function {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1013",
+                message: format!(
+                    "effect execution {} has a non-unique function identity",
+                    execution.effect
+                ),
+            });
+            continue;
+        }
+        let Some(function) = module
+            .functions
+            .iter()
+            .find(|function| function.id == execution.function)
+        else {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1014",
+                message: format!(
+                    "effect execution {} references a missing function",
+                    execution.effect
+                ),
+            });
+            continue;
+        };
+        if function.entry_block != execution.entry_block {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1015",
+                message: format!(
+                    "effect execution {} has an inconsistent entry block",
+                    execution.effect
+                ),
+            });
+        }
+        let operations = function
+            .blocks
+            .iter()
+            .flat_map(|block| &block.instructions)
+            .filter_map(|instruction| match instruction.kind {
+                IrInstructionKind::CapabilityCall { operation, .. }
+                | IrInstructionKind::CapabilityAssign { operation, .. } => Some(operation),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        if operations != execution.capability_operations {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1016",
+                message: format!(
+                    "effect execution {} has inconsistent capability operations",
+                    execution.effect
+                ),
+            });
+        }
+    }
+}
+
 fn validate_instruction(
     instruction: &IrInstruction,
     function: Option<&IrFunction>,
@@ -1906,7 +2287,7 @@ fn validate_instruction(
     }
     for operand in instruction_operands(&instruction.kind) {
         if let IrOperand::Value(value) = operand {
-            if function.is_none_or(|function| !function.values.contains_key(value)) {
+            if function.is_none_or(|function| !function.values.contains_key(&value)) {
                 diagnostics.push(IrValidationDiagnostic {
                     code: "EZIR1007",
                     message: format!(
@@ -1939,6 +2320,19 @@ fn validate_instruction(
             });
         }
     }
+    if let IrInstructionKind::CapabilityCall { operation, .. }
+    | IrInstructionKind::CapabilityAssign { operation, .. } = &instruction.kind
+    {
+        if EFFECT_CAPABILITY_REGISTRY.operation(*operation).is_none() {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1017",
+                message: format!(
+                    "instruction {} references unknown capability operation {}",
+                    instruction.id, operation.0
+                ),
+            });
+        }
+    }
     if let Some(result) = &instruction.result {
         if !function_instruction_ids.contains(&instruction.id) {
             diagnostics.push(IrValidationDiagnostic {
@@ -1952,13 +2346,17 @@ fn validate_instruction(
     }
 }
 
-fn instruction_operands(kind: &IrInstructionKind) -> Vec<&IrOperand> {
+fn instruction_operands(kind: &IrInstructionKind) -> Vec<IrOperand> {
     match kind {
         IrInstructionKind::StoreStorage { value, .. }
         | IrInstructionKind::Unary { operand: value, .. }
         | IrInstructionKind::Copy { source: value }
-        | IrInstructionKind::GetMember { object: value, .. } => vec![value],
-        IrInstructionKind::Binary { left, right, .. } => vec![left, right],
+        | IrInstructionKind::GetMember { object: value, .. } => vec![value.clone()],
+        IrInstructionKind::Binary { left, right, .. } => vec![left.clone(), right.clone()],
+        IrInstructionKind::CapabilityCall { arguments, .. } => {
+            arguments.iter().cloned().map(IrOperand::Value).collect()
+        }
+        IrInstructionKind::CapabilityAssign { value, .. } => vec![IrOperand::Value(value.clone())],
         IrInstructionKind::Nop
         | IrInstructionKind::Constant { .. }
         | IrInstructionKind::InitializeStorage { .. }
@@ -1977,6 +2375,8 @@ fn instruction_storages(kind: &IrInstructionKind) -> Vec<&IrStorageId> {
         | IrInstructionKind::Copy { .. }
         | IrInstructionKind::LoadComputed { .. }
         | IrInstructionKind::GetMember { .. }
+        | IrInstructionKind::CapabilityCall { .. }
+        | IrInstructionKind::CapabilityAssign { .. }
         | IrInstructionKind::Binary { .. }
         | IrInstructionKind::Unary { .. } => Vec::new(),
     }
@@ -2252,6 +2652,16 @@ pub enum IrInstructionKind {
         storage: IrStorageId,
         value: IrOperand,
     },
+    /// One compiler-recognized, observable void capability invocation.
+    CapabilityCall {
+        operation: CapabilityOperationId,
+        arguments: Vec<IrValueId>,
+    },
+    /// One compiler-recognized, observable void capability-member assignment.
+    CapabilityAssign {
+        operation: CapabilityOperationId,
+        value: IrValueId,
+    },
     Binary {
         operation: IrBinaryOperation,
         left: IrOperand,
@@ -2261,6 +2671,18 @@ pub enum IrInstructionKind {
         operation: IrUnaryOperation,
         operand: IrOperand,
     },
+}
+
+impl IrInstructionKind {
+    /// Whether this instruction is an observable operation that optimization
+    /// passes must preserve and keep ordered.
+    #[must_use]
+    pub const fn is_observable_side_effect(&self) -> bool {
+        matches!(
+            self,
+            Self::CapabilityCall { .. } | Self::CapabilityAssign { .. }
+        )
+    }
 }
 
 /// Immutable copy-propagation pass for canonical IR operands.
@@ -2530,12 +2952,12 @@ pub enum IrUnaryOperation {
 mod tests {
     use super::{
         compute_dominators, compute_post_dominators, lower_components_to_ir, optimize_computed_ir,
-        validate_intermediate_representation, IntermediateRepresentation, IrBinaryOperation,
-        IrBlock, IrBlockId, IrBranchArm, IrBranchEdge, IrConstant, IrFunction, IrInstruction,
-        IrInstructionId, IrInstructionKind, IrLoop, IrLoopId, IrModule, IrOperand, IrStorageId,
-        IrUnaryOperation, IrValue, IrValueDefinition, IrValueId,
+        validate_effect_ir, validate_intermediate_representation, IntermediateRepresentation,
+        IrBinaryOperation, IrBlock, IrBlockId, IrBranchArm, IrBranchEdge, IrConstant, IrFunction,
+        IrInstruction, IrInstructionId, IrInstructionKind, IrLoop, IrLoopId, IrModule, IrOperand,
+        IrStorageId, IrUnaryOperation, IrValue, IrValueDefinition, IrValueId,
     };
-    use crate::{SemanticId, SemanticType, SourceProvenance};
+    use crate::{CapabilityOperationId, SemanticId, SemanticType, SourceProvenance};
     use std::collections::BTreeMap;
 
     #[test]
@@ -2588,6 +3010,7 @@ mod tests {
                 template_entrypoints: Vec::new(),
                 functions: vec![function],
                 computed_evaluations: Vec::new(),
+                effect_executions: Vec::new(),
             }],
         };
 
@@ -3168,6 +3591,143 @@ class ComputedIr extends Component {
                 .is_some_and(|function| function.values.contains_key(&evaluation.result))
         }));
         assert!(validate_intermediate_representation(&ir).is_empty());
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn lowers_one_effect_function_with_generic_capability_instructions() {
+        let parsed = ezc_parser::parse_file(
+            "src/EffectIr.tsx",
+            r#"
+@component("x-effect-ir")
+class EffectIr extends Component {
+  title = state("EdgeZero");
+  theme = state("light");
+  count = state(1);
+
+  @computed()
+  get total() { return this.count * 2; }
+
+  @action()
+  refreshTitle() { this.title = "Refreshed"; }
+
+  @action()
+  refreshTheme() { this.theme = "dark"; }
+
+  @effect()
+  syncAndReport() {
+    document.title = this.title;
+    console.log("total", this.total);
+    localStorage.setItem("theme", this.theme);
+  }
+
+  @effect()
+  logReady() { console.log("ready"); }
+
+  @effect()
+  invalidMutation() { this.title = "invalid"; }
+
+  render() { return <p />; }
+}
+"#,
+        );
+        let model = crate::build_application_semantic_model(&parsed);
+        let component = &model.components[0];
+        let sync = component.id.effect("syncAndReport");
+        let ready = component.id.effect("logReady");
+        let invalid = component.id.effect("invalidMutation");
+        let ir = lower_components_to_ir(&model);
+        let module = &ir.modules[0];
+        let execution = module
+            .effect_executions
+            .iter()
+            .find(|execution| execution.effect == sync)
+            .expect("sync effect execution");
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.id == sync)
+            .expect("sync effect function");
+
+        assert_eq!(module.effect_executions.len(), 2);
+        assert_eq!(execution.function, sync);
+        assert_ne!(execution.function, component.id.method("syncAndReport"));
+        assert_eq!(
+            execution.capability_operations,
+            vec![
+                CapabilityOperationId("builtin.browser.document.title.assign"),
+                CapabilityOperationId("builtin.browser.console.log"),
+                CapabilityOperationId("builtin.browser.local_storage.set_item"),
+            ]
+        );
+        let capability_instructions = function.blocks[0]
+            .instructions
+            .iter()
+            .filter(|instruction| {
+                matches!(
+                    instruction.kind,
+                    IrInstructionKind::CapabilityCall { .. }
+                        | IrInstructionKind::CapabilityAssign { .. }
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(capability_instructions.len(), 3);
+        assert!(matches!(
+            capability_instructions[0].kind,
+            IrInstructionKind::CapabilityAssign { ref operation, .. }
+                if operation == &CapabilityOperationId("builtin.browser.document.title.assign")
+        ));
+        assert!(matches!(
+            capability_instructions[1].kind,
+            IrInstructionKind::CapabilityCall { ref operation, ref arguments }
+                if operation == &CapabilityOperationId("builtin.browser.console.log")
+                    && arguments.len() == 2
+        ));
+        assert!(matches!(
+            capability_instructions[2].kind,
+            IrInstructionKind::CapabilityCall { ref operation, ref arguments }
+                if operation == &CapabilityOperationId("builtin.browser.local_storage.set_item")
+                    && arguments.len() == 2
+        ));
+        assert!(capability_instructions
+            .iter()
+            .all(|instruction| instruction.result.is_none()
+                && instruction.kind.is_observable_side_effect()));
+        assert!(function.blocks[0].instructions.iter().any(|instruction| {
+            matches!(
+                instruction.kind,
+                IrInstructionKind::LoadStorage { ref storage }
+                    if storage == &IrStorageId::for_semantic_origin(&component.id.state_field("title"))
+            )
+        }));
+        assert!(function.blocks[0].instructions.iter().any(|instruction| {
+            matches!(
+                instruction.kind,
+                IrInstructionKind::LoadComputed { ref computed }
+                    if computed == &component.id.computed("total")
+            )
+        }));
+        let ready_function = module
+            .functions
+            .iter()
+            .find(|function| function.id == ready)
+            .expect("dependency-free effect function");
+        assert!(ready_function.blocks[0]
+            .instructions
+            .iter()
+            .all(|instruction| {
+                !matches!(
+                    instruction.kind,
+                    IrInstructionKind::LoadStorage { .. } | IrInstructionKind::LoadComputed { .. }
+                )
+            }));
+        assert!(!module
+            .effect_executions
+            .iter()
+            .any(|execution| execution.effect == invalid));
+        assert_eq!(ir.effect_ir_function(&sync), Some(&sync));
+        assert!(validate_intermediate_representation(&ir).is_empty());
+        assert!(validate_effect_ir(&model, &ir).is_empty());
     }
 
     #[test]

@@ -276,6 +276,15 @@ impl EffectCapabilityRegistry {
         DEFINITIONS
     }
 
+    /// Resolves one already-classified canonical operation identity.
+    #[must_use]
+    pub fn operation(self, id: CapabilityOperationId) -> Option<&'static CapabilityOperation> {
+        self.definitions()
+            .iter()
+            .flat_map(|definition| definition.operations)
+            .find(|operation| operation.id == id)
+    }
+
     #[must_use]
     pub fn operation_at(
         self,

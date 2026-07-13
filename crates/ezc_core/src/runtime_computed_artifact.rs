@@ -395,7 +395,9 @@ fn runtime_instruction(
         IrInstructionKind::Nop
         | IrInstructionKind::Copy { .. }
         | IrInstructionKind::InitializeStorage { .. }
-        | IrInstructionKind::StoreStorage { .. } => None,
+        | IrInstructionKind::StoreStorage { .. }
+        | IrInstructionKind::CapabilityCall { .. }
+        | IrInstructionKind::CapabilityAssign { .. } => None,
     }
 }
 

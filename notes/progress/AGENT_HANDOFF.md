@@ -3,29 +3,29 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: F9 - effect scheduler integration
-* Working tree: clean after the F9 commit
+* Latest completed slice: F10 - canonical effect IR lowering
+* Working tree: clean after the F10 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: F9 - effect scheduler integration
-* Summary: Valid F8-eligible effects now receive immutable initial and action-batch execution plans that retain only their minimal required computed prerequisites, reference filtered E9 batches, and place effects in terminal Phase-D-scheduler batches.
-* Key files: crates/ezc_core/src/effect.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_core/src/lib.rs
-* New behavior: Initial plans place every schedulable valid effect after `AfterInitialRender`; action plans reevaluate only required computed values invalidated by the batch. Unavailable prerequisites make the affected effect explicitly unplanned. Direct-state and dependency-free effects remain schedulable, and unrelated computed work is absent from the effect subset.
-* Fixtures added or changed: Core coverage proves shared/transitive prerequisite selection, filtered E9 batches, action invalidation intersection, terminal effect batching, dependency-free effects, and unavailable prerequisite records. No runtime fixture is needed because F9 adds no execution behavior.
+* Slice: F10 - canonical effect IR lowering
+* Summary: F5-valid, F9-schedulable effects now lower to one canonical IR function keyed by the effect semantic ID, with a matching `IrEffectExecution` record and explicitly observable generic capability instructions.
+* Key files: crates/ezc_core/src/intermediate_representation.rs; crates/ezc_core/src/effect_capability.rs; crates/ezc_core/src/runtime_computed_artifact.rs; crates/ezc_core/src/lib.rs
+* New behavior: Effects reuse the shared expression-to-IR lowering path for state/computed reads and operands. F4 operation IDs drive `CapabilityCall` and `CapabilityAssign`; operation ordering and statement provenance are retained, capability instructions have no result, and F10 validation joins canonical IR to F4/F5/F9 facts without rematching source paths.
+* Fixtures added or changed: Core coverage proves document assignment, console and storage calls, state/computed loads, dependency-free effects, effect-function identity, shared action-plan reuse, effectful instruction metadata/order, and invalid-effect exclusion. No runtime fixture is needed because F10 adds no execution behavior.
 
 Current in-progress slice
 
-* Slice: F10 - effect IR lowering
-* Status: Paused awaiting canonical effect-IR contract
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F9
-* Remaining: F10 through F20. Do not begin effect IR lowering until the canonical instruction and artifact contract below is resolved.
+* Slice: F11 - effect IR optimization
+* Status: Ready after F10 commit
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F10
+* Remaining: F11 through F20. F11 must use the existing immutable optimization pipeline while preserving observable F10 capability operations and statement order.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core --lib: pass (159 tests)
+* cargo test -p ezc_core --lib: pass (160 tests)
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 
 Architecture decisions made
@@ -74,9 +74,9 @@ Architecture decisions made
 * Reason: F8 remains the sole eligibility authority and E9 remains the sole computed-ordering authority. F9 filters existing E9 batches, records their source batch indexes, and invokes the Phase D scheduler only for terminal effect batches, so unrelated computed work is neither removed from the global plan nor duplicated for effects.
 * Tradeoff: Effects with unavailable computed prerequisites are explicitly unplanned rather than observing stale values. F9 adds no IR, runtime registry/artifact, execution, value-equality check, or runtime dependency discovery; F10 owns effect IR lowering.
 
-* Decision needed before F10: define the canonical IR representation for valid effect external-member assignments and capability calls, including how F4 registry operation/lowering identities, F2 operand expressions, effect result/terminator semantics, and F9 plan identities enter existing IR modules/functions/instructions.
-* Reason: The available handoff identifies F10 as effect IR lowering but does not specify whether these operations use existing generic instructions, new canonical effect instructions, or a distinct execution-plan linkage. That choice fixes F11 optimization eligibility, F12 runtime registry records, F13 artifact shape, and F15 execution behavior.
-* Tradeoff: F9 remains complete and committed. No F10 IR, optimizer behavior, runtime registry/artifact, execution, or dependency discovery has been introduced; await the canonical F10 contract rather than inventing a future-facing IR form.
+* Decision: F10 represents each lowered effect with one `IrEffectExecution` and one separate effect-ID-keyed `IrFunction`; recognized operations lower only to generic `CapabilityCall` or `CapabilityAssign` instructions carrying the canonical F4 operation ID.
+* Reason: This reuses the existing IR module/function/block/value identity domains and shared operand lowering while preserving F4 registry IDs as the extensibility boundary. Capability instruction enum variants make observability explicit to F11 without built-in-specific IR or raw source-path matching.
+* Tradeoff: Effects retain one flat entry block and normal completion with no semantic result. F10 does not duplicate F9 schedules, optimize operands, emit registry/artifact data, execute capabilities, add cleanup/async behavior, or perform runtime dependency discovery; F11 owns immutable optimization.
 
 * Decision needed before F8: define the canonical identity for a completed action batch when one authored action method lowers to multiple `ComponentAction` state-write records.
 * Reason: Effects run once per completed action batch, but existing component actions are individual state operations. F8 must either map effects to method/batch identity and deduplicate changed dependencies there, or map effects to individual writes and require F9/runtime layers to reconstruct the batch. The choice determines trigger metadata, F9 ordering, F12 registry identity, and F15 batching behavior.
