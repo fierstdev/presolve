@@ -74,9 +74,11 @@ pub use computed_value::{
     ComputedPurityViolation, ComputedPurityViolationKind, ComputedValue,
 };
 pub use effect::{
-    analyze_effect_reactivity, collect_effects, lower_effect_bodies, validate_effects, Effect,
-    EffectBody, EffectExecutionPolicy, EffectReactiveAnalysis, EffectSemanticViolation,
-    EffectSemanticViolationKind, EffectStatement, EffectStatementKind, EffectValidation,
+    analyze_effect_reactivity, collect_effects, derive_effect_trigger_plan, lower_effect_bodies,
+    validate_effects, ActionBatch, ActionBatchEffectTrigger, Effect, EffectBody,
+    EffectExecutionPolicy, EffectReactiveAnalysis, EffectSemanticViolation,
+    EffectSemanticViolationKind, EffectStatement, EffectStatementKind, EffectTriggerPlan,
+    EffectValidation,
 };
 pub use effect_capability::{
     ArgumentSerializationPolicy, BuiltinCapabilityProvenance, CapabilityDefinition, CapabilityId,

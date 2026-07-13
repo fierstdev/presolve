@@ -93,6 +93,11 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn action_batch(&self, method: &str) -> Self {
+        self.child("action-batch", method)
+    }
+
+    #[must_use]
     pub fn local_variable(&self, name: &str, index: usize) -> Self {
         self.child("local", &format!("{name}:{index}"))
     }

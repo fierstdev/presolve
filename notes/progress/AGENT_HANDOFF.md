@@ -17,10 +17,10 @@ Last completed slice
 
 Current in-progress slice
 
-* Slice: F8 - effect trigger derivation
-* Status: Paused awaiting canonical completed-action-batch trigger identity
+* Slice: F9 - effect scheduler integration
+* Status: Ready after the F8 commit
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F7
-* Remaining: F8 - effect trigger derivation, then F9 through F20. Do not begin trigger mapping until the batch identity decision below is resolved.
+* Remaining: F9 - effect scheduler integration, then F10 through F20. Consume F8 trigger eligibility without recreating batch identity or execution behavior.
 
 Verification
 
@@ -65,6 +65,10 @@ Architecture decisions made
 * Decision: F7 projects existing transitive graph analysis into `EffectReactiveAnalysis` records keyed by valid effect semantic ID.
 * Reason: Trigger and scheduler slices need stable semantic identities for complete dependencies without traversing graph strings or source expressions. The projection preserves the terminal invariant: effects can have dependencies but no dependents.
 * Tradeoff: F7 adds no effect-to-action trigger mapping, ordering, scheduler batches, IR, or runtime behavior.
+
+* Decision: F8 keys trigger eligibility by authored action-method `ActionBatch` identity, never individual write identity.
+* Reason: A batch retains ordered write records and a deduplicated state set, then emits at most one trigger relation per batch/effect with stable matching-state evidence. Initial triggers are a separate explicit valid-effect list.
+* Tradeoff: F8 proves eligibility only. It does not infer runtime value equality, schedule effects, lower IR, or emit runtime metadata.
 
 * Decision needed before F8: define the canonical identity for a completed action batch when one authored action method lowers to multiple `ComponentAction` state-write records.
 * Reason: Effects run once per completed action batch, but existing component actions are individual state operations. F8 must either map effects to method/batch identity and deduplicate changed dependencies there, or map effects to individual writes and require F9/runtime layers to reconstruct the batch. The choice determines trigger metadata, F9 ordering, F12 registry identity, and F15 batching behavior.

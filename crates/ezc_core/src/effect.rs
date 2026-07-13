@@ -58,6 +58,29 @@ pub struct EffectReactiveAnalysis {
     pub dependents: Vec<SemanticId>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionBatch {
+    pub id: SemanticId,
+    pub authored_action_method: SemanticId,
+    pub ordered_write_records: Vec<SemanticId>,
+    pub written_states: Vec<SemanticId>,
+    pub provenance: SourceProvenance,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionBatchEffectTrigger {
+    pub action_batch: SemanticId,
+    pub effects: Vec<SemanticId>,
+    pub matched_states: BTreeMap<SemanticId, Vec<SemanticId>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct EffectTriggerPlan {
+    pub initial_effects: Vec<SemanticId>,
+    pub action_batches: BTreeMap<SemanticId, ActionBatch>,
+    pub action_batch_triggers: Vec<ActionBatchEffectTrigger>,
+}
+
 /// A first-class compiler semantic entity for one `@effect()` method.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Effect {
@@ -317,6 +340,80 @@ pub fn analyze_effect_reactivity(
             )
         })
         .collect()
+}
+
+/// # Panics
+///
+/// Panics when an authored action method has no canonical source provenance.
+#[must_use]
+pub fn derive_effect_trigger_plan(
+    components: &[ComponentNode],
+    effects: &BTreeMap<SemanticId, Effect>,
+    analysis: &BTreeMap<SemanticId, EffectReactiveAnalysis>,
+    provenance: &BTreeMap<SemanticId, SourceProvenance>,
+) -> EffectTriggerPlan {
+    let initial_effects = effects
+        .values()
+        .filter(|effect| effect.validation == EffectValidation::Valid)
+        .map(|effect| effect.id.clone())
+        .collect::<Vec<_>>();
+    let mut action_batches = BTreeMap::new();
+    for component in components {
+        for method in component.methods.iter().filter(|method| method.is_action()) {
+            let writes = component
+                .actions
+                .iter()
+                .filter(|action| action.method == method.name)
+                .collect::<Vec<_>>();
+            let id = component.id.action_batch(&method.name);
+            action_batches.insert(
+                id.clone(),
+                ActionBatch {
+                    id,
+                    authored_action_method: method.id.clone(),
+                    ordered_write_records: writes.iter().map(|action| action.id.clone()).collect(),
+                    written_states: writes
+                        .iter()
+                        .map(|action| component.id.state_field(&action.field))
+                        .collect::<std::collections::BTreeSet<_>>()
+                        .into_iter()
+                        .collect(),
+                    provenance: provenance
+                        .get(&method.id)
+                        .expect("action methods should have canonical provenance")
+                        .clone(),
+                },
+            );
+        }
+    }
+    let action_batch_triggers = action_batches
+        .values()
+        .filter_map(|batch| {
+            let matched_states = initial_effects
+                .iter()
+                .filter_map(|effect| {
+                    let matches = analysis
+                        .get(effect)?
+                        .dependencies
+                        .iter()
+                        .filter(|dependency| batch.written_states.contains(dependency))
+                        .cloned()
+                        .collect::<Vec<_>>();
+                    (!matches.is_empty()).then(|| (effect.clone(), matches))
+                })
+                .collect::<BTreeMap<_, _>>();
+            (!matched_states.is_empty()).then(|| ActionBatchEffectTrigger {
+                action_batch: batch.id.clone(),
+                effects: matched_states.keys().cloned().collect(),
+                matched_states,
+            })
+        })
+        .collect();
+    EffectTriggerPlan {
+        initial_effects,
+        action_batches,
+        action_batch_triggers,
+    }
 }
 
 /// Lower all authored effect bodies to ordered statement records.
@@ -602,7 +699,7 @@ class Effects extends Component {
   profile = state({ name: "Ada" });
 
   @action()
-  increment() { this.total += 1; }
+  increment() { this.total += 1; this.total += 1; }
 
   helper() {}
 
@@ -766,6 +863,28 @@ class Effects extends Component {
             .contains(&component.id.state_field("total")));
         assert!(analysis.dependents.is_empty());
         assert!(asm.effect_reactive_analysis(&facts_id).is_none());
+        let trigger_plan = asm.effect_trigger_plan();
+        assert!(trigger_plan.initial_effects.contains(&sync_id));
+        assert!(!trigger_plan.initial_effects.contains(&facts_id));
+        let batch = trigger_plan
+            .action_batches
+            .get(&component.id.action_batch("increment"))
+            .expect("increment action batch");
+        assert_eq!(batch.ordered_write_records.len(), 2);
+        assert_eq!(
+            batch.written_states,
+            vec![component.id.state_field("total")]
+        );
+        let trigger = trigger_plan
+            .action_batch_triggers
+            .iter()
+            .find(|trigger| trigger.action_batch == batch.id)
+            .expect("batch trigger");
+        assert_eq!(trigger.effects, vec![sync_id.clone()]);
+        assert_eq!(
+            trigger.matched_states[&sync_id],
+            vec![component.id.state_field("total")]
+        );
         assert_eq!(validate_application_semantic_model(&asm), Vec::new());
     }
 
