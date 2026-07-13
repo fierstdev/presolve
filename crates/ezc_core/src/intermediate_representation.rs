@@ -138,6 +138,47 @@ pub struct IrReactiveGraph {
     pub edges: Vec<IrReactiveEdge>,
 }
 
+/// Immutable transitive dependency and dependent topology derived from a
+/// canonical reactive graph.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct IrReactiveTransitiveAnalysis {
+    pub dependencies: BTreeMap<String, Vec<String>>,
+    pub dependents: BTreeMap<String, Vec<String>>,
+}
+
+/// Derive deterministic transitive reactive dependency and dependent maps.
+///
+/// This analysis preserves direct graph topology and deliberately makes no
+/// cycle diagnosis or scheduling decision.
+#[must_use]
+pub fn analyze_reactive_transitive_graph(graph: &IrReactiveGraph) -> IrReactiveTransitiveAnalysis {
+    let dependencies = graph
+        .nodes
+        .keys()
+        .map(|id| {
+            (
+                id.clone(),
+                graph.transitive_targets(id, IrReactiveEdgeKind::Reads),
+            )
+        })
+        .collect();
+    let dependents = graph
+        .nodes
+        .keys()
+        .map(|id| {
+            (
+                id.clone(),
+                graph.transitive_targets(id, IrReactiveEdgeKind::Invalidates),
+            )
+        })
+        .collect();
+
+    IrReactiveTransitiveAnalysis {
+        dependencies,
+        dependents,
+    }
+}
+
 /// Build compiler-owned reactive topology from canonical state, computed, and
 /// computed-reference products.
 ///
@@ -361,6 +402,23 @@ pub enum IrReactiveEdgeKind {
 }
 
 impl IrReactiveGraph {
+    fn transitive_targets(&self, source: &str, kind: IrReactiveEdgeKind) -> Vec<String> {
+        let mut discovered = BTreeSet::new();
+        let mut pending = BTreeSet::from([source.to_string()]);
+        while let Some(current) = pending.pop_first() {
+            for edge in self
+                .edges
+                .iter()
+                .filter(|edge| edge.source == current && edge.kind == kind)
+            {
+                if discovered.insert(edge.target.clone()) {
+                    pending.insert(edge.target.clone());
+                }
+            }
+        }
+        discovered.into_iter().collect()
+    }
+
     #[must_use]
     pub fn computed_dependencies(&self, computed: &str) -> Vec<&IrReactiveEdge> {
         matches!(
@@ -413,6 +471,24 @@ impl IrReactiveGraph {
             .iter()
             .filter(|edge| edge.source == source)
             .collect()
+    }
+}
+
+impl IrReactiveTransitiveAnalysis {
+    #[must_use]
+    pub fn dependencies_of(&self, node: &str) -> &[String] {
+        self.dependencies
+            .get(node)
+            .map(Vec::as_slice)
+            .unwrap_or_default()
+    }
+
+    #[must_use]
+    pub fn dependents_of(&self, node: &str) -> &[String] {
+        self.dependents
+            .get(node)
+            .map(Vec::as_slice)
+            .unwrap_or_default()
     }
 }
 

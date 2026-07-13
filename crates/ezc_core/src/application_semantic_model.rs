@@ -10,7 +10,7 @@ use crate::component_graph::{
 };
 use crate::computed_value::{collect_computed_values, ComputedValue};
 use crate::expression_graph::{ExpressionGraph, ExpressionNode};
-use crate::intermediate_representation::IrReactiveGraph;
+use crate::intermediate_representation::{IrReactiveGraph, IrReactiveTransitiveAnalysis};
 use crate::semantic_id::{SemanticId, SemanticOwner};
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
@@ -29,6 +29,7 @@ pub struct ApplicationSemanticModel {
     pub components: Vec<ComponentNode>,
     pub computed_values: BTreeMap<SemanticId, ComputedValue>,
     pub reactive_graph: IrReactiveGraph,
+    pub reactive_transitive_analysis: IrReactiveTransitiveAnalysis,
     pub templates: Vec<TemplateNode>,
     pub template_entities: Vec<TemplateSemanticEntity>,
     pub diagnostics: Vec<ComponentDiagnostic>,
@@ -491,6 +492,7 @@ pub fn build_application_semantic_model_from_component_graph(
         &references,
         &provenance,
     );
+    let reactive_transitive_analysis = crate::analyze_reactive_transitive_graph(&reactive_graph);
 
     let semantic_types =
         SemanticTypeModel::from_components(&component_graph.components, &provenance)
@@ -510,6 +512,7 @@ pub fn build_application_semantic_model_from_component_graph(
         components: component_graph.components.clone(),
         computed_values,
         reactive_graph,
+        reactive_transitive_analysis,
         templates,
         template_entities,
         diagnostics: component_graph
@@ -616,6 +619,7 @@ fn build_application_semantic_model_from_files_with_bindings(
     ));
     let reactive_graph =
         crate::build_reactive_graph(&components, &computed_values, &references, &provenance);
+    let reactive_transitive_analysis = crate::analyze_reactive_transitive_graph(&reactive_graph);
 
     let semantic_types = SemanticTypeModel::from_components_with_aliases_and_bindings(
         &components,
@@ -639,6 +643,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         components,
         computed_values,
         reactive_graph,
+        reactive_transitive_analysis,
         templates,
         template_entities,
         diagnostics,
@@ -1393,6 +1398,55 @@ class ComputedReactiveGraph extends Component {
             .invalidations_from(count.as_str())
             .iter()
             .all(|edge| { edge.target != label.as_str() }));
+    }
+
+    #[test]
+    fn computes_deterministic_transitive_reactive_dependencies_and_dependents() {
+        let parsed = ezc_parser::parse_file(
+            "src/ComputedTransitiveReactiveGraph.tsx",
+            r#"
+@component("x-computed-transitive-reactive-graph")
+class ComputedTransitiveReactiveGraph extends Component {
+  count = state(1);
+
+  @computed()
+  get doubled() { return this.count * 2; }
+
+  @computed()
+  get label() { return this.doubled + 1; }
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let component = &asm.components[0];
+        let count = component.id.state_field("count");
+        let doubled = component.id.computed("doubled");
+        let label = component.id.computed("label");
+        let analysis = &asm.reactive_transitive_analysis;
+
+        assert_eq!(analysis.dependencies.len(), 3);
+        assert_eq!(analysis.dependents.len(), 3);
+        assert_eq!(
+            analysis.dependencies_of(count.as_str()),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            analysis.dependencies_of(doubled.as_str()),
+            vec![count.as_str().to_string()]
+        );
+        assert_eq!(
+            analysis.dependencies_of(label.as_str()),
+            vec![doubled.as_str().to_string(), count.as_str().to_string()]
+        );
+        assert_eq!(
+            analysis.dependents_of(count.as_str()),
+            vec![doubled.as_str().to_string(), label.as_str().to_string()]
+        );
+        assert_eq!(
+            analysis.dependents_of(doubled.as_str()),
+            vec![label.as_str().to_string()]
+        );
+        assert_eq!(analysis.dependents_of(label.as_str()), Vec::<String>::new());
     }
 
     #[test]

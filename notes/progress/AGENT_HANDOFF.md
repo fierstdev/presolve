@@ -3,34 +3,39 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: E6 - computed reactive graph
-* Working tree: clean after the E6 commit
+* Latest completed slice: E7 - computed transitive dependency analysis
+* Working tree: clean after the E7 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: E6 - computed reactive graph
-* Summary: Projected canonical computed read references into a compiler-owned direct reactive graph.
+* Slice: E7 - computed transitive dependency analysis
+* Summary: Derived deterministic transitive dependency and dependent maps from the canonical direct reactive graph.
 * Key files: crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/intermediate_representation.rs; crates/ezc_core/src/lib.rs
-* New behavior: The ASM now exposes deterministic state/computed reactive nodes, direct `Reads` edges from computed declarations to their dependencies, and reverse `Invalidates` edges from dependencies to direct computed dependents.
-* Fixtures added or changed: focused core coverage for state-to-computed and computed-to-computed direct reads and invalidations.
+* New behavior: The ASM now exposes compiler-owned immutable transitive analysis for every reactive node, covering both `Reads` dependency closure and `Invalidates` dependent closure in stable ID order.
+* Fixtures added or changed: focused core coverage for a state -> computed -> computed chain and its full dependency/dependent closures.
 
 Current in-progress slice
 
-* Slice: E6 - computed reactive graph
+* Slice: E7 - computed transitive dependency analysis
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E6
-* Remaining: E7 - compute transitive reactive dependencies and dependents.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E7
+* Remaining: E8 - detect computed dependency cycles.
 
 Verification
 
 * cargo fmt --all --check: pass
+* cargo test -p ezc_core transitive_reactive: pass
 * cargo test -p ezc_core reactive_graph: pass
 * cargo test -p ezc_core computed: pass
 * cargo check -p ezc_cli: pass
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 
 Architecture decisions made
+
+* Decision: Transitive reactive topology is an immutable ASM analysis with deterministic dependency and dependent adjacency maps for every canonical reactive node.
+* Reason: Later cycle detection, scheduler, runtime, and inspection consumers can query compiler-produced closures without traversing source expressions or rediscovering reactive paths.
+* Tradeoff: E7 derives reachability only. It does not classify or diagnose cycles, choose evaluation order, create update batches, add new edge kinds, or lower runtime artifacts; E8 owns deterministic cycle diagnostics.
 
 * Decision: The reactive graph is an immutable compiler-owned projection of canonical computed semantic references: `Reads` goes from a computed value to a direct state/computed dependency, and `Invalidates` is the reverse edge with the same relation provenance.
 * Reason: Later dependency analysis and scheduler consumers can query one deterministic topology without rediscovering getter reads or relying on runtime observation.
@@ -560,14 +565,14 @@ Known limitations
 * Item: Method parameters are compiler-owned identifier declarations with canonical source provenance only. They do not execute, close over values, resolve local/template/action references, or support destructuring, defaults, rest declarations, or semantic type checking.
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
-* Item: The canonical expression graph covers supported state initializer expressions and direct supported computed getter returns. Computed expression nodes and entities have inferred canonical types through resolved state/computed reads; computed values are pure or impure with `EZC1034` purity diagnostics, while reactive scheduling and evaluation remain later work.
+* Item: The canonical expression graph covers supported state initializer expressions and direct supported computed getter returns. Computed expression nodes and entities have inferred canonical types through resolved state/computed reads; computed values are pure or impure with `EZC1034` purity diagnostics, and compiler-owned direct/transitive reactive topology is available. Cycle diagnostics, scheduling, evaluation, and runtime behavior remain later work.
 * Item: C30 exposes direct ASM type queries only. CLI inspection output, source diagnostics, backend enforcement, resource declaration lowering, and final type diagnostic families remain later Phase C work.
 * Item: Canonical IR functions currently contain only empty entry basic blocks plus structural branch-edge and natural-loop records. Dominator and post-dominator results include only declared conditional edges; there are no source-lowered branches or loops, condition operands, explicit terminators, or statement instructions yet.
 * Item: Source lowering still creates empty function value registries and no method load/store instructions. D3-A can analyze manually constructed canonical IR now; subsequent lowering slices must populate values before source data-flow results become non-empty.
 
 Exact next step
 
-Next is E6: populate the canonical reactive graph from computed declarations using compiler-owned read and invalidation edges. Do not add transitive analysis, cycle diagnostics, scheduler planning, IR, or runtime behavior.
+Next is E8: detect computed dependency cycles with deterministic diagnostics. Do not plan evaluation/update batches, lower computed IR, or add runtime behavior.
 
 Useful commands
 
