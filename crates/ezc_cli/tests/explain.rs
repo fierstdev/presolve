@@ -3631,14 +3631,14 @@ fn build_command_writes_page_manifest_and_runtime_artifacts() {
         std::fs::read_to_string(out_dir.join("runtime.js")).expect("failed to read built runtime");
 
     assert!(actual_runtime.contains("ez-template-manifest"));
-    assert!(actual_runtime.contains("SUPPORTED_SCHEMA_VERSION = 1"));
+    assert!(actual_runtime.contains("SUPPORTED_SCHEMA_VERSION = 2"));
     assert!(actual_runtime.contains("RUNTIME_VERSION = \"0.0.0\""));
     assert!(actual_runtime.contains("validateManifestSchema"));
     assert!(actual_runtime.contains("EZR_UNSUPPORTED_SCHEMA"));
     assert!(actual_runtime.contains("diagnostics"));
     assert!(actual_runtime.contains("data-ez-node"));
     assert!(actual_runtime.contains("ez-binding:"));
-    assert!(actual_runtime.contains("normalizeHandlerReference"));
+    assert!(!actual_runtime.contains("normalizeHandlerReference"));
     assert!(actual_runtime.contains("createRuntimeStore"));
     assert!(actual_runtime.contains("readField"));
     assert!(actual_runtime.contains("writeField"));
@@ -3737,6 +3737,25 @@ fn build_command_writes_compiler_generated_effect_runtime_metadata() {
     let page = std::fs::read_to_string(out_dir.join("index.html"))
         .expect("failed to read generated effect runtime page");
     assert!(page.contains("id=\"ez-effect-runtime\""));
+
+    let manifest = std::fs::read_to_string(out_dir.join("template.manifest.json"))
+        .expect("failed to read generated template manifest");
+    let manifest: serde_json::Value = serde_json::from_str(&manifest).expect("manifest JSON");
+    assert_eq!(manifest["schema_version"], 2);
+    assert_eq!(
+        manifest["components"][0]["template"]["events"][0]["kind"],
+        "action"
+    );
+    assert!(
+        manifest["components"][0]["template"]["events"][0]["method_id"]
+            .as_str()
+            .is_some_and(|id| id.ends_with("/method:update"))
+    );
+    assert!(
+        manifest["components"][0]["template"]["events"][0]["action_batch_id"]
+            .as_str()
+            .is_some_and(|id| id.ends_with("/action-batch:update"))
+    );
 
     let artifact = std::fs::read_to_string(out_dir.join("effect.runtime.json"))
         .expect("failed to read effect runtime artifact");

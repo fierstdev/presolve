@@ -6,6 +6,12 @@ class InitialEffectRuntime extends Component {
   @computed()
   get doubled() { return this.count * 2; }
 
+  @action()
+  update() {
+    this.count += 1;
+    this.title = "EdgeZero after action";
+  }
+
   @effect()
   report() {
     console.log(this.doubled);
@@ -13,5 +19,5 @@ class InitialEffectRuntime extends Component {
     localStorage.setItem("edgezero-effect-initial", "ready");
   }
 
-  render() { return <p>{this.count}</p>; }
+  render() { return <button onClick={() => this.update()}>{this.count}</button>; }
 }

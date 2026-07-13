@@ -1,8 +1,9 @@
 use crate::application_semantic_model::ApplicationSemanticModel;
 use crate::semantic_id::SemanticOwner;
 use crate::{
-    EffectOperationClassification, EffectRenderBoundary, EffectValidation, SemanticTypeId,
-    EFFECT_CAPABILITY_REGISTRY,
+    build_template_manifest_from_asm, EffectOperationClassification, EffectRenderBoundary,
+    EffectValidation, ManifestEventKind, SemanticTypeId, EFFECT_CAPABILITY_REGISTRY,
+    TEMPLATE_MANIFEST_SCHEMA_VERSION,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -80,8 +81,68 @@ pub fn validate_application_semantic_model(
     validate_semantic_types(model, &mut diagnostics);
     validate_effect_statement_types(model, &mut diagnostics);
     validate_effect_execution_plan(model, &mut diagnostics);
+    validate_template_action_bindings(model, &mut diagnostics);
 
     diagnostics
+}
+
+fn validate_template_action_bindings(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    let manifest = build_template_manifest_from_asm(model);
+    if manifest.schema_version != TEMPLATE_MANIFEST_SCHEMA_VERSION {
+        return;
+    }
+    for component_manifest in &manifest.components {
+        let Some(component) = model
+            .components
+            .iter()
+            .find(|component| component.class_name == component_manifest.name)
+        else {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1126".to_string(),
+                message: format!(
+                    "template manifest references missing component `{}`",
+                    component_manifest.name
+                ),
+            });
+            continue;
+        };
+        for event in &component_manifest.template.events {
+            if event.kind != Some(ManifestEventKind::Action) {
+                diagnostics.push(AsmValidationDiagnostic {
+                    code: "EZASM1127".to_string(),
+                    message: format!(
+                        "template event `{}` is missing canonical action binding metadata",
+                        event.node
+                    ),
+                });
+                continue;
+            }
+            let method = component
+                .methods
+                .iter()
+                .find(|method| Some(method.id.as_str()) == event.method_id.as_deref());
+            let batch = method.and_then(|method| {
+                model
+                    .effect_trigger_plan
+                    .action_batches
+                    .values()
+                    .find(|batch| batch.authored_action_method == method.id)
+            });
+            if batch.is_none_or(|batch| Some(batch.id.as_str()) != event.action_batch_id.as_deref())
+            {
+                diagnostics.push(AsmValidationDiagnostic {
+                    code: "EZASM1128".to_string(),
+                    message: format!(
+                        "template event `{}` does not resolve to its canonical F8 action batch",
+                        event.node
+                    ),
+                });
+            }
+        }
+    }
 }
 
 fn validate_effect_execution_plan(

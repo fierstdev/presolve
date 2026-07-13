@@ -9,7 +9,7 @@ use std::process;
 use ezc_core::{
     build_application_semantic_model_for_unit, build_component_graph,
     build_runtime_computed_artifact, build_runtime_effect_artifact, build_semantic_graph,
-    build_template_graph, build_template_manifest, explain_json, explain_text,
+    build_template_graph, build_template_manifest_from_asm, explain_json, explain_text,
     fold_component_graph, generate_runtime_stub, generate_standalone_page_with_effect_runtime,
     generate_static_html, lower_components_to_ir, optimize_effect_ir,
     runtime_computed_artifact_json, runtime_effect_artifact_json, semantic_graph_json,
@@ -1371,9 +1371,10 @@ fn run_manifest(mut args: Vec<String>) {
     });
 
     let parsed = parse_file(&path, &source);
-    let component_graph = fold_component_graph(&build_component_graph(&parsed));
-    let template_graph = build_template_graph(&component_graph);
-    let manifest = build_template_manifest(&component_graph, &template_graph);
+    let asm = build_application_semantic_model_for_unit(&CompilationUnit::from_parsed_files(vec![
+        parsed,
+    ]));
+    let manifest = build_template_manifest_from_asm(&asm);
 
     println!("{}", template_manifest_json(&manifest));
 }
@@ -1404,7 +1405,7 @@ fn run_build(mut args: Vec<String>) {
     let component_graph = fold_component_graph(&build_component_graph(&parsed));
     let template_graph = build_template_graph(&component_graph);
     let html_fragment = generate_static_html(&template_graph);
-    let manifest = build_template_manifest(&component_graph, &template_graph);
+    let manifest = build_template_manifest_from_asm(&asm);
     let manifest_json = template_manifest_json(&manifest);
     let page_title = page_title_from_graph(&template_graph);
     let page_html = generate_standalone_page_with_effect_runtime(

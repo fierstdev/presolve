@@ -5,7 +5,8 @@ const RUNTIME_STUB: &str = r#"(() => {
   const COMPUTED_ARTIFACT_ELEMENT_ID = "ez-computed-runtime";
   const EFFECT_ARTIFACT_ELEMENT_ID = "ez-effect-runtime";
   const RUNTIME_VERSION = "0.0.0";
-  const SUPPORTED_SCHEMA_VERSION = 1;
+  const SUPPORTED_SCHEMA_VERSION = 2;
+  const LEGACY_MANIFEST_SCHEMA_VERSION = 1;
   const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 3;
   const SUPPORTED_EFFECT_ARTIFACT_SCHEMA_VERSION = 1;
 
@@ -61,8 +62,70 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
-  function validateManifestSchema(manifest, diagnostics) {
-    if (manifest?.schema_version !== SUPPORTED_SCHEMA_VERSION) {
+  function effectArtifactHasActionPlans(effectArtifact) {
+    return (effectArtifact?.effects ?? []).some((effect) =>
+      Array.isArray(effect.action_batch_triggers) && effect.action_batch_triggers.length > 0
+    );
+  }
+
+  function validateManifestActionBindings(manifest, diagnostics) {
+    for (const component of manifest.components ?? []) {
+      const actionsByMethod = new Map();
+
+      for (const action of component.actions ?? []) {
+        if (typeof action.method_id !== "string" || typeof action.action_batch_id !== "string") {
+          reportDiagnostic(
+            diagnostics,
+            "EZR_INVALID_ACTION_BINDING",
+            "Schema-v2 template action was missing compiler action identities",
+            { component: component.name, action },
+            true
+          );
+          throw new EdgeZeroBootError("EZR_INVALID_ACTION_BINDING");
+        }
+        actionsByMethod.set(action.method_id, action.action_batch_id);
+      }
+
+      for (const event of component.template?.events ?? []) {
+        if (event.kind !== "action") {
+          reportDiagnostic(
+            diagnostics,
+            "EZR_INVALID_ACTION_BINDING",
+            "Schema-v2 template event was not an explicit action binding",
+            { component: component.name, event },
+            true
+          );
+          throw new EdgeZeroBootError("EZR_INVALID_ACTION_BINDING");
+        }
+        if (typeof event.method_id !== "string" || typeof event.action_batch_id !== "string") {
+          reportDiagnostic(
+            diagnostics,
+            "EZR_INVALID_ACTION_BINDING",
+            "Schema-v2 template action binding was missing an action batch identity",
+            { component: component.name, event },
+            true
+          );
+          throw new EdgeZeroBootError("EZR_INVALID_ACTION_BINDING");
+        }
+        if (actionsByMethod.get(event.method_id) !== event.action_batch_id) {
+          reportDiagnostic(
+            diagnostics,
+            "EZR_INVALID_ACTION_BINDING",
+            "Template action binding did not match its compiler action implementation",
+            { component: component.name, event },
+            true
+          );
+          throw new EdgeZeroBootError("EZR_INVALID_ACTION_BINDING");
+        }
+      }
+    }
+  }
+
+  function validateManifestSchema(manifest, effectArtifact, diagnostics) {
+    if (
+      manifest?.schema_version !== SUPPORTED_SCHEMA_VERSION &&
+      manifest?.schema_version !== LEGACY_MANIFEST_SCHEMA_VERSION
+    ) {
       reportDiagnostic(
         diagnostics,
         "EZR_UNSUPPORTED_SCHEMA",
@@ -74,6 +137,24 @@ const RUNTIME_STUB: &str = r#"(() => {
         true
       );
       throw new EdgeZeroBootError("EZR_UNSUPPORTED_SCHEMA");
+    }
+
+    if (
+      manifest.schema_version === LEGACY_MANIFEST_SCHEMA_VERSION &&
+      effectArtifactHasActionPlans(effectArtifact)
+    ) {
+      reportDiagnostic(
+        diagnostics,
+        "EZR_LEGACY_MANIFEST_EFFECT_ACTIONS",
+        "A legacy template manifest cannot activate compiler-generated effect action batches",
+        { schema_version: manifest.schema_version },
+        true
+      );
+      throw new EdgeZeroBootError("EZR_LEGACY_MANIFEST_EFFECT_ACTIONS");
+    }
+
+    if (manifest.schema_version === SUPPORTED_SCHEMA_VERSION) {
+      validateManifestActionBindings(manifest, diagnostics);
     }
   }
 
@@ -179,10 +260,6 @@ const RUNTIME_STUB: &str = r#"(() => {
       );
       throw new EdgeZeroBootError("EZR_UNSUPPORTED_EFFECT_ARTIFACT_SCHEMA");
     }
-  }
-
-  function normalizeHandlerReference(reference) {
-    return String(reference ?? "").replace(/^this\./, "");
   }
 
   function fieldNameFromThisMember(expression) {
@@ -381,9 +458,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     const actionsByMethod = new Map();
 
     for (const action of component.actions ?? []) {
-      const actions = actionsByMethod.get(action.method) ?? [];
-      actions.push(action);
-      actionsByMethod.set(action.method, actions);
+      const record = actionsByMethod.get(action.method_id) ?? {
+        action_batch_id: action.action_batch_id,
+        actions: []
+      };
+      record.actions.push(action);
+      actionsByMethod.set(action.method_id, record);
     }
 
     return actionsByMethod;
@@ -391,10 +471,6 @@ const RUNTIME_STUB: &str = r#"(() => {
 
   function componentFieldKey(componentName, field) {
     return `${componentName}:${field}`;
-  }
-
-  function componentMethodKey(componentName, method) {
-    return `${componentName}:${method}`;
   }
 
   function formatBindingValue(value) {
@@ -867,7 +943,9 @@ const RUNTIME_STUB: &str = r#"(() => {
       storageByComponentField,
       invalidationsByStorage,
       computedUpdateRuns: 0,
-      initialEffectRuns: []
+      initialEffectRuns: [],
+      completedActionEffectRuns: [],
+      activeActionBatch: null
     };
   }
 
@@ -1093,6 +1171,44 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
+  function actionEffectBatches(effectArtifact, actionBatchId) {
+    const batches = new Map();
+
+    for (const effect of effectArtifact?.effects ?? []) {
+      const trigger = (effect.action_batch_triggers ?? []).find(
+        (candidate) => candidate.action_batch === actionBatchId
+      );
+
+      if (trigger === undefined) {
+        continue;
+      }
+
+      const effects = batches.get(trigger.effect_batch_index) ?? [];
+      effects.push(effect);
+      batches.set(trigger.effect_batch_index, effects);
+    }
+
+    return [...batches.entries()].sort(([left], [right]) => left - right);
+  }
+
+  function executeCompletedActionEffects(store, actionBatchId) {
+    for (const [effectBatchIndex, effects] of actionEffectBatches(
+      store.effectArtifact,
+      actionBatchId
+    )) {
+      for (const effect of effects) {
+        const evidence = {
+          action_batch_id: actionBatchId,
+          effect: effect.effect,
+          effect_batch_index: effectBatchIndex,
+          capability_operations: []
+        };
+        executeEffectProgram(store, effect, evidence);
+        store.completedActionEffectRuns.push(evidence);
+      }
+    }
+  }
+
   function executeComputedPlan(store) {
     if (store.computedArtifact === null) {
       return;
@@ -1229,11 +1345,8 @@ const RUNTIME_STUB: &str = r#"(() => {
   function registerActions(store, component, manifestComponent) {
     const actionsByMethod = buildActionsByMethod(manifestComponent);
 
-    for (const [method, actions] of actionsByMethod) {
-      store.actionsByMethod.set(
-        componentMethodKey(component.name, method),
-        actions
-      );
+    for (const [methodId, actionRecord] of actionsByMethod) {
+      store.actionsByMethod.set(methodId, actionRecord);
     }
   }
 
@@ -1248,12 +1361,12 @@ const RUNTIME_STUB: &str = r#"(() => {
       return;
     }
 
-    const method = normalizeHandlerReference(event.handler);
-    const actions = store.actionsByMethod.get(
-      componentMethodKey(component.name, method)
-    );
+    const actionRecord = store.actionsByMethod.get(event.method_id);
 
-    if (actions === undefined) {
+    if (
+      actionRecord === undefined ||
+      actionRecord.action_batch_id !== event.action_batch_id
+    ) {
       reportDiagnostic(
         store.diagnostics,
         "EZR_UNRESOLVED_ACTION",
@@ -1277,7 +1390,8 @@ const RUNTIME_STUB: &str = r#"(() => {
 
     eventsByNode.set(event.node, {
       component,
-      actions
+      action_batch_id: event.action_batch_id,
+      actions: actionRecord.actions
     });
     store.eventsByType.set(event.event, eventsByNode);
   }
@@ -1511,13 +1625,20 @@ const RUNTIME_STUB: &str = r#"(() => {
     writeField(store, component, action.field, current + delta);
   }
 
-  function executeActions(store, component, actions) {
-    for (const action of actions) {
-      executeAction(store, component, action);
-    }
+  function executeActions(store, component, actionBatchId, actions) {
+    store.activeActionBatch = actionBatchId;
 
-    executeComputedUpdateBatches(store);
-    refreshComputedDebugState(store);
+    try {
+      for (const action of actions) {
+        executeAction(store, component, action);
+      }
+
+      executeComputedUpdateBatches(store);
+      executeCompletedActionEffects(store, actionBatchId);
+    } finally {
+      store.activeActionBatch = null;
+      refreshComputedDebugState(store);
+    }
   }
 
   function registerComponentEvents(store, component) {
@@ -1559,7 +1680,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       return;
     }
 
-    executeActions(store, record.component, record.actions);
+    executeActions(store, record.component, record.action_batch_id, record.actions);
   }
 
   function installDelegatedEventListeners(store) {
@@ -1603,6 +1724,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     computed = [],
     computed_update_runs = 0,
     initial_effect_runs = [],
+    completed_action_effect_runs = [],
     diagnostics
   }) {
     return {
@@ -1615,7 +1737,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       components,
       computed,
       computed_update_runs,
-      initial_effect_runs
+      initial_effect_runs,
+      completed_action_effect_runs
     };
   }
 
@@ -1673,7 +1796,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       components: debugComponents(store),
       computed: debugComputed(store),
       computed_update_runs: store.computedUpdateRuns,
-      initial_effect_runs: store.initialEffectRuns
+      initial_effect_runs: store.initialEffectRuns,
+      completed_action_effect_runs: store.completedActionEffectRuns
     });
   }
 
@@ -1682,11 +1806,11 @@ const RUNTIME_STUB: &str = r#"(() => {
 
     try {
       const manifest = readManifest(diagnostics);
-      validateManifestSchema(manifest, diagnostics);
       const computedArtifact = readComputedArtifact(diagnostics);
       validateComputedArtifactSchema(computedArtifact, diagnostics);
       const effectArtifact = readEffectArtifact(diagnostics);
       validateEffectArtifactSchema(effectArtifact, diagnostics);
+      validateManifestSchema(manifest, effectArtifact, diagnostics);
 
       const state = initializeRuntime(manifest, computedArtifact, effectArtifact, diagnostics);
       const status = state.diagnostics.some((diagnostic) => diagnostic.fatal)
@@ -1752,7 +1876,7 @@ mod tests {
         assert!(runtime.contains("ez-template-manifest"));
         assert!(runtime.contains("ez-effect-runtime"));
         assert!(runtime.contains("RUNTIME_VERSION = \"0.0.0\""));
-        assert!(runtime.contains("SUPPORTED_SCHEMA_VERSION = 1"));
+        assert!(runtime.contains("SUPPORTED_SCHEMA_VERSION = 2"));
         assert!(runtime.contains("EZR_MISSING_MANIFEST"));
         assert!(runtime.contains("EZR_INVALID_MANIFEST_JSON"));
         assert!(runtime.contains("EZR_UNSUPPORTED_SCHEMA"));
@@ -1761,7 +1885,6 @@ mod tests {
         assert!(runtime.contains("reportDiagnostic"));
         assert!(runtime.contains("validateManifestSchema"));
         assert!(runtime.contains("validateEffectArtifactSchema"));
-        assert!(runtime.contains("normalizeHandlerReference"));
         assert!(runtime.contains("createRuntimeStore"));
         assert!(runtime.contains("readField"));
         assert!(runtime.contains("writeField"));
@@ -1770,9 +1893,12 @@ mod tests {
         assert!(runtime.contains("isBooleanAttribute"));
         assert!(runtime.contains("isPropertyAttribute"));
         assert!(runtime.contains("updateAttributeBinding"));
-        assert!(runtime.contains("const actions = actionsByMethod.get(action.method) ?? []"));
-        assert!(runtime.contains("actions.push(action)"));
+        assert!(runtime.contains("actionsByMethod.set(action.method_id, action.action_batch_id)"));
+        assert!(runtime.contains("const actionRecord = store.actionsByMethod.get(event.method_id)"));
+        assert!(runtime.contains("actionRecord.action_batch_id !== event.action_batch_id"));
         assert!(runtime.contains("executeActions"));
+        assert!(runtime.contains("executeCompletedActionEffects"));
+        assert!(runtime.contains("activeActionBatch"));
         assert!(runtime.contains("executeInitialEffects"));
         assert!(runtime.contains("dispatchEffectCapability"));
         assert!(runtime.contains("formatBindingValue"));

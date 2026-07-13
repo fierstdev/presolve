@@ -180,9 +180,10 @@ pub use template_graph::{
     TemplateAttribute, TemplateChild, TemplateGraph, TemplateNode, TemplateNodeId,
 };
 pub use template_manifest::{
-    build_template_manifest, template_manifest_json, ManifestAction, ManifestBindingTarget,
-    ManifestComponent, ManifestEvent, ManifestNode, ManifestOperation, ManifestTemplate,
-    TemplateManifest, TEMPLATE_MANIFEST_SCHEMA_VERSION,
+    build_template_manifest, build_template_manifest_from_asm, template_manifest_json,
+    ManifestAction, ManifestBindingTarget, ManifestComponent, ManifestEvent, ManifestEventKind,
+    ManifestNode, ManifestOperation, ManifestTemplate, TemplateManifest,
+    TEMPLATE_MANIFEST_SCHEMA_VERSION,
 };
 pub use template_semantics::{
     build_template_semantic_entities, TemplateSemanticEntity, TemplateSemanticKind,
@@ -2516,7 +2517,7 @@ class Beta extends Component {
         let template_graph = build_template_graph(&component_graph);
         let manifest = build_template_manifest(&component_graph, &template_graph);
 
-        assert_eq!(manifest.schema_version, TEMPLATE_MANIFEST_SCHEMA_VERSION);
+        assert_eq!(manifest.schema_version, 1);
         assert_eq!(manifest.components.len(), 1);
 
         let component = &manifest.components[0];
@@ -2548,8 +2549,11 @@ class Beta extends Component {
             component.template.events,
             vec![ManifestEvent {
                 node: "n1".to_string(),
+                kind: None,
                 event: "click".to_string(),
                 handler: "this.increment".to_string(),
+                method_id: None,
+                action_batch_id: None,
             }]
         );
 
@@ -2557,6 +2561,8 @@ class Beta extends Component {
             component.actions,
             vec![ManifestAction {
                 method: "increment".to_string(),
+                method_id: None,
+                action_batch_id: None,
                 operation: ManifestOperation::Increment,
                 field: "count".to_string(),
                 operand: None,
@@ -2567,10 +2573,7 @@ class Beta extends Component {
         let manifest_value: serde_json::Value =
             serde_json::from_str(&manifest_json).expect("manifest JSON should parse");
 
-        assert_eq!(
-            manifest_value["schema_version"],
-            serde_json::json!(TEMPLATE_MANIFEST_SCHEMA_VERSION)
-        );
+        assert_eq!(manifest_value["schema_version"], serde_json::json!(1));
     }
 
     #[test]
@@ -2591,6 +2594,8 @@ class Beta extends Component {
             manifest.components[0].actions,
             vec![ManifestAction {
                 method: "decrement".to_string(),
+                method_id: None,
+                action_batch_id: None,
                 operation: ManifestOperation::Decrement,
                 field: "count".to_string(),
                 operand: None,
@@ -2626,12 +2631,16 @@ class Beta extends Component {
             vec![
                 ManifestAction {
                     method: "addTwo".to_string(),
+                    method_id: None,
+                    action_batch_id: None,
                     operation: ManifestOperation::AddAssign,
                     field: "count".to_string(),
                     operand: Some(SerializableValue::Number("2".to_string())),
                 },
                 ManifestAction {
                     method: "subtractThree".to_string(),
+                    method_id: None,
+                    action_batch_id: None,
                     operation: ManifestOperation::SubtractAssign,
                     field: "count".to_string(),
                     operand: Some(SerializableValue::Number("3".to_string())),
@@ -2679,6 +2688,8 @@ class Beta extends Component {
             manifest.components[0].actions,
             vec![ManifestAction {
                 method: "reset".to_string(),
+                method_id: None,
+                action_batch_id: None,
                 operation: ManifestOperation::Assign,
                 field: "count".to_string(),
                 operand: Some(SerializableValue::Number("0".to_string())),
@@ -2714,6 +2725,8 @@ class Beta extends Component {
             manifest.components[0].actions,
             vec![ManifestAction {
                 method: "toggle".to_string(),
+                method_id: None,
+                action_batch_id: None,
                 operation: ManifestOperation::Toggle,
                 field: "enabled".to_string(),
                 operand: None,
@@ -2752,30 +2765,40 @@ class Beta extends Component {
             vec![
                 ManifestAction {
                     method: "apply".to_string(),
+                    method_id: None,
+                    action_batch_id: None,
                     operation: ManifestOperation::AddAssign,
                     field: "count".to_string(),
                     operand: Some(SerializableValue::Number("2".to_string())),
                 },
                 ManifestAction {
                     method: "apply".to_string(),
+                    method_id: None,
+                    action_batch_id: None,
                     operation: ManifestOperation::Decrement,
                     field: "count".to_string(),
                     operand: None,
                 },
                 ManifestAction {
                     method: "apply".to_string(),
+                    method_id: None,
+                    action_batch_id: None,
                     operation: ManifestOperation::Assign,
                     field: "count".to_string(),
                     operand: Some(SerializableValue::Number("8".to_string())),
                 },
                 ManifestAction {
                     method: "apply".to_string(),
+                    method_id: None,
+                    action_batch_id: None,
                     operation: ManifestOperation::Increment,
                     field: "count".to_string(),
                     operand: None,
                 },
                 ManifestAction {
                     method: "apply".to_string(),
+                    method_id: None,
+                    action_batch_id: None,
                     operation: ManifestOperation::Toggle,
                     field: "enabled".to_string(),
                     operand: None,

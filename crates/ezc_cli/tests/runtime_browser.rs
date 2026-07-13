@@ -1209,6 +1209,57 @@ fn initial_effects_execute_once_from_compiler_generated_runtime_programs() {
 }
 
 #[test]
+fn completed_action_batches_execute_compiler_planned_effects_once() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/completed-action-effect-runtime");
+
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean previous browser test output");
+    }
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0053-effect-initial-runtime/input/InitialEffectRuntime.tsx",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("browser test output path was not valid UTF-8"),
+        ])
+        .output()
+        .expect("failed to build completed action effect fixture");
+    assert!(output.status.success());
+
+    write_completed_action_effect_probe_page(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile dir");
+    let user_data_dir = format!(
+        "--user-data-dir={}",
+        profile_dir
+            .to_str()
+            .expect("Chrome profile path was not valid UTF-8")
+    );
+    let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
+
+    let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+
+    assert!(
+        stdout.contains("EDGEZERO_COMPLETED_ACTION_EFFECT_BROWSER_TEST_PASS"),
+        "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn multi_step_actions_flush_one_compiler_generated_computed_batch() {
     let _guard = browser_test_guard();
     let repo_root = repo_root();
@@ -1394,6 +1445,55 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
 }
 
+fn write_completed_action_effect_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
+    let probe = index.replace(
+        "</body>",
+        r#"<script>
+const fail = (message) => { throw new Error(message); };
+const waitFor = (predicate, label) => new Promise((resolve, reject) => {
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    if (predicate()) { resolve(); return; }
+    if (Date.now() > deadline) { reject(new Error(`Timed out waiting for ${label}`)); return; }
+    setTimeout(tick, 20);
+  };
+  tick();
+});
+(async () => {
+  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  const manifestEvent = window.__EDGEZERO__.manifest.components[0].template.events[0];
+  if (manifestEvent.kind !== "action" || !manifestEvent.method_id || !manifestEvent.action_batch_id) {
+    fail("template manifest did not carry canonical action activation identities");
+  }
+  document.querySelector("button")?.click();
+  await waitFor(() => window.__EDGEZERO__.completed_action_effect_runs.length === 1, "completed action effect");
+  if (document.title !== "EdgeZero after action") fail("completed action effect did not synchronize title");
+  const run = window.__EDGEZERO__.completed_action_effect_runs[0];
+  if (run.action_batch_id !== manifestEvent.action_batch_id || run.effect_batch_index !== 0) {
+    fail("runtime did not consume the exact compiler action batch plan");
+  }
+  if (run.capability_operations.length !== 3) fail("completed action effect did not preserve capability program");
+  if (window.__EDGEZERO__.initial_effect_runs.length !== 1) fail("initial effect plan was replayed after action");
+  if (window.__EDGEZERO__.computed.find((entry) => entry.computed.endsWith("/computed:doubled"))?.value !== 6) {
+    fail("completed action effect ran before compiler computed flush");
+  }
+  if (window.__EDGEZERO__.store.activeActionBatch !== null) fail("runtime retained an active action batch");
+  if (window.__EDGEZERO__.diagnostics.length !== 0) fail("completed action effect reported diagnostics");
+  document.body.dataset.browserTest = "pass";
+  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_COMPLETED_ACTION_EFFECT_BROWSER_TEST_PASS</div>");
+})().catch((error) => {
+  document.body.dataset.browserTest = "fail";
+  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_COMPLETED_ACTION_EFFECT_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  console.error(error);
+});
+</script>
+</body>"#,
+    );
+
+    fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
+}
+
 fn write_batched_computed_probe_page(out_dir: &Path) {
     let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
     let probe = index.replace(
@@ -1547,7 +1647,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     fail("runtime version was not exposed");
   }
 
-  if (window.__EDGEZERO__.supported_schema_version !== 1) {
+  if (window.__EDGEZERO__.supported_schema_version !== 2) {
     fail("supported schema version was not exposed");
   }
 
@@ -2763,7 +2863,7 @@ fn write_runtime_contract_probe_page(
     page.push_str("(async () => {\n");
     page.push_str("  await waitFor(() => document.documentElement.dataset.ezRuntime === \"error\" && window.__EDGEZERO__, \"runtime error\");\n");
     page.push_str("  if (window.__EDGEZERO__.runtime_version !== \"0.0.0\") fail(\"runtime version was not exposed\");\n");
-    page.push_str("  if (window.__EDGEZERO__.supported_schema_version !== 1) fail(\"supported schema version was not exposed\");\n");
+    page.push_str("  if (window.__EDGEZERO__.supported_schema_version !== 2) fail(\"supported schema version was not exposed\");\n");
     page.push_str("  const diagnostics = window.__EDGEZERO__.diagnostics;\n");
     page.push_str("  if (!Array.isArray(diagnostics) || diagnostics.length === 0) fail(\"diagnostics were not exposed\");\n");
     page.push_str("  if (diagnostics[0].code !== \"");

@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde::Serialize;
 
 use crate::component_graph::{ComponentGraph, ComponentNode, SerializableValue, StateOperation};
@@ -6,8 +8,10 @@ use crate::template_graph::{
     AttributeValue, ConditionalNode, ElementNode, FragmentNode, ListNode, TemplateChild,
     TemplateGraph, TemplateNode,
 };
+use crate::ApplicationSemanticModel;
 
-pub const TEMPLATE_MANIFEST_SCHEMA_VERSION: u32 = 1;
+pub const TEMPLATE_MANIFEST_SCHEMA_VERSION: u32 = 2;
+const LEGACY_TEMPLATE_MANIFEST_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct TemplateManifest {
@@ -82,13 +86,29 @@ pub enum ManifestBindingTarget {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ManifestEvent {
     pub node: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<ManifestEventKind>,
     pub event: String,
     pub handler: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub method_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action_batch_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub enum ManifestEventKind {
+    #[serde(rename = "action")]
+    Action,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ManifestAction {
     pub method: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub method_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action_batch_id: Option<String>,
     pub operation: ManifestOperation,
     pub field: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -122,12 +142,40 @@ pub fn build_template_manifest(
     template_graph: &TemplateGraph,
 ) -> TemplateManifest {
     TemplateManifest {
-        schema_version: TEMPLATE_MANIFEST_SCHEMA_VERSION,
+        schema_version: LEGACY_TEMPLATE_MANIFEST_SCHEMA_VERSION,
         components: template_graph
             .templates
             .iter()
             .map(|template| manifest_component(component_graph, template))
             .collect::<Vec<_>>(),
+    }
+}
+
+/// Build schema-v2 template metadata from canonical ASM action-batch facts.
+#[must_use]
+pub fn build_template_manifest_from_asm(model: &ApplicationSemanticModel) -> TemplateManifest {
+    TemplateManifest {
+        // A source unit without F8 action batches remains a legacy manifest: it
+        // cannot activate completed-action effects and therefore must not claim
+        // to provide the v2 action-batch bridge.
+        schema_version: if model.effect_trigger_plan.action_batches.is_empty() {
+            LEGACY_TEMPLATE_MANIFEST_SCHEMA_VERSION
+        } else {
+            TEMPLATE_MANIFEST_SCHEMA_VERSION
+        },
+        components: model
+            .templates
+            .iter()
+            .filter_map(|template| {
+                let component = model
+                    .components
+                    .iter()
+                    .find(|component| component.class_name == template.component_name)?;
+                let mut manifest = manifest_component_for(component, template);
+                apply_action_bindings(&mut manifest, &action_bindings(model, component));
+                Some(manifest)
+            })
+            .collect(),
     }
 }
 
@@ -145,6 +193,24 @@ fn manifest_component(
     component_graph: &ComponentGraph,
     template: &TemplateNode,
 ) -> ManifestComponent {
+    component_graph
+        .components
+        .iter()
+        .find(|component| component.class_name == template.component_name)
+        .map_or_else(
+            || ManifestComponent {
+                name: template.component_name.clone(),
+                template: ManifestTemplate {
+                    nodes: Vec::new(),
+                    events: Vec::new(),
+                },
+                actions: Vec::new(),
+            },
+            |component| manifest_component_for(component, template),
+        )
+}
+
+fn manifest_component_for(component: &ComponentNode, template: &TemplateNode) -> ManifestComponent {
     let mut nodes = Vec::new();
     let mut events = Vec::new();
 
@@ -154,17 +220,63 @@ fn manifest_component(
         collect_fragment(fragment, &mut nodes, &mut events);
     }
 
-    let actions = component_graph
-        .components
-        .iter()
-        .find(|component| component.class_name == template.component_name)
-        .map(manifest_actions)
-        .unwrap_or_default();
-
     ManifestComponent {
         name: template.component_name.clone(),
         template: ManifestTemplate { nodes, events },
-        actions,
+        actions: manifest_actions(component),
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ActionBinding {
+    method_id: String,
+    action_batch_id: String,
+}
+
+fn action_bindings(
+    model: &ApplicationSemanticModel,
+    component: &ComponentNode,
+) -> BTreeMap<String, ActionBinding> {
+    component
+        .methods
+        .iter()
+        .filter_map(|method| {
+            let batch = model
+                .effect_trigger_plan
+                .action_batches
+                .values()
+                .find(|batch| batch.authored_action_method == method.id)?;
+            Some((
+                method.name.clone(),
+                ActionBinding {
+                    method_id: method.id.to_string(),
+                    action_batch_id: batch.id.to_string(),
+                },
+            ))
+        })
+        .collect()
+}
+
+fn apply_action_bindings(
+    manifest: &mut ManifestComponent,
+    bindings: &BTreeMap<String, ActionBinding>,
+) {
+    for action in &mut manifest.actions {
+        if let Some(binding) = bindings.get(&action.method) {
+            action.method_id = Some(binding.method_id.clone());
+            action.action_batch_id = Some(binding.action_batch_id.clone());
+        }
+    }
+    for event in &mut manifest.template.events {
+        let method = event
+            .handler
+            .strip_prefix("this.")
+            .unwrap_or(&event.handler);
+        if let Some(binding) = bindings.get(method) {
+            event.kind = Some(ManifestEventKind::Action);
+            event.method_id = Some(binding.method_id.clone());
+            event.action_batch_id = Some(binding.action_batch_id.clone());
+        }
     }
 }
 
@@ -184,6 +296,8 @@ fn manifest_actions(component: &ComponentNode) -> Vec<ManifestAction> {
         .iter()
         .map(|action| ManifestAction {
             method: action.method.clone(),
+            method_id: None,
+            action_batch_id: None,
             operation: manifest_operation(&action.operation),
             field: action.field.clone(),
             operand: manifest_operand(&action.operation),
@@ -226,8 +340,11 @@ fn collect_element(
             AttributeValue::EventHandler { event, handler } => {
                 events.push(ManifestEvent {
                     node: element.id.0.clone(),
+                    kind: None,
                     event: event.clone(),
                     handler: handler.clone(),
+                    method_id: None,
+                    action_batch_id: None,
                 });
             }
             AttributeValue::Binding {
@@ -312,4 +429,52 @@ fn collect_conditional(conditional: &ConditionalNode, nodes: &mut Vec<ManifestNo
         when_true_html: generate_children_html(&conditional.when_true),
         when_false_html: generate_children_html(&conditional.when_false),
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        build_template_manifest_from_asm, ManifestEventKind, TEMPLATE_MANIFEST_SCHEMA_VERSION,
+    };
+    use crate::build_application_semantic_model;
+
+    #[test]
+    fn emits_canonical_f8_action_batch_ids_on_every_action_binding() {
+        let parsed = ezc_parser::parse_file(
+            "src/TemplateActionBatch.tsx",
+            r#"
+@component("x-template-action-batch")
+class TemplateActionBatch extends Component {
+  count = state(0);
+
+  @action()
+  update() { this.count += 1; this.count += 1; }
+
+  render() { return <button onClick={() => this.update()}>Update</button>; }
+}
+"#,
+        );
+        let model = build_application_semantic_model(&parsed);
+        let component = &model.components[0];
+        let method = component.id.method("update");
+        let batch = model
+            .effect_trigger_plan
+            .action_batches
+            .values()
+            .find(|batch| batch.authored_action_method == method)
+            .expect("canonical F8 batch");
+        let manifest = build_template_manifest_from_asm(&model);
+        let component_manifest = &manifest.components[0];
+        let event = &component_manifest.template.events[0];
+
+        assert_eq!(manifest.schema_version, TEMPLATE_MANIFEST_SCHEMA_VERSION);
+        assert_eq!(event.kind, Some(ManifestEventKind::Action));
+        assert_eq!(event.method_id.as_deref(), Some(method.as_str()));
+        assert_eq!(event.action_batch_id.as_deref(), Some(batch.id.as_str()));
+        assert_eq!(component_manifest.actions.len(), 2);
+        assert!(component_manifest.actions.iter().all(|action| {
+            action.method_id.as_deref() == Some(method.as_str())
+                && action.action_batch_id.as_deref() == Some(batch.id.as_str())
+        }));
+    }
 }
