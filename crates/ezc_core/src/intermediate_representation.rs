@@ -159,6 +159,14 @@ pub struct IrReactiveCycleAnalysis {
     pub cycles: Vec<IrReactiveCycle>,
 }
 
+/// Compiler-generated evaluation order and update batches for computed values.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct IrComputedEvaluationPlan {
+    pub evaluation_order: Vec<String>,
+    pub update_batches: Vec<Vec<String>>,
+    pub unplanned: Vec<String>,
+}
+
 /// Derive deterministic transitive reactive dependency and dependent maps.
 ///
 /// This analysis preserves direct graph topology and deliberately makes no
@@ -245,6 +253,35 @@ pub fn analyze_reactive_cycles(graph: &IrReactiveGraph) -> IrReactiveCycleAnalys
     cycles.sort_by(|left, right| left.nodes.cmp(&right.nodes));
 
     IrReactiveCycleAnalysis { cycles }
+}
+
+/// Build a deterministic computed evaluation plan through the canonical update
+/// scheduler.
+#[must_use]
+pub fn plan_computed_evaluation(graph: &IrReactiveGraph) -> IrComputedEvaluationPlan {
+    let nodes = graph
+        .nodes
+        .iter()
+        .filter(|(_, node)| node.kind == IrReactiveNodeKind::Computed)
+        .map(|(id, node)| (id.clone(), node.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let edges = graph
+        .edges
+        .iter()
+        .filter(|edge| {
+            edge.kind == IrReactiveEdgeKind::Invalidates
+                && nodes.contains_key(&edge.source)
+                && nodes.contains_key(&edge.target)
+        })
+        .cloned()
+        .collect();
+    let inspection = IrUpdateScheduler::new(IrReactiveGraph { nodes, edges }).inspect();
+
+    IrComputedEvaluationPlan {
+        evaluation_order: inspection.order,
+        update_batches: inspection.batches,
+        unplanned: inspection.cycles,
+    }
 }
 
 fn reverse_reactive_adjacency(

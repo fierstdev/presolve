@@ -11,7 +11,8 @@ use crate::component_graph::{
 use crate::computed_value::{collect_computed_values, ComputedValue};
 use crate::expression_graph::{ExpressionGraph, ExpressionNode};
 use crate::intermediate_representation::{
-    IrReactiveCycleAnalysis, IrReactiveGraph, IrReactiveTransitiveAnalysis,
+    IrComputedEvaluationPlan, IrReactiveCycleAnalysis, IrReactiveGraph,
+    IrReactiveTransitiveAnalysis,
 };
 use crate::semantic_id::{SemanticId, SemanticOwner};
 use crate::semantic_provenance::SourceProvenance;
@@ -33,6 +34,7 @@ pub struct ApplicationSemanticModel {
     pub reactive_graph: IrReactiveGraph,
     pub reactive_transitive_analysis: IrReactiveTransitiveAnalysis,
     pub reactive_cycle_analysis: IrReactiveCycleAnalysis,
+    pub computed_evaluation_plan: IrComputedEvaluationPlan,
     pub templates: Vec<TemplateNode>,
     pub template_entities: Vec<TemplateSemanticEntity>,
     pub diagnostics: Vec<ComponentDiagnostic>,
@@ -480,13 +482,17 @@ pub fn build_application_semantic_model_from_component_graph(
         &template_entities,
         &ownership,
     );
-    let (reactive_graph, reactive_transitive_analysis, reactive_cycle_analysis) =
-        build_computed_reactive_products(
-            &component_graph.components,
-            &computed_values,
-            &references,
-            &provenance,
-        );
+    let (
+        reactive_graph,
+        reactive_transitive_analysis,
+        reactive_cycle_analysis,
+        computed_evaluation_plan,
+    ) = build_computed_reactive_products(
+        &component_graph.components,
+        &computed_values,
+        &references,
+        &provenance,
+    );
     let computed_cycle_diagnostics =
         collect_computed_cycle_diagnostics(&reactive_cycle_analysis, &computed_values);
 
@@ -510,6 +516,7 @@ pub fn build_application_semantic_model_from_component_graph(
         reactive_graph,
         reactive_transitive_analysis,
         reactive_cycle_analysis,
+        computed_evaluation_plan,
         templates,
         template_entities,
         diagnostics: component_graph
@@ -600,8 +607,12 @@ fn build_application_semantic_model_from_files_with_bindings(
         &expression_graph,
     ));
     extend_template_references(&mut references, &components, &template_entities, &ownership);
-    let (reactive_graph, reactive_transitive_analysis, reactive_cycle_analysis) =
-        build_computed_reactive_products(&components, &computed_values, &references, &provenance);
+    let (
+        reactive_graph,
+        reactive_transitive_analysis,
+        reactive_cycle_analysis,
+        computed_evaluation_plan,
+    ) = build_computed_reactive_products(&components, &computed_values, &references, &provenance);
     append_computed_cycle_diagnostics(&mut diagnostics, &reactive_cycle_analysis, &computed_values);
 
     let semantic_types = SemanticTypeModel::from_components_with_aliases_and_bindings(
@@ -628,6 +639,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         reactive_graph,
         reactive_transitive_analysis,
         reactive_cycle_analysis,
+        computed_evaluation_plan,
         templates,
         template_entities,
         diagnostics,
@@ -784,11 +796,13 @@ fn build_computed_reactive_products(
     IrReactiveGraph,
     IrReactiveTransitiveAnalysis,
     IrReactiveCycleAnalysis,
+    IrComputedEvaluationPlan,
 ) {
     let graph = crate::build_reactive_graph(components, computed_values, references, provenance);
     let transitive_analysis = crate::analyze_reactive_transitive_graph(&graph);
     let cycle_analysis = crate::analyze_reactive_cycles(&graph);
-    (graph, transitive_analysis, cycle_analysis)
+    let evaluation_plan = crate::plan_computed_evaluation(&graph);
+    (graph, transitive_analysis, cycle_analysis, evaluation_plan)
 }
 
 fn extend_template_references(
@@ -1573,6 +1587,79 @@ class ComputedDependencyCycles extends Component {
                     .provenance
                     .clone()
             )
+        );
+    }
+
+    #[test]
+    fn plans_deterministic_computed_evaluation_order_and_batches() {
+        let parsed = ezc_parser::parse_file(
+            "src/ComputedEvaluationPlan.tsx",
+            r#"
+@component("x-computed-evaluation-plan")
+class ComputedEvaluationPlan extends Component {
+  count = state(1);
+  other = state(2);
+
+  @computed()
+  get alpha() { return this.count; }
+
+  @computed()
+  get beta() { return this.other; }
+
+  @computed()
+  get gamma() { return this.alpha; }
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let component = &asm.components[0];
+        let alpha = component.id.computed("alpha");
+        let beta = component.id.computed("beta");
+        let gamma = component.id.computed("gamma");
+
+        assert_eq!(
+            asm.computed_evaluation_plan.evaluation_order,
+            vec![
+                alpha.as_str().to_string(),
+                beta.as_str().to_string(),
+                gamma.as_str().to_string(),
+            ]
+        );
+        assert_eq!(
+            asm.computed_evaluation_plan.update_batches,
+            vec![
+                vec![alpha.as_str().to_string(), beta.as_str().to_string()],
+                vec![gamma.as_str().to_string()],
+            ]
+        );
+        assert!(asm.computed_evaluation_plan.unplanned.is_empty());
+    }
+
+    #[test]
+    fn leaves_cyclic_computed_values_unplanned() {
+        let parsed = ezc_parser::parse_file(
+            "src/CyclicComputedEvaluationPlan.tsx",
+            r#"
+@component("x-cyclic-computed-evaluation-plan")
+class CyclicComputedEvaluationPlan extends Component {
+  @computed()
+  get alpha() { return this.beta; }
+
+  @computed()
+  get beta() { return this.alpha; }
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let component = &asm.components[0];
+        let alpha = component.id.computed("alpha");
+        let beta = component.id.computed("beta");
+
+        assert!(asm.computed_evaluation_plan.evaluation_order.is_empty());
+        assert!(asm.computed_evaluation_plan.update_batches.is_empty());
+        assert_eq!(
+            asm.computed_evaluation_plan.unplanned,
+            vec![alpha.as_str().to_string(), beta.as_str().to_string()]
         );
     }
 
