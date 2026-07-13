@@ -335,11 +335,11 @@ class Effects extends Component {
             reference.kind == SemanticReferenceKind::EffectState
                 && reference.target == component.id.state_field("title")
         }));
-        assert!(asm
-            .semantic_types
-            .assignments
-            .keys()
-            .all(|id| id != target && id != value));
+        assert!(asm.semantic_types.assignments.keys().any(|id| id == target));
+        assert_eq!(
+            asm.semantic_type_of(value),
+            Some(&crate::SemanticType::String)
+        );
 
         let invalid = asm
             .effect_body(&component.id.effect("invalid"))
@@ -368,5 +368,131 @@ class Effects extends Component {
                 UnsupportedEffectStatementKind::LocalDeclaration
             ))
         ));
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn types_effect_statements_against_the_versioned_capability_registry() {
+        let parsed = ezc_parser::parse_file(
+            "src/Effects.tsx",
+            r#"
+@component("x-effects")
+class Effects extends Component {
+  title = state("EdgeZero");
+  theme = state("dark");
+  total = state(3);
+  profile = state({ name: "Ada" });
+
+  @action()
+  increment() { this.total += 1; }
+
+  helper() {}
+
+  @effect()
+  sync() {
+    document.title = this.title;
+    console.log("total", this.total);
+    console.info(this.title);
+    console.warn(this.title);
+    console.error(this.title);
+    localStorage.setItem("theme", this.theme);
+    localStorage.removeItem("theme");
+    sessionStorage.setItem("theme", this.theme);
+    sessionStorage.removeItem("theme");
+  }
+
+  @effect()
+  facts() {
+    document.title = this.profile;
+    analytics.track(this.total);
+    this.total = 1;
+    this.increment();
+    this.sync();
+    this.helper();
+    this.unknown();
+    return;
+  }
+
+  render() { return <p />; }
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let component = &asm.components[0];
+        let sync = asm
+            .effect_body(&component.id.effect("sync"))
+            .expect("sync body");
+        let facts = asm
+            .effect_body(&component.id.effect("facts"))
+            .expect("facts body");
+        let record = |statement: &crate::SemanticId| {
+            asm.effect_statement_type(statement)
+                .expect("statement type")
+        };
+
+        assert_eq!(crate::EFFECT_CAPABILITY_REGISTRY.version(), 1);
+        assert_eq!(
+            record(&sync.statements[0]).capability_operation,
+            Some(crate::CapabilityOperationId(
+                "builtin.browser.document.title.assign"
+            ))
+        );
+        for statement in &sync.statements[1..5] {
+            assert_eq!(
+                record(statement).operation_classification,
+                crate::EffectOperationClassification::RecognizedCapability
+            );
+            assert_eq!(
+                record(statement).serialization_compatibility,
+                crate::EffectCompatibility::Compatible
+            );
+        }
+        for statement in &sync.statements[5..] {
+            assert_eq!(
+                record(statement).signature_compatibility,
+                crate::EffectCompatibility::Compatible
+            );
+        }
+        assert_eq!(
+            record(&facts.statements[0]).signature_compatibility,
+            crate::EffectCompatibility::Incompatible
+        );
+        assert_eq!(
+            record(&facts.statements[1]).operation_classification,
+            crate::EffectOperationClassification::UnknownExternalCapability
+        );
+        assert_eq!(
+            record(&facts.statements[1]).signature_compatibility,
+            crate::EffectCompatibility::Incompatible
+        );
+        assert_eq!(
+            record(&facts.statements[1]).operand_types,
+            vec![crate::SemanticType::Number]
+        );
+        assert_eq!(
+            record(&facts.statements[2]).operation_classification,
+            crate::EffectOperationClassification::ReactiveStateAssignment
+        );
+        assert_eq!(
+            record(&facts.statements[3]).operation_classification,
+            crate::EffectOperationClassification::ComponentActionCall
+        );
+        assert_eq!(
+            record(&facts.statements[4]).operation_classification,
+            crate::EffectOperationClassification::ComponentEffectCall
+        );
+        assert_eq!(
+            record(&facts.statements[5]).operation_classification,
+            crate::EffectOperationClassification::ComponentMethodCall
+        );
+        assert_eq!(
+            record(&facts.statements[6]).operation_classification,
+            crate::EffectOperationClassification::UnresolvedComponentCall
+        );
+        assert_eq!(
+            record(&facts.statements[7]).operation_classification,
+            crate::EffectOperationClassification::BareReturn
+        );
+        assert_eq!(validate_application_semantic_model(&asm), Vec::new());
     }
 }

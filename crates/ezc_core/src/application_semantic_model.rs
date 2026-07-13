@@ -18,7 +18,7 @@ use crate::intermediate_representation::{
 use crate::semantic_id::{SemanticId, SemanticOwner};
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
-use crate::semantic_type::SemanticTypeModel;
+use crate::semantic_type::{EffectStatementTypeRecord, SemanticTypeModel};
 use crate::template_graph::{build_template_graph, TemplateNode};
 use crate::template_semantics::{
     build_template_semantic_entities, TemplateSemanticEntity, TemplateSemanticKind,
@@ -178,6 +178,15 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub fn effect_body(&self, effect: &SemanticId) -> Option<&EffectBody> {
         self.effect_bodies.get(effect)
+    }
+
+    /// Returns F4 typing facts for one canonical effect statement.
+    #[must_use]
+    pub fn effect_statement_type(
+        &self,
+        statement: &SemanticId,
+    ) -> Option<&EffectStatementTypeRecord> {
+        self.semantic_types.effect_statements.get(statement)
     }
 
     #[must_use]
@@ -530,6 +539,8 @@ pub fn build_application_semantic_model_from_component_graph(
         SemanticTypeModel::from_components(&component_graph.components, &provenance),
         &component_graph.components,
         &computed_values,
+        &effects,
+        &effect_statements,
         &expression_graph,
         &references,
         &template_entities,
@@ -662,6 +673,8 @@ fn build_application_semantic_model_from_files_with_bindings(
         ),
         &components,
         &computed_values,
+        &effects,
+        &effect_statements,
         &expression_graph,
         &references,
         &template_entities,
@@ -725,10 +738,13 @@ fn extend_derived_entity_provenance(
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 fn finalize_semantic_types(
     semantic_types: SemanticTypeModel,
     components: &[ComponentNode],
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    effects: &BTreeMap<SemanticId, Effect>,
+    effect_statements: &BTreeMap<SemanticId, EffectStatement>,
     expression_graph: &ExpressionGraph,
     references: &[SemanticReference],
     template_entities: &[TemplateSemanticEntity],
@@ -736,6 +752,7 @@ fn finalize_semantic_types(
     semantic_types
         .with_expression_types(expression_graph, components)
         .with_computed_value_types(components, computed_values, expression_graph, references)
+        .with_effect_statement_types(components, effects, effect_statements, expression_graph)
         .with_template_binding_types(template_entities, references)
         .normalized()
 }

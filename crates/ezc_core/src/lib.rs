@@ -12,6 +12,7 @@ pub mod compiler_pass;
 pub mod component_graph;
 pub mod computed_value;
 pub mod effect;
+pub mod effect_capability;
 pub mod explain;
 pub mod expression_graph;
 pub mod html_codegen;
@@ -76,6 +77,13 @@ pub use effect::{
     collect_effects, lower_effect_bodies, Effect, EffectBody, EffectExecutionPolicy,
     EffectStatement, EffectStatementKind,
 };
+pub use effect_capability::{
+    ArgumentSerializationPolicy, BuiltinCapabilityProvenance, CapabilityDefinition, CapabilityId,
+    CapabilityOperation, CapabilityOperationId, CapabilityOperationKind, CapabilityParameters,
+    CapabilityResultPolicy, CapabilitySignature, CapabilityValueContract, EffectCapabilityRegistry,
+    RuntimeCapabilityLowering, StaticCapabilityPath, EFFECT_CAPABILITY_REGISTRY,
+    EFFECT_CAPABILITY_REGISTRY_VERSION,
+};
 pub use explain::{explain_json, explain_text};
 pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 pub use html_codegen::generate_static_html;
@@ -135,10 +143,10 @@ pub use semantic_type::{
     boundary_compatibility, dom_binding_contract, is_assignable, is_state_initializer_assignable,
     operator_result_type, semantic_type_text, serialization_compatibility,
     state_initializer_value_type, BoundaryCompatibility, ComputedValueType, DomBindingContract,
-    DomBindingKind, ExecutionBoundary, ObjectType, ResourceExecutionBoundary, ResourceType,
-    SemanticOperator, SemanticType, SemanticTypeAlias, SemanticTypeAssignment, SemanticTypeId,
-    SemanticTypeModel, SemanticTypeStatus, SerializationCompatibility, TypeDiagnosticCode,
-    TypeDiagnosticFamily,
+    DomBindingKind, EffectCompatibility, EffectOperationClassification, EffectStatementTypeRecord,
+    ExecutionBoundary, ObjectType, ResourceExecutionBoundary, ResourceType, SemanticOperator,
+    SemanticType, SemanticTypeAlias, SemanticTypeAssignment, SemanticTypeId, SemanticTypeModel,
+    SemanticTypeStatus, SerializationCompatibility, TypeDiagnosticCode, TypeDiagnosticFamily,
 };
 pub use summarize::summarize_source;
 pub use symbol_table::{

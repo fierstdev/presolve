@@ -3,12 +3,13 @@ use std::fmt;
 use std::path::PathBuf;
 
 use crate::{
-    BindingTable, ComponentNode, ComputedValue, ImportBindingTarget, SemanticId, SerializableValue,
-    SourceProvenance, SymbolKind,
+    BindingTable, CapabilityOperationId, CapabilityOperationKind, CapabilityParameters,
+    CapabilityValueContract, ComponentNode, ComputedValue, Effect, EffectStatement,
+    EffectStatementKind, ExpressionGraph, ExpressionNodeKind, ImportBindingTarget, SemanticId,
+    SerializableValue, SourceProvenance, SymbolKind, EFFECT_CAPABILITY_REGISTRY,
 };
 use crate::{
-    ExpressionGraph, ExpressionNodeKind, SemanticReference, SemanticReferenceKind,
-    TemplateSemanticEntity, TemplateSemanticKind,
+    SemanticReference, SemanticReferenceKind, TemplateSemanticEntity, TemplateSemanticKind,
 };
 use ezc_parser::ParsedTypeAlias;
 
@@ -299,6 +300,46 @@ pub struct SemanticTypeModel {
     pub member_accesses: BTreeMap<SemanticId, MemberAccessType>,
     pub computed_values: BTreeMap<SemanticId, ComputedValueType>,
     pub action_signatures: BTreeMap<SemanticId, ActionSignatureType>,
+    pub effect_statements: BTreeMap<SemanticId, EffectStatementTypeRecord>,
+}
+
+/// Compatibility facts recorded by effect typing without issuing F5 diagnostics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EffectCompatibility {
+    Compatible,
+    Incompatible,
+    Unknown,
+}
+
+/// The compiler-owned classification of one authored effect statement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EffectOperationClassification {
+    RecognizedCapability,
+    UnknownExternalCapability,
+    ReactiveStateAssignment,
+    ComponentActionCall,
+    ComponentEffectCall,
+    ComponentMethodCall,
+    UnresolvedComponentCall,
+    UnresolvedComponentAssignment,
+    BareReturn,
+    ValueReturn,
+    Empty,
+    UnsupportedStatement,
+}
+
+/// Immutable F4 typing and compatibility facts keyed by effect statement identity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EffectStatementTypeRecord {
+    pub statement: SemanticId,
+    pub operation_classification: EffectOperationClassification,
+    pub operand_types: Vec<SemanticType>,
+    pub target_type: Option<SemanticType>,
+    pub signature_compatibility: EffectCompatibility,
+    pub boundary_compatibility: EffectCompatibility,
+    pub serialization_compatibility: EffectCompatibility,
+    pub capability_operation: Option<CapabilityOperationId>,
+    pub provenance: SourceProvenance,
 }
 
 /// Canonical item and index type information for one template list scope.
@@ -622,6 +663,7 @@ impl SemanticTypeModel {
             member_accesses: BTreeMap::new(),
             computed_values: BTreeMap::new(),
             action_signatures: BTreeMap::new(),
+            effect_statements: BTreeMap::new(),
         }
     }
 
@@ -815,6 +857,17 @@ impl SemanticTypeModel {
                 *output = normalize_semantic_type(output.clone());
             }
         }
+        for statement in self.effect_statements.values_mut() {
+            statement.operand_types = statement
+                .operand_types
+                .iter()
+                .cloned()
+                .map(normalize_semantic_type)
+                .collect();
+            if let Some(target_type) = &mut statement.target_type {
+                *target_type = normalize_semantic_type(target_type.clone());
+            }
+        }
         self
     }
 
@@ -854,6 +907,80 @@ impl SemanticTypeModel {
                     provenance: node.provenance.clone(),
                 },
             );
+        }
+        self
+    }
+
+    /// Attaches effect operand types and statement-level capability facts.
+    ///
+    /// This consumes only the immutable registry and existing component/ASM
+    /// products. It intentionally records incompatibilities without emitting
+    /// semantic diagnostics; F5 owns language-rule rejection.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the graph's effect expression index contains an ID that
+    /// does not resolve to an expression node.
+    #[must_use]
+    pub fn with_effect_statement_types(
+        mut self,
+        components: &[ComponentNode],
+        effects: &BTreeMap<SemanticId, Effect>,
+        statements: &BTreeMap<SemanticId, EffectStatement>,
+        graph: &ExpressionGraph,
+    ) -> Self {
+        let components_by_id = components
+            .iter()
+            .map(|component| (component.id.clone(), component))
+            .collect::<BTreeMap<_, _>>();
+        let effect_nodes = effects
+            .values()
+            .flat_map(|effect| graph.nodes_for(&effect.id))
+            .map(|node| node.id.clone())
+            .collect::<Vec<_>>();
+        let mut expression_types = BTreeMap::new();
+        for id in effect_nodes {
+            infer_effect_expression_type(
+                &id,
+                graph,
+                &self.assignments,
+                &components_by_id,
+                effects,
+                &mut expression_types,
+            );
+        }
+        for (id, semantic_type) in expression_types {
+            let node = graph.node(&id).expect("effect expression graph node");
+            self.assignments.insert(
+                id.clone(),
+                SemanticTypeAssignment {
+                    id: SemanticTypeId::for_subject(&id),
+                    subject: id,
+                    semantic_type,
+                    origin: node.owner.clone(),
+                    status: SemanticTypeStatus::Inferred,
+                    provenance: node.provenance.clone(),
+                },
+            );
+        }
+        for statement in statements.values() {
+            let Some(effect) = effects.get(&statement.owner) else {
+                continue;
+            };
+            let Some(component_id) = effect.owner.entity_id() else {
+                continue;
+            };
+            let Some(component) = components_by_id.get(component_id) else {
+                continue;
+            };
+            let record = effect_statement_type_record(
+                statement,
+                effect,
+                component,
+                graph,
+                &self.assignments,
+            );
+            self.effect_statements.insert(statement.id.clone(), record);
         }
         self
     }
@@ -1204,6 +1331,438 @@ fn inferred_return_type(values: &[SerializableValue]) -> Option<SemanticType> {
         [semantic_type] => Some(semantic_type.clone()),
         _ if types.windows(2).all(|window| window[0] == window[1]) => types.pop(),
         _ => Some(SemanticType::Union(types)),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn infer_effect_expression_type(
+    id: &SemanticId,
+    graph: &ExpressionGraph,
+    assignments: &BTreeMap<SemanticId, SemanticTypeAssignment>,
+    components: &BTreeMap<SemanticId, &ComponentNode>,
+    effects: &BTreeMap<SemanticId, Effect>,
+    expression_types: &mut BTreeMap<SemanticId, SemanticType>,
+) -> SemanticType {
+    if let Some(semantic_type) = expression_types.get(id) {
+        return semantic_type.clone();
+    }
+    let node = graph.node(id).expect("effect expression graph node");
+    let child_type =
+        |child: &SemanticId, expression_types: &mut BTreeMap<SemanticId, SemanticType>| {
+            infer_effect_expression_type(
+                child,
+                graph,
+                assignments,
+                components,
+                effects,
+                expression_types,
+            )
+        };
+    let semantic_type = match &node.kind {
+        ExpressionNodeKind::Literal(value) => state_initializer_value_type(value),
+        ExpressionNodeKind::Boolean(value) => SemanticType::BooleanLiteral(*value),
+        ExpressionNodeKind::Identifier(_) => SemanticType::Unknown,
+        ExpressionNodeKind::ThisMember { name } => effects
+            .get(&node.owner)
+            .and_then(|effect| effect.owner.entity_id())
+            .and_then(|component_id| components.get(component_id))
+            .and_then(|component| {
+                component
+                    .state_fields
+                    .iter()
+                    .find(|field| field.name == *name)
+                    .map(|field| field.id.clone())
+                    .or_else(|| {
+                        let computed = component.id.computed(name);
+                        assignments.contains_key(&computed).then_some(computed)
+                    })
+            })
+            .and_then(|target| assignments.get(&target))
+            .map_or(SemanticType::Unknown, |assignment| {
+                assignment.semantic_type.clone()
+            }),
+        ExpressionNodeKind::MemberAccess { object, property } => {
+            computed_member_access_type(&child_type(object, expression_types), property)
+        }
+        ExpressionNodeKind::Arithmetic {
+            left,
+            right,
+            operator,
+        } => operator_result_type(
+            SemanticOperator::Arithmetic(*operator),
+            &[
+                child_type(left, expression_types),
+                child_type(right, expression_types),
+            ],
+        )
+        .unwrap_or(SemanticType::Unknown),
+        ExpressionNodeKind::Comparison {
+            left,
+            right,
+            operator,
+        } => operator_result_type(
+            SemanticOperator::Comparison(*operator),
+            &[
+                child_type(left, expression_types),
+                child_type(right, expression_types),
+            ],
+        )
+        .unwrap_or(SemanticType::Unknown),
+        ExpressionNodeKind::Logical {
+            left,
+            right,
+            operator,
+        } => operator_result_type(
+            SemanticOperator::Logical(*operator),
+            &[
+                child_type(left, expression_types),
+                child_type(right, expression_types),
+            ],
+        )
+        .unwrap_or(SemanticType::Unknown),
+        ExpressionNodeKind::NullishCoalescing { left, right } => operator_result_type(
+            SemanticOperator::NullishCoalescing,
+            &[
+                child_type(left, expression_types),
+                child_type(right, expression_types),
+            ],
+        )
+        .unwrap_or(SemanticType::Unknown),
+        ExpressionNodeKind::Unary { operand, operator } => operator_result_type(
+            SemanticOperator::Unary(*operator),
+            &[child_type(operand, expression_types)],
+        )
+        .unwrap_or(SemanticType::Unknown),
+    };
+    expression_types.insert(id.clone(), semantic_type.clone());
+    semantic_type
+}
+
+#[allow(clippy::too_many_lines)]
+fn effect_statement_type_record(
+    statement: &EffectStatement,
+    effect: &Effect,
+    component: &ComponentNode,
+    graph: &ExpressionGraph,
+    assignments: &BTreeMap<SemanticId, SemanticTypeAssignment>,
+) -> EffectStatementTypeRecord {
+    let expression_type = |id: &SemanticId| {
+        assignments
+            .get(id)
+            .map_or(SemanticType::Unknown, |assignment| {
+                assignment.semantic_type.clone()
+            })
+    };
+    let record = |operation_classification,
+                  operand_types,
+                  target_type,
+                  signature_compatibility,
+                  boundary_compatibility,
+                  serialization_compatibility,
+                  capability_operation| EffectStatementTypeRecord {
+        statement: statement.id.clone(),
+        operation_classification,
+        operand_types,
+        target_type,
+        signature_compatibility,
+        boundary_compatibility,
+        serialization_compatibility,
+        capability_operation,
+        provenance: statement.provenance.clone(),
+    };
+    match &statement.kind {
+        EffectStatementKind::ExternalMemberAssignment { target, value } => {
+            let value_type = expression_type(value);
+            if let Some(name) = this_member_name(target, graph) {
+                if let Some(field) = component
+                    .state_fields
+                    .iter()
+                    .find(|field| field.name == name)
+                {
+                    let target_type = assignments
+                        .get(&field.id)
+                        .map(|assignment| assignment.semantic_type.clone());
+                    let signature = target_type
+                        .as_ref()
+                        .map_or(EffectCompatibility::Unknown, |target| {
+                            effect_assignability(&value_type, target)
+                        });
+                    return record(
+                        EffectOperationClassification::ReactiveStateAssignment,
+                        vec![value_type],
+                        target_type,
+                        signature,
+                        EffectCompatibility::Compatible,
+                        EffectCompatibility::Compatible,
+                        None,
+                    );
+                }
+                return record(
+                    EffectOperationClassification::UnresolvedComponentAssignment,
+                    vec![value_type],
+                    None,
+                    EffectCompatibility::Unknown,
+                    EffectCompatibility::Unknown,
+                    EffectCompatibility::Unknown,
+                    None,
+                );
+            }
+            let path = static_capability_path(target, graph);
+            let operation = path.as_deref().and_then(|path| {
+                EFFECT_CAPABILITY_REGISTRY
+                    .operation_at(path, CapabilityOperationKind::MemberAssignment)
+            });
+            let Some(operation) = operation else {
+                return record(
+                    EffectOperationClassification::UnknownExternalCapability,
+                    vec![value_type],
+                    None,
+                    EffectCompatibility::Unknown,
+                    EffectCompatibility::Unknown,
+                    EffectCompatibility::Unknown,
+                    None,
+                );
+            };
+            let target_type = operation_value_type(operation.signature.parameters, 0);
+            let signature = target_type
+                .as_ref()
+                .map_or(EffectCompatibility::Unknown, |target| {
+                    effect_assignability(&value_type, target)
+                });
+            record(
+                EffectOperationClassification::RecognizedCapability,
+                vec![value_type],
+                target_type,
+                signature,
+                effect_boundary_compatibility(effect, operation.boundary),
+                EffectCompatibility::Compatible,
+                Some(operation.id),
+            )
+        }
+        EffectStatementKind::CapabilityCall { callee, arguments } => {
+            let argument_types = arguments.iter().map(expression_type).collect::<Vec<_>>();
+            if let Some(name) = this_member_name(callee, graph) {
+                let classification = component
+                    .methods
+                    .iter()
+                    .find(|method| method.name == name)
+                    .map_or(
+                        EffectOperationClassification::UnresolvedComponentCall,
+                        |method| {
+                            if method.is_action() {
+                                EffectOperationClassification::ComponentActionCall
+                            } else if method.is_effect() {
+                                EffectOperationClassification::ComponentEffectCall
+                            } else {
+                                EffectOperationClassification::ComponentMethodCall
+                            }
+                        },
+                    );
+                return record(
+                    classification,
+                    argument_types,
+                    None,
+                    EffectCompatibility::Unknown,
+                    EffectCompatibility::Compatible,
+                    EffectCompatibility::Compatible,
+                    None,
+                );
+            }
+            let path = static_capability_path(callee, graph);
+            let operation = path.as_deref().and_then(|path| {
+                EFFECT_CAPABILITY_REGISTRY.operation_at(path, CapabilityOperationKind::MethodCall)
+            });
+            let Some(operation) = operation else {
+                return record(
+                    EffectOperationClassification::UnknownExternalCapability,
+                    argument_types,
+                    None,
+                    EffectCompatibility::Incompatible,
+                    EffectCompatibility::Unknown,
+                    EffectCompatibility::Unknown,
+                    None,
+                );
+            };
+            let signature =
+                operation_signature_compatibility(operation.signature.parameters, &argument_types);
+            let serialization = match operation.argument_serialization {
+                crate::ArgumentSerializationPolicy::None => EffectCompatibility::Compatible,
+                crate::ArgumentSerializationPolicy::Structural => argument_types.iter().fold(
+                    EffectCompatibility::Compatible,
+                    |compatibility, semantic_type| {
+                        combine_effect_compatibility(
+                            compatibility,
+                            if serialization_compatibility(semantic_type)
+                                == SerializationCompatibility::Serializable
+                            {
+                                EffectCompatibility::Compatible
+                            } else {
+                                EffectCompatibility::Incompatible
+                            },
+                        )
+                    },
+                ),
+            };
+            record(
+                EffectOperationClassification::RecognizedCapability,
+                argument_types,
+                None,
+                signature,
+                effect_boundary_compatibility(effect, operation.boundary),
+                serialization,
+                Some(operation.id),
+            )
+        }
+        EffectStatementKind::EffectReturn { value: None } => record(
+            EffectOperationClassification::BareReturn,
+            Vec::new(),
+            None,
+            EffectCompatibility::Compatible,
+            EffectCompatibility::Compatible,
+            EffectCompatibility::Compatible,
+            None,
+        ),
+        EffectStatementKind::EffectReturn { value: Some(value) } => record(
+            EffectOperationClassification::ValueReturn,
+            vec![expression_type(value)],
+            None,
+            EffectCompatibility::Incompatible,
+            EffectCompatibility::Compatible,
+            EffectCompatibility::Compatible,
+            None,
+        ),
+        EffectStatementKind::Empty => record(
+            EffectOperationClassification::Empty,
+            Vec::new(),
+            None,
+            EffectCompatibility::Compatible,
+            EffectCompatibility::Compatible,
+            EffectCompatibility::Compatible,
+            None,
+        ),
+        EffectStatementKind::Unsupported(_) => record(
+            EffectOperationClassification::UnsupportedStatement,
+            Vec::new(),
+            None,
+            EffectCompatibility::Incompatible,
+            EffectCompatibility::Unknown,
+            EffectCompatibility::Unknown,
+            None,
+        ),
+    }
+}
+
+fn this_member_name<'a>(id: &SemanticId, graph: &'a ExpressionGraph) -> Option<&'a str> {
+    match &graph.node(id)?.kind {
+        ExpressionNodeKind::ThisMember { name } => Some(name),
+        _ => None,
+    }
+}
+
+fn static_capability_path(id: &SemanticId, graph: &ExpressionGraph) -> Option<String> {
+    match &graph.node(id)?.kind {
+        ExpressionNodeKind::Identifier(name) if name != "this" => Some(name.clone()),
+        ExpressionNodeKind::MemberAccess { object, property } => Some(format!(
+            "{}.{}",
+            static_capability_path(object, graph)?,
+            property
+        )),
+        _ => None,
+    }
+}
+
+fn operation_value_type(parameters: CapabilityParameters, index: usize) -> Option<SemanticType> {
+    match parameters {
+        CapabilityParameters::Fixed(parameters) => parameters
+            .get(index)
+            .and_then(|parameter| parameter.semantic_type()),
+        CapabilityParameters::Variadic(parameter) => parameter.semantic_type(),
+    }
+}
+
+fn operation_signature_compatibility(
+    parameters: CapabilityParameters,
+    arguments: &[SemanticType],
+) -> EffectCompatibility {
+    match parameters {
+        CapabilityParameters::Fixed(parameters) if parameters.len() != arguments.len() => {
+            EffectCompatibility::Incompatible
+        }
+        CapabilityParameters::Fixed(parameters) => parameters.iter().zip(arguments).fold(
+            EffectCompatibility::Compatible,
+            |compatibility, (parameter, argument)| {
+                combine_effect_compatibility(
+                    compatibility,
+                    capability_value_compatibility(*parameter, argument),
+                )
+            },
+        ),
+        CapabilityParameters::Variadic(parameter) => arguments.iter().fold(
+            EffectCompatibility::Compatible,
+            |compatibility, argument| {
+                combine_effect_compatibility(
+                    compatibility,
+                    capability_value_compatibility(parameter, argument),
+                )
+            },
+        ),
+    }
+}
+
+fn capability_value_compatibility(
+    contract: CapabilityValueContract,
+    value: &SemanticType,
+) -> EffectCompatibility {
+    match contract {
+        CapabilityValueContract::String => effect_assignability(
+            value,
+            &contract
+                .semantic_type()
+                .expect("string capability contract type"),
+        ),
+        CapabilityValueContract::SerializableDiagnosticValue => {
+            if serialization_compatibility(value) == SerializationCompatibility::Serializable {
+                EffectCompatibility::Compatible
+            } else {
+                EffectCompatibility::Incompatible
+            }
+        }
+    }
+}
+
+fn effect_assignability(source: &SemanticType, target: &SemanticType) -> EffectCompatibility {
+    if source == &SemanticType::Unknown || source == &SemanticType::Never {
+        EffectCompatibility::Unknown
+    } else if is_assignable(source, target) {
+        EffectCompatibility::Compatible
+    } else {
+        EffectCompatibility::Incompatible
+    }
+}
+
+fn effect_boundary_compatibility(
+    effect: &Effect,
+    operation_boundary: ExecutionBoundary,
+) -> EffectCompatibility {
+    if effect.execution_boundary == operation_boundary {
+        EffectCompatibility::Compatible
+    } else {
+        EffectCompatibility::Incompatible
+    }
+}
+
+fn combine_effect_compatibility(
+    left: EffectCompatibility,
+    right: EffectCompatibility,
+) -> EffectCompatibility {
+    match (left, right) {
+        (EffectCompatibility::Incompatible, _) | (_, EffectCompatibility::Incompatible) => {
+            EffectCompatibility::Incompatible
+        }
+        (EffectCompatibility::Unknown, _) | (_, EffectCompatibility::Unknown) => {
+            EffectCompatibility::Unknown
+        }
+        _ => EffectCompatibility::Compatible,
     }
 }
 

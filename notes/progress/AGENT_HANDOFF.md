@@ -3,31 +3,30 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: F3 - effect reference resolution
-* Working tree: clean after the F3 commit
+* Latest completed slice: F4 - effect typing and capability registry
+* Working tree: clean after the F4 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: F3 - effect reference resolution
-* Summary: Effect expression `this.<name>` reads now resolve through canonical `EffectState` and `EffectComputed` semantic references.
-* Key files: crates/ezc_parser/src/model.rs; crates/ezc_parser/src/oxc_adapter.rs; crates/ezc_core/src/effect.rs; crates/ezc_core/src/expression_graph.rs; crates/ezc_core/src/component_graph.rs; crates/ezc_core/src/application_semantic_model.rs
-* New behavior: F2 retains static-member assignments, direct static calls, final bare returns, value-return candidates, and unsupported local/branch/loop/block/exception/compound forms in authored order with statement and operand provenance. No reference resolution, type assignments, reactive relations, scheduling, IR, runtime metadata, or execution is produced.
-* Fixtures added or changed: fixtures/0052-effect-body-lowering/input/Effects.tsx, with parser and core lowering coverage.
+* Slice: F4 - effect typing and capability registry
+* Summary: A versioned immutable compiler registry now owns the complete initial browser capability vocabulary, and every lowered effect statement receives canonical operand types, capability identity/classification, signature, boundary, and serialization compatibility facts.
+* Key files: crates/ezc_core/src/effect_capability.rs; crates/ezc_core/src/semantic_type.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_core/src/effect.rs
+* New behavior: Exact `document.title`, `console.{log,info,warn,error}`, `localStorage.{setItem,removeItem}`, and `sessionStorage.{setItem,removeItem}` paths resolve through registry v1. Unknown external calls/assignments remain unknown rather than `any`, while arguments and values are still typed. `this` calls classify as action/effect/method/unresolved component calls; reactive state assignments retain type compatibility facts for F5.
+* Fixtures added or changed: Core coverage exercises every initial registry operation plus known/unknown capability, reactive assignment, and component-call classifications. No runtime fixture is needed because F4 adds no execution behavior.
 
 Current in-progress slice
 
-* Slice: F4 - effect typing
-* Status: Paused awaiting the canonical capability type/registry contract
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F3
-* Remaining: F4 - effect typing, then F5 through F20. Do not begin F4 capability validation until the contract below is decided.
+* Slice: F5 - effect semantic validation
+* Status: Ready to begin after the F4 commit
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F4
+* Remaining: F5 - effect semantic validation, then F6 through F20. Consume F4 records; do not duplicate capability recognition or type/boundary analysis.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_parser: pass
-* cargo test -p ezc_core: pass
-* cargo clippy --workspace --all-targets -- -D warnings: pass
+* cargo test -p ezc_core --lib: pass (157 tests)
+* cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 
 Architecture decisions made
 
@@ -51,9 +50,9 @@ Architecture decisions made
 * Reason: Effect ownership remains the reactive consumer identity while individual expression spans still support later diagnostics.
 * Tradeoff: F3 resolves only direct `this.<name>` reads. It does not classify call targets, validate assignments, infer types, or build reactive edges.
 
-* Decision needed before F4: define the canonical capability registry and its type signatures for static host members and calls.
-* Reason: F4 must type assignment targets and capability call operands and validate execution-boundary/capability compatibility, but current compiler products do not define recognized capabilities, their member signatures, or their client boundary contracts. An ad hoc `document`/`storage`/`analytics` allowlist would become an unowned language authority and predetermine F5, F10, F12, and F13 semantics.
-* Tradeoff: F3 remains complete and committed. Await guidance on the initial recognized capability names/member paths/call signatures and the treatment of unknown static identifiers before assigning effect operand types or capability compatibility results.
+* Decision: F4 consumes registry version 1 as the sole authority for external effect operations.
+* Reason: Stable capability and operation IDs, exact static paths, signatures, client boundaries, argument serialization, and runtime-lowering identities must originate in one immutable compiler product. `EffectStatementTypeRecord` projects its facts by statement identity without browser-global inspection or duplicated recognition in diagnostics/IR/runtime layers.
+* Tradeoff: The initial registry is deliberately limited to `document.title`, console logging, and local/session storage writes. Unknown paths are never `any`; F4 records their typed operands plus incompatible/unknown compatibility evidence, while F5 owns semantic rejection and diagnostics. No capability extensions, reactive edges, scheduler placement, IR, runtime metadata, or execution are added here.
 
 * Decision: ASM validation resolves typed subjects through either canonical semantic entities or canonical expression-graph nodes, using the subject's authoritative provenance in either case.
 * Reason: Expression nodes are first-class compiler products with stable IDs and spans, but are intentionally not modeled as generic semantic entities. Validation must preserve that separation while accepting their canonical type assignments.
