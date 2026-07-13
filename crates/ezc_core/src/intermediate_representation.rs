@@ -1,9 +1,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
+use crate::component_graph::{
+    ArithmeticOperator, ComparisonOperator, LogicalOperator, UnaryOperator,
+};
 use crate::{
-    ApplicationSemanticModel, ComponentNode, ComputedValue, SemanticId, SemanticReference,
-    SemanticReferenceKind, SemanticType, SourceProvenance,
+    ApplicationSemanticModel, ComponentNode, ComputedPurity, ComputedValue, ExpressionNode,
+    ExpressionNodeKind, SemanticId, SemanticReference, SemanticReferenceKind, SemanticType,
+    SerializableValue, SourceProvenance,
 };
 
 /// Compiler-owned intermediate representation, independent of backend output.
@@ -21,12 +25,22 @@ pub struct IrModule {
     pub storage_initializers: Vec<IrInstruction>,
     pub template_entrypoints: Vec<IrTemplateEntrypoint>,
     pub functions: Vec<IrFunction>,
+    pub computed_evaluations: Vec<IrComputedEvaluation>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IrTemplateEntrypoint {
     pub template: SemanticId,
     pub render_method: SemanticId,
+    pub provenance: SourceProvenance,
+}
+
+/// Canonical IR evaluation result for one computed semantic entity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrComputedEvaluation {
+    pub computed: SemanticId,
+    pub function: SemanticId,
+    pub result: IrValueId,
     pub provenance: SourceProvenance,
 }
 
@@ -678,82 +692,322 @@ pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateR
                 storage_initializers: Vec::new(),
                 template_entrypoints: Vec::new(),
                 functions: Vec::new(),
+                computed_evaluations: Vec::new(),
             });
-        module.components.push(component.id.clone());
-        module
-            .storages
-            .extend(component.state_fields.iter().filter_map(|field| {
-                model.provenance(&field.id).map(|provenance| IrStorage {
-                    id: IrStorageId::for_semantic_origin(&field.id),
-                    semantic_origin: field.id.clone(),
-                    value_type: model
-                        .semantic_types
-                        .assignments
-                        .get(&field.id)
-                        .map_or(SemanticType::Unknown, |assignment| {
-                            assignment.semantic_type.clone()
-                        }),
-                    initial_value: field.initial_value.clone(),
-                    provenance: provenance.clone(),
-                })
-            }));
-        let storage_offset = module.storage_initializers.len();
-        module
-            .storage_initializers
-            .extend(
-                component
-                    .state_fields
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(index, field)| {
-                        model.provenance(&field.id).map(|provenance| IrInstruction {
-                            id: IrInstructionId::for_module(&module.path, storage_offset + index),
-                            provenance: provenance.clone(),
-                            result: None,
-                            semantic_origin: Some(field.id.clone()),
-                            kind: IrInstructionKind::InitializeStorage {
-                                storage: IrStorageId::for_semantic_origin(&field.id),
-                            },
-                        })
-                    }),
-            );
-        if let (Some(template), Some(render)) = (
-            model
-                .templates
-                .iter()
-                .find(|template| template.component_name == component.class_name),
-            component
-                .methods
-                .iter()
-                .find(|method| method.name == "render"),
-        ) {
-            module.template_entrypoints.push(IrTemplateEntrypoint {
-                template: template.id.clone(),
-                render_method: render.id.clone(),
-                provenance: template.provenance.clone(),
-            });
-        }
-        module
-            .functions
-            .extend(component.methods.iter().filter_map(|method| {
-                model.provenance(&method.id).map(|provenance| IrFunction {
-                    id: method.id.clone(),
-                    name: method.name.clone(),
-                    provenance: provenance.clone(),
-                    entry_block: IrBlockId::entry_for(&method.id),
-                    blocks: vec![IrBlock {
-                        id: IrBlockId::entry_for(&method.id),
-                        provenance: provenance.clone(),
-                        instructions: Vec::new(),
-                    }],
-                    branch_edges: Vec::new(),
-                    values: BTreeMap::new(),
-                    loops: Vec::new(),
-                })
-            }));
+        lower_component_to_ir(model, component, module);
     }
     IntermediateRepresentation {
         modules: modules.into_values().collect(),
+    }
+}
+
+fn lower_component_to_ir(
+    model: &ApplicationSemanticModel,
+    component: &ComponentNode,
+    module: &mut IrModule,
+) {
+    module.components.push(component.id.clone());
+    module
+        .storages
+        .extend(component.state_fields.iter().filter_map(|field| {
+            model.provenance(&field.id).map(|provenance| IrStorage {
+                id: IrStorageId::for_semantic_origin(&field.id),
+                semantic_origin: field.id.clone(),
+                value_type: model
+                    .semantic_types
+                    .assignments
+                    .get(&field.id)
+                    .map_or(SemanticType::Unknown, |assignment| {
+                        assignment.semantic_type.clone()
+                    }),
+                initial_value: field.initial_value.clone(),
+                provenance: provenance.clone(),
+            })
+        }));
+    let storage_offset = module.storage_initializers.len();
+    module
+        .storage_initializers
+        .extend(
+            component
+                .state_fields
+                .iter()
+                .enumerate()
+                .filter_map(|(index, field)| {
+                    model.provenance(&field.id).map(|provenance| IrInstruction {
+                        id: IrInstructionId::for_module(&module.path, storage_offset + index),
+                        provenance: provenance.clone(),
+                        result: None,
+                        semantic_origin: Some(field.id.clone()),
+                        kind: IrInstructionKind::InitializeStorage {
+                            storage: IrStorageId::for_semantic_origin(&field.id),
+                        },
+                    })
+                }),
+        );
+    if let (Some(template), Some(render)) = (
+        model
+            .templates
+            .iter()
+            .find(|template| template.component_name == component.class_name),
+        component
+            .methods
+            .iter()
+            .find(|method| method.name == "render"),
+    ) {
+        module.template_entrypoints.push(IrTemplateEntrypoint {
+            template: template.id.clone(),
+            render_method: render.id.clone(),
+            provenance: template.provenance.clone(),
+        });
+    }
+    module
+        .functions
+        .extend(component.methods.iter().filter_map(|method| {
+            model.provenance(&method.id).map(|provenance| IrFunction {
+                id: method.id.clone(),
+                name: method.name.clone(),
+                provenance: provenance.clone(),
+                entry_block: IrBlockId::entry_for(&method.id),
+                blocks: vec![IrBlock {
+                    id: IrBlockId::entry_for(&method.id),
+                    provenance: provenance.clone(),
+                    instructions: Vec::new(),
+                }],
+                branch_edges: Vec::new(),
+                values: BTreeMap::new(),
+                loops: Vec::new(),
+            })
+        }));
+    for computed in model
+        .computed_evaluation_plan
+        .evaluation_order
+        .iter()
+        .filter_map(|id| {
+            model
+                .computed_values
+                .values()
+                .find(|computed| computed.id.as_str() == id)
+        })
+    {
+        if computed.owner.entity_id() != Some(&component.id)
+            || computed.purity != ComputedPurity::Pure
+        {
+            continue;
+        }
+        if let Some((function, evaluation)) = lower_computed_evaluation(model, component, computed)
+        {
+            module.functions.push(function);
+            module.computed_evaluations.push(evaluation);
+        }
+    }
+}
+
+fn lower_computed_evaluation(
+    model: &ApplicationSemanticModel,
+    component: &ComponentNode,
+    computed: &ComputedValue,
+) -> Option<(IrFunction, IrComputedEvaluation)> {
+    let root = model.expression_graph.root_for(&computed.id)?.clone();
+    let entry_block = IrBlockId::entry_for(&computed.id);
+    let mut lowering = ComputedIrLowering {
+        model,
+        component,
+        computed,
+        entry_block: entry_block.clone(),
+        instructions: Vec::new(),
+        values: BTreeMap::new(),
+    };
+    let result = lowering.lower_node(&root)?;
+    let function = IrFunction {
+        id: computed.id.clone(),
+        name: computed.name.clone(),
+        provenance: computed.provenance.clone(),
+        entry_block: entry_block.clone(),
+        blocks: vec![IrBlock {
+            id: entry_block,
+            provenance: computed.provenance.clone(),
+            instructions: lowering.instructions,
+        }],
+        branch_edges: Vec::new(),
+        values: lowering.values,
+        loops: Vec::new(),
+    };
+    let evaluation = IrComputedEvaluation {
+        computed: computed.id.clone(),
+        function: function.id.clone(),
+        result,
+        provenance: computed.provenance.clone(),
+    };
+    Some((function, evaluation))
+}
+
+struct ComputedIrLowering<'a> {
+    model: &'a ApplicationSemanticModel,
+    component: &'a ComponentNode,
+    computed: &'a ComputedValue,
+    entry_block: IrBlockId,
+    instructions: Vec<IrInstruction>,
+    values: BTreeMap<IrValueId, IrValue>,
+}
+
+impl ComputedIrLowering<'_> {
+    fn lower_node(&mut self, id: &SemanticId) -> Option<IrValueId> {
+        let node = self.model.expression_graph.node(id)?.clone();
+        let kind = match node.kind.clone() {
+            ExpressionNodeKind::Literal(value) => IrInstructionKind::Constant {
+                value: ir_constant(value),
+            },
+            ExpressionNodeKind::Boolean(value) => IrInstructionKind::Constant {
+                value: IrConstant::Boolean(value),
+            },
+            ExpressionNodeKind::ThisMember { name } => self.lower_this_member(&name)?,
+            ExpressionNodeKind::MemberAccess { object, property } => IrInstructionKind::GetMember {
+                object: IrOperand::Value(self.lower_node(&object)?),
+                property,
+            },
+            ExpressionNodeKind::Arithmetic {
+                left,
+                right,
+                operator,
+            } => IrInstructionKind::Binary {
+                operation: ir_arithmetic_operation(operator),
+                left: IrOperand::Value(self.lower_node(&left)?),
+                right: IrOperand::Value(self.lower_node(&right)?),
+            },
+            ExpressionNodeKind::Comparison {
+                left,
+                right,
+                operator,
+            } => IrInstructionKind::Binary {
+                operation: ir_comparison_operation(operator),
+                left: IrOperand::Value(self.lower_node(&left)?),
+                right: IrOperand::Value(self.lower_node(&right)?),
+            },
+            ExpressionNodeKind::Logical {
+                left,
+                right,
+                operator,
+            } => IrInstructionKind::Binary {
+                operation: ir_logical_operation(operator),
+                left: IrOperand::Value(self.lower_node(&left)?),
+                right: IrOperand::Value(self.lower_node(&right)?),
+            },
+            ExpressionNodeKind::NullishCoalescing { left, right } => IrInstructionKind::Binary {
+                operation: IrBinaryOperation::NullishCoalesce,
+                left: IrOperand::Value(self.lower_node(&left)?),
+                right: IrOperand::Value(self.lower_node(&right)?),
+            },
+            ExpressionNodeKind::Unary { operand, operator } => IrInstructionKind::Unary {
+                operation: ir_unary_operation(operator),
+                operand: IrOperand::Value(self.lower_node(&operand)?),
+            },
+        };
+        Some(self.emit(node, kind))
+    }
+
+    fn lower_this_member(&self, name: &str) -> Option<IrInstructionKind> {
+        let target = self
+            .component
+            .state_fields
+            .iter()
+            .find(|field| field.name == name)
+            .map(|field| field.id.clone())
+            .or_else(|| {
+                self.model
+                    .computed_values
+                    .get(&self.component.id.computed(name))
+                    .map(|computed| computed.id.clone())
+            })?;
+        self.model
+            .references
+            .iter()
+            .find(|reference| reference.source == self.computed.id && reference.target == target)?;
+        if self
+            .component
+            .state_fields
+            .iter()
+            .any(|field| field.id == target)
+        {
+            Some(IrInstructionKind::LoadStorage {
+                storage: IrStorageId::for_semantic_origin(&target),
+            })
+        } else {
+            Some(IrInstructionKind::LoadComputed { computed: target })
+        }
+    }
+
+    fn emit(&mut self, node: ExpressionNode, kind: IrInstructionKind) -> IrValueId {
+        let value = IrValueId::for_function(&self.computed.id, self.values.len());
+        let instruction = IrInstructionId::for_block(&self.entry_block, self.instructions.len());
+        self.values.insert(
+            value.clone(),
+            IrValue {
+                id: value.clone(),
+                definition: IrValueDefinition::Instruction(instruction.clone()),
+                semantic_type: self
+                    .model
+                    .semantic_type_of(&node.id)
+                    .cloned()
+                    .unwrap_or(SemanticType::Unknown),
+                provenance: node.provenance.clone(),
+                semantic_origin: Some(node.id.clone()),
+            },
+        );
+        self.instructions.push(IrInstruction {
+            id: instruction,
+            provenance: node.provenance,
+            result: Some(value.clone()),
+            semantic_origin: Some(node.id),
+            kind,
+        });
+        value
+    }
+}
+
+fn ir_constant(value: SerializableValue) -> IrConstant {
+    match value {
+        SerializableValue::Null => IrConstant::Null,
+        SerializableValue::Boolean(value) => IrConstant::Boolean(value),
+        SerializableValue::Number(value) => IrConstant::Number(value),
+        SerializableValue::String(value) => IrConstant::String(value),
+        SerializableValue::Array(value) => IrConstant::Array(value),
+        SerializableValue::Object(value) => IrConstant::Object(value),
+    }
+}
+
+const fn ir_arithmetic_operation(operator: ArithmeticOperator) -> IrBinaryOperation {
+    match operator {
+        ArithmeticOperator::Add => IrBinaryOperation::Add,
+        ArithmeticOperator::Subtract => IrBinaryOperation::Subtract,
+        ArithmeticOperator::Multiply => IrBinaryOperation::Multiply,
+        ArithmeticOperator::Divide => IrBinaryOperation::Divide,
+        ArithmeticOperator::Remainder => IrBinaryOperation::Remainder,
+    }
+}
+
+const fn ir_comparison_operation(operator: ComparisonOperator) -> IrBinaryOperation {
+    match operator {
+        ComparisonOperator::Equal => IrBinaryOperation::Equal,
+        ComparisonOperator::NotEqual => IrBinaryOperation::NotEqual,
+        ComparisonOperator::LessThan => IrBinaryOperation::LessThan,
+        ComparisonOperator::LessThanOrEqual => IrBinaryOperation::LessThanOrEqual,
+        ComparisonOperator::GreaterThan => IrBinaryOperation::GreaterThan,
+        ComparisonOperator::GreaterThanOrEqual => IrBinaryOperation::GreaterThanOrEqual,
+    }
+}
+
+const fn ir_logical_operation(operator: LogicalOperator) -> IrBinaryOperation {
+    match operator {
+        LogicalOperator::And => IrBinaryOperation::And,
+        LogicalOperator::Or => IrBinaryOperation::Or,
+    }
+}
+
+const fn ir_unary_operation(operator: UnaryOperator) -> IrUnaryOperation {
+    match operator {
+        UnaryOperator::Not => IrUnaryOperation::Not,
+        UnaryOperator::Plus => IrUnaryOperation::Identity,
+        UnaryOperator::Minus => IrUnaryOperation::Negate,
     }
 }
 
@@ -924,6 +1178,8 @@ pub enum IrConstant {
     Boolean(bool),
     Number(String),
     String(String),
+    Array(Vec<SerializableValue>),
+    Object(BTreeMap<String, SerializableValue>),
 }
 
 /// A closed set of executable inputs supported by the canonical IR.
@@ -1174,6 +1430,7 @@ pub fn analyze_constant_propagation(function: &IrFunction) -> IrConstantPropagat
                             (IrUnaryOperation::Not, IrConstant::Boolean(value)) => {
                                 Some(IrConstant::Boolean(!value))
                             }
+                            (IrUnaryOperation::Identity, value) => Some(value),
                             (IrUnaryOperation::Negate, IrConstant::Number(value)) => {
                                 negate_number(&value).map(IrConstant::Number)
                             }
@@ -1230,7 +1487,8 @@ fn evaluate_numeric_binary(
         IrBinaryOperation::Subtract => left - right,
         IrBinaryOperation::Multiply => left * right,
         IrBinaryOperation::Divide if right != 0.0 => left / right,
-        IrBinaryOperation::Divide => return None,
+        IrBinaryOperation::Remainder if right != 0.0 => left % right,
+        _ => return None,
     };
     Some(format_number(value))
 }
@@ -1407,6 +1665,16 @@ pub fn validate_intermediate_representation(
         .iter()
         .flat_map(|module| module.storages.iter().map(|storage| storage.id.clone()))
         .collect::<BTreeSet<_>>();
+    let computed_evaluation_ids = representation
+        .modules
+        .iter()
+        .flat_map(|module| {
+            module
+                .computed_evaluations
+                .iter()
+                .map(|evaluation| evaluation.computed.clone())
+        })
+        .collect::<BTreeSet<_>>();
     let mut diagnostics = Vec::new();
     let mut instruction_ids = BTreeSet::new();
 
@@ -1417,79 +1685,142 @@ pub fn validate_intermediate_representation(
                 None,
                 &BTreeSet::new(),
                 &storage_ids,
+                &computed_evaluation_ids,
                 &mut instruction_ids,
                 &mut diagnostics,
             );
         }
         for function in &module.functions {
-            let function_instruction_ids = function
-                .blocks
-                .iter()
-                .flat_map(|block| {
-                    block
-                        .instructions
-                        .iter()
-                        .map(|instruction| instruction.id.clone())
-                })
-                .collect::<BTreeSet<_>>();
-            for block in &function.blocks {
-                for instruction in &block.instructions {
-                    validate_instruction(
-                        instruction,
-                        Some(function),
-                        &function_instruction_ids,
-                        &storage_ids,
-                        &mut instruction_ids,
-                        &mut diagnostics,
-                    );
-                }
-            }
-            for (id, value) in &function.values {
-                if id != &value.id {
-                    diagnostics.push(IrValidationDiagnostic {
-                        code: "EZIR1001",
-                        message: format!(
-                            "value registry key {id} does not match value ID {}",
-                            value.id
-                        ),
-                    });
-                }
-                match &value.definition {
-                    IrValueDefinition::Instruction(instruction) => {
-                        if !function_instruction_ids.contains(instruction) {
-                            diagnostics.push(IrValidationDiagnostic {
-                                code: "EZIR1002",
-                                message: format!("value {id} references missing defining instruction {instruction}"),
-                            });
-                        }
-                    }
-                    IrValueDefinition::Parameter {
-                        function: owner, ..
-                    } if owner != &function.id => {
-                        diagnostics.push(IrValidationDiagnostic {
-                            code: "EZIR1003",
-                            message: format!(
-                                "value {id} belongs to parameter function {owner}, not {}",
-                                function.id
-                            ),
-                        });
-                    }
-                    IrValueDefinition::BlockParameter { block, .. }
-                        if function.block(block).is_none() =>
-                    {
-                        diagnostics.push(IrValidationDiagnostic {
-                            code: "EZIR1004",
-                            message: format!(
-                                "value {id} references missing block parameter owner {block}"
-                            ),
-                        });
-                    }
-                    _ => {}
-                }
-            }
+            validate_function(
+                function,
+                &storage_ids,
+                &computed_evaluation_ids,
+                &mut instruction_ids,
+                &mut diagnostics,
+            );
         }
+        validate_computed_evaluations(module, &mut diagnostics);
     }
     diagnostics
+}
+
+fn validate_function(
+    function: &IrFunction,
+    storage_ids: &BTreeSet<IrStorageId>,
+    computed_evaluation_ids: &BTreeSet<SemanticId>,
+    instruction_ids: &mut BTreeSet<IrInstructionId>,
+    diagnostics: &mut Vec<IrValidationDiagnostic>,
+) {
+    let function_instruction_ids = function
+        .blocks
+        .iter()
+        .flat_map(|block| {
+            block
+                .instructions
+                .iter()
+                .map(|instruction| instruction.id.clone())
+        })
+        .collect::<BTreeSet<_>>();
+    for block in &function.blocks {
+        for instruction in &block.instructions {
+            validate_instruction(
+                instruction,
+                Some(function),
+                &function_instruction_ids,
+                storage_ids,
+                computed_evaluation_ids,
+                instruction_ids,
+                diagnostics,
+            );
+        }
+    }
+    for (id, value) in &function.values {
+        validate_value(function, id, value, &function_instruction_ids, diagnostics);
+    }
+}
+
+fn validate_value(
+    function: &IrFunction,
+    id: &IrValueId,
+    value: &IrValue,
+    instruction_ids: &BTreeSet<IrInstructionId>,
+    diagnostics: &mut Vec<IrValidationDiagnostic>,
+) {
+    if id != &value.id {
+        diagnostics.push(IrValidationDiagnostic {
+            code: "EZIR1001",
+            message: format!(
+                "value registry key {id} does not match value ID {}",
+                value.id
+            ),
+        });
+    }
+    match &value.definition {
+        IrValueDefinition::Instruction(instruction) if !instruction_ids.contains(instruction) => {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1002",
+                message: format!(
+                    "value {id} references missing defining instruction {instruction}"
+                ),
+            });
+        }
+        IrValueDefinition::Parameter {
+            function: owner, ..
+        } if owner != &function.id => {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1003",
+                message: format!(
+                    "value {id} belongs to parameter function {owner}, not {}",
+                    function.id
+                ),
+            });
+        }
+        IrValueDefinition::BlockParameter { block, .. } if function.block(block).is_none() => {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1004",
+                message: format!("value {id} references missing block parameter owner {block}"),
+            });
+        }
+        _ => {}
+    }
+}
+
+fn validate_computed_evaluations(module: &IrModule, diagnostics: &mut Vec<IrValidationDiagnostic>) {
+    for evaluation in &module.computed_evaluations {
+        if evaluation.computed != evaluation.function {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1010",
+                message: format!(
+                    "computed evaluation {} must use its computed ID as function {}",
+                    evaluation.computed, evaluation.function
+                ),
+            });
+            continue;
+        }
+        let Some(function) = module
+            .functions
+            .iter()
+            .find(|function| function.id == evaluation.function)
+        else {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1010",
+                message: format!(
+                    "computed evaluation {} references missing function {}",
+                    evaluation.computed, evaluation.function
+                ),
+            });
+            continue;
+        };
+        if !function.values.contains_key(&evaluation.result) {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1011",
+                message: format!(
+                    "computed evaluation {} references missing result {}",
+                    evaluation.computed, evaluation.result
+                ),
+            });
+        }
+    }
 }
 
 fn validate_instruction(
@@ -1497,6 +1828,7 @@ fn validate_instruction(
     function: Option<&IrFunction>,
     function_instruction_ids: &BTreeSet<IrInstructionId>,
     storage_ids: &BTreeSet<IrStorageId>,
+    computed_evaluation_ids: &BTreeSet<SemanticId>,
     instruction_ids: &mut BTreeSet<IrInstructionId>,
     diagnostics: &mut Vec<IrValidationDiagnostic>,
 ) {
@@ -1543,6 +1875,17 @@ fn validate_instruction(
             });
         }
     }
+    if let IrInstructionKind::LoadComputed { computed } = &instruction.kind {
+        if !computed_evaluation_ids.contains(computed) {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1012",
+                message: format!(
+                    "instruction {} references unknown computed evaluation {computed}",
+                    instruction.id
+                ),
+            });
+        }
+    }
     if let Some(result) = &instruction.result {
         if !function_instruction_ids.contains(&instruction.id) {
             diagnostics.push(IrValidationDiagnostic {
@@ -1560,12 +1903,14 @@ fn instruction_operands(kind: &IrInstructionKind) -> Vec<&IrOperand> {
     match kind {
         IrInstructionKind::StoreStorage { value, .. }
         | IrInstructionKind::Unary { operand: value, .. }
-        | IrInstructionKind::Copy { source: value } => vec![value],
+        | IrInstructionKind::Copy { source: value }
+        | IrInstructionKind::GetMember { object: value, .. } => vec![value],
         IrInstructionKind::Binary { left, right, .. } => vec![left, right],
         IrInstructionKind::Nop
         | IrInstructionKind::Constant { .. }
         | IrInstructionKind::InitializeStorage { .. }
-        | IrInstructionKind::LoadStorage { .. } => Vec::new(),
+        | IrInstructionKind::LoadStorage { .. }
+        | IrInstructionKind::LoadComputed { .. } => Vec::new(),
     }
 }
 
@@ -1577,6 +1922,8 @@ fn instruction_storages(kind: &IrInstructionKind) -> Vec<&IrStorageId> {
         IrInstructionKind::Nop
         | IrInstructionKind::Constant { .. }
         | IrInstructionKind::Copy { .. }
+        | IrInstructionKind::LoadComputed { .. }
+        | IrInstructionKind::GetMember { .. }
         | IrInstructionKind::Binary { .. }
         | IrInstructionKind::Unary { .. } => Vec::new(),
     }
@@ -1841,6 +2188,13 @@ pub enum IrInstructionKind {
     LoadStorage {
         storage: IrStorageId,
     },
+    LoadComputed {
+        computed: SemanticId,
+    },
+    GetMember {
+        object: IrOperand,
+        property: String,
+    },
     StoreStorage {
         storage: IrStorageId,
         value: IrOperand,
@@ -2008,7 +2362,8 @@ fn replace_copy_operands(kind: &mut IrInstructionKind, copies: &BTreeMap<IrValue
         | IrInstructionKind::StoreStorage { value: source, .. }
         | IrInstructionKind::Unary {
             operand: source, ..
-        } => resolve(source),
+        }
+        | IrInstructionKind::GetMember { object: source, .. } => resolve(source),
         IrInstructionKind::Binary { left, right, .. } => {
             resolve(left);
             resolve(right);
@@ -2086,12 +2441,23 @@ pub enum IrBinaryOperation {
     Subtract,
     Multiply,
     Divide,
+    Remainder,
+    Equal,
+    NotEqual,
+    LessThan,
+    LessThanOrEqual,
+    GreaterThan,
+    GreaterThanOrEqual,
+    And,
+    Or,
+    NullishCoalesce,
 }
 
 /// A unary operation with value-producing IR semantics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IrUnaryOperation {
     Not,
+    Identity,
     Negate,
 }
 
@@ -2099,10 +2465,10 @@ pub enum IrUnaryOperation {
 mod tests {
     use super::{
         compute_dominators, compute_post_dominators, lower_components_to_ir,
-        validate_intermediate_representation, IntermediateRepresentation, IrBlock, IrBlockId,
-        IrBranchArm, IrBranchEdge, IrConstant, IrFunction, IrInstruction, IrInstructionId,
-        IrInstructionKind, IrLoop, IrLoopId, IrModule, IrOperand, IrStorageId, IrValue,
-        IrValueDefinition, IrValueId,
+        validate_intermediate_representation, IntermediateRepresentation, IrBinaryOperation,
+        IrBlock, IrBlockId, IrBranchArm, IrBranchEdge, IrConstant, IrFunction, IrInstruction,
+        IrInstructionId, IrInstructionKind, IrLoop, IrLoopId, IrModule, IrOperand, IrStorageId,
+        IrUnaryOperation, IrValue, IrValueDefinition, IrValueId,
     };
     use crate::{SemanticId, SemanticType, SourceProvenance};
     use std::collections::BTreeMap;
@@ -2156,6 +2522,7 @@ mod tests {
                 storage_initializers: Vec::new(),
                 template_entrypoints: Vec::new(),
                 functions: vec![function],
+                computed_evaluations: Vec::new(),
             }],
         };
 
@@ -2611,6 +2978,131 @@ mod tests {
                 .expect("render")
                 .id
         );
+    }
+
+    fn computed_ir_fixture() -> (
+        IntermediateRepresentation,
+        SemanticId,
+        SemanticId,
+        SemanticId,
+    ) {
+        let parsed = ezc_parser::parse_file(
+            "src/ComputedIr.tsx",
+            r#"
+@component("x-computed-ir")
+class ComputedIr extends Component {
+  count = state(1);
+  profile = state({ hidden: false });
+
+  @computed()
+  get doubled() { return this.count * 2; }
+
+  @computed()
+  get visible() { return ((this.doubled >= 2 && !this.profile.hidden) ?? false) || true; }
+}
+"#,
+        );
+        let model = crate::build_application_semantic_model(&parsed);
+        let component = &model.components[0];
+        let count = component.id.state_field("count");
+        let doubled = component.id.computed("doubled");
+        let visible = component.id.computed("visible");
+        (lower_components_to_ir(&model), count, doubled, visible)
+    }
+
+    #[test]
+    fn lowers_planned_computed_evaluations_into_canonical_ir_functions() {
+        let (ir, count, doubled, visible) = computed_ir_fixture();
+        let module = &ir.modules[0];
+        let doubled_function = module
+            .functions
+            .iter()
+            .find(|function| function.id == doubled)
+            .expect("computed doubled function");
+        let visible_function = module
+            .functions
+            .iter()
+            .find(|function| function.id == visible)
+            .expect("computed visible function");
+
+        assert_eq!(module.computed_evaluations.len(), 2);
+        assert_eq!(doubled_function.name, "doubled");
+        assert!(doubled_function.blocks[0]
+            .instructions
+            .iter()
+            .any(|instruction| {
+                matches!(
+                    instruction.kind,
+                    IrInstructionKind::LoadStorage { ref storage }
+                        if storage == &IrStorageId::for_semantic_origin(&count)
+                )
+            }));
+        assert!(doubled_function.blocks[0]
+            .instructions
+            .iter()
+            .any(|instruction| {
+                matches!(
+                    instruction.kind,
+                    IrInstructionKind::Binary {
+                        operation: IrBinaryOperation::Multiply,
+                        ..
+                    }
+                )
+            }));
+        assert!(visible_function.blocks[0]
+            .instructions
+            .iter()
+            .any(|instruction| {
+                matches!(
+                    instruction.kind,
+                    IrInstructionKind::LoadComputed { ref computed } if computed == &doubled
+                )
+            }));
+        assert!(visible_function.blocks[0]
+            .instructions
+            .iter()
+            .any(|instruction| {
+                matches!(instruction.kind, IrInstructionKind::GetMember { .. })
+            }));
+        for operation in [
+            IrBinaryOperation::GreaterThanOrEqual,
+            IrBinaryOperation::And,
+            IrBinaryOperation::NullishCoalesce,
+            IrBinaryOperation::Or,
+        ] {
+            assert!(visible_function.blocks[0]
+                .instructions
+                .iter()
+                .any(|instruction| {
+                    matches!(
+                        instruction.kind,
+                        IrInstructionKind::Binary {
+                            operation: candidate,
+                            ..
+                        } if candidate == operation
+                    )
+                }));
+        }
+        assert!(visible_function.blocks[0]
+            .instructions
+            .iter()
+            .any(|instruction| {
+                matches!(
+                    instruction.kind,
+                    IrInstructionKind::Unary {
+                        operation: IrUnaryOperation::Not,
+                        ..
+                    }
+                )
+            }));
+        assert!(module.computed_evaluations.iter().all(|evaluation| {
+            module
+                .functions
+                .iter()
+                .find(|function| function.id == evaluation.function)
+                .is_some_and(|function| function.values.contains_key(&evaluation.result))
+        }));
+        assert!(validate_intermediate_representation(&ir).is_empty());
     }
 
     #[test]

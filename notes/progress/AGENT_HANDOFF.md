@@ -3,37 +3,39 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: E9 - computed evaluation planning
-* Working tree: clean after the E9 commit
+* Latest completed slice: E10 - computed IR lowering
+* Working tree: clean after the E10 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: E9 - computed evaluation planning
-* Summary: Generated deterministic computed evaluation order and update batches through the Phase D scheduler.
-* Key files: crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/intermediate_representation.rs; crates/ezc_core/src/lib.rs
-* New behavior: The ASM now exposes a compiler-owned computed evaluation plan with stable order, update batches, and explicitly unplanned scheduler nodes.
-* Fixtures added or changed: focused core coverage for deterministic ordering and independent/dependent computed batches.
+* Slice: E10 - computed IR lowering
+* Summary: Lowered schedulable pure computed expressions into canonical computed-ID IR functions and result records.
+* Key files: crates/ezc_core/src/intermediate_representation.rs; crates/ezc_core/src/lib.rs
+* New behavior: Each lowerable computed entity owns an IR function and an `IrComputedEvaluation` result record; resolved state/computed reads and all E2 expression forms lower to typed, provenanced IR instructions.
+* Fixtures added or changed: focused IR coverage for computed function identity, storage/computed loads, member access, arithmetic/comparison/logical/nullish/unary operations, result records, and integrity validation.
 
 Current in-progress slice
 
-* Slice: E9 - computed evaluation planning
+* Slice: E10 - computed IR lowering
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E9
-* Remaining: E10 - lower computed evaluation into canonical IR functions.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E10
+* Remaining: E11 - run immutable optimization over computed IR.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core evaluation_order: pass
-* cargo test -p ezc_core dependency_cycles: pass
-* cargo test -p ezc_core transitive_reactive: pass
-* cargo test -p ezc_core reactive_graph: pass
+* cargo test -p ezc_core lowers_planned_computed_evaluations: pass
+* cargo test -p ezc_core intermediate_representation::tests: pass
 * cargo test -p ezc_core computed: pass
 * cargo check -p ezc_cli: pass
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 
 Architecture decisions made
+
+* Decision: A computed evaluation lowers to an IR function keyed by the first-class computed semantic ID, with a separate canonical `IrComputedEvaluation` record naming its result value.
+* Reason: The computed entity—not its authored getter method—is the compiler-owned derived-value subject for scheduling and future runtime records, while the evaluation record makes the produced value inspectable without adding a terminator before the IR roadmap evolves that contract.
+* Tradeoff: E10 lowers only pure computed values that E9 can plan and whose E2 expression root resolves through existing canonical references. E5/E8 diagnostics already reject impure/cyclic values; unresolved reads remain diagnostic-free until E19 and produce no evaluation IR. E10 does not optimize, execute, cache, or emit runtime metadata.
 
 * Decision: Computed evaluation planning projects only computed-to-computed `Invalidates` edges into the existing Phase D scheduler; state remains an external invalidation trigger rather than a scheduled computed node.
 * Reason: The E6 graph intentionally records both `Reads` and inverse `Invalidates` edges, so this projection preserves one canonical reactive source while giving the scheduler its dependency-to-dependent direction without introducing artificial two-edge cycles.
@@ -575,14 +577,14 @@ Known limitations
 * Item: Method parameters are compiler-owned identifier declarations with canonical source provenance only. They do not execute, close over values, resolve local/template/action references, or support destructuring, defaults, rest declarations, or semantic type checking.
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
-* Item: The canonical expression graph covers supported state initializer expressions and direct supported computed getter returns. Computed expression nodes and entities have inferred canonical types through resolved state/computed reads; computed values are pure or impure with `EZC1034` purity diagnostics, compiler-owned direct/transitive reactive topology is available, computed cycles emit `EZC1035`, and evaluation plans expose stable order/batches. Getter execution, cache allocation, IR lowering, and runtime behavior remain later work.
+* Item: The canonical expression graph covers supported state initializer expressions and direct supported computed getter returns. Computed expression nodes and entities have inferred canonical types through resolved state/computed reads; computed values are pure or impure with `EZC1034` purity diagnostics, compiler-owned direct/transitive reactive topology is available, computed cycles emit `EZC1035`, and evaluation plans expose stable order/batches. Pure scheduled E2 expressions now lower to canonical IR functions, but optimization, getter execution, cache allocation, and runtime behavior remain later work.
 * Item: C30 exposes direct ASM type queries only. CLI inspection output, source diagnostics, backend enforcement, resource declaration lowering, and final type diagnostic families remain later Phase C work.
-* Item: Canonical IR functions currently contain only empty entry basic blocks plus structural branch-edge and natural-loop records. Dominator and post-dominator results include only declared conditional edges; there are no source-lowered branches or loops, condition operands, explicit terminators, or statement instructions yet.
-* Item: Source lowering still creates empty function value registries and no method load/store instructions. D3-A can analyze manually constructed canonical IR now; subsequent lowering slices must populate values before source data-flow results become non-empty.
+* Item: Authored method IR functions still contain only empty entry basic blocks plus structural branch-edge and natural-loop records. Computed E10 functions lower the supported E2 expression graph into value-producing instructions, but neither form has source-lowered branches/loops, explicit terminators, or general statement instructions.
+* Item: Authored method lowering still creates empty function value registries and no method load/store instructions. Computed E10 functions register their defining values and resolved state/computed loads; D3-A analyses apply to both canonical forms without adding general source statement lowering.
 
 Exact next step
 
-Next is E10: lower computed evaluation into canonical IR functions. Do not run optimization or add runtime registry/metadata/behavior.
+Next is E11: run the immutable optimization pipeline over computed IR. Do not add runtime registry/metadata/behavior.
 
 Useful commands
 
