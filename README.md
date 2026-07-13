@@ -82,6 +82,13 @@ an entity selector (or an entity filter) activates the same read-only,
 canonical ASM inspection path as `ezc_cli asm`, including its text/JSON
 document, source selection, deterministic filtering, and explicit failures.
 
+For a computed entity, the inspection record additionally contains the
+compiler-owned computed type, transitive dependencies and dependents,
+zero-based evaluation-order and update-batch positions, purity,
+serializability, and canonical IR function identity. Unplanned values use
+`null` for their evaluation positions or IR function identity; the CLI does not
+infer or discover this metadata at runtime.
+
 Selected entity inspection supports optional filters:
 
 ```sh

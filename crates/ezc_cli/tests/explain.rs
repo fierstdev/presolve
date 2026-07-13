@@ -199,7 +199,7 @@ fn asm_command_emits_deterministic_json_inspection() {
 
     let document: serde_json::Value =
         serde_json::from_slice(&first.stdout).expect("ASM inspection output was not valid JSON");
-    assert_eq!(document["schema_version"], 1);
+    assert_eq!(document["schema_version"], 2);
     assert_eq!(
         document["file"],
         "fixtures/0001-source-summary/input/Counter.tsx"
@@ -350,7 +350,7 @@ fn asm_command_inspects_one_semantic_entity() {
 
     assert!(output.status.success());
     let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("entity JSON");
-    assert_eq!(document["schema_version"], 1);
+    assert_eq!(document["schema_version"], 2);
     assert_eq!(document["entity"]["id"], entity_id);
     assert_eq!(document["entity"]["kind"], "state-field");
     assert_eq!(document["entity"]["semantic_type"]["type_text"], "number");
@@ -395,6 +395,81 @@ fn asm_command_inspects_one_semantic_entity() {
         explain_document["entity"]["semantic_type"]["type_text"],
         "number"
     );
+}
+
+#[test]
+fn asm_and_explain_inspect_canonical_computed_metadata() {
+    let path = "fixtures/0044-computed-runtime-execution/input/RuntimeComputed.tsx";
+    let component = "module:fixtures/0044-computed-runtime-execution/input/RuntimeComputed.tsx/component:x-runtime-computed";
+    let doubled = format!("{component}/computed:doubled");
+    let label = format!("{component}/computed:label");
+    let count = format!("{component}/state:count");
+    let inspection_args = [path, "--entity", &label, "--format", "json"];
+
+    let asm = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .arg("asm")
+        .args(inspection_args)
+        .output()
+        .expect("failed to inspect computed ASM entity");
+    let explain = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .arg("explain")
+        .args(inspection_args)
+        .output()
+        .expect("failed to inspect computed entity through explain");
+    let full_asm = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["asm", path, "--format", "json"])
+        .output()
+        .expect("failed to inspect the full computed ASM document");
+    let text = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["asm", path, "--entity", &label])
+        .output()
+        .expect("failed to inspect computed ASM entity as text");
+
+    assert!(asm.status.success());
+    assert!(explain.status.success());
+    assert!(full_asm.status.success());
+    assert!(text.status.success());
+    assert_eq!(asm.stdout, explain.stdout);
+
+    let document: serde_json::Value =
+        serde_json::from_slice(&asm.stdout).expect("computed entity inspection JSON");
+    assert_eq!(document["schema_version"], 2);
+    assert_eq!(document["entity"]["computed"]["computed_type"], "number");
+    assert_eq!(
+        document["entity"]["computed"]["dependencies"],
+        serde_json::json!([doubled, count])
+    );
+    assert_eq!(
+        document["entity"]["computed"]["dependents"],
+        serde_json::json!([])
+    );
+    assert_eq!(document["entity"]["computed"]["evaluation_order"], 1);
+    assert_eq!(document["entity"]["computed"]["evaluation_batch"], 1);
+    assert_eq!(document["entity"]["computed"]["purity"], "pure");
+    assert_eq!(
+        document["entity"]["computed"]["serializability"],
+        "serializable"
+    );
+    assert_eq!(document["entity"]["computed"]["ir_function"], label);
+
+    let full_document: serde_json::Value =
+        serde_json::from_slice(&full_asm.stdout).expect("full computed ASM inspection JSON");
+    let full_entity = full_document["entities"]
+        .as_array()
+        .expect("full ASM entities")
+        .iter()
+        .find(|entity| entity["id"] == label)
+        .expect("computed entity in full ASM inspection");
+    assert_eq!(full_entity["computed"], document["entity"]["computed"]);
+
+    let text = String::from_utf8(text.stdout).expect("computed entity text");
+    assert!(text.contains("  computed:\n"));
+    assert!(text.contains("    evaluation order: Some(1)\n"));
+    assert!(text.contains("    purity: pure\n"));
 }
 
 #[test]

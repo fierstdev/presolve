@@ -3,32 +3,38 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: E17 - serializable computed resumability planning
-* Working tree: clean after the E17 commit
+* Latest completed slice: E18 - computed inspection and queries
+* Working tree: clean after the E18 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: E17 - serializable computed resumability planning
-* Summary: Resumability plans and manifests now include compiler-lowered, structurally serializable computed cache identities.
-* Key files: crates/ezc_core/src/resume_plan.rs; crates/ezc_core/src/resume_manifest.rs; crates/ezc_core/src/lib.rs
-* New behavior: Each eligible computed record adds a stable computed ID, cache-slot ID, dirty-flag ID, and initial dirty state to its component resume plan. Eligibility derives from E10/E12 lowering and E4 serialization compatibility.
-* Fixtures added or changed: focused core plan and manifest serialization coverage for eligible versus unresolved computed values.
+* Slice: E18 - computed inspection and queries
+* Summary: ASM and selected-entity explain inspection now expose canonical computed metadata in schema v2.
+* Key files: crates/ezc_cli/src/main.rs; crates/ezc_cli/tests/explain.rs; README.md
+* New behavior: Computed records expose canonical type, E7 transitive dependencies and dependents, zero-based E9 evaluation positions, E5 purity, E4 serializability, and E10 IR function identity. `asm` and selector-driven `explain` use the same deterministic document and text rendering.
+* Fixtures added or changed: focused CLI regression coverage reuses the existing RuntimeComputed fixture; no fixture-suite expansion.
 
 Current in-progress slice
 
-* Slice: E17 - serializable computed resumability planning
+* Slice: E18 - computed inspection and queries
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E17
-* Remaining: E18 - computed inspection and queries.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E18
+* Remaining: E19 - computed diagnostics.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core resume: pass
-* cargo clippy -p ezc_core --all-targets -- -D warnings: pass
+* cargo test -p ezc_cli asm_and_explain_inspect_canonical_computed_metadata: pass
+* cargo test -p ezc_cli asm_command_emits_deterministic_json_inspection: pass
+* cargo test -p ezc_cli asm_command_inspects_one_semantic_entity: pass
+* cargo clippy -p ezc_cli --all-targets -- -D warnings: pass
 
 Architecture decisions made
+
+* Decision: ASM inspection schema v2 adds a computed-only record that projects existing E4/E5/E7/E9/E10 compiler products without reconstructing source facts.
+* Reason: Inspection consumers receive deterministic computed type, transitive topology, schedule placement, purity, boundary compatibility, and IR identity from the same canonical products used by later compiler stages.
+* Tradeoff: E18 reports zero-based schedule positions and `null` for values with no E9 placement or E10 function. It does not add diagnostics, infer metadata in the CLI, execute computed values, add runtime discovery, or expand fixtures.
 
 * Decision: Resume plans include only E12 registry records that are structurally serializable under E4, with stable cache-slot and dirty-flag metadata rather than speculative cache payloads.
 * Reason: Resume and serialization consumers can identify exactly which compiler-lowered caches may cross a resume boundary without treating cyclic, impure, unresolved, unlowered, or non-serializable values as partially resumable.
@@ -609,7 +615,7 @@ Known limitations
 
 Exact next step
 
-Next is E18: extend ASM and explain output with computed type, dependencies, dependents, evaluation order, purity, serializability, and IR identity. Do not add new diagnostics, runtime discovery, or fixture-suite expansion.
+Next is E19: add stable computed diagnostics for invalid declarations, unsupported bodies, unresolved reads, purity violations, type mismatches, dependency cycles, and serialization violations. Do not begin the fixture suite, stability audit, or runtime extensions.
 
 Useful commands
 

@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::env;
 use std::fmt::Write as _;
 use std::fs;
@@ -436,6 +437,7 @@ fn asm_inspection_json(
     asm: &ApplicationSemanticModel,
     validation: &[AsmValidationDiagnostic],
 ) -> String {
+    let computed_functions = computed_evaluation_functions(asm);
     let mut references = asm
         .references
         .iter()
@@ -475,7 +477,7 @@ fn asm_inspection_json(
     validation.sort_by(|left, right| (left.code, left.message).cmp(&(right.code, right.message)));
 
     let document = AsmInspectionDocument {
-        schema_version: 1,
+        schema_version: 2,
         file: paths[0].display().to_string(),
         files: (paths.len() > 1).then(|| {
             paths
@@ -485,27 +487,8 @@ fn asm_inspection_json(
         }),
         entities: asm
             .ownership
-            .iter()
-            .map(|(id, owner)| {
-                let entity = asm
-                    .entity(id)
-                    .expect("ASM ownership should only contain semantic entities");
-                let provenance = asm
-                    .provenance(id)
-                    .expect("ASM ownership should have source provenance");
-
-                AsmInspectionEntity {
-                    id: id.as_str(),
-                    kind: semantic_entity_kind(entity),
-                    owner: semantic_owner_id(owner),
-                    provenance: provenance.into(),
-                    declared_type: declared_state_type(entity),
-                    initial_expression: initial_expression(asm, entity),
-                    local_variables: method_local_variables(entity),
-                    parameters: method_parameters(entity, provenance),
-                    semantic_type: asm_semantic_type(asm, id),
-                }
-            })
+            .keys()
+            .map(|id| asm_inspection_entity(asm, id, &computed_functions))
             .collect(),
         references,
         diagnostics,
@@ -577,6 +560,7 @@ fn print_asm_entity_text(
     diagnostics: &[ezc_core::ComponentDiagnostic],
     filters: AsmEntityFilters,
 ) {
+    let computed_functions = computed_evaluation_functions(asm);
     let entity = asm
         .entity(id)
         .expect("ASM ownership should contain entities");
@@ -600,6 +584,17 @@ fn print_asm_entity_text(
         println!("  semantic type: {}", semantic_type.type_text);
         println!("    status: {}", semantic_type.status);
         println!("    origin: {}", semantic_type.origin);
+    }
+    if let Some(computed) = asm_computed_inspection(asm, id, &computed_functions) {
+        println!("  computed:");
+        println!("    type: {}", computed.computed_type);
+        println!("    dependencies: {:?}", computed.dependencies);
+        println!("    dependents: {:?}", computed.dependents);
+        println!("    evaluation order: {:?}", computed.evaluation_order);
+        println!("    evaluation batch: {:?}", computed.evaluation_batch);
+        println!("    purity: {}", computed.purity);
+        println!("    serializability: {}", computed.serializability);
+        println!("    IR function: {:?}", computed.ir_function);
     }
     let parents = asm.ancestors_of(id);
     println!("  parents: {}", parents.len());
@@ -652,23 +647,11 @@ fn asm_entity_inspection_json(
     diagnostics: &[ezc_core::ComponentDiagnostic],
     filters: AsmEntityFilters,
 ) -> String {
-    let entity = asm
-        .entity(id)
-        .expect("ASM ownership should contain entities");
+    let computed_functions = computed_evaluation_functions(asm);
     let provenance = asm.provenance(id).expect("ASM entities have provenance");
     let document = AsmEntityInspectionDocument {
-        schema_version: 1,
-        entity: AsmInspectionEntity {
-            id: id.as_str(),
-            kind: semantic_entity_kind(entity),
-            owner: semantic_owner_id(asm.owner(id).expect("ASM entities have owners")),
-            provenance: provenance.into(),
-            declared_type: declared_state_type(entity),
-            initial_expression: initial_expression(asm, entity),
-            local_variables: method_local_variables(entity),
-            parameters: method_parameters(entity, provenance),
-            semantic_type: asm_semantic_type(asm, id),
-        },
+        schema_version: 2,
+        entity: asm_inspection_entity(asm, id, &computed_functions),
         parents: asm
             .ancestors_of(id)
             .into_iter()
@@ -1037,6 +1020,90 @@ fn asm_semantic_type(
     })
 }
 
+fn computed_evaluation_functions(
+    asm: &ApplicationSemanticModel,
+) -> BTreeMap<SemanticId, SemanticId> {
+    lower_components_to_ir(asm)
+        .modules
+        .into_iter()
+        .flat_map(|module| module.computed_evaluations)
+        .map(|evaluation| (evaluation.computed, evaluation.function))
+        .collect()
+}
+
+fn asm_inspection_entity<'a>(
+    asm: &'a ApplicationSemanticModel,
+    id: &'a SemanticId,
+    computed_functions: &BTreeMap<SemanticId, SemanticId>,
+) -> AsmInspectionEntity<'a> {
+    let entity = asm
+        .entity(id)
+        .expect("ASM ownership should contain semantic entities");
+    let provenance = asm.provenance(id).expect("ASM entities have provenance");
+
+    AsmInspectionEntity {
+        id: id.as_str(),
+        kind: semantic_entity_kind(entity),
+        owner: semantic_owner_id(asm.owner(id).expect("ASM entities have owners")),
+        provenance: provenance.into(),
+        declared_type: declared_state_type(entity),
+        initial_expression: initial_expression(asm, entity),
+        local_variables: method_local_variables(entity),
+        parameters: method_parameters(entity, provenance),
+        semantic_type: asm_semantic_type(asm, id),
+        computed: asm_computed_inspection(asm, id, computed_functions),
+    }
+}
+
+fn asm_computed_inspection(
+    asm: &ApplicationSemanticModel,
+    id: &SemanticId,
+    computed_functions: &BTreeMap<SemanticId, SemanticId>,
+) -> Option<AsmInspectionComputed> {
+    let computed = asm.computed_value(id)?;
+    let computed_type = asm
+        .semantic_types
+        .computed_values
+        .get(id)
+        .expect("computed semantic entities should have canonical type metadata");
+    let evaluation_order = asm
+        .computed_evaluation_plan
+        .evaluation_order
+        .iter()
+        .position(|computed_id| computed_id == id.as_str());
+    let evaluation_batch = asm
+        .computed_evaluation_plan
+        .update_batches
+        .iter()
+        .position(|batch| batch.iter().any(|computed_id| computed_id == id.as_str()));
+
+    Some(AsmInspectionComputed {
+        computed_type: semantic_type_text(&computed_type.semantic_type),
+        dependencies: asm
+            .reactive_transitive_analysis
+            .dependencies_of(id.as_str())
+            .to_vec(),
+        dependents: asm
+            .reactive_transitive_analysis
+            .dependents_of(id.as_str())
+            .to_vec(),
+        evaluation_order,
+        evaluation_batch,
+        purity: match computed.purity {
+            ezc_core::ComputedPurity::Unclassified => "unclassified",
+            ezc_core::ComputedPurity::Pure => "pure",
+            ezc_core::ComputedPurity::Impure => "impure",
+        },
+        serializability: match computed_type.serialization {
+            ezc_core::SerializationCompatibility::Serializable => "serializable",
+            ezc_core::SerializationCompatibility::NotSerializable => "not-serializable",
+        },
+        ir_function: computed_functions
+            .get(id)
+            .map(|function| function.as_str().to_string()),
+    })
+}
+
 fn initial_expression(
     asm: &ApplicationSemanticModel,
     entity: SemanticEntity<'_>,
@@ -1129,6 +1196,20 @@ struct AsmInspectionEntity<'a> {
     parameters: Option<Vec<AsmInspectionMethodParameter<'a>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     semantic_type: Option<AsmInspectionSemanticType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    computed: Option<AsmInspectionComputed>,
+}
+
+#[derive(Serialize)]
+struct AsmInspectionComputed {
+    computed_type: String,
+    dependencies: Vec<String>,
+    dependents: Vec<String>,
+    evaluation_order: Option<usize>,
+    evaluation_batch: Option<usize>,
+    purity: &'static str,
+    serializability: &'static str,
+    ir_function: Option<String>,
 }
 
 #[derive(Serialize)]
