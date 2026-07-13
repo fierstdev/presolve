@@ -3,9 +3,11 @@ const RUNTIME_STUB: &str = r#"(() => {
 
   const MANIFEST_ELEMENT_ID = "ez-template-manifest";
   const COMPUTED_ARTIFACT_ELEMENT_ID = "ez-computed-runtime";
+  const EFFECT_ARTIFACT_ELEMENT_ID = "ez-effect-runtime";
   const RUNTIME_VERSION = "0.0.0";
   const SUPPORTED_SCHEMA_VERSION = 1;
   const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 3;
+  const SUPPORTED_EFFECT_ARTIFACT_SCHEMA_VERSION = 1;
 
   class EdgeZeroBootError extends Error {
     constructor(code) {
@@ -124,6 +126,58 @@ const RUNTIME_STUB: &str = r#"(() => {
         true
       );
       throw new EdgeZeroBootError("EZR_UNSUPPORTED_COMPUTED_ARTIFACT_SCHEMA");
+    }
+  }
+
+  function readEffectArtifact(diagnostics) {
+    const element = document.getElementById(EFFECT_ARTIFACT_ELEMENT_ID);
+
+    if (element === null) {
+      return null;
+    }
+
+    if (!(element instanceof HTMLScriptElement)) {
+      reportDiagnostic(
+        diagnostics,
+        "EZR_INVALID_EFFECT_ARTIFACT",
+        "Effect runtime metadata was not stored in a script element",
+        { artifactElementId: EFFECT_ARTIFACT_ELEMENT_ID },
+        true
+      );
+      throw new EdgeZeroBootError("EZR_INVALID_EFFECT_ARTIFACT");
+    }
+
+    try {
+      return JSON.parse(element.textContent ?? "");
+    } catch (error) {
+      reportDiagnostic(
+        diagnostics,
+        "EZR_INVALID_EFFECT_ARTIFACT",
+        "Effect runtime metadata JSON could not be parsed",
+        { message: error instanceof Error ? error.message : String(error) },
+        true
+      );
+      throw new EdgeZeroBootError("EZR_INVALID_EFFECT_ARTIFACT");
+    }
+  }
+
+  function validateEffectArtifactSchema(artifact, diagnostics) {
+    if (artifact === null) {
+      return;
+    }
+
+    if (artifact.schema_version !== SUPPORTED_EFFECT_ARTIFACT_SCHEMA_VERSION) {
+      reportDiagnostic(
+        diagnostics,
+        "EZR_UNSUPPORTED_EFFECT_ARTIFACT_SCHEMA",
+        `Unsupported effect runtime metadata schema version ${String(artifact.schema_version)}`,
+        {
+          schema_version: artifact.schema_version,
+          supported_schema_version: SUPPORTED_EFFECT_ARTIFACT_SCHEMA_VERSION
+        },
+        true
+      );
+      throw new EdgeZeroBootError("EZR_UNSUPPORTED_EFFECT_ARTIFACT_SCHEMA");
     }
   }
 
@@ -772,7 +826,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     return nextInstances;
   }
 
-  function createRuntimeStore(elementsByNode, diagnostics, computedArtifact) {
+  function createRuntimeStore(elementsByNode, diagnostics, computedArtifact, effectArtifact) {
     const computedEvaluations = new Map();
     const storageValues = new Map();
     const storageByComponentField = new Map();
@@ -804,6 +858,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       elementsByNode,
       diagnostics,
       computedArtifact,
+      effectArtifact,
       computedEvaluations,
       computedDirty,
       computedValues: new Map(),
@@ -811,7 +866,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       storageValues,
       storageByComponentField,
       invalidationsByStorage,
-      computedUpdateRuns: 0
+      computedUpdateRuns: 0,
+      initialEffectRuns: []
     };
   }
 
@@ -860,69 +916,181 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
+  function executePureProgramInstruction(store, values, instruction, subject) {
+    if (instruction.kind === "constant") {
+      values.set(instruction.result, instruction.value);
+      return true;
+    }
+
+    if (instruction.kind === "load-state") {
+      values.set(instruction.result, store.storageValues.get(instruction.storage));
+      return true;
+    }
+
+    if (instruction.kind === "load-computed") {
+      if (store.computedDirty.get(instruction.computed) === true) {
+        reportDiagnostic(
+          store.diagnostics,
+          "EZR_UNPLANNED_COMPUTED_DEPENDENCY",
+          "Compiler program depended on a value not yet evaluated by the compiler plan",
+          { subject, dependency: instruction.computed }
+        );
+        values.set(instruction.result, undefined);
+      } else {
+        values.set(instruction.result, store.computedValues.get(instruction.computed));
+      }
+      return true;
+    }
+
+    if (instruction.kind === "get-member") {
+      const object = computedOperandValue(store, values, instruction.object);
+      const value = object !== null && typeof object === "object"
+        && Object.prototype.hasOwnProperty.call(object, instruction.property)
+        ? object[instruction.property]
+        : undefined;
+      values.set(instruction.result, value);
+      return true;
+    }
+
+    if (instruction.kind === "binary") {
+      values.set(
+        instruction.result,
+        computedBinary(
+          instruction.operation,
+          computedOperandValue(store, values, instruction.left),
+          computedOperandValue(store, values, instruction.right)
+        )
+      );
+      return true;
+    }
+
+    if (instruction.kind === "unary") {
+      values.set(
+        instruction.result,
+        computedUnary(
+          instruction.operation,
+          computedOperandValue(store, values, instruction.operand)
+        )
+      );
+      return true;
+    }
+
+    return false;
+  }
+
   function executeComputedProgram(store, evaluation) {
     const values = new Map();
 
     for (const instruction of evaluation.program?.instructions ?? []) {
-      if (instruction.kind === "constant") {
-        values.set(instruction.result, instruction.value);
-        continue;
-      }
-
-      if (instruction.kind === "load-state") {
-        values.set(instruction.result, store.storageValues.get(instruction.storage));
-        continue;
-      }
-
-      if (instruction.kind === "load-computed") {
-        if (store.computedDirty.get(instruction.computed) === true) {
-          reportDiagnostic(
-            store.diagnostics,
-            "EZR_UNPLANNED_COMPUTED_DEPENDENCY",
-            "Computed evaluation depended on a value not yet evaluated by the compiler plan",
-            { computed: evaluation.computed, dependency: instruction.computed }
-          );
-          values.set(instruction.result, undefined);
-        } else {
-          values.set(instruction.result, store.computedValues.get(instruction.computed));
-        }
-        continue;
-      }
-
-      if (instruction.kind === "get-member") {
-        const object = computedOperandValue(store, values, instruction.object);
-        const value = object !== null && typeof object === "object"
-          && Object.prototype.hasOwnProperty.call(object, instruction.property)
-          ? object[instruction.property]
-          : undefined;
-        values.set(instruction.result, value);
-        continue;
-      }
-
-      if (instruction.kind === "binary") {
-        values.set(
-          instruction.result,
-          computedBinary(
-            instruction.operation,
-            computedOperandValue(store, values, instruction.left),
-            computedOperandValue(store, values, instruction.right)
-          )
-        );
-        continue;
-      }
-
-      if (instruction.kind === "unary") {
-        values.set(
-          instruction.result,
-          computedUnary(
-            instruction.operation,
-            computedOperandValue(store, values, instruction.operand)
-          )
-        );
-      }
+      executePureProgramInstruction(store, values, instruction, evaluation.computed);
     }
 
     return values.get(evaluation.program?.result);
+  }
+
+  function initialEffectBatches(effectArtifact) {
+    const batches = new Map();
+
+    for (const effect of effectArtifact?.effects ?? []) {
+      const trigger = effect.initial_trigger;
+
+      if (trigger === null || trigger === undefined) {
+        continue;
+      }
+
+      const effects = batches.get(trigger.effect_batch_index) ?? [];
+      effects.push(effect);
+      batches.set(trigger.effect_batch_index, effects);
+    }
+
+    return [...batches.entries()].sort(([left], [right]) => left - right);
+  }
+
+  function dispatchEffectCapability(store, effect, instruction, values, evidence) {
+    const runtimeLowering = instruction.runtime_lowering;
+    const arguments = (instruction.arguments ?? []).map((operand) =>
+      computedOperandValue(store, values, operand)
+    );
+    const value = computedOperandValue(store, values, instruction.value);
+
+    switch (runtimeLowering) {
+      case "builtin.browser.document.title.assign":
+        document.title = value;
+        break;
+      case "builtin.browser.console.log":
+        console.log(...arguments);
+        break;
+      case "builtin.browser.console.info":
+        console.info(...arguments);
+        break;
+      case "builtin.browser.console.warn":
+        console.warn(...arguments);
+        break;
+      case "builtin.browser.console.error":
+        console.error(...arguments);
+        break;
+      case "builtin.browser.local_storage.set_item":
+        localStorage.setItem(...arguments);
+        break;
+      case "builtin.browser.local_storage.remove_item":
+        localStorage.removeItem(...arguments);
+        break;
+      case "builtin.browser.session_storage.set_item":
+        sessionStorage.setItem(...arguments);
+        break;
+      case "builtin.browser.session_storage.remove_item":
+        sessionStorage.removeItem(...arguments);
+        break;
+      default:
+        reportDiagnostic(
+          store.diagnostics,
+          "EZR_UNSUPPORTED_EFFECT_CAPABILITY",
+          "Effect program referenced an unsupported compiler runtime lowering",
+          { effect: effect.effect, runtime_lowering: runtimeLowering }
+        );
+        return;
+    }
+
+    evidence.capability_operations.push({
+      operation: instruction.operation,
+      runtime_lowering: runtimeLowering
+    });
+  }
+
+  function executeEffectProgram(store, effect, evidence) {
+    const values = new Map();
+
+    for (const instruction of effect.program?.instructions ?? []) {
+      if (executePureProgramInstruction(store, values, instruction, effect.effect)) {
+        continue;
+      }
+
+      if (instruction.kind === "capability-call" || instruction.kind === "capability-assign") {
+        dispatchEffectCapability(store, effect, instruction, values, evidence);
+        continue;
+      }
+
+      reportDiagnostic(
+        store.diagnostics,
+        "EZR_UNSUPPORTED_EFFECT_INSTRUCTION",
+        "Effect program contained an unsupported compiler instruction",
+        { effect: effect.effect, kind: instruction.kind }
+      );
+    }
+  }
+
+  function executeInitialEffects(store) {
+    for (const [effectBatchIndex, effects] of initialEffectBatches(store.effectArtifact)) {
+      for (const effect of effects) {
+        const evidence = {
+          effect: effect.effect,
+          effect_batch_index: effectBatchIndex,
+          capability_operations: []
+        };
+        executeEffectProgram(store, effect, evidence);
+        store.initialEffectRuns.push(evidence);
+      }
+    }
   }
 
   function executeComputedPlan(store) {
@@ -1434,6 +1602,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     components = [],
     computed = [],
     computed_update_runs = 0,
+    initial_effect_runs = [],
     diagnostics
   }) {
     return {
@@ -1445,16 +1614,17 @@ const RUNTIME_STUB: &str = r#"(() => {
       store,
       components,
       computed,
-      computed_update_runs
+      computed_update_runs,
+      initial_effect_runs
     };
   }
 
-  function initializeRuntime(manifest, computedArtifact, diagnostics) {
+  function initializeRuntime(manifest, computedArtifact, effectArtifact, diagnostics) {
     const bindingAnchors = collectBindingAnchors();
     const conditionalAnchors = collectConditionalAnchors();
     const listAnchors = collectListAnchors();
     const elementsByNode = collectElementAnchors();
-    const store = createRuntimeStore(elementsByNode, diagnostics, computedArtifact);
+    const store = createRuntimeStore(elementsByNode, diagnostics, computedArtifact, effectArtifact);
     const missingAnchors = collectMissingAnchors(
       manifest,
       bindingAnchors,
@@ -1491,6 +1661,8 @@ const RUNTIME_STUB: &str = r#"(() => {
 
     executeComputedPlan(store);
 
+    executeInitialEffects(store);
+
     installDelegatedEventListeners(store);
 
     return runtimeState({
@@ -1500,7 +1672,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       store,
       components: debugComponents(store),
       computed: debugComputed(store),
-      computed_update_runs: store.computedUpdateRuns
+      computed_update_runs: store.computedUpdateRuns,
+      initial_effect_runs: store.initialEffectRuns
     });
   }
 
@@ -1512,8 +1685,10 @@ const RUNTIME_STUB: &str = r#"(() => {
       validateManifestSchema(manifest, diagnostics);
       const computedArtifact = readComputedArtifact(diagnostics);
       validateComputedArtifactSchema(computedArtifact, diagnostics);
+      const effectArtifact = readEffectArtifact(diagnostics);
+      validateEffectArtifactSchema(effectArtifact, diagnostics);
 
-      const state = initializeRuntime(manifest, computedArtifact, diagnostics);
+      const state = initializeRuntime(manifest, computedArtifact, effectArtifact, diagnostics);
       const status = state.diagnostics.some((diagnostic) => diagnostic.fatal)
         || state.missingAnchors.length > 0
         ? "error"
@@ -1575,6 +1750,7 @@ mod tests {
         let runtime = generate_runtime_stub();
 
         assert!(runtime.contains("ez-template-manifest"));
+        assert!(runtime.contains("ez-effect-runtime"));
         assert!(runtime.contains("RUNTIME_VERSION = \"0.0.0\""));
         assert!(runtime.contains("SUPPORTED_SCHEMA_VERSION = 1"));
         assert!(runtime.contains("EZR_MISSING_MANIFEST"));
@@ -1584,6 +1760,7 @@ mod tests {
         assert!(runtime.contains("ez-binding:"));
         assert!(runtime.contains("reportDiagnostic"));
         assert!(runtime.contains("validateManifestSchema"));
+        assert!(runtime.contains("validateEffectArtifactSchema"));
         assert!(runtime.contains("normalizeHandlerReference"));
         assert!(runtime.contains("createRuntimeStore"));
         assert!(runtime.contains("readField"));
@@ -1596,6 +1773,8 @@ mod tests {
         assert!(runtime.contains("const actions = actionsByMethod.get(action.method) ?? []"));
         assert!(runtime.contains("actions.push(action)"));
         assert!(runtime.contains("executeActions"));
+        assert!(runtime.contains("executeInitialEffects"));
+        assert!(runtime.contains("dispatchEffectCapability"));
         assert!(runtime.contains("formatBindingValue"));
         assert!(runtime.contains("value === null ? \"\" : String(value)"));
         assert!(runtime.contains("listItemMemberPath"));

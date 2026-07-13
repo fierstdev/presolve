@@ -8,10 +8,11 @@ use std::process;
 
 use ezc_core::{
     build_application_semantic_model_for_unit, build_component_graph,
-    build_runtime_computed_artifact, build_semantic_graph, build_template_graph,
-    build_template_manifest, explain_json, explain_text, fold_component_graph,
-    generate_runtime_stub, generate_standalone_page_with_computed_runtime, generate_static_html,
-    lower_components_to_ir, runtime_computed_artifact_json, semantic_graph_json,
+    build_runtime_computed_artifact, build_runtime_effect_artifact, build_semantic_graph,
+    build_template_graph, build_template_manifest, explain_json, explain_text,
+    fold_component_graph, generate_runtime_stub, generate_standalone_page_with_effect_runtime,
+    generate_static_html, lower_components_to_ir, optimize_effect_ir,
+    runtime_computed_artifact_json, runtime_effect_artifact_json, semantic_graph_json,
     semantic_type_text, summarize_source, template_manifest_json,
     validate_application_semantic_model, ApplicationSemanticModel, AsmValidationDiagnostic,
     AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
@@ -1394,20 +1395,24 @@ fn run_build(mut args: Vec<String>) {
     let parsed = parse_file(&input_path, &source);
     let unit = CompilationUnit::from_parsed_files(vec![parsed.clone()]);
     let asm = ConstantFoldingPass.transform(&build_application_semantic_model_for_unit(&unit));
-    let computed_ir = lower_components_to_ir(&asm);
-    let computed_runtime_artifact = build_runtime_computed_artifact(&asm, &computed_ir);
+    let ir = lower_components_to_ir(&asm);
+    let computed_runtime_artifact = build_runtime_computed_artifact(&asm, &ir);
     let computed_runtime_json = runtime_computed_artifact_json(&computed_runtime_artifact);
+    let effect_ir = optimize_effect_ir(&ir).output;
+    let effect_runtime_artifact = build_runtime_effect_artifact(&asm, &effect_ir);
+    let effect_runtime_json = runtime_effect_artifact_json(&effect_runtime_artifact);
     let component_graph = fold_component_graph(&build_component_graph(&parsed));
     let template_graph = build_template_graph(&component_graph);
     let html_fragment = generate_static_html(&template_graph);
     let manifest = build_template_manifest(&component_graph, &template_graph);
     let manifest_json = template_manifest_json(&manifest);
     let page_title = page_title_from_graph(&template_graph);
-    let page_html = generate_standalone_page_with_computed_runtime(
+    let page_html = generate_standalone_page_with_effect_runtime(
         &page_title,
         &html_fragment,
         &manifest,
         &computed_runtime_artifact,
+        &effect_runtime_artifact,
     );
     let runtime_js = generate_runtime_stub();
 
@@ -1416,6 +1421,7 @@ fn run_build(mut args: Vec<String>) {
         &page_html,
         &manifest_json,
         &computed_runtime_json,
+        &effect_runtime_json,
         &runtime_js,
     )
     .unwrap_or_else(|error| {
@@ -1430,6 +1436,7 @@ fn run_build(mut args: Vec<String>) {
     println!("Wrote {}", out_dir.join("index.html").display());
     println!("Wrote {}", out_dir.join("template.manifest.json").display());
     println!("Wrote {}", out_dir.join("computed.runtime.json").display());
+    println!("Wrote {}", out_dir.join("effect.runtime.json").display());
     println!("Wrote {}", out_dir.join("runtime.js").display());
 }
 
@@ -2224,6 +2231,7 @@ fn write_build_artifacts(
     html: &str,
     manifest_json: &str,
     computed_runtime_json: &str,
+    effect_runtime_json: &str,
     runtime_js: &str,
 ) -> io::Result<()> {
     fs::create_dir_all(out_dir)?;
@@ -2233,6 +2241,8 @@ fn write_build_artifacts(
     fs::write(out_dir.join("template.manifest.json"), manifest_json)?;
 
     fs::write(out_dir.join("computed.runtime.json"), computed_runtime_json)?;
+
+    fs::write(out_dir.join("effect.runtime.json"), effect_runtime_json)?;
 
     fs::write(out_dir.join("runtime.js"), runtime_js)?;
 

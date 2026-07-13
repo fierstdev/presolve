@@ -3709,6 +3709,64 @@ fn build_command_writes_compiler_generated_computed_runtime_metadata() {
 }
 
 #[test]
+fn build_command_writes_compiler_generated_effect_runtime_metadata() {
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-test-output/effect-runtime-artifact");
+
+    if out_dir.exists() {
+        std::fs::remove_dir_all(&out_dir).expect("failed to clean previous test output");
+    }
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0053-effect-initial-runtime/input/InitialEffectRuntime.tsx",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("test output path was not valid UTF-8"),
+        ])
+        .output()
+        .expect("failed to build effect runtime artifact fixture");
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    assert!(stdout.contains("effect.runtime.json"));
+
+    let page = std::fs::read_to_string(out_dir.join("index.html"))
+        .expect("failed to read generated effect runtime page");
+    assert!(page.contains("id=\"ez-effect-runtime\""));
+
+    let artifact = std::fs::read_to_string(out_dir.join("effect.runtime.json"))
+        .expect("failed to read effect runtime artifact");
+    let artifact: serde_json::Value = serde_json::from_str(&artifact).expect("artifact JSON");
+    assert_eq!(artifact["schema_version"], 1);
+    assert_eq!(artifact["effects"].as_array().map(Vec::len), Some(1));
+    assert_eq!(
+        artifact["effects"][0]["initial_trigger"]["effect_batch_index"],
+        0
+    );
+    assert_eq!(
+        artifact["effects"][0]["capability_operations"],
+        serde_json::json!([
+            {
+                "operation": "builtin.browser.console.log",
+                "runtime_lowering": "builtin.browser.console.log"
+            },
+            {
+                "operation": "builtin.browser.document.title.assign",
+                "runtime_lowering": "builtin.browser.document.title.assign"
+            },
+            {
+                "operation": "builtin.browser.local_storage.set_item",
+                "runtime_lowering": "builtin.browser.local_storage.set_item"
+            }
+        ])
+    );
+}
+
+#[test]
 fn html_command_matches_keyed_list_reconciliation_fixture() {
     let repo_root = repo_root();
 

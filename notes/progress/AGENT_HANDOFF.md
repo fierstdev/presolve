@@ -3,30 +3,32 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: F13 - runtime effect artifact
-* Working tree: clean after the F13 commit
+* Latest completed slice: F14 - initial effect runtime execution
+* Working tree: clean after the F14 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: F13 - runtime effect artifact
-* Summary: The compiler now emits a deterministic schema-v1 effect artifact from F12 records and F10/F11 IR, containing explicit trigger metadata, stable capability operation/lowering IDs, and ordered executable programs.
-* Key files: crates/ezc_core/src/runtime_effect_artifact.rs; crates/ezc_core/src/runtime_computed_artifact.rs; crates/ezc_core/src/lib.rs
-* New behavior: Effect operands reuse the existing computed-artifact instruction encoding. F10 `CapabilityCall` and `CapabilityAssign` become explicit ordered artifact roots with the F4 operation ID and corresponding registry runtime-lowering ID; F8/F9/F12 trigger details serialize as canonical semantic IDs only.
-* Fixtures added or changed: Core coverage proves F11-optimized IR consumption, initial/action trigger serialization, stable capability program ordering and lowerings, invalid-effect exclusion, deterministic JSON, and absence of source-path/provenance fields from emitted programs. No runtime fixture is needed because F13 emits but does not execute the artifact.
+* Slice: F14 - initial effect runtime execution
+* Summary: Generated pages now embed F13 effect metadata, and the shared browser runtime executes each compiler-provided initial effect batch once after state, computed initialization, and rendered DOM setup.
+* Key files: crates/ezc_core/src/runtime_codegen.rs; crates/ezc_core/src/page_codegen.rs; crates/ezc_cli/src/main.rs; crates/ezc_cli/tests/runtime_browser.rs; fixtures/0053-effect-initial-runtime/input/InitialEffectRuntime.tsx
+* New behavior: The runtime validates schema-v1 effect artifacts, reuses the shared pure-program evaluator, dispatches only compiler-emitted runtime-lowering IDs, preserves the artifact's batch/effect/statement order, and exposes `window.__EDGEZERO__.initial_effect_runs` deterministic evidence. Action dispatch does not run effects yet.
+* Fixtures added or changed: The focused CLI test proves `effect.runtime.json` and embedded metadata; a real browser fixture proves computed-before-effect ordering, one initial run, ordered console/title/storage dispatch, title/storage side effects, and no diagnostics.
 
 Current in-progress slice
 
-* Slice: F14 - initial effect runtime execution
-* Status: Ready after F13 commit
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F13
-* Remaining: F14 through F20. F14 must consume the F13 artifact and execute each initial effect once after initial rendering, without action-batch execution or runtime discovery.
+* Slice: F15 - completed-action batched effect execution
+* Status: Ready after F14 commit
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F14
+* Remaining: F15 through F20. F15 must consume the compiler-generated action trigger plans after one completed action and computed flush, without reconstructing eligibility or dependencies at runtime.
 
 Verification
 
 * cargo fmt --all --check: pass
 * cargo test -p ezc_core --lib: pass (163 tests)
-* cargo clippy -p ezc_core --all-targets -- -D warnings: pass
+* cargo test -p ezc_cli --test explain build_command_writes_compiler_generated_effect_runtime_metadata: pass
+* cargo test -p ezc_cli --test runtime_browser initial_effects_execute_once_from_compiler_generated_runtime_programs: pass
+* cargo clippy --workspace --all-targets -- -D warnings: pass
 
 Architecture decisions made
 
@@ -89,6 +91,10 @@ Architecture decisions made
 * Decision: F13 emits schema-v1 effect programs by reusing the existing computed-artifact encoding for pure IR instructions and adding only explicit F10 capability instruction roots.
 * Reason: A shared operand/value instruction encoding keeps F10/F11 IR lowering canonical across computed and effect artifacts. Capability operation IDs resolve to runtime-lowering IDs only through the immutable F4 registry, so no emitted field or runtime path matcher depends on authored static member paths.
 * Tradeoff: The artifact carries canonical IDs and executable programs, not source provenance or raw paths. F13 emits no page integration or execution behavior, does not recompute F8/F9 products, and does not perform runtime discovery; F14 owns one-time initial execution.
+
+* Decision: F14 groups initial effects only by their compiler-emitted F9 batch index, preserving artifact order within a batch, and dispatches capability operations solely by their compiler-emitted runtime-lowering ID.
+* Reason: F13 already records initial trigger membership and batch position, so grouping consumes explicit compiler products rather than observing dependencies or reconstructing eligibility. Sharing the established pure-IR evaluator ensures effect operands see the completed compiler-generated computed initialization before external synchronization.
+* Tradeoff: Debug evidence records effect and capability IDs, never runtime dependency observations or arbitrary local state. F14 intentionally does not consult action trigger records after an action; F15 owns completed-action batching, computed-flush composition, and exactly-once action-triggered execution.
 
 * Decision needed before F8: define the canonical identity for a completed action batch when one authored action method lowers to multiple `ComponentAction` state-write records.
 * Reason: Effects run once per completed action batch, but existing component actions are individual state operations. F8 must either map effects to method/batch identity and deduplicate changed dependencies there, or map effects to individual writes and require F9/runtime layers to reconstruct the batch. The choice determines trigger metadata, F9 ordering, F12 registry identity, and F15 batching behavior.

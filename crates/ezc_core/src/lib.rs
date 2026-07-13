@@ -122,7 +122,10 @@ pub use model::{
 pub use module_graph::{
     build_module_graph, ModuleEdge, ModuleEdgeKind, ModuleGraph, ModuleNode, ModuleTarget,
 };
-pub use page_codegen::{generate_standalone_page, generate_standalone_page_with_computed_runtime};
+pub use page_codegen::{
+    generate_standalone_page, generate_standalone_page_with_computed_runtime,
+    generate_standalone_page_with_effect_runtime,
+};
 pub use resume_manifest::{
     build_resume_manifest, resume_manifest_json, ResumeManifest, RESUME_MANIFEST_SCHEMA_VERSION,
 };
