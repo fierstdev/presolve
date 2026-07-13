@@ -18,9 +18,9 @@ Last completed slice
 Current in-progress slice
 
 * Slice: F8 - effect trigger derivation
-* Status: Ready to begin after the F7 commit
+* Status: Paused awaiting canonical completed-action-batch trigger identity
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F7
-* Remaining: F8 - effect trigger derivation, then F9 through F20. Consume F7 closures and existing action batches; do not schedule or execute effects yet.
+* Remaining: F8 - effect trigger derivation, then F9 through F20. Do not begin trigger mapping until the batch identity decision below is resolved.
 
 Verification
 
@@ -65,6 +65,10 @@ Architecture decisions made
 * Decision: F7 projects existing transitive graph analysis into `EffectReactiveAnalysis` records keyed by valid effect semantic ID.
 * Reason: Trigger and scheduler slices need stable semantic identities for complete dependencies without traversing graph strings or source expressions. The projection preserves the terminal invariant: effects can have dependencies but no dependents.
 * Tradeoff: F7 adds no effect-to-action trigger mapping, ordering, scheduler batches, IR, or runtime behavior.
+
+* Decision needed before F8: define the canonical identity for a completed action batch when one authored action method lowers to multiple `ComponentAction` state-write records.
+* Reason: Effects run once per completed action batch, but existing component actions are individual state operations. F8 must either map effects to method/batch identity and deduplicate changed dependencies there, or map effects to individual writes and require F9/runtime layers to reconstruct the batch. The choice determines trigger metadata, F9 ordering, F12 registry identity, and F15 batching behavior.
+* Tradeoff: F7 remains complete and committed. No trigger mapping, scheduling, runtime metadata, or execution has been introduced; await a contract for batch/method identity, multi-write deduplication, and the representation of actions that change no effect dependency.
 
 * Decision: ASM validation resolves typed subjects through either canonical semantic entities or canonical expression-graph nodes, using the subject's authoritative provenance in either case.
 * Reason: Expression nodes are first-class compiler products with stable IDs and spans, but are intentionally not modeled as generic semantic entities. Validation must preserve that separation while accepting their canonical type assignments.
