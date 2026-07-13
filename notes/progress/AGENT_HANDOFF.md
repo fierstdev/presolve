@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: G4 - Context Provider visibility and resolution
-* Working tree: G4 is ready to commit. The Phase G roadmap file is user-provided and untracked.
+* Working tree: G4 is committed. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-13
 
 Last completed slice
@@ -18,7 +18,7 @@ Last completed slice
 Current in-progress slice
 
 * Slice: G5 - Context type validation
-* Status: Ready to inspect the roadmap contract after the G4 commit checkpoint.
+* Status: Blocked pending an explicit Context/Provider/Consumer type compatibility contract.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4
 * Remaining: G5 through G20.
 
@@ -61,6 +61,10 @@ Architecture decisions made
 * Decision: G4 uses one compiler-owned `ComponentScopeGraph` as the sole Provider-visibility input. Phase G populates it reflexively only; future compiler-owned composition lowering may add validated parent edges without changing the nearest-scope algorithm.
 * Reason: This gives Consumers deterministic binding results without inferring ancestry from imports, source order, lexical nesting, templates, or runtime parent traversal. Explicit Providers take precedence by nearest scope; canonical Context defaults are distinct fallback results rather than hidden Providers.
 * Tradeoff: Without a canonical composition edge, cross-component Providers are intentionally invisible. G4 records immutable resolution facts and `resolves-to-provider` edges only; it adds no type compatibility, runtime slot, scheduling, IR, execution, or runtime discovery behavior.
+
+* Decision needed before G5: define Provider value-type inference/evaluation scope; the directed compatibility rules among Context declared type, Provider declared and value types, Consumer requested type, and Context default; serialization and execution-boundary compatibility; canonical compatibility-result identity/status; and how unresolved, ambiguous, invalid, and default resolutions participate.
+* Reason: The roadmap lists the three type participants but does not specify assignability direction, structural/nominal behavior, unknown/alias handling, whether a Provider declaration type, value type, or both govern compatibility, or which existing semantic type facts become authoritative. Selecting those rules would invent language semantics and prematurely determine G18 diagnostics and later runtime eligibility.
+* Tradeoff: G4 remains complete and committed. No Provider/Consumer compatibility, inferred Provider value type, default compatibility, boundary/serialization result, Context type diagnostic, or runtime type behavior has been added.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.
