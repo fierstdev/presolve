@@ -986,7 +986,7 @@ impl SemanticTypeModel {
         self
     }
 
-    /// Attaches inferred types to canonical state-initializer expression nodes.
+    /// Attaches inferred types to canonical declaration expression nodes.
     ///
     /// # Panics
     ///
@@ -998,14 +998,31 @@ impl SemanticTypeModel {
         graph: &ExpressionGraph,
         components: &[ComponentNode],
     ) -> Self {
-        let state_owners = components
+        let declaration_owners = components
             .iter()
-            .flat_map(|component| component.state_fields.iter().map(|field| field.id.clone()))
+            .flat_map(|component| {
+                component
+                    .state_fields
+                    .iter()
+                    .map(|field| field.id.clone())
+                    .chain(
+                        component
+                            .context_declarations
+                            .iter()
+                            .map(|context| component.id.context(&context.name)),
+                    )
+                    .chain(
+                        component
+                            .provider_declarations
+                            .iter()
+                            .map(|provider| component.id.provider(&provider.name)),
+                    )
+            })
             .collect::<BTreeSet<_>>();
         let nodes = graph
             .nodes
             .values()
-            .filter(|node| state_owners.contains(&node.owner))
+            .filter(|node| declaration_owners.contains(&node.owner))
             .map(|node| node.id.clone())
             .collect::<Vec<_>>();
         for id in nodes {

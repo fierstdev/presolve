@@ -3,34 +3,33 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: G4 - Context Provider visibility and resolution
-* Working tree: G4 is committed. The Phase G roadmap file is user-provided and untracked.
+* Latest completed slice: G5 - Context typing and compatibility
+* Working tree: G5 is ready to commit. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-13
 
 Last completed slice
 
-* Slice: G4 - Context Provider visibility and resolution
-* Summary: Every canonical Consumer now receives an immutable `ContextResolution`: explicit Provider, Context default fallback, unresolved, ambiguity, or invalid Context reference. The resolution uses only an immutable component scope graph and canonical Context/Provider/Consumer products.
-* Key files: crates/ezc_core/src/component_scope.rs; crates/ezc_core/src/context_resolution.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_core/src/semantic_graph.rs
-* New behavior: Phase G’s scope baseline is reflexive self-scope, so same-component Providers resolve at distance zero while cross-component Providers remain invisible without a canonical parent edge. Context defaults are explicit fallbacks, and semantic graph schema v5 emits `resolves-to-provider` edges only for explicit selections.
-* Unsupported semantics: G4 has no type compatibility filtering, lifetime/dependency graph, scheduling, IR, runtime slots/artifacts, execution, resumability, Context diagnostics, runtime provider discovery, source/import/lexical ancestry inference, or component-tree reconstruction.
+* Slice: G5 - Context typing and compatibility
+* Summary: Context, Provider, Consumer, and resolved binding type records are immutable ASM products. Provider value inference remains distinct from the Provider declaration type; the directed chain is value -> Provider declaration -> Context declaration -> Consumer request, while Context defaults remain distinct fallback sources.
+* Key files: crates/ezc_core/src/context_typing.rs; crates/ezc_core/src/semantic_type.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_core/src/lib.rs
+* New behavior: G5 reuses canonical semantic type, serialization, and execution-boundary facts without reselection. Unknown type facts remain conservative, and a binding is runtime eligible only when its preselected source chain is compatible, serializable, and boundary-compatible.
+* Unsupported semantics: G5 adds no diagnostics, ownership/lifetime or dependency graph, scheduling, IR, runtime slots/artifacts, execution, resumability, runtime provider discovery, source/import/lexical ancestry inference, or component-tree reconstruction. Semantic graph schema remains v5.
 
 Current in-progress slice
 
-* Slice: G5 - Context type validation
-* Status: Blocked pending an explicit Context/Provider/Consumer type compatibility contract.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4
-* Remaining: G5 through G20.
+* Slice: G6 - Context ownership graph
+* Status: Ready to begin after the G5 commit.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5
+* Remaining: G6 through G20.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core context_resolution: pass (6 focused tests)
-* cargo test -p ezc_core component_scope: pass (3 focused tests)
-* cargo test -p ezc_core semantic_graph: pass (6 focused tests)
-* cargo test -p ezc_core --lib: pass (195 tests; shared ASM infrastructure)
+* cargo test -p ezc_core context_typing: pass (4 focused tests)
+* cargo test -p ezc_core --lib: pass (199 tests; shared semantic-type infrastructure)
 * cargo test -p ezc_cli --test explain: pass (123 tests)
 * cargo clippy -p ezc_core -p ezc_cli --all-targets -- -D warnings: pass
+* git diff --check: pass
 
 Architecture decisions made
 
@@ -65,6 +64,10 @@ Architecture decisions made
 * Decision needed before G5: define Provider value-type inference/evaluation scope; the directed compatibility rules among Context declared type, Provider declared and value types, Consumer requested type, and Context default; serialization and execution-boundary compatibility; canonical compatibility-result identity/status; and how unresolved, ambiguous, invalid, and default resolutions participate.
 * Reason: The roadmap lists the three type participants but does not specify assignability direction, structural/nominal behavior, unknown/alias handling, whether a Provider declaration type, value type, or both govern compatibility, or which existing semantic type facts become authoritative. Selecting those rules would invent language semantics and prematurely determine G18 diagnostics and later runtime eligibility.
 * Tradeoff: G4 remains complete and committed. No Provider/Consumer compatibility, inferred Provider value type, default compatibility, boundary/serialization result, Context type diagnostic, or runtime type behavior has been added.
+
+* Decision: A Context declared type is the canonical channel contract. G5 projects the existing type model into immutable records and evaluates Provider values through `value -> Provider declaration -> Context declaration -> Consumer request`; Context defaults independently flow to the Context declaration. Unknown type facts are conservative, and G4 resolution is never reselected.
+* Reason: Existing compiler type, serialization, and boundary products already provide the canonical facts necessary for a complete directed compatibility result. Retaining every intermediate relation lets later diagnostics and runtime lowering consume one compiler-owned answer without evaluating source again or querying Providers at runtime.
+* Tradeoff: G5 records compatibility only. It adds no new type language, diagnostic catalog, Provider visibility rule, source reconstruction, dependency graph, schedule, IR, artifact, runtime slot, or execution behavior.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.

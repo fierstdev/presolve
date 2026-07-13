@@ -15,6 +15,7 @@ pub mod computed_value;
 pub mod consumer;
 pub mod context;
 pub mod context_resolution;
+pub mod context_typing;
 pub mod effect;
 pub mod effect_capability;
 pub mod effect_diagnostics;
@@ -90,6 +91,11 @@ pub use consumer::{collect_consumer_entities, ConsumerEntity, ContextResolutionS
 pub use context::{collect_context_entities, ContextEntity};
 pub use context_resolution::{
     collect_context_resolutions, ContextResolution, ContextResolutionResult,
+};
+pub use context_typing::{
+    collect_context_type_products, CompatibilityStatus, ConsumerTypeRecord,
+    ContextBindingCompatibility, ContextBindingTypeRecord, ContextSerializationCompatibility,
+    ContextTypeProducts, ContextTypeRecord, ProviderTypeRecord,
 };
 pub use effect::{
     analyze_effect_reactivity, collect_effects, derive_effect_trigger_plan, lower_effect_bodies,

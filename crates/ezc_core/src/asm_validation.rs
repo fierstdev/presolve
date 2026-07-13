@@ -88,12 +88,91 @@ pub fn validate_application_semantic_model(
     validate_providers(model, &mut diagnostics);
     validate_consumers(model, &mut diagnostics);
     validate_context_resolution(model, &mut diagnostics);
+    validate_context_typing(model, &mut diagnostics);
     validate_effect_statement_types(model, &mut diagnostics);
     validate_effect_execution_plan(model, &mut diagnostics);
     validate_component_diagnostic_metadata(model, &mut diagnostics);
     validate_template_action_bindings(model, &mut diagnostics);
 
     diagnostics
+}
+
+fn validate_context_typing(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    if model.context_types.len() != model.contexts.len()
+        || model.provider_types.len() != model.providers.len()
+        || model.consumer_types.len() != model.consumers.len()
+        || model.context_binding_types.len() != model.consumers.len()
+    {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1176".to_string(),
+            message: "Context typing records do not exactly cover canonical entities".to_string(),
+        });
+    }
+    for context in model.contexts.values() {
+        if model.context_type(&context.id).is_none_or(|record| {
+            record.declared_type != context.declared_type_id
+                || record.normalized_type != context.declared_type_id
+        }) {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1177".to_string(),
+                message: format!("Context `{}` has an invalid type record", context.id),
+            });
+        }
+    }
+    for provider in model.providers.values() {
+        if model.provider_type(&provider.id).is_none_or(|record| {
+            record.declared_type != provider.declared_type_id
+                || record.inferred_value_type == provider.declared_type_id
+                || record.context != Some(provider.context.clone())
+        }) {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1178".to_string(),
+                message: format!("Provider `{}` has an invalid type record", provider.id),
+            });
+        }
+    }
+    for consumer in model.consumers.values() {
+        let Some(binding) = model.context_binding_type(&consumer.id) else {
+            continue;
+        };
+        if model.consumer_type(&consumer.id).is_none_or(|record| {
+            record.requested_type != consumer.requested_type_id
+                || record.context != consumer.context().cloned()
+        }) || model
+            .context_resolution(&consumer.id)
+            .is_none_or(|resolution| binding.resolution != resolution.result)
+        {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1179".to_string(),
+                message: format!("Consumer `{}` has an invalid type record", consumer.id),
+            });
+        }
+        if let crate::ContextResolutionResult::Provider { provider, .. } = &binding.resolution {
+            if binding.provider.as_ref() != Some(provider) {
+                diagnostics.push(AsmValidationDiagnostic {
+                    code: "EZASM1180".to_string(),
+                    message: format!("Consumer `{}` does not retain its G4 Provider", consumer.id),
+                });
+            }
+        }
+        if binding.overall == crate::ContextBindingCompatibility::Compatible
+            && (binding.source_to_context != crate::CompatibilityStatus::Compatible
+                || binding.context_to_consumer != crate::CompatibilityStatus::Compatible
+                || binding.boundary_compatibility != crate::CompatibilityStatus::Compatible
+                || binding.serialization != crate::ContextSerializationCompatibility::Serializable)
+        {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1181".to_string(),
+                message: format!(
+                    "Consumer `{}` has a permissively compatible binding",
+                    consumer.id
+                ),
+            });
+        }
+    }
 }
 
 #[allow(clippy::too_many_lines)]

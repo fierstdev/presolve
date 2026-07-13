@@ -16,6 +16,10 @@ use crate::context::{collect_context_entities, ContextEntity};
 use crate::context_resolution::{
     collect_context_resolutions, ContextResolution, ContextResolutionResult,
 };
+use crate::context_typing::{
+    collect_context_type_products, ConsumerTypeRecord, ContextBindingCompatibility,
+    ContextBindingTypeRecord, ContextTypeRecord, ProviderTypeRecord,
+};
 use crate::expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 use crate::intermediate_representation::{
     IrComputedEvaluationPlan, IrReactiveCycleAnalysis, IrReactiveGraph,
@@ -48,6 +52,10 @@ pub struct ApplicationSemanticModel {
     pub consumers: BTreeMap<ConsumerId, ConsumerEntity>,
     pub component_scope: ComponentScopeGraph,
     pub context_resolutions: BTreeMap<ConsumerId, ContextResolution>,
+    pub context_types: BTreeMap<ContextId, ContextTypeRecord>,
+    pub provider_types: BTreeMap<ProviderId, ProviderTypeRecord>,
+    pub consumer_types: BTreeMap<ConsumerId, ConsumerTypeRecord>,
+    pub context_binding_types: BTreeMap<ConsumerId, ContextBindingTypeRecord>,
     pub duplicate_provider_declarations: Vec<DuplicateProviderDeclaration>,
     pub computed_values: BTreeMap<SemanticId, ComputedValue>,
     pub effects: BTreeMap<SemanticId, Effect>,
@@ -379,6 +387,32 @@ impl ApplicationSemanticModel {
                 matches!(resolution.result, ContextResolutionResult::Unresolved).then_some(consumer)
             })
             .collect()
+    }
+
+    #[must_use]
+    pub fn context_type(&self, context: &ContextId) -> Option<&ContextTypeRecord> {
+        self.context_types.get(context)
+    }
+
+    #[must_use]
+    pub fn provider_type(&self, provider: &ProviderId) -> Option<&ProviderTypeRecord> {
+        self.provider_types.get(provider)
+    }
+
+    #[must_use]
+    pub fn consumer_type(&self, consumer: &ConsumerId) -> Option<&ConsumerTypeRecord> {
+        self.consumer_types.get(consumer)
+    }
+
+    #[must_use]
+    pub fn context_binding_type(&self, consumer: &ConsumerId) -> Option<&ContextBindingTypeRecord> {
+        self.context_binding_types.get(consumer)
+    }
+
+    #[must_use]
+    pub fn runtime_eligible_context_binding(&self, consumer: &ConsumerId) -> bool {
+        self.context_binding_type(consumer)
+            .is_some_and(|binding| binding.overall == ContextBindingCompatibility::Compatible)
     }
 
     #[must_use]
@@ -793,6 +827,14 @@ pub fn build_application_semantic_model_from_component_graph(
         &references,
         &template_entities,
     );
+    let context_type_products = collect_context_type_products(
+        &contexts,
+        &providers,
+        &consumers,
+        &context_resolutions,
+        &expression_graph,
+        &semantic_types,
+    );
     let effects = validate_effects(
         &component_graph.components,
         effects,
@@ -851,6 +893,10 @@ pub fn build_application_semantic_model_from_component_graph(
         consumers,
         component_scope,
         context_resolutions,
+        context_types: context_type_products.contexts,
+        provider_types: context_type_products.providers,
+        consumer_types: context_type_products.consumers,
+        context_binding_types: context_type_products.bindings,
         duplicate_provider_declarations,
         computed_values,
         effects,
@@ -999,6 +1045,14 @@ fn build_application_semantic_model_from_files_with_bindings(
         &references,
         &template_entities,
     );
+    let context_type_products = collect_context_type_products(
+        &contexts,
+        &providers,
+        &consumers,
+        &context_resolutions,
+        &expression_graph,
+        &semantic_types,
+    );
     let effects = validate_effects(&components, effects, &effect_statements, &semantic_types);
     let (
         reactive_graph,
@@ -1050,6 +1104,10 @@ fn build_application_semantic_model_from_files_with_bindings(
         consumers,
         component_scope,
         context_resolutions,
+        context_types: context_type_products.contexts,
+        provider_types: context_type_products.providers,
+        consumer_types: context_type_products.consumers,
+        context_binding_types: context_type_products.bindings,
         duplicate_provider_declarations,
         computed_values,
         effects,
