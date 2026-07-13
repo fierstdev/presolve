@@ -29,6 +29,7 @@ pub mod resume_plan;
 pub mod route_graph;
 pub mod runtime_codegen;
 pub mod runtime_computed;
+pub mod runtime_computed_artifact;
 pub mod semantic_graph;
 pub mod semantic_id;
 pub mod semantic_provenance;
@@ -109,6 +110,11 @@ pub use runtime_codegen::generate_runtime_stub;
 pub use runtime_computed::{
     build_runtime_computed_registry, RuntimeComputedCacheSlot, RuntimeComputedDirtyFlag,
     RuntimeComputedRecord, RuntimeComputedRegistry,
+};
+pub use runtime_computed_artifact::{
+    build_runtime_computed_artifact, runtime_computed_artifact_json, RuntimeComputedArtifact,
+    RuntimeComputedArtifactDirtyFlag, RuntimeComputedArtifactEvaluation,
+    RuntimeComputedArtifactSerialization, RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION,
 };
 pub use semantic_graph::{
     build_semantic_graph, semantic_graph_json, SemanticGraph, SemanticGraphEdge,

@@ -6,10 +6,12 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 use ezc_core::{
-    build_application_semantic_model_for_unit, build_component_graph, build_semantic_graph,
+    build_application_semantic_model_for_unit, build_component_graph,
+    build_runtime_computed_artifact, build_runtime_computed_registry, build_semantic_graph,
     build_template_graph, build_template_manifest, explain_json, explain_text,
     fold_component_graph, generate_runtime_stub, generate_standalone_page, generate_static_html,
-    semantic_graph_json, semantic_type_text, summarize_source, template_manifest_json,
+    lower_components_to_ir, runtime_computed_artifact_json, semantic_graph_json,
+    semantic_type_text, summarize_source, template_manifest_json,
     validate_application_semantic_model, ApplicationSemanticModel, AsmValidationDiagnostic,
     AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
     ImmutableAsmPass, RenderAttribute, RenderAttributeValue, SemanticEntity, SemanticEntityKind,
@@ -1301,6 +1303,12 @@ fn run_build(mut args: Vec<String>) {
     });
 
     let parsed = parse_file(&input_path, &source);
+    let unit = CompilationUnit::from_parsed_files(vec![parsed.clone()]);
+    let asm = ConstantFoldingPass.transform(&build_application_semantic_model_for_unit(&unit));
+    let computed_registry = build_runtime_computed_registry(&asm, &lower_components_to_ir(&asm));
+    let computed_runtime_artifact =
+        build_runtime_computed_artifact(&computed_registry, &asm.computed_evaluation_plan);
+    let computed_runtime_json = runtime_computed_artifact_json(&computed_runtime_artifact);
     let component_graph = fold_component_graph(&build_component_graph(&parsed));
     let template_graph = build_template_graph(&component_graph);
     let html_fragment = generate_static_html(&template_graph);
@@ -1310,19 +1318,25 @@ fn run_build(mut args: Vec<String>) {
     let page_html = generate_standalone_page(&page_title, &html_fragment, &manifest);
     let runtime_js = generate_runtime_stub();
 
-    write_build_artifacts(&out_dir, &page_html, &manifest_json, &runtime_js).unwrap_or_else(
-        |error| {
-            eprintln!(
-                "failed to write build artifacts to {}: {error}",
-                out_dir.display()
-            );
+    write_build_artifacts(
+        &out_dir,
+        &page_html,
+        &manifest_json,
+        &computed_runtime_json,
+        &runtime_js,
+    )
+    .unwrap_or_else(|error| {
+        eprintln!(
+            "failed to write build artifacts to {}: {error}",
+            out_dir.display()
+        );
 
-            process::exit(1);
-        },
-    );
+        process::exit(1);
+    });
 
     println!("Wrote {}", out_dir.join("index.html").display());
     println!("Wrote {}", out_dir.join("template.manifest.json").display());
+    println!("Wrote {}", out_dir.join("computed.runtime.json").display());
     println!("Wrote {}", out_dir.join("runtime.js").display());
 }
 
@@ -2116,6 +2130,7 @@ fn write_build_artifacts(
     out_dir: &PathBuf,
     html: &str,
     manifest_json: &str,
+    computed_runtime_json: &str,
     runtime_js: &str,
 ) -> io::Result<()> {
     fs::create_dir_all(out_dir)?;
@@ -2123,6 +2138,8 @@ fn write_build_artifacts(
     fs::write(out_dir.join("index.html"), html)?;
 
     fs::write(out_dir.join("template.manifest.json"), manifest_json)?;
+
+    fs::write(out_dir.join("computed.runtime.json"), computed_runtime_json)?;
 
     fs::write(out_dir.join("runtime.js"), runtime_js)?;
 

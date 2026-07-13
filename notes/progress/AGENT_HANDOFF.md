@@ -3,34 +3,39 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: E13 - template computed bindings
-* Working tree: clean after the E13 commit
+* Latest completed slice: E14 - computed runtime artifact generation
+* Working tree: clean after the E14 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: E13 - template computed bindings
-* Summary: Resolved direct template uses of computed getters to first-class computed ASM entities.
-* Key files: crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/semantic_reference.rs; crates/ezc_core/src/semantic_type.rs; crates/ezc_core/src/semantic_graph.rs; crates/ezc_cli/src/main.rs
-* New behavior: Direct `this.<computed>` binding, dynamic-attribute, and conditional uses now emit deterministic `template-computed` relations, inherit the computed type, and appear in semantic graph and selected-entity CLI inspection.
-* Fixtures added or changed: `fixtures/0043-template-computed-bindings` plus focused core and CLI coverage for canonical targets, provenance, type projection, graph edges, and relation filtering.
+* Slice: E14 - computed runtime artifact generation
+* Summary: Emitted a versioned compiler-generated computed-evaluation metadata artifact from canonical registry and scheduling products.
+* Key files: crates/ezc_core/src/runtime_computed_artifact.rs; crates/ezc_core/src/lib.rs; crates/ezc_cli/src/main.rs
+* New behavior: `ezc_cli build` now writes `computed.runtime.json` with canonical evaluation records, cache slots, dirty flags, direct dependencies, evaluation-function IDs, serialization, evaluation order, and update batches.
+* Fixtures added or changed: focused core determinism coverage and CLI build coverage using `fixtures/0043-template-computed-bindings`.
 
 Current in-progress slice
 
-* Slice: E13 - template computed bindings
+* Slice: E14 - computed runtime artifact generation
 * Status: Complete
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E13
-* Remaining: E14 - emit compiler-generated runtime metadata for computed evaluation.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E14
+* Remaining: E15 - cached computed runtime execution.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core resolves_template_bindings_to_canonical_computed_entities: pass
-* cargo test -p ezc_cli asm_command_filters_template_computed_references: pass
+* cargo test -p ezc_core runtime_computed: pass
+* cargo test -p ezc_cli build_command_writes_compiler_generated_computed_runtime_metadata: pass
+* cargo test -p ezc_cli build_command_writes_page_manifest_and_runtime_artifacts: pass
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 * cargo clippy -p ezc_cli --all-targets -- -D warnings: pass
 
 Architecture decisions made
+
+* Decision: `computed.runtime.json` is a separate schema-versioned build artifact generated from the E12 runtime registry and E9 evaluation plan.
+* Reason: Runtime consumers receive stable cache, dirty, dependency, evaluation-function, serialization, order, and batching metadata without parsing source or discovering dependencies dynamically.
+* Tradeoff: E14 serializes metadata only and filters the existing plan to registry entries with lowered evaluation functions. The current runtime neither loads the file nor executes a computed function, mutates a cache, or invalidates a dependency; E15 owns execution.
 
 * Decision: Direct template `this.<name>` uses resolve to a distinct `template-computed` reference only when the owning component has a matching first-class computed entity and no same-named state field.
 * Reason: Template consumers receive a stable declaration-to-use relation and canonical computed type without reparsing source or conflating computed reads with state dependencies; existing state resolution retains its established precedence.
@@ -588,14 +593,14 @@ Known limitations
 * Item: Method parameters are compiler-owned identifier declarations with canonical source provenance only. They do not execute, close over values, resolve local/template/action references, or support destructuring, defaults, rest declarations, or semantic type checking.
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
-* Item: The canonical expression graph covers supported state initializer expressions and direct supported computed getter returns. Computed expression nodes and entities have inferred canonical types through resolved state/computed reads; exact template binding uses can resolve to computed entities, but do not evaluate them. Computed values are pure or impure with `EZC1034` purity diagnostics, compiler-owned direct/transitive reactive topology is available, computed cycles emit `EZC1035`, and evaluation plans expose stable order/batches. Pure scheduled E2 expressions lower to canonical IR functions, a separate immutable optimized IR product, and metadata-only runtime records; getter execution, cache mutation, artifact generation, and runtime behavior remain later work.
+* Item: The canonical expression graph covers supported state initializer expressions and direct supported computed getter returns. Computed expression nodes and entities have inferred canonical types through resolved state/computed reads; exact template binding uses can resolve to computed entities, but do not evaluate them. Computed values are pure or impure with `EZC1034` purity diagnostics, compiler-owned direct/transitive reactive topology is available, computed cycles emit `EZC1035`, and evaluation plans expose stable order/batches. Pure scheduled E2 expressions lower to canonical IR functions, a separate immutable optimized IR product, and emitted `computed.runtime.json` metadata; the current runtime does not consume that artifact, execute getters, or mutate caches.
 * Item: C30 exposes direct ASM type queries only. CLI inspection output, source diagnostics, backend enforcement, resource declaration lowering, and final type diagnostic families remain later Phase C work.
 * Item: Authored method IR functions still contain only empty entry basic blocks plus structural branch-edge and natural-loop records. Computed E10 functions lower the supported E2 expression graph into value-producing instructions, but neither form has source-lowered branches/loops, explicit terminators, or general statement instructions.
 * Item: Authored method lowering still creates empty function value registries and no method load/store instructions. Computed E10 functions register their defining values and resolved state/computed loads; D3-A analyses apply to both canonical forms without adding general source statement lowering.
 
 Exact next step
 
-Next is E14: emit compiler-generated runtime metadata for computed evaluation. Do not permit runtime dependency discovery or execute/invalidate computed values.
+Next is E15: implement cached computed execution driven entirely by compiler-generated dependency plans. Do not add batched invalidation or runtime dependency discovery.
 
 Useful commands
 
@@ -626,4 +631,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the E13 commit.
+* None after the E14 commit.

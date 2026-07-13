@@ -3425,6 +3425,61 @@ fn build_command_writes_page_manifest_and_runtime_artifacts() {
 }
 
 #[test]
+fn build_command_writes_compiler_generated_computed_runtime_metadata() {
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-test-output/computed-runtime-artifact");
+
+    if out_dir.exists() {
+        std::fs::remove_dir_all(&out_dir).expect("failed to clean previous test output");
+    }
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0043-template-computed-bindings/input/ComputedTemplate.tsx",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("test output path was not valid UTF-8"),
+        ])
+        .output()
+        .expect("failed to build computed runtime artifact fixture");
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    assert!(stdout.contains("computed.runtime.json"));
+
+    let artifact = std::fs::read_to_string(out_dir.join("computed.runtime.json"))
+        .expect("failed to read computed runtime artifact");
+    let artifact: serde_json::Value = serde_json::from_str(&artifact).expect("artifact JSON");
+    let component = "module:fixtures/0043-template-computed-bindings/input/ComputedTemplate.tsx/component:x-computed-template";
+    let label = format!("{component}/computed:label");
+    let visible = format!("{component}/computed:visible");
+
+    assert_eq!(artifact["schema_version"], 1);
+    assert_eq!(
+        artifact["evaluation_order"],
+        serde_json::json!([label, visible])
+    );
+    assert_eq!(
+        artifact["update_batches"],
+        serde_json::json!([[label, visible]])
+    );
+    assert_eq!(artifact["evaluations"].as_array().map(Vec::len), Some(2));
+    assert!(artifact["evaluations"]
+        .as_array()
+        .is_some_and(|evaluations| {
+            evaluations.iter().all(|evaluation| {
+                evaluation["computed"] == evaluation["evaluation_function"]
+                    && evaluation["dirty_flag"]["initial_value"] == true
+                    && evaluation["serialization"] == "serializable"
+                    && evaluation["dependencies"] == serde_json::json!([])
+            })
+        }));
+}
+
+#[test]
 fn html_command_matches_keyed_list_reconciliation_fixture() {
     let repo_root = repo_root();
 
