@@ -1,9 +1,10 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    ComponentNode, EffectStatementSyntaxKind, ExecutionBoundary, ExpressionGraph,
-    IrReactiveTransitiveAnalysis, SemanticId, SemanticOwner, SemanticTypeModel, SourceProvenance,
-    UnsupportedEffectStatementKind,
+    ComponentNode, ComputedPurity, ComputedValue, EffectStatementSyntaxKind, ExecutionBoundary,
+    ExpressionGraph, IrComputedEvaluationPlan, IrReactiveGraph, IrReactiveNode, IrReactiveNodeKind,
+    IrReactiveTransitiveAnalysis, IrUpdateScheduler, SemanticId, SemanticOwner, SemanticTypeModel,
+    SourceProvenance, UnsupportedEffectStatementKind,
 };
 
 /// Compiler-owned execution contract for an effect.
@@ -79,6 +80,71 @@ pub struct EffectTriggerPlan {
     pub initial_effects: Vec<SemanticId>,
     pub action_batches: BTreeMap<SemanticId, ActionBatch>,
     pub action_batch_triggers: Vec<ActionBatchEffectTrigger>,
+}
+
+/// One filtered reference to an existing E9 computed-update batch.
+///
+/// `source_batch_index` identifies the canonical E9 batch; `computed` retains
+/// only the effect-required members without changing E9's ordering or batch
+/// boundaries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EffectComputedPrerequisiteBatch {
+    pub source_batch_index: u32,
+    pub computed: Vec<SemanticId>,
+}
+
+/// The compiler-owned boundary separating initial rendering from effects.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EffectRenderBoundary {
+    AfterInitialRender,
+}
+
+/// One scheduler-produced terminal batch of effects.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EffectExecutionBatch {
+    pub index: u32,
+    pub effects: Vec<SemanticId>,
+}
+
+/// The reason an otherwise eligible effect has no execution batch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnplannedEffectReason {
+    UnavailableComputedPrerequisite,
+}
+
+/// An F8-eligible effect whose required computed values cannot be executed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnplannedEffect {
+    pub effect: SemanticId,
+    pub reason: UnplannedEffectReason,
+    pub computed_dependencies: Vec<SemanticId>,
+}
+
+/// The initial effect schedule, explicitly separated from rendering.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct InitialEffectExecutionPlan {
+    pub required_computed: Vec<SemanticId>,
+    pub prerequisite_batches: Vec<EffectComputedPrerequisiteBatch>,
+    pub render_boundary: Option<EffectRenderBoundary>,
+    pub effect_batches: Vec<EffectExecutionBatch>,
+    pub unplanned_effects: Vec<UnplannedEffect>,
+}
+
+/// The compiler-owned effect schedule for one completed action batch.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionEffectExecutionPlan {
+    pub action_batch: SemanticId,
+    pub required_computed: Vec<SemanticId>,
+    pub prerequisite_batches: Vec<EffectComputedPrerequisiteBatch>,
+    pub effect_batches: Vec<EffectExecutionBatch>,
+    pub unplanned_effects: Vec<UnplannedEffect>,
+}
+
+/// Immutable F9 scheduling product derived from F7, F8, and E9 products.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct EffectExecutionPlan {
+    pub initial: InitialEffectExecutionPlan,
+    pub actions: Vec<ActionEffectExecutionPlan>,
 }
 
 /// A first-class compiler semantic entity for one `@effect()` method.
@@ -414,6 +480,272 @@ pub fn derive_effect_trigger_plan(
         action_batches,
         action_batch_triggers,
     }
+}
+
+/// Derive minimal, dependency-complete computed prerequisites and terminal
+/// effect batches from existing F7, F8, and E9 compiler products.
+///
+/// This function never inspects effect or computed source expressions. E9
+/// remains the authority for computed ordering; F9 only filters its batches
+/// and asks the existing Phase D scheduler to form terminal effect batches.
+#[must_use]
+pub fn plan_effect_execution(
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    effects: &BTreeMap<SemanticId, Effect>,
+    effect_analysis: &BTreeMap<SemanticId, EffectReactiveAnalysis>,
+    trigger_plan: &EffectTriggerPlan,
+    reactive_transitive_analysis: &IrReactiveTransitiveAnalysis,
+    computed_evaluation_plan: &IrComputedEvaluationPlan,
+) -> EffectExecutionPlan {
+    let computed_by_text = computed_values
+        .keys()
+        .map(|id| (id.as_str().to_string(), id.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let executable = computed_evaluation_plan
+        .evaluation_order
+        .iter()
+        .filter_map(|id| computed_by_text.get(id))
+        .filter(|id| {
+            computed_values
+                .get(*id)
+                .is_some_and(|computed| computed.purity == ComputedPurity::Pure)
+        })
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let initial = build_initial_effect_execution_plan(
+        &trigger_plan.initial_effects,
+        effects,
+        effect_analysis,
+        computed_values,
+        &executable,
+        computed_evaluation_plan,
+    );
+    let actions = trigger_plan
+        .action_batch_triggers
+        .iter()
+        .filter_map(|trigger| {
+            let batch = trigger_plan.action_batches.get(&trigger.action_batch)?;
+            let invalidated = batch
+                .written_states
+                .iter()
+                .flat_map(|state| reactive_transitive_analysis.dependents_of(state.as_str()))
+                .filter_map(|id| computed_by_text.get(id).cloned())
+                .collect::<BTreeSet<_>>();
+            Some(build_action_effect_execution_plan(
+                &batch.id,
+                &trigger.effects,
+                effects,
+                effect_analysis,
+                computed_values,
+                &executable,
+                &invalidated,
+                computed_evaluation_plan,
+            ))
+        })
+        .collect();
+
+    EffectExecutionPlan { initial, actions }
+}
+
+fn build_initial_effect_execution_plan(
+    eligible_effects: &[SemanticId],
+    effects: &BTreeMap<SemanticId, Effect>,
+    effect_analysis: &BTreeMap<SemanticId, EffectReactiveAnalysis>,
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    executable: &BTreeSet<SemanticId>,
+    computed_evaluation_plan: &IrComputedEvaluationPlan,
+) -> InitialEffectExecutionPlan {
+    let membership = effect_execution_membership(
+        eligible_effects,
+        effects,
+        effect_analysis,
+        computed_values,
+        executable,
+    );
+    let required_computed = membership
+        .schedulable_effects
+        .iter()
+        .flat_map(|effect| required_computed_for_effect(effect, effect_analysis, computed_values))
+        .collect::<BTreeSet<_>>();
+    InitialEffectExecutionPlan {
+        prerequisite_batches: select_prerequisite_batches(
+            &required_computed,
+            computed_evaluation_plan,
+            computed_values,
+        ),
+        required_computed: required_computed.into_iter().collect(),
+        render_boundary: Some(EffectRenderBoundary::AfterInitialRender),
+        effect_batches: schedule_terminal_effects(&membership.schedulable_effects, effects),
+        unplanned_effects: membership.unplanned_effects,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_action_effect_execution_plan(
+    action_batch: &SemanticId,
+    eligible_effects: &[SemanticId],
+    effects: &BTreeMap<SemanticId, Effect>,
+    effect_analysis: &BTreeMap<SemanticId, EffectReactiveAnalysis>,
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    executable: &BTreeSet<SemanticId>,
+    invalidated: &BTreeSet<SemanticId>,
+    computed_evaluation_plan: &IrComputedEvaluationPlan,
+) -> ActionEffectExecutionPlan {
+    let membership = effect_execution_membership(
+        eligible_effects,
+        effects,
+        effect_analysis,
+        computed_values,
+        executable,
+    );
+    let required_computed = membership
+        .schedulable_effects
+        .iter()
+        .flat_map(|effect| required_computed_for_effect(effect, effect_analysis, computed_values))
+        .filter(|computed| invalidated.contains(computed))
+        .collect::<BTreeSet<_>>();
+    ActionEffectExecutionPlan {
+        action_batch: action_batch.clone(),
+        prerequisite_batches: select_prerequisite_batches(
+            &required_computed,
+            computed_evaluation_plan,
+            computed_values,
+        ),
+        required_computed: required_computed.into_iter().collect(),
+        effect_batches: schedule_terminal_effects(&membership.schedulable_effects, effects),
+        unplanned_effects: membership.unplanned_effects,
+    }
+}
+
+#[derive(Debug, Default)]
+struct EffectExecutionMembership {
+    schedulable_effects: Vec<SemanticId>,
+    unplanned_effects: Vec<UnplannedEffect>,
+}
+
+fn effect_execution_membership(
+    eligible_effects: &[SemanticId],
+    effects: &BTreeMap<SemanticId, Effect>,
+    effect_analysis: &BTreeMap<SemanticId, EffectReactiveAnalysis>,
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    executable: &BTreeSet<SemanticId>,
+) -> EffectExecutionMembership {
+    let mut membership = EffectExecutionMembership::default();
+    for effect in eligible_effects {
+        if !effects.contains_key(effect) {
+            continue;
+        }
+        let unavailable = required_computed_for_effect(effect, effect_analysis, computed_values)
+            .into_iter()
+            .filter(|computed| !executable.contains(computed))
+            .collect::<Vec<_>>();
+        if unavailable.is_empty() {
+            membership.schedulable_effects.push(effect.clone());
+        } else {
+            membership.unplanned_effects.push(UnplannedEffect {
+                effect: effect.clone(),
+                reason: UnplannedEffectReason::UnavailableComputedPrerequisite,
+                computed_dependencies: unavailable,
+            });
+        }
+    }
+    membership.schedulable_effects.sort();
+    membership.schedulable_effects.dedup();
+    membership
+        .unplanned_effects
+        .sort_by(|left, right| left.effect.cmp(&right.effect));
+    membership
+}
+
+fn required_computed_for_effect(
+    effect: &SemanticId,
+    effect_analysis: &BTreeMap<SemanticId, EffectReactiveAnalysis>,
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+) -> Vec<SemanticId> {
+    effect_analysis
+        .get(effect)
+        .into_iter()
+        .flat_map(|analysis| &analysis.dependencies)
+        .filter(|dependency| computed_values.contains_key(*dependency))
+        .cloned()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+fn select_prerequisite_batches(
+    required_computed: &BTreeSet<SemanticId>,
+    computed_evaluation_plan: &IrComputedEvaluationPlan,
+    computed_values: &BTreeMap<SemanticId, ComputedValue>,
+) -> Vec<EffectComputedPrerequisiteBatch> {
+    computed_evaluation_plan
+        .update_batches
+        .iter()
+        .enumerate()
+        .filter_map(|(index, batch)| {
+            let computed = batch
+                .iter()
+                .filter_map(|id| {
+                    computed_values
+                        .keys()
+                        .find(|computed| computed.as_str() == id)
+                })
+                .filter(|computed| required_computed.contains(*computed))
+                .cloned()
+                .collect::<Vec<_>>();
+            (!computed.is_empty()).then_some(EffectComputedPrerequisiteBatch {
+                source_batch_index: u32::try_from(index)
+                    .expect("computed scheduler batch index should fit u32"),
+                computed,
+            })
+        })
+        .collect()
+}
+
+fn schedule_terminal_effects(
+    effects: &[SemanticId],
+    canonical_effects: &BTreeMap<SemanticId, Effect>,
+) -> Vec<EffectExecutionBatch> {
+    let nodes = effects
+        .iter()
+        .filter_map(|effect| {
+            canonical_effects.get(effect).map(|canonical| {
+                (
+                    effect.as_str().to_string(),
+                    IrReactiveNode {
+                        id: effect.as_str().to_string(),
+                        kind: IrReactiveNodeKind::Effect,
+                        provenance: canonical.provenance.clone(),
+                    },
+                )
+            })
+        })
+        .collect();
+    let inspection = IrUpdateScheduler::new(IrReactiveGraph {
+        nodes,
+        edges: Vec::new(),
+    })
+    .inspect();
+    inspection
+        .batches
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, batch)| {
+            let effects = batch
+                .into_iter()
+                .filter_map(|id| {
+                    canonical_effects
+                        .keys()
+                        .find(|effect| effect.as_str() == id)
+                        .cloned()
+                })
+                .collect::<Vec<_>>();
+            (!effects.is_empty()).then_some(EffectExecutionBatch {
+                index: u32::try_from(index).expect("effect scheduler batch index should fit u32"),
+                effects,
+            })
+        })
+        .collect()
 }
 
 /// Lower all authored effect bodies to ordered statement records.
@@ -884,6 +1216,152 @@ class Effects extends Component {
         assert_eq!(
             trigger.matched_states[&sync_id],
             vec![component.id.state_field("total")]
+        );
+        assert_eq!(validate_application_semantic_model(&asm), Vec::new());
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn schedules_minimal_effect_prerequisites_from_existing_computed_batches() {
+        let parsed = ezc_parser::parse_file(
+            "src/EffectExecutionPlan.tsx",
+            r#"
+@component("x-effect-execution-plan")
+class EffectExecutionPlan extends Component {
+  price = state(1);
+  locale = state("en-US");
+  theme = state("light");
+
+  @computed()
+  get subtotal() { return this.price * 2; }
+
+  @computed()
+  get total() { return this.subtotal + 1; }
+
+  @computed()
+  get currentLocale() { return this.locale; }
+
+  @computed()
+  get unrelated() { return this.theme; }
+
+  @action()
+  increment() { this.price += 1; }
+
+  @action()
+  restyle() { this.theme = "dark"; }
+
+  @effect()
+  report() { console.log(this.total, this.currentLocale); }
+
+  @effect()
+  audit() { console.log(this.price); }
+
+  @effect()
+  bootLog() { console.log("ready"); }
+
+  render() { return <p />; }
+}
+"#,
+        );
+        let asm = build_application_semantic_model(&parsed);
+        let component = &asm.components[0];
+        let subtotal = component.id.computed("subtotal");
+        let total = component.id.computed("total");
+        let current_locale = component.id.computed("currentLocale");
+        let unrelated = component.id.computed("unrelated");
+        let report = component.id.effect("report");
+        let audit = component.id.effect("audit");
+        let boot_log = component.id.effect("bootLog");
+        let execution = asm.effect_execution_plan();
+
+        assert_eq!(
+            execution.initial.required_computed,
+            vec![current_locale.clone(), subtotal.clone(), total.clone()]
+        );
+        assert_eq!(
+            execution.initial.render_boundary,
+            Some(crate::EffectRenderBoundary::AfterInitialRender)
+        );
+        assert_eq!(
+            execution
+                .initial
+                .prerequisite_batches
+                .iter()
+                .map(|batch| batch.computed.clone())
+                .collect::<Vec<_>>(),
+            vec![vec![current_locale, subtotal.clone()], vec![total.clone()]]
+        );
+        assert!(!execution.initial.required_computed.contains(&unrelated));
+        assert_eq!(
+            execution.initial.effect_batches,
+            vec![crate::EffectExecutionBatch {
+                index: 0,
+                effects: vec![audit.clone(), boot_log.clone(), report.clone()],
+            }]
+        );
+        assert!(execution.initial.unplanned_effects.is_empty());
+
+        assert_eq!(execution.actions.len(), 1);
+        let action = &execution.actions[0];
+        assert_eq!(action.action_batch, component.id.action_batch("increment"));
+        assert_eq!(action.required_computed, vec![subtotal, total.clone()]);
+        assert_eq!(
+            action
+                .prerequisite_batches
+                .iter()
+                .map(|batch| batch.computed.clone())
+                .collect::<Vec<_>>(),
+            vec![
+                vec![component.id.computed("subtotal")],
+                vec![component.id.computed("total")],
+            ]
+        );
+        assert_eq!(
+            action.effect_batches,
+            vec![crate::EffectExecutionBatch {
+                index: 0,
+                effects: vec![audit, report.clone()],
+            }]
+        );
+        assert!(action.unplanned_effects.is_empty());
+
+        let unavailable_plan = crate::IrComputedEvaluationPlan {
+            evaluation_order: asm
+                .computed_evaluation_plan
+                .evaluation_order
+                .iter()
+                .filter(|computed| computed.as_str() != total.as_str())
+                .cloned()
+                .collect(),
+            update_batches: asm
+                .computed_evaluation_plan
+                .update_batches
+                .iter()
+                .map(|batch| {
+                    batch
+                        .iter()
+                        .filter(|computed| computed.as_str() != total.as_str())
+                        .cloned()
+                        .collect()
+                })
+                .collect(),
+            unplanned: vec![total.as_str().to_string()],
+        };
+        let unavailable = crate::plan_effect_execution(
+            &asm.computed_values,
+            &asm.effects,
+            &asm.effect_reactive_analysis,
+            asm.effect_trigger_plan(),
+            &asm.reactive_transitive_analysis,
+            &unavailable_plan,
+        );
+        assert_eq!(
+            unavailable.initial.unplanned_effects,
+            vec![crate::UnplannedEffect {
+                effect: report,
+                reason: crate::UnplannedEffectReason::UnavailableComputedPrerequisite,
+                computed_dependencies: vec![total],
+            }]
         );
         assert_eq!(validate_application_semantic_model(&asm), Vec::new());
     }

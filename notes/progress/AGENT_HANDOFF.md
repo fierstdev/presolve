@@ -3,29 +3,29 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: F7 - effect transitive analysis
-* Working tree: clean after the F7 commit
+* Latest completed slice: F9 - effect scheduler integration
+* Working tree: clean after the F9 commit
 * Date: 2026-07-12
 
 Last completed slice
 
-* Slice: F7 - effect transitive analysis
-* Summary: Valid effects now expose deterministic effect-keyed transitive dependencies and dependents by projecting the existing reactive transitive analysis.
-* Key files: crates/ezc_core/src/effect.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/lib.rs
-* New behavior: Analysis preserves semantic identities rather than raw graph strings, excludes invalid effects, and confirms terminal effects have no dependents. It reuses F6 graph closure without rereading expressions or constructing a second graph.
-* Fixtures added or changed: Core coverage verifies transitive effect dependencies and empty dependents. No runtime fixture is needed because F7 adds no execution behavior.
+* Slice: F9 - effect scheduler integration
+* Summary: Valid F8-eligible effects now receive immutable initial and action-batch execution plans that retain only their minimal required computed prerequisites, reference filtered E9 batches, and place effects in terminal Phase-D-scheduler batches.
+* Key files: crates/ezc_core/src/effect.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_core/src/lib.rs
+* New behavior: Initial plans place every schedulable valid effect after `AfterInitialRender`; action plans reevaluate only required computed values invalidated by the batch. Unavailable prerequisites make the affected effect explicitly unplanned. Direct-state and dependency-free effects remain schedulable, and unrelated computed work is absent from the effect subset.
+* Fixtures added or changed: Core coverage proves shared/transitive prerequisite selection, filtered E9 batches, action invalidation intersection, terminal effect batching, dependency-free effects, and unavailable prerequisite records. No runtime fixture is needed because F9 adds no execution behavior.
 
 Current in-progress slice
 
-* Slice: F9 - effect scheduler integration
-* Status: Paused awaiting computed-prerequisite scheduling contract
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F7
-* Remaining: F9 - effect scheduler integration, then F10 through F20. Do not begin scheduler planning until the prerequisite-membership decision below is resolved.
+* Slice: F10 - effect IR lowering
+* Status: Ready after F9 commit
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F9
+* Remaining: F10 through F20. F10 must consume F9 plans and existing effect statements/capability records; do not add runtime execution or dependency discovery.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core --lib: pass (158 tests)
+* cargo test -p ezc_core --lib: pass (159 tests)
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 
 Architecture decisions made
@@ -70,9 +70,9 @@ Architecture decisions made
 * Reason: A batch retains ordered write records and a deduplicated state set, then emits at most one trigger relation per batch/effect with stable matching-state evidence. Initial triggers are a separate explicit valid-effect list.
 * Tradeoff: F8 proves eligibility only. It does not infer runtime value equality, schedule effects, lower IR, or emit runtime metadata.
 
-* Decision needed before F9: define the computed-prerequisite set for each initial and action-batch effect schedule.
-* Reason: F8 identifies eligible effects but not whether F9 schedules every transitive computed dependency of those effects, only dependencies invalidated by the specific written-state set, or a shared component/global computed flush before effects. The choice fixes scheduler-plan membership, ordering, runtime artifact shape, and whether unrelated computed evaluation is permitted.
-* Tradeoff: F8 remains complete and committed. No effect scheduler positions, computed/effect batch plan, IR, runtime metadata, or execution has been introduced; await the initial-render and action-batch prerequisite selection rule.
+* Decision: F9 uses minimal dependency-complete computed prerequisites. Initial schedules include every executable direct/transitive computed dependency of F8-initial effects; action schedules intersect those dependencies with computed values invalidated by that action batch.
+* Reason: F8 remains the sole eligibility authority and E9 remains the sole computed-ordering authority. F9 filters existing E9 batches, records their source batch indexes, and invokes the Phase D scheduler only for terminal effect batches, so unrelated computed work is neither removed from the global plan nor duplicated for effects.
+* Tradeoff: Effects with unavailable computed prerequisites are explicitly unplanned rather than observing stale values. F9 adds no IR, runtime registry/artifact, execution, value-equality check, or runtime dependency discovery; F10 owns effect IR lowering.
 
 * Decision needed before F8: define the canonical identity for a completed action batch when one authored action method lowers to multiple `ComponentAction` state-write records.
 * Reason: Effects run once per completed action batch, but existing component actions are individual state operations. F8 must either map effects to method/batch identity and deduplicate changed dependencies there, or map effects to individual writes and require F9/runtime layers to reconstruct the batch. The choice determines trigger metadata, F9 ordering, F12 registry identity, and F15 batching behavior.

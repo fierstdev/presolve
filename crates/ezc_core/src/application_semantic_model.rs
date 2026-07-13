@@ -25,8 +25,8 @@ use crate::template_semantics::{
 };
 use crate::{
     analyze_effect_reactivity, collect_effects, derive_effect_trigger_plan, lower_effect_bodies,
-    validate_effects, Effect, EffectBody, EffectReactiveAnalysis, EffectStatement,
-    EffectTriggerPlan,
+    plan_effect_execution, validate_effects, Effect, EffectBody, EffectExecutionPlan,
+    EffectReactiveAnalysis, EffectStatement, EffectTriggerPlan,
 };
 
 /// Application-level semantic data assembled from the compiler's existing graphs.
@@ -39,6 +39,7 @@ pub struct ApplicationSemanticModel {
     pub effects: BTreeMap<SemanticId, Effect>,
     pub effect_reactive_analysis: BTreeMap<SemanticId, EffectReactiveAnalysis>,
     pub effect_trigger_plan: EffectTriggerPlan,
+    pub effect_execution_plan: EffectExecutionPlan,
     pub effect_bodies: BTreeMap<SemanticId, EffectBody>,
     pub effect_statements: BTreeMap<SemanticId, EffectStatement>,
     pub reactive_graph: IrReactiveGraph,
@@ -194,6 +195,11 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub const fn effect_trigger_plan(&self) -> &EffectTriggerPlan {
         &self.effect_trigger_plan
+    }
+
+    #[must_use]
+    pub const fn effect_execution_plan(&self) -> &EffectExecutionPlan {
+        &self.effect_execution_plan
     }
 
     /// Returns F4 typing facts for one canonical effect statement.
@@ -581,6 +587,14 @@ pub fn build_application_semantic_model_from_component_graph(
         &effect_reactive_analysis,
         &provenance,
     );
+    let effect_execution_plan = plan_effect_execution(
+        &computed_values,
+        &effects,
+        &effect_reactive_analysis,
+        &effect_trigger_plan,
+        &reactive_transitive_analysis,
+        &computed_evaluation_plan,
+    );
     let mut diagnostics = component_graph.diagnostics.clone();
     diagnostics.extend(computed_diagnostics);
     extend_computed_diagnostics(
@@ -601,6 +615,7 @@ pub fn build_application_semantic_model_from_component_graph(
         effects,
         effect_reactive_analysis,
         effect_trigger_plan,
+        effect_execution_plan,
         effect_bodies,
         effect_statements,
         reactive_graph,
@@ -736,6 +751,14 @@ fn build_application_semantic_model_from_files_with_bindings(
         &effect_reactive_analysis,
         &provenance,
     );
+    let effect_execution_plan = plan_effect_execution(
+        &computed_values,
+        &effects,
+        &effect_reactive_analysis,
+        &effect_trigger_plan,
+        &reactive_transitive_analysis,
+        &computed_evaluation_plan,
+    );
     extend_computed_diagnostics(
         &mut diagnostics,
         &components,
@@ -754,6 +777,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         effects,
         effect_reactive_analysis,
         effect_trigger_plan,
+        effect_execution_plan,
         effect_bodies,
         effect_statements,
         reactive_graph,
