@@ -18,7 +18,7 @@ Last completed slice
 Current in-progress slice
 
 * Slice: G18 - Context diagnostics
-* Status: Ready after G17 commits; project existing G1-G16 facts into the fixed EZC1052-EZC1067 catalog.
+* Status: Blocked pending a retained invalid-declaration diagnostic authority for G1-G3 forms.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1 through G17
 * Remaining: G18 through G20.
 
@@ -33,6 +33,10 @@ Verification
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision needed before G18: define the immutable compiler product that retains invalid Context, Provider, and Consumer declaration forms (including canonical subject identity/provenance) or explicitly authorize revision of the G1-G3 discard contract.
+* Reason: Current G1-G3 lowering intentionally excludes invalid decorator/forms from canonical entities and emits no diagnostic records. `ApplicationSemanticModel` retains valid Context/Provider/Consumer maps only, so `EZC1052`--`EZC1054` cannot be projected from G1-G16 facts. Re-reading source, rerunning parser/decorator interpretation in diagnostics, or inventing subject identities would violate the supplied G18 authority rule and compiler-only invariant.
+* Tradeoff: G17 remains complete and committed. No partial Context diagnostics, check-JSON schema change, inspection-schema v6 change, runtime diagnostic reconstruction, or catalog guesswork has been added.
 
 * Decision: G1 Context syntax is a zero-argument `@context()` decorated non-static component field with an explicit declared type. It lowers to a distinct component-qualified `ContextId` and remains separate from the authored field identity.
 * Reason: One exact field form makes name, ownership, declared type, provenance, and later Provider/Consumer targets compiler-owned facts without accepting runtime constructors, decorator naming, or implicit globals.
