@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: G7 - Compiler-owned Context dependency graph
-* Working tree: G7 is ready to commit. The Phase G roadmap file is user-provided and untracked.
+* Working tree: G7 is committed. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-13
 
 Last completed slice
@@ -18,7 +18,7 @@ Last completed slice
 Current in-progress slice
 
 * Slice: G8 - Context lifetime analysis
-* Status: Ready to assess after the G7 commit.
+* Status: Blocked pending an explicit Context lifetime-analysis contract.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5; G6; G7
 * Remaining: G8 through G20.
 
@@ -83,6 +83,10 @@ Architecture decisions made
 * Decision: G7 projects only direct Context value-flow topology. Provider/default sources supply Context contracts, Provider expressions read canonical State/Computed nodes, and Consumers depend only on the exact G4-selected Provider/default source; G5 compatibility annotates these facts but never removes them.
 * Reason: The canonical expression graph, G4 resolution, and G5 records already establish all direct facts needed by later lifetime/evaluation analysis. Retained indexes answer dependency and reverse-dependency queries without source rewalk, scope traversal, Provider lookup, or runtime discovery.
 * Tradeoff: G7 does not merge with the existing reactive graph or create ownership/ancestry/request/candidate edges. It computes no transitive closure, cycle analysis, lifetime result, ordering, schedule, IR, runtime artifact, or execution behavior.
+
+* Decision needed before G8: define Context lifetime domains and identities; the compatibility relation among Context, Provider, Consumer, default, State, and Computed lifetimes; how ownership, scope ancestry, G4 selection, G5 status, and G7 direct dependencies contribute; treatment of unresolved/ambiguous/invalid bindings; canonical result/status records, validation, queries, and export/schema requirements.
+* Reason: G8 names component, Provider, and Consumer lifetime examples but does not define what a lifetime means or the analysis result. Assigning lexical, scope, component-instance, provider-selection, runtime-slot, or dependency-derived lifetimes would invent semantics that determine G9 initialization availability and later runtime behavior.
+* Tradeoff: G7 remains complete and committed. No lifetime facts, compatibility diagnostics, selection changes, ordering, scheduling, IR, runtime lifetime tracking, or runtime discovery has been added.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.
