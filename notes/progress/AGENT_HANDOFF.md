@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: G9 - Compiler-owned Context evaluation planning
-* Working tree: G9 is ready to commit. The Phase G roadmap file is user-provided and untracked.
+* Working tree: G9 is committed. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-13
 
 Last completed slice
@@ -18,8 +18,8 @@ Last completed slice
 Current in-progress slice
 
 * Slice: G10 - Context IR lowering
-* Status: Ready to assess after the G9 commit.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5; G6; G7; G8
+* Status: Blocked pending an explicit Context IR lowering contract.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5; G6; G7; G8; G9
 * Remaining: G10 through G20.
 
 Verification
@@ -99,6 +99,10 @@ Architecture decisions made
 * Decision: G9 retains one immutable initial `ContextEvaluationPlan`. Every canonical Provider/default source and every Consumer receive an entry; executable demand requires the exact G4 selection plus G5 and G8 compatibility. The Phase D scheduler orders only planned sources by canonical scope depth and stable typed source identity.
 * Reason: The plan composes existing compiler products without changing their authority: G4 selection is never retried, G5/G8 remain eligibility authorities, G7 remains the direct-dependency authority, and Phase E computed plans are reused as prerequisite metadata.
 * Tradeoff: G9 is initial availability only. Unused and blocked sources remain plan facts but have no batch; the slice creates no IR, runtime storage, execution, update propagation, public inspection schema, or runtime Provider discovery.
+
+* Decision needed before G10: define the canonical Context IR product: function, block, operation, value, and storage/load identities; how G9 source and batch identities map into it; whether Provider/default expressions reuse or extend Phase E expression lowering; Consumer-load operands and result semantics; treatment of unavailable entries; computed prerequisite ordering; validation and inspection/schema expectations.
+* Reason: The G10 roadmap only says to lower Context initialization, Provider values, and Consumer loads. Selecting SSA versus Context storage semantics, source function boundaries, load targets, initialization effects, value ownership, or unavailable-entry representation would invent the compiler architecture and determine later G11 optimization and G12 runtime artifacts.
+* Tradeoff: G9 remains complete and committed. No Context IR, storage/load operation, lowering, optimizer integration, runtime artifact, execution, or runtime Context lookup has been added.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.
