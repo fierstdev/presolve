@@ -3,30 +3,30 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: G7 - Compiler-owned Context dependency graph
-* Working tree: G7 is committed. The Phase G roadmap file is user-provided and untracked.
+* Latest completed slice: G8 - Compiler-owned Context lifetime analysis
+* Working tree: G8 is ready to commit. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-13
 
 Last completed slice
 
-* Slice: G7 - Compiler-owned Context dependency graph
-* Summary: The ASM now retains one immutable typed `ContextDependencyGraph` for direct value flow: Provider/default sources supply Context contracts, Provider expressions read canonical State/Computed values, and Consumers depend only on their exact G4-selected Provider or default source.
-* Key files: crates/ezc_core/src/context_dependency.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_core/src/lib.rs
-* New behavior: Edges are deterministic dependent-to-dependency facts with retained forward/reverse indexes. G5 compatibility annotates supply and selected-binding edges without filtering G4 topology. The general semantic graph and its schema v5 remain unchanged.
-* Unsupported semantics: G7 adds no ownership or component ancestry edges, Provider visibility/reselection, transitive closure, lifetime validity, cycle diagnostics, evaluation order, scheduling, IR, runtime slots/artifacts, execution, resumability, public Context diagnostics, or runtime dependency discovery.
+* Slice: G8 - Compiler-owned Context lifetime analysis
+* Summary: The ASM now retains immutable component-scope lifetime records for Contexts, Providers, Consumers, Context defaults, direct State/Computed dependencies, and selected bindings. Ownership supplies the lifetime identity; G4’s `ComponentScopeGraph` alone supplies outlives ordering.
+* Key files: crates/ezc_core/src/context_lifetime.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_core/src/lib.rs
+* New behavior: Provider/default source aggregates and Consumer binding statuses are explicit. A selected source remains selected even when its lifetime is incompatible, and G5 type compatibility remains entirely independent. The general semantic graph and its schema v5 remain unchanged.
+* Unsupported semantics: G8 adds no ancestry inference, Provider reselection, evaluation order, scheduling, cycle diagnostics, IR, runtime slots/artifacts, execution, resumability, public Context diagnostics, runtime instances, or runtime lifetime/provider discovery.
 
 Current in-progress slice
 
-* Slice: G8 - Context lifetime analysis
-* Status: Blocked pending an explicit Context lifetime-analysis contract.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5; G6; G7
-* Remaining: G8 through G20.
+* Slice: G9 - Context evaluation planning
+* Status: Ready to assess after the G8 commit.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5; G6; G7; G8
+* Remaining: G9 through G20.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core context_dependency: pass (3 focused tests)
-* cargo test -p ezc_core --lib: pass (204 tests; shared ASM dependency/validation infrastructure)
+* cargo test -p ezc_core context_lifetime: pass (3 focused tests)
+* cargo test -p ezc_core --lib: pass (207 tests; shared ASM lifetime/validation infrastructure)
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 * git diff --check: pass
 
@@ -87,6 +87,10 @@ Architecture decisions made
 * Decision needed before G8: define Context lifetime domains and identities; the compatibility relation among Context, Provider, Consumer, default, State, and Computed lifetimes; how ownership, scope ancestry, G4 selection, G5 status, and G7 direct dependencies contribute; treatment of unresolved/ambiguous/invalid bindings; canonical result/status records, validation, queries, and export/schema requirements.
 * Reason: G8 names component, Provider, and Consumer lifetime examples but does not define what a lifetime means or the analysis result. Assigning lexical, scope, component-instance, provider-selection, runtime-slot, or dependency-derived lifetimes would invent semantics that determine G9 initialization availability and later runtime behavior.
 * Tradeoff: G7 remains complete and committed. No lifetime facts, compatibility diagnostics, selection changes, ordering, scheduling, IR, runtime lifetime tracking, or runtime discovery has been added.
+
+* Decision: G8 lifetime is one `ComponentScopeLifetime(ComponentId)` domain. Canonical G6 ownership determines each entity’s lifetime identity, while exact G4 ancestor chains determine outlives compatibility for direct G7 dependencies and selected bindings.
+* Reason: This preserves the compiler-only separation: scope topology, ownership, resolution, and direct value flow each remain authoritative in their existing products, while G8 records only availability compatibility and aggregate source status.
+* Tradeoff: G8 never changes G4 selection or filters on G5 typing. It adds no lexical/module/runtime-instance lifetime, ancestry inference, ordering, scheduling, IR, artifact, execution, or runtime discovery behavior.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.

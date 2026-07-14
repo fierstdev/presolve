@@ -14,6 +14,7 @@ use crate::computed_value::{collect_computed_values, ComputedDiagnosticCode, Com
 use crate::consumer::{collect_consumer_entities, ConsumerEntity, ContextResolutionState};
 use crate::context::{collect_context_entities, ContextEntity};
 use crate::context_dependency::{collect_context_dependency_graph, ContextDependencyGraph};
+use crate::context_lifetime::{collect_context_lifetime_analysis, ContextLifetimeAnalysis};
 use crate::context_ownership::{collect_context_ownership_graph, ContextOwnershipGraph};
 use crate::context_resolution::{
     collect_context_resolutions, ContextResolution, ContextResolutionResult,
@@ -54,6 +55,7 @@ pub struct ApplicationSemanticModel {
     pub consumers: BTreeMap<ConsumerId, ConsumerEntity>,
     pub context_ownership: ContextOwnershipGraph,
     pub context_dependency: ContextDependencyGraph,
+    pub context_lifetime: ContextLifetimeAnalysis,
     pub component_scope: ComponentScopeGraph,
     pub context_resolutions: BTreeMap<ConsumerId, ContextResolution>,
     pub context_types: BTreeMap<ContextId, ContextTypeRecord>,
@@ -349,6 +351,11 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub const fn context_dependency_graph(&self) -> &ContextDependencyGraph {
         &self.context_dependency
+    }
+
+    #[must_use]
+    pub const fn context_lifetime_analysis(&self) -> &ContextLifetimeAnalysis {
+        &self.context_lifetime
     }
 
     #[must_use]
@@ -869,6 +876,18 @@ pub fn build_application_semantic_model_from_component_graph(
         &computed_values,
         &expression_graph,
     );
+    let context_lifetime = collect_context_lifetime_analysis(
+        &component_graph.components,
+        &contexts,
+        &providers,
+        &consumers,
+        &computed_values,
+        &context_ownership,
+        &component_scope,
+        &context_resolutions,
+        &context_dependency,
+        &provenance,
+    );
     let effects = validate_effects(
         &component_graph.components,
         effects,
@@ -927,6 +946,7 @@ pub fn build_application_semantic_model_from_component_graph(
         consumers,
         context_ownership,
         context_dependency,
+        context_lifetime,
         component_scope,
         context_resolutions,
         context_types: context_type_products.contexts,
@@ -1109,6 +1129,18 @@ fn build_application_semantic_model_from_files_with_bindings(
         &computed_values,
         &expression_graph,
     );
+    let context_lifetime = collect_context_lifetime_analysis(
+        &components,
+        &contexts,
+        &providers,
+        &consumers,
+        &computed_values,
+        &context_ownership,
+        &component_scope,
+        &context_resolutions,
+        &context_dependency,
+        &provenance,
+    );
     let effects = validate_effects(&components, effects, &effect_statements, &semantic_types);
     let (
         reactive_graph,
@@ -1160,6 +1192,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         consumers,
         context_ownership,
         context_dependency,
+        context_lifetime,
         component_scope,
         context_resolutions,
         context_types: context_type_products.contexts,
