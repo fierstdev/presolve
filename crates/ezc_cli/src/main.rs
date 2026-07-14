@@ -8,13 +8,14 @@ use std::process;
 
 use ezc_core::{
     build_application_semantic_model_for_unit, build_component_graph,
-    build_effect_inspection_registry, build_runtime_computed_artifact,
-    build_runtime_context_artifact, build_runtime_effect_artifact, build_semantic_graph,
-    build_template_graph, build_template_manifest_from_asm, explain_json, explain_text,
-    fold_component_graph, generate_runtime_stub, generate_standalone_page_with_context_runtime,
-    generate_static_html, lower_components_to_ir, optimize_context_ir, optimize_effect_ir,
-    runtime_computed_artifact_json, runtime_context_artifact_json, runtime_effect_artifact_json,
-    semantic_graph_json, semantic_type_text, summarize_source, template_manifest_json,
+    build_context_inspection_registry, build_effect_inspection_registry,
+    build_runtime_computed_artifact, build_runtime_context_artifact, build_runtime_effect_artifact,
+    build_semantic_graph, build_template_graph, build_template_manifest_from_asm, explain_json,
+    explain_text, fold_component_graph, generate_runtime_stub,
+    generate_standalone_page_with_context_runtime, generate_static_html, lower_components_to_ir,
+    optimize_context_ir, optimize_effect_ir, runtime_computed_artifact_json,
+    runtime_context_artifact_json, runtime_effect_artifact_json, semantic_graph_json,
+    semantic_type_text, summarize_source, template_manifest_json,
     validate_application_semantic_model, ApplicationSemanticModel, AsmValidationDiagnostic,
     AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
     EffectInspection, EffectInspectionRegistry, ImmutableAsmPass, RenderAttribute,
@@ -28,7 +29,7 @@ use ezc_parser::{
 };
 use serde::Serialize;
 
-const ASM_INSPECTION_SCHEMA_VERSION: u32 = 4;
+const ASM_INSPECTION_SCHEMA_VERSION: u32 = 5;
 
 fn main() {
     let mut args = env::args().skip(1).collect::<Vec<_>>();
@@ -488,6 +489,7 @@ fn asm_inspection_json(
 ) -> String {
     let computed_functions = computed_evaluation_functions(asm);
     let effect_inspections = build_effect_inspection_registry(asm);
+    let context_inspections = build_context_inspection_registry(asm);
     let mut references = asm
         .references
         .iter()
@@ -535,7 +537,15 @@ fn asm_inspection_json(
         entities: asm
             .ownership
             .keys()
-            .map(|id| asm_inspection_entity(asm, id, &computed_functions, &effect_inspections))
+            .map(|id| {
+                asm_inspection_entity(
+                    asm,
+                    id,
+                    &computed_functions,
+                    &effect_inspections,
+                    &context_inspections,
+                )
+            })
             .collect(),
         references,
         diagnostics,
@@ -725,10 +735,17 @@ fn asm_entity_inspection_json(
 ) -> String {
     let computed_functions = computed_evaluation_functions(asm);
     let effect_inspections = build_effect_inspection_registry(asm);
+    let context_inspections = build_context_inspection_registry(asm);
     let provenance = asm.provenance(id).expect("ASM entities have provenance");
     let document = AsmEntityInspectionDocument {
         schema_version: ASM_INSPECTION_SCHEMA_VERSION,
-        entity: asm_inspection_entity(asm, id, &computed_functions, &effect_inspections),
+        entity: asm_inspection_entity(
+            asm,
+            id,
+            &computed_functions,
+            &effect_inspections,
+            &context_inspections,
+        ),
         parents: asm
             .ancestors_of(id)
             .into_iter()
@@ -1131,6 +1148,7 @@ fn asm_inspection_entity<'a>(
     id: &'a SemanticId,
     computed_functions: &BTreeMap<SemanticId, SemanticId>,
     effect_inspections: &EffectInspectionRegistry,
+    context_inspections: &ezc_core::ContextInspectionRegistry,
 ) -> AsmInspectionEntity<'a> {
     let entity = asm
         .entity(id)
@@ -1149,6 +1167,7 @@ fn asm_inspection_entity<'a>(
         semantic_type: asm_semantic_type(asm, id),
         computed: asm_computed_inspection(asm, id, computed_functions),
         effect: effect_inspections.records.get(id).cloned(),
+        context: context_inspections.records.get(id).cloned(),
     }
 }
 
@@ -1297,6 +1316,8 @@ struct AsmInspectionEntity<'a> {
     computed: Option<AsmInspectionComputed>,
     #[serde(skip_serializing_if = "Option::is_none")]
     effect: Option<EffectInspection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    context: Option<ezc_core::ContextInspection>,
 }
 
 #[derive(Serialize)]

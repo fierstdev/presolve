@@ -3,32 +3,33 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: G16 - Context resumability
-* Working tree: G16 implementation is ready to commit. The Phase G roadmap file is user-provided and untracked.
+* Latest completed slice: G17 - Context inspection
+* Working tree: G17 implementation is ready to commit. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: G16 - Context resumability
-* Summary: `ContextResumePlan` now projects serializable runtime Context slots into distinct `ContextResumeSlotId` records, and the shared resume manifest advances to schema v3 with required `context_slots` metadata.
-* Key files: crates/ezc_core/src/context_resume.rs; crates/ezc_core/src/resume_plan.rs; crates/ezc_core/src/resume_manifest.rs; crates/ezc_core/src/lib.rs
-* New behavior: Resume records retain exact runtime slot/source/Context/type/source-kind identities, uninitialized status, action membership, Consumer bindings, boundary, and provenance. Legacy manifests remain deserializable but fail v3 validation.
-* Unsupported semantics: G16 adds no live snapshot capture/restoration, Provider search, Context re-evaluation for discovery, dynamic binding decision, evaluator-stack serialization, ancestry/candidate serialization, inspection schema, or diagnostics.
+* Slice: G17 - Context inspection
+* Summary: ASM inspection schema is v5. One core `ContextInspectionRegistry` projects Context, Provider, and Consumer source-plan/slot/IR/runtime/update/resume facts, and both full/selected ASM consume it without CLI reanalysis.
+* Key files: crates/ezc_core/src/context_inspection.rs; crates/ezc_core/src/lib.rs; crates/ezc_cli/src/main.rs; crates/ezc_cli/tests/explain.rs
+* New behavior: Inspection exposes null/absent identities rather than guessing and retains only compiler-produced Context facts.
+* Unsupported semantics: G17 adds no new Context resolution/type/lifetime analysis, runtime lookup, graph reconstruction, serialized runtime schema, resumability behavior, or diagnostics.
 
 Current in-progress slice
 
-* Slice: G17 - Context inspection
-* Status: Ready after G16 commits; inspection schema must advance to v5 through one core projection.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1 through G16
-* Remaining: G17 through G20.
+* Slice: G18 - Context diagnostics
+* Status: Ready after G17 commits; project existing G1-G16 facts into the fixed EZC1052-EZC1067 catalog.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1 through G17
+* Remaining: G18 through G20.
 
 Verification
 
-* cargo test -p ezc_core context_resume: pass (1 focused resume slot test)
-* cargo test -p ezc_core resume_: pass (5 focused resume tests)
+* cargo test -p ezc_core context_inspection: pass (1 focused core projection test)
+* cargo test -p ezc_cli --test explain asm: pass (30 focused ASM/selected inspection tests)
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core --lib: pass (220 tests)
+* cargo test -p ezc_core --lib: pass (221 tests)
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
+* cargo clippy -p ezc_cli --all-targets -- -D warnings: pass
 * git diff --check: pass
 
 Architecture decisions made

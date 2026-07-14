@@ -16,6 +16,7 @@ pub mod consumer;
 pub mod context;
 pub mod context_dependency;
 pub mod context_evaluation;
+pub mod context_inspection;
 pub mod context_lifetime;
 pub mod context_ownership;
 pub mod context_resolution;
@@ -107,6 +108,9 @@ pub use context_evaluation::{
     ContextConsumerAvailabilityStatus, ContextEvaluationBatch, ContextEvaluationBatchId,
     ContextEvaluationPlan, ContextEvaluationPlanId, ContextSourceBlockReason,
     ContextSourcePlanEntry, ContextSourcePlanStatus, ContextValueSourceId,
+};
+pub use context_inspection::{
+    build_context_inspection_registry, ContextInspection, ContextInspectionRegistry,
 };
 pub use context_lifetime::{
     collect_context_lifetime_analysis, ContextBindingLifetimeRecord, ContextBindingLifetimeSource,
