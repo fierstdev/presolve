@@ -432,7 +432,7 @@ fn binding_overall(
 mod tests {
     use crate::{
         build_application_semantic_model, validate_application_semantic_model, CompatibilityStatus,
-        ConsumerId, ContextBindingCompatibility, ContextBindingCompatibility::*, ProviderId,
+        ConsumerId, ContextBindingCompatibility::*, ProviderId,
     };
 
     #[test]
@@ -564,12 +564,13 @@ class App extends Component {
         ));
         let invalid_consumer =
             ConsumerId::for_component(&invalid.components[0].id, "toolbarLocale");
+        assert!(invalid.context_binding_type(&invalid_consumer).is_none());
         assert_eq!(
             invalid
-                .context_binding_type(&invalid_consumer)
-                .unwrap()
-                .overall,
-            ContextBindingCompatibility::InvalidContextReference
+                .context_declaration_candidates()
+                .invalid_candidates()
+                .len(),
+            1
         );
     }
 }

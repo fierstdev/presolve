@@ -13,6 +13,9 @@ use crate::component_scope::ComponentScopeGraph;
 use crate::computed_value::{collect_computed_values, ComputedDiagnosticCode, ComputedValue};
 use crate::consumer::{collect_consumer_entities, ConsumerEntity, ContextResolutionState};
 use crate::context::{collect_context_entities, ContextEntity};
+use crate::context_declaration_candidate::{
+    collect_context_declaration_candidates, ContextDeclarationCandidateRegistry,
+};
 use crate::context_dependency::{collect_context_dependency_graph, ContextDependencyGraph};
 use crate::context_evaluation::{collect_context_evaluation_plan, ContextEvaluationPlan};
 use crate::context_lifetime::{collect_context_lifetime_analysis, ContextLifetimeAnalysis};
@@ -54,6 +57,7 @@ pub struct ApplicationSemanticModel {
     pub contexts: BTreeMap<ContextId, ContextEntity>,
     pub providers: BTreeMap<ProviderId, ProviderEntity>,
     pub consumers: BTreeMap<ConsumerId, ConsumerEntity>,
+    pub context_declaration_candidates: ContextDeclarationCandidateRegistry,
     pub context_ownership: ContextOwnershipGraph,
     pub context_dependency: ContextDependencyGraph,
     pub context_lifetime: ContextLifetimeAnalysis,
@@ -245,6 +249,11 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub fn context(&self, id: &ContextId) -> Option<&ContextEntity> {
         self.contexts.get(id)
+    }
+
+    #[must_use]
+    pub const fn context_declaration_candidates(&self) -> &ContextDeclarationCandidateRegistry {
+        &self.context_declaration_candidates
     }
 
     #[must_use]
@@ -790,6 +799,12 @@ pub fn build_application_semantic_model_from_component_graph(
         None,
     );
     let consumers = collect_consumer_entities(&component_graph.components, &contexts, None);
+    let context_declaration_candidates = collect_context_declaration_candidates(
+        &component_graph.components,
+        &contexts,
+        &providers,
+        &consumers,
+    );
     let component_scope = ComponentScopeGraph::reflexive(&component_graph.components);
     let context_resolutions = collect_context_resolutions(
         &consumers,
@@ -963,6 +978,7 @@ pub fn build_application_semantic_model_from_component_graph(
         contexts,
         providers,
         consumers,
+        context_declaration_candidates,
         context_ownership,
         context_dependency,
         context_lifetime,
@@ -995,6 +1011,9 @@ pub fn build_application_semantic_model_from_component_graph(
     model
         .diagnostics
         .extend(crate::collect_effect_diagnostics(&model));
+    model
+        .diagnostics
+        .extend(crate::collect_context_diagnostics(&model));
     model
 }
 
@@ -1053,6 +1072,8 @@ fn build_application_semantic_model_from_files_with_bindings(
     let (providers, duplicate_provider_declarations) =
         collect_provider_entities(&components, &contexts, &expression_graph, bindings);
     let consumers = collect_consumer_entities(&components, &contexts, bindings);
+    let context_declaration_candidates =
+        collect_context_declaration_candidates(&components, &contexts, &providers, &consumers);
     let component_scope = ComponentScopeGraph::reflexive(&components);
     let context_resolutions = collect_context_resolutions(
         &consumers,
@@ -1222,6 +1243,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         contexts,
         providers,
         consumers,
+        context_declaration_candidates,
         context_ownership,
         context_dependency,
         context_lifetime,
@@ -1254,6 +1276,9 @@ fn build_application_semantic_model_from_files_with_bindings(
     model
         .diagnostics
         .extend(crate::collect_effect_diagnostics(&model));
+    model
+        .diagnostics
+        .extend(crate::collect_context_diagnostics(&model));
     model
 }
 

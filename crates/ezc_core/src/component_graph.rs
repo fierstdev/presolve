@@ -4,7 +4,9 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::semantic_id::{EffectId, EffectStatementId, SemanticId, SemanticOwner};
+use crate::semantic_id::{
+    ContextDeclarationCandidateId, EffectId, EffectStatementId, SemanticId, SemanticOwner,
+};
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
 
@@ -39,6 +41,9 @@ pub struct ComponentNode {
     pub context_declarations: Vec<ContextDeclaration>,
     pub provider_declarations: Vec<ProviderDeclaration>,
     pub consumer_declarations: Vec<ConsumerDeclaration>,
+    /// Source-faithful candidates retained for every Context-family decorator,
+    /// including forms that cannot produce a semantic entity.
+    pub context_declaration_candidates: Vec<AuthoredContextDeclarationCandidate>,
     pub methods: Vec<ComponentMethod>,
     pub actions: Vec<ComponentAction>,
     pub render: Option<RenderModel>,
@@ -103,6 +108,57 @@ pub struct ConsumerDeclaration {
     pub decorator_provenance: SourceProvenance,
     pub name_provenance: SourceProvenance,
     pub provenance: SourceProvenance,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ContextDeclarationCandidateKind {
+    Context,
+    Provider,
+    Consumer,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AuthoredDeclarationKind {
+    InstanceField,
+    StaticField,
+    Method,
+    Getter,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ContextDeclarationViolation {
+    InvalidDeclarationKind { actual: AuthoredDeclarationKind },
+    StaticDeclarationUnsupported,
+    ConflictingSemanticDecorators,
+    DecoratorArity { actual: usize, expected: usize },
+    ContextDesignatorUnsupported,
+    UnresolvedContextDesignator,
+    MissingDeclaredType,
+    MissingInitializer,
+    ForbiddenInitializer,
+    UnsupportedInitializer,
+    DefiniteAssignmentRequired,
+    DuplicateProvider,
+}
+
+/// Parser/lowering-owned facts retained before semantic entity construction.
+/// No diagnostic code is assigned here.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthoredContextDeclarationCandidate {
+    pub id: ContextDeclarationCandidateId,
+    pub kind: ContextDeclarationCandidateKind,
+    pub owner_component: SemanticId,
+    pub authored_declaration: SemanticId,
+    pub declaration_kind: AuthoredDeclarationKind,
+    pub field_name: Option<String>,
+    pub declared_type: Option<DeclaredStateType>,
+    pub context_designator: Option<ContextDesignator>,
+    pub decorator_argument_count: usize,
+    pub decorator_provenance: SourceProvenance,
+    pub provenance: SourceProvenance,
+    pub static_modifier_provenance: Option<SourceProvenance>,
+    pub initializer_provenance: Option<SourceProvenance>,
+    pub violations: Vec<ContextDeclarationViolation>,
 }
 
 /// A compiler-owned numeric arithmetic expression lowered from a state initializer.
@@ -934,6 +990,8 @@ fn build_component_node(
     let context_declarations = context_declarations_from_class(class, path, &id);
     let provider_declarations = provider_declarations_from_class(class, path, &id);
     let consumer_declarations = consumer_declarations_from_class(class, path, &id);
+    let context_declaration_candidates =
+        context_declaration_candidates_from_class(class, path, &id);
 
     let methods = class
         .methods
@@ -995,10 +1053,187 @@ fn build_component_node(
         context_declarations,
         provider_declarations,
         consumer_declarations,
+        context_declaration_candidates,
         methods,
         actions,
         render,
     }
+}
+
+#[allow(clippy::too_many_lines)]
+fn context_declaration_candidates_from_class(
+    class: &ParsedClass,
+    path: &Path,
+    component: &SemanticId,
+) -> Vec<AuthoredContextDeclarationCandidate> {
+    let mut candidates = Vec::new();
+    for property in &class.properties {
+        for decorator in property.decorators.iter().filter(|decorator| {
+            matches!(decorator.name.as_str(), "context" | "provide" | "consume")
+        }) {
+            let kind = match decorator.name.as_str() {
+                "context" => ContextDeclarationCandidateKind::Context,
+                "provide" => ContextDeclarationCandidateKind::Provider,
+                "consume" => ContextDeclarationCandidateKind::Consumer,
+                _ => unreachable!("filtered Context decorator"),
+            };
+            let declaration_kind = if property.is_static {
+                AuthoredDeclarationKind::StaticField
+            } else {
+                AuthoredDeclarationKind::InstanceField
+            };
+            let mut violations = Vec::new();
+            let expected_arity = usize::from(kind != ContextDeclarationCandidateKind::Context);
+            if decorator.argument_count != expected_arity {
+                violations.push(ContextDeclarationViolation::DecoratorArity {
+                    actual: decorator.argument_count,
+                    expected: expected_arity,
+                });
+            }
+            if property.is_static {
+                violations.push(ContextDeclarationViolation::StaticDeclarationUnsupported);
+            }
+            let has_conflict = property.decorators.iter().any(|other| {
+                other.name != decorator.name
+                    && matches!(
+                        other.name.as_str(),
+                        "state"
+                            | "context"
+                            | "provide"
+                            | "consume"
+                            | "computed"
+                            | "effect"
+                            | "action"
+                            | "resource"
+                    )
+            });
+            if has_conflict {
+                violations.push(ContextDeclarationViolation::ConflictingSemanticDecorators);
+            }
+            let declared_type =
+                property
+                    .type_annotation
+                    .as_ref()
+                    .map(|annotation| DeclaredStateType {
+                        kind: declared_state_type_kind(&annotation.text),
+                        text: annotation.text.clone(),
+                        provenance: SourceProvenance::new(path, annotation.span),
+                    });
+            if declared_type.is_none() {
+                violations.push(ContextDeclarationViolation::MissingDeclaredType);
+            }
+            let designator = decorator
+                .static_member_argument
+                .as_ref()
+                .map(|value| context_designator_from_parsed(value, path));
+            match kind {
+                ContextDeclarationCandidateKind::Context => {
+                    if property.initializer.is_some() && property.initializer_literal.is_none() {
+                        violations.push(ContextDeclarationViolation::UnsupportedInitializer);
+                    }
+                }
+                ContextDeclarationCandidateKind::Provider => {
+                    if decorator.argument_count == 1 && designator.is_none() {
+                        violations.push(ContextDeclarationViolation::ContextDesignatorUnsupported);
+                    }
+                    if property.initializer.is_none() {
+                        violations.push(ContextDeclarationViolation::MissingInitializer);
+                    } else if property.initializer_expression.is_none() {
+                        violations.push(ContextDeclarationViolation::UnsupportedInitializer);
+                    }
+                }
+                ContextDeclarationCandidateKind::Consumer => {
+                    if decorator.argument_count == 1 && designator.is_none() {
+                        violations.push(ContextDeclarationViolation::ContextDesignatorUnsupported);
+                    }
+                    if property.initializer.is_some() {
+                        violations.push(ContextDeclarationViolation::ForbiddenInitializer);
+                    }
+                    if !property.is_definite_assignment {
+                        violations.push(ContextDeclarationViolation::DefiniteAssignmentRequired);
+                    }
+                }
+            }
+            candidates.push(AuthoredContextDeclarationCandidate {
+                id: ContextDeclarationCandidateId::for_component_position(
+                    component,
+                    decorator.span.start,
+                ),
+                kind,
+                owner_component: component.clone(),
+                authored_declaration: component
+                    .context_declaration_candidate(property.name_span.start),
+                declaration_kind,
+                field_name: Some(property.name.clone()),
+                declared_type,
+                context_designator: designator,
+                decorator_argument_count: decorator.argument_count,
+                decorator_provenance: SourceProvenance::new(path, decorator.span),
+                provenance: SourceProvenance::new(path, property.span),
+                static_modifier_provenance: property
+                    .is_static
+                    .then(|| SourceProvenance::new(path, property.span)),
+                initializer_provenance: property
+                    .initializer_span
+                    .map(|span| SourceProvenance::new(path, span)),
+                violations,
+            });
+        }
+    }
+    for method in &class.methods {
+        for decorator in method.decorators.iter().filter(|decorator| {
+            matches!(decorator.name.as_str(), "context" | "provide" | "consume")
+        }) {
+            let kind = match decorator.name.as_str() {
+                "context" => ContextDeclarationCandidateKind::Context,
+                "provide" => ContextDeclarationCandidateKind::Provider,
+                "consume" => ContextDeclarationCandidateKind::Consumer,
+                _ => unreachable!("filtered Context decorator"),
+            };
+            let expected_arity = usize::from(kind != ContextDeclarationCandidateKind::Context);
+            let mut violations = vec![ContextDeclarationViolation::InvalidDeclarationKind {
+                actual: if method.is_getter {
+                    AuthoredDeclarationKind::Getter
+                } else {
+                    AuthoredDeclarationKind::Method
+                },
+            }];
+            if decorator.argument_count != expected_arity {
+                violations.push(ContextDeclarationViolation::DecoratorArity {
+                    actual: decorator.argument_count,
+                    expected: expected_arity,
+                });
+            }
+            candidates.push(AuthoredContextDeclarationCandidate {
+                id: ContextDeclarationCandidateId::for_component_position(
+                    component,
+                    decorator.span.start,
+                ),
+                kind,
+                owner_component: component.clone(),
+                authored_declaration: component.method(&method.name),
+                declaration_kind: if method.is_getter {
+                    AuthoredDeclarationKind::Getter
+                } else {
+                    AuthoredDeclarationKind::Method
+                },
+                field_name: None,
+                declared_type: None,
+                context_designator: decorator
+                    .static_member_argument
+                    .as_ref()
+                    .map(|value| context_designator_from_parsed(value, path)),
+                decorator_argument_count: decorator.argument_count,
+                decorator_provenance: SourceProvenance::new(path, decorator.span),
+                provenance: SourceProvenance::new(path, method.span),
+                static_modifier_provenance: None,
+                initializer_provenance: None,
+                violations,
+            });
+        }
+    }
+    candidates.sort_by(|left, right| left.id.cmp(&right.id));
+    candidates
 }
 
 fn component_method_from_parsed(

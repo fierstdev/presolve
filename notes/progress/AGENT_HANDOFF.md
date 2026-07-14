@@ -3,24 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: G17 - Context inspection
-* Working tree: G17 implementation is ready to commit. The Phase G roadmap file is user-provided and untracked.
+* Latest completed slice: G18 - Context diagnostics
+* Working tree: G18 implementation is ready to commit. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: G17 - Context inspection
-* Summary: ASM inspection schema is v5. One core `ContextInspectionRegistry` projects Context, Provider, and Consumer source-plan/slot/IR/runtime/update/resume facts, and both full/selected ASM consume it without CLI reanalysis.
-* Key files: crates/ezc_core/src/context_inspection.rs; crates/ezc_core/src/lib.rs; crates/ezc_cli/src/main.rs; crates/ezc_cli/tests/explain.rs
-* New behavior: Inspection exposes null/absent identities rather than guessing and retains only compiler-produced Context facts.
-* Unsupported semantics: G17 adds no new Context resolution/type/lifetime analysis, runtime lookup, graph reconstruction, serialized runtime schema, resumability behavior, or diagnostics.
+* Slice: G18 - Context diagnostics
+* Summary: G1-G3 now retain one immutable source-qualified candidate for every `@context`, `@provide`, and `@consume` declaration. G18 projects those facts to `EZC1052`–`EZC1056` without source rewalk; invalid unresolved Consumers and duplicate Providers are excluded from G4-G17 executable products.
+* Key files: crates/ezc_core/src/context_declaration_candidate.rs; crates/ezc_core/src/context_diagnostics.rs; crates/ezc_core/src/component_graph.rs
+* Schema decision: no serialized diagnostic-envelope or ASM inspection shape changed, so check JSON remains v2 and ASM inspection remains v5.
 
 Current in-progress slice
 
-* Slice: G18 - Context diagnostics
-* Status: Blocked pending a retained invalid-declaration diagnostic authority for G1-G3 forms.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1 through G17
-* Remaining: G18 through G20.
+* Slice: G19 - Context fixtures
+* Status: Ready to begin after this G18 commit.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1 through G18
+* Remaining: G19 through G20.
 
 Verification
 

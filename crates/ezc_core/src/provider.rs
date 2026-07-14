@@ -45,7 +45,7 @@ pub fn collect_provider_entities(
 ) {
     let mut providers = BTreeMap::new();
     let mut duplicates = Vec::new();
-    let mut seen = BTreeMap::<(SemanticId, ContextId), ProviderId>::new();
+    let mut declarations = Vec::new();
 
     for component in components {
         for declaration in &component.provider_declarations {
@@ -58,39 +58,47 @@ pub fn collect_provider_entities(
                 continue;
             };
             let id = ProviderId::for_component(&component.id, &declaration.name);
-            let key = (component.id.clone(), context.clone());
-            if let Some(retained_provider) = seen.get(&key) {
-                duplicates.push(DuplicateProviderDeclaration {
-                    owner: component.id.clone(),
-                    context,
-                    retained_provider: retained_provider.clone(),
-                    rejected_field: declaration.authored_field.clone(),
-                    provenance: declaration.provenance.clone(),
-                });
-                continue;
-            }
             let semantic_id = id.as_semantic_id().clone();
             let Some(value_expression) = expression_graph.root_for(&semantic_id).cloned() else {
                 continue;
             };
-            seen.insert(key, id.clone());
-            providers.insert(
-                id.clone(),
-                ProviderEntity {
-                    declared_type_id: SemanticTypeId::for_subject(&semantic_id),
-                    id,
-                    owner: SemanticOwner::entity(component.id.clone()),
-                    authored_field: declaration.authored_field.clone(),
-                    name: declaration.name.clone(),
-                    context_designator: declaration.context_designator.clone(),
-                    context,
-                    declared_type: declaration.declared_type.clone(),
-                    value_expression,
-                    execution_boundary: ExecutionBoundary::Client,
-                    provenance: declaration.provenance.clone(),
-                },
-            );
+            declarations.push((component, declaration, context, id, value_expression));
         }
+    }
+    let mut counts = BTreeMap::<(SemanticId, ContextId), usize>::new();
+    for (component, _, context, _, _) in &declarations {
+        *counts
+            .entry((component.id.clone(), context.clone()))
+            .or_default() += 1;
+    }
+    for (component, declaration, context, id, value_expression) in declarations {
+        if counts[&(component.id.clone(), context.clone())] > 1 {
+            duplicates.push(DuplicateProviderDeclaration {
+                owner: component.id.clone(),
+                context,
+                retained_provider: id,
+                rejected_field: declaration.authored_field.clone(),
+                provenance: declaration.provenance.clone(),
+            });
+            continue;
+        }
+        let semantic_id = id.as_semantic_id().clone();
+        providers.insert(
+            id.clone(),
+            ProviderEntity {
+                declared_type_id: SemanticTypeId::for_subject(&semantic_id),
+                id,
+                owner: SemanticOwner::entity(component.id.clone()),
+                authored_field: declaration.authored_field.clone(),
+                name: declaration.name.clone(),
+                context_designator: declaration.context_designator.clone(),
+                context,
+                declared_type: declaration.declared_type.clone(),
+                value_expression,
+                execution_boundary: ExecutionBoundary::Client,
+                provenance: declaration.provenance.clone(),
+            },
+        );
     }
 
     (providers, duplicates)
@@ -219,7 +227,7 @@ class ThemeBoundary extends Component {
     }
 
     #[test]
-    fn retains_one_provider_per_context_per_component() {
+    fn retains_duplicate_providers_without_selecting_an_executable_winner() {
         let parsed = ezc_parser::parse_file(
             "src/AppShell.tsx",
             r#"
@@ -237,9 +245,14 @@ class AppShell extends Component {
         );
         let asm = build_application_semantic_model(&parsed);
 
-        assert_eq!(asm.providers().len(), 1);
-        assert_eq!(asm.duplicate_provider_declarations.len(), 1);
-        assert_eq!(asm.providers()[0].name, "primary");
+        assert!(asm.providers().is_empty());
+        assert_eq!(asm.duplicate_provider_declarations.len(), 2);
+        assert_eq!(
+            asm.context_declaration_candidates()
+                .invalid_candidates()
+                .len(),
+            2
+        );
     }
 
     #[test]

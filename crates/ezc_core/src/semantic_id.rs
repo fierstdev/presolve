@@ -48,6 +48,14 @@ pub struct ProviderId(SemanticId);
 #[serde(transparent)]
 pub struct ConsumerId(SemanticId);
 
+/// Stable identity for an authored Context-family declaration candidate.
+///
+/// Candidates are source-qualified compiler facts.  They intentionally do not
+/// share an identity domain with valid Context, Provider, or Consumer entities.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ContextDeclarationCandidateId(SemanticId);
+
 /// Direct owner of a semantic entity within one compiled application.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SemanticOwner {
@@ -145,6 +153,11 @@ impl SemanticId {
     #[must_use]
     pub fn consumer_field(&self, name: &str) -> Self {
         self.child("consumer-field", name)
+    }
+
+    #[must_use]
+    pub fn context_declaration_candidate(&self, position: usize) -> Self {
+        self.child("context-declaration", &position.to_string())
     }
 
     /// Stable generated-function identity for a Provider Context source.
@@ -305,6 +318,23 @@ impl ConsumerId {
     }
 }
 
+impl ContextDeclarationCandidateId {
+    #[must_use]
+    pub fn for_component_position(component: &SemanticId, position: usize) -> Self {
+        Self(component.context_declaration_candidate(position))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 fn normalized_module_path(path: &Path) -> String {
     let mut segments = Vec::new();
     let absolute = path.is_absolute();
@@ -362,6 +392,12 @@ impl fmt::Display for ProviderId {
 }
 
 impl fmt::Display for ConsumerId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for ContextDeclarationCandidateId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(formatter)
     }

@@ -52,6 +52,16 @@ pub fn collect_consumer_entities(
 
     for component in components {
         for declaration in &component.consumer_declarations {
+            let Some(context) = resolve_context(
+                &declaration.context_designator,
+                components,
+                contexts,
+                bindings,
+            ) else {
+                // The retained declaration candidate carries the unresolved
+                // designator fact.  An invalid Consumer must not enter G4-G17.
+                continue;
+            };
             let id = ConsumerId::for_component(&component.id, &declaration.name);
             let semantic_id = id.as_semantic_id().clone();
             consumers.insert(
@@ -63,16 +73,7 @@ pub fn collect_consumer_entities(
                     authored_field: declaration.authored_field.clone(),
                     name: declaration.name.clone(),
                     context_designator: declaration.context_designator.clone(),
-                    context_resolution: resolve_context(
-                        &declaration.context_designator,
-                        components,
-                        contexts,
-                        bindings,
-                    )
-                    .map_or(
-                        ContextResolutionState::Unresolved,
-                        ContextResolutionState::Resolved,
-                    ),
+                    context_resolution: ContextResolutionState::Resolved(context),
                     requested_type: declaration.requested_type.clone(),
                     execution_boundary: ExecutionBoundary::Client,
                     provenance: declaration.provenance.clone(),
@@ -213,7 +214,7 @@ class Toolbar extends Component {
     }
 
     #[test]
-    fn retains_unresolved_canonical_context_requests_without_provider_edges() {
+    fn retains_unresolved_context_designators_as_invalid_candidates() {
         let parsed = ezc_parser::parse_file(
             "src/toolbar.tsx",
             r#"
@@ -227,10 +228,12 @@ class Toolbar extends Component {
         );
         let asm = build_application_semantic_model(&parsed);
 
-        assert_eq!(asm.consumers().len(), 1);
+        assert!(asm.consumers().is_empty());
         assert_eq!(
-            asm.consumers()[0].context_resolution,
-            ContextResolutionState::Unresolved
+            asm.context_declaration_candidates()
+                .invalid_candidates()
+                .len(),
+            1
         );
         assert!(asm.references.is_empty());
     }

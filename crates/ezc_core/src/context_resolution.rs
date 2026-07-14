@@ -394,7 +394,7 @@ class Toolbar extends Component {
     }
 
     #[test]
-    fn retains_invalid_context_reference_without_provider_or_default_fallback() {
+    fn excludes_invalid_context_references_from_resolution() {
         let asm = build_application_semantic_model(&ezc_parser::parse_file(
             "src/toolbar.tsx",
             r#"
@@ -408,9 +408,12 @@ class Toolbar extends Component {
         ));
         let consumer = ConsumerId::for_component(&asm.components[0].id, "theme");
 
-        assert!(matches!(
-            asm.context_resolution(&consumer).unwrap().result,
-            ContextResolutionResult::InvalidContextReference
-        ));
+        assert!(asm.context_resolution(&consumer).is_none());
+        assert_eq!(
+            asm.context_declaration_candidates()
+                .invalid_candidates()
+                .len(),
+            1
+        );
     }
 }

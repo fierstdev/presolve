@@ -101,7 +101,7 @@ class AppShell extends Component {
     }
 
     #[test]
-    fn excludes_invalid_and_nonliteral_context_declarations_without_diagnostics() {
+    fn retains_invalid_context_candidates_for_g18_diagnostics() {
         let parsed = ezc_parser::parse_file(
             "src/InvalidContexts.tsx",
             r#"
@@ -131,7 +131,19 @@ class InvalidContexts extends Component {
 
         assert!(asm.contexts().is_empty());
         assert!(asm.components[0].state_fields.is_empty());
-        assert!(asm.diagnostics.is_empty());
+        assert_eq!(
+            asm.context_declaration_candidates()
+                .invalid_candidates()
+                .len(),
+            5
+        );
+        assert_eq!(
+            asm.diagnostics
+                .iter()
+                .map(|diagnostic| diagnostic.code.as_str())
+                .collect::<Vec<_>>(),
+            vec!["EZC1052", "EZC1052", "EZC1052", "EZC1052", "EZC1052"]
+        );
     }
 
     #[test]

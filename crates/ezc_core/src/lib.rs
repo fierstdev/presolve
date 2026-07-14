@@ -14,7 +14,9 @@ pub mod component_scope;
 pub mod computed_value;
 pub mod consumer;
 pub mod context;
+pub mod context_declaration_candidate;
 pub mod context_dependency;
+pub mod context_diagnostics;
 pub mod context_evaluation;
 pub mod context_inspection;
 pub mod context_lifetime;
@@ -80,16 +82,18 @@ pub use compiler_pass::{
 };
 pub use component_graph::{
     build_component_graph, build_component_graph_for_module, ArithmeticEvaluationError,
-    ArithmeticExpression, ArithmeticExpressionKind, ArithmeticOperator, ComparisonOperator,
+    ArithmeticExpression, ArithmeticExpressionKind, ArithmeticOperator,
+    AuthoredContextDeclarationCandidate, AuthoredDeclarationKind, ComparisonOperator,
     ComponentAction, ComponentDiagnostic, ComponentDiagnosticSeverity, ComponentGraph,
     ComponentMethod, ComponentNode, ComputedExpression, ComputedExpressionKind,
     ConstantEvaluationError, ConstantExpression, ConstantExpressionKind, ConsumerDeclaration,
-    ContextDeclaration, ContextDesignator, DeclaredStateType, DeclaredStateTypeKind,
-    DiagnosticSecondaryLabel, EffectBodySyntax, EffectExpression, EffectExpressionKind,
-    EffectStatementSyntax, EffectStatementSyntaxKind, LogicalOperator, MethodCall,
-    MethodLocalVariable, MethodParameter, RenderAttribute, RenderAttributeValue, RenderChild,
-    RenderEventHandler, RenderFragment, RenderList, RenderModel, SerializableValue, StateField,
-    StateOperation, UnsupportedEffectStatementKind,
+    ContextDeclaration, ContextDeclarationCandidateKind, ContextDeclarationViolation,
+    ContextDesignator, DeclaredStateType, DeclaredStateTypeKind, DiagnosticSecondaryLabel,
+    EffectBodySyntax, EffectExpression, EffectExpressionKind, EffectStatementSyntax,
+    EffectStatementSyntaxKind, LogicalOperator, MethodCall, MethodLocalVariable, MethodParameter,
+    RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler, RenderFragment,
+    RenderList, RenderModel, SerializableValue, StateField, StateOperation,
+    UnsupportedEffectStatementKind,
 };
 pub use component_scope::{ComponentScopeDiagnostic, ComponentScopeGraph};
 pub use computed_value::{
@@ -98,11 +102,16 @@ pub use computed_value::{
 };
 pub use consumer::{collect_consumer_entities, ConsumerEntity, ContextResolutionState};
 pub use context::{collect_context_entities, ContextEntity};
+pub use context_declaration_candidate::{
+    collect_context_declaration_candidates, ContextDeclarationCandidate,
+    ContextDeclarationCandidateRegistry, ContextDeclarationStatus, ContextSemanticEntityId,
+};
 pub use context_dependency::{
     collect_context_dependency_graph, ContextDependencyCompatibility, ContextDependencyEdge,
     ContextDependencyEdgeKind, ContextDependencyGraph, ContextDependencyNode,
     ContextDependencyNodeId, ContextDependencyNodeKind,
 };
+pub use context_diagnostics::collect_context_diagnostics;
 pub use context_evaluation::{
     collect_context_evaluation_plan, ContextConsumerAvailabilityEntry,
     ContextConsumerAvailabilityStatus, ContextEvaluationBatch, ContextEvaluationBatchId,
@@ -257,7 +266,8 @@ pub use semantic_graph::{
     SEMANTIC_GRAPH_SCHEMA_VERSION,
 };
 pub use semantic_id::{
-    ConsumerId, ContextId, EffectId, EffectStatementId, ProviderId, SemanticId, SemanticOwner,
+    ConsumerId, ContextDeclarationCandidateId, ContextId, EffectId, EffectStatementId, ProviderId,
+    SemanticId, SemanticOwner,
 };
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
