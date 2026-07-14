@@ -81,6 +81,21 @@ pub struct SlotContentFragmentId(SemanticId);
 #[serde(transparent)]
 pub struct SlotOutletId(SemanticId);
 
+/// Stable identity for one compiler-owned build/page component root.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ComponentRootId(SemanticId);
+
+/// Stable identity for one component instance or blocked instance boundary.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ComponentInstanceId(SemanticId);
+
+/// Stable identity for a conditional or keyed-list component instance template region.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ComponentStructuralRegionId(SemanticId);
+
 /// Stable identity for an authored Context-family declaration candidate.
 ///
 /// Candidates are source-qualified compiler facts.  They intentionally do not
@@ -112,6 +127,10 @@ impl SemanticOwner {
 }
 
 impl SemanticId {
+    #[must_use]
+    pub fn component_root(component: &Self) -> Self {
+        Self(format!("root:{}", component.as_str()))
+    }
     #[must_use]
     pub fn component(element_name: Option<&str>, class_name: &str) -> Self {
         Self(format!("component:{}", element_name.unwrap_or(class_name)))
@@ -302,6 +321,16 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn component_instance_invocation(&self, invocation: &str) -> Self {
+        self.child("invocation", invocation)
+    }
+
+    #[must_use]
+    pub fn component_structural_region(&self, kind: &str) -> Self {
+        self.child("component-structural-region", kind)
+    }
+
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -488,6 +517,66 @@ impl SlotOutletId {
     }
 }
 
+impl ComponentRootId {
+    #[must_use]
+    pub fn for_component(component: &SemanticId) -> Self {
+        Self(SemanticId::component_root(component))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl ComponentInstanceId {
+    #[must_use]
+    pub fn for_root(root: &ComponentRootId) -> Self {
+        Self(root.as_semantic_id().clone())
+    }
+
+    #[must_use]
+    pub fn for_invocation(parent: &Self, invocation: &ComponentInvocationId) -> Self {
+        Self(
+            parent
+                .as_semantic_id()
+                .component_instance_invocation(invocation.as_str()),
+        )
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl ComponentStructuralRegionId {
+    #[must_use]
+    pub fn for_template_entity(entity: &SemanticId, kind: &str) -> Self {
+        Self(entity.component_structural_region(kind))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 impl ContextDeclarationCandidateId {
     #[must_use]
     pub fn for_component_position(component: &SemanticId, position: usize) -> Self {
@@ -598,6 +687,24 @@ impl fmt::Display for SlotContentFragmentId {
 }
 
 impl fmt::Display for SlotOutletId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for ComponentRootId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for ComponentInstanceId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for ComponentStructuralRegionId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(formatter)
     }

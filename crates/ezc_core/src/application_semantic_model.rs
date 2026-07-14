@@ -9,6 +9,10 @@ use crate::component_graph::{
     ComponentDiagnosticSeverity, ComponentMethod, ComponentNode, MethodLocalVariable,
     RenderEventHandler, StateField,
 };
+use crate::component_instance::{
+    plan_component_instances, BlockedComponentInstancePlan, ComponentInstance,
+    ComponentInstancePlan,
+};
 use crate::component_invocation::{collect_component_invocations, ComponentInvocationEntity};
 use crate::component_scope::ComponentScopeGraph;
 use crate::computed_value::{collect_computed_values, ComputedDiagnosticCode, ComputedValue};
@@ -65,6 +69,7 @@ pub struct ApplicationSemanticModel {
     pub consumers: BTreeMap<ConsumerId, ConsumerEntity>,
     pub slots: BTreeMap<SlotId, SlotEntity>,
     pub component_invocations: BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
+    pub component_instance_plan: ComponentInstancePlan,
     pub slot_content_fragments: BTreeMap<SlotContentFragmentId, SlotContentFragment>,
     pub slot_outlets: BTreeMap<SlotOutletId, SlotOutlet>,
     pub context_declaration_candidates: ContextDeclarationCandidateRegistry,
@@ -108,6 +113,8 @@ pub enum SemanticEntity<'a> {
     Consumer(&'a ConsumerEntity),
     Slot(&'a SlotEntity),
     ComponentInvocation(&'a ComponentInvocationEntity),
+    ComponentInstance(&'a ComponentInstance),
+    BlockedComponentInstance(&'a BlockedComponentInstancePlan),
     SlotContentFragment(&'a SlotContentFragment),
     SlotOutlet(&'a SlotOutlet),
     Computed(&'a ComputedValue),
@@ -130,6 +137,8 @@ pub enum SemanticEntityKind {
     Consumer,
     Slot,
     ComponentInvocation,
+    ComponentInstance,
+    BlockedComponentInstance,
     SlotContentFragment,
     SlotOutlet,
     Computed,
@@ -154,6 +163,8 @@ impl SemanticEntity<'_> {
             Self::Consumer(_) => SemanticEntityKind::Consumer,
             Self::Slot(_) => SemanticEntityKind::Slot,
             Self::ComponentInvocation(_) => SemanticEntityKind::ComponentInvocation,
+            Self::ComponentInstance(_) => SemanticEntityKind::ComponentInstance,
+            Self::BlockedComponentInstance(_) => SemanticEntityKind::BlockedComponentInstance,
             Self::SlotContentFragment(_) => SemanticEntityKind::SlotContentFragment,
             Self::SlotOutlet(_) => SemanticEntityKind::SlotOutlet,
             Self::Computed(_) => SemanticEntityKind::Computed,
@@ -169,6 +180,7 @@ impl SemanticEntity<'_> {
 }
 
 impl ApplicationSemanticModel {
+    #[allow(clippy::too_many_lines)]
     #[must_use]
     pub fn entity(&self, id: &SemanticId) -> Option<SemanticEntity<'_>> {
         for component in &self.components {
@@ -247,6 +259,22 @@ impl ApplicationSemanticModel {
             .find(|invocation| invocation.id.as_semantic_id() == id)
         {
             return Some(SemanticEntity::ComponentInvocation(invocation));
+        }
+        if let Some(instance) = self
+            .component_instance_plan
+            .instances
+            .values()
+            .find(|instance| instance.id.as_semantic_id() == id)
+        {
+            return Some(SemanticEntity::ComponentInstance(instance));
+        }
+        if let Some(blocked) = self
+            .component_instance_plan
+            .blocked
+            .values()
+            .find(|blocked| blocked.id.as_semantic_id() == id)
+        {
+            return Some(SemanticEntity::BlockedComponentInstance(blocked));
         }
         if let Some(fragment) = self
             .slot_content_fragments
@@ -445,6 +473,49 @@ impl ApplicationSemanticModel {
         self.component_invocations
             .iter()
             .filter_map(|(id, invocation)| (&invocation.owner_component == component).then_some(id))
+            .collect()
+    }
+
+    #[must_use]
+    pub fn component_instance(
+        &self,
+        id: &crate::ComponentInstanceId,
+    ) -> Option<&ComponentInstance> {
+        self.component_instance_plan.instances.get(id)
+    }
+
+    #[must_use]
+    pub fn component_build_roots(&self) -> Vec<&crate::ComponentBuildRoot> {
+        self.component_instance_plan.roots.values().collect()
+    }
+
+    #[must_use]
+    pub fn component_instances(&self) -> Vec<&ComponentInstance> {
+        self.component_instance_plan.instances.values().collect()
+    }
+
+    #[must_use]
+    pub fn blocked_component_instances(&self) -> Vec<&BlockedComponentInstancePlan> {
+        self.component_instance_plan.blocked.values().collect()
+    }
+
+    #[must_use]
+    pub fn blocked_component_instance(
+        &self,
+        id: &crate::ComponentInstanceId,
+    ) -> Option<&BlockedComponentInstancePlan> {
+        self.component_instance_plan.blocked.get(id)
+    }
+
+    #[must_use]
+    pub fn component_instances_for_definition(
+        &self,
+        component: &SemanticId,
+    ) -> Vec<&ComponentInstance> {
+        self.component_instance_plan
+            .instances
+            .values()
+            .filter(|instance| &instance.component == component)
             .collect()
     }
 
@@ -932,6 +1003,12 @@ pub fn build_application_semantic_model_from_component_graph(
         None,
         &component_graph.provenance,
     );
+    let component_instance_plan = plan_component_instances(
+        &component_graph.components,
+        &component_invocations,
+        &template_entities,
+        &component_graph.provenance,
+    );
     let (computed_values, computed_diagnostics) = classify_computed_values(
         &component_graph.components,
         collect_computed_values(&component_graph.components, &component_graph.provenance),
@@ -975,6 +1052,7 @@ pub fn build_application_semantic_model_from_component_graph(
         &component_invocations,
         &slot_composition.fragments,
         &slot_composition.outlets,
+        &component_instance_plan,
         &computed_values,
         &effects,
     );
@@ -987,6 +1065,7 @@ pub fn build_application_semantic_model_from_component_graph(
         &component_invocations,
         &slot_composition.fragments,
         &slot_composition.outlets,
+        &component_instance_plan,
         &computed_values,
         &effects,
         &templates,
@@ -1140,6 +1219,7 @@ pub fn build_application_semantic_model_from_component_graph(
         consumers,
         slots,
         component_invocations,
+        component_instance_plan,
         slot_content_fragments: slot_composition.fragments,
         slot_outlets: slot_composition.outlets,
         context_declaration_candidates,
@@ -1233,6 +1313,12 @@ fn build_application_semantic_model_from_files_with_bindings(
         bindings,
         &provenance,
     );
+    let component_instance_plan = plan_component_instances(
+        &components,
+        &component_invocations,
+        &template_entities,
+        &provenance,
+    );
 
     let (computed_values, computed_diagnostics) = classify_computed_values(
         &components,
@@ -1267,6 +1353,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         &component_invocations,
         &slot_composition.fragments,
         &slot_composition.outlets,
+        &component_instance_plan,
         &computed_values,
         &effects,
     );
@@ -1279,6 +1366,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         &component_invocations,
         &slot_composition.fragments,
         &slot_composition.outlets,
+        &component_instance_plan,
         &computed_values,
         &effects,
         &templates,
@@ -1429,6 +1517,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         consumers,
         slots,
         component_invocations,
+        component_instance_plan,
         slot_content_fragments: slot_composition.fragments,
         slot_outlets: slot_composition.outlets,
         context_declaration_candidates,
@@ -1491,6 +1580,7 @@ fn extend_derived_entity_provenance(
     component_invocations: &BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
     slot_content_fragments: &BTreeMap<SlotContentFragmentId, SlotContentFragment>,
     slot_outlets: &BTreeMap<SlotOutletId, SlotOutlet>,
+    component_instance_plan: &ComponentInstancePlan,
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
     effects: &BTreeMap<SemanticId, Effect>,
 ) {
@@ -1533,6 +1623,18 @@ fn extend_derived_entity_provenance(
         (
             outlet.id.as_semantic_id().clone(),
             outlet.provenance.clone(),
+        )
+    }));
+    provenance.extend(component_instance_plan.instances.values().map(|instance| {
+        (
+            instance.id.as_semantic_id().clone(),
+            instance.provenance.clone(),
+        )
+    }));
+    provenance.extend(component_instance_plan.blocked.values().map(|blocked| {
+        (
+            blocked.id.as_semantic_id().clone(),
+            blocked.provenance.clone(),
         )
     }));
     provenance.extend(
@@ -2439,6 +2541,7 @@ fn collect_ownership(
     component_invocations: &BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
     slot_content_fragments: &BTreeMap<SlotContentFragmentId, SlotContentFragment>,
     slot_outlets: &BTreeMap<SlotOutletId, SlotOutlet>,
+    component_instance_plan: &ComponentInstancePlan,
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
     effects: &BTreeMap<SemanticId, Effect>,
     templates: &[TemplateNode],
@@ -2546,6 +2649,24 @@ fn collect_ownership(
         }
     }
 
+    for instance in component_instance_plan.instances.values() {
+        ownership.insert(
+            instance.id.as_semantic_id().clone(),
+            instance
+                .parent_instance
+                .as_ref()
+                .map_or(SemanticOwner::Application, |parent| {
+                    SemanticOwner::entity(parent.as_semantic_id().clone())
+                }),
+        );
+    }
+    for blocked in component_instance_plan.blocked.values() {
+        ownership.insert(
+            blocked.id.as_semantic_id().clone(),
+            SemanticOwner::entity(blocked.parent_instance.as_semantic_id().clone()),
+        );
+    }
+
     for template in templates {
         let component = components
             .iter()
@@ -2572,8 +2693,8 @@ mod tests {
     };
     use crate::{
         build_component_graph_for_module, build_template_graph, build_template_semantic_entities,
-        CompilationUnit, SemanticEntity, SemanticEntityKind, SemanticOwner, SemanticReferenceKind,
-        TemplateSemanticKind,
+        CompilationUnit, ComponentInstancePlan, SemanticEntity, SemanticEntityKind, SemanticOwner,
+        SemanticReferenceKind, TemplateSemanticKind,
     };
 
     #[test]
@@ -3853,6 +3974,7 @@ class Counter extends Component {
             &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
+            &ComponentInstancePlan::default(),
             &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &templates,
@@ -3879,6 +4001,7 @@ class Counter extends Component {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn traverses_application_ownership_in_semantic_id_order() {
         let parsed = ezc_parser::parse_file(
             "src/Counter.tsx",
@@ -3902,7 +4025,19 @@ class Counter extends Component {
         let component = &asm.components[0];
         let roots = asm.application_roots();
 
-        assert_eq!(roots, vec![&component.id]);
+        assert_eq!(
+            roots,
+            vec![
+                &component.id,
+                asm.component_instance_plan
+                    .instances
+                    .values()
+                    .find(|instance| instance.depth == 0)
+                    .expect("build root instance")
+                    .id
+                    .as_semantic_id(),
+            ]
+        );
         assert_eq!(
             asm.children_of(&component.id),
             vec![
@@ -3929,7 +4064,10 @@ class Counter extends Component {
         assert_eq!(descendants[0], &component.methods[0].id);
         assert_eq!(descendants[1], &component.actions[0].id);
         assert_eq!(descendants[2], &component.methods[1].id);
-        assert_eq!(descendants.len(), asm.ownership.len() - 1);
+        assert_eq!(
+            descendants.len(),
+            asm.ownership.len() - asm.application_roots().len()
+        );
         assert_eq!(
             asm.entities_of_kind(SemanticEntityKind::Method),
             vec![&component.methods[0].id, &component.methods[1].id]

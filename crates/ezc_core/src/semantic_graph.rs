@@ -129,6 +129,7 @@ pub enum SemanticGraphEdgeKind {
 /// Panics if the ASM ownership map references a missing semantic entity or one
 /// without source provenance, which violates the canonical ASM invariant.
 #[must_use]
+#[allow(clippy::too_many_lines)]
 pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
     let nodes = asm
         .ownership
@@ -139,6 +140,8 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
                 Some(
                     SemanticEntity::Slot(_)
                         | SemanticEntity::ComponentInvocation(_)
+                        | SemanticEntity::ComponentInstance(_)
+                        | SemanticEntity::BlockedComponentInstance(_)
                         | SemanticEntity::SlotContentFragment(_)
                         | SemanticEntity::SlotOutlet(_)
                 )
@@ -162,7 +165,24 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
             }
         })
         .collect();
-    let roots = asm.application_roots().into_iter().cloned().collect();
+    let roots = asm
+        .application_roots()
+        .into_iter()
+        .filter(|id| {
+            !matches!(
+                asm.entity(id),
+                Some(
+                    SemanticEntity::Slot(_)
+                        | SemanticEntity::ComponentInvocation(_)
+                        | SemanticEntity::ComponentInstance(_)
+                        | SemanticEntity::BlockedComponentInstance(_)
+                        | SemanticEntity::SlotContentFragment(_)
+                        | SemanticEntity::SlotOutlet(_)
+                )
+            )
+        })
+        .cloned()
+        .collect();
     let mut edges = asm
         .ownership
         .iter()
@@ -172,6 +192,8 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
                 Some(
                     SemanticEntity::Slot(_)
                         | SemanticEntity::ComponentInvocation(_)
+                        | SemanticEntity::ComponentInstance(_)
+                        | SemanticEntity::BlockedComponentInstance(_)
                         | SemanticEntity::SlotContentFragment(_)
                         | SemanticEntity::SlotOutlet(_)
                 )
@@ -269,6 +291,9 @@ fn semantic_graph_node_kind(entity: SemanticEntity<'_>) -> SemanticGraphNodeKind
         }
         SemanticEntity::ComponentInvocation(_) => {
             unreachable!("Component invocations are not projected into semantic graph schema v5")
+        }
+        SemanticEntity::ComponentInstance(_) | SemanticEntity::BlockedComponentInstance(_) => {
+            unreachable!("Component instances are not projected into semantic graph schema v5")
         }
         SemanticEntity::SlotContentFragment(_) => {
             unreachable!("Slot fragments are not projected into semantic graph schema v5")
@@ -560,7 +585,10 @@ class Counter extends Component {
 
         assert_eq!(graph.schema_version, 5);
         assert_eq!(graph.roots, vec![component.id.clone()]);
-        assert_eq!(graph.nodes.len(), asm.ownership.len());
+        assert_eq!(
+            graph.nodes.len(),
+            asm.ownership.len() - asm.component_instance_plan.instances.len()
+        );
         assert!(graph
             .nodes
             .windows(2)

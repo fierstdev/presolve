@@ -3,36 +3,40 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: H3 - Slot content and outlet lowering
-* Working tree: clean after the H3 Slot content/outlet commit.
+* Latest completed slice: H4 - Component instance planning
+* Working tree: clean after the H4 component instance planning commit.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: H3 - Slot content and outlet lowering
-* Summary: H3 lowers direct caller children into one `children` fragment, exact direct `<template slot="name">` wrappers into named caller-owned fragments, and callee `<slot />`/`<slot name="name" />` directives into canonical outlets. It retains missing declarations, unresolved targets, dynamic/invalid/nested wrappers, duplicate fragments/outlets, invalid outlet attributes, and fallback content as ordered blocked facts without binding or runtime behavior.
-* Key files: crates/ezc_core/src/slot_content.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/semantic_id.rs; crates/ezc_core/src/template_graph.rs
-* Schema decision: no serialized shape changed in H3. Semantic graph remains v5, Context runtime artifact v2, template manifest v2, resume manifest v3, ASM inspection v6, and check JSON v3. Slot composition projection remains deferred to H18.
+* Slice: H4 - Component instance planning
+* Summary: H4 introduces typed build roots and finite statically reachable `ComponentInstance` plans. Route components are explicit roots; without routes, zero-incoming valid definitions are build entries, with one canonical fallback root for cycle-only graphs. Repeated definition uses produce distinct invocation-path identities, conditional/list uses become structural templates, and unresolved, dynamic, invalid-target, and cycle boundaries remain separate blocked records.
+* Key files: crates/ezc_core/src/component_instance.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/semantic_id.rs
+* Schema decision: no serialized shape changed in H4. Semantic graph remains v5, Context runtime artifact v2, template manifest v2, resume manifest v3, ASM inspection v6, and check JSON v3. Instance projection remains deferred to H18.
 
 Current in-progress slice
 
 * Slice: none
-* Status: H3 is complete and committed. H4 has not started.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H3
-* Remaining in Phase H: H4 through H21.
+* Status: H4 is complete and committed. H5 has not started.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H4
+* Remaining in Phase H: H5 through H21.
 
 Verification
 
 * Phase H entry gate: `just check` pass (workspace formatting, strict workspace clippy, and complete workspace test matrix: 12 Context fixture/freeze, 125 CLI inspection/build, 24 real-browser, 244 core, 3 parser unit, and 26 parser integration tests)
 * cargo test -p ezc_parser: pass (5 unit; 26 integration)
-* cargo test -p ezc_core slot_content --lib: pass (5 focused)
-* cargo test -p ezc_core --lib: pass (258)
+* cargo test -p ezc_core component_instance --lib: pass (5 focused)
+* cargo test -p ezc_core --lib: pass (263)
 * cargo test -p ezc_cli --test explain: pass (125)
 * cargo clippy -p ezc_parser -p ezc_core -p ezc_cli --all-targets -- -D warnings: pass
 * cargo fmt --all --check: pass
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: H4 defines one compiler-owned `ComponentBuildRoot` per routed page when routes exist. Without routes, every valid definition with no incoming resolved invocation is a build entry; if a cycle-only graph has no such definition, the lexicographically first valid component is the single canonical fallback root.
+* Reason: The repository has route records and build-all-template behavior but no explicit multi-root build identity. The narrow root product preserves routed pages and disconnected build entries without treating every library definition as a root, while the cycle fallback guarantees a finite plan and an explicit cycle boundary.
+* Tradeoff: Root and child `ComponentInstanceId` values encode the root plus the full canonical invocation path. Conditional/keyed-list uses are one `StructuralTemplate` record rather than eager branch/item instances. Resolved recursion stops at a typed cycle boundary; unresolved, dynamic, ambiguous/non-component, and invalid targets are blocked records and never executable instances. H4 performs no scope-graph validation or execution.
 
 * Decision: H3 consumes only immutable template, invocation, and Slot products. Exact direct-child `<template slot="name">` wrappers are compile-time-only named fragments; all other `<template>` elements remain ordinary default content while any dynamic, malformed, or nested Slot-wrapper intent is retained as a blocked fact. Direct non-wrapper children form one `children` fragment, and empty invocations form no incoming fragment.
 * Reason: Caller-owned synthetic fragment roots and ordered canonical template-entity roots preserve lexical/semantic ownership separately from later callee placement. Grouping by invocation and requested Slot guarantees one fragment per invocation/Slot while retaining duplicate provenance for H19.
@@ -800,7 +804,7 @@ Architecture decisions made
 
 Known limitations
 
-* Item: H1-H3 support Slot declarations, static component invocations, and unbound caller-fragment/callee-outlet facts only. Instance planning, fragment/outlet binding, Context reprojection, IR, runtime artifacts/execution, resumability, inspection, and diagnostics remain H4-H19 work. Phase H entities are intentionally absent from frozen semantic graph v5 and ASM inspection v6 until H18.
+* Item: H1-H4 support Slot declarations, static invocations, unbound fragments/outlets, and finite component instance plans only. Instance-scope validation, fragment/outlet binding, Context reprojection, IR, runtime artifacts/execution, resumability, inspection, and diagnostics remain H5-H19 work. Phase H entities are intentionally absent from frozen semantic graph v5 and ASM inspection v6 until H18.
 * Item: Conditional rendering only supports simple `this.<stateField>` conditions with JSX element or fragment branches.
 * Item: Conditional branch snippets are replaced as static HTML. Bindings, events, and nested dynamic behavior inside swapped-in branch snippets are not re-registered yet.
 * Item: Keyed lists currently accept only `iterable.map((item, index?) => <element>...</element>)` with identifier parameters and an expression-bodied callback. Static and runtime reconciliation support a direct primitive item key or a dot-member key such as `item.id` that resolves to a unique primitive.
@@ -838,7 +842,7 @@ Known limitations
 
 Exact next step
 
-Implement H4 static component instance planning from explicit build/page roots and reachable canonical invocations. Preserve distinct repeated-use identities and explicit blocked expansion/cycle/invalid-parent records without eager recursive expansion or execution.
+Implement H5 `ComponentInstanceScopeGraph` from executable H4 instances, with deterministic root/child indexes and integrity diagnostics for unknown endpoints, reciprocity, depth, roots, cycles, ordering, and multi-parent violations. Keep blocked H4 records outside executable graph nodes.
 
 Useful commands
 
@@ -869,4 +873,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the H3 commit (`feat(core): lower slot content and outlets`).
+* None after the H4 commit (`feat(core): plan component instances`).

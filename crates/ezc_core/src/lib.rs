@@ -10,6 +10,7 @@ pub mod binding_table;
 pub mod compilation_unit;
 pub mod compiler_pass;
 pub mod component_graph;
+pub mod component_instance;
 pub mod component_invocation;
 pub mod component_scope;
 pub mod computed_value;
@@ -98,6 +99,11 @@ pub use component_graph::{
     RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler, RenderFragment,
     RenderList, RenderModel, SerializableValue, SlotDeclaration, SlotDeclarationViolation,
     SlotKind, StateField, StateOperation, UnsupportedEffectStatementKind,
+};
+pub use component_instance::{
+    plan_component_instances, BlockedComponentInstancePlan, BlockedComponentInstanceReason,
+    ComponentBuildRoot, ComponentBuildRootKind, ComponentInstance, ComponentInstancePlan,
+    ComponentInstanceStatus,
 };
 pub use component_invocation::{
     collect_component_invocations, ComponentInvocationEntity, ComponentInvocationResolutionStatus,
@@ -273,9 +279,10 @@ pub use semantic_graph::{
     SEMANTIC_GRAPH_SCHEMA_VERSION,
 };
 pub use semantic_id::{
-    ComponentInvocationId, ConsumerId, ContextDeclarationCandidateId, ContextId, EffectId,
-    EffectStatementId, ProviderId, SemanticId, SemanticOwner, SlotContentFragmentId,
-    SlotDeclarationCandidateId, SlotId, SlotOutletId, TemplatePositionId,
+    ComponentInstanceId, ComponentInvocationId, ComponentRootId, ComponentStructuralRegionId,
+    ConsumerId, ContextDeclarationCandidateId, ContextId, EffectId, EffectStatementId, ProviderId,
+    SemanticId, SemanticOwner, SlotContentFragmentId, SlotDeclarationCandidateId, SlotId,
+    SlotOutletId, TemplatePositionId,
 };
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
