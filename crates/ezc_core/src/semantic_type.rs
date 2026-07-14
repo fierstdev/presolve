@@ -6,7 +6,7 @@ use crate::{
     BindingTable, CapabilityOperationId, CapabilityOperationKind, CapabilityParameters,
     CapabilityValueContract, ComponentNode, ComputedValue, ConsumerEntity, ContextEntity, Effect,
     EffectStatement, EffectStatementKind, ExpressionGraph, ExpressionNodeKind, ImportBindingTarget,
-    ProviderEntity, SemanticId, SerializableValue, SourceProvenance, SymbolKind,
+    ProviderEntity, SemanticId, SerializableValue, SlotEntity, SourceProvenance, SymbolKind,
     EFFECT_CAPABILITY_REGISTRY,
 };
 use crate::{
@@ -71,6 +71,8 @@ pub enum SemanticType {
     Boolean,
     Number,
     String,
+    /// Nominal built-in type accepted only by canonical Slot declarations.
+    SlotContent,
     BooleanLiteral(bool),
     NumberLiteral(String),
     StringLiteral(String),
@@ -91,6 +93,7 @@ pub fn semantic_type_text(semantic_type: &SemanticType) -> String {
         SemanticType::Boolean => "boolean".to_string(),
         SemanticType::Number => "number".to_string(),
         SemanticType::String => "string".to_string(),
+        SemanticType::SlotContent => "SlotContent".to_string(),
         SemanticType::BooleanLiteral(value) => value.to_string(),
         SemanticType::NumberLiteral(value) => value.clone(),
         SemanticType::StringLiteral(value) => format!("{value:?}"),
@@ -247,7 +250,7 @@ fn semantic_type_sort_key(semantic_type: &SemanticType) -> String {
 #[must_use]
 pub fn serialization_compatibility(semantic_type: &SemanticType) -> SerializationCompatibility {
     let serializable = match semantic_type {
-        SemanticType::Unknown | SemanticType::Never => false,
+        SemanticType::Unknown | SemanticType::Never | SemanticType::SlotContent => false,
         SemanticType::Null
         | SemanticType::Boolean
         | SemanticType::Number
@@ -685,6 +688,27 @@ impl SemanticTypeModel {
                     origin: subject,
                     status: SemanticTypeStatus::Declared,
                     provenance: context.provenance.clone(),
+                },
+            );
+        }
+        self
+    }
+
+    /// Attaches the exact nominal H1 `SlotContent` type to canonical Slot
+    /// entities. Alias and structural compatibility are intentionally absent.
+    #[must_use]
+    pub fn with_slot_types(mut self, slots: &BTreeMap<crate::SlotId, SlotEntity>) -> Self {
+        for slot in slots.values() {
+            let subject = slot.id.as_semantic_id().clone();
+            self.assignments.insert(
+                subject.clone(),
+                SemanticTypeAssignment {
+                    id: SemanticTypeId::for_subject(&subject),
+                    subject: subject.clone(),
+                    semantic_type: SemanticType::SlotContent,
+                    origin: subject,
+                    status: SemanticTypeStatus::Declared,
+                    provenance: slot.provenance.clone(),
                 },
             );
         }
@@ -2509,6 +2533,7 @@ fn semantic_type_from_annotation(text: &str) -> Option<SemanticType> {
         "number" => Some(SemanticType::Number),
         "boolean" => Some(SemanticType::Boolean),
         "null" => Some(SemanticType::Null),
+        "SlotContent" => Some(SemanticType::SlotContent),
         "true" => Some(SemanticType::BooleanLiteral(true)),
         "false" => Some(SemanticType::BooleanLiteral(false)),
         _ => string_literal_type(text).or_else(|| numeric_literal_type(text)),
@@ -2579,7 +2604,8 @@ pub fn is_assignable(source: &SemanticType, target: &SemanticType) -> bool {
         | (SemanticType::Null, SemanticType::Null)
         | (SemanticType::Boolean | SemanticType::BooleanLiteral(_), SemanticType::Boolean)
         | (SemanticType::Number | SemanticType::NumberLiteral(_), SemanticType::Number)
-        | (SemanticType::String | SemanticType::StringLiteral(_), SemanticType::String) => true,
+        | (SemanticType::String | SemanticType::StringLiteral(_), SemanticType::String)
+        | (SemanticType::SlotContent, SemanticType::SlotContent) => true,
         (SemanticType::BooleanLiteral(source), SemanticType::BooleanLiteral(target)) => {
             source == target
         }

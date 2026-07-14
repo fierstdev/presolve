@@ -44,6 +44,45 @@ class AppShell extends Component {
     }
 
     #[test]
+    fn retains_slot_declaration_and_invalid_declaration_form_facts() {
+        let source = r#"
+@component("x-card")
+class Card extends Component {
+  @slot()
+  children!: SlotContent;
+
+  @slot("header")
+  static invalid: string = "bad";
+
+  @slot()
+  outlet() {}
+
+  attach(@slot() content: SlotContent) {}
+}
+"#;
+        let parsed = parse_file("src/Card.tsx", source);
+        assert!(parsed.diagnostics.is_empty(), "{:#?}", parsed.diagnostics);
+        let class = &parsed.classes[0];
+        let children = &class.properties[0];
+        assert_eq!(children.decorators[0].name, "slot");
+        assert_eq!(children.decorators[0].argument_count, 0);
+        assert_eq!(
+            children.type_annotation.as_ref().unwrap().text,
+            "SlotContent"
+        );
+        assert!(children.is_definite_assignment);
+        assert!(children.initializer.is_none());
+
+        let invalid = &class.properties[1];
+        assert_eq!(invalid.decorators[0].argument_count, 1);
+        assert!(invalid.is_static);
+        assert_eq!(invalid.initializer.as_deref(), Some("\"bad\""));
+
+        assert_eq!(class.methods[0].decorators[0].name, "slot");
+        assert_eq!(class.methods[1].parameters[0].decorators[0].name, "slot");
+    }
+
+    #[test]
     fn retains_static_member_provider_designators_and_value_expressions() {
         let parsed = parse_file(
             "src/AppShell.tsx",

@@ -48,6 +48,19 @@ pub struct ProviderId(SemanticId);
 #[serde(transparent)]
 pub struct ConsumerId(SemanticId);
 
+/// Stable identity for one compiler-owned component Slot semantic entity.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SlotId(SemanticId);
+
+/// Stable identity for one authored `@slot()` declaration candidate.
+///
+/// Candidate identity is source-qualified and remains distinct from `SlotId`,
+/// so invalid declarations never acquire a valid Slot identity.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SlotDeclarationCandidateId(SemanticId);
+
 /// Stable identity for an authored Context-family declaration candidate.
 ///
 /// Candidates are source-qualified compiler facts.  They intentionally do not
@@ -153,6 +166,21 @@ impl SemanticId {
     #[must_use]
     pub fn consumer_field(&self, name: &str) -> Self {
         self.child("consumer-field", name)
+    }
+
+    #[must_use]
+    pub fn slot(&self, name: &str) -> Self {
+        self.child("slot", name)
+    }
+
+    #[must_use]
+    pub fn slot_field(&self, name: &str) -> Self {
+        self.child("slot-field", name)
+    }
+
+    #[must_use]
+    pub fn slot_declaration_candidate(&self, position: usize) -> Self {
+        self.child("slot-declaration", &position.to_string())
     }
 
     #[must_use]
@@ -318,6 +346,40 @@ impl ConsumerId {
     }
 }
 
+impl SlotId {
+    #[must_use]
+    pub fn for_component(component: &SemanticId, name: &str) -> Self {
+        Self(component.slot(name))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl SlotDeclarationCandidateId {
+    #[must_use]
+    pub fn for_component_position(component: &SemanticId, position: usize) -> Self {
+        Self(component.slot_declaration_candidate(position))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 impl ContextDeclarationCandidateId {
     #[must_use]
     pub fn for_component_position(component: &SemanticId, position: usize) -> Self {
@@ -397,6 +459,18 @@ impl fmt::Display for ConsumerId {
     }
 }
 
+impl fmt::Display for SlotId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for SlotDeclarationCandidateId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
 impl fmt::Display for ContextDeclarationCandidateId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(formatter)
@@ -405,7 +479,7 @@ impl fmt::Display for ContextDeclarationCandidateId {
 
 #[cfg(test)]
 mod tests {
-    use super::{ConsumerId, ContextId, ProviderId, SemanticId, SemanticOwner};
+    use super::{ConsumerId, ContextId, ProviderId, SemanticId, SemanticOwner, SlotId};
 
     #[test]
     fn derives_component_scoped_ids() {
@@ -439,6 +513,10 @@ mod tests {
         assert_eq!(
             ConsumerId::for_component(&component, "theme").as_str(),
             "component:x-counter/consumer:theme"
+        );
+        assert_eq!(
+            SlotId::for_component(&component, "children").as_str(),
+            "component:x-counter/slot:children"
         );
         assert_eq!(
             component.effect_activation_slot("syncTitle").as_str(),

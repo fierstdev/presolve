@@ -427,6 +427,11 @@ fn print_asm_text(
     asm: &ApplicationSemanticModel,
     validation: &[AsmValidationDiagnostic],
 ) {
+    let projected_entities = asm
+        .ownership
+        .keys()
+        .filter(|id| is_phase_g_inspection_entity(asm, id))
+        .collect::<Vec<_>>();
     if paths.len() == 1 {
         println!("File: {}", paths[0].display());
     } else {
@@ -438,10 +443,22 @@ fn print_asm_text(
     println!("ApplicationSemanticModel:");
     println!("  components: {}", asm.components.len());
     println!("  templates: {}", asm.templates.len());
-    println!("  ownership: {}", asm.ownership.len());
+    println!("  ownership: {}", projected_entities.len());
     println!("  references: {}", asm.references.len());
-    println!("  provenance: {}", asm.provenance.len());
-    println!("  semantic types: {}", asm.semantic_types.assignments.len());
+    println!(
+        "  provenance: {}",
+        projected_entities
+            .iter()
+            .filter(|id| asm.provenance(id).is_some())
+            .count()
+    );
+    println!(
+        "  semantic types: {}",
+        projected_entities
+            .iter()
+            .filter(|id| asm.semantic_types.assignments.contains_key(*id))
+            .count()
+    );
     println!("  diagnostics: {}", asm.diagnostics.len());
     println!("  validation: {}", validation.len());
 
@@ -576,6 +593,7 @@ fn asm_inspection_json(
         entities: asm
             .ownership
             .keys()
+            .filter(|id| is_phase_g_inspection_entity(asm, id))
             .map(|id| {
                 asm_inspection_entity(
                     asm,
@@ -598,6 +616,7 @@ fn asm_inspection_json(
 fn find_asm_entity<'a>(asm: &'a ApplicationSemanticModel, entity_id: &str) -> &'a SemanticId {
     asm.ownership
         .keys()
+        .filter(|id| is_phase_g_inspection_entity(asm, id))
         .find(|id| id.as_str() == entity_id)
         .unwrap_or_else(|| {
             eprintln!("unknown ASM entity: {entity_id}");
@@ -611,6 +630,7 @@ fn find_asm_entity_at<'a>(
     offset: usize,
 ) -> &'a SemanticId {
     let mut candidates = asm.entities_at(path, offset);
+    candidates.retain(|id| is_phase_g_inspection_entity(asm, id));
     if candidates.is_empty() {
         eprintln!("no ASM entity at {}:{offset}", path.display());
         process::exit(1);
@@ -706,7 +726,7 @@ fn print_asm_entity_text(
     for child in children {
         println!("    {}", child.as_str());
     }
-    println!("  descendants: {}", asm.descendants_of(id).len());
+    println!("  descendants: {}", projected_descendants(asm, id).len());
     print_entity_references(
         "outgoing",
         filtered_entity_references(asm.references_from(id), filters),
@@ -795,7 +815,7 @@ fn asm_entity_inspection_json(
             .into_iter()
             .map(SemanticId::as_str)
             .collect(),
-        descendant_count: asm.descendants_of(id).len(),
+        descendant_count: projected_descendants(asm, id).len(),
         outgoing_references: filtered_entity_references(asm.references_from(id), filters)
             .into_iter()
             .map(AsmInspectionReference::from)
@@ -820,6 +840,7 @@ fn filtered_entity_children<'a>(
 ) -> Vec<&'a SemanticId> {
     asm.children_of(id)
         .into_iter()
+        .filter(|child| is_phase_g_inspection_entity(asm, child))
         .filter(|child| {
             filters.child_kind.is_none_or(|kind| {
                 asm.entity(child)
@@ -827,6 +848,20 @@ fn filtered_entity_children<'a>(
             })
         })
         .collect()
+}
+
+fn projected_descendants<'a>(
+    asm: &'a ApplicationSemanticModel,
+    id: &SemanticId,
+) -> Vec<&'a SemanticId> {
+    asm.descendants_of(id)
+        .into_iter()
+        .filter(|descendant| is_phase_g_inspection_entity(asm, descendant))
+        .collect()
+}
+
+fn is_phase_g_inspection_entity(asm: &ApplicationSemanticModel, id: &SemanticId) -> bool {
+    !matches!(asm.entity(id), Some(SemanticEntity::Slot(_)))
 }
 
 fn filtered_entity_references(
@@ -1123,6 +1158,7 @@ fn semantic_entity_kind(entity: SemanticEntity<'_>) -> &'static str {
         SemanticEntity::Context(_) => "context",
         SemanticEntity::Provider(_) => "provider",
         SemanticEntity::Consumer(_) => "consumer",
+        SemanticEntity::Slot(_) => "slot",
         SemanticEntity::Computed(_) => "computed",
         SemanticEntity::Effect(_) => "effect",
         SemanticEntity::Parameter(_) => "parameter",

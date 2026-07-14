@@ -6,7 +6,7 @@ use serde::Serialize;
 
 use crate::semantic_id::{
     ConsumerId, ContextDeclarationCandidateId, ContextId, EffectId, EffectStatementId, ProviderId,
-    SemanticId, SemanticOwner,
+    SemanticId, SemanticOwner, SlotDeclarationCandidateId,
 };
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
@@ -42,9 +42,13 @@ pub struct ComponentNode {
     pub context_declarations: Vec<ContextDeclaration>,
     pub provider_declarations: Vec<ProviderDeclaration>,
     pub consumer_declarations: Vec<ConsumerDeclaration>,
+    pub slot_declarations: Vec<SlotDeclaration>,
     /// Source-faithful candidates retained for every Context-family decorator,
     /// including forms that cannot produce a semantic entity.
     pub context_declaration_candidates: Vec<AuthoredContextDeclarationCandidate>,
+    /// Source-faithful candidates retained for every `@slot()` decorator,
+    /// including forms that cannot produce a canonical Slot entity.
+    pub slot_declaration_candidates: Vec<AuthoredSlotDeclarationCandidate>,
     pub methods: Vec<ComponentMethod>,
     pub actions: Vec<ComponentAction>,
     pub render: Option<RenderModel>,
@@ -112,6 +116,56 @@ pub struct ConsumerDeclaration {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SlotKind {
+    Default,
+    Named,
+}
+
+/// Authored source facts for one valid H1 `@slot()` component field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SlotDeclaration {
+    pub authored_field: SemanticId,
+    pub name: String,
+    pub kind: SlotKind,
+    pub declared_type: DeclaredStateType,
+    pub decorator_provenance: SourceProvenance,
+    pub name_provenance: SourceProvenance,
+    pub provenance: SourceProvenance,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SlotDeclarationViolation {
+    InvalidDeclarationKind { actual: AuthoredDeclarationKind },
+    StaticDeclarationUnsupported,
+    ConflictingSemanticDecorators,
+    DecoratorArity { actual: usize, expected: usize },
+    InvalidDeclaredType { actual: Option<String> },
+    ForbiddenInitializer,
+    DefiniteAssignmentRequired,
+    DuplicateSlot,
+}
+
+/// Parser/lowering-owned facts retained before canonical Slot construction.
+/// Invalid candidates have their own source identity and never acquire a
+/// `SlotId`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthoredSlotDeclarationCandidate {
+    pub id: SlotDeclarationCandidateId,
+    pub owner_component: SemanticId,
+    pub authored_declaration: SemanticId,
+    pub declaration_kind: AuthoredDeclarationKind,
+    pub field_name: Option<String>,
+    pub declared_type: Option<DeclaredStateType>,
+    pub decorator_argument_count: usize,
+    pub decorator_provenance: SourceProvenance,
+    pub name_provenance: Option<SourceProvenance>,
+    pub provenance: SourceProvenance,
+    pub static_modifier_provenance: Option<SourceProvenance>,
+    pub initializer_provenance: Option<SourceProvenance>,
+    pub violations: Vec<SlotDeclarationViolation>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ContextDeclarationCandidateKind {
     Context,
     Provider,
@@ -124,6 +178,7 @@ pub enum AuthoredDeclarationKind {
     StaticField,
     Method,
     Getter,
+    Parameter,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1005,6 +1060,8 @@ fn build_component_node(
     let consumer_declarations = consumer_declarations_from_class(class, path, &id);
     let context_declaration_candidates =
         context_declaration_candidates_from_class(class, path, &id);
+    let slot_declaration_candidates = slot_declaration_candidates_from_class(class, path, &id);
+    let slot_declarations = slot_declarations_from_candidates(&slot_declaration_candidates);
 
     let methods = class
         .methods
@@ -1070,7 +1127,9 @@ fn build_component_node(
         context_declarations,
         provider_declarations,
         consumer_declarations,
+        slot_declarations,
         context_declaration_candidates,
+        slot_declaration_candidates,
         methods,
         actions,
         render,
@@ -1122,6 +1181,7 @@ fn context_declaration_candidates_from_class(
                             | "effect"
                             | "action"
                             | "resource"
+                            | "slot"
                     )
             });
             if has_conflict {
@@ -1253,6 +1313,229 @@ fn context_declaration_candidates_from_class(
     candidates
 }
 
+#[allow(clippy::too_many_lines)]
+fn slot_declaration_candidates_from_class(
+    class: &ParsedClass,
+    path: &Path,
+    component: &SemanticId,
+) -> Vec<AuthoredSlotDeclarationCandidate> {
+    let mut candidates = Vec::new();
+
+    for property in &class.properties {
+        for decorator in property
+            .decorators
+            .iter()
+            .filter(|decorator| decorator.name == "slot")
+        {
+            let declaration_kind = if property.is_static {
+                AuthoredDeclarationKind::StaticField
+            } else {
+                AuthoredDeclarationKind::InstanceField
+            };
+            let mut violations = Vec::new();
+            if decorator.argument_count != 0 {
+                violations.push(SlotDeclarationViolation::DecoratorArity {
+                    actual: decorator.argument_count,
+                    expected: 0,
+                });
+            }
+            if property.is_static {
+                violations.push(SlotDeclarationViolation::StaticDeclarationUnsupported);
+            }
+            let has_conflict = property.initializer.as_deref() == Some("state(...)")
+                || property.decorators.iter().any(|other| {
+                    other.name != "slot"
+                        && matches!(
+                            other.name.as_str(),
+                            "context"
+                                | "provide"
+                                | "consume"
+                                | "computed"
+                                | "effect"
+                                | "action"
+                                | "resource"
+                        )
+                });
+            if has_conflict {
+                violations.push(SlotDeclarationViolation::ConflictingSemanticDecorators);
+            }
+            let declared_type =
+                property
+                    .type_annotation
+                    .as_ref()
+                    .map(|annotation| DeclaredStateType {
+                        kind: declared_state_type_kind(&annotation.text),
+                        text: annotation.text.clone(),
+                        provenance: SourceProvenance::new(path, annotation.span),
+                    });
+            if declared_type
+                .as_ref()
+                .is_none_or(|declared| declared.text != "SlotContent")
+            {
+                violations.push(SlotDeclarationViolation::InvalidDeclaredType {
+                    actual: declared_type.as_ref().map(|declared| declared.text.clone()),
+                });
+            }
+            if property.initializer.is_some() {
+                violations.push(SlotDeclarationViolation::ForbiddenInitializer);
+            }
+            if !property.is_definite_assignment {
+                violations.push(SlotDeclarationViolation::DefiniteAssignmentRequired);
+            }
+            candidates.push(AuthoredSlotDeclarationCandidate {
+                id: SlotDeclarationCandidateId::for_component_position(
+                    component,
+                    decorator.span.start,
+                ),
+                owner_component: component.clone(),
+                authored_declaration: component.slot_field(&property.name),
+                declaration_kind,
+                field_name: Some(property.name.clone()),
+                declared_type,
+                decorator_argument_count: decorator.argument_count,
+                decorator_provenance: SourceProvenance::new(path, decorator.span),
+                name_provenance: Some(SourceProvenance::new(path, property.name_span)),
+                provenance: SourceProvenance::new(path, property.span),
+                static_modifier_provenance: property
+                    .is_static
+                    .then(|| SourceProvenance::new(path, property.span)),
+                initializer_provenance: property
+                    .initializer_span
+                    .map(|span| SourceProvenance::new(path, span)),
+                violations,
+            });
+        }
+    }
+
+    for method in &class.methods {
+        retain_invalid_slot_candidate(
+            &mut candidates,
+            component,
+            &component.method(&method.name),
+            if method.is_getter {
+                AuthoredDeclarationKind::Getter
+            } else {
+                AuthoredDeclarationKind::Method
+            },
+            None,
+            &method.decorators,
+            path,
+            method.span,
+        );
+        for (index, parameter) in method.parameters.iter().enumerate() {
+            retain_invalid_slot_candidate(
+                &mut candidates,
+                component,
+                &component
+                    .method(&method.name)
+                    .parameter(&parameter.name, index),
+                AuthoredDeclarationKind::Parameter,
+                Some(&parameter.name),
+                &parameter.decorators,
+                path,
+                parameter.span,
+            );
+        }
+    }
+
+    let mut counts = BTreeMap::<String, usize>::new();
+    for name in candidates
+        .iter()
+        .filter_map(|candidate| candidate.field_name.as_ref())
+    {
+        *counts.entry(name.clone()).or_default() += 1;
+    }
+    for candidate in &mut candidates {
+        if candidate
+            .field_name
+            .as_ref()
+            .is_some_and(|name| counts[name] > 1)
+        {
+            candidate
+                .violations
+                .push(SlotDeclarationViolation::DuplicateSlot);
+        }
+    }
+    candidates.sort_by(|left, right| left.id.cmp(&right.id));
+    candidates
+}
+
+#[allow(clippy::too_many_arguments)]
+fn retain_invalid_slot_candidate(
+    candidates: &mut Vec<AuthoredSlotDeclarationCandidate>,
+    component: &SemanticId,
+    authored_declaration: &SemanticId,
+    declaration_kind: AuthoredDeclarationKind,
+    field_name: Option<&str>,
+    decorators: &[ezc_parser::ParsedDecorator],
+    path: &Path,
+    span: SourceSpan,
+) {
+    for decorator in decorators
+        .iter()
+        .filter(|decorator| decorator.name == "slot")
+    {
+        let mut violations = vec![SlotDeclarationViolation::InvalidDeclarationKind {
+            actual: declaration_kind,
+        }];
+        if decorator.argument_count != 0 {
+            violations.push(SlotDeclarationViolation::DecoratorArity {
+                actual: decorator.argument_count,
+                expected: 0,
+            });
+        }
+        candidates.push(AuthoredSlotDeclarationCandidate {
+            id: SlotDeclarationCandidateId::for_component_position(component, decorator.span.start),
+            owner_component: component.clone(),
+            authored_declaration: authored_declaration.clone(),
+            declaration_kind,
+            field_name: field_name.map(str::to_string),
+            declared_type: None,
+            decorator_argument_count: decorator.argument_count,
+            decorator_provenance: SourceProvenance::new(path, decorator.span),
+            name_provenance: field_name.map(|_| SourceProvenance::new(path, span)),
+            provenance: SourceProvenance::new(path, span),
+            static_modifier_provenance: None,
+            initializer_provenance: None,
+            violations,
+        });
+    }
+}
+
+fn slot_declarations_from_candidates(
+    candidates: &[AuthoredSlotDeclarationCandidate],
+) -> Vec<SlotDeclaration> {
+    candidates
+        .iter()
+        .filter(|candidate| candidate.violations.is_empty())
+        .map(|candidate| {
+            let name = candidate
+                .field_name
+                .clone()
+                .expect("valid Slot candidates are fields");
+            SlotDeclaration {
+                authored_field: candidate.authored_declaration.clone(),
+                kind: if name == "children" {
+                    SlotKind::Default
+                } else {
+                    SlotKind::Named
+                },
+                name,
+                declared_type: candidate
+                    .declared_type
+                    .clone()
+                    .expect("valid Slot candidates have a declared type"),
+                decorator_provenance: candidate.decorator_provenance.clone(),
+                name_provenance: candidate
+                    .name_provenance
+                    .clone()
+                    .expect("valid Slot candidates retain field-name provenance"),
+                provenance: candidate.provenance.clone(),
+            }
+        })
+        .collect()
+}
+
 fn component_method_from_parsed(
     method: &ParsedMethod,
     path: &Path,
@@ -1368,7 +1651,10 @@ fn state_fields_from_class(class: &ParsedClass, path: &Path, id: &SemanticId) ->
         .filter(|property| {
             property.initializer.as_deref() == Some("state(...)")
                 && !property.decorators.iter().any(|decorator| {
-                    matches!(decorator.name.as_str(), "context" | "provide" | "consume")
+                    matches!(
+                        decorator.name.as_str(),
+                        "context" | "provide" | "consume" | "slot"
+                    )
                 })
         })
         .map(|property| {
@@ -1416,10 +1702,9 @@ fn context_declarations_from_class(
 
             (decorator.argument_count == 0
                 && !property.is_static
-                && !property
-                    .decorators
-                    .iter()
-                    .any(|decorator| matches!(decorator.name.as_str(), "provide" | "consume"))
+                && !property.decorators.iter().any(|decorator| {
+                    matches!(decorator.name.as_str(), "provide" | "consume" | "slot")
+                })
                 && property
                     .initializer
                     .as_ref()
@@ -1469,10 +1754,9 @@ fn provider_declarations_from_class(
 
             (decorator.argument_count == 1
                 && !property.is_static
-                && !property
-                    .decorators
-                    .iter()
-                    .any(|decorator| matches!(decorator.name.as_str(), "context" | "consume")))
+                && !property.decorators.iter().any(|decorator| {
+                    matches!(decorator.name.as_str(), "context" | "consume" | "slot")
+                }))
             .then(|| ProviderDeclaration {
                 authored_field: id.provider_field(&property.name),
                 name: property.name.clone(),
@@ -1509,7 +1793,14 @@ fn consumer_declarations_from_class(
             let has_conflicting_decorator = property.decorators.iter().any(|decorator| {
                 matches!(
                     decorator.name.as_str(),
-                    "state" | "context" | "provide" | "computed" | "effect" | "action" | "resource"
+                    "state"
+                        | "context"
+                        | "provide"
+                        | "computed"
+                        | "effect"
+                        | "action"
+                        | "resource"
+                        | "slot"
                 )
             });
 

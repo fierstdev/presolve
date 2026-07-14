@@ -352,6 +352,7 @@ pub struct ParsedMethodCall {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedMethodParameter {
     pub name: String,
+    pub decorators: Vec<ParsedDecorator>,
     pub span: SourceSpan,
     pub type_annotation: Option<ParsedTypeAnnotation>,
 }

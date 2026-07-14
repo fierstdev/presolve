@@ -133,6 +133,7 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
     let nodes = asm
         .ownership
         .keys()
+        .filter(|id| !matches!(asm.entity(id), Some(SemanticEntity::Slot(_))))
         .map(|id| {
             let entity = asm
                 .entity(id)
@@ -155,13 +156,18 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
     let mut edges = asm
         .ownership
         .iter()
-        .filter_map(|(target, owner)| match owner {
-            SemanticOwner::Application => None,
-            SemanticOwner::Entity(source) => Some(SemanticGraphEdge {
-                kind: SemanticGraphEdgeKind::Ownership,
-                source: source.clone(),
-                target: target.clone(),
-            }),
+        .filter_map(|(target, owner)| {
+            if matches!(asm.entity(target), Some(SemanticEntity::Slot(_))) {
+                return None;
+            }
+            match owner {
+                SemanticOwner::Application => None,
+                SemanticOwner::Entity(source) => Some(SemanticGraphEdge {
+                    kind: SemanticGraphEdgeKind::Ownership,
+                    source: source.clone(),
+                    target: target.clone(),
+                }),
+            }
         })
         .chain(asm.references.iter().map(|reference| SemanticGraphEdge {
             kind: semantic_graph_edge_kind(reference.kind),
@@ -240,6 +246,9 @@ fn semantic_graph_node_kind(entity: SemanticEntity<'_>) -> SemanticGraphNodeKind
         SemanticEntity::Context(_) => SemanticGraphNodeKind::Context,
         SemanticEntity::Provider(_) => SemanticGraphNodeKind::Provider,
         SemanticEntity::Consumer(_) => SemanticGraphNodeKind::Consumer,
+        SemanticEntity::Slot(_) => {
+            unreachable!("Slots are not projected into frozen semantic graph schema v5")
+        }
         SemanticEntity::Computed(_) => SemanticGraphNodeKind::Computed,
         SemanticEntity::Effect(_) => SemanticGraphNodeKind::Effect,
         SemanticEntity::Parameter(_) => SemanticGraphNodeKind::Parameter,

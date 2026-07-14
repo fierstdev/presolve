@@ -3,33 +3,40 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: G20 - Context stability audit and freeze
-* Working tree: clean after the G20 stability commit.
+* Latest completed slice: H1 - Canonical Slot entities
+* Working tree: clean after the H1 canonical Slot entity commit.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: G20 - Context stability audit and freeze
-* Summary: Phase G is complete. G20 verifies one canonical authority for every G1-G19 concern, consolidates Provider/Consumer Context-designator resolution into one compile-time resolver, restricts expression typing to canonical valid Context/Provider owners, makes Context diagnostic type evidence validate against its exact canonical declaration provenance, freezes runtime ordering/no-discovery guards, and publishes the supported/unsupported Context contract. No Provider selection, typing, lifetime, planning, lowering, artifact, or runtime semantics changed.
-* Key files: crates/ezc_core/src/context_designator.rs; crates/ezc_core/src/provider.rs; crates/ezc_core/src/consumer.rs; crates/ezc_core/src/semantic_type.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_cli/src/main.rs; crates/ezc_cli/tests/context_fixtures.rs; docs/context-contract.md; README.md
-* Schema decision: no serialized shape changed in G20. Semantic graph is frozen at v5, Context runtime artifact at v2, template manifest at v2, resume manifest at v3, ASM inspection at v6, and check JSON at v3. The internal runtime Context registry contract remains v1.
+* Slice: H1 - Canonical Slot entities
+* Summary: H1 retains every authored `@slot()` declaration candidate, lowers only the exact valid declaration-only component field form into an immutable component-qualified `SlotEntity`, adds nominal `SlotContent` semantic typing and generic ASM identity/ownership queries, and preserves invalid declaration facts without fabricating valid `SlotId` values. No invocation, outlet, content binding, runtime, or diagnostic projection was added.
+* Key files: crates/ezc_parser/src/model.rs; crates/ezc_parser/src/oxc_adapter.rs; crates/ezc_core/src/slot.rs; crates/ezc_core/src/component_graph.rs; crates/ezc_core/src/semantic_id.rs; crates/ezc_core/src/semantic_type.rs; crates/ezc_core/src/application_semantic_model.rs
+* Schema decision: no serialized shape changed in H1. Semantic graph remains v5, Context runtime artifact v2, template manifest v2, resume manifest v3, ASM inspection v6, and check JSON v3. Slot projection is deliberately deferred to the single H18 ASM inspection increment.
 
 Current in-progress slice
 
 * Slice: none
-* Status: Phase G is complete and frozen. Phase H has not started and requires its own explicit roadmap/contract.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20
-* Remaining in Phase G: none.
+* Status: H1 is complete and committed. H2 has not started.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1
+* Remaining in Phase H: H2 through H21.
 
 Verification
 
-* just check: pass (workspace formatting, strict workspace clippy, and complete workspace test matrix)
-* cargo test --workspace: pass (1 CLI unit; 12 Context fixture/freeze; 125 CLI inspection/build; 24 real-browser; 244 core; 3 parser unit; 26 parser integration tests)
-* cargo test -p ezc_cli --test explain context_diagnostics_share_check_full_asm_selected_asm_and_explain_projection -- --exact --nocapture: pass
-* cargo test -p ezc_cli --test explain build_command_writes_and_embeds_context_runtime_artifact -- --exact --nocapture: pass
+* Phase H entry gate: `just check` pass (workspace formatting, strict workspace clippy, and complete workspace test matrix: 12 Context fixture/freeze, 125 CLI inspection/build, 24 real-browser, 244 core, 3 parser unit, and 26 parser integration tests)
+* cargo test -p ezc_parser: pass (4 unit; 26 integration)
+* cargo test -p ezc_core slot --lib: pass (11 focused)
+* cargo test -p ezc_core --lib: pass (249)
+* cargo test -p ezc_cli --test explain: pass (125)
+* cargo clippy -p ezc_parser -p ezc_core -p ezc_cli --all-targets -- -D warnings: pass
+* cargo fmt --all --check: pass
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: H1 accepts only a zero-argument, non-static, declaration-only definite-assignment component field of exact built-in type `SlotContent`. The field name is the slot name; `children` is the default slot and every other valid name is named. Every authored candidate receives a source-qualified `SlotDeclarationCandidateId`, while only a candidate with no violation receives a component-qualified `SlotId`.
+* Reason: This keeps valid semantic identity separate from retained invalid syntax and supplies H19 with exact arity, declaration-kind, type, static, initializer, definite-assignment, duplicate, and conflicting-decorator facts without reparsing source or fabricating identities.
+* Tradeoff: `SlotContent` is nominal, client-boundary, exact-assignable, and nonserializable. H1 adds generic in-memory ASM lookup and ownership only. The frozen semantic graph v5 and ASM inspection v6 omit Slot entities until the roadmap-owned H18 projection; invocation, outlet, content binding, runtime, and diagnostics remain absent.
 
 * Decision: G20 freezes one compile-time Context-designator resolver shared by G2 Provider and G3 Consumer lowering. G4 remains the only Provider visibility/selection authority; every later product only consumes its retained result.
 * Reason: Removing the duplicated raw path/import matching prevents Provider and Consumer identity resolution from drifting while preserving all existing local and imported designator behavior.
@@ -785,6 +792,7 @@ Architecture decisions made
 
 Known limitations
 
+* Item: H1 supports Slot declarations only. Component invocation, slot outlets/fragments/bindings, instance planning, Context reprojection, IR, runtime artifacts/execution, resumability, inspection, and diagnostics remain H2-H19 work. Slot entities are intentionally absent from frozen semantic graph v5 and ASM inspection v6 until H18.
 * Item: Conditional rendering only supports simple `this.<stateField>` conditions with JSX element or fragment branches.
 * Item: Conditional branch snippets are replaced as static HTML. Bindings, events, and nested dynamic behavior inside swapped-in branch snippets are not re-registered yet.
 * Item: Keyed lists currently accept only `iterable.map((item, index?) => <element>...</element>)` with identifier parameters and an expression-bodied callback. Static and runtime reconciliation support a direct primitive item key or a dot-member key such as `item.id` that resolves to a unique primitive.
@@ -822,7 +830,7 @@ Known limitations
 
 Exact next step
 
-Await an explicit G3 authored Consumer declaration contract before beginning Consumer lowering. Do not infer Consumers from fields, templates, methods, or Provider declarations.
+Implement H2 canonical component invocation entities from statically resolved PascalCase template tags. Preserve authored invocation candidates and blocked resolution facts without adding slots, instance planning, runtime behavior, or diagnostics projection.
 
 Useful commands
 
@@ -853,4 +861,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the E17 commit.
+* None after the H1 commit (`feat(core): add canonical slot entities`).

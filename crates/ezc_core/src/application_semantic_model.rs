@@ -33,10 +33,11 @@ use crate::intermediate_representation::{
     IrReactiveTransitiveAnalysis,
 };
 use crate::provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
-use crate::semantic_id::{ConsumerId, ContextId, ProviderId, SemanticId, SemanticOwner};
+use crate::semantic_id::{ConsumerId, ContextId, ProviderId, SemanticId, SemanticOwner, SlotId};
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
 use crate::semantic_type::{EffectStatementTypeRecord, SemanticTypeModel};
+use crate::slot::{collect_slot_entities, SlotEntity};
 use crate::template_graph::{build_template_graph, TemplateNode};
 use crate::template_semantics::{
     build_template_semantic_entities, TemplateSemanticEntity, TemplateSemanticKind,
@@ -57,6 +58,7 @@ pub struct ApplicationSemanticModel {
     pub contexts: BTreeMap<ContextId, ContextEntity>,
     pub providers: BTreeMap<ProviderId, ProviderEntity>,
     pub consumers: BTreeMap<ConsumerId, ConsumerEntity>,
+    pub slots: BTreeMap<SlotId, SlotEntity>,
     pub context_declaration_candidates: ContextDeclarationCandidateRegistry,
     pub context_ownership: ContextOwnershipGraph,
     pub context_dependency: ContextDependencyGraph,
@@ -96,6 +98,7 @@ pub enum SemanticEntity<'a> {
     Context(&'a ContextEntity),
     Provider(&'a ProviderEntity),
     Consumer(&'a ConsumerEntity),
+    Slot(&'a SlotEntity),
     Computed(&'a ComputedValue),
     Effect(&'a Effect),
     Parameter(&'a crate::MethodParameter),
@@ -114,6 +117,7 @@ pub enum SemanticEntityKind {
     Context,
     Provider,
     Consumer,
+    Slot,
     Computed,
     Effect,
     Parameter,
@@ -134,6 +138,7 @@ impl SemanticEntity<'_> {
             Self::Context(_) => SemanticEntityKind::Context,
             Self::Provider(_) => SemanticEntityKind::Provider,
             Self::Consumer(_) => SemanticEntityKind::Consumer,
+            Self::Slot(_) => SemanticEntityKind::Slot,
             Self::Computed(_) => SemanticEntityKind::Computed,
             Self::Effect(_) => SemanticEntityKind::Effect,
             Self::Parameter(_) => SemanticEntityKind::Parameter,
@@ -211,6 +216,13 @@ impl ApplicationSemanticModel {
             .find(|consumer| consumer.id.as_semantic_id() == id)
         {
             return Some(SemanticEntity::Consumer(consumer));
+        }
+        if let Some(slot) = self
+            .slots
+            .values()
+            .find(|slot| slot.id.as_semantic_id() == id)
+        {
+            return Some(SemanticEntity::Slot(slot));
         }
         if let Some(effect) = self.effects.get(id) {
             return Some(SemanticEntity::Effect(effect));
@@ -347,6 +359,31 @@ impl ApplicationSemanticModel {
         self.consumers
             .iter()
             .find_map(|(id, consumer)| (&consumer.authored_field == field).then_some(id))
+    }
+
+    #[must_use]
+    pub fn slots(&self) -> Vec<&SlotEntity> {
+        self.slots.values().collect()
+    }
+
+    #[must_use]
+    pub fn slot(&self, id: &SlotId) -> Option<&SlotEntity> {
+        self.slots.get(id)
+    }
+
+    #[must_use]
+    pub fn slots_owned_by(&self, component: &SemanticId) -> Vec<&SlotId> {
+        self.slots
+            .iter()
+            .filter_map(|(id, slot)| (&slot.owner == component).then_some(id))
+            .collect()
+    }
+
+    #[must_use]
+    pub fn slot_for_authored_field(&self, field: &SemanticId) -> Option<&SlotId> {
+        self.slots
+            .iter()
+            .find_map(|(id, slot)| (&slot.authored_field == field).then_some(id))
     }
 
     #[must_use]
@@ -792,6 +829,7 @@ pub fn build_application_semantic_model_from_component_graph(
     let expression_graph =
         ExpressionGraph::from_components(&component_graph.components, &component_graph.provenance);
     let contexts = collect_context_entities(&component_graph.components, &expression_graph);
+    let slots = collect_slot_entities(&component_graph.components);
     let (providers, duplicate_provider_declarations) = collect_provider_entities(
         &component_graph.components,
         &contexts,
@@ -820,6 +858,7 @@ pub fn build_application_semantic_model_from_component_graph(
         &contexts,
         &providers,
         &consumers,
+        &slots,
         &computed_values,
         &effects,
     );
@@ -828,6 +867,7 @@ pub fn build_application_semantic_model_from_component_graph(
         &contexts,
         &providers,
         &consumers,
+        &slots,
         &computed_values,
         &effects,
         &templates,
@@ -871,6 +911,7 @@ pub fn build_application_semantic_model_from_component_graph(
         &contexts,
         &providers,
         &consumers,
+        &slots,
         &computed_values,
         &effects,
         &effect_statements,
@@ -978,6 +1019,7 @@ pub fn build_application_semantic_model_from_component_graph(
         contexts,
         providers,
         consumers,
+        slots,
         context_declaration_candidates,
         context_ownership,
         context_dependency,
@@ -1069,6 +1111,7 @@ fn build_application_semantic_model_from_files_with_bindings(
     let effects = collect_effects(&components, &provenance);
     let expression_graph = ExpressionGraph::from_components(&components, &provenance);
     let contexts = collect_context_entities(&components, &expression_graph);
+    let slots = collect_slot_entities(&components);
     let (providers, duplicate_provider_declarations) =
         collect_provider_entities(&components, &contexts, &expression_graph, bindings);
     let consumers = collect_consumer_entities(&components, &contexts, bindings);
@@ -1088,6 +1131,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         &contexts,
         &providers,
         &consumers,
+        &slots,
         &computed_values,
         &effects,
     );
@@ -1096,6 +1140,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         &contexts,
         &providers,
         &consumers,
+        &slots,
         &computed_values,
         &effects,
         &templates,
@@ -1143,6 +1188,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         &contexts,
         &providers,
         &consumers,
+        &slots,
         &computed_values,
         &effects,
         &effect_statements,
@@ -1243,6 +1289,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         contexts,
         providers,
         consumers,
+        slots,
         context_declaration_candidates,
         context_ownership,
         context_dependency,
@@ -1298,6 +1345,7 @@ fn extend_derived_entity_provenance(
     contexts: &BTreeMap<ContextId, ContextEntity>,
     providers: &BTreeMap<ProviderId, ProviderEntity>,
     consumers: &BTreeMap<ConsumerId, ConsumerEntity>,
+    slots: &BTreeMap<SlotId, SlotEntity>,
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
     effects: &BTreeMap<SemanticId, Effect>,
 ) {
@@ -1320,6 +1368,11 @@ fn extend_derived_entity_provenance(
         )
     }));
     provenance.extend(
+        slots
+            .values()
+            .map(|slot| (slot.id.as_semantic_id().clone(), slot.provenance.clone())),
+    );
+    provenance.extend(
         computed_values
             .iter()
             .map(|(id, computed)| (id.clone(), computed.provenance.clone())),
@@ -1338,6 +1391,7 @@ fn finalize_semantic_types(
     contexts: &BTreeMap<ContextId, ContextEntity>,
     providers: &BTreeMap<ProviderId, ProviderEntity>,
     consumers: &BTreeMap<ConsumerId, ConsumerEntity>,
+    slots: &BTreeMap<SlotId, SlotEntity>,
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
     effects: &BTreeMap<SemanticId, Effect>,
     effect_statements: &BTreeMap<SemanticId, EffectStatement>,
@@ -1346,6 +1400,7 @@ fn finalize_semantic_types(
     template_entities: &[TemplateSemanticEntity],
 ) -> SemanticTypeModel {
     semantic_types
+        .with_slot_types(slots)
         .with_context_types(contexts)
         .with_provider_types(providers)
         .with_consumer_types(consumers)
@@ -2217,6 +2272,7 @@ fn collect_ownership(
     contexts: &BTreeMap<ContextId, ContextEntity>,
     providers: &BTreeMap<ProviderId, ProviderEntity>,
     consumers: &BTreeMap<ConsumerId, ConsumerEntity>,
+    slots: &BTreeMap<SlotId, SlotEntity>,
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
     effects: &BTreeMap<SemanticId, Effect>,
     templates: &[TemplateNode],
@@ -2271,6 +2327,9 @@ fn collect_ownership(
             .filter(|consumer| consumer.owner.entity_id() == Some(&component.id))
         {
             ownership.insert(consumer.id.as_semantic_id().clone(), consumer.owner.clone());
+        }
+        for slot in slots.values().filter(|slot| slot.owner == component.id) {
+            ownership.insert(slot.id.as_semantic_id().clone(), slot.semantic_owner());
         }
         for effect in effects
             .values()
@@ -3594,6 +3653,7 @@ class Counter extends Component {
 
         let ownership = collect_ownership(
             &component_graph.components,
+            &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),

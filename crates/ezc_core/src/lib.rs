@@ -60,6 +60,7 @@ pub mod semantic_id;
 pub mod semantic_provenance;
 pub mod semantic_reference;
 pub mod semantic_type;
+pub mod slot;
 pub mod summarize;
 pub mod symbol_table;
 pub mod template_graph;
@@ -84,17 +85,17 @@ pub use compiler_pass::{
 pub use component_graph::{
     build_component_graph, build_component_graph_for_module, ArithmeticEvaluationError,
     ArithmeticExpression, ArithmeticExpressionKind, ArithmeticOperator,
-    AuthoredContextDeclarationCandidate, AuthoredDeclarationKind, ComparisonOperator,
-    ComponentAction, ComponentDiagnostic, ComponentDiagnosticSeverity, ComponentGraph,
-    ComponentMethod, ComponentNode, ComputedExpression, ComputedExpressionKind,
+    AuthoredContextDeclarationCandidate, AuthoredDeclarationKind, AuthoredSlotDeclarationCandidate,
+    ComparisonOperator, ComponentAction, ComponentDiagnostic, ComponentDiagnosticSeverity,
+    ComponentGraph, ComponentMethod, ComponentNode, ComputedExpression, ComputedExpressionKind,
     ConstantEvaluationError, ConstantExpression, ConstantExpressionKind, ConsumerDeclaration,
     ContextDeclaration, ContextDeclarationCandidateKind, ContextDeclarationViolation,
     ContextDesignator, DeclaredStateType, DeclaredStateTypeKind, DiagnosticSecondaryLabel,
     EffectBodySyntax, EffectExpression, EffectExpressionKind, EffectStatementSyntax,
     EffectStatementSyntaxKind, LogicalOperator, MethodCall, MethodLocalVariable, MethodParameter,
     RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler, RenderFragment,
-    RenderList, RenderModel, SerializableValue, StateField, StateOperation,
-    UnsupportedEffectStatementKind,
+    RenderList, RenderModel, SerializableValue, SlotDeclaration, SlotDeclarationViolation,
+    SlotKind, StateField, StateOperation, UnsupportedEffectStatementKind,
 };
 pub use component_scope::{ComponentScopeDiagnostic, ComponentScopeGraph};
 pub use computed_value::{
@@ -268,7 +269,7 @@ pub use semantic_graph::{
 };
 pub use semantic_id::{
     ConsumerId, ContextDeclarationCandidateId, ContextId, EffectId, EffectStatementId, ProviderId,
-    SemanticId, SemanticOwner,
+    SemanticId, SemanticOwner, SlotDeclarationCandidateId, SlotId,
 };
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
@@ -281,6 +282,7 @@ pub use semantic_type::{
     SemanticType, SemanticTypeAlias, SemanticTypeAssignment, SemanticTypeId, SemanticTypeModel,
     SemanticTypeStatus, SerializationCompatibility, TypeDiagnosticCode, TypeDiagnosticFamily,
 };
+pub use slot::{collect_slot_entities, SlotEntity};
 pub use summarize::summarize_source;
 pub use symbol_table::{
     build_symbol_table, ModuleSymbol, ModuleSymbolTable, SymbolDiagnostic, SymbolKind, SymbolTable,

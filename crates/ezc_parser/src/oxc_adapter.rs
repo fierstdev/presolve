@@ -481,6 +481,11 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
         .filter_map(|parameter| {
             Some(ParsedMethodParameter {
                 name: binding_identifier_name(&parameter.pattern.kind)?,
+                decorators: parameter
+                    .decorators
+                    .iter()
+                    .filter_map(|decorator| parse_decorator(decorator, source))
+                    .collect(),
                 span: source_span(source, parameter.span),
                 type_annotation: parameter
                     .pattern
