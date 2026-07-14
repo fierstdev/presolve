@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: G6 - Compiler-owned Context ownership graph
-* Working tree: G6 is ready to commit. The Phase G roadmap file is user-provided and untracked.
+* Working tree: G6 is committed. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-13
 
 Last completed slice
@@ -18,7 +18,7 @@ Last completed slice
 Current in-progress slice
 
 * Slice: G7 - Context dependency graph
-* Status: Ready to assess after the G6 commit.
+* Status: Blocked pending an explicit Context dependency-graph contract.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5; G6
 * Remaining: G7 through G20.
 
@@ -75,6 +75,10 @@ Architecture decisions made
 * Decision: G6 is one derived `ContextOwnershipGraph`, distinct from `ComponentScopeGraph` and `ContextResolution`. Its only edges are Component-to-Context, Component-to-Provider, Component-to-Consumer, and Context-to-default-expression; typed IDs and retained inverse indexes make all reads compiler-owned and deterministic.
 * Reason: Entity owners and default expression roots already establish canonical semantic ownership. Projecting them once preserves a lifetime-analysis input without turning ownership into composition, visibility, binding selection, or data dependency authority.
 * Tradeoff: Context ownership is independent of G4 resolution and G5 compatibility. G6 neither copies scope topology nor adds Provider-to-Context, Consumer-to-Context/Provider, component-to-component, Provider-value-expression, or runtime edges; it makes no public inspection schema change.
+
+* Decision needed before G7: define the canonical Context dependency-graph product: its typed node and edge domains/directions; whether Provider value and Context-default expression references are direct-only or transitive; how explicit Provider/default/unresolved/ambiguous/invalid Consumer resolutions contribute; handling of unknown or incompatible G5 bindings; graph ordering, invariants, queries, validation, and export/schema requirements.
+* Reason: G7 says to project Provider/Consumer relations and ownership but does not define data-dependency topology. Treating semantic request/provide/ownership relations, expression nodes, or G4 candidate evidence as dependencies would invent the facts needed by G8 lifetime and G9 evaluation planning.
+* Tradeoff: G6 remains complete and committed. No Context dependency graph, expression dependency closure, scheduling, Provider reselection, runtime graph reconstruction, or runtime behavior has been added.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.
