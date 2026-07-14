@@ -11,6 +11,7 @@ pub mod compilation_unit;
 pub mod compiler_pass;
 pub mod component_graph;
 pub mod component_instance;
+pub mod component_instance_scope;
 pub mod component_invocation;
 pub mod component_scope;
 pub mod computed_value;
@@ -104,6 +105,11 @@ pub use component_instance::{
     plan_component_instances, BlockedComponentInstancePlan, BlockedComponentInstanceReason,
     ComponentBuildRoot, ComponentBuildRootKind, ComponentInstance, ComponentInstancePlan,
     ComponentInstanceStatus,
+};
+pub use component_instance_scope::{
+    build_component_instance_scope_graph, validate_component_instance_scope_graph,
+    ComponentInstanceScopeDiagnostic, ComponentInstanceScopeGraph, ComponentInstanceScopeNode,
+    ComponentInstanceScopeViolation,
 };
 pub use component_invocation::{
     collect_component_invocations, ComponentInvocationEntity, ComponentInvocationResolutionStatus,

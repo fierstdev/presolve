@@ -93,12 +93,42 @@ pub fn validate_application_semantic_model(
     validate_context_dependency(model, &mut diagnostics);
     validate_context_lifetime(model, &mut diagnostics);
     validate_context_evaluation(model, &mut diagnostics);
+    validate_component_instance_scope(model, &mut diagnostics);
     validate_effect_statement_types(model, &mut diagnostics);
     validate_effect_execution_plan(model, &mut diagnostics);
     validate_component_diagnostic_metadata(model, &mut diagnostics);
     validate_template_action_bindings(model, &mut diagnostics);
 
     diagnostics
+}
+
+fn validate_component_instance_scope(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    let expected = crate::build_component_instance_scope_graph(&model.component_instance_plan);
+    if model.component_instance_scope != expected {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1192".to_string(),
+            message: "component instance scope graph does not match the canonical H4 plan"
+                .to_string(),
+        });
+    }
+    diagnostics.extend(
+        crate::validate_component_instance_scope_graph(&model.component_instance_scope)
+            .into_iter()
+            .map(|diagnostic| AsmValidationDiagnostic {
+                code: "EZASM1193".to_string(),
+                message: format!(
+                    "component instance scope {:?} at `{}`{}",
+                    diagnostic.violation,
+                    diagnostic.instance,
+                    diagnostic.related.map_or_else(String::new, |related| {
+                        format!(" related to `{related}`")
+                    })
+                ),
+            }),
+    );
 }
 
 fn validate_context_dependency(

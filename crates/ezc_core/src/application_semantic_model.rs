@@ -13,6 +13,9 @@ use crate::component_instance::{
     plan_component_instances, BlockedComponentInstancePlan, ComponentInstance,
     ComponentInstancePlan,
 };
+use crate::component_instance_scope::{
+    build_component_instance_scope_graph, ComponentInstanceScopeGraph,
+};
 use crate::component_invocation::{collect_component_invocations, ComponentInvocationEntity};
 use crate::component_scope::ComponentScopeGraph;
 use crate::computed_value::{collect_computed_values, ComputedDiagnosticCode, ComputedValue};
@@ -70,6 +73,7 @@ pub struct ApplicationSemanticModel {
     pub slots: BTreeMap<SlotId, SlotEntity>,
     pub component_invocations: BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
     pub component_instance_plan: ComponentInstancePlan,
+    pub component_instance_scope: ComponentInstanceScopeGraph,
     pub slot_content_fragments: BTreeMap<SlotContentFragmentId, SlotContentFragment>,
     pub slot_outlets: BTreeMap<SlotOutletId, SlotOutlet>,
     pub context_declaration_candidates: ContextDeclarationCandidateRegistry,
@@ -517,6 +521,11 @@ impl ApplicationSemanticModel {
             .values()
             .filter(|instance| &instance.component == component)
             .collect()
+    }
+
+    #[must_use]
+    pub const fn component_instance_scope_graph(&self) -> &ComponentInstanceScopeGraph {
+        &self.component_instance_scope
     }
 
     #[must_use]
@@ -1009,6 +1018,7 @@ pub fn build_application_semantic_model_from_component_graph(
         &template_entities,
         &component_graph.provenance,
     );
+    let component_instance_scope = build_component_instance_scope_graph(&component_instance_plan);
     let (computed_values, computed_diagnostics) = classify_computed_values(
         &component_graph.components,
         collect_computed_values(&component_graph.components, &component_graph.provenance),
@@ -1220,6 +1230,7 @@ pub fn build_application_semantic_model_from_component_graph(
         slots,
         component_invocations,
         component_instance_plan,
+        component_instance_scope,
         slot_content_fragments: slot_composition.fragments,
         slot_outlets: slot_composition.outlets,
         context_declaration_candidates,
@@ -1319,6 +1330,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         &template_entities,
         &provenance,
     );
+    let component_instance_scope = build_component_instance_scope_graph(&component_instance_plan);
 
     let (computed_values, computed_diagnostics) = classify_computed_values(
         &components,
@@ -1518,6 +1530,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         slots,
         component_invocations,
         component_instance_plan,
+        component_instance_scope,
         slot_content_fragments: slot_composition.fragments,
         slot_outlets: slot_composition.outlets,
         context_declaration_candidates,
