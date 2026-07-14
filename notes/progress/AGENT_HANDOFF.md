@@ -3,33 +3,31 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: G13 - Context runtime artifact
-* Working tree: G13 implementation is ready to commit. The Phase G roadmap file is user-provided and untracked.
+* Latest completed slice: G14 - Initial Context runtime
+* Working tree: G14 implementation is ready to commit. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: G13 - Context runtime artifact
-* Summary: The compiler now emits separate schema-v1 `context.runtime.json` data from G12 and optimized G11 source programs; `ezc_cli build` writes and embeds that exact artifact.
-* Key files: crates/ezc_core/src/runtime_context_artifact.rs; crates/ezc_core/src/page_codegen.rs; crates/ezc_cli/src/main.rs; crates/ezc_cli/tests/explain.rs; crates/ezc_core/src/lib.rs
-* New behavior: Sources serialize canonical source/Context/slot/function identities, type/boundary contracts, prerequisites, G9 batches, and optimized instructions. Consumer bindings serialize exact source slots and load identities. Instruction encoding reuses computed operand encoding with explicit `initialize_context_slot` and `load_context_slot` operations.
-* Unsupported semantics: G13 adds no Context runtime execution/storage, update semantics, resumability, inspection schema, public diagnostics, Provider/Context lookup, name matching, tree traversal, ownership/dependency reconstruction, or binding inference.
+* Slice: G14 - Initial Context runtime
+* Summary: The generated runtime validates `context.runtime.json`, evaluates exact compiler-emitted Context source programs after initial computed evaluation, initializes a closed slot table, and binds Consumers directly to emitted slots before initial effects.
+* Key files: crates/ezc_core/src/runtime_codegen.rs
+* New behavior: Artifact/schema errors abort boot. Source execution is sequential in compiler batch/program order; Context slots, Consumer bindings, source runs, and failures are evidence under `window.__EDGEZERO__` only.
+* Unsupported semantics: G14 adds no Provider/Context lookup, name matching, tree traversal, dependency reconstruction, fallback/reselection, Context updates, resumability, inspection schema, or public diagnostics.
 
 Current in-progress slice
 
-* Slice: G14 - Initial Context runtime
-* Status: Ready to begin after G13 commits; execute only compiler-emitted slots/programs in the required State → Computed → Context → Render → Effects boot order.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5; G6; G7; G8; G9; G10; G11; G12; G13
-* Remaining: G14 through G20.
+* Slice: G15 - Context update propagation
+* Status: Ready after G14 commits; compiler-generated action-batch plans must drive updates before effects.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1 through G14
+* Remaining: G15 through G20.
 
 Verification
 
-* cargo test -p ezc_core runtime_context_artifact: pass (1 focused G13 artifact test)
-* cargo test -p ezc_cli --test explain context_runtime_artifact: pass (1 focused build/embed test)
+* cargo test -p ezc_core runtime_codegen: pass (1 focused generated-runtime contract test)
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core --lib: pass (218 tests; shared Context artifact infrastructure)
+* cargo test -p ezc_core --lib: pass (218 tests)
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
-* cargo clippy -p ezc_cli --all-targets -- -D warnings: pass
 * git diff --check: pass
 
 Architecture decisions made

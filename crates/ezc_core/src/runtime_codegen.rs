@@ -4,11 +4,13 @@ const RUNTIME_STUB: &str = r#"(() => {
   const MANIFEST_ELEMENT_ID = "ez-template-manifest";
   const COMPUTED_ARTIFACT_ELEMENT_ID = "ez-computed-runtime";
   const EFFECT_ARTIFACT_ELEMENT_ID = "ez-effect-runtime";
+  const CONTEXT_ARTIFACT_ELEMENT_ID = "ez-context-runtime";
   const RUNTIME_VERSION = "0.0.0";
   const SUPPORTED_SCHEMA_VERSION = 2;
   const LEGACY_MANIFEST_SCHEMA_VERSION = 1;
   const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 3;
   const SUPPORTED_EFFECT_ARTIFACT_SCHEMA_VERSION = 1;
+  const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 1;
 
   class EdgeZeroBootError extends Error {
     constructor(code) {
@@ -259,6 +261,26 @@ const RUNTIME_STUB: &str = r#"(() => {
         true
       );
       throw new EdgeZeroBootError("EZR_UNSUPPORTED_EFFECT_ARTIFACT_SCHEMA");
+    }
+  }
+
+  function readContextArtifact(diagnostics) {
+    const element = document.getElementById(CONTEXT_ARTIFACT_ELEMENT_ID);
+    if (!(element instanceof HTMLScriptElement)) {
+      reportDiagnostic(diagnostics, "EZR_INVALID_CONTEXT_ARTIFACT", "Context runtime metadata was not stored in a script element", { artifactElementId: CONTEXT_ARTIFACT_ELEMENT_ID }, true);
+      throw new EdgeZeroBootError("EZR_INVALID_CONTEXT_ARTIFACT");
+    }
+    try { return JSON.parse(element.textContent ?? ""); }
+    catch (error) {
+      reportDiagnostic(diagnostics, "EZR_INVALID_CONTEXT_ARTIFACT", "Context runtime metadata JSON could not be parsed", { message: error instanceof Error ? error.message : String(error) }, true);
+      throw new EdgeZeroBootError("EZR_INVALID_CONTEXT_ARTIFACT");
+    }
+  }
+
+  function validateContextArtifactSchema(artifact, diagnostics) {
+    if (artifact.schema_version !== SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION) {
+      reportDiagnostic(diagnostics, "EZR_UNSUPPORTED_CONTEXT_ARTIFACT_SCHEMA", `Unsupported Context runtime metadata schema version ${String(artifact.schema_version)}`, { schema_version: artifact.schema_version, supported_schema_version: SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION }, true);
+      throw new EdgeZeroBootError("EZR_UNSUPPORTED_CONTEXT_ARTIFACT_SCHEMA");
     }
   }
 
@@ -902,7 +924,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     return nextInstances;
   }
 
-  function createRuntimeStore(elementsByNode, diagnostics, computedArtifact, effectArtifact) {
+  function createRuntimeStore(elementsByNode, diagnostics, computedArtifact, contextArtifact, effectArtifact) {
     const computedEvaluations = new Map();
     const storageValues = new Map();
     const storageByComponentField = new Map();
@@ -934,7 +956,12 @@ const RUNTIME_STUB: &str = r#"(() => {
       elementsByNode,
       diagnostics,
       computedArtifact,
+      contextArtifact,
       effectArtifact,
+      contextSlots: new Map(),
+      contextConsumerBindings: new Map(),
+      contextInitialSourceRuns: [],
+      contextFailures: [],
       computedEvaluations,
       computedDirty,
       computedValues: new Map(),
@@ -1235,6 +1262,40 @@ const RUNTIME_STUB: &str = r#"(() => {
       store.computedValues.set(computed, value);
       store.computedCaches.set(evaluation.cache_slot, value);
       store.computedDirty.set(computed, false);
+    }
+  }
+
+  function executeInitialContext(store) {
+    const sources = new Map((store.contextArtifact?.sources ?? []).map((source) => [source.source, source]));
+    for (const batch of store.contextArtifact?.initial_batches ?? []) {
+      for (const sourceId of batch.sources ?? []) {
+        const source = sources.get(sourceId);
+        if (source === undefined) { continue; }
+        const unavailable = (source.required_computed ?? []).some((computed) => store.computedDirty.get(computed) === true);
+        if (unavailable) {
+          store.contextFailures.push({ source: source.source, failure: "unavailable-computed-prerequisite" });
+          continue;
+        }
+        const values = new Map();
+        let initialized = false;
+        for (const instruction of source.program?.instructions ?? []) {
+          if (executePureProgramInstruction(store, values, instruction, source.source)) { continue; }
+          if (instruction.kind === "initialize_context_slot") {
+            store.contextSlots.set(instruction.slot, computedOperandValue(store, values, instruction.value));
+            initialized = true;
+            continue;
+          }
+          store.contextFailures.push({ source: source.source, failure: `unsupported-instruction:${String(instruction.kind)}` });
+          break;
+        }
+        if (initialized) { store.contextInitialSourceRuns.push(source.source); }
+      }
+    }
+    for (const consumer of store.contextArtifact?.consumers ?? []) {
+      store.contextConsumerBindings.set(consumer.consumer, consumer.slot);
+      if (!store.contextSlots.has(consumer.slot)) {
+        store.contextFailures.push({ consumer: consumer.consumer, failure: "source-slot-unavailable" });
+      }
     }
   }
 
@@ -1725,6 +1786,10 @@ const RUNTIME_STUB: &str = r#"(() => {
     computed_update_runs = 0,
     initial_effect_runs = [],
     completed_action_effect_runs = [],
+    context_initial_source_runs = [],
+    context_slots = [],
+    context_consumer_bindings = [],
+    context_failures = [],
     diagnostics
   }) {
     return {
@@ -1738,16 +1803,20 @@ const RUNTIME_STUB: &str = r#"(() => {
       computed,
       computed_update_runs,
       initial_effect_runs,
-      completed_action_effect_runs
+      completed_action_effect_runs,
+      context_initial_source_runs,
+      context_slots,
+      context_consumer_bindings,
+      context_failures
     };
   }
 
-  function initializeRuntime(manifest, computedArtifact, effectArtifact, diagnostics) {
+  function initializeRuntime(manifest, computedArtifact, contextArtifact, effectArtifact, diagnostics) {
     const bindingAnchors = collectBindingAnchors();
     const conditionalAnchors = collectConditionalAnchors();
     const listAnchors = collectListAnchors();
     const elementsByNode = collectElementAnchors();
-    const store = createRuntimeStore(elementsByNode, diagnostics, computedArtifact, effectArtifact);
+    const store = createRuntimeStore(elementsByNode, diagnostics, computedArtifact, contextArtifact, effectArtifact);
     const missingAnchors = collectMissingAnchors(
       manifest,
       bindingAnchors,
@@ -1784,6 +1853,8 @@ const RUNTIME_STUB: &str = r#"(() => {
 
     executeComputedPlan(store);
 
+    executeInitialContext(store);
+
     executeInitialEffects(store);
 
     installDelegatedEventListeners(store);
@@ -1797,7 +1868,11 @@ const RUNTIME_STUB: &str = r#"(() => {
       computed: debugComputed(store),
       computed_update_runs: store.computedUpdateRuns,
       initial_effect_runs: store.initialEffectRuns,
-      completed_action_effect_runs: store.completedActionEffectRuns
+      completed_action_effect_runs: store.completedActionEffectRuns,
+      context_initial_source_runs: store.contextInitialSourceRuns,
+      context_slots: [...store.contextSlots.entries()],
+      context_consumer_bindings: [...store.contextConsumerBindings.entries()],
+      context_failures: store.contextFailures
     });
   }
 
@@ -1808,11 +1883,13 @@ const RUNTIME_STUB: &str = r#"(() => {
       const manifest = readManifest(diagnostics);
       const computedArtifact = readComputedArtifact(diagnostics);
       validateComputedArtifactSchema(computedArtifact, diagnostics);
+      const contextArtifact = readContextArtifact(diagnostics);
+      validateContextArtifactSchema(contextArtifact, diagnostics);
       const effectArtifact = readEffectArtifact(diagnostics);
       validateEffectArtifactSchema(effectArtifact, diagnostics);
       validateManifestSchema(manifest, effectArtifact, diagnostics);
 
-      const state = initializeRuntime(manifest, computedArtifact, effectArtifact, diagnostics);
+      const state = initializeRuntime(manifest, computedArtifact, contextArtifact, effectArtifact, diagnostics);
       const status = state.diagnostics.some((diagnostic) => diagnostic.fatal)
         || state.missingAnchors.length > 0
         ? "error"
@@ -1875,6 +1952,9 @@ mod tests {
 
         assert!(runtime.contains("ez-template-manifest"));
         assert!(runtime.contains("ez-effect-runtime"));
+        assert!(runtime.contains("ez-context-runtime"));
+        assert!(runtime.contains("executeInitialContext(store)"));
+        assert!(runtime.contains("contextSlots: new Map()"));
         assert!(runtime.contains("RUNTIME_VERSION = \"0.0.0\""));
         assert!(runtime.contains("SUPPORTED_SCHEMA_VERSION = 2"));
         assert!(runtime.contains("EZR_MISSING_MANIFEST"));
