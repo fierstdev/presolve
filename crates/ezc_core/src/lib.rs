@@ -16,6 +16,7 @@ pub mod consumer;
 pub mod context;
 pub mod context_declaration_candidate;
 pub mod context_dependency;
+mod context_designator;
 pub mod context_diagnostics;
 pub mod context_evaluation;
 pub mod context_inspection;

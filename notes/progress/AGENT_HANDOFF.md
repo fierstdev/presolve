@@ -3,34 +3,45 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: G19 - Context fixture expansion
-* Working tree: clean after the G19 fixture commit.
+* Latest completed slice: G20 - Context stability audit and freeze
+* Working tree: clean after the G20 stability commit.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: G19 - Context fixtures
-* Summary: G19 adds fixture-only coverage for authored declarations, resolution and explicit scope-graph selection, typing/serialization/boundary contracts, ownership/dependency/lifetime products, evaluation/IR/runtime/resume exclusion, the complete `EZC1052`–`EZC1067` catalog, multi-file identity collision resistance, serialized determinism, and real-browser Context initialization/update/failure behavior. No compiler or runtime semantics changed.
-* Key files: crates/ezc_cli/tests/context_fixtures.rs; crates/ezc_cli/tests/runtime_browser.rs; fixtures/0057-context-compiler-matrix; fixtures/0058-context-resolution-typing; fixtures/0059-context-runtime-matrix; fixtures/0060-context-multi-file-identity; fixtures/0061-context-declaration-diagnostics
-* Schema decision: no serialized shape changed in G19. Semantic graph remains v5, Context runtime artifact remains v2, template manifest remains v2, resume manifest remains v3, ASM inspection remains v6, and check JSON remains v3.
+* Slice: G20 - Context stability audit and freeze
+* Summary: Phase G is complete. G20 verifies one canonical authority for every G1-G19 concern, consolidates Provider/Consumer Context-designator resolution into one compile-time resolver, restricts expression typing to canonical valid Context/Provider owners, makes Context diagnostic type evidence validate against its exact canonical declaration provenance, freezes runtime ordering/no-discovery guards, and publishes the supported/unsupported Context contract. No Provider selection, typing, lifetime, planning, lowering, artifact, or runtime semantics changed.
+* Key files: crates/ezc_core/src/context_designator.rs; crates/ezc_core/src/provider.rs; crates/ezc_core/src/consumer.rs; crates/ezc_core/src/semantic_type.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_cli/src/main.rs; crates/ezc_cli/tests/context_fixtures.rs; docs/context-contract.md; README.md
+* Schema decision: no serialized shape changed in G20. Semantic graph is frozen at v5, Context runtime artifact at v2, template manifest at v2, resume manifest at v3, ASM inspection at v6, and check JSON at v3. The internal runtime Context registry contract remains v1.
 
 Current in-progress slice
 
-* Slice: G20 - Context stability audit and freeze
-* Status: Ready to begin after the G19 fixture commit; G20 has not started.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1 through G19
-* Remaining: G20.
+* Slice: none
+* Status: Phase G is complete and frozen. Phase H has not started and requires its own explicit roadmap/contract.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20
+* Remaining in Phase G: none.
 
 Verification
 
-* cargo test -p ezc_cli --test context_fixtures -- --nocapture: pass (10 fixture-matrix tests)
-* cargo test -p ezc_core context_ --lib: pass (63 focused Context tests)
-* cargo test -p ezc_cli --test runtime_browser context_ -- --nocapture: pass (2 real-browser Context tests)
-* cargo fmt --all --check: pass
-* cargo clippy -p ezc_cli --all-targets -- -D warnings: pass
+* just check: pass (workspace formatting, strict workspace clippy, and complete workspace test matrix)
+* cargo test --workspace: pass (1 CLI unit; 12 Context fixture/freeze; 125 CLI inspection/build; 24 real-browser; 244 core; 3 parser unit; 26 parser integration tests)
+* cargo test -p ezc_cli --test explain context_diagnostics_share_check_full_asm_selected_asm_and_explain_projection -- --exact --nocapture: pass
+* cargo test -p ezc_cli --test explain build_command_writes_and_embeds_context_runtime_artifact -- --exact --nocapture: pass
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: G20 freezes one compile-time Context-designator resolver shared by G2 Provider and G3 Consumer lowering. G4 remains the only Provider visibility/selection authority; every later product only consumes its retained result.
+* Reason: Removing the duplicated raw path/import matching prevents Provider and Consumer identity resolution from drifting while preserving all existing local and imported designator behavior.
+* Tradeoff: The shared resolver establishes only `ContextId`. It does not select a Provider, add scope edges, interpret runtime names, or broaden the language.
+
+* Decision: declaration-expression typing is limited to canonical State, valid Context, and valid Provider owners. Retained invalid Provider candidates may keep authored/expression evidence, but receive no type assignment whose origin pretends that an executable Provider entity exists.
+* Reason: This makes deliberately invalid G18 fixtures valid immutable compiler products and removes `EZASM1105` without accepting fabricated invalid semantic origins.
+* Tradeoff: No valid Provider typing changes. Invalid candidates remain excluded from G4-G17, IR, runtime artifacts, and resume state.
+
+* Decision: Context diagnostic secondary type labels validate against the exact canonical Provider or Context declared-type provenance already used by G18 projection. Check JSON now names its frozen v3 constant rather than embedding an unowned literal.
+* Reason: Canonical `EZC1059`–`EZC1064` evidence must pass shared ASM validation, while mutated/noncanonical provenance must continue to fail. Naming the version makes the serialized freeze explicit without changing output.
+* Tradeoff: No diagnostic code, identity, message, label, suppression, ordering, or serialized shape changes.
 
 * Decision: G19 is fixture expansion only. It adds no semantic product, language form, Provider selection, type/lifetime rule, lowering behavior, artifact field, runtime operation, or schema version.
 * Reason: The matrix now proves the frozen G1-G18 products from authored declarations through real-browser execution, including compiler-generated `ContextValueSlotId` bindings, exact action-batch updates, blocked-source exclusion, stable resume identities, and byte-deterministic public outputs.

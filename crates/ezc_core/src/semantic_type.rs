@@ -1063,27 +1063,22 @@ impl SemanticTypeModel {
         mut self,
         graph: &ExpressionGraph,
         components: &[ComponentNode],
+        contexts: &BTreeMap<crate::ContextId, ContextEntity>,
+        providers: &BTreeMap<crate::ProviderId, ProviderEntity>,
     ) -> Self {
         let declaration_owners = components
             .iter()
-            .flat_map(|component| {
-                component
-                    .state_fields
-                    .iter()
-                    .map(|field| field.id.clone())
-                    .chain(
-                        component
-                            .context_declarations
-                            .iter()
-                            .map(|context| component.id.context(&context.name)),
-                    )
-                    .chain(
-                        component
-                            .provider_declarations
-                            .iter()
-                            .map(|provider| component.id.provider(&provider.name)),
-                    )
-            })
+            .flat_map(|component| component.state_fields.iter().map(|field| field.id.clone()))
+            .chain(
+                contexts
+                    .keys()
+                    .map(|context| context.as_semantic_id().clone()),
+            )
+            .chain(
+                providers
+                    .keys()
+                    .map(|provider| provider.as_semantic_id().clone()),
+            )
             .collect::<BTreeSet<_>>();
         let nodes = graph
             .nodes

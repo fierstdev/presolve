@@ -1349,7 +1349,7 @@ fn finalize_semantic_types(
         .with_context_types(contexts)
         .with_provider_types(providers)
         .with_consumer_types(consumers)
-        .with_expression_types(expression_graph, components)
+        .with_expression_types(expression_graph, components, contexts, providers)
         .with_computed_value_types(components, computed_values, expression_graph, references)
         .with_context_source_expression_types(components, contexts, providers, expression_graph)
         .with_effect_statement_types(components, effects, effect_statements, expression_graph)

@@ -1124,7 +1124,8 @@ fn validate_component_diagnostic_metadata(
                     .expression_graph
                     .nodes
                     .values()
-                    .any(|expression| expression.provenance == label.provenance);
+                    .any(|expression| expression.provenance == label.provenance)
+                || context_diagnostic_secondary_is_canonical(model, diagnostic, &label.provenance);
             if !canonical {
                 diagnostics.push(AsmValidationDiagnostic {
                     code: "EZASM1134".to_string(),
@@ -1135,6 +1136,26 @@ fn validate_component_diagnostic_metadata(
                 });
             }
         }
+    }
+}
+
+fn context_diagnostic_secondary_is_canonical(
+    model: &ApplicationSemanticModel,
+    diagnostic: &crate::ComponentDiagnostic,
+    provenance: &crate::SourceProvenance,
+) -> bool {
+    match diagnostic.code.as_str() {
+        "EZC1059" => diagnostic
+            .provider_id
+            .as_ref()
+            .and_then(|id| model.provider(id))
+            .is_some_and(|provider| &provider.declared_type.provenance == provenance),
+        "EZC1060" | "EZC1061" | "EZC1062" | "EZC1063" | "EZC1064" => diagnostic
+            .context_id
+            .as_ref()
+            .and_then(|id| model.context(id))
+            .is_some_and(|context| &context.declared_type.provenance == provenance),
+        _ => false,
     }
 }
 

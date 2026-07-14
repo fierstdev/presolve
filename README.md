@@ -123,6 +123,15 @@ multi-file identity. The real-browser cases exercise the runtime chain,
 batching, and diamond fixtures; the remaining cases validate canonical compiler
 products and diagnostics.
 
+## Context contract
+
+Phase G Context semantics, compiler authority, runtime ordering, frozen schema
+versions, and explicit unsupported behavior are documented in
+[`docs/context-contract.md`](docs/context-contract.md). Runtime Consumer access
+uses compiler-generated Context slot identities only; it performs no Provider
+lookup, Context-name matching, ancestry traversal, dependency reconstruction,
+or binding reselection.
+
 ## Computed values: supported contract and limits
 
 `@computed()` currently applies only to synchronous getters with one supported

@@ -6,14 +6,19 @@ use std::process::{Command, Output};
 use ezc_core::{
     build_application_semantic_model, build_application_semantic_model_for_unit,
     build_resume_manifest, build_resume_plan, build_runtime_context_artifact,
-    build_runtime_context_registry, build_semantic_graph, collect_context_diagnostics,
-    collect_context_resolutions, lower_components_to_ir, optimize_context_ir, resume_manifest_json,
-    runtime_context_artifact_json, semantic_graph_json, CompatibilityStatus, CompilationUnit,
-    ComponentScopeGraph, ConsumerId, ContextBindingCompatibility, ContextBindingLifetimeStatus,
+    build_runtime_context_registry, build_semantic_graph, build_template_manifest_from_asm,
+    collect_context_diagnostics, collect_context_resolutions, generate_runtime_stub,
+    lower_components_to_ir, optimize_context_ir, resume_manifest_json,
+    runtime_context_artifact_json, semantic_graph_json, validate_application_semantic_model,
+    validate_context_ir, validate_optimized_context_ir, validate_resume_manifest,
+    validate_runtime_context_registry, CompatibilityStatus, CompilationUnit, ComponentScopeGraph,
+    ConsumerId, ContextBindingCompatibility, ContextBindingLifetimeStatus,
     ContextDeclarationStatus, ContextDependencyNodeId, ContextResolutionResult,
     ContextSerializationCompatibility, ContextSlotResumeStatus, ContextSourceBlockReason,
     ContextSourcePlanStatus, ContextValueSourceId, IrInstructionKind, ProviderId,
-    RuntimeContextSourceKind,
+    RuntimeContextSourceKind, RESUME_MANIFEST_SCHEMA_VERSION,
+    RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, SEMANTIC_GRAPH_SCHEMA_VERSION,
+    TEMPLATE_MANIFEST_SCHEMA_VERSION,
 };
 
 fn repo_root() -> PathBuf {
@@ -693,4 +698,79 @@ fn context_fixture_outputs_are_byte_deterministic_across_all_serialized_surfaces
             fs::read(out_b.join(artifact)).unwrap()
         );
     }
+}
+
+#[test]
+fn phase_g_diagnostic_fixtures_are_canonically_validated() {
+    for path in [
+        "fixtures/0057-context-compiler-matrix/input/ContextCompilerMatrix.tsx",
+        "fixtures/0058-context-resolution-typing/input/ContextResolutionTyping.tsx",
+        "fixtures/0061-context-declaration-diagnostics/input/InvalidContextDeclarations.tsx",
+        "fixtures/0061-context-declaration-diagnostics/input/ContextDiagnosticProducts.tsx",
+    ] {
+        let validation = validate_application_semantic_model(&fixture_model(path));
+        assert!(validation.is_empty(), "{path}: {validation:#?}");
+    }
+}
+
+#[test]
+fn phase_g_freezes_schema_versions_runtime_order_and_no_discovery_contract() {
+    assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 5);
+    assert_eq!(RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, 2);
+    assert_eq!(TEMPLATE_MANIFEST_SCHEMA_VERSION, 2);
+    assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 3);
+
+    let path = "fixtures/0059-context-runtime-matrix/input/ContextRuntimeMatrix.tsx";
+    let model = fixture_model(path);
+    let ir = lower_components_to_ir(&model);
+    assert!(validate_context_ir(&model, &ir).is_empty());
+    let optimized = optimize_context_ir(&ir);
+    assert!(validate_optimized_context_ir(&model, &ir, &optimized).is_empty());
+    let registry = build_runtime_context_registry(&model, &optimized);
+    assert!(validate_runtime_context_registry(&model, &optimized, &registry).is_empty());
+    assert_eq!(build_semantic_graph(&model).schema_version, 5);
+    assert_eq!(
+        build_runtime_context_artifact(&model, &optimized).schema_version,
+        2
+    );
+    let resume = build_resume_manifest(&build_resume_plan(&model));
+    assert_eq!(resume.schema_version, 3);
+    assert!(validate_resume_manifest(&resume).is_empty());
+    assert_eq!(build_template_manifest_from_asm(&model).schema_version, 2);
+
+    for (args, expected) in [
+        (vec!["check", path, "--format", "json"], 3),
+        (vec!["asm", path, "--format", "json"], 6),
+    ] {
+        let output = run_cli(&args);
+        assert!(output.status.success());
+        let document: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(document["schema_version"], expected);
+    }
+
+    let runtime = generate_runtime_stub();
+    for forbidden in [
+        "contextProviders",
+        "resolveContext",
+        "contextName",
+        "contextKey",
+        "contextAncestors",
+        "reconstructContext",
+    ] {
+        assert!(!runtime.contains(forbidden), "runtime contains {forbidden}");
+    }
+    let cold_computed = runtime.find("executeComputedPlan(store);").unwrap();
+    let cold_context = runtime.find("executeInitialContext(store);").unwrap();
+    let cold_effects = runtime.find("executeInitialEffects(store);").unwrap();
+    assert!(cold_computed < cold_context && cold_context < cold_effects);
+    let update_computed = runtime
+        .find("executeComputedUpdateBatches(store);")
+        .unwrap();
+    let update_context = runtime
+        .find("executeContextUpdates(store, actionBatchId);")
+        .unwrap();
+    let update_effects = runtime
+        .find("executeCompletedActionEffects(store, actionBatchId);")
+        .unwrap();
+    assert!(update_computed < update_context && update_context < update_effects);
 }

@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    BindingTable, ComponentNode, ConsumerId, ContextDesignator, ContextEntity, ContextId,
-    ExecutionBoundary, ImportBindingTarget, SemanticId, SemanticOwner, SemanticTypeId,
-    SourceProvenance, SymbolKind,
+    context_designator::resolve_context_designator, BindingTable, ComponentNode, ConsumerId,
+    ContextDesignator, ContextEntity, ContextId, ExecutionBoundary, SemanticId, SemanticOwner,
+    SemanticTypeId, SourceProvenance,
 };
 
 /// Canonical resolution of a G3 Consumer's compile-time-only Context designator.
@@ -52,7 +52,7 @@ pub fn collect_consumer_entities(
 
     for component in components {
         for declaration in &component.consumer_declarations {
-            let Some(context) = resolve_context(
+            let Some(context) = resolve_context_designator(
                 &declaration.context_designator,
                 components,
                 contexts,
@@ -83,42 +83,6 @@ pub fn collect_consumer_entities(
     }
 
     consumers
-}
-
-fn resolve_context(
-    designator: &ContextDesignator,
-    components: &[ComponentNode],
-    contexts: &BTreeMap<ContextId, ContextEntity>,
-    bindings: Option<&BindingTable>,
-) -> Option<ContextId> {
-    let local_component = components
-        .iter()
-        .find(|component| {
-            component.class_name == designator.component_symbol
-                && contexts.values().any(|context| {
-                    context.owner.entity_id() == Some(&component.id)
-                        && context.provenance.path == designator.provenance.path
-                })
-        })
-        .map(|component| component.id.clone());
-    let imported_component = bindings
-        .and_then(|bindings| {
-            bindings.resolve_import(&designator.provenance.path, &designator.component_symbol)
-        })
-        .and_then(|binding| match &binding.target {
-            ImportBindingTarget::Symbol(symbol) if symbol.kind == SymbolKind::Component => {
-                Some(symbol.id.clone())
-            }
-            ImportBindingTarget::Symbol(_) | ImportBindingTarget::Namespace { .. } => None,
-        });
-    let component = local_component.or(imported_component)?;
-    contexts
-        .values()
-        .find(|context| {
-            context.owner.entity_id() == Some(&component)
-                && context.name == designator.context_member
-        })
-        .map(|context| context.id.clone())
 }
 
 #[cfg(test)]
