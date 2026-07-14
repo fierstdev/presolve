@@ -1260,6 +1260,116 @@ fn completed_action_batches_execute_compiler_planned_effects_once() {
 }
 
 #[test]
+fn context_sources_bind_and_update_from_compiler_plans_in_a_real_browser() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/context-runtime-matrix");
+
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean previous browser test output");
+    }
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0059-context-runtime-matrix/input/ContextRuntimeMatrix.tsx",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("browser test output path was not valid UTF-8"),
+        ])
+        .output()
+        .expect("failed to build Context runtime fixture");
+    assert!(
+        output.status.success(),
+        "Context runtime fixture failed to build:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    write_context_runtime_probe_page(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile dir");
+    let user_data_dir = format!(
+        "--user-data-dir={}",
+        profile_dir
+            .to_str()
+            .expect("Chrome profile path was not valid UTF-8")
+    );
+    let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
+
+    let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+
+    assert!(
+        stdout.contains("EDGEZERO_CONTEXT_RUNTIME_BROWSER_TEST_PASS"),
+        "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn context_source_failure_preserves_compiler_binding_without_reselection_in_a_real_browser() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/context-source-failure");
+
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean previous browser test output");
+    }
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0059-context-runtime-matrix/input/ContextRuntimeMatrix.tsx",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("browser test output path was not valid UTF-8"),
+        ])
+        .output()
+        .expect("failed to build Context failure fixture");
+    assert!(
+        output.status.success(),
+        "Context failure fixture failed to build:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    write_context_source_failure_probe_page(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile dir");
+    let user_data_dir = format!(
+        "--user-data-dir={}",
+        profile_dir
+            .to_str()
+            .expect("Chrome profile path was not valid UTF-8")
+    );
+    let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
+
+    let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+
+    assert!(
+        stdout.contains("EDGEZERO_CONTEXT_FAILURE_BROWSER_TEST_PASS"),
+        "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn multi_step_actions_flush_one_compiler_generated_computed_batch() {
     let _guard = browser_test_guard();
     let repo_root = repo_root();
@@ -1485,6 +1595,135 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
   document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_COMPLETED_ACTION_EFFECT_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  console.error(error);
+});
+</script>
+</body>"#,
+    );
+
+    fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
+}
+
+fn write_context_runtime_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
+    let probe = index.replace(
+        "</body>",
+        r#"<script>
+const fail = (message) => { throw new Error(message); };
+const waitFor = (predicate, label) => new Promise((resolve, reject) => {
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    if (predicate()) { resolve(); return; }
+    if (Date.now() > deadline) { reject(new Error(`Timed out waiting for ${label}`)); return; }
+    setTimeout(tick, 20);
+  };
+  tick();
+});
+(async () => {
+  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  const runtime = window.__EDGEZERO__;
+  const artifactElement = document.getElementById("ez-context-runtime");
+  if (artifactElement === null) fail("compiler Context artifact was missing");
+  const artifact = JSON.parse(artifactElement.textContent);
+  const serializedArtifact = JSON.stringify(artifact);
+  for (const forbidden of ["lookup", "resolve", "traverse", "ancestry", "reconstruct"]) {
+    if (serializedArtifact.includes(forbidden)) fail(`Context artifact contained forbidden runtime operation: ${forbidden}`);
+  }
+  if (artifact.sources.length !== 1 || artifact.consumers.length !== 2) fail("Context artifact did not preserve the frozen source and Consumer plans");
+  if (runtime.context_initial_source_runs.length !== 1) fail("initial Context source did not execute exactly once");
+  if (runtime.context_slots.length !== 1 || runtime.context_slots[0][1] !== 2) fail("initial Context slot value was incorrect");
+  if (runtime.context_consumer_bindings.length !== 2) fail("Consumer bindings were missing");
+  const slot = runtime.context_consumer_bindings[0][1];
+  if (!runtime.context_consumer_bindings.every((binding) => binding[1] === slot)) fail("Consumers did not bind directly to the shared compiler slot");
+  if (runtime.context_failures.length !== 0) fail("initial Context execution reported failures");
+  if (runtime.initial_effect_runs.length !== 1) fail("cold boot did not execute the effect after Context initialization");
+
+  const buttons = document.querySelectorAll("button");
+  buttons[0].click();
+  await waitFor(
+    () => runtime.store.contextUpdateSourceRuns.length === 1 && runtime.store.completedActionEffectRuns.length === 1,
+    "Context update and completed effect"
+  );
+  if (runtime.store.contextSlots.get(slot) !== 6) fail("Context update did not observe the flushed computed value");
+  if (runtime.store.computedUpdateRuns !== 1) fail("completed action did not execute one computed update batch");
+  if (runtime.store.contextUpdateSourceRuns[0].action_batch !== artifact.action_updates[0].action_batch) {
+    fail("runtime did not consume the exact compiler action-batch Context plan");
+  }
+  if (runtime.store.completedActionEffectRuns[0].action_batch_id !== artifact.action_updates[0].action_batch) {
+    fail("completed effect did not run after the same compiler action batch");
+  }
+  if (!runtime.context_consumer_bindings.every((binding) => runtime.store.contextConsumerBindings.get(binding[0]) === slot)) {
+    fail("Consumer bindings changed during the Context update");
+  }
+
+  buttons[1].click();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  if (runtime.store.contextUpdateSourceRuns.length !== 1) fail("unrelated action reevaluated the Context source");
+  if (runtime.store.completedActionEffectRuns.length !== 1) fail("unrelated action executed the dependent effect");
+  if (runtime.store.contextSlots.get(slot) !== 6) fail("unrelated action changed the Context slot");
+  if (runtime.diagnostics.length !== 0) fail("Context execution reported runtime diagnostics");
+  document.body.dataset.browserTest = "pass";
+  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_CONTEXT_RUNTIME_BROWSER_TEST_PASS</div>");
+})().catch((error) => {
+  document.body.dataset.browserTest = "fail";
+  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_CONTEXT_RUNTIME_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  console.error(error);
+});
+</script>
+</body>"#,
+    );
+
+    fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
+}
+
+fn write_context_source_failure_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
+    let index = index.replace(
+        r#"<script src="./runtime.js"></script>"#,
+        r#"<script>
+const contextArtifactElement = document.getElementById("ez-context-runtime");
+const contextArtifact = JSON.parse(contextArtifactElement.textContent);
+const initialize = contextArtifact.sources[0].program.instructions
+  .find((instruction) => instruction.kind === "initialize_context_slot");
+initialize.kind = "unsupported_context_instruction";
+contextArtifactElement.textContent = JSON.stringify(contextArtifact);
+</script>
+<script src="./runtime.js"></script>"#,
+    );
+    let probe = index.replace(
+        "</body>",
+        r#"<script>
+const fail = (message) => { throw new Error(message); };
+const waitFor = (predicate, label) => new Promise((resolve, reject) => {
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    if (predicate()) { resolve(); return; }
+    if (Date.now() > deadline) { reject(new Error(`Timed out waiting for ${label}`)); return; }
+    setTimeout(tick, 20);
+  };
+  tick();
+});
+(async () => {
+  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  const runtime = window.__EDGEZERO__;
+  if (runtime.context_initial_source_runs.length !== 0) fail("failed source was recorded as initialized");
+  if (runtime.context_slots.length !== 0) fail("failed source populated a Context slot");
+  if (runtime.context_consumer_bindings.length !== 2) fail("compiler Consumer bindings were not retained after source failure");
+  const slot = runtime.context_consumer_bindings[0][1];
+  if (!runtime.context_consumer_bindings.every((binding) => binding[1] === slot)) fail("source failure changed compiler-selected Consumer slots");
+  if (!runtime.context_failures.some((failure) => failure.failure === "unsupported-instruction:unsupported_context_instruction")) {
+    fail("source failure was not reported from the compiler program evaluator");
+  }
+  const unavailable = runtime.context_failures.filter((failure) => failure.failure === "source-slot-unavailable");
+  if (unavailable.length !== 2) fail("each compiler-bound Consumer did not report the unavailable slot");
+  const artifact = JSON.parse(document.getElementById("ez-context-runtime").textContent);
+  if (artifact.sources.length !== 1 || artifact.consumers.length !== 2) fail("runtime reconstructed or reselected Context bindings");
+  if (runtime.store.contextConsumerBindings.size !== 2) fail("runtime discarded direct Consumer slot bindings");
+  document.body.dataset.browserTest = "pass";
+  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_CONTEXT_FAILURE_BROWSER_TEST_PASS</div>");
+})().catch((error) => {
+  document.body.dataset.browserTest = "fail";
+  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_CONTEXT_FAILURE_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>

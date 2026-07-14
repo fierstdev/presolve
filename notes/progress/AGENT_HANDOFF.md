@@ -3,36 +3,38 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: G18 - Context diagnostics corrective gate
-* Working tree: clean after the corrective G18 commit.
+* Latest completed slice: G19 - Context fixture expansion
+* Working tree: clean after the G19 fixture commit.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: G18 - Context diagnostics
-* Summary: G18 now projects the complete stable `EZC1052`–`EZC1067` catalog exclusively from retained declaration candidates and canonical G4, G5, G8, G9, and G10 products. The shared `ComponentDiagnostic` carries canonical candidate, Context, Provider, and Consumer identities plus ordered, deduplicated secondary evidence. Root-cause suppression prevents derivative resolution, typing, lifetime, planning, or lowering noise without changing any Context semantic product or runtime behavior.
-* Key files: crates/ezc_core/src/context_diagnostics.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_cli/src/main.rs; crates/ezc_cli/tests/explain.rs; fixtures/0056-context-diagnostic-parity/input/ContextDiagnosticParity.tsx
-* Schema decision: the structured diagnostic shape changes check JSON from v2 to v3 and ASM inspection from v5 to v6. Context runtime artifact remains v2; effect runtime artifact remains v1; legacy non-Context diagnostics retain their prior fields and behavior.
+* Slice: G19 - Context fixtures
+* Summary: G19 adds fixture-only coverage for authored declarations, resolution and explicit scope-graph selection, typing/serialization/boundary contracts, ownership/dependency/lifetime products, evaluation/IR/runtime/resume exclusion, the complete `EZC1052`–`EZC1067` catalog, multi-file identity collision resistance, serialized determinism, and real-browser Context initialization/update/failure behavior. No compiler or runtime semantics changed.
+* Key files: crates/ezc_cli/tests/context_fixtures.rs; crates/ezc_cli/tests/runtime_browser.rs; fixtures/0057-context-compiler-matrix; fixtures/0058-context-resolution-typing; fixtures/0059-context-runtime-matrix; fixtures/0060-context-multi-file-identity; fixtures/0061-context-declaration-diagnostics
+* Schema decision: no serialized shape changed in G19. Semantic graph remains v5, Context runtime artifact remains v2, template manifest remains v2, resume manifest remains v3, ASM inspection remains v6, and check JSON remains v3.
 
 Current in-progress slice
 
-* Slice: G19 - Context fixtures
-* Status: Unblocked after the corrective G18 commit; G19 has not started.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1 through G18
-* Remaining: G19 through G20.
+* Slice: G20 - Context stability audit and freeze
+* Status: Ready to begin after the G19 fixture commit; G20 has not started.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1 through G19
+* Remaining: G20.
 
 Verification
 
-* cargo test -p ezc_core context_diagnostics --lib: pass (23 focused catalog, suppression, and validator tests)
-* cargo test -p ezc_core --lib: pass (244 tests)
-* cargo test -p ezc_cli --test explain context_diagnostics_share_check_full_asm_selected_asm_and_explain_projection -- --exact: pass (check/full ASM/selected ASM/selected explain parity)
-* cargo test -p ezc_cli --test explain: pass (125 tests, including legacy diagnostic and frozen schema coverage)
+* cargo test -p ezc_cli --test context_fixtures -- --nocapture: pass (10 fixture-matrix tests)
+* cargo test -p ezc_core context_ --lib: pass (63 focused Context tests)
+* cargo test -p ezc_cli --test runtime_browser context_ -- --nocapture: pass (2 real-browser Context tests)
 * cargo fmt --all --check: pass
-* cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 * cargo clippy -p ezc_cli --all-targets -- -D warnings: pass
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: G19 is fixture expansion only. It adds no semantic product, language form, Provider selection, type/lifetime rule, lowering behavior, artifact field, runtime operation, or schema version.
+* Reason: The matrix now proves the frozen G1-G18 products from authored declarations through real-browser execution, including compiler-generated `ContextValueSlotId` bindings, exact action-batch updates, blocked-source exclusion, stable resume identities, and byte-deterministic public outputs.
+* Tradeoff: Deliberately invalid/diagnostic fixtures expose existing ASM-validation interactions for G20 to audit, specifically type-evidence secondary provenance and unresolved expression origins on invalid Provider candidates. G19 records coverage but does not repair or redefine those contracts.
 
 * Decision: G18 uses retained declaration candidates and canonical G4/G5/G8/G9/G10 records as its only diagnostic sources. The shared `ComponentDiagnostic` is extended with optional typed candidate, Context, Provider, and Consumer identities; no Context-specific diagnostic envelope exists.
 * Reason: Complete canonical identities, narrow source-specific provenance, deterministic secondary evidence, and validation can therefore cross every compiler inspection surface without source rewalk, missing-product inference, Provider reselection, dependency reconstruction, or runtime logic.
