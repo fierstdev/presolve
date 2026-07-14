@@ -3,32 +3,31 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: G15 - Context update propagation
-* Working tree: G15 implementation is ready to commit. The Phase G roadmap file is user-provided and untracked.
+* Latest completed slice: G16 - Context resumability
+* Working tree: G16 implementation is ready to commit. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: G15 - Context update propagation
-* Summary: Compiler-generated `ContextUpdatePlan` now maps each authored action batch to deduplicated reactive Provider source updates, required computed batches, G9 source batches, and affected Consumer bindings. `context.runtime.json` is schema v2.
-* Key files: crates/ezc_core/src/context_update.rs; crates/ezc_core/src/runtime_context_artifact.rs; crates/ezc_core/src/runtime_codegen.rs; crates/ezc_core/src/lib.rs
-* New behavior: After State writes and the existing computed flush, runtime consumes the emitted action plan to overwrite exact existing slots once per source, then executes completed-action effects. Defaults never update; failures retain their prior slot value and record evidence.
-* Unsupported semantics: G15 adds no runtime reverse dependency map, Provider reselection/fallback, Context lookup, name matching, component traversal, binding reconstruction, equality mechanism, resumability, inspection schema, or public diagnostics.
+* Slice: G16 - Context resumability
+* Summary: `ContextResumePlan` now projects serializable runtime Context slots into distinct `ContextResumeSlotId` records, and the shared resume manifest advances to schema v3 with required `context_slots` metadata.
+* Key files: crates/ezc_core/src/context_resume.rs; crates/ezc_core/src/resume_plan.rs; crates/ezc_core/src/resume_manifest.rs; crates/ezc_core/src/lib.rs
+* New behavior: Resume records retain exact runtime slot/source/Context/type/source-kind identities, uninitialized status, action membership, Consumer bindings, boundary, and provenance. Legacy manifests remain deserializable but fail v3 validation.
+* Unsupported semantics: G16 adds no live snapshot capture/restoration, Provider search, Context re-evaluation for discovery, dynamic binding decision, evaluator-stack serialization, ancestry/candidate serialization, inspection schema, or diagnostics.
 
 Current in-progress slice
 
-* Slice: G16 - Context resumability
-* Status: Ready after G15 commits; plan serializable slots and advance resume manifest to v3 only.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1 through G15
-* Remaining: G16 through G20.
+* Slice: G17 - Context inspection
+* Status: Ready after G16 commits; inspection schema must advance to v5 through one core projection.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1 through G16
+* Remaining: G17 through G20.
 
 Verification
 
-* cargo test -p ezc_core context_update: pass (1 focused G15 plan test)
-* cargo test -p ezc_core runtime_context_artifact: pass (1 focused artifact test)
-* cargo test -p ezc_core runtime_codegen: pass (1 focused runtime ordering test)
+* cargo test -p ezc_core context_resume: pass (1 focused resume slot test)
+* cargo test -p ezc_core resume_: pass (5 focused resume tests)
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core --lib: pass (219 tests)
+* cargo test -p ezc_core --lib: pass (220 tests)
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 * git diff --check: pass
 

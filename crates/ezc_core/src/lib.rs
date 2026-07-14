@@ -19,6 +19,7 @@ pub mod context_evaluation;
 pub mod context_lifetime;
 pub mod context_ownership;
 pub mod context_resolution;
+pub mod context_resume;
 pub mod context_typing;
 pub mod context_update;
 pub mod effect;
@@ -121,6 +122,10 @@ pub use context_ownership::{
 pub use context_resolution::{
     collect_context_resolutions, ContextResolution, ContextResolutionResult,
 };
+pub use context_resume::{
+    build_context_resume_plan, ContextResumePlan, ContextResumeRecord, ContextResumeSlotId,
+    ContextSlotResumeStatus,
+};
 pub use context_typing::{
     collect_context_type_products, CompatibilityStatus, ConsumerTypeRecord,
     ContextBindingCompatibility, ContextBindingTypeRecord, ContextSerializationCompatibility,
@@ -200,7 +205,8 @@ pub use page_codegen::{
 pub use provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
 pub use resume_manifest::{
     build_resume_manifest, resume_manifest_json, validate_resume_manifest, ResumeManifest,
-    ResumeManifestEffectRecord, ResumeManifestValidationDiagnostic, RESUME_MANIFEST_SCHEMA_VERSION,
+    ResumeManifestContextSlotRecord, ResumeManifestEffectRecord,
+    ResumeManifestValidationDiagnostic, RESUME_MANIFEST_SCHEMA_VERSION,
 };
 pub use resume_plan::{build_resume_plan, ResumeComponentPlan, ResumeComputedPlan, ResumePlan};
 pub use runtime_codegen::generate_runtime_stub;

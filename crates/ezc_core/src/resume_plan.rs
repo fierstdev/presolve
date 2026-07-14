@@ -2,8 +2,10 @@ use crate::application_semantic_model::ApplicationSemanticModel;
 use crate::component_graph::render_event_handlers;
 use crate::semantic_id::SemanticId;
 use crate::{
-    build_effect_resume_plan, build_runtime_computed_registry, build_runtime_effect_registry,
-    lower_components_to_ir, optimize_effect_ir, EffectResumePlan,
+    build_context_resume_plan, build_context_update_plan, build_effect_resume_plan,
+    build_runtime_computed_registry, build_runtime_context_registry, build_runtime_effect_registry,
+    lower_components_to_ir, optimize_context_ir, optimize_effect_ir, ContextResumePlan,
+    EffectResumePlan,
 };
 use serde::{Deserialize, Serialize};
 
@@ -11,6 +13,7 @@ use serde::{Deserialize, Serialize};
 pub struct ResumePlan {
     pub components: Vec<ResumeComponentPlan>,
     pub effects: EffectResumePlan,
+    pub contexts: ContextResumePlan,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResumeComponentPlan {
@@ -34,6 +37,9 @@ pub fn build_resume_plan(model: &ApplicationSemanticModel) -> ResumePlan {
     let ir = lower_components_to_ir(model);
     let registry = build_runtime_computed_registry(model, &ir);
     let effect_registry = build_runtime_effect_registry(model, &optimize_effect_ir(&ir).output);
+    let context_ir = optimize_context_ir(&ir);
+    let context_registry = build_runtime_context_registry(model, &context_ir);
+    let context_updates = build_context_update_plan(model, &context_ir);
 
     ResumePlan {
         components: model
@@ -70,6 +76,7 @@ pub fn build_resume_plan(model: &ApplicationSemanticModel) -> ResumePlan {
             })
             .collect(),
         effects: build_effect_resume_plan(model, &effect_registry),
+        contexts: build_context_resume_plan(&context_registry, &context_updates),
     }
 }
 

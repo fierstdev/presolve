@@ -7,7 +7,7 @@ use crate::effect_resume::{EffectActivationSlotId, EffectActivationStatus};
 use crate::resume_plan::ResumePlan;
 use crate::semantic_type::ExecutionBoundary;
 
-pub const RESUME_MANIFEST_SCHEMA_VERSION: u32 = 2;
+pub const RESUME_MANIFEST_SCHEMA_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResumeManifest {
@@ -17,6 +17,29 @@ pub struct ResumeManifest {
     /// browser, capability, DOM, or interpreter state.
     #[serde(default)]
     pub effects: Vec<ResumeManifestEffectRecord>,
+    #[serde(default)]
+    pub context_slots: Vec<ResumeManifestContextSlotRecord>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResumeManifestContextSlotRecord {
+    pub source: String,
+    pub context_id: String,
+    pub runtime_slot_id: String,
+    pub resume_slot_id: crate::ContextResumeSlotId,
+    pub semantic_type: String,
+    pub source_kind: ResumeManifestContextSourceKind,
+    pub initial_status: crate::ContextSlotResumeStatus,
+    pub action_batch_ids: Vec<String>,
+    pub consumer_ids: Vec<String>,
+    pub execution_boundary: ResumeManifestEffectExecutionBoundary,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResumeManifestContextSourceKind {
+    Provider,
+    ContextDefault,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -94,6 +117,41 @@ pub fn build_resume_manifest(plan: &ResumePlan) -> ResumeManifest {
                 execution_boundary: execution_boundary(record.boundary),
             })
             .collect(),
+        context_slots: plan
+            .contexts
+            .records
+            .iter()
+            .map(|record| ResumeManifestContextSlotRecord {
+                source: match &record.source {
+                    crate::ContextValueSourceId::Provider(provider) => {
+                        provider.as_str().to_string()
+                    }
+                    crate::ContextValueSourceId::ContextDefault(context) => {
+                        format!("{}/default", context.as_str())
+                    }
+                },
+                context_id: record.context.as_str().to_string(),
+                runtime_slot_id: record.runtime_slot.as_str().to_string(),
+                resume_slot_id: record.resume_slot.clone(),
+                semantic_type: record.semantic_type.to_string(),
+                source_kind: match record.source_kind {
+                    crate::RuntimeContextSourceKind::Provider => {
+                        ResumeManifestContextSourceKind::Provider
+                    }
+                    crate::RuntimeContextSourceKind::ContextDefault => {
+                        ResumeManifestContextSourceKind::ContextDefault
+                    }
+                },
+                initial_status: record.initial_status,
+                action_batch_ids: record
+                    .action_batches
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect(),
+                consumer_ids: record.consumers.iter().map(ToString::to_string).collect(),
+                execution_boundary: execution_boundary(record.boundary),
+            })
+            .collect(),
     }
 }
 
@@ -106,7 +164,7 @@ pub fn resume_manifest_json(manifest: &ResumeManifest) -> String {
     serde_json::to_string_pretty(manifest).expect("resume manifest should serialize")
 }
 
-/// Validate schema-v2 compiler-owned effect activation metadata.
+/// Validate schema-v3 compiler-owned effect activation and Context slot metadata.
 ///
 /// Legacy v1 manifests remain deserializable for consumers that do not attempt
 /// effect restoration, but this validation rejects them because they cannot
@@ -230,7 +288,7 @@ class ResumeManifestComputed extends Component {
         let json: serde_json::Value =
             serde_json::from_str(&resume_manifest_json(&manifest)).expect("resume manifest JSON");
 
-        assert_eq!(json["schema_version"], 2);
+        assert_eq!(json["schema_version"], 3);
         assert_eq!(json["effects"], serde_json::json!([]));
         assert_eq!(
             json["components"][0]["computed"][0]["computed"],
@@ -269,7 +327,7 @@ class ResumeManifestEffect extends Component {
         let effect = &value["effects"][0];
 
         assert_eq!(json, repeated);
-        assert_eq!(value["schema_version"], 2);
+        assert_eq!(value["schema_version"], 3);
         assert_eq!(effect["initial_status"], "pending");
         assert_eq!(
             effect["activation_slot_id"],
