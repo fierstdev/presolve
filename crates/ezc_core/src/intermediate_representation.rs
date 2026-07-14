@@ -190,6 +190,45 @@ pub struct ContextIrReport {
     pub consumer_bindings: Vec<IrContextConsumerBinding>,
 }
 
+/// One G10 source evaluation retained after immutable Context-only optimization.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OptimizedIrContextSourceEvaluation {
+    pub source: ContextValueSourceId,
+    pub context: crate::ContextId,
+    pub function: ContextSourceFunctionId,
+    pub entry_block: IrBlockId,
+    pub result: IrValueId,
+    pub slot: ContextValueSlotId,
+    pub evaluation_batch: ContextEvaluationBatchId,
+    pub prerequisite_computed_batches: Vec<u32>,
+    pub provenance: SourceProvenance,
+}
+
+impl From<&IrContextSourceEvaluation> for OptimizedIrContextSourceEvaluation {
+    fn from(evaluation: &IrContextSourceEvaluation) -> Self {
+        Self {
+            source: evaluation.source.clone(),
+            context: evaluation.context.clone(),
+            function: evaluation.function.clone(),
+            entry_block: evaluation.entry_block.clone(),
+            result: evaluation.result.clone(),
+            slot: evaluation.slot.clone(),
+            evaluation_batch: evaluation.evaluation_batch.clone(),
+            prerequisite_computed_batches: evaluation.prerequisite_computed_batches.clone(),
+            provenance: evaluation.provenance.clone(),
+        }
+    }
+}
+
+/// Immutable G11 optimization product for G10-generated Context source IR.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OptimizedContextIrReport {
+    pub source_report: ContextIrReport,
+    pub optimized_module: IntermediateRepresentation,
+    pub source_evaluations: Vec<OptimizedIrContextSourceEvaluation>,
+    pub pass_metrics: Vec<IrOptimizationPassReport>,
+}
+
 impl ContextIrReport {
     #[must_use]
     pub fn context_source_evaluation(
@@ -1931,6 +1970,61 @@ pub fn optimize_effect_ir(input: &IntermediateRepresentation) -> IrOptimizationR
     report
 }
 
+/// Run the existing immutable optimization pipeline over G10-generated Context
+/// source functions only. The source-to-slot bindings remain compiler-owned
+/// G9/G10 facts; optimization can simplify a source value producer but cannot
+/// select, replace, merge, or remove a Context slot.
+#[must_use]
+pub fn optimize_context_ir(input: &IntermediateRepresentation) -> OptimizedContextIrReport {
+    let context_functions = input
+        .context_ir
+        .source_evaluations
+        .iter()
+        .map(|evaluation| evaluation.function.as_semantic_id().clone())
+        .collect::<BTreeSet<_>>();
+    let mut context_input = input.clone();
+    for module in &mut context_input.modules {
+        module
+            .functions
+            .retain(|function| context_functions.contains(&function.id));
+        module.computed_evaluations.clear();
+        module.effect_executions.clear();
+    }
+
+    let projection = computed_optimization_pipeline().run_with_report(&context_input);
+    let mut optimized_module = input.clone();
+    for (module, optimized) in optimized_module
+        .modules
+        .iter_mut()
+        .zip(&projection.output.modules)
+    {
+        let optimized_functions = optimized
+            .functions
+            .iter()
+            .map(|function| (function.id.clone(), function.clone()))
+            .collect::<BTreeMap<_, _>>();
+        for function in &mut module.functions {
+            if context_functions.contains(&function.id) {
+                if let Some(optimized) = optimized_functions.get(&function.id) {
+                    *function = optimized.clone();
+                }
+            }
+        }
+    }
+
+    OptimizedContextIrReport {
+        source_report: input.context_ir.clone(),
+        optimized_module,
+        source_evaluations: input
+            .context_ir
+            .source_evaluations
+            .iter()
+            .map(OptimizedIrContextSourceEvaluation::from)
+            .collect(),
+        pass_metrics: projection.passes,
+    }
+}
+
 /// Compact structural metrics for one canonical IR snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IrOptimizationMetrics {
@@ -2671,6 +2765,170 @@ pub fn validate_context_ir(
                 code: "EZIR1042",
                 message: format!("available Context Consumer {consumer} has no load IR"),
             });
+        }
+    }
+    diagnostics
+}
+
+/// Validates the immutable G11 optimization product against its frozen G9/G10
+/// inputs. This deliberately consumes retained compiler products and never
+/// re-runs Provider selection, Context typing, lifetime analysis, or planning.
+#[allow(clippy::too_many_lines)]
+#[must_use]
+pub fn validate_optimized_context_ir(
+    model: &ApplicationSemanticModel,
+    input: &IntermediateRepresentation,
+    report: &OptimizedContextIrReport,
+) -> Vec<IrValidationDiagnostic> {
+    let mut diagnostics = validate_context_ir(model, &report.optimized_module);
+    if report.source_report != input.context_ir
+        || report.optimized_module.context_ir != report.source_report
+    {
+        diagnostics.push(IrValidationDiagnostic {
+            code: "EZIR1043",
+            message: "optimized Context IR does not retain its exact G10 source report".to_string(),
+        });
+    }
+
+    let expected_evaluations = input
+        .context_ir
+        .source_evaluations
+        .iter()
+        .map(OptimizedIrContextSourceEvaluation::from)
+        .collect::<Vec<_>>();
+    if report.source_evaluations != expected_evaluations {
+        diagnostics.push(IrValidationDiagnostic {
+            code: "EZIR1044",
+            message: "optimized Context source evaluations changed frozen identities or order"
+                .to_string(),
+        });
+    }
+    if report.optimized_module.context_ir.consumer_bindings != input.context_ir.consumer_bindings {
+        diagnostics.push(IrValidationDiagnostic {
+            code: "EZIR1045",
+            message: "optimized Context IR changed compiler-selected Consumer slot bindings"
+                .to_string(),
+        });
+    }
+
+    let source_functions = input
+        .context_ir
+        .source_evaluations
+        .iter()
+        .map(|evaluation| evaluation.function.as_semantic_id().clone())
+        .collect::<BTreeSet<_>>();
+    for evaluation in &report.source_evaluations {
+        let functions = report
+            .optimized_module
+            .modules
+            .iter()
+            .flat_map(|module| &module.functions)
+            .filter(|function| function.id == *evaluation.function.as_semantic_id())
+            .collect::<Vec<_>>();
+        if functions.len() != 1 {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1046",
+                message: format!(
+                    "optimized Context source {:?} has {} IR functions instead of one",
+                    evaluation.source,
+                    functions.len()
+                ),
+            });
+            continue;
+        }
+        let function = functions[0];
+        let initializations = report
+            .optimized_module
+            .modules
+            .iter()
+            .flat_map(|module| &module.functions)
+            .flat_map(|function| &function.blocks)
+            .flat_map(|block| &block.instructions)
+            .filter(|instruction| {
+                matches!(
+                    &instruction.kind,
+                    IrInstructionKind::InitializeContextSlot { slot, .. } if slot == &evaluation.slot
+                )
+            })
+            .collect::<Vec<_>>();
+        let exact_initializations = function
+            .blocks
+            .iter()
+            .flat_map(|block| &block.instructions)
+            .filter(|instruction| {
+                matches!(
+                    &instruction.kind,
+                    IrInstructionKind::InitializeContextSlot { slot, value }
+                        if slot == &evaluation.slot && value == &evaluation.result
+                )
+            })
+            .count();
+        if initializations.len() != 1
+            || exact_initializations != 1
+            || function.entry_block != evaluation.entry_block
+            || !function.values.contains_key(&evaluation.result)
+        {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1047",
+                message: format!(
+                    "optimized Context source {:?} does not retain one exact observable slot initialization",
+                    evaluation.source
+                ),
+            });
+        }
+    }
+
+    let optimized_modules = report
+        .optimized_module
+        .modules
+        .iter()
+        .map(|module| (&module.path, module))
+        .collect::<BTreeMap<_, _>>();
+    for module in &input.modules {
+        let Some(optimized) = optimized_modules.get(&module.path) else {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1048",
+                message: format!(
+                    "optimized Context IR is missing module {}",
+                    module.path.display()
+                ),
+            });
+            continue;
+        };
+        if module.components != optimized.components
+            || module.storages != optimized.storages
+            || module.storage_initializers != optimized.storage_initializers
+            || module.template_entrypoints != optimized.template_entrypoints
+            || module.computed_evaluations != optimized.computed_evaluations
+            || module.effect_executions != optimized.effect_executions
+            || module.functions.len() != optimized.functions.len()
+        {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1049",
+                message: format!(
+                    "optimized Context IR changed a non-Context module product in {}",
+                    module.path.display()
+                ),
+            });
+        }
+        for function in &module.functions {
+            if source_functions.contains(&function.id) {
+                continue;
+            }
+            if optimized
+                .functions
+                .iter()
+                .find(|candidate| candidate.id == function.id)
+                != Some(function)
+            {
+                diagnostics.push(IrValidationDiagnostic {
+                    code: "EZIR1050",
+                    message: format!(
+                        "optimized Context IR changed unrelated function {}",
+                        function.id
+                    ),
+                });
+            }
         }
     }
     diagnostics
@@ -3568,11 +3826,12 @@ pub enum IrUnaryOperation {
 mod tests {
     use super::{
         compute_dominators, compute_post_dominators, lower_components_to_ir, optimize_computed_ir,
-        optimize_effect_ir, validate_context_ir, validate_effect_ir,
-        validate_intermediate_representation, ContextIrReport, IntermediateRepresentation,
-        IrBinaryOperation, IrBlock, IrBlockId, IrBranchArm, IrBranchEdge, IrConstant, IrFunction,
-        IrInstruction, IrInstructionId, IrInstructionKind, IrLoop, IrLoopId, IrModule, IrOperand,
-        IrStorageId, IrUnaryOperation, IrValue, IrValueDefinition, IrValueId,
+        optimize_context_ir, optimize_effect_ir, validate_context_ir, validate_effect_ir,
+        validate_intermediate_representation, validate_optimized_context_ir, ContextIrReport,
+        IntermediateRepresentation, IrBinaryOperation, IrBlock, IrBlockId, IrBranchArm,
+        IrBranchEdge, IrConstant, IrFunction, IrInstruction, IrInstructionId, IrInstructionKind,
+        IrLoop, IrLoopId, IrModule, IrOperand, IrStorageId, IrUnaryOperation, IrValue,
+        IrValueDefinition, IrValueId,
     };
     use crate::{
         build_application_semantic_model, CapabilityOperationId, ConsumerId, ContextId,
@@ -4616,6 +4875,99 @@ class App extends Component {
         assert!(ir.context_source_evaluation(&broken).is_none());
         assert!(ir.context_consumer_binding(&broken_consumer).is_none());
         assert!(validate_context_ir(&model, &ir).is_empty());
+    }
+
+    #[test]
+    fn optimizes_context_sources_without_changing_slots_or_unrelated_ir() {
+        let model = build_application_semantic_model(&ezc_parser::parse_file(
+            "src/App.tsx",
+            r#"
+@component("x-app")
+class App extends Component {
+  @computed()
+  get unrelated(): number { return 4 + 5; }
+  @context()
+  count!: number;
+  @provide(App.count)
+  providedCount: number = 1 + 2;
+  @consume(App.count)
+  first!: number;
+  @consume(App.count)
+  second!: number;
+  render() { return <main />; }
+}
+"#,
+        ));
+        let component = &model.components[0].id;
+        let source =
+            ContextValueSourceId::Provider(ProviderId::for_component(component, "providedCount"));
+        let unrelated = component.computed("unrelated");
+        let input = lower_components_to_ir(&model);
+        let original_unrelated = input.modules[0]
+            .functions
+            .iter()
+            .find(|function| function.id == unrelated)
+            .expect("unrelated computed function")
+            .clone();
+        let original_source = input
+            .context_source_evaluation(&source)
+            .expect("planned Context source")
+            .clone();
+
+        let report = optimize_context_ir(&input);
+        let optimized_source = report
+            .optimized_module
+            .modules
+            .iter()
+            .flat_map(|module| &module.functions)
+            .find(|function| function.id == *original_source.function.as_semantic_id())
+            .expect("optimized Context source function");
+        let optimized_unrelated = report.optimized_module.modules[0]
+            .functions
+            .iter()
+            .find(|function| function.id == unrelated)
+            .expect("preserved unrelated computed function");
+
+        assert_eq!(input, lower_components_to_ir(&model));
+        assert_eq!(optimized_unrelated, &original_unrelated);
+        assert_eq!(
+            report.source_evaluations,
+            vec![super::OptimizedIrContextSourceEvaluation::from(
+                &original_source
+            )]
+        );
+        assert_eq!(
+            report.optimized_module.context_ir.consumer_bindings,
+            input.context_ir.consumer_bindings
+        );
+        assert_eq!(optimized_source.blocks[0].instructions.len(), 2);
+        assert!(matches!(
+            optimized_source.blocks[0].instructions[0].kind,
+            IrInstructionKind::Constant {
+                value: IrConstant::Number(ref value)
+            } if value == "3"
+        ));
+        assert!(matches!(
+            optimized_source.blocks[0].instructions[1].kind,
+            IrInstructionKind::InitializeContextSlot { ref slot, ref value }
+                if slot == &original_source.slot && value == &original_source.result
+        ));
+        assert_eq!(
+            report
+                .pass_metrics
+                .iter()
+                .map(|pass| pass.name)
+                .collect::<Vec<_>>(),
+            vec![
+                "common-subexpression-elimination",
+                "copy-propagation",
+                "constant-folding",
+                "instruction-simplification",
+                "dead-code-elimination",
+                "cfg-cleanup",
+            ]
+        );
+        assert!(validate_optimized_context_ir(&model, &input, &report).is_empty());
     }
 
     #[test]

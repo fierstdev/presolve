@@ -3,32 +3,30 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: G10 - Canonical Context IR lowering
-* Working tree: G10 is committed. The Phase G roadmap file is user-provided and untracked.
+* Latest completed slice: G11 - Context IR optimization
+* Working tree: G11 implementation is ready to commit. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: G10 - Canonical Context IR lowering
-* Summary: Every G9-planned Provider or Context-default source now lowers into one generated canonical IR function, one `ContextValueSlotId`, one result value, and one observable `InitializeContextSlot` instruction. Every G9-available Consumer receives one immutable binding/load record for its exact selected slot.
-* Key files: crates/ezc_core/src/intermediate_representation.rs; crates/ezc_core/src/semantic_type.rs; crates/ezc_core/src/semantic_id.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/lib.rs
-* New behavior: Source functions reuse canonical expression lowering and State/Computed targets, preserve G9 batch and computed-prerequisite references, and never coerce or reselect. Provider/default, slot, and Consumer-load identities are distinct. Canonical Provider/default `this.<State|Computed>` reads now receive the existing type product required for G5/G9 eligibility.
-* Unsupported semantics: G10 adds no Context optimization, live runtime storage, registry/artifact, execution, updates, resumability, inspection schema, public Context diagnostics, runtime Context/Provider discovery, runtime ownership inference, or runtime graph reconstruction.
+* Slice: G11 - Context IR optimization
+* Summary: G10-generated Context source functions now run through the existing immutable optimization pipeline in a Context-only projection and merge back into a cloned canonical IR by semantic function identity.
+* Key files: crates/ezc_core/src/intermediate_representation.rs; crates/ezc_core/src/lib.rs
+* New behavior: `OptimizedContextIrReport` retains the exact G10 source report, immutable optimized module, ordered source-evaluation identities, and existing pass metrics. Optimization may simplify pure producer instructions, but `InitializeContextSlot` remains the exact observable root for the same compiler-generated slot and result. Consumer bindings and all non-Context functions remain byte-for-byte canonical IR products.
+* Unsupported semantics: G11 adds no Context runtime registry/artifact, execution, updates, resumability, inspection schema, public diagnostics, runtime Context/Provider discovery, runtime ownership inference, runtime graph reconstruction, or slot aliasing/rebinding.
 
 Current in-progress slice
 
-* Slice: G11 - Context IR optimization
-* Status: Blocked pending an explicit Context IR optimization contract.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5; G6; G7; G8; G9; G10
-* Remaining: G11 through G20.
+* Slice: G12 - Context runtime registry and artifact lowering
+* Status: Ready to begin after G11 commits; use the supplied G11-G20 contract without revising G4 selection or G10/G11 identities.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5; G6; G7; G8; G9; G10; G11
+* Remaining: G12 through G20.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core intermediate_representation: pass (19 tests; 3 focused G10 cases)
-* cargo test -p ezc_core context_: pass (36 focused Context tests)
-* cargo test -p ezc_core semantic_type: pass (8 focused type tests)
-* cargo test -p ezc_core --lib: pass (215 tests; shared IR/type infrastructure)
+* cargo test -p ezc_core intermediate_representation: pass (20 tests; focused G11 optimization case included)
+* cargo test -p ezc_core --lib: pass (216 tests; shared IR infrastructure)
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 * git diff --check: pass
 
@@ -110,9 +108,9 @@ Architecture decisions made
 * Reason: G4/G9 already supply one exact selected source, and the shared IR supplies function/value/instruction structure. Retaining slot/load identities in an immutable report lets G11 optimize source functions without removing initialization and lets G12 consume only compiler-generated identities.
 * Tradeoff: Context slots are not `IrStorage` or runtime allocations. Blocked/unused sources and unavailable Consumers receive no partial IR, and G10 adds no optimizer invocation, runtime registry/artifact, execution, fallback, or lookup behavior.
 
-* Decision needed before G11: define the immutable optimized Context IR product and its relationship to G10 source functions, results, slot initializations, and Consumer load records; exact optimization scope and pass sequence; whether optimization is Context-source-only or may affect other module functions; required preservation/mapping invariants; and validation/inspection/runtime-consumer inputs.
-* Reason: The roadmap says only to reuse the optimizer and preserve observable initialization order. Selecting the optimized-product identity, applying the existing pipeline to a whole module versus only Context functions, retaining G10 result references, or deciding slot/load rewrite and merge rules would invent the architecture that G12 runtime registry and later Context artifacts must consume.
-* Tradeoff: G10 remains complete and committed. No Context optimizer product, pass execution, slot/load rewrite, constant folding, source merge, runtime artifact, execution, or runtime lookup has been added.
+* Decision: G11 optimizes only the G10-generated Context source functions through an immutable projection, then merges those functions into a clone of the original IR by semantic function identity. `OptimizedContextIrReport` retains the unmodified `ContextIrReport`, one ordered source-evaluation projection per G10 source, and the existing optimizer pass metrics.
+* Reason: The existing pipeline can simplify pure producer values without allowing Context semantics to drift. `InitializeContextSlot` is an observable root, so each frozen slot/result pair remains exactly once; G9 batches, G10 Consumer loads, and G4 selection are retained instead of being recomputed or rebound.
+* Tradeoff: G11 does not optimize authored methods, Computed functions, effects, or any other module product. It introduces no Context runtime artifact, evaluator, update plan, slot aliases, fallback, inspection schema change, Provider lookup, or runtime graph reconstruction.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.
