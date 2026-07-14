@@ -20,6 +20,7 @@ pub mod context_lifetime;
 pub mod context_ownership;
 pub mod context_resolution;
 pub mod context_typing;
+pub mod context_update;
 pub mod effect;
 pub mod effect_capability;
 pub mod effect_diagnostics;
@@ -125,6 +126,7 @@ pub use context_typing::{
     ContextBindingCompatibility, ContextBindingTypeRecord, ContextSerializationCompatibility,
     ContextTypeProducts, ContextTypeRecord, ProviderTypeRecord,
 };
+pub use context_update::{build_context_update_plan, ContextActionUpdatePlan, ContextUpdatePlan};
 pub use effect::{
     analyze_effect_reactivity, collect_effects, derive_effect_trigger_plan, lower_effect_bodies,
     plan_effect_execution, validate_effects, ActionBatch, ActionBatchEffectTrigger,
@@ -220,10 +222,10 @@ pub use runtime_context::{
 };
 pub use runtime_context_artifact::{
     build_runtime_context_artifact, runtime_context_artifact_json, RuntimeContextArtifact,
-    SerializedContextBatchId, SerializedContextConsumerBinding, SerializedContextEvaluationBatch,
-    SerializedContextExecutionBoundary, SerializedContextInstruction,
-    SerializedContextInstructionKind, SerializedContextProgram, SerializedContextSource,
-    SerializedContextSourceKind, RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION,
+    SerializedContextActionUpdatePlan, SerializedContextBatchId, SerializedContextConsumerBinding,
+    SerializedContextEvaluationBatch, SerializedContextExecutionBoundary,
+    SerializedContextInstruction, SerializedContextInstructionKind, SerializedContextProgram,
+    SerializedContextSource, SerializedContextSourceKind, RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION,
 };
 pub use runtime_effect::{
     build_runtime_effect_registry, RuntimeActionBatchEffectTrigger, RuntimeEffectRecord,

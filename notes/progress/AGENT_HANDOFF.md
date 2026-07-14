@@ -3,30 +3,32 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: G14 - Initial Context runtime
-* Working tree: G14 implementation is ready to commit. The Phase G roadmap file is user-provided and untracked.
+* Latest completed slice: G15 - Context update propagation
+* Working tree: G15 implementation is ready to commit. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: G14 - Initial Context runtime
-* Summary: The generated runtime validates `context.runtime.json`, evaluates exact compiler-emitted Context source programs after initial computed evaluation, initializes a closed slot table, and binds Consumers directly to emitted slots before initial effects.
-* Key files: crates/ezc_core/src/runtime_codegen.rs
-* New behavior: Artifact/schema errors abort boot. Source execution is sequential in compiler batch/program order; Context slots, Consumer bindings, source runs, and failures are evidence under `window.__EDGEZERO__` only.
-* Unsupported semantics: G14 adds no Provider/Context lookup, name matching, tree traversal, dependency reconstruction, fallback/reselection, Context updates, resumability, inspection schema, or public diagnostics.
+* Slice: G15 - Context update propagation
+* Summary: Compiler-generated `ContextUpdatePlan` now maps each authored action batch to deduplicated reactive Provider source updates, required computed batches, G9 source batches, and affected Consumer bindings. `context.runtime.json` is schema v2.
+* Key files: crates/ezc_core/src/context_update.rs; crates/ezc_core/src/runtime_context_artifact.rs; crates/ezc_core/src/runtime_codegen.rs; crates/ezc_core/src/lib.rs
+* New behavior: After State writes and the existing computed flush, runtime consumes the emitted action plan to overwrite exact existing slots once per source, then executes completed-action effects. Defaults never update; failures retain their prior slot value and record evidence.
+* Unsupported semantics: G15 adds no runtime reverse dependency map, Provider reselection/fallback, Context lookup, name matching, component traversal, binding reconstruction, equality mechanism, resumability, inspection schema, or public diagnostics.
 
 Current in-progress slice
 
-* Slice: G15 - Context update propagation
-* Status: Ready after G14 commits; compiler-generated action-batch plans must drive updates before effects.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1 through G14
-* Remaining: G15 through G20.
+* Slice: G16 - Context resumability
+* Status: Ready after G15 commits; plan serializable slots and advance resume manifest to v3 only.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1 through G15
+* Remaining: G16 through G20.
 
 Verification
 
-* cargo test -p ezc_core runtime_codegen: pass (1 focused generated-runtime contract test)
+* cargo test -p ezc_core context_update: pass (1 focused G15 plan test)
+* cargo test -p ezc_core runtime_context_artifact: pass (1 focused artifact test)
+* cargo test -p ezc_core runtime_codegen: pass (1 focused runtime ordering test)
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core --lib: pass (218 tests)
+* cargo test -p ezc_core --lib: pass (219 tests)
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 * git diff --check: pass
 

@@ -10,7 +10,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const LEGACY_MANIFEST_SCHEMA_VERSION = 1;
   const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 3;
   const SUPPORTED_EFFECT_ARTIFACT_SCHEMA_VERSION = 1;
-  const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 1;
+  const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 2;
 
   class EdgeZeroBootError extends Error {
     constructor(code) {
@@ -961,6 +961,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       contextSlots: new Map(),
       contextConsumerBindings: new Map(),
       contextInitialSourceRuns: [],
+      contextUpdateSourceRuns: [],
       contextFailures: [],
       computedEvaluations,
       computedDirty,
@@ -1296,6 +1297,31 @@ const RUNTIME_STUB: &str = r#"(() => {
       if (!store.contextSlots.has(consumer.slot)) {
         store.contextFailures.push({ consumer: consumer.consumer, failure: "source-slot-unavailable" });
       }
+    }
+  }
+
+  function executeContextUpdates(store, actionBatchId) {
+    const update = (store.contextArtifact?.action_updates ?? []).find(
+      (candidate) => candidate.action_batch === actionBatchId
+    );
+    if (update === undefined || update.invalidated_sources.length === 0) { return; }
+    const sources = new Map((store.contextArtifact?.sources ?? []).map((source) => [source.source, source]));
+    for (const sourceId of update.invalidated_sources) {
+      const source = sources.get(sourceId);
+      if (source === undefined) { continue; }
+      const values = new Map();
+      let initialized = false;
+      for (const instruction of source.program?.instructions ?? []) {
+        if (executePureProgramInstruction(store, values, instruction, source.source)) { continue; }
+        if (instruction.kind === "initialize_context_slot") {
+          store.contextSlots.set(instruction.slot, computedOperandValue(store, values, instruction.value));
+          initialized = true;
+          continue;
+        }
+        store.contextFailures.push({ action_batch: actionBatchId, source: source.source, failure: `unsupported-update-instruction:${String(instruction.kind)}` });
+        break;
+      }
+      if (initialized) { store.contextUpdateSourceRuns.push({ action_batch: actionBatchId, source: source.source }); }
     }
   }
 
@@ -1695,6 +1721,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       }
 
       executeComputedUpdateBatches(store);
+      executeContextUpdates(store, actionBatchId);
       executeCompletedActionEffects(store, actionBatchId);
     } finally {
       store.activeActionBatch = null;
@@ -1790,6 +1817,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     context_slots = [],
     context_consumer_bindings = [],
     context_failures = [],
+    context_update_source_runs = [],
     diagnostics
   }) {
     return {
@@ -1807,7 +1835,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       context_initial_source_runs,
       context_slots,
       context_consumer_bindings,
-      context_failures
+      context_failures,
+      context_update_source_runs
     };
   }
 
@@ -1872,7 +1901,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       context_initial_source_runs: store.contextInitialSourceRuns,
       context_slots: [...store.contextSlots.entries()],
       context_consumer_bindings: [...store.contextConsumerBindings.entries()],
-      context_failures: store.contextFailures
+      context_failures: store.contextFailures,
+      context_update_source_runs: store.contextUpdateSourceRuns
     });
   }
 
@@ -1954,6 +1984,7 @@ mod tests {
         assert!(runtime.contains("ez-effect-runtime"));
         assert!(runtime.contains("ez-context-runtime"));
         assert!(runtime.contains("executeInitialContext(store)"));
+        assert!(runtime.contains("executeContextUpdates(store, actionBatchId)"));
         assert!(runtime.contains("contextSlots: new Map()"));
         assert!(runtime.contains("RUNTIME_VERSION = \"0.0.0\""));
         assert!(runtime.contains("SUPPORTED_SCHEMA_VERSION = 2"));

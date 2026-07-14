@@ -6,12 +6,12 @@ use crate::runtime_computed_artifact::{
     runtime_instruction, RuntimeComputedArtifactInstruction, RuntimeComputedArtifactOperand,
 };
 use crate::{
-    build_runtime_context_registry, ContextEvaluationBatchId, ExecutionBoundary,
-    OptimizedContextIrReport, RuntimeContextConsumerRecord, RuntimeContextEvaluationBatch,
-    RuntimeContextSourceKind, RuntimeContextSourceRecord,
+    build_context_update_plan, build_runtime_context_registry, ContextEvaluationBatchId,
+    ExecutionBoundary, OptimizedContextIrReport, RuntimeContextConsumerRecord,
+    RuntimeContextEvaluationBatch, RuntimeContextSourceKind, RuntimeContextSourceRecord,
 };
 
-pub const RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION: u32 = 1;
+pub const RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION: u32 = 2;
 
 /// Separate schema-v1 artifact for compiler-owned Context runtime metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -20,6 +20,7 @@ pub struct RuntimeContextArtifact {
     pub sources: Vec<SerializedContextSource>,
     pub consumers: Vec<SerializedContextConsumerBinding>,
     pub initial_batches: Vec<SerializedContextEvaluationBatch>,
+    pub action_updates: Vec<SerializedContextActionUpdatePlan>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -94,6 +95,15 @@ pub struct SerializedContextEvaluationBatch {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SerializedContextActionUpdatePlan {
+    pub action_batch: String,
+    pub invalidated_sources: Vec<String>,
+    pub prerequisite_computed_batches: Vec<u32>,
+    pub source_evaluation_batches: Vec<SerializedContextBatchId>,
+    pub affected_consumers: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SerializedContextBatchId {
     pub plan: &'static str,
     pub index: u32,
@@ -114,6 +124,7 @@ pub fn build_runtime_context_artifact(
     optimized: &OptimizedContextIrReport,
 ) -> RuntimeContextArtifact {
     let registry = build_runtime_context_registry(model, optimized);
+    let updates = build_context_update_plan(model, optimized);
     let programs = context_programs(optimized);
     RuntimeContextArtifact {
         schema_version: RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION,
@@ -133,6 +144,7 @@ pub fn build_runtime_context_artifact(
             .iter()
             .map(serialized_batch)
             .collect(),
+        action_updates: updates.actions.iter().map(serialized_update).collect(),
     }
 }
 
@@ -237,6 +249,24 @@ fn serialized_batch(batch: &RuntimeContextEvaluationBatch) -> SerializedContextE
     SerializedContextEvaluationBatch {
         id: batch_id(&batch.id),
         sources: batch.sources.iter().map(source_id).collect(),
+    }
+}
+
+fn serialized_update(update: &crate::ContextActionUpdatePlan) -> SerializedContextActionUpdatePlan {
+    SerializedContextActionUpdatePlan {
+        action_batch: update.action_batch.as_str().to_string(),
+        invalidated_sources: update.invalidated_sources.iter().map(source_id).collect(),
+        prerequisite_computed_batches: update.prerequisite_computed_batches.clone(),
+        source_evaluation_batches: update
+            .source_evaluation_batches
+            .iter()
+            .map(batch_id)
+            .collect(),
+        affected_consumers: update
+            .affected_consumers
+            .iter()
+            .map(|consumer| consumer.as_str().to_string())
+            .collect(),
     }
 }
 
