@@ -15,6 +15,7 @@ pub mod computed_value;
 pub mod consumer;
 pub mod context;
 pub mod context_dependency;
+pub mod context_evaluation;
 pub mod context_lifetime;
 pub mod context_ownership;
 pub mod context_resolution;
@@ -96,6 +97,12 @@ pub use context_dependency::{
     collect_context_dependency_graph, ContextDependencyCompatibility, ContextDependencyEdge,
     ContextDependencyEdgeKind, ContextDependencyGraph, ContextDependencyNode,
     ContextDependencyNodeId, ContextDependencyNodeKind,
+};
+pub use context_evaluation::{
+    collect_context_evaluation_plan, ContextConsumerAvailabilityEntry,
+    ContextConsumerAvailabilityStatus, ContextEvaluationBatch, ContextEvaluationBatchId,
+    ContextEvaluationPlan, ContextEvaluationPlanId, ContextSourceBlockReason,
+    ContextSourcePlanEntry, ContextSourcePlanStatus, ContextValueSourceId,
 };
 pub use context_lifetime::{
     collect_context_lifetime_analysis, ContextBindingLifetimeRecord, ContextBindingLifetimeSource,

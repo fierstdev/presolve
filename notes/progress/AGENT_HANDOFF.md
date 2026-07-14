@@ -3,30 +3,30 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: G8 - Compiler-owned Context lifetime analysis
-* Working tree: G8 is committed. The Phase G roadmap file is user-provided and untracked.
+* Latest completed slice: G9 - Compiler-owned Context evaluation planning
+* Working tree: G9 is ready to commit. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-13
 
 Last completed slice
 
-* Slice: G8 - Compiler-owned Context lifetime analysis
-* Summary: The ASM now retains immutable component-scope lifetime records for Contexts, Providers, Consumers, Context defaults, direct State/Computed dependencies, and selected bindings. Ownership supplies the lifetime identity; G4’s `ComponentScopeGraph` alone supplies outlives ordering.
-* Key files: crates/ezc_core/src/context_lifetime.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_core/src/lib.rs
-* New behavior: Provider/default source aggregates and Consumer binding statuses are explicit. A selected source remains selected even when its lifetime is incompatible, and G5 type compatibility remains entirely independent. The general semantic graph and its schema v5 remain unchanged.
-* Unsupported semantics: G8 adds no ancestry inference, Provider reselection, evaluation order, scheduling, cycle diagnostics, IR, runtime slots/artifacts, execution, resumability, public Context diagnostics, runtime instances, or runtime lifetime/provider discovery.
+* Slice: G9 - Compiler-owned Context evaluation planning
+* Summary: The ASM now retains one immutable initial `ContextEvaluationPlan` with a canonical entry for every Provider and Context-default source, deterministic scheduler-produced batches for executable sources, and one explicit availability entry per Consumer.
+* Key files: crates/ezc_core/src/context_evaluation.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_core/src/lib.rs
+* New behavior: Exact G4-selected sources are planned only when demanded by at least one G5/G8-compatible Consumer and the source itself remains eligible. Shared sources evaluate once; unused and blocked sources remain inspectable. G7 direct State/Computed requirements are retained, and executable Phase E computed batches are referenced rather than rebuilt.
+* Unsupported semantics: G9 adds no Context IR, optimization, runtime slots/artifacts, execution, update propagation, resumability, inspection schema, public diagnostics, runtime Provider discovery, runtime graph reconstruction, or Provider reselection.
 
 Current in-progress slice
 
-* Slice: G9 - Context evaluation planning
-* Status: Blocked pending an explicit Context evaluation-plan contract.
+* Slice: G10 - Context IR lowering
+* Status: Ready to assess after the G9 commit.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5; G6; G7; G8
-* Remaining: G9 through G20.
+* Remaining: G10 through G20.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core context_lifetime: pass (3 focused tests)
-* cargo test -p ezc_core --lib: pass (207 tests; shared ASM lifetime/validation infrastructure)
+* cargo test -p ezc_core context_evaluation: pass (5 focused tests)
+* cargo test -p ezc_core --lib: pass (212 tests; shared ASM evaluation-plan/validation infrastructure)
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 * git diff --check: pass
 
@@ -95,6 +95,10 @@ Architecture decisions made
 * Decision needed before G9: define the canonical evaluation-plan identity and entry records; deterministic initialization/availability ordering rules; relation to ownership and component-scope ordering; treatment of Provider/default sources, unresolved/ambiguous/invalid resolutions, G5 incompatible/unknown bindings, and G8 incompatible/unknown lifetimes; plan validation, queries, inspection/schema, and whether a plan contains only eligible values or explicit blocked entries.
 * Reason: G9 names Provider initialization order, Consumer availability, and ownership ordering but does not define the compiler plan semantics or its failure representation. Choosing source order, component order, scope order, dependency order, eligibility filtering, or blocked-entry behavior would invent language semantics required by G10 lowering and later runtime artifacts.
 * Tradeoff: G8 remains complete and committed. No evaluation/availability plan, ordering, scheduling, Provider reselection, IR, runtime record, or execution behavior has been added.
+
+* Decision: G9 retains one immutable initial `ContextEvaluationPlan`. Every canonical Provider/default source and every Consumer receive an entry; executable demand requires the exact G4 selection plus G5 and G8 compatibility. The Phase D scheduler orders only planned sources by canonical scope depth and stable typed source identity.
+* Reason: The plan composes existing compiler products without changing their authority: G4 selection is never retried, G5/G8 remain eligibility authorities, G7 remains the direct-dependency authority, and Phase E computed plans are reused as prerequisite metadata.
+* Tradeoff: G9 is initial availability only. Unused and blocked sources remain plan facts but have no batch; the slice creates no IR, runtime storage, execution, update propagation, public inspection schema, or runtime Provider discovery.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.

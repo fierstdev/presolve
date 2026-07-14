@@ -92,6 +92,7 @@ pub fn validate_application_semantic_model(
     validate_context_ownership(model, &mut diagnostics);
     validate_context_dependency(model, &mut diagnostics);
     validate_context_lifetime(model, &mut diagnostics);
+    validate_context_evaluation(model, &mut diagnostics);
     validate_effect_statement_types(model, &mut diagnostics);
     validate_effect_execution_plan(model, &mut diagnostics);
     validate_component_diagnostic_metadata(model, &mut diagnostics);
@@ -144,6 +145,30 @@ fn validate_context_lifetime(
         diagnostics.push(AsmValidationDiagnostic {
             code: "EZASM1190".to_string(),
             message: "Context lifetime analysis does not match canonical ASM products".to_string(),
+        });
+    }
+}
+
+fn validate_context_evaluation(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    let expected = crate::collect_context_evaluation_plan(
+        &model.contexts,
+        &model.providers,
+        &model.context_resolutions,
+        &model.context_types,
+        &model.provider_types,
+        &model.context_binding_types,
+        &model.context_lifetime,
+        &model.context_dependency,
+        &model.computed_evaluation_plan,
+        &model.component_scope,
+    );
+    if model.context_evaluation != expected {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1191".to_string(),
+            message: "Context evaluation plan does not match canonical ASM products".to_string(),
         });
     }
 }

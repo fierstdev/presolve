@@ -14,6 +14,7 @@ use crate::computed_value::{collect_computed_values, ComputedDiagnosticCode, Com
 use crate::consumer::{collect_consumer_entities, ConsumerEntity, ContextResolutionState};
 use crate::context::{collect_context_entities, ContextEntity};
 use crate::context_dependency::{collect_context_dependency_graph, ContextDependencyGraph};
+use crate::context_evaluation::{collect_context_evaluation_plan, ContextEvaluationPlan};
 use crate::context_lifetime::{collect_context_lifetime_analysis, ContextLifetimeAnalysis};
 use crate::context_ownership::{collect_context_ownership_graph, ContextOwnershipGraph};
 use crate::context_resolution::{
@@ -56,6 +57,7 @@ pub struct ApplicationSemanticModel {
     pub context_ownership: ContextOwnershipGraph,
     pub context_dependency: ContextDependencyGraph,
     pub context_lifetime: ContextLifetimeAnalysis,
+    pub context_evaluation: ContextEvaluationPlan,
     pub component_scope: ComponentScopeGraph,
     pub context_resolutions: BTreeMap<ConsumerId, ContextResolution>,
     pub context_types: BTreeMap<ContextId, ContextTypeRecord>,
@@ -356,6 +358,11 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub const fn context_lifetime_analysis(&self) -> &ContextLifetimeAnalysis {
         &self.context_lifetime
+    }
+
+    #[must_use]
+    pub const fn context_evaluation_plan(&self) -> &ContextEvaluationPlan {
+        &self.context_evaluation
     }
 
     #[must_use]
@@ -906,6 +913,18 @@ pub fn build_application_semantic_model_from_component_graph(
         &references,
         &provenance,
     );
+    let context_evaluation = collect_context_evaluation_plan(
+        &contexts,
+        &providers,
+        &context_resolutions,
+        &context_type_products.contexts,
+        &context_type_products.providers,
+        &context_type_products.bindings,
+        &context_lifetime,
+        &context_dependency,
+        &computed_evaluation_plan,
+        &component_scope,
+    );
     let effect_reactive_analysis = analyze_effect_reactivity(
         &component_graph.components,
         &computed_values,
@@ -947,6 +966,7 @@ pub fn build_application_semantic_model_from_component_graph(
         context_ownership,
         context_dependency,
         context_lifetime,
+        context_evaluation,
         component_scope,
         context_resolutions,
         context_types: context_type_products.contexts,
@@ -1154,6 +1174,18 @@ fn build_application_semantic_model_from_files_with_bindings(
         &references,
         &provenance,
     );
+    let context_evaluation = collect_context_evaluation_plan(
+        &contexts,
+        &providers,
+        &context_resolutions,
+        &context_type_products.contexts,
+        &context_type_products.providers,
+        &context_type_products.bindings,
+        &context_lifetime,
+        &context_dependency,
+        &computed_evaluation_plan,
+        &component_scope,
+    );
     let effect_reactive_analysis = analyze_effect_reactivity(
         &components,
         &computed_values,
@@ -1193,6 +1225,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         context_ownership,
         context_dependency,
         context_lifetime,
+        context_evaluation,
         component_scope,
         context_resolutions,
         context_types: context_type_products.contexts,
