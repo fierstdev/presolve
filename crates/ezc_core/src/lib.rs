@@ -14,6 +14,7 @@ pub mod component_scope;
 pub mod computed_value;
 pub mod consumer;
 pub mod context;
+pub mod context_ownership;
 pub mod context_resolution;
 pub mod context_typing;
 pub mod effect;
@@ -89,6 +90,11 @@ pub use computed_value::{
 };
 pub use consumer::{collect_consumer_entities, ConsumerEntity, ContextResolutionState};
 pub use context::{collect_context_entities, ContextEntity};
+pub use context_ownership::{
+    collect_context_ownership_graph, ContextOwnedEntities, ContextOwnershipEdge,
+    ContextOwnershipEdgeKind, ContextOwnershipGraph, ContextOwnershipNode, ContextOwnershipNodeId,
+    ContextOwnershipNodeKind, ContextOwnershipOwnerId, ContextOwnershipTargetId,
+};
 pub use context_resolution::{
     collect_context_resolutions, ContextResolution, ContextResolutionResult,
 };

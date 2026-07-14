@@ -13,6 +13,7 @@ use crate::component_scope::ComponentScopeGraph;
 use crate::computed_value::{collect_computed_values, ComputedDiagnosticCode, ComputedValue};
 use crate::consumer::{collect_consumer_entities, ConsumerEntity, ContextResolutionState};
 use crate::context::{collect_context_entities, ContextEntity};
+use crate::context_ownership::{collect_context_ownership_graph, ContextOwnershipGraph};
 use crate::context_resolution::{
     collect_context_resolutions, ContextResolution, ContextResolutionResult,
 };
@@ -50,6 +51,7 @@ pub struct ApplicationSemanticModel {
     pub contexts: BTreeMap<ContextId, ContextEntity>,
     pub providers: BTreeMap<ProviderId, ProviderEntity>,
     pub consumers: BTreeMap<ConsumerId, ConsumerEntity>,
+    pub context_ownership: ContextOwnershipGraph,
     pub component_scope: ComponentScopeGraph,
     pub context_resolutions: BTreeMap<ConsumerId, ContextResolution>,
     pub context_types: BTreeMap<ContextId, ContextTypeRecord>,
@@ -335,6 +337,11 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub fn context_resolution(&self, consumer: &ConsumerId) -> Option<&ContextResolution> {
         self.context_resolutions.get(consumer)
+    }
+
+    #[must_use]
+    pub const fn context_ownership_graph(&self) -> &ContextOwnershipGraph {
+        &self.context_ownership
     }
 
     #[must_use]
@@ -790,6 +797,14 @@ pub fn build_application_semantic_model_from_component_graph(
         &templates,
         &template_entities,
     );
+    let context_ownership = collect_context_ownership_graph(
+        &component_graph.components,
+        &contexts,
+        &providers,
+        &consumers,
+        &expression_graph,
+        &provenance,
+    );
     let (effect_bodies, effect_statements) =
         lower_effect_bodies(&component_graph.components, &effects, &expression_graph);
     let mut references = component_graph.references.clone();
@@ -891,6 +906,7 @@ pub fn build_application_semantic_model_from_component_graph(
         contexts,
         providers,
         consumers,
+        context_ownership,
         component_scope,
         context_resolutions,
         context_types: context_type_products.contexts,
@@ -1004,6 +1020,14 @@ fn build_application_semantic_model_from_files_with_bindings(
         &templates,
         &template_entities,
     );
+    let context_ownership = collect_context_ownership_graph(
+        &components,
+        &contexts,
+        &providers,
+        &consumers,
+        &expression_graph,
+        &provenance,
+    );
     let (effect_bodies, effect_statements) =
         lower_effect_bodies(&components, &effects, &expression_graph);
     references.extend(build_computed_references(
@@ -1102,6 +1126,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         contexts,
         providers,
         consumers,
+        context_ownership,
         component_scope,
         context_resolutions,
         context_types: context_type_products.contexts,

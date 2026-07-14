@@ -89,12 +89,164 @@ pub fn validate_application_semantic_model(
     validate_consumers(model, &mut diagnostics);
     validate_context_resolution(model, &mut diagnostics);
     validate_context_typing(model, &mut diagnostics);
+    validate_context_ownership(model, &mut diagnostics);
     validate_effect_statement_types(model, &mut diagnostics);
     validate_effect_execution_plan(model, &mut diagnostics);
     validate_component_diagnostic_metadata(model, &mut diagnostics);
     validate_template_action_bindings(model, &mut diagnostics);
 
     diagnostics
+}
+
+#[allow(clippy::too_many_lines)]
+fn validate_context_ownership(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    let graph = &model.context_ownership;
+    if graph
+        .nodes
+        .iter()
+        .any(|node| matches!(node.id, crate::ContextOwnershipNodeId::Component(ref id) if model.component(id).is_none()))
+    {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1182".to_string(),
+            message: "Context ownership graph references a missing component".to_string(),
+        });
+    }
+    if graph.nodes.len()
+        != model.contexts.len()
+            + model.providers.len()
+            + model.consumers.len()
+            + graph
+                .nodes
+                .iter()
+                .filter(|node| matches!(node.kind, crate::ContextOwnershipNodeKind::Component))
+                .count()
+    {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1183".to_string(),
+            message: "Context ownership graph has an invalid node domain".to_string(),
+        });
+    }
+    for context in model.contexts.values() {
+        let expected_owner = context.owner.entity_id();
+        let default = context.default_expression.as_ref();
+        if graph.owner_of_context(&context.id) != expected_owner
+            || graph.context_default_expression(&context.id) != default
+            || !expected_owner.is_some_and(|owner| {
+                exactly_one_ownership_edge(
+                    graph,
+                    &crate::ContextOwnershipOwnerId::Component(owner.clone()),
+                    &crate::ContextOwnershipTargetId::Context(context.id.clone()),
+                    crate::ContextOwnershipEdgeKind::ComponentOwnsContext,
+                )
+            })
+        {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1184".to_string(),
+                message: format!("Context `{}` has an invalid ownership record", context.id),
+            });
+        }
+        if let Some(default) = default {
+            let default_provenance = model
+                .expression_graph
+                .node(default)
+                .map(|node| &node.provenance);
+            let default_edge = graph.edges.iter().find(|edge| {
+                edge.owner == crate::ContextOwnershipOwnerId::Context(context.id.clone())
+                    && edge.owned == crate::ContextOwnershipTargetId::Expression(default.clone())
+                    && edge.kind == crate::ContextOwnershipEdgeKind::ContextOwnsDefaultExpression
+            });
+            if default_edge.is_none_or(|edge| Some(&edge.provenance) != default_provenance) {
+                diagnostics.push(AsmValidationDiagnostic {
+                    code: "EZASM1188".to_string(),
+                    message: format!(
+                        "Context `{}` has an invalid default ownership edge",
+                        context.id
+                    ),
+                });
+            }
+        }
+    }
+    for provider in model.providers.values() {
+        if graph.owner_of_provider(&provider.id) != provider.owner.entity_id()
+            || !provider.owner.entity_id().is_some_and(|owner| {
+                exactly_one_ownership_edge(
+                    graph,
+                    &crate::ContextOwnershipOwnerId::Component(owner.clone()),
+                    &crate::ContextOwnershipTargetId::Provider(provider.id.clone()),
+                    crate::ContextOwnershipEdgeKind::ComponentOwnsProvider,
+                )
+            })
+        {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1185".to_string(),
+                message: format!("Provider `{}` has an invalid ownership record", provider.id),
+            });
+        }
+    }
+    for consumer in model.consumers.values() {
+        if graph.owner_of_consumer(&consumer.id) != consumer.owner.entity_id()
+            || !consumer.owner.entity_id().is_some_and(|owner| {
+                exactly_one_ownership_edge(
+                    graph,
+                    &crate::ContextOwnershipOwnerId::Component(owner.clone()),
+                    &crate::ContextOwnershipTargetId::Consumer(consumer.id.clone()),
+                    crate::ContextOwnershipEdgeKind::ComponentOwnsConsumer,
+                )
+            })
+        {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1186".to_string(),
+                message: format!("Consumer `{}` has an invalid ownership record", consumer.id),
+            });
+        }
+    }
+    if graph.edges.windows(2).any(|pair| {
+        (&pair[0].owner, pair[0].kind, &pair[0].owned)
+            > (&pair[1].owner, pair[1].kind, &pair[1].owned)
+    }) || graph.edges.iter().any(|edge| {
+        !matches!(
+            (&edge.owner, &edge.owned, edge.kind),
+            (
+                crate::ContextOwnershipOwnerId::Component(_),
+                crate::ContextOwnershipTargetId::Context(_),
+                crate::ContextOwnershipEdgeKind::ComponentOwnsContext
+            ) | (
+                crate::ContextOwnershipOwnerId::Component(_),
+                crate::ContextOwnershipTargetId::Provider(_),
+                crate::ContextOwnershipEdgeKind::ComponentOwnsProvider
+            ) | (
+                crate::ContextOwnershipOwnerId::Component(_),
+                crate::ContextOwnershipTargetId::Consumer(_),
+                crate::ContextOwnershipEdgeKind::ComponentOwnsConsumer
+            ) | (
+                crate::ContextOwnershipOwnerId::Context(_),
+                crate::ContextOwnershipTargetId::Expression(_),
+                crate::ContextOwnershipEdgeKind::ContextOwnsDefaultExpression
+            )
+        )
+    }) {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1187".to_string(),
+            message: "Context ownership graph has an invalid edge domain or order".to_string(),
+        });
+    }
+}
+
+fn exactly_one_ownership_edge(
+    graph: &crate::ContextOwnershipGraph,
+    source: &crate::ContextOwnershipOwnerId,
+    target: &crate::ContextOwnershipTargetId,
+    kind: crate::ContextOwnershipEdgeKind,
+) -> bool {
+    graph
+        .edges
+        .iter()
+        .filter(|edge| &edge.owner == source && &edge.owned == target && edge.kind == kind)
+        .count()
+        == 1
 }
 
 fn validate_context_typing(

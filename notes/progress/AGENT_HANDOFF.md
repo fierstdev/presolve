@@ -3,32 +3,31 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: G5 - Context typing and compatibility
-* Working tree: G5 is committed. The Phase G roadmap file is user-provided and untracked.
+* Latest completed slice: G6 - Compiler-owned Context ownership graph
+* Working tree: G6 is ready to commit. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-13
 
 Last completed slice
 
-* Slice: G5 - Context typing and compatibility
-* Summary: Context, Provider, Consumer, and resolved binding type records are immutable ASM products. Provider value inference remains distinct from the Provider declaration type; the directed chain is value -> Provider declaration -> Context declaration -> Consumer request, while Context defaults remain distinct fallback sources.
-* Key files: crates/ezc_core/src/context_typing.rs; crates/ezc_core/src/semantic_type.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_core/src/lib.rs
-* New behavior: G5 reuses canonical semantic type, serialization, and execution-boundary facts without reselection. Unknown type facts remain conservative, and a binding is runtime eligible only when its preselected source chain is compatible, serializable, and boundary-compatible.
-* Unsupported semantics: G5 adds no diagnostics, ownership/lifetime or dependency graph, scheduling, IR, runtime slots/artifacts, execution, resumability, runtime provider discovery, source/import/lexical ancestry inference, or component-tree reconstruction. Semantic graph schema remains v5.
+* Slice: G6 - Compiler-owned Context ownership graph
+* Summary: The ASM now retains one immutable typed `ContextOwnershipGraph` projected from canonical Context, Provider, Consumer, and Context-default facts. Components own declared Contexts, Providers, and Consumers; Contexts own their canonical default expression targets.
+* Key files: crates/ezc_core/src/context_ownership.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_core/src/lib.rs
+* New behavior: The graph stores deterministic owner-to-owned edges only, has retained inverse ownership indexes, and validates all canonical entities without changing G4 selection or G5 eligibility. The general semantic graph and its schema v5 remain unchanged.
+* Unsupported semantics: G6 adds no component ancestry, Provider visibility or reselection, dependency graph, lifetime validity, scheduling, IR, runtime slots/artifacts, execution, resumability, public Context diagnostics, runtime ownership/provider discovery, or component-tree reconstruction.
 
 Current in-progress slice
 
-* Slice: G6 - Context ownership graph
-* Status: Blocked pending an explicit ownership-graph contract.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5
-* Remaining: G6 through G20.
+* Slice: G7 - Context dependency graph
+* Status: Ready to assess after the G6 commit.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5; G6
+* Remaining: G7 through G20.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core context_typing: pass (4 focused tests)
-* cargo test -p ezc_core --lib: pass (199 tests; shared semantic-type infrastructure)
-* cargo test -p ezc_cli --test explain: pass (123 tests)
-* cargo clippy -p ezc_core -p ezc_cli --all-targets -- -D warnings: pass
+* cargo test -p ezc_core context_ownership: pass (3 focused tests)
+* cargo test -p ezc_core --lib: pass (201 tests; shared ASM ownership/validation infrastructure)
+* cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 * git diff --check: pass
 
 Architecture decisions made
@@ -72,6 +71,10 @@ Architecture decisions made
 * Decision needed before G6: define the canonical ownership-graph product: its node and edge domains/directions; whether and how component ancestry relates to the existing `ComponentScopeGraph`; which Context/Provider/Consumer/default/unresolved/ambiguous facts appear; graph invariants, queries, and export/schema requirements; and whether this is a projection or a new authoritative composition product.
 * Reason: The G6 roadmap names owners and ancestry but does not define a graph contract. The compiler already has entity ownership and a G4 visibility scope graph, but choosing an ownership topology or treating scope edges as ownership would invent the semantics that G7 dependency projection, G8 lifetime analysis, and G9 ordering must consume.
 * Tradeoff: G5 remains complete and committed. No G6 ownership graph, inferred ancestry, Provider visibility change, dependency graph, runtime traversal, runtime ownership lookup, or component-tree reconstruction has been added.
+
+* Decision: G6 is one derived `ContextOwnershipGraph`, distinct from `ComponentScopeGraph` and `ContextResolution`. Its only edges are Component-to-Context, Component-to-Provider, Component-to-Consumer, and Context-to-default-expression; typed IDs and retained inverse indexes make all reads compiler-owned and deterministic.
+* Reason: Entity owners and default expression roots already establish canonical semantic ownership. Projecting them once preserves a lifetime-analysis input without turning ownership into composition, visibility, binding selection, or data dependency authority.
+* Tradeoff: Context ownership is independent of G4 resolution and G5 compatibility. G6 neither copies scope topology nor adds Provider-to-Context, Consumer-to-Context/Provider, component-to-component, Provider-value-expression, or runtime edges; it makes no public inspection schema change.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.
