@@ -3,30 +3,32 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: G9 - Compiler-owned Context evaluation planning
-* Working tree: G9 is committed. The Phase G roadmap file is user-provided and untracked.
-* Date: 2026-07-13
+* Latest completed slice: G10 - Canonical Context IR lowering
+* Working tree: G10 is ready to commit. The Phase G roadmap file is user-provided and untracked.
+* Date: 2026-07-14
 
 Last completed slice
 
-* Slice: G9 - Compiler-owned Context evaluation planning
-* Summary: The ASM now retains one immutable initial `ContextEvaluationPlan` with a canonical entry for every Provider and Context-default source, deterministic scheduler-produced batches for executable sources, and one explicit availability entry per Consumer.
-* Key files: crates/ezc_core/src/context_evaluation.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_core/src/lib.rs
-* New behavior: Exact G4-selected sources are planned only when demanded by at least one G5/G8-compatible Consumer and the source itself remains eligible. Shared sources evaluate once; unused and blocked sources remain inspectable. G7 direct State/Computed requirements are retained, and executable Phase E computed batches are referenced rather than rebuilt.
-* Unsupported semantics: G9 adds no Context IR, optimization, runtime slots/artifacts, execution, update propagation, resumability, inspection schema, public diagnostics, runtime Provider discovery, runtime graph reconstruction, or Provider reselection.
+* Slice: G10 - Canonical Context IR lowering
+* Summary: Every G9-planned Provider or Context-default source now lowers into one generated canonical IR function, one `ContextValueSlotId`, one result value, and one observable `InitializeContextSlot` instruction. Every G9-available Consumer receives one immutable binding/load record for its exact selected slot.
+* Key files: crates/ezc_core/src/intermediate_representation.rs; crates/ezc_core/src/semantic_type.rs; crates/ezc_core/src/semantic_id.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/lib.rs
+* New behavior: Source functions reuse canonical expression lowering and State/Computed targets, preserve G9 batch and computed-prerequisite references, and never coerce or reselect. Provider/default, slot, and Consumer-load identities are distinct. Canonical Provider/default `this.<State|Computed>` reads now receive the existing type product required for G5/G9 eligibility.
+* Unsupported semantics: G10 adds no Context optimization, live runtime storage, registry/artifact, execution, updates, resumability, inspection schema, public Context diagnostics, runtime Context/Provider discovery, runtime ownership inference, or runtime graph reconstruction.
 
 Current in-progress slice
 
-* Slice: G10 - Context IR lowering
-* Status: Blocked pending an explicit Context IR lowering contract.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5; G6; G7; G8; G9
-* Remaining: G10 through G20.
+* Slice: G11 - Context IR optimization
+* Status: Ready to assess after the G10 commit.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5; G6; G7; G8; G9; G10
+* Remaining: G11 through G20.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core context_evaluation: pass (5 focused tests)
-* cargo test -p ezc_core --lib: pass (212 tests; shared ASM evaluation-plan/validation infrastructure)
+* cargo test -p ezc_core intermediate_representation: pass (19 tests; 3 focused G10 cases)
+* cargo test -p ezc_core context_: pass (36 focused Context tests)
+* cargo test -p ezc_core semantic_type: pass (8 focused type tests)
+* cargo test -p ezc_core --lib: pass (215 tests; shared IR/type infrastructure)
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 * git diff --check: pass
 
@@ -103,6 +105,10 @@ Architecture decisions made
 * Decision needed before G10: define the canonical Context IR product: function, block, operation, value, and storage/load identities; how G9 source and batch identities map into it; whether Provider/default expressions reuse or extend Phase E expression lowering; Consumer-load operands and result semantics; treatment of unavailable entries; computed prerequisite ordering; validation and inspection/schema expectations.
 * Reason: The G10 roadmap only says to lower Context initialization, Provider values, and Consumer loads. Selecting SSA versus Context storage semantics, source function boundaries, load targets, initialization effects, value ownership, or unavailable-entry representation would invent the compiler architecture and determine later G11 optimization and G12 runtime artifacts.
 * Tradeoff: G9 remains complete and committed. No Context IR, storage/load operation, lowering, optimizer integration, runtime artifact, execution, or runtime Context lookup has been added.
+
+* Decision: G10 uses a distinct compiler-only `ContextValueSlotId` per G9-planned source, a distinct generated `ContextSourceFunctionId`, and a distinct `ContextConsumerLoadId` per available Consumer. The source function produces its result and performs observable `InitializeContextSlot`; Consumer bindings retain typed `LoadContextSlot` records without generating a Consumer function.
+* Reason: G4/G9 already supply one exact selected source, and the shared IR supplies function/value/instruction structure. Retaining slot/load identities in an immutable report lets G11 optimize source functions without removing initialization and lets G12 consume only compiler-generated identities.
+* Tradeoff: Context slots are not `IrStorage` or runtime allocations. Blocked/unused sources and unavailable Consumers receive no partial IR, and G10 adds no optimizer invocation, runtime registry/artifact, execution, fallback, or lookup behavior.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.

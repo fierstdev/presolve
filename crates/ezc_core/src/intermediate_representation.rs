@@ -6,16 +6,18 @@ use crate::component_graph::{
 };
 use crate::{
     ApplicationSemanticModel, CapabilityOperationId, CapabilityOperationKind, ComponentNode,
-    ComputedPurity, ComputedValue, Effect, EffectCompatibility, EffectStatementKind,
-    EffectValidation, ExpressionNode, ExpressionNodeKind, SemanticId, SemanticReference,
-    SemanticReferenceKind, SemanticType, SerializableValue, SourceProvenance,
-    EFFECT_CAPABILITY_REGISTRY,
+    ComputedPurity, ComputedValue, ConsumerId, ContextConsumerAvailabilityStatus,
+    ContextEvaluationBatchId, ContextSourcePlanStatus, ContextValueSourceId, Effect,
+    EffectCompatibility, EffectStatementKind, EffectValidation, ExpressionNode, ExpressionNodeKind,
+    SemanticId, SemanticReference, SemanticReferenceKind, SemanticType, SemanticTypeId,
+    SerializableValue, SourceProvenance, EFFECT_CAPABILITY_REGISTRY,
 };
 
 /// Compiler-owned intermediate representation, independent of backend output.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct IntermediateRepresentation {
     pub modules: Vec<IrModule>,
+    pub context_ir: ContextIrReport,
 }
 
 /// One source module represented in the canonical IR.
@@ -58,6 +60,158 @@ pub struct IrEffectExecution {
     pub provenance: SourceProvenance,
 }
 
+/// Stable compiler-owned Context slot identity. It is not a runtime lookup key.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ContextValueSlotId(String);
+
+impl ContextValueSlotId {
+    #[must_use]
+    pub fn for_source(source: &ContextValueSourceId) -> Self {
+        match source {
+            ContextValueSourceId::Provider(provider) => Self(format!("{provider}/context-slot")),
+            ContextValueSourceId::ContextDefault(context) => {
+                Self(format!("{context}/default-context-slot"))
+            }
+        }
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for ContextValueSlotId {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+/// Typed generated-function identity for one planned Context value source.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ContextSourceFunctionId(SemanticId);
+
+impl ContextSourceFunctionId {
+    #[must_use]
+    pub fn for_source(source: &ContextValueSourceId) -> Self {
+        match source {
+            ContextValueSourceId::Provider(provider) => {
+                Self(provider.as_semantic_id().context_provider_function())
+            }
+            ContextValueSourceId::ContextDefault(context) => {
+                Self(context.as_semantic_id().context_default_function())
+            }
+        }
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for ContextSourceFunctionId {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+/// Typed canonical operation identity for one available Consumer Context load.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ContextConsumerLoadId(SemanticId);
+
+impl ContextConsumerLoadId {
+    #[must_use]
+    pub fn for_consumer(consumer: &ConsumerId) -> Self {
+        Self(consumer.as_semantic_id().context_consumer_load())
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for ContextConsumerLoadId {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+/// One compiler-owned source function and Context-slot initialization plan.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrContextSourceEvaluation {
+    pub source: ContextValueSourceId,
+    pub context: crate::ContextId,
+    pub function: ContextSourceFunctionId,
+    pub entry_block: IrBlockId,
+    pub result: IrValueId,
+    pub slot: ContextValueSlotId,
+    pub evaluation_batch: ContextEvaluationBatchId,
+    pub prerequisite_computed_batches: Vec<u32>,
+    pub provenance: SourceProvenance,
+}
+
+/// One retained, compiler-owned Context-slot load operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrContextLoad {
+    pub id: ContextConsumerLoadId,
+    pub slot: ContextValueSlotId,
+    pub result: IrValueId,
+}
+
+impl IrContextLoad {
+    /// The generic canonical instruction form represented by this retained
+    /// binding load. Loads have no generated Consumer function in G10.
+    #[must_use]
+    pub fn kind(&self) -> IrInstructionKind {
+        IrInstructionKind::LoadContextSlot {
+            slot: self.slot.clone(),
+        }
+    }
+}
+
+/// One available Consumer's exact compiler-selected Context-slot binding.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrContextConsumerBinding {
+    pub consumer: ConsumerId,
+    pub context: crate::ContextId,
+    pub source: ContextValueSourceId,
+    pub slot: ContextValueSlotId,
+    pub load: IrContextLoad,
+    pub semantic_type: SemanticTypeId,
+    pub provenance: SourceProvenance,
+}
+
+/// Immutable G10 Context IR products, ordered by G9 batches and Consumer ID.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ContextIrReport {
+    pub source_evaluations: Vec<IrContextSourceEvaluation>,
+    pub consumer_bindings: Vec<IrContextConsumerBinding>,
+}
+
+impl ContextIrReport {
+    #[must_use]
+    pub fn context_source_evaluation(
+        &self,
+        source: &ContextValueSourceId,
+    ) -> Option<&IrContextSourceEvaluation> {
+        self.source_evaluations
+            .iter()
+            .find(|evaluation| evaluation.source == *source)
+    }
+
+    #[must_use]
+    pub fn context_consumer_binding(
+        &self,
+        consumer: &ConsumerId,
+    ) -> Option<&IrContextConsumerBinding> {
+        self.consumer_bindings
+            .iter()
+            .find(|binding| binding.consumer == *consumer)
+    }
+}
+
 /// F10 effects complete normally and produce no semantic result value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IrEffectCompletion {
@@ -73,6 +227,22 @@ impl IntermediateRepresentation {
             .flat_map(|module| &module.effect_executions)
             .find(|execution| execution.effect == *effect)
             .map(|execution| &execution.function)
+    }
+
+    #[must_use]
+    pub fn context_source_evaluation(
+        &self,
+        source: &ContextValueSourceId,
+    ) -> Option<&IrContextSourceEvaluation> {
+        self.context_ir.context_source_evaluation(source)
+    }
+
+    #[must_use]
+    pub fn context_consumer_binding(
+        &self,
+        consumer: &ConsumerId,
+    ) -> Option<&IrContextConsumerBinding> {
+        self.context_ir.context_consumer_binding(consumer)
     }
 }
 
@@ -748,8 +918,10 @@ pub fn lower_components_to_ir(model: &ApplicationSemanticModel) -> IntermediateR
             });
         lower_component_to_ir(model, component, module);
     }
+    let context_ir = lower_context_ir(model, &mut modules);
     IntermediateRepresentation {
         modules: modules.into_values().collect(),
+        context_ir,
     }
 }
 
@@ -872,6 +1044,159 @@ fn lower_component_to_ir(
     }
 }
 
+fn lower_context_ir(
+    model: &ApplicationSemanticModel,
+    modules: &mut BTreeMap<PathBuf, IrModule>,
+) -> ContextIrReport {
+    let executable_computed = modules
+        .values()
+        .flat_map(|module| &module.computed_evaluations)
+        .map(|evaluation| evaluation.computed.clone())
+        .collect::<BTreeSet<_>>();
+    let mut report = ContextIrReport::default();
+    let mut slots = BTreeMap::new();
+
+    for batch in &model.context_evaluation.evaluation_batches {
+        for source in &batch.sources {
+            let Some(entry) = model.context_evaluation.context_source_plan(source) else {
+                continue;
+            };
+            if entry.status != ContextSourcePlanStatus::Planned {
+                continue;
+            }
+            let Some(component) = model
+                .components
+                .iter()
+                .find(|component| component.id == entry.owner_component)
+            else {
+                continue;
+            };
+            let Some((function, evaluation)) = lower_context_source(
+                model,
+                component,
+                entry,
+                batch.id.clone(),
+                &executable_computed,
+            ) else {
+                continue;
+            };
+            let Some(module) = modules.get_mut(&entry.provenance.path) else {
+                continue;
+            };
+            slots.insert(source.clone(), evaluation.slot.clone());
+            module.functions.push(function);
+            report.source_evaluations.push(evaluation);
+        }
+    }
+
+    for (consumer, entry) in &model.context_evaluation.consumer_entries {
+        if entry.status != ContextConsumerAvailabilityStatus::Available {
+            continue;
+        }
+        let (Some(source), Some(slot), Some(entity), Some(context)) = (
+            entry.selected_source.as_ref(),
+            entry
+                .selected_source
+                .as_ref()
+                .and_then(|source| slots.get(source)),
+            model.consumers.get(consumer),
+            model
+                .consumers
+                .get(consumer)
+                .and_then(crate::ConsumerEntity::context),
+        ) else {
+            continue;
+        };
+        let load = IrContextLoad {
+            id: ContextConsumerLoadId::for_consumer(consumer),
+            slot: slot.clone(),
+            result: IrValueId::for_function(
+                ContextConsumerLoadId::for_consumer(consumer).as_semantic_id(),
+                0,
+            ),
+        };
+        report.consumer_bindings.push(IrContextConsumerBinding {
+            consumer: consumer.clone(),
+            context: context.clone(),
+            source: source.clone(),
+            slot: slot.clone(),
+            load,
+            semantic_type: entity.requested_type_id.clone(),
+            provenance: entry.provenance.clone(),
+        });
+    }
+    report
+}
+
+fn lower_context_source(
+    model: &ApplicationSemanticModel,
+    component: &ComponentNode,
+    entry: &crate::ContextSourcePlanEntry,
+    evaluation_batch: ContextEvaluationBatchId,
+    executable_computed: &BTreeSet<SemanticId>,
+) -> Option<(IrFunction, IrContextSourceEvaluation)> {
+    let function_id = ContextSourceFunctionId::for_source(&entry.source);
+    let entry_block = IrBlockId::entry_for(function_id.as_semantic_id());
+    let dependencies = entry
+        .required_state
+        .iter()
+        .chain(&entry.required_computed)
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let mut lowering = ExpressionIrLowering {
+        model,
+        component,
+        function: function_id.as_semantic_id(),
+        reference_owner: match &entry.source {
+            ContextValueSourceId::Provider(provider) => provider.as_semantic_id(),
+            ContextValueSourceId::ContextDefault(context) => context.as_semantic_id(),
+        },
+        entry_block: entry_block.clone(),
+        instructions: Vec::new(),
+        values: BTreeMap::new(),
+        executable_computed: Some(executable_computed),
+        allowed_dependencies: Some(&dependencies),
+    };
+    let result = lowering.lower_node(&entry.expression_root)?;
+    let slot = ContextValueSlotId::for_source(&entry.source);
+    lowering.instructions.push(IrInstruction {
+        id: IrInstructionId::for_block(&entry_block, lowering.instructions.len()),
+        provenance: entry.provenance.clone(),
+        result: None,
+        semantic_origin: Some(entry.expression_root.clone()),
+        kind: IrInstructionKind::InitializeContextSlot {
+            slot: slot.clone(),
+            value: result.clone(),
+        },
+    });
+    let function = IrFunction {
+        id: function_id.as_semantic_id().clone(),
+        name: format!("context-evaluate:{:?}", entry.source),
+        provenance: entry.provenance.clone(),
+        entry_block: entry_block.clone(),
+        blocks: vec![IrBlock {
+            id: entry_block.clone(),
+            provenance: entry.provenance.clone(),
+            instructions: lowering.instructions,
+        }],
+        branch_edges: Vec::new(),
+        values: lowering.values,
+        loops: Vec::new(),
+    };
+    let evaluation = IrContextSourceEvaluation {
+        source: entry.source.clone(),
+        context: entry.context.clone(),
+        function: function_id,
+        entry_block,
+        result,
+        slot,
+        evaluation_batch,
+        prerequisite_computed_batches: entry.prerequisite_computed_batches.clone(),
+        provenance: entry.provenance.clone(),
+    };
+    Some((function, evaluation))
+}
+
 fn lower_computed_evaluation(
     model: &ApplicationSemanticModel,
     component: &ComponentNode,
@@ -888,6 +1213,7 @@ fn lower_computed_evaluation(
         instructions: Vec::new(),
         values: BTreeMap::new(),
         executable_computed: None,
+        allowed_dependencies: None,
     };
     let result = lowering.lower_node(&root)?;
     let function = IrFunction {
@@ -930,6 +1256,7 @@ fn lower_effect_execution(
         instructions: Vec::new(),
         values: BTreeMap::new(),
         executable_computed: Some(executable_computed),
+        allowed_dependencies: None,
     };
     let mut capability_operations = Vec::new();
     for statement_id in &body.statements {
@@ -1030,6 +1357,7 @@ struct ExpressionIrLowering<'a> {
     instructions: Vec<IrInstruction>,
     values: BTreeMap<IrValueId, IrValue>,
     executable_computed: Option<&'a BTreeSet<SemanticId>>,
+    allowed_dependencies: Option<&'a BTreeSet<SemanticId>>,
 }
 
 impl ExpressionIrLowering<'_> {
@@ -1103,9 +1431,16 @@ impl ExpressionIrLowering<'_> {
                     .get(&self.component.id.computed(name))
                     .map(|computed| computed.id.clone())
             })?;
-        self.model.references.iter().find(|reference| {
+        let has_reference = self.model.references.iter().any(|reference| {
             reference.source == *self.reference_owner && reference.target == target
-        })?;
+        });
+        if !has_reference
+            && !self
+                .allowed_dependencies
+                .is_some_and(|dependencies| dependencies.contains(&target))
+        {
+            return None;
+        }
         if self
             .component
             .state_fields
@@ -2111,6 +2446,236 @@ pub fn validate_effect_ir(
     diagnostics
 }
 
+/// Validates G10 Context IR against retained G9 and existing canonical products.
+/// This consumes plan facts only and does not rerun Context resolution, typing,
+/// lifetime, or evaluation planning.
+#[allow(clippy::too_many_lines)]
+#[must_use]
+pub fn validate_context_ir(
+    model: &ApplicationSemanticModel,
+    representation: &IntermediateRepresentation,
+) -> Vec<IrValidationDiagnostic> {
+    let mut diagnostics = validate_intermediate_representation(representation);
+    let planned = model
+        .context_evaluation
+        .source_entries
+        .iter()
+        .filter(|(_, entry)| entry.status == ContextSourcePlanStatus::Planned)
+        .collect::<BTreeMap<_, _>>();
+    let batches = model
+        .context_evaluation
+        .evaluation_batches
+        .iter()
+        .flat_map(|batch| {
+            batch
+                .sources
+                .iter()
+                .cloned()
+                .map(move |source| (source, batch.id.clone()))
+        })
+        .collect::<BTreeMap<_, _>>();
+    let mut source_records = BTreeMap::new();
+    let mut slots = BTreeSet::new();
+    let mut functions = BTreeSet::new();
+
+    for evaluation in &representation.context_ir.source_evaluations {
+        let Some(entry) = planned.get(&evaluation.source) else {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1030",
+                message: format!("Context source {:?} is not G9-planned", evaluation.source),
+            });
+            continue;
+        };
+        if source_records
+            .insert(evaluation.source.clone(), evaluation)
+            .is_some()
+            || !slots.insert(evaluation.slot.clone())
+            || !functions.insert(evaluation.function.clone())
+        {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1031",
+                message: format!(
+                    "Context source {:?} has non-unique IR identities",
+                    evaluation.source
+                ),
+            });
+        }
+        if evaluation.context != entry.context
+            || evaluation.function != ContextSourceFunctionId::for_source(&evaluation.source)
+            || evaluation.slot != ContextValueSlotId::for_source(&evaluation.source)
+            || evaluation.prerequisite_computed_batches != entry.prerequisite_computed_batches
+            || batches.get(&evaluation.source) != Some(&evaluation.evaluation_batch)
+        {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1032",
+                message: format!(
+                    "Context source {:?} conflicts with retained G9 facts",
+                    evaluation.source
+                ),
+            });
+        }
+        let function = representation
+            .modules
+            .iter()
+            .flat_map(|module| &module.functions)
+            .find(|function| function.id == *evaluation.function.as_semantic_id());
+        let Some(function) = function else {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1033",
+                message: format!(
+                    "Context source {:?} is missing its IR function",
+                    evaluation.source
+                ),
+            });
+            continue;
+        };
+        let initializes_slot = function
+            .blocks
+            .iter()
+            .flat_map(|block| &block.instructions)
+            .any(|instruction| {
+                matches!(
+                    &instruction.kind,
+                    IrInstructionKind::InitializeContextSlot { slot, value }
+                        if slot == &evaluation.slot && value == &evaluation.result
+                )
+            });
+        if function.entry_block != evaluation.entry_block
+            || !function.values.contains_key(&evaluation.result)
+            || !initializes_slot
+        {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1034",
+                message: format!(
+                    "Context source {:?} lacks its exact result or slot initialization",
+                    evaluation.source
+                ),
+            });
+        }
+        let actual_state = function
+            .blocks
+            .iter()
+            .flat_map(|block| &block.instructions)
+            .filter_map(|instruction| match &instruction.kind {
+                IrInstructionKind::LoadStorage { storage } => Some(storage.clone()),
+                _ => None,
+            })
+            .collect::<BTreeSet<_>>();
+        let expected_state = entry
+            .required_state
+            .iter()
+            .map(IrStorageId::for_semantic_origin)
+            .collect::<BTreeSet<_>>();
+        let actual_computed = function
+            .blocks
+            .iter()
+            .flat_map(|block| &block.instructions)
+            .filter_map(|instruction| match &instruction.kind {
+                IrInstructionKind::LoadComputed { computed } => Some(computed.clone()),
+                _ => None,
+            })
+            .collect::<BTreeSet<_>>();
+        let expected_computed = entry
+            .required_computed
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        if !expected_state.is_subset(&actual_state)
+            || !expected_computed.is_subset(&actual_computed)
+        {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1035",
+                message: format!(
+                    "Context source {:?} has incomplete canonical dependencies",
+                    evaluation.source
+                ),
+            });
+        }
+    }
+    for source in planned.keys() {
+        if !source_records.contains_key(*source) {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1036",
+                message: format!("G9-planned Context source {source:?} has no IR"),
+            });
+        }
+    }
+
+    let available = model
+        .context_evaluation
+        .consumer_entries
+        .iter()
+        .filter(|(_, entry)| entry.status == ContextConsumerAvailabilityStatus::Available)
+        .collect::<BTreeMap<_, _>>();
+    let mut consumer_records = BTreeSet::new();
+    for binding in &representation.context_ir.consumer_bindings {
+        let Some(entry) = available.get(&binding.consumer) else {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1037",
+                message: format!(
+                    "unavailable Context Consumer {} has executable IR",
+                    binding.consumer
+                ),
+            });
+            continue;
+        };
+        if !consumer_records.insert(binding.consumer.clone()) {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1038",
+                message: format!(
+                    "Context Consumer {} has duplicate load IR",
+                    binding.consumer
+                ),
+            });
+        }
+        let Some(consumer) = model.consumers.get(&binding.consumer) else {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1039",
+                message: format!("Context Consumer {} is not canonical", binding.consumer),
+            });
+            continue;
+        };
+        let Some(source) = entry.selected_source.as_ref() else {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1040",
+                message: format!(
+                    "available Context Consumer {} has no selected source",
+                    binding.consumer
+                ),
+            });
+            continue;
+        };
+        let source_slot = source_records
+            .get(source)
+            .map(|evaluation| &evaluation.slot);
+        if consumer.context() != Some(&binding.context)
+            || binding.source != *source
+            || source_slot != Some(&binding.slot)
+            || binding.load.id != ContextConsumerLoadId::for_consumer(&binding.consumer)
+            || binding.load.slot != binding.slot
+            || binding.load.result != IrValueId::for_function(binding.load.id.as_semantic_id(), 0)
+            || binding.semantic_type != consumer.requested_type_id
+        {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1041",
+                message: format!(
+                    "Context Consumer {} conflicts with G4/G9 IR facts",
+                    binding.consumer
+                ),
+            });
+        }
+    }
+    for consumer in available.keys() {
+        if !consumer_records.contains(*consumer) {
+            diagnostics.push(IrValidationDiagnostic {
+                code: "EZIR1042",
+                message: format!("available Context Consumer {consumer} has no load IR"),
+            });
+        }
+    }
+    diagnostics
+}
+
 fn validate_function(
     function: &IrFunction,
     storage_ids: &BTreeSet<IrStorageId>,
@@ -2391,10 +2956,14 @@ fn instruction_operands(kind: &IrInstructionKind) -> Vec<IrOperand> {
             arguments.iter().cloned().map(IrOperand::Value).collect()
         }
         IrInstructionKind::CapabilityAssign { value, .. } => vec![IrOperand::Value(value.clone())],
+        IrInstructionKind::InitializeContextSlot { value, .. } => {
+            vec![IrOperand::Value(value.clone())]
+        }
         IrInstructionKind::Nop
         | IrInstructionKind::Constant { .. }
         | IrInstructionKind::InitializeStorage { .. }
         | IrInstructionKind::LoadStorage { .. }
+        | IrInstructionKind::LoadContextSlot { .. }
         | IrInstructionKind::LoadComputed { .. } => Vec::new(),
     }
 }
@@ -2407,7 +2976,9 @@ fn instruction_storages(kind: &IrInstructionKind) -> Vec<&IrStorageId> {
         IrInstructionKind::Nop
         | IrInstructionKind::Constant { .. }
         | IrInstructionKind::Copy { .. }
+        | IrInstructionKind::InitializeContextSlot { .. }
         | IrInstructionKind::LoadComputed { .. }
+        | IrInstructionKind::LoadContextSlot { .. }
         | IrInstructionKind::GetMember { .. }
         | IrInstructionKind::CapabilityCall { .. }
         | IrInstructionKind::CapabilityAssign { .. }
@@ -2672,8 +3243,17 @@ pub enum IrInstructionKind {
     InitializeStorage {
         storage: IrStorageId,
     },
+    /// Observable initialization of one compiler-owned Context value slot.
+    InitializeContextSlot {
+        slot: ContextValueSlotId,
+        value: IrValueId,
+    },
     LoadStorage {
         storage: IrStorageId,
+    },
+    /// Typed read from one exact compiler-selected Context value slot.
+    LoadContextSlot {
+        slot: ContextValueSlotId,
     },
     LoadComputed {
         computed: SemanticId,
@@ -2714,7 +3294,9 @@ impl IrInstructionKind {
     pub const fn is_observable_side_effect(&self) -> bool {
         matches!(
             self,
-            Self::CapabilityCall { .. } | Self::CapabilityAssign { .. }
+            Self::CapabilityCall { .. }
+                | Self::CapabilityAssign { .. }
+                | Self::InitializeContextSlot { .. }
         )
     }
 }
@@ -2986,13 +3568,16 @@ pub enum IrUnaryOperation {
 mod tests {
     use super::{
         compute_dominators, compute_post_dominators, lower_components_to_ir, optimize_computed_ir,
-        optimize_effect_ir, validate_effect_ir, validate_intermediate_representation,
-        IntermediateRepresentation, IrBinaryOperation, IrBlock, IrBlockId, IrBranchArm,
-        IrBranchEdge, IrConstant, IrFunction, IrInstruction, IrInstructionId, IrInstructionKind,
-        IrLoop, IrLoopId, IrModule, IrOperand, IrStorageId, IrUnaryOperation, IrValue,
-        IrValueDefinition, IrValueId,
+        optimize_effect_ir, validate_context_ir, validate_effect_ir,
+        validate_intermediate_representation, ContextIrReport, IntermediateRepresentation,
+        IrBinaryOperation, IrBlock, IrBlockId, IrBranchArm, IrBranchEdge, IrConstant, IrFunction,
+        IrInstruction, IrInstructionId, IrInstructionKind, IrLoop, IrLoopId, IrModule, IrOperand,
+        IrStorageId, IrUnaryOperation, IrValue, IrValueDefinition, IrValueId,
     };
-    use crate::{CapabilityOperationId, SemanticId, SemanticType, SourceProvenance};
+    use crate::{
+        build_application_semantic_model, CapabilityOperationId, ConsumerId, ContextId,
+        ContextValueSourceId, ProviderId, SemanticId, SemanticType, SourceProvenance,
+    };
     use std::collections::BTreeMap;
 
     #[test]
@@ -3047,6 +3632,7 @@ mod tests {
                 computed_evaluations: Vec::new(),
                 effect_executions: Vec::new(),
             }],
+            context_ir: ContextIrReport::default(),
         };
 
         assert_eq!(ir.modules[0].functions[0].blocks[0].instructions.len(), 1);
@@ -3865,6 +4451,171 @@ class OptimizedEffectIr extends Component {
         );
         assert!(validate_intermediate_representation(output).is_empty());
         assert!(validate_effect_ir(&model, output).is_empty());
+    }
+
+    #[test]
+    fn lowers_state_backed_provider_once_for_shared_consumers() {
+        let model = build_application_semantic_model(&ezc_parser::parse_file(
+            "src/App.tsx",
+            r#"
+@component("x-app")
+class App extends Component {
+  selected: string = state("dark");
+  @context()
+  theme!: string;
+  @provide(App.theme)
+  providedTheme: string = this.selected;
+  @consume(App.theme)
+  first!: string;
+  @consume(App.theme)
+  second!: string;
+  render() { return <main />; }
+}
+"#,
+        ));
+        let component = &model.components[0].id;
+        let provider = ProviderId::for_component(component, "providedTheme");
+        let first = ConsumerId::for_component(component, "first");
+        let second = ConsumerId::for_component(component, "second");
+        let ir = lower_components_to_ir(&model);
+        let evaluation = ir
+            .context_source_evaluation(&ContextValueSourceId::Provider(provider))
+            .expect("planned Provider source evaluation");
+        let function = ir
+            .modules
+            .iter()
+            .flat_map(|module| &module.functions)
+            .find(|function| function.id == *evaluation.function.as_semantic_id())
+            .expect("Provider source function");
+        assert!(function.blocks[0].instructions.iter().any(|instruction| {
+            matches!(
+                instruction.kind,
+                IrInstructionKind::LoadStorage { ref storage }
+                    if storage == &IrStorageId::for_semantic_origin(&component.state_field("selected"))
+            )
+        }));
+        assert!(function.blocks[0].instructions.iter().any(|instruction| {
+            matches!(
+                instruction.kind,
+                IrInstructionKind::InitializeContextSlot { ref slot, ref value }
+                    if slot == &evaluation.slot && value == &evaluation.result
+            )
+        }));
+        let first_binding = ir.context_consumer_binding(&first).expect("first load");
+        let second_binding = ir.context_consumer_binding(&second).expect("second load");
+        assert_eq!(first_binding.slot, evaluation.slot);
+        assert_eq!(second_binding.slot, evaluation.slot);
+        assert_ne!(first_binding.load.id, second_binding.load.id);
+        assert!(matches!(
+            first_binding.load.kind(),
+            IrInstructionKind::LoadContextSlot { slot } if slot == evaluation.slot
+        ));
+        assert!(validate_context_ir(&model, &ir).is_empty());
+    }
+
+    #[test]
+    fn lowers_default_and_computed_provider_with_distinct_source_slots() {
+        let model = build_application_semantic_model(&ezc_parser::parse_file(
+            "src/App.tsx",
+            r#"
+@component("x-app")
+class App extends Component {
+  selected: string = state("dark");
+  @computed()
+  get derivedTheme(): string { return this.selected; }
+  @context()
+  theme!: string;
+  @provide(App.theme)
+  providedTheme: string = this.derivedTheme;
+  @consume(App.theme)
+  theme!: string;
+  @context()
+  locale: string = "en";
+  @consume(App.locale)
+  locale!: string;
+  render() { return <main />; }
+}
+"#,
+        ));
+        let component = &model.components[0].id;
+        let provider =
+            ContextValueSourceId::Provider(ProviderId::for_component(component, "providedTheme"));
+        let locale =
+            ContextValueSourceId::ContextDefault(ContextId::for_component(component, "locale"));
+        let ir = lower_components_to_ir(&model);
+        let provider_evaluation = ir
+            .context_source_evaluation(&provider)
+            .expect("Provider IR");
+        let default_evaluation = ir.context_source_evaluation(&locale).expect("default IR");
+        assert_ne!(provider_evaluation.function, default_evaluation.function);
+        assert_ne!(provider_evaluation.slot, default_evaluation.slot);
+        assert!(!provider_evaluation.prerequisite_computed_batches.is_empty());
+        let provider_function = ir
+            .modules
+            .iter()
+            .flat_map(|module| &module.functions)
+            .find(|function| function.id == *provider_evaluation.function.as_semantic_id())
+            .expect("Provider function");
+        assert!(provider_function.blocks[0]
+            .instructions
+            .iter()
+            .any(|instruction| {
+                matches!(instruction.kind, IrInstructionKind::LoadComputed { .. })
+            }));
+        let locale_consumer = ConsumerId::for_component(component, "locale");
+        assert_eq!(
+            ir.context_consumer_binding(&locale_consumer)
+                .expect("default Consumer load")
+                .slot,
+            default_evaluation.slot
+        );
+        assert!(validate_context_ir(&model, &ir).is_empty());
+    }
+
+    #[test]
+    fn omits_unused_blocked_and_unavailable_context_ir() {
+        let model = build_application_semantic_model(&ezc_parser::parse_file(
+            "src/App.tsx",
+            r#"
+@component("x-app")
+class App extends Component {
+  @context()
+  unused!: string;
+  @provide(App.unused)
+  unusedProvider: string = "unused";
+  @context()
+  broken!: number;
+  @provide(App.broken)
+  brokenProvider: string = "wrong";
+  @consume(App.broken)
+  brokenValue!: number;
+  @context()
+  missing!: string;
+  @consume(App.missing)
+  missingValue!: string;
+  render() { return <main />; }
+}
+"#,
+        ));
+        let component = &model.components[0].id;
+        let unused =
+            ContextValueSourceId::Provider(ProviderId::for_component(component, "unusedProvider"));
+        let broken =
+            ContextValueSourceId::Provider(ProviderId::for_component(component, "brokenProvider"));
+        let broken_consumer = ConsumerId::for_component(component, "brokenValue");
+        assert!(model
+            .context_evaluation_plan()
+            .context_source_plan(&unused)
+            .is_some());
+        assert!(model
+            .context_evaluation_plan()
+            .context_source_plan(&broken)
+            .is_some());
+        let ir = lower_components_to_ir(&model);
+        assert!(ir.context_source_evaluation(&unused).is_none());
+        assert!(ir.context_source_evaluation(&broken).is_none());
+        assert!(ir.context_consumer_binding(&broken_consumer).is_none());
+        assert!(validate_context_ir(&model, &ir).is_empty());
     }
 
     #[test]

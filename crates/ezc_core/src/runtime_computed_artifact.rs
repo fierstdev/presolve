@@ -395,7 +395,9 @@ pub(crate) fn runtime_instruction(
         IrInstructionKind::Nop
         | IrInstructionKind::Copy { .. }
         | IrInstructionKind::InitializeStorage { .. }
+        | IrInstructionKind::InitializeContextSlot { .. }
         | IrInstructionKind::StoreStorage { .. }
+        | IrInstructionKind::LoadContextSlot { .. }
         | IrInstructionKind::CapabilityCall { .. }
         | IrInstructionKind::CapabilityAssign { .. } => None,
     }

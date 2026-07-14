@@ -910,6 +910,72 @@ impl SemanticTypeModel {
         self
     }
 
+    /// Attaches inferred types to canonical Provider and Context-default
+    /// expressions using their already-resolved component ownership and the
+    /// existing State/Computed type products. This creates no Context
+    /// compatibility result; G5 consumes these facts separately.
+    #[must_use]
+    pub fn with_context_source_expression_types(
+        mut self,
+        components: &[ComponentNode],
+        contexts: &BTreeMap<crate::ContextId, ContextEntity>,
+        providers: &BTreeMap<crate::ProviderId, ProviderEntity>,
+        graph: &ExpressionGraph,
+    ) -> Self {
+        let components_by_id = components
+            .iter()
+            .map(|component| (component.id.clone(), component))
+            .collect::<BTreeMap<_, _>>();
+        let owners = contexts
+            .values()
+            .filter_map(|context| {
+                context
+                    .owner
+                    .entity_id()
+                    .map(|owner| (context.id.as_semantic_id().clone(), owner.clone()))
+            })
+            .chain(providers.values().filter_map(|provider| {
+                provider
+                    .owner
+                    .entity_id()
+                    .map(|owner| (provider.id.as_semantic_id().clone(), owner.clone()))
+            }))
+            .collect::<BTreeMap<_, _>>();
+        let expression_ids = owners
+            .keys()
+            .flat_map(|owner| graph.nodes_for(owner))
+            .map(|node| node.id.clone())
+            .collect::<Vec<_>>();
+        let mut inferred = BTreeMap::new();
+        for id in expression_ids {
+            infer_context_source_expression_type(
+                &id,
+                graph,
+                &self.assignments,
+                &owners,
+                &components_by_id,
+                &mut inferred,
+            );
+        }
+        for (id, semantic_type) in inferred {
+            let Some(node) = graph.node(&id) else {
+                continue;
+            };
+            self.assignments.insert(
+                id.clone(),
+                SemanticTypeAssignment {
+                    id: SemanticTypeId::for_subject(&id),
+                    subject: id,
+                    semantic_type,
+                    origin: node.owner.clone(),
+                    status: SemanticTypeStatus::Inferred,
+                    provenance: node.provenance.clone(),
+                },
+            );
+        }
+        self
+    }
+
     fn with_action_signature_types(mut self, components: &[ComponentNode]) -> Self {
         for method in components
             .iter()
@@ -1992,6 +2058,97 @@ fn infer_computed_type(
         });
     visiting.remove(computed);
     computed_types.insert(computed.clone(), semantic_type.clone());
+    semantic_type
+}
+
+fn infer_context_source_expression_type(
+    id: &SemanticId,
+    graph: &ExpressionGraph,
+    assignments: &BTreeMap<SemanticId, SemanticTypeAssignment>,
+    owners: &BTreeMap<SemanticId, SemanticId>,
+    components: &BTreeMap<SemanticId, &ComponentNode>,
+    inferred: &mut BTreeMap<SemanticId, SemanticType>,
+) -> SemanticType {
+    if let Some(semantic_type) = inferred.get(id) {
+        return semantic_type.clone();
+    }
+    let Some(node) = graph.node(id) else {
+        return SemanticType::Unknown;
+    };
+    let child = |child: &SemanticId, inferred: &mut BTreeMap<SemanticId, SemanticType>| {
+        infer_context_source_expression_type(
+            child,
+            graph,
+            assignments,
+            owners,
+            components,
+            inferred,
+        )
+    };
+    let semantic_type = match &node.kind {
+        ExpressionNodeKind::Literal(value) => state_initializer_value_type(value),
+        ExpressionNodeKind::Boolean(value) => SemanticType::BooleanLiteral(*value),
+        ExpressionNodeKind::Identifier(_) => SemanticType::Unknown,
+        ExpressionNodeKind::ThisMember { name } => owners
+            .get(&node.owner)
+            .and_then(|owner| components.get(owner))
+            .and_then(|component| {
+                component
+                    .state_fields
+                    .iter()
+                    .find(|field| field.name == *name)
+                    .map(|field| field.id.clone())
+                    .or_else(|| {
+                        let computed = component.id.computed(name);
+                        assignments.contains_key(&computed).then_some(computed)
+                    })
+            })
+            .and_then(|target| assignments.get(&target))
+            .map_or(SemanticType::Unknown, |assignment| {
+                assignment.semantic_type.clone()
+            }),
+        ExpressionNodeKind::MemberAccess { object, property } => {
+            computed_member_access_type(&child(object, inferred), property)
+        }
+        ExpressionNodeKind::Arithmetic {
+            left,
+            right,
+            operator,
+        } => operator_result_type(
+            SemanticOperator::Arithmetic(*operator),
+            &[child(left, inferred), child(right, inferred)],
+        )
+        .unwrap_or(SemanticType::Unknown),
+        ExpressionNodeKind::Comparison {
+            left,
+            right,
+            operator,
+        } => operator_result_type(
+            SemanticOperator::Comparison(*operator),
+            &[child(left, inferred), child(right, inferred)],
+        )
+        .unwrap_or(SemanticType::Unknown),
+        ExpressionNodeKind::Logical {
+            left,
+            right,
+            operator,
+        } => operator_result_type(
+            SemanticOperator::Logical(*operator),
+            &[child(left, inferred), child(right, inferred)],
+        )
+        .unwrap_or(SemanticType::Unknown),
+        ExpressionNodeKind::NullishCoalescing { left, right } => operator_result_type(
+            SemanticOperator::NullishCoalescing,
+            &[child(left, inferred), child(right, inferred)],
+        )
+        .unwrap_or(SemanticType::Unknown),
+        ExpressionNodeKind::Unary { operand, operator } => operator_result_type(
+            SemanticOperator::Unary(*operator),
+            &[child(operand, inferred)],
+        )
+        .unwrap_or(SemanticType::Unknown),
+    };
+    inferred.insert(id.clone(), semantic_type.clone());
     semantic_type
 }
 

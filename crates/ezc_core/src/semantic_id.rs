@@ -147,6 +147,24 @@ impl SemanticId {
         self.child("consumer-field", name)
     }
 
+    /// Stable generated-function identity for a Provider Context source.
+    #[must_use]
+    pub fn context_provider_function(&self) -> Self {
+        self.child("context-source", "evaluation")
+    }
+
+    /// Stable generated-function identity for a Context-default source.
+    #[must_use]
+    pub fn context_default_function(&self) -> Self {
+        self.child("context-default-source", "evaluation")
+    }
+
+    /// Stable semantic origin used only to scope a retained Context Consumer load value.
+    #[must_use]
+    pub fn context_consumer_load(&self) -> Self {
+        self.child("context-load", "value")
+    }
+
     #[must_use]
     pub fn effect_activation_slot(&self, name: &str) -> Self {
         self.child("effect-activation", name)

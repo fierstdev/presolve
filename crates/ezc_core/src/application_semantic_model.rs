@@ -1326,6 +1326,7 @@ fn finalize_semantic_types(
         .with_consumer_types(consumers)
         .with_expression_types(expression_graph, components)
         .with_computed_value_types(components, computed_values, expression_graph, references)
+        .with_context_source_expression_types(components, contexts, providers, expression_graph)
         .with_effect_statement_types(components, effects, effect_statements, expression_graph)
         .with_template_binding_types(template_entities, references)
         .normalized()
