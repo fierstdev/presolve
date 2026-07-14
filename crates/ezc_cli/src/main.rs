@@ -9,17 +9,18 @@ use std::process;
 use ezc_core::{
     build_application_semantic_model_for_unit, build_component_graph,
     build_effect_inspection_registry, build_runtime_computed_artifact,
-    build_runtime_effect_artifact, build_semantic_graph, build_template_graph,
-    build_template_manifest_from_asm, explain_json, explain_text, fold_component_graph,
-    generate_runtime_stub, generate_standalone_page_with_effect_runtime, generate_static_html,
-    lower_components_to_ir, optimize_effect_ir, runtime_computed_artifact_json,
-    runtime_effect_artifact_json, semantic_graph_json, semantic_type_text, summarize_source,
-    template_manifest_json, validate_application_semantic_model, ApplicationSemanticModel,
-    AsmValidationDiagnostic, AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass,
-    DeclaredStateTypeKind, EffectInspection, EffectInspectionRegistry, ImmutableAsmPass,
-    RenderAttribute, RenderAttributeValue, SemanticEntity, SemanticEntityKind, SemanticId,
-    SemanticOwner, SemanticReferenceKind, SerializableValue, SourceProvenance, StateOperation,
-    TemplateChild, TemplateGraph, TemplateSemanticKind,
+    build_runtime_context_artifact, build_runtime_effect_artifact, build_semantic_graph,
+    build_template_graph, build_template_manifest_from_asm, explain_json, explain_text,
+    fold_component_graph, generate_runtime_stub, generate_standalone_page_with_context_runtime,
+    generate_static_html, lower_components_to_ir, optimize_context_ir, optimize_effect_ir,
+    runtime_computed_artifact_json, runtime_context_artifact_json, runtime_effect_artifact_json,
+    semantic_graph_json, semantic_type_text, summarize_source, template_manifest_json,
+    validate_application_semantic_model, ApplicationSemanticModel, AsmValidationDiagnostic,
+    AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
+    EffectInspection, EffectInspectionRegistry, ImmutableAsmPass, RenderAttribute,
+    RenderAttributeValue, SemanticEntity, SemanticEntityKind, SemanticId, SemanticOwner,
+    SemanticReferenceKind, SerializableValue, SourceProvenance, StateOperation, TemplateChild,
+    TemplateGraph, TemplateSemanticKind,
 };
 use ezc_parser::{
     parse_file, ParseDiagnostic, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
@@ -1527,17 +1528,21 @@ fn run_build(mut args: Vec<String>) {
     let effect_ir = optimize_effect_ir(&ir).output;
     let effect_runtime_artifact = build_runtime_effect_artifact(&asm, &effect_ir);
     let effect_runtime_json = runtime_effect_artifact_json(&effect_runtime_artifact);
+    let context_ir = optimize_context_ir(&ir);
+    let context_runtime_artifact = build_runtime_context_artifact(&asm, &context_ir);
+    let context_runtime_json = runtime_context_artifact_json(&context_runtime_artifact);
     let component_graph = fold_component_graph(&build_component_graph(&parsed));
     let template_graph = build_template_graph(&component_graph);
     let html_fragment = generate_static_html(&template_graph);
     let manifest = build_template_manifest_from_asm(&asm);
     let manifest_json = template_manifest_json(&manifest);
     let page_title = page_title_from_graph(&template_graph);
-    let page_html = generate_standalone_page_with_effect_runtime(
+    let page_html = generate_standalone_page_with_context_runtime(
         &page_title,
         &html_fragment,
         &manifest,
         &computed_runtime_artifact,
+        &context_runtime_artifact,
         &effect_runtime_artifact,
     );
     let runtime_js = generate_runtime_stub();
@@ -1547,6 +1552,7 @@ fn run_build(mut args: Vec<String>) {
         &page_html,
         &manifest_json,
         &computed_runtime_json,
+        &context_runtime_json,
         &effect_runtime_json,
         &runtime_js,
     )
@@ -1562,6 +1568,7 @@ fn run_build(mut args: Vec<String>) {
     println!("Wrote {}", out_dir.join("index.html").display());
     println!("Wrote {}", out_dir.join("template.manifest.json").display());
     println!("Wrote {}", out_dir.join("computed.runtime.json").display());
+    println!("Wrote {}", out_dir.join("context.runtime.json").display());
     println!("Wrote {}", out_dir.join("effect.runtime.json").display());
     println!("Wrote {}", out_dir.join("runtime.js").display());
 }
@@ -2357,6 +2364,7 @@ fn write_build_artifacts(
     html: &str,
     manifest_json: &str,
     computed_runtime_json: &str,
+    context_runtime_json: &str,
     effect_runtime_json: &str,
     runtime_js: &str,
 ) -> io::Result<()> {
@@ -2367,6 +2375,8 @@ fn write_build_artifacts(
     fs::write(out_dir.join("template.manifest.json"), manifest_json)?;
 
     fs::write(out_dir.join("computed.runtime.json"), computed_runtime_json)?;
+
+    fs::write(out_dir.join("context.runtime.json"), context_runtime_json)?;
 
     fs::write(out_dir.join("effect.runtime.json"), effect_runtime_json)?;
 

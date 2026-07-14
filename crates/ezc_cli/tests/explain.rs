@@ -4029,6 +4029,66 @@ fn build_command_writes_compiler_generated_effect_runtime_metadata() {
 }
 
 #[test]
+fn build_command_writes_and_embeds_context_runtime_artifact() {
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-test-output/context-runtime-artifact");
+    let input = out_dir.join("ContextRuntime.tsx");
+
+    if out_dir.exists() {
+        std::fs::remove_dir_all(&out_dir).expect("failed to clean previous test output");
+    }
+    std::fs::create_dir_all(&out_dir).expect("failed to create test output directory");
+    std::fs::write(
+        &input,
+        r#"
+@component("x-context-runtime")
+class ContextRuntime extends Component {
+  count = state(1);
+  @context()
+  total!: number;
+  @provide(ContextRuntime.total)
+  providedTotal: number = this.count + 2;
+  @consume(ContextRuntime.total)
+  total!: number;
+  render() { return <main />; }
+}
+"#,
+    )
+    .expect("failed to write Context runtime input");
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            input.to_str().expect("test input path was not valid UTF-8"),
+            "--out",
+            out_dir
+                .to_str()
+                .expect("test output path was not valid UTF-8"),
+        ])
+        .output()
+        .expect("failed to build Context runtime artifact");
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    assert!(stdout.contains("context.runtime.json"));
+    let page = std::fs::read_to_string(out_dir.join("index.html"))
+        .expect("failed to read generated Context runtime page");
+    assert!(page.contains("id=\"ez-context-runtime\""));
+    let artifact = std::fs::read_to_string(out_dir.join("context.runtime.json"))
+        .expect("failed to read Context runtime artifact");
+    let artifact: serde_json::Value = serde_json::from_str(&artifact).expect("artifact JSON");
+    assert_eq!(artifact["schema_version"], 1);
+    assert_eq!(artifact["sources"].as_array().map(Vec::len), Some(1));
+    assert_eq!(artifact["consumers"].as_array().map(Vec::len), Some(1));
+    assert!(artifact["sources"][0]["program"]["instructions"]
+        .as_array()
+        .is_some_and(|instructions| instructions
+            .iter()
+            .any(|instruction| { instruction["kind"] == "initialize_context_slot" })));
+}
+
+#[test]
 fn html_command_matches_keyed_list_reconciliation_fixture() {
     let repo_root = repo_root();
 

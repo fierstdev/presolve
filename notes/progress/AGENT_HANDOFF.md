@@ -3,31 +3,33 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: G12 - Context runtime registry
-* Working tree: G12 implementation is ready to commit. The Phase G roadmap file is user-provided and untracked.
+* Latest completed slice: G13 - Context runtime artifact
+* Working tree: G13 implementation is ready to commit. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: G12 - Context runtime registry
-* Summary: `RuntimeContextRegistry` now projects only G9-planned, G11-optimized Context sources and G9-available G10 Consumer bindings into deterministic compiler-owned runtime metadata with schema contract version 1.
-* Key files: crates/ezc_core/src/runtime_context.rs; crates/ezc_core/src/lib.rs
-* New behavior: Source records retain exact source, slot, function, type, source kind, State/Computed prerequisites, G9 batch, boundary, serialization, and provenance. Consumer records retain only their exact selected source slot and G10 load identity. Initial batches preserve G9 scheduler order.
-* Unsupported semantics: G12 adds no artifact, runtime storage/evaluation, update execution, resumability, inspection schema, public diagnostics, runtime Context/Provider discovery, name matching, tree traversal, ownership/dependency reconstruction, or slot rebinding.
+* Slice: G13 - Context runtime artifact
+* Summary: The compiler now emits separate schema-v1 `context.runtime.json` data from G12 and optimized G11 source programs; `ezc_cli build` writes and embeds that exact artifact.
+* Key files: crates/ezc_core/src/runtime_context_artifact.rs; crates/ezc_core/src/page_codegen.rs; crates/ezc_cli/src/main.rs; crates/ezc_cli/tests/explain.rs; crates/ezc_core/src/lib.rs
+* New behavior: Sources serialize canonical source/Context/slot/function identities, type/boundary contracts, prerequisites, G9 batches, and optimized instructions. Consumer bindings serialize exact source slots and load identities. Instruction encoding reuses computed operand encoding with explicit `initialize_context_slot` and `load_context_slot` operations.
+* Unsupported semantics: G13 adds no Context runtime execution/storage, update semantics, resumability, inspection schema, public diagnostics, Provider/Context lookup, name matching, tree traversal, ownership/dependency reconstruction, or binding inference.
 
 Current in-progress slice
 
-* Slice: G13 - Context runtime artifact
-* Status: Ready to begin after G12 commits; artifact schema version 1 must serialize G12 registry and optimized G11 programs without execution.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5; G6; G7; G8; G9; G10; G11; G12
-* Remaining: G13 through G20.
+* Slice: G14 - Initial Context runtime
+* Status: Ready to begin after G13 commits; execute only compiler-emitted slots/programs in the required State → Computed → Context → Render → Effects boot order.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5; G6; G7; G8; G9; G10; G11; G12; G13
+* Remaining: G14 through G20.
 
 Verification
 
-* cargo test -p ezc_core runtime_context: pass (1 focused G12 registry test)
+* cargo test -p ezc_core runtime_context_artifact: pass (1 focused G13 artifact test)
+* cargo test -p ezc_cli --test explain context_runtime_artifact: pass (1 focused build/embed test)
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core --lib: pass (217 tests; shared runtime registry infrastructure)
+* cargo test -p ezc_core --lib: pass (218 tests; shared Context artifact infrastructure)
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
+* cargo clippy -p ezc_cli --all-targets -- -D warnings: pass
 * git diff --check: pass
 
 Architecture decisions made
@@ -115,6 +117,10 @@ Architecture decisions made
 * Decision: G12 introduces `RuntimeContextRegistry` with schema contract version 1 as a deterministic projection of G9 planned sources, G11 optimized source functions, and available G10 Consumer bindings. Source records are ordered by canonical source identity; Consumer records by `ConsumerId`; batches retain G9 order.
 * Reason: The runtime needs exact slot/function/batch/type metadata, but no semantic authority. Projecting only existing compiler products retains G4 selection, G5 typing, G8 lifetime eligibility, and G9 scheduling without creating a Provider search key, Context name key, ancestry chain, or reverse dependency table.
 * Tradeoff: G12 records metadata only. It does not serialize an artifact, allocate or evaluate slots, perform cold boot/update ordering, emit diagnostics/inspection, alias slots, or permit runtime lookup/reconstruction.
+
+* Decision: G13 emits a distinct `context.runtime.json` artifact at schema version 1 and embeds the same serialized artifact under `ez-context-runtime`. It reuses existing operand instruction encoding and adds only `initialize_context_slot` and `load_context_slot` operations.
+* Reason: The emitted artifact carries compiler-generated source, function, slot, batch, type, and Consumer-load identities directly into the generated page, so G14 can execute a closed plan without Context-name matching, Provider searches, or graph rebuilding.
+* Tradeoff: G13 serializes programs but does not execute them. It does not unify Context with computed/effect schemas, add lookup instructions, or create any fallback/rebinding behavior.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.

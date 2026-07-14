@@ -46,6 +46,7 @@ pub mod runtime_codegen;
 pub mod runtime_computed;
 pub mod runtime_computed_artifact;
 pub mod runtime_context;
+pub mod runtime_context_artifact;
 pub mod runtime_effect;
 pub mod runtime_effect_artifact;
 pub mod semantic_graph;
@@ -192,7 +193,7 @@ pub use module_graph::{
 };
 pub use page_codegen::{
     generate_standalone_page, generate_standalone_page_with_computed_runtime,
-    generate_standalone_page_with_effect_runtime,
+    generate_standalone_page_with_context_runtime, generate_standalone_page_with_effect_runtime,
 };
 pub use provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
 pub use resume_manifest::{
@@ -216,6 +217,13 @@ pub use runtime_context::{
     RuntimeContextConsumerRecord, RuntimeContextEvaluationBatch, RuntimeContextRegistry,
     RuntimeContextRegistryValidationDiagnostic, RuntimeContextSourceKind,
     RuntimeContextSourceRecord, RUNTIME_CONTEXT_REGISTRY_SCHEMA_CONTRACT_VERSION,
+};
+pub use runtime_context_artifact::{
+    build_runtime_context_artifact, runtime_context_artifact_json, RuntimeContextArtifact,
+    SerializedContextBatchId, SerializedContextConsumerBinding, SerializedContextEvaluationBatch,
+    SerializedContextExecutionBoundary, SerializedContextInstruction,
+    SerializedContextInstructionKind, SerializedContextProgram, SerializedContextSource,
+    SerializedContextSourceKind, RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION,
 };
 pub use runtime_effect::{
     build_runtime_effect_registry, RuntimeActionBatchEffectTrigger, RuntimeEffectRecord,
