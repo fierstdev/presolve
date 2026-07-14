@@ -45,6 +45,7 @@ pub mod route_graph;
 pub mod runtime_codegen;
 pub mod runtime_computed;
 pub mod runtime_computed_artifact;
+pub mod runtime_context;
 pub mod runtime_effect;
 pub mod runtime_effect_artifact;
 pub mod semantic_graph;
@@ -209,6 +210,12 @@ pub use runtime_computed_artifact::{
     RuntimeComputedArtifactDirtyFlag, RuntimeComputedArtifactEvaluation,
     RuntimeComputedArtifactInvalidation, RuntimeComputedArtifactSerialization,
     RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION,
+};
+pub use runtime_context::{
+    build_runtime_context_registry, validate_runtime_context_registry,
+    RuntimeContextConsumerRecord, RuntimeContextEvaluationBatch, RuntimeContextRegistry,
+    RuntimeContextRegistryValidationDiagnostic, RuntimeContextSourceKind,
+    RuntimeContextSourceRecord, RUNTIME_CONTEXT_REGISTRY_SCHEMA_CONTRACT_VERSION,
 };
 pub use runtime_effect::{
     build_runtime_effect_registry, RuntimeActionBatchEffectTrigger, RuntimeEffectRecord,
