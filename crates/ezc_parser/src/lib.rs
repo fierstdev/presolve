@@ -83,6 +83,39 @@ class Card extends Component {
     }
 
     #[test]
+    fn retains_canonical_component_tag_names_and_exact_name_spans() {
+        let source = r#"
+@component("x-page")
+class Page extends Component {
+  render() { return <main><Card /><Registry.Card /></main>; }
+}
+"#;
+        let parsed = parse_file("src/Page.tsx", source);
+        let super::ParsedJsxNode::Element(root) = &parsed.classes[0].methods[0].jsx_roots[0] else {
+            panic!("element root");
+        };
+        let elements = root
+            .children
+            .iter()
+            .filter_map(|child| match child {
+                super::ParsedJsxChild::Element(element) => Some(element),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(elements[0].name, "Card");
+        assert_eq!(elements[1].name, "Registry.Card");
+        assert_eq!(
+            &source[elements[0].name_span.start..elements[0].name_span.end],
+            "Card"
+        );
+        assert_eq!(
+            &source[elements[1].name_span.start..elements[1].name_span.end],
+            "Registry.Card"
+        );
+    }
+
+    #[test]
     fn retains_static_member_provider_designators_and_value_expressions() {
         let parsed = parse_file(
             "src/AppShell.tsx",

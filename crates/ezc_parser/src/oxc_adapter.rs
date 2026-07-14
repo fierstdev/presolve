@@ -6,8 +6,8 @@ use oxc_ast::ast::{
     Argument, AssignmentTarget, BindingPatternKind, ClassElement, Declaration,
     ExportDefaultDeclarationKind, Expression, ImportDeclarationSpecifier, JSXAttributeItem,
     JSXAttributeName, JSXAttributeValue, JSXChild, JSXElementName, JSXExpression, JSXFragment,
-    ModuleExportName, ObjectPropertyKind, Program, PropertyKey, PropertyKind,
-    SimpleAssignmentTarget, Statement,
+    JSXMemberExpression, JSXMemberExpressionObject, ModuleExportName, ObjectPropertyKind, Program,
+    PropertyKey, PropertyKind, SimpleAssignmentTarget, Statement,
 };
 use oxc_diagnostics::Severity as OxcSeverity;
 use oxc_parser::Parser;
@@ -1411,6 +1411,7 @@ fn parsed_jsx_element(
 
     Some(ParsedJsxElement {
         name,
+        name_span: source_span(source, element.opening_element.name.span()),
         span: source_span(source, element.span),
         attributes,
         event_handlers,
@@ -1892,10 +1893,22 @@ fn jsx_element_name(name: &JSXElementName<'_>) -> Option<String> {
     match name {
         JSXElementName::Identifier(identifier) => Some(identifier.name.to_string()),
         JSXElementName::IdentifierReference(identifier) => Some(identifier.name.to_string()),
-        JSXElementName::NamespacedName(namespaced) => Some(format!("{namespaced:?}")),
-        JSXElementName::MemberExpression(member) => Some(format!("{member:?}")),
+        JSXElementName::NamespacedName(namespaced) => Some(format!(
+            "{}:{}",
+            namespaced.namespace.name, namespaced.name.name
+        )),
+        JSXElementName::MemberExpression(member) => Some(jsx_member_expression_name(member)),
         JSXElementName::ThisExpression(_) => Some("this".to_string()),
     }
+}
+
+fn jsx_member_expression_name(member: &JSXMemberExpression<'_>) -> String {
+    let object = match &member.object {
+        JSXMemberExpressionObject::IdentifierReference(identifier) => identifier.name.to_string(),
+        JSXMemberExpressionObject::MemberExpression(member) => jsx_member_expression_name(member),
+        JSXMemberExpressionObject::ThisExpression(_) => "this".to_string(),
+    };
+    format!("{object}.{}", member.property.name)
 }
 
 fn parsed_jsx_attribute(attribute: &JSXAttributeItem<'_>, source: &str) -> ParsedJsxAttribute {

@@ -406,6 +406,7 @@ pub enum ParsedJsxNode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedJsxElement {
     pub name: String,
+    pub name_span: SourceSpan,
     pub span: SourceSpan,
     pub attributes: Vec<ParsedJsxAttribute>,
     pub event_handlers: Vec<ParsedEventHandler>,

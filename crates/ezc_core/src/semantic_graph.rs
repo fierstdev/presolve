@@ -133,7 +133,12 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
     let nodes = asm
         .ownership
         .keys()
-        .filter(|id| !matches!(asm.entity(id), Some(SemanticEntity::Slot(_))))
+        .filter(|id| {
+            !matches!(
+                asm.entity(id),
+                Some(SemanticEntity::Slot(_) | SemanticEntity::ComponentInvocation(_))
+            )
+        })
         .map(|id| {
             let entity = asm
                 .entity(id)
@@ -157,7 +162,10 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
         .ownership
         .iter()
         .filter_map(|(target, owner)| {
-            if matches!(asm.entity(target), Some(SemanticEntity::Slot(_))) {
+            if matches!(
+                asm.entity(target),
+                Some(SemanticEntity::Slot(_) | SemanticEntity::ComponentInvocation(_))
+            ) {
                 return None;
             }
             match owner {
@@ -248,6 +256,9 @@ fn semantic_graph_node_kind(entity: SemanticEntity<'_>) -> SemanticGraphNodeKind
         SemanticEntity::Consumer(_) => SemanticGraphNodeKind::Consumer,
         SemanticEntity::Slot(_) => {
             unreachable!("Slots are not projected into frozen semantic graph schema v5")
+        }
+        SemanticEntity::ComponentInvocation(_) => {
+            unreachable!("Component invocations are not projected into semantic graph schema v5")
         }
         SemanticEntity::Computed(_) => SemanticGraphNodeKind::Computed,
         SemanticEntity::Effect(_) => SemanticGraphNodeKind::Effect,

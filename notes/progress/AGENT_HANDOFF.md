@@ -3,36 +3,40 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: H1 - Canonical Slot entities
-* Working tree: clean after the H1 canonical Slot entity commit.
+* Latest completed slice: H2 - Canonical component invocation entities
+* Working tree: clean after the H2 canonical component invocation commit.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: H1 - Canonical Slot entities
-* Summary: H1 retains every authored `@slot()` declaration candidate, lowers only the exact valid declaration-only component field form into an immutable component-qualified `SlotEntity`, adds nominal `SlotContent` semantic typing and generic ASM identity/ownership queries, and preserves invalid declaration facts without fabricating valid `SlotId` values. No invocation, outlet, content binding, runtime, or diagnostic projection was added.
-* Key files: crates/ezc_parser/src/model.rs; crates/ezc_parser/src/oxc_adapter.rs; crates/ezc_core/src/slot.rs; crates/ezc_core/src/component_graph.rs; crates/ezc_core/src/semantic_id.rs; crates/ezc_core/src/semantic_type.rs; crates/ezc_core/src/application_semantic_model.rs
-* Schema decision: no serialized shape changed in H1. Semantic graph remains v5, Context runtime artifact v2, template manifest v2, resume manifest v3, ASM inspection v6, and check JSON v3. Slot projection is deliberately deferred to the single H18 ASM inspection increment.
+* Slice: H2 - Canonical component invocation entities
+* Summary: H2 lowers only `PascalCase` template element uses into immutable caller-owned `ComponentInvocationEntity` records, resolves local and imported aliases through canonical module/binding facts, assigns distinct traversal-derived invocation and source-position identities to repeated uses, and retains unresolved, non-component, ambiguous, and unsupported dynamic-target statuses without runtime lookup or target selection.
+* Key files: crates/ezc_core/src/component_invocation.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/semantic_id.rs; crates/ezc_core/src/template_semantics.rs; crates/ezc_parser/src/model.rs; crates/ezc_parser/src/oxc_adapter.rs
+* Schema decision: no serialized shape changed in H2. Semantic graph remains v5, Context runtime artifact v2, template manifest v2, resume manifest v3, ASM inspection v6, and check JSON v3. Component invocation projection remains deferred to H18.
 
 Current in-progress slice
 
 * Slice: none
-* Status: H1 is complete and committed. H2 has not started.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1
-* Remaining in Phase H: H2 through H21.
+* Status: H2 is complete and committed. H3 has not started.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H2
+* Remaining in Phase H: H3 through H21.
 
 Verification
 
 * Phase H entry gate: `just check` pass (workspace formatting, strict workspace clippy, and complete workspace test matrix: 12 Context fixture/freeze, 125 CLI inspection/build, 24 real-browser, 244 core, 3 parser unit, and 26 parser integration tests)
-* cargo test -p ezc_parser: pass (4 unit; 26 integration)
-* cargo test -p ezc_core slot --lib: pass (11 focused)
-* cargo test -p ezc_core --lib: pass (249)
+* cargo test -p ezc_parser: pass (5 unit; 26 integration)
+* cargo test -p ezc_core component_invocation --lib: pass (4 focused)
+* cargo test -p ezc_core --lib: pass (253)
 * cargo test -p ezc_cli --test explain: pass (125)
 * cargo clippy -p ezc_parser -p ezc_core -p ezc_cli --all-targets -- -D warnings: pass
 * cargo fmt --all --check: pass
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: H2 recognizes only an exact identifier whose first character is ASCII uppercase as a statically resolvable component invocation. JSX member or namespaced targets whose final segment is PascalCase are retained as `UnsupportedDynamicTarget`; lowercase intrinsic elements are not invocation candidates.
+* Reason: Canonical template traversal supplies the template entity and source position, while local component definitions and the existing import binding table supply the only target-resolution authority. Repeated uses therefore retain distinct caller/template/path identities without DOM indexes, runtime names, or source-order target selection.
+* Tradeoff: A resolved target participates in the invocation identity; blocked identities use an explicit status-qualified authored symbol. H2 adds no instance, slot fragment/outlet, runtime relation, or diagnostic projection. Canonical invocation entities remain absent from semantic graph v5 and ASM inspection v6 until H18.
 
 * Decision: H1 accepts only a zero-argument, non-static, declaration-only definite-assignment component field of exact built-in type `SlotContent`. The field name is the slot name; `children` is the default slot and every other valid name is named. Every authored candidate receives a source-qualified `SlotDeclarationCandidateId`, while only a candidate with no violation receives a component-qualified `SlotId`.
 * Reason: This keeps valid semantic identity separate from retained invalid syntax and supplies H19 with exact arity, declaration-kind, type, static, initializer, definite-assignment, duplicate, and conflicting-decorator facts without reparsing source or fabricating identities.
@@ -792,7 +796,7 @@ Architecture decisions made
 
 Known limitations
 
-* Item: H1 supports Slot declarations only. Component invocation, slot outlets/fragments/bindings, instance planning, Context reprojection, IR, runtime artifacts/execution, resumability, inspection, and diagnostics remain H2-H19 work. Slot entities are intentionally absent from frozen semantic graph v5 and ASM inspection v6 until H18.
+* Item: H1-H2 support Slot declarations and static component invocation facts only. Slot outlets/fragments/bindings, instance planning, Context reprojection, IR, runtime artifacts/execution, resumability, inspection, and diagnostics remain H3-H19 work. Phase H entities are intentionally absent from frozen semantic graph v5 and ASM inspection v6 until H18.
 * Item: Conditional rendering only supports simple `this.<stateField>` conditions with JSX element or fragment branches.
 * Item: Conditional branch snippets are replaced as static HTML. Bindings, events, and nested dynamic behavior inside swapped-in branch snippets are not re-registered yet.
 * Item: Keyed lists currently accept only `iterable.map((item, index?) => <element>...</element>)` with identifier parameters and an expression-bodied callback. Static and runtime reconciliation support a direct primitive item key or a dot-member key such as `item.id` that resolves to a unique primitive.
@@ -830,7 +834,7 @@ Known limitations
 
 Exact next step
 
-Implement H2 canonical component invocation entities from statically resolved PascalCase template tags. Preserve authored invocation candidates and blocked resolution facts without adding slots, instance planning, runtime behavior, or diagnostics projection.
+Implement H3 caller-owned slot content fragments and callee-owned slot outlets from canonical template traversal. Preserve invalid direct-child wrappers, names, duplicates, missing declarations/outlets, and lexical ownership without binding fragments to outlets or adding runtime behavior.
 
 Useful commands
 
@@ -861,4 +865,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the H1 commit (`feat(core): add canonical slot entities`).
+* None after the H2 commit (`feat(core): add canonical component invocations`).

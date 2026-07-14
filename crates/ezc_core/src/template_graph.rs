@@ -40,6 +40,7 @@ pub struct TemplateNode {
 pub struct ElementNode {
     pub id: TemplateNodeId,
     pub tag_name: String,
+    pub tag_name_span: SourceSpan,
     pub span: SourceSpan,
     pub attributes: Vec<TemplateAttribute>,
     pub children: Vec<TemplateChild>,
@@ -185,6 +186,7 @@ fn element_from_render(
     ids: &mut TemplateIdAllocator,
 ) -> Option<ElementNode> {
     let tag_name = render.root_element.clone()?;
+    let tag_name_span = render.root_element_name_span?;
     let span = render.root_span?;
     let id = ids.alloc();
 
@@ -209,6 +211,7 @@ fn element_from_render(
     Some(ElementNode {
         id,
         tag_name,
+        tag_name_span,
         span,
         attributes,
         children,
@@ -227,6 +230,7 @@ fn element_from_render_element(
     ElementNode {
         id,
         tag_name: element.tag_name.clone(),
+        tag_name_span: element.tag_name_span,
         span: element.span,
         attributes: template_attributes(
             &element.attributes,

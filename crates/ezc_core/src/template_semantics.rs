@@ -12,6 +12,8 @@ pub struct TemplateSemanticEntity {
     pub owner: SemanticOwner,
     pub kind: TemplateSemanticKind,
     pub scope: TemplateSemanticScope,
+    pub tag_name: Option<String>,
+    pub tag_name_provenance: Option<SourceProvenance>,
     pub attribute_name: Option<String>,
     pub list_item_variable: Option<String>,
     pub list_index_variable: Option<String>,
@@ -84,6 +86,17 @@ fn collect_element(
         None,
         element.span,
     );
+    entities
+        .last_mut()
+        .expect("element semantic entity was just inserted")
+        .tag_name = Some(element.tag_name.clone());
+    entities
+        .last_mut()
+        .expect("element semantic entity was just inserted")
+        .tag_name_provenance = Some(SourceProvenance::new(
+        &template.provenance.path,
+        element.tag_name_span,
+    ));
 
     for attribute in &element.attributes {
         let Some(span) = attribute.span else {
@@ -272,6 +285,8 @@ fn push_entity(
         owner: SemanticOwner::entity(template.id.clone()),
         kind,
         scope,
+        tag_name: None,
+        tag_name_provenance: None,
         attribute_name: None,
         list_item_variable: None,
         list_index_variable: None,

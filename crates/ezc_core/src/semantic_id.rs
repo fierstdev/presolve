@@ -61,6 +61,16 @@ pub struct SlotId(SemanticId);
 #[serde(transparent)]
 pub struct SlotDeclarationCandidateId(SemanticId);
 
+/// Stable identity for one authored component use in a caller template.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ComponentInvocationId(SemanticId);
+
+/// Typed identity for one canonical authored position in a template traversal.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct TemplatePositionId(SemanticId);
+
 /// Stable identity for an authored Context-family declaration candidate.
 ///
 /// Candidates are source-qualified compiler facts.  They intentionally do not
@@ -262,6 +272,16 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn component_invocation(&self, target: &str) -> Self {
+        self.child("component-invocation", target)
+    }
+
+    #[must_use]
+    pub fn template_position(&self) -> Self {
+        self.child("template-position", "authored")
+    }
+
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -380,6 +400,40 @@ impl SlotDeclarationCandidateId {
     }
 }
 
+impl ComponentInvocationId {
+    #[must_use]
+    pub fn for_template_entity(template_entity: &SemanticId, target: &str) -> Self {
+        Self(template_entity.component_invocation(target))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl TemplatePositionId {
+    #[must_use]
+    pub fn for_template_entity(template_entity: &SemanticId) -> Self {
+        Self(template_entity.template_position())
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 impl ContextDeclarationCandidateId {
     #[must_use]
     pub fn for_component_position(component: &SemanticId, position: usize) -> Self {
@@ -471,6 +525,18 @@ impl fmt::Display for SlotDeclarationCandidateId {
     }
 }
 
+impl fmt::Display for ComponentInvocationId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for TemplatePositionId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
 impl fmt::Display for ContextDeclarationCandidateId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(formatter)
@@ -479,7 +545,10 @@ impl fmt::Display for ContextDeclarationCandidateId {
 
 #[cfg(test)]
 mod tests {
-    use super::{ConsumerId, ContextId, ProviderId, SemanticId, SemanticOwner, SlotId};
+    use super::{
+        ComponentInvocationId, ConsumerId, ContextId, ProviderId, SemanticId, SemanticOwner,
+        SlotId, TemplatePositionId,
+    };
 
     #[test]
     fn derives_component_scoped_ids() {
@@ -540,6 +609,15 @@ mod tests {
         assert_eq!(
             component.template().as_str(),
             "component:x-counter/template:render"
+        );
+        let element = component.template().template_entity("element", "root.0");
+        assert_eq!(
+            TemplatePositionId::for_template_entity(&element).as_str(),
+            "component:x-counter/template:render/element:root.0/template-position:authored"
+        );
+        assert_eq!(
+            ComponentInvocationId::for_template_entity(&element, "component:x-card").as_str(),
+            "component:x-counter/template:render/element:root.0/component-invocation:component:x-card"
         );
     }
 

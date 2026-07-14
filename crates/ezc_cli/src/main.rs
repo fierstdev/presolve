@@ -861,7 +861,10 @@ fn projected_descendants<'a>(
 }
 
 fn is_phase_g_inspection_entity(asm: &ApplicationSemanticModel, id: &SemanticId) -> bool {
-    !matches!(asm.entity(id), Some(SemanticEntity::Slot(_)))
+    !matches!(
+        asm.entity(id),
+        Some(SemanticEntity::Slot(_) | SemanticEntity::ComponentInvocation(_))
+    )
 }
 
 fn filtered_entity_references(
@@ -1159,6 +1162,7 @@ fn semantic_entity_kind(entity: SemanticEntity<'_>) -> &'static str {
         SemanticEntity::Provider(_) => "provider",
         SemanticEntity::Consumer(_) => "consumer",
         SemanticEntity::Slot(_) => "slot",
+        SemanticEntity::ComponentInvocation(_) => "component-invocation",
         SemanticEntity::Computed(_) => "computed",
         SemanticEntity::Effect(_) => "effect",
         SemanticEntity::Parameter(_) => "parameter",

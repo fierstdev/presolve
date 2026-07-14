@@ -861,6 +861,7 @@ pub enum RenderChild {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RenderElement {
     pub tag_name: String,
+    pub tag_name_span: SourceSpan,
     pub span: SourceSpan,
     pub attributes: Vec<RenderAttribute>,
     pub event_handlers: Vec<RenderEventHandler>,
@@ -919,6 +920,7 @@ pub struct RenderEventHandler {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RenderModel {
     pub root_element: Option<String>,
+    pub root_element_name_span: Option<SourceSpan>,
     pub root_span: Option<SourceSpan>,
     pub root_fragment: Option<RenderFragment>,
     pub attributes: Vec<RenderAttribute>,
@@ -2167,6 +2169,7 @@ fn render_model_from_parsed_method(
 
     RenderModel {
         root_element: root_element.map(|element| element.name.clone()),
+        root_element_name_span: root_element.map(|element| element.name_span),
         root_span: root_element.map(|element| element.span),
         root_fragment: root_fragment
             .map(|fragment| render_fragment_from_parsed(fragment, component_id, &mut event_ids)),
@@ -2359,6 +2362,7 @@ fn render_child_from_parsed(
         },
         ParsedJsxChild::Element(element) => RenderChild::Element(RenderElement {
             tag_name: element.name.clone(),
+            tag_name_span: element.name_span,
             span: element.span,
             attributes: element
                 .attributes
@@ -2438,6 +2442,7 @@ fn render_children_from_parsed_node(
     match node {
         ParsedJsxNode::Element(element) => vec![RenderChild::Element(RenderElement {
             tag_name: element.name.clone(),
+            tag_name_span: element.name_span,
             span: element.span,
             attributes: element
                 .attributes
