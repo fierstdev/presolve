@@ -132,6 +132,10 @@ fn effect_violation_diagnostic(
         provenance: Some(violation.provenance.clone()),
         effect_id: Some(EffectId::from_semantic(&effect.id)),
         statement_id,
+        context_declaration_candidate_id: None,
+        context_id: None,
+        provider_id: None,
+        consumer_id: None,
         secondary_labels: normalized_labels(secondary_labels(model, effect, violation)),
     }
 }
@@ -183,6 +187,10 @@ fn unavailable_prerequisite_diagnostic(
         provenance: Some(effect.provenance.clone()),
         effect_id: Some(EffectId::from_semantic(&effect.id)),
         statement_id: None,
+        context_declaration_candidate_id: None,
+        context_id: None,
+        provider_id: None,
+        consumer_id: None,
         secondary_labels: normalized_labels(labels),
     }
 }

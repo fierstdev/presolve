@@ -3,39 +3,40 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: G18 - Context diagnostics
-* Working tree: G18 implementation is ready to commit. The Phase G roadmap file is user-provided and untracked.
+* Latest completed slice: G18 - Context diagnostics corrective gate
+* Working tree: clean after the corrective G18 commit.
 * Date: 2026-07-14
 
 Last completed slice
 
 * Slice: G18 - Context diagnostics
-* Summary: G1-G3 now retain one immutable source-qualified candidate for every `@context`, `@provide`, and `@consume` declaration. G18 projects those facts to `EZC1052`–`EZC1056` without source rewalk; invalid unresolved Consumers and duplicate Providers are excluded from G4-G17 executable products.
-* Key files: crates/ezc_core/src/context_declaration_candidate.rs; crates/ezc_core/src/context_diagnostics.rs; crates/ezc_core/src/component_graph.rs
-* Schema decision: no serialized diagnostic-envelope or ASM inspection shape changed, so check JSON remains v2 and ASM inspection remains v5.
+* Summary: G18 now projects the complete stable `EZC1052`–`EZC1067` catalog exclusively from retained declaration candidates and canonical G4, G5, G8, G9, and G10 products. The shared `ComponentDiagnostic` carries canonical candidate, Context, Provider, and Consumer identities plus ordered, deduplicated secondary evidence. Root-cause suppression prevents derivative resolution, typing, lifetime, planning, or lowering noise without changing any Context semantic product or runtime behavior.
+* Key files: crates/ezc_core/src/context_diagnostics.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_cli/src/main.rs; crates/ezc_cli/tests/explain.rs; fixtures/0056-context-diagnostic-parity/input/ContextDiagnosticParity.tsx
+* Schema decision: the structured diagnostic shape changes check JSON from v2 to v3 and ASM inspection from v5 to v6. Context runtime artifact remains v2; effect runtime artifact remains v1; legacy non-Context diagnostics retain their prior fields and behavior.
 
 Current in-progress slice
 
 * Slice: G19 - Context fixtures
-* Status: Ready to begin after this G18 commit.
+* Status: Unblocked after the corrective G18 commit; G19 has not started.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1 through G18
 * Remaining: G19 through G20.
 
 Verification
 
-* cargo test -p ezc_core context_inspection: pass (1 focused core projection test)
-* cargo test -p ezc_cli --test explain asm: pass (30 focused ASM/selected inspection tests)
+* cargo test -p ezc_core context_diagnostics --lib: pass (23 focused catalog, suppression, and validator tests)
+* cargo test -p ezc_core --lib: pass (244 tests)
+* cargo test -p ezc_cli --test explain context_diagnostics_share_check_full_asm_selected_asm_and_explain_projection -- --exact: pass (check/full ASM/selected ASM/selected explain parity)
+* cargo test -p ezc_cli --test explain: pass (125 tests, including legacy diagnostic and frozen schema coverage)
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core --lib: pass (221 tests)
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 * cargo clippy -p ezc_cli --all-targets -- -D warnings: pass
 * git diff --check: pass
 
 Architecture decisions made
 
-* Decision needed before G18: define the immutable compiler product that retains invalid Context, Provider, and Consumer declaration forms (including canonical subject identity/provenance) or explicitly authorize revision of the G1-G3 discard contract.
-* Reason: Current G1-G3 lowering intentionally excludes invalid decorator/forms from canonical entities and emits no diagnostic records. `ApplicationSemanticModel` retains valid Context/Provider/Consumer maps only, so `EZC1052`--`EZC1054` cannot be projected from G1-G16 facts. Re-reading source, rerunning parser/decorator interpretation in diagnostics, or inventing subject identities would violate the supplied G18 authority rule and compiler-only invariant.
-* Tradeoff: G17 remains complete and committed. No partial Context diagnostics, check-JSON schema change, inspection-schema v6 change, runtime diagnostic reconstruction, or catalog guesswork has been added.
+* Decision: G18 uses retained declaration candidates and canonical G4/G5/G8/G9/G10 records as its only diagnostic sources. The shared `ComponentDiagnostic` is extended with optional typed candidate, Context, Provider, and Consumer identities; no Context-specific diagnostic envelope exists.
+* Reason: Complete canonical identities, narrow source-specific provenance, deterministic secondary evidence, and validation can therefore cross every compiler inspection surface without source rewalk, missing-product inference, Provider reselection, dependency reconstruction, or runtime logic.
+* Tradeoff: Check JSON advances to v3 and ASM inspection to v6 because their structured shape changed. Other public schemas and all Context selection, typing, lifetime, planning, lowering, artifact, and runtime contracts remain unchanged.
 
 * Decision: G1 Context syntax is a zero-argument `@context()` decorated non-static component field with an explicit declared type. It lowers to a distinct component-qualified `ContextId` and remains separate from the authored field identity.
 * Reason: One exact field form makes name, ownership, declared type, provenance, and later Provider/Consumer targets compiler-owned facts without accepting runtime constructors, decorator naming, or implicit globals.

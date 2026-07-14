@@ -110,9 +110,8 @@ pub fn collect_context_declaration_candidates(
         })
         .collect::<Vec<_>>();
 
-    // A duplicate Provider group has no winner.  Existing lowering keeps the
-    // first entity for historical G4 recovery, so retain the candidate facts
-    // and make all source candidates invalid for G18 without changing G4.
+    // A duplicate Provider group has no winner. Retain the candidate facts and
+    // make all otherwise-valid source candidates invalid without changing G4.
     let mut groups = BTreeMap::<(SemanticId, String, String), Vec<usize>>::new();
     for (index, candidate) in candidates.iter().enumerate() {
         if candidate.authored.kind == ContextDeclarationCandidateKind::Provider {
@@ -138,6 +137,11 @@ pub fn collect_context_declaration_candidates(
                     ]);
                 }
                 ContextDeclarationStatus::Invalid(violations) => {
+                    if violations.as_slice()
+                        == [ContextDeclarationViolation::UnresolvedContextDesignator]
+                    {
+                        violations.clear();
+                    }
                     violations.push(ContextDeclarationViolation::DuplicateProvider);
                     violations.sort_by_key(violation_rank);
                     violations.dedup();

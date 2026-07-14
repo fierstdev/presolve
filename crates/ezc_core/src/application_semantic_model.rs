@@ -1483,6 +1483,10 @@ fn classify_computed_values(
                 severity: ComponentDiagnosticSeverity::Error,
                 effect_id: None,
                 statement_id: None,
+                context_declaration_candidate_id: None,
+                context_id: None,
+                provider_id: None,
+                consumer_id: None,
                 secondary_labels: Vec::new(),
                 code: ComputedDiagnosticCode::PurityViolation.as_str().to_string(),
                 message: format!(
@@ -1514,6 +1518,10 @@ fn collect_computed_cycle_diagnostics(
                 severity: ComponentDiagnosticSeverity::Error,
                 effect_id: None,
                 statement_id: None,
+                context_declaration_candidate_id: None,
+                context_id: None,
+                provider_id: None,
+                consumer_id: None,
                 secondary_labels: Vec::new(),
                 code: ComputedDiagnosticCode::DependencyCycle.as_str().to_string(),
                 message: format!(
@@ -1565,6 +1573,10 @@ fn collect_invalid_computed_declaration_diagnostics(
             severity: ComponentDiagnosticSeverity::Error,
             effect_id: None,
             statement_id: None,
+            context_declaration_candidate_id: None,
+            context_id: None,
+            provider_id: None,
+            consumer_id: None,
             secondary_labels: Vec::new(),
             code: ComputedDiagnosticCode::InvalidDeclaration
                 .as_str()
@@ -1610,6 +1622,10 @@ fn collect_computed_body_and_read_diagnostics(
                 severity: ComponentDiagnosticSeverity::Error,
                 effect_id: None,
                 statement_id: None,
+                context_declaration_candidate_id: None,
+                context_id: None,
+                provider_id: None,
+                consumer_id: None,
                 secondary_labels: Vec::new(),
                 code: ComputedDiagnosticCode::UnsupportedBody.as_str().to_string(),
                 message: format!(
@@ -1651,6 +1667,10 @@ fn unresolved_computed_read_diagnostic(
         severity: ComponentDiagnosticSeverity::Error,
         effect_id: None,
         statement_id: None,
+        context_declaration_candidate_id: None,
+        context_id: None,
+        provider_id: None,
+        consumer_id: None,
         secondary_labels: Vec::new(),
         code: ComputedDiagnosticCode::UnresolvedRead.as_str().to_string(),
         message: format!(
@@ -1680,6 +1700,10 @@ fn collect_computed_type_diagnostics(
                 severity: ComponentDiagnosticSeverity::Error,
                 effect_id: None,
                 statement_id: None,
+                context_declaration_candidate_id: None,
+                context_id: None,
+                provider_id: None,
+                consumer_id: None,
                 secondary_labels: Vec::new(),
                 code: ComputedDiagnosticCode::TypeMismatch.as_str().to_string(),
                 message: format!(
@@ -1696,6 +1720,10 @@ fn collect_computed_type_diagnostics(
                 severity: ComponentDiagnosticSeverity::Error,
                 effect_id: None,
                 statement_id: None,
+                context_declaration_candidate_id: None,
+                context_id: None,
+                provider_id: None,
+                consumer_id: None,
                 secondary_labels: Vec::new(),
                 code: ComputedDiagnosticCode::SerializationViolation
                     .as_str()

@@ -29,7 +29,7 @@ use ezc_parser::{
 };
 use serde::Serialize;
 
-const ASM_INSPECTION_SCHEMA_VERSION: u32 = 5;
+const ASM_INSPECTION_SCHEMA_VERSION: u32 = 6;
 
 fn main() {
     let mut args = env::args().skip(1).collect::<Vec<_>>();
@@ -315,7 +315,7 @@ fn check_json(
     } else {
         Vec::new()
     };
-    serde_json::to_string_pretty(&serde_json::json!({"schema_version": 2, "files": unit.files().iter().map(|file| file.path.display().to_string()).collect::<Vec<_>>(), "summary": {"parser_diagnostics": parser_count, "compiler_diagnostics": asm.diagnostics.len(), "validation": validation.len()}, "categories": categories, "fail_on": diagnostic_severity_label(fail_on), "parser_diagnostics": parser_diagnostics, "compiler_diagnostics": compiler_diagnostics, "validation": validation_diagnostics})).expect("check document should serialize") + "\n"
+    serde_json::to_string_pretty(&serde_json::json!({"schema_version": 3, "files": unit.files().iter().map(|file| file.path.display().to_string()).collect::<Vec<_>>(), "summary": {"parser_diagnostics": parser_count, "compiler_diagnostics": asm.diagnostics.len(), "validation": validation.len()}, "categories": categories, "fail_on": diagnostic_severity_label(fail_on), "parser_diagnostics": parser_diagnostics, "compiler_diagnostics": compiler_diagnostics, "validation": validation_diagnostics})).expect("check document should serialize") + "\n"
 }
 
 fn parser_diagnostic_json(path: &Path, diagnostic: &ParseDiagnostic) -> serde_json::Value {
@@ -364,6 +364,41 @@ fn compiler_diagnostic_json(diagnostic: &ezc_core::ComponentDiagnostic) -> serde
             .as_ref()
             .map_or(serde_json::Value::Null, |id| serde_json::json!(id.as_str())),
     );
+    for (name, value) in [
+        (
+            "context_declaration_candidate_id",
+            diagnostic
+                .context_declaration_candidate_id
+                .as_ref()
+                .map(ezc_core::ContextDeclarationCandidateId::as_str),
+        ),
+        (
+            "context_id",
+            diagnostic
+                .context_id
+                .as_ref()
+                .map(ezc_core::ContextId::as_str),
+        ),
+        (
+            "provider_id",
+            diagnostic
+                .provider_id
+                .as_ref()
+                .map(ezc_core::ProviderId::as_str),
+        ),
+        (
+            "consumer_id",
+            diagnostic
+                .consumer_id
+                .as_ref()
+                .map(ezc_core::ConsumerId::as_str),
+        ),
+    ] {
+        document.insert(
+            name.to_string(),
+            value.map_or(serde_json::Value::Null, serde_json::Value::from),
+        );
+    }
     document.insert("secondary_labels".to_string(), serde_json::Value::Array(diagnostic.secondary_labels.iter().map(|label| serde_json::json!({"provenance": AsmInspectionProvenance::from(&label.provenance), "message": label.message})).collect()));
     serde_json::Value::Object(document)
 }
@@ -504,12 +539,11 @@ fn asm_inspection_json(
         (left.source, left.target, left.kind).cmp(&(right.source, right.target, right.kind))
     });
 
-    let mut diagnostics = asm
+    let diagnostics = asm
         .diagnostics
         .iter()
         .map(AsmInspectionDiagnostic::from)
         .collect::<Vec<_>>();
-    diagnostics.sort_by(|left, right| (left.code, left.message).cmp(&(right.code, right.message)));
 
     let mut validation = validation
         .iter()
@@ -520,6 +554,10 @@ fn asm_inspection_json(
             primary_provenance: None,
             effect_id: None,
             statement_id: None,
+            context_declaration_candidate_id: None,
+            context_id: None,
+            provider_id: None,
+            consumer_id: None,
             secondary_labels: Vec::new(),
         })
         .collect::<Vec<_>>();
@@ -676,7 +714,7 @@ fn print_asm_entity_text(
         "incoming",
         filtered_entity_references(asm.references_to(id), filters),
     );
-    print_entity_diagnostics(diagnostics, provenance);
+    print_entity_diagnostics(diagnostics, id, provenance);
 }
 
 fn print_entity_references(label: &str, references: Vec<&ezc_core::SemanticReference>) {
@@ -718,9 +756,10 @@ fn print_effect_inspection_text(effect: &EffectInspection) {
 
 fn print_entity_diagnostics(
     diagnostics: &[ezc_core::ComponentDiagnostic],
+    id: &SemanticId,
     provenance: &SourceProvenance,
 ) {
-    let diagnostics = related_entity_diagnostics(diagnostics, provenance);
+    let diagnostics = related_entity_diagnostics(diagnostics, id, provenance);
     println!("  diagnostics: {}", diagnostics.len());
     for diagnostic in diagnostics {
         println!("    {}: {}", diagnostic.code, diagnostic.message);
@@ -764,7 +803,7 @@ fn asm_entity_inspection_json(
             .into_iter()
             .map(AsmInspectionReference::from)
             .collect(),
-        diagnostics: related_entity_diagnostics(diagnostics, provenance)
+        diagnostics: related_entity_diagnostics(diagnostics, id, provenance)
             .into_iter()
             .map(AsmInspectionDiagnostic::from)
             .collect(),
@@ -810,19 +849,41 @@ fn filtered_entity_references(
 
 fn related_entity_diagnostics<'a>(
     diagnostics: &'a [ezc_core::ComponentDiagnostic],
+    id: &SemanticId,
     provenance: &SourceProvenance,
 ) -> Vec<&'a ezc_core::ComponentDiagnostic> {
+    let id = id.as_str();
     diagnostics
         .iter()
         .filter(|diagnostic| {
             diagnostic
-                .provenance
+                .effect_id
                 .as_ref()
-                .is_some_and(|diagnostic_provenance| {
-                    diagnostic_provenance.path == provenance.path
-                        && diagnostic_provenance.span.start < provenance.span.end
-                        && provenance.span.start < diagnostic_provenance.span.end
-                })
+                .is_some_and(|item| item.as_str() == id)
+                || diagnostic
+                    .context_declaration_candidate_id
+                    .as_ref()
+                    .is_some_and(|item| item.as_str() == id)
+                || diagnostic
+                    .context_id
+                    .as_ref()
+                    .is_some_and(|item| item.as_str() == id)
+                || diagnostic
+                    .provider_id
+                    .as_ref()
+                    .is_some_and(|item| item.as_str() == id)
+                || diagnostic
+                    .consumer_id
+                    .as_ref()
+                    .is_some_and(|item| item.as_str() == id)
+                || diagnostic
+                    .provenance
+                    .as_ref()
+                    .is_some_and(|diagnostic_provenance| {
+                        diagnostic_provenance.path == provenance.path
+                            && diagnostic_provenance.span.start < provenance.span.end
+                            && provenance.span.start < diagnostic_provenance.span.end
+                    })
         })
         .collect()
 }
@@ -1385,6 +1446,10 @@ struct AsmInspectionDiagnostic<'a> {
     effect_id: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     statement_id: Option<&'a str>,
+    context_declaration_candidate_id: Option<&'a str>,
+    context_id: Option<&'a str>,
+    provider_id: Option<&'a str>,
+    consumer_id: Option<&'a str>,
     secondary_labels: Vec<AsmInspectionSecondaryLabel>,
 }
 
@@ -1406,6 +1471,22 @@ impl<'a> From<&'a ezc_core::ComponentDiagnostic> for AsmInspectionDiagnostic<'a>
                 .statement_id
                 .as_ref()
                 .map(ezc_core::EffectStatementId::as_str),
+            context_declaration_candidate_id: diagnostic
+                .context_declaration_candidate_id
+                .as_ref()
+                .map(ezc_core::ContextDeclarationCandidateId::as_str),
+            context_id: diagnostic
+                .context_id
+                .as_ref()
+                .map(ezc_core::ContextId::as_str),
+            provider_id: diagnostic
+                .provider_id
+                .as_ref()
+                .map(ezc_core::ProviderId::as_str),
+            consumer_id: diagnostic
+                .consumer_id
+                .as_ref()
+                .map(ezc_core::ConsumerId::as_str),
             secondary_labels: diagnostic
                 .secondary_labels
                 .iter()

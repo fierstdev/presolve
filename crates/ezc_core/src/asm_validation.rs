@@ -915,11 +915,126 @@ fn validate_consumers(
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn validate_component_diagnostic_metadata(
     model: &ApplicationSemanticModel,
     diagnostics: &mut Vec<AsmValidationDiagnostic>,
 ) {
     for diagnostic in &model.diagnostics {
+        let valid_context = diagnostic
+            .context_id
+            .as_ref()
+            .is_none_or(|id| model.context(id).is_some());
+        let valid_provider = diagnostic
+            .provider_id
+            .as_ref()
+            .is_none_or(|id| model.provider(id).is_some());
+        let valid_consumer = diagnostic
+            .consumer_id
+            .as_ref()
+            .is_none_or(|id| model.consumer(id).is_some());
+        let valid_candidate = diagnostic
+            .context_declaration_candidate_id
+            .as_ref()
+            .is_none_or(|id| {
+                model
+                    .context_declaration_candidates()
+                    .candidate(id)
+                    .is_some()
+            });
+        if !(valid_context && valid_provider && valid_consumer && valid_candidate) {
+            diagnostics.push(AsmValidationDiagnostic {
+                code: "EZASM1135".to_string(),
+                message: format!(
+                    "compiler diagnostic `{}` references an unknown Context diagnostic subject",
+                    diagnostic.code
+                ),
+            });
+        }
+        if let (Some(provider), Some(context)) = (
+            diagnostic
+                .provider_id
+                .as_ref()
+                .and_then(|id| model.provider(id)),
+            diagnostic.context_id.as_ref(),
+        ) {
+            if &provider.context != context {
+                diagnostics.push(AsmValidationDiagnostic {
+                    code: "EZASM1138".to_string(),
+                    message: format!(
+                        "compiler diagnostic `{}` references a Provider for the wrong Context",
+                        diagnostic.code
+                    ),
+                });
+            }
+        }
+        if let (Some(consumer), Some(context)) = (
+            diagnostic
+                .consumer_id
+                .as_ref()
+                .and_then(|id| model.consumer(id)),
+            diagnostic.context_id.as_ref(),
+        ) {
+            if consumer.context() != Some(context) {
+                diagnostics.push(AsmValidationDiagnostic {
+                    code: "EZASM1139".to_string(),
+                    message: format!(
+                        "compiler diagnostic `{}` references a Consumer for the wrong Context",
+                        diagnostic.code
+                    ),
+                });
+            }
+        }
+        if diagnostic.context_declaration_candidate_id.is_some()
+            && (diagnostic.context_id.is_some()
+                || diagnostic.provider_id.is_some()
+                || diagnostic.consumer_id.is_some())
+        {
+            diagnostics.push(AsmValidationDiagnostic { code: "EZASM1136".to_string(), message: format!("invalid Context declaration diagnostic `{}` carries a semantic entity identity", diagnostic.code) });
+        }
+        if ("EZC1052"..="EZC1067").contains(&diagnostic.code.as_str()) {
+            if let Some(primary) = diagnostic.provenance.as_ref() {
+                if !context_diagnostic_primary_is_canonical(model, diagnostic, primary) {
+                    diagnostics.push(AsmValidationDiagnostic {
+                        code: "EZASM1140".to_string(),
+                        message: format!(
+                            "Context diagnostic `{}` has non-canonical primary provenance",
+                            diagnostic.code
+                        ),
+                    });
+                }
+            }
+            if diagnostic.code == "EZC1058" {
+                let mut expected = diagnostic
+                    .consumer_id
+                    .as_ref()
+                    .and_then(|consumer| model.context_resolutions.get(consumer))
+                    .and_then(|resolution| match &resolution.result {
+                        crate::ContextResolutionResult::Ambiguous { providers, .. } => {
+                            Some(providers.clone())
+                        }
+                        _ => None,
+                    })
+                    .unwrap_or_default();
+                expected.sort();
+                expected.dedup();
+                let expected = expected
+                    .iter()
+                    .filter_map(|id| model.provider(id))
+                    .map(|provider| crate::DiagnosticSecondaryLabel {
+                        provenance: provider.provenance.clone(),
+                        message: format!("Candidate Provider `{}`.", provider.id),
+                    })
+                    .collect::<Vec<_>>();
+                if diagnostic.secondary_labels != expected {
+                    diagnostics.push(AsmValidationDiagnostic {
+                        code: "EZASM1134".to_string(),
+                        message: "Context ambiguity diagnostic has non-canonical Provider evidence"
+                            .to_string(),
+                    });
+                }
+            }
+        }
         let effect = diagnostic.effect_id.as_ref().and_then(|effect_id| {
             model
                 .effects
@@ -992,6 +1107,15 @@ fn validate_component_diagnostic_metadata(
             });
         }
         for label in &diagnostic.secondary_labels {
+            if diagnostic.provenance.as_ref() == Some(&label.provenance) {
+                diagnostics.push(AsmValidationDiagnostic {
+                    code: "EZASM1137".to_string(),
+                    message: format!(
+                        "compiler diagnostic `{}` repeats primary provenance as a secondary label",
+                        diagnostic.code
+                    ),
+                });
+            }
             let canonical = model
                 .provenance
                 .values()
@@ -1011,6 +1135,164 @@ fn validate_component_diagnostic_metadata(
                 });
             }
         }
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+fn context_diagnostic_primary_is_canonical(
+    model: &ApplicationSemanticModel,
+    diagnostic: &crate::ComponentDiagnostic,
+    primary: &crate::SourceProvenance,
+) -> bool {
+    match diagnostic.code.as_str() {
+        "EZC1052" | "EZC1053" | "EZC1054" | "EZC1055" | "EZC1056" => diagnostic
+            .context_declaration_candidate_id
+            .as_ref()
+            .and_then(|id| model.context_declaration_candidates().candidate(id))
+            .is_some_and(|candidate| {
+                let crate::ContextDeclarationStatus::Invalid(violations) = &candidate.status else {
+                    return false;
+                };
+                let expected = match violations.first() {
+                    Some(crate::ContextDeclarationViolation::StaticDeclarationUnsupported) => {
+                        candidate.authored.static_modifier_provenance.as_ref()
+                    }
+                    Some(
+                        crate::ContextDeclarationViolation::UnsupportedInitializer
+                        | crate::ContextDeclarationViolation::ForbiddenInitializer
+                        | crate::ContextDeclarationViolation::MissingInitializer,
+                    ) => candidate.authored.initializer_provenance.as_ref(),
+                    Some(
+                        crate::ContextDeclarationViolation::ContextDesignatorUnsupported
+                        | crate::ContextDeclarationViolation::UnresolvedContextDesignator,
+                    ) => candidate
+                        .authored
+                        .context_designator
+                        .as_ref()
+                        .map(|designator| &designator.provenance),
+                    Some(_) => Some(&candidate.authored.decorator_provenance),
+                    None => None,
+                }
+                .unwrap_or(&candidate.authored.provenance);
+                expected == primary
+            }),
+        "EZC1057" | "EZC1058" => diagnostic
+            .consumer_id
+            .as_ref()
+            .and_then(|id| model.context_resolutions.get(id))
+            .is_some_and(|record| &record.provenance == primary),
+        "EZC1059" => {
+            diagnostic
+                .provider_id
+                .as_ref()
+                .and_then(|id| model.provider(id))
+                .and_then(|provider| {
+                    model
+                        .expression_graph
+                        .provenance_of(&provider.value_expression)
+                })
+                == Some(primary)
+        }
+        "EZC1060" => diagnostic
+            .provider_id
+            .as_ref()
+            .and_then(|id| model.provider(id))
+            .is_some_and(|provider| &provider.declared_type.provenance == primary),
+        "EZC1061" => {
+            diagnostic
+                .context_id
+                .as_ref()
+                .and_then(|id| model.context(id))
+                .and_then(|context| context.default_expression.as_ref())
+                .and_then(|expression| model.expression_graph.provenance_of(expression))
+                == Some(primary)
+        }
+        "EZC1062" => diagnostic
+            .consumer_id
+            .as_ref()
+            .and_then(|id| model.consumer(id))
+            .is_some_and(|consumer| &consumer.requested_type.provenance == primary),
+        "EZC1063" | "EZC1064" => {
+            if let Some(provider) = diagnostic
+                .provider_id
+                .as_ref()
+                .and_then(|id| model.provider(id))
+            {
+                return model
+                    .expression_graph
+                    .provenance_of(&provider.value_expression)
+                    == Some(primary);
+            }
+            diagnostic
+                .context_id
+                .as_ref()
+                .and_then(|id| model.context(id))
+                .is_some_and(|context| {
+                    context
+                        .default_expression
+                        .as_ref()
+                        .and_then(|expression| model.expression_graph.provenance_of(expression))
+                        .unwrap_or(&context.declared_type.provenance)
+                        == primary
+                })
+        }
+        "EZC1065" => {
+            diagnostic
+                .consumer_id
+                .as_ref()
+                .and_then(|id| model.context_lifetime.binding_lifetimes.get(id))
+                .is_some_and(|record| &record.provenance == primary)
+                || model
+                    .context_lifetime
+                    .dependency_lifetimes
+                    .iter()
+                    .any(|record| &record.provenance == primary)
+        }
+        "EZC1066" | "EZC1067" => model
+            .context_evaluation
+            .source_entries
+            .values()
+            .filter(|entry| diagnostic.context_id.as_ref() == Some(&entry.context))
+            .filter(|entry| match &entry.source {
+                crate::ContextValueSourceId::Provider(provider) => {
+                    diagnostic.provider_id.as_ref() == Some(provider)
+                }
+                crate::ContextValueSourceId::ContextDefault(_) => diagnostic.provider_id.is_none(),
+            })
+            .any(|entry| {
+                if diagnostic.code == "EZC1067" {
+                    return model
+                        .expression_graph
+                        .provenance_of(&entry.expression_root)
+                        .unwrap_or(&entry.provenance)
+                        == primary;
+                }
+                let dependent = match &entry.source {
+                    crate::ContextValueSourceId::Provider(provider) => {
+                        crate::ContextDependencyNodeId::Provider(provider.clone())
+                    }
+                    crate::ContextValueSourceId::ContextDefault(context) => {
+                        crate::ContextDependencyNodeId::ContextDefault(context.clone())
+                    }
+                };
+                entry.reasons.iter().any(|reason| {
+                    let dependency = match reason {
+                        crate::ContextSourceBlockReason::MissingStateDependency(id) => {
+                            crate::ContextDependencyNodeId::State(id.clone())
+                        }
+                        crate::ContextSourceBlockReason::UnavailableComputedDependency(id) => {
+                            crate::ContextDependencyNodeId::Computed(id.clone())
+                        }
+                        _ => return false,
+                    };
+                    model.context_dependency.edges.iter().any(|edge| {
+                        edge.dependent == dependent
+                            && edge.dependency == dependency
+                            && &edge.provenance == primary
+                    })
+                }) || &entry.provenance == primary
+            }),
+        _ => false,
     }
 }
 

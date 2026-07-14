@@ -204,7 +204,7 @@ fn asm_command_emits_deterministic_json_inspection() {
 
     let document: serde_json::Value =
         serde_json::from_slice(&first.stdout).expect("ASM inspection output was not valid JSON");
-    assert_eq!(document["schema_version"], 5);
+    assert_eq!(document["schema_version"], 6);
     assert_eq!(
         document["file"],
         "fixtures/0001-source-summary/input/Counter.tsx"
@@ -355,7 +355,7 @@ fn asm_command_inspects_one_semantic_entity() {
 
     assert!(output.status.success());
     let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("entity JSON");
-    assert_eq!(document["schema_version"], 5);
+    assert_eq!(document["schema_version"], 6);
     assert_eq!(document["entity"]["id"], entity_id);
     assert_eq!(document["entity"]["kind"], "state-field");
     assert_eq!(document["entity"]["semantic_type"]["type_text"], "number");
@@ -442,7 +442,7 @@ fn asm_and_explain_inspect_canonical_computed_metadata() {
 
     let document: serde_json::Value =
         serde_json::from_slice(&asm.stdout).expect("computed entity inspection JSON");
-    assert_eq!(document["schema_version"], 5);
+    assert_eq!(document["schema_version"], 6);
     assert_eq!(document["entity"]["computed"]["computed_type"], "number");
     assert_eq!(
         document["entity"]["computed"]["dependencies"],
@@ -519,7 +519,7 @@ fn asm_and_explain_project_one_canonical_effect_inspection_record() {
 
     let selected: serde_json::Value = serde_json::from_slice(&asm.stdout).expect("effect JSON");
     let inspection = &selected["entity"]["effect"];
-    assert_eq!(selected["schema_version"], 5);
+    assert_eq!(selected["schema_version"], 6);
     assert_eq!(inspection["validation"]["status"], "valid");
     assert_eq!(
         inspection["direct_dependencies"]["state"],
@@ -1542,7 +1542,7 @@ fn check_command_emits_json_diagnostics() {
         .output().expect("failed to run ezc_cli check");
     assert!(!output.status.success());
     let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("check JSON");
-    assert_eq!(document["schema_version"], 2);
+    assert_eq!(document["schema_version"], 3);
     assert_eq!(
         document["compiler_diagnostics"].as_array().map(Vec::len),
         Some(7)
@@ -1628,8 +1628,75 @@ fn effect_diagnostics_share_check_and_selected_explain_projection() {
     assert!(explain.status.success());
     let explain: serde_json::Value =
         serde_json::from_slice(&explain.stdout).expect("selected effect explain JSON");
-    assert_eq!(explain["schema_version"], 5);
+    assert_eq!(explain["schema_version"], 6);
     assert_eq!(explain["diagnostics"], serde_json::Value::Array(expected));
+}
+
+#[test]
+fn context_diagnostics_share_check_full_asm_selected_asm_and_explain_projection() {
+    let path = "fixtures/0056-context-diagnostic-parity/input/ContextDiagnosticParity.tsx";
+    let context_id = concat!(
+        "module:fixtures/0056-context-diagnostic-parity/input/ContextDiagnosticParity.tsx/",
+        "component:x-context-diagnostic-parity/context:theme"
+    );
+    let run = |args: &[&str]| {
+        Command::new(ezc_cli_bin())
+            .current_dir(repo_root())
+            .args(args)
+            .output()
+            .expect("failed to run Context diagnostic surface")
+    };
+    let parse = |output: &std::process::Output| {
+        serde_json::from_slice::<serde_json::Value>(&output.stdout)
+            .expect("Context diagnostic surface JSON")
+    };
+    let normalize = |diagnostics: &serde_json::Value| {
+        diagnostics
+            .as_array()
+            .expect("Context diagnostics")
+            .iter()
+            .map(|diagnostic| {
+                serde_json::json!({
+                    "code": diagnostic["code"],
+                    "severity": diagnostic["severity"],
+                    "message": diagnostic["message"],
+                    "primary_provenance": diagnostic["primary_provenance"],
+                    "context_declaration_candidate_id": diagnostic["context_declaration_candidate_id"],
+                    "context_id": diagnostic["context_id"],
+                    "provider_id": diagnostic["provider_id"],
+                    "consumer_id": diagnostic["consumer_id"],
+                    "secondary_labels": diagnostic["secondary_labels"],
+                })
+            })
+            .collect::<Vec<_>>()
+    };
+
+    let check_output = run(&["check", path, "--format", "json"]);
+    assert!(!check_output.status.success());
+    let check = parse(&check_output);
+    assert_eq!(check["schema_version"], 3);
+    let expected = normalize(&check["compiler_diagnostics"]);
+    assert_eq!(
+        expected
+            .iter()
+            .map(|diagnostic| diagnostic["code"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        ["EZC1060", "EZC1059", "EZC1062"]
+    );
+
+    let full_asm_output = run(&["asm", path, "--format", "json"]);
+    assert!(full_asm_output.status.success());
+    let full_asm = parse(&full_asm_output);
+    assert_eq!(full_asm["schema_version"], 6);
+    assert_eq!(normalize(&full_asm["diagnostics"]), expected);
+
+    for command in ["asm", "explain"] {
+        let output = run(&[command, "--entity", context_id, path, "--format", "json"]);
+        assert!(output.status.success());
+        let selected = parse(&output);
+        assert_eq!(selected["schema_version"], 6);
+        assert_eq!(normalize(&selected["diagnostics"]), expected);
+    }
 }
 
 #[test]
@@ -4078,7 +4145,7 @@ class ContextRuntime extends Component {
     let artifact = std::fs::read_to_string(out_dir.join("context.runtime.json"))
         .expect("failed to read Context runtime artifact");
     let artifact: serde_json::Value = serde_json::from_str(&artifact).expect("artifact JSON");
-    assert_eq!(artifact["schema_version"], 1);
+    assert_eq!(artifact["schema_version"], 2);
     assert_eq!(artifact["sources"].as_array().map(Vec::len), Some(1));
     assert_eq!(artifact["consumers"].as_array().map(Vec::len), Some(1));
     assert!(artifact["sources"][0]["program"]["instructions"]
