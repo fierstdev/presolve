@@ -136,7 +136,12 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
         .filter(|id| {
             !matches!(
                 asm.entity(id),
-                Some(SemanticEntity::Slot(_) | SemanticEntity::ComponentInvocation(_))
+                Some(
+                    SemanticEntity::Slot(_)
+                        | SemanticEntity::ComponentInvocation(_)
+                        | SemanticEntity::SlotContentFragment(_)
+                        | SemanticEntity::SlotOutlet(_)
+                )
             )
         })
         .map(|id| {
@@ -164,7 +169,12 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
         .filter_map(|(target, owner)| {
             if matches!(
                 asm.entity(target),
-                Some(SemanticEntity::Slot(_) | SemanticEntity::ComponentInvocation(_))
+                Some(
+                    SemanticEntity::Slot(_)
+                        | SemanticEntity::ComponentInvocation(_)
+                        | SemanticEntity::SlotContentFragment(_)
+                        | SemanticEntity::SlotOutlet(_)
+                )
             ) {
                 return None;
             }
@@ -259,6 +269,12 @@ fn semantic_graph_node_kind(entity: SemanticEntity<'_>) -> SemanticGraphNodeKind
         }
         SemanticEntity::ComponentInvocation(_) => {
             unreachable!("Component invocations are not projected into semantic graph schema v5")
+        }
+        SemanticEntity::SlotContentFragment(_) => {
+            unreachable!("Slot fragments are not projected into semantic graph schema v5")
+        }
+        SemanticEntity::SlotOutlet(_) => {
+            unreachable!("Slot outlets are not projected into semantic graph schema v5")
         }
         SemanticEntity::Computed(_) => SemanticGraphNodeKind::Computed,
         SemanticEntity::Effect(_) => SemanticGraphNodeKind::Effect,

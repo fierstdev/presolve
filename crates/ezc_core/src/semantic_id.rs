@@ -71,6 +71,16 @@ pub struct ComponentInvocationId(SemanticId);
 #[serde(transparent)]
 pub struct TemplatePositionId(SemanticId);
 
+/// Stable identity for one caller-owned content fragment supplied to an invocation Slot.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SlotContentFragmentId(SemanticId);
+
+/// Stable identity for one callee-authored compile-time Slot outlet.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SlotOutletId(SemanticId);
+
 /// Stable identity for an authored Context-family declaration candidate.
 ///
 /// Candidates are source-qualified compiler facts.  They intentionally do not
@@ -282,6 +292,16 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn slot_content_fragment(&self, slot_name: &str) -> Self {
+        self.child("slot-content", slot_name)
+    }
+
+    #[must_use]
+    pub fn slot_outlet(&self, slot_name: &str) -> Self {
+        self.child("slot-outlet", slot_name)
+    }
+
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -434,6 +454,40 @@ impl TemplatePositionId {
     }
 }
 
+impl SlotContentFragmentId {
+    #[must_use]
+    pub fn for_invocation(invocation: &ComponentInvocationId, slot_name: &str) -> Self {
+        Self(invocation.as_semantic_id().slot_content_fragment(slot_name))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl SlotOutletId {
+    #[must_use]
+    pub fn for_template_entity(template_entity: &SemanticId, slot_name: &str) -> Self {
+        Self(template_entity.slot_outlet(slot_name))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 impl ContextDeclarationCandidateId {
     #[must_use]
     pub fn for_component_position(component: &SemanticId, position: usize) -> Self {
@@ -532,6 +586,18 @@ impl fmt::Display for ComponentInvocationId {
 }
 
 impl fmt::Display for TemplatePositionId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for SlotContentFragmentId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for SlotOutletId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(formatter)
     }

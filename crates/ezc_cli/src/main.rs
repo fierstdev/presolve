@@ -863,7 +863,12 @@ fn projected_descendants<'a>(
 fn is_phase_g_inspection_entity(asm: &ApplicationSemanticModel, id: &SemanticId) -> bool {
     !matches!(
         asm.entity(id),
-        Some(SemanticEntity::Slot(_) | SemanticEntity::ComponentInvocation(_))
+        Some(
+            SemanticEntity::Slot(_)
+                | SemanticEntity::ComponentInvocation(_)
+                | SemanticEntity::SlotContentFragment(_)
+                | SemanticEntity::SlotOutlet(_)
+        )
     )
 }
 
@@ -1163,6 +1168,8 @@ fn semantic_entity_kind(entity: SemanticEntity<'_>) -> &'static str {
         SemanticEntity::Consumer(_) => "consumer",
         SemanticEntity::Slot(_) => "slot",
         SemanticEntity::ComponentInvocation(_) => "component-invocation",
+        SemanticEntity::SlotContentFragment(_) => "slot-content-fragment",
+        SemanticEntity::SlotOutlet(_) => "slot-outlet",
         SemanticEntity::Computed(_) => "computed",
         SemanticEntity::Effect(_) => "effect",
         SemanticEntity::Parameter(_) => "parameter",

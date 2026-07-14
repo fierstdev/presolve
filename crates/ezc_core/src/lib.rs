@@ -62,6 +62,7 @@ pub mod semantic_provenance;
 pub mod semantic_reference;
 pub mod semantic_type;
 pub mod slot;
+pub mod slot_content;
 pub mod summarize;
 pub mod symbol_table;
 pub mod template_graph;
@@ -273,8 +274,8 @@ pub use semantic_graph::{
 };
 pub use semantic_id::{
     ComponentInvocationId, ConsumerId, ContextDeclarationCandidateId, ContextId, EffectId,
-    EffectStatementId, ProviderId, SemanticId, SemanticOwner, SlotDeclarationCandidateId, SlotId,
-    TemplatePositionId,
+    EffectStatementId, ProviderId, SemanticId, SemanticOwner, SlotContentFragmentId,
+    SlotDeclarationCandidateId, SlotId, SlotOutletId, TemplatePositionId,
 };
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
@@ -288,6 +289,11 @@ pub use semantic_type::{
     SemanticTypeStatus, SerializationCompatibility, TypeDiagnosticCode, TypeDiagnosticFamily,
 };
 pub use slot::{collect_slot_entities, SlotEntity};
+pub use slot_content::{
+    collect_slot_composition, SlotCompositionRegistry, SlotContentFragment,
+    SlotContentFragmentStatus, SlotContentFragmentViolation, SlotOutlet, SlotOutletStatus,
+    SlotOutletViolation,
+};
 pub use summarize::summarize_source;
 pub use symbol_table::{
     build_symbol_table, ModuleSymbol, ModuleSymbolTable, SymbolDiagnostic, SymbolKind, SymbolTable,

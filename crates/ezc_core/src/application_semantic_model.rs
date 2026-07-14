@@ -35,12 +35,14 @@ use crate::intermediate_representation::{
 };
 use crate::provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
 use crate::semantic_id::{
-    ComponentInvocationId, ConsumerId, ContextId, ProviderId, SemanticId, SemanticOwner, SlotId,
+    ComponentInvocationId, ConsumerId, ContextId, ProviderId, SemanticId, SemanticOwner,
+    SlotContentFragmentId, SlotId, SlotOutletId,
 };
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
 use crate::semantic_type::{EffectStatementTypeRecord, SemanticTypeModel};
 use crate::slot::{collect_slot_entities, SlotEntity};
+use crate::slot_content::{collect_slot_composition, SlotContentFragment, SlotOutlet};
 use crate::template_graph::{build_template_graph, TemplateNode};
 use crate::template_semantics::{
     build_template_semantic_entities, TemplateSemanticEntity, TemplateSemanticKind,
@@ -63,6 +65,8 @@ pub struct ApplicationSemanticModel {
     pub consumers: BTreeMap<ConsumerId, ConsumerEntity>,
     pub slots: BTreeMap<SlotId, SlotEntity>,
     pub component_invocations: BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
+    pub slot_content_fragments: BTreeMap<SlotContentFragmentId, SlotContentFragment>,
+    pub slot_outlets: BTreeMap<SlotOutletId, SlotOutlet>,
     pub context_declaration_candidates: ContextDeclarationCandidateRegistry,
     pub context_ownership: ContextOwnershipGraph,
     pub context_dependency: ContextDependencyGraph,
@@ -104,6 +108,8 @@ pub enum SemanticEntity<'a> {
     Consumer(&'a ConsumerEntity),
     Slot(&'a SlotEntity),
     ComponentInvocation(&'a ComponentInvocationEntity),
+    SlotContentFragment(&'a SlotContentFragment),
+    SlotOutlet(&'a SlotOutlet),
     Computed(&'a ComputedValue),
     Effect(&'a Effect),
     Parameter(&'a crate::MethodParameter),
@@ -124,6 +130,8 @@ pub enum SemanticEntityKind {
     Consumer,
     Slot,
     ComponentInvocation,
+    SlotContentFragment,
+    SlotOutlet,
     Computed,
     Effect,
     Parameter,
@@ -146,6 +154,8 @@ impl SemanticEntity<'_> {
             Self::Consumer(_) => SemanticEntityKind::Consumer,
             Self::Slot(_) => SemanticEntityKind::Slot,
             Self::ComponentInvocation(_) => SemanticEntityKind::ComponentInvocation,
+            Self::SlotContentFragment(_) => SemanticEntityKind::SlotContentFragment,
+            Self::SlotOutlet(_) => SemanticEntityKind::SlotOutlet,
             Self::Computed(_) => SemanticEntityKind::Computed,
             Self::Effect(_) => SemanticEntityKind::Effect,
             Self::Parameter(_) => SemanticEntityKind::Parameter,
@@ -237,6 +247,20 @@ impl ApplicationSemanticModel {
             .find(|invocation| invocation.id.as_semantic_id() == id)
         {
             return Some(SemanticEntity::ComponentInvocation(invocation));
+        }
+        if let Some(fragment) = self
+            .slot_content_fragments
+            .values()
+            .find(|fragment| fragment.id.as_semantic_id() == id)
+        {
+            return Some(SemanticEntity::SlotContentFragment(fragment));
+        }
+        if let Some(outlet) = self
+            .slot_outlets
+            .values()
+            .find(|outlet| outlet.id.as_semantic_id() == id)
+        {
+            return Some(SemanticEntity::SlotOutlet(outlet));
         }
         if let Some(effect) = self.effects.get(id) {
             return Some(SemanticEntity::Effect(effect));
@@ -421,6 +445,48 @@ impl ApplicationSemanticModel {
         self.component_invocations
             .iter()
             .filter_map(|(id, invocation)| (&invocation.owner_component == component).then_some(id))
+            .collect()
+    }
+
+    #[must_use]
+    pub fn slot_content_fragments(&self) -> Vec<&SlotContentFragment> {
+        self.slot_content_fragments.values().collect()
+    }
+
+    #[must_use]
+    pub fn slot_content_fragment(
+        &self,
+        id: &SlotContentFragmentId,
+    ) -> Option<&SlotContentFragment> {
+        self.slot_content_fragments.get(id)
+    }
+
+    #[must_use]
+    pub fn slot_content_fragments_for(
+        &self,
+        invocation: &ComponentInvocationId,
+    ) -> Vec<&SlotContentFragment> {
+        self.slot_content_fragments
+            .values()
+            .filter(|fragment| &fragment.invocation == invocation)
+            .collect()
+    }
+
+    #[must_use]
+    pub fn slot_outlets(&self) -> Vec<&SlotOutlet> {
+        self.slot_outlets.values().collect()
+    }
+
+    #[must_use]
+    pub fn slot_outlet(&self, id: &SlotOutletId) -> Option<&SlotOutlet> {
+        self.slot_outlets.get(id)
+    }
+
+    #[must_use]
+    pub fn slot_outlets_owned_by(&self, component: &SemanticId) -> Vec<&SlotOutletId> {
+        self.slot_outlets
+            .iter()
+            .filter_map(|(id, outlet)| (&outlet.owner_component == component).then_some(id))
             .collect()
     }
 
@@ -876,6 +942,7 @@ pub fn build_application_semantic_model_from_component_graph(
         ExpressionGraph::from_components(&component_graph.components, &component_graph.provenance);
     let contexts = collect_context_entities(&component_graph.components, &expression_graph);
     let slots = collect_slot_entities(&component_graph.components);
+    let slot_composition = collect_slot_composition(&templates, &component_invocations, &slots);
     let (providers, duplicate_provider_declarations) = collect_provider_entities(
         &component_graph.components,
         &contexts,
@@ -906,6 +973,8 @@ pub fn build_application_semantic_model_from_component_graph(
         &consumers,
         &slots,
         &component_invocations,
+        &slot_composition.fragments,
+        &slot_composition.outlets,
         &computed_values,
         &effects,
     );
@@ -916,6 +985,8 @@ pub fn build_application_semantic_model_from_component_graph(
         &consumers,
         &slots,
         &component_invocations,
+        &slot_composition.fragments,
+        &slot_composition.outlets,
         &computed_values,
         &effects,
         &templates,
@@ -1069,6 +1140,8 @@ pub fn build_application_semantic_model_from_component_graph(
         consumers,
         slots,
         component_invocations,
+        slot_content_fragments: slot_composition.fragments,
+        slot_outlets: slot_composition.outlets,
         context_declaration_candidates,
         context_ownership,
         context_dependency,
@@ -1170,6 +1243,7 @@ fn build_application_semantic_model_from_files_with_bindings(
     let expression_graph = ExpressionGraph::from_components(&components, &provenance);
     let contexts = collect_context_entities(&components, &expression_graph);
     let slots = collect_slot_entities(&components);
+    let slot_composition = collect_slot_composition(&templates, &component_invocations, &slots);
     let (providers, duplicate_provider_declarations) =
         collect_provider_entities(&components, &contexts, &expression_graph, bindings);
     let consumers = collect_consumer_entities(&components, &contexts, bindings);
@@ -1191,6 +1265,8 @@ fn build_application_semantic_model_from_files_with_bindings(
         &consumers,
         &slots,
         &component_invocations,
+        &slot_composition.fragments,
+        &slot_composition.outlets,
         &computed_values,
         &effects,
     );
@@ -1201,6 +1277,8 @@ fn build_application_semantic_model_from_files_with_bindings(
         &consumers,
         &slots,
         &component_invocations,
+        &slot_composition.fragments,
+        &slot_composition.outlets,
         &computed_values,
         &effects,
         &templates,
@@ -1351,6 +1429,8 @@ fn build_application_semantic_model_from_files_with_bindings(
         consumers,
         slots,
         component_invocations,
+        slot_content_fragments: slot_composition.fragments,
+        slot_outlets: slot_composition.outlets,
         context_declaration_candidates,
         context_ownership,
         context_dependency,
@@ -1409,6 +1489,8 @@ fn extend_derived_entity_provenance(
     consumers: &BTreeMap<ConsumerId, ConsumerEntity>,
     slots: &BTreeMap<SlotId, SlotEntity>,
     component_invocations: &BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
+    slot_content_fragments: &BTreeMap<SlotContentFragmentId, SlotContentFragment>,
+    slot_outlets: &BTreeMap<SlotOutletId, SlotOutlet>,
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
     effects: &BTreeMap<SemanticId, Effect>,
 ) {
@@ -1439,6 +1521,18 @@ fn extend_derived_entity_provenance(
         (
             invocation.id.as_semantic_id().clone(),
             invocation.provenance.clone(),
+        )
+    }));
+    provenance.extend(slot_content_fragments.values().map(|fragment| {
+        (
+            fragment.id.as_semantic_id().clone(),
+            fragment.provenance.clone(),
+        )
+    }));
+    provenance.extend(slot_outlets.values().map(|outlet| {
+        (
+            outlet.id.as_semantic_id().clone(),
+            outlet.provenance.clone(),
         )
     }));
     provenance.extend(
@@ -2335,7 +2429,7 @@ fn this_member_name(expression: &str) -> Option<&str> {
     })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 fn collect_ownership(
     components: &[ComponentNode],
     contexts: &BTreeMap<ContextId, ContextEntity>,
@@ -2343,6 +2437,8 @@ fn collect_ownership(
     consumers: &BTreeMap<ConsumerId, ConsumerEntity>,
     slots: &BTreeMap<SlotId, SlotEntity>,
     component_invocations: &BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
+    slot_content_fragments: &BTreeMap<SlotContentFragmentId, SlotContentFragment>,
+    slot_outlets: &BTreeMap<SlotOutletId, SlotOutlet>,
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
     effects: &BTreeMap<SemanticId, Effect>,
     templates: &[TemplateNode],
@@ -2407,6 +2503,24 @@ fn collect_ownership(
         {
             ownership.insert(
                 invocation.id.as_semantic_id().clone(),
+                SemanticOwner::entity(component.id.clone()),
+            );
+        }
+        for fragment in slot_content_fragments
+            .values()
+            .filter(|fragment| fragment.owner_component == component.id)
+        {
+            ownership.insert(
+                fragment.id.as_semantic_id().clone(),
+                SemanticOwner::entity(component.id.clone()),
+            );
+        }
+        for outlet in slot_outlets
+            .values()
+            .filter(|outlet| outlet.owner_component == component.id)
+        {
+            ownership.insert(
+                outlet.id.as_semantic_id().clone(),
                 SemanticOwner::entity(component.id.clone()),
             );
         }
@@ -3732,6 +3846,8 @@ class Counter extends Component {
 
         let ownership = collect_ownership(
             &component_graph.components,
+            &std::collections::BTreeMap::new(),
+            &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
