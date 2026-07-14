@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: G8 - Compiler-owned Context lifetime analysis
-* Working tree: G8 is ready to commit. The Phase G roadmap file is user-provided and untracked.
+* Working tree: G8 is committed. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-13
 
 Last completed slice
@@ -18,7 +18,7 @@ Last completed slice
 Current in-progress slice
 
 * Slice: G9 - Context evaluation planning
-* Status: Ready to assess after the G8 commit.
+* Status: Blocked pending an explicit Context evaluation-plan contract.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5; G6; G7; G8
 * Remaining: G9 through G20.
 
@@ -91,6 +91,10 @@ Architecture decisions made
 * Decision: G8 lifetime is one `ComponentScopeLifetime(ComponentId)` domain. Canonical G6 ownership determines each entity’s lifetime identity, while exact G4 ancestor chains determine outlives compatibility for direct G7 dependencies and selected bindings.
 * Reason: This preserves the compiler-only separation: scope topology, ownership, resolution, and direct value flow each remain authoritative in their existing products, while G8 records only availability compatibility and aggregate source status.
 * Tradeoff: G8 never changes G4 selection or filters on G5 typing. It adds no lexical/module/runtime-instance lifetime, ancestry inference, ordering, scheduling, IR, artifact, execution, or runtime discovery behavior.
+
+* Decision needed before G9: define the canonical evaluation-plan identity and entry records; deterministic initialization/availability ordering rules; relation to ownership and component-scope ordering; treatment of Provider/default sources, unresolved/ambiguous/invalid resolutions, G5 incompatible/unknown bindings, and G8 incompatible/unknown lifetimes; plan validation, queries, inspection/schema, and whether a plan contains only eligible values or explicit blocked entries.
+* Reason: G9 names Provider initialization order, Consumer availability, and ownership ordering but does not define the compiler plan semantics or its failure representation. Choosing source order, component order, scope order, dependency order, eligibility filtering, or blocked-entry behavior would invent language semantics required by G10 lowering and later runtime artifacts.
+* Tradeoff: G8 remains complete and committed. No evaluation/availability plan, ordering, scheduling, Provider reselection, IR, runtime record, or execution behavior has been added.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.
