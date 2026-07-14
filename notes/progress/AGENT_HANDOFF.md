@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: G10 - Canonical Context IR lowering
-* Working tree: G10 is ready to commit. The Phase G roadmap file is user-provided and untracked.
+* Working tree: G10 is committed. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-14
 
 Last completed slice
@@ -18,7 +18,7 @@ Last completed slice
 Current in-progress slice
 
 * Slice: G11 - Context IR optimization
-* Status: Ready to assess after the G10 commit.
+* Status: Blocked pending an explicit Context IR optimization contract.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5; G6; G7; G8; G9; G10
 * Remaining: G11 through G20.
 
@@ -109,6 +109,10 @@ Architecture decisions made
 * Decision: G10 uses a distinct compiler-only `ContextValueSlotId` per G9-planned source, a distinct generated `ContextSourceFunctionId`, and a distinct `ContextConsumerLoadId` per available Consumer. The source function produces its result and performs observable `InitializeContextSlot`; Consumer bindings retain typed `LoadContextSlot` records without generating a Consumer function.
 * Reason: G4/G9 already supply one exact selected source, and the shared IR supplies function/value/instruction structure. Retaining slot/load identities in an immutable report lets G11 optimize source functions without removing initialization and lets G12 consume only compiler-generated identities.
 * Tradeoff: Context slots are not `IrStorage` or runtime allocations. Blocked/unused sources and unavailable Consumers receive no partial IR, and G10 adds no optimizer invocation, runtime registry/artifact, execution, fallback, or lookup behavior.
+
+* Decision needed before G11: define the immutable optimized Context IR product and its relationship to G10 source functions, results, slot initializations, and Consumer load records; exact optimization scope and pass sequence; whether optimization is Context-source-only or may affect other module functions; required preservation/mapping invariants; and validation/inspection/runtime-consumer inputs.
+* Reason: The roadmap says only to reuse the optimizer and preserve observable initialization order. Selecting the optimized-product identity, applying the existing pipeline to a whole module versus only Context functions, retaining G10 result references, or deciding slot/load rewrite and merge rules would invent the architecture that G12 runtime registry and later Context artifacts must consume.
+* Tradeoff: G10 remains complete and committed. No Context optimizer product, pass execution, slot/load rewrite, constant folding, source merge, runtime artifact, execution, or runtime lookup has been added.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.
