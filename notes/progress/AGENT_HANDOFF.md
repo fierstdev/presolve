@@ -3,30 +3,30 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: G6 - Compiler-owned Context ownership graph
-* Working tree: G6 is committed. The Phase G roadmap file is user-provided and untracked.
+* Latest completed slice: G7 - Compiler-owned Context dependency graph
+* Working tree: G7 is ready to commit. The Phase G roadmap file is user-provided and untracked.
 * Date: 2026-07-13
 
 Last completed slice
 
-* Slice: G6 - Compiler-owned Context ownership graph
-* Summary: The ASM now retains one immutable typed `ContextOwnershipGraph` projected from canonical Context, Provider, Consumer, and Context-default facts. Components own declared Contexts, Providers, and Consumers; Contexts own their canonical default expression targets.
-* Key files: crates/ezc_core/src/context_ownership.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_core/src/lib.rs
-* New behavior: The graph stores deterministic owner-to-owned edges only, has retained inverse ownership indexes, and validates all canonical entities without changing G4 selection or G5 eligibility. The general semantic graph and its schema v5 remain unchanged.
-* Unsupported semantics: G6 adds no component ancestry, Provider visibility or reselection, dependency graph, lifetime validity, scheduling, IR, runtime slots/artifacts, execution, resumability, public Context diagnostics, runtime ownership/provider discovery, or component-tree reconstruction.
+* Slice: G7 - Compiler-owned Context dependency graph
+* Summary: The ASM now retains one immutable typed `ContextDependencyGraph` for direct value flow: Provider/default sources supply Context contracts, Provider expressions read canonical State/Computed values, and Consumers depend only on their exact G4-selected Provider or default source.
+* Key files: crates/ezc_core/src/context_dependency.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs; crates/ezc_core/src/lib.rs
+* New behavior: Edges are deterministic dependent-to-dependency facts with retained forward/reverse indexes. G5 compatibility annotates supply and selected-binding edges without filtering G4 topology. The general semantic graph and its schema v5 remain unchanged.
+* Unsupported semantics: G7 adds no ownership or component ancestry edges, Provider visibility/reselection, transitive closure, lifetime validity, cycle diagnostics, evaluation order, scheduling, IR, runtime slots/artifacts, execution, resumability, public Context diagnostics, or runtime dependency discovery.
 
 Current in-progress slice
 
-* Slice: G7 - Context dependency graph
-* Status: Blocked pending an explicit Context dependency-graph contract.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5; G6
-* Remaining: G7 through G20.
+* Slice: G8 - Context lifetime analysis
+* Status: Ready to assess after the G7 commit.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; G1; G2; G3; G4; G5; G6; G7
+* Remaining: G8 through G20.
 
 Verification
 
 * cargo fmt --all --check: pass
-* cargo test -p ezc_core context_ownership: pass (3 focused tests)
-* cargo test -p ezc_core --lib: pass (201 tests; shared ASM ownership/validation infrastructure)
+* cargo test -p ezc_core context_dependency: pass (3 focused tests)
+* cargo test -p ezc_core --lib: pass (204 tests; shared ASM dependency/validation infrastructure)
 * cargo clippy -p ezc_core --all-targets -- -D warnings: pass
 * git diff --check: pass
 
@@ -79,6 +79,10 @@ Architecture decisions made
 * Decision needed before G7: define the canonical Context dependency-graph product: its typed node and edge domains/directions; whether Provider value and Context-default expression references are direct-only or transitive; how explicit Provider/default/unresolved/ambiguous/invalid Consumer resolutions contribute; handling of unknown or incompatible G5 bindings; graph ordering, invariants, queries, validation, and export/schema requirements.
 * Reason: G7 says to project Provider/Consumer relations and ownership but does not define data-dependency topology. Treating semantic request/provide/ownership relations, expression nodes, or G4 candidate evidence as dependencies would invent the facts needed by G8 lifetime and G9 evaluation planning.
 * Tradeoff: G6 remains complete and committed. No Context dependency graph, expression dependency closure, scheduling, Provider reselection, runtime graph reconstruction, or runtime behavior has been added.
+
+* Decision: G7 projects only direct Context value-flow topology. Provider/default sources supply Context contracts, Provider expressions read canonical State/Computed nodes, and Consumers depend only on the exact G4-selected Provider/default source; G5 compatibility annotates these facts but never removes them.
+* Reason: The canonical expression graph, G4 resolution, and G5 records already establish all direct facts needed by later lifetime/evaluation analysis. Retained indexes answer dependency and reverse-dependency queries without source rewalk, scope traversal, Provider lookup, or runtime discovery.
+* Tradeoff: G7 does not merge with the existing reactive graph or create ownership/ancestry/request/candidate edges. It computes no transitive closure, cycle analysis, lifetime result, ordering, schedule, IR, runtime artifact, or execution behavior.
 
 * Decision: Effects are first-class ASM entities keyed as `component/effect:name`, owned directly by their component and linked to the authored method ID.
 * Reason: Effects are reactive consumers in their own right, so ownership, provenance, identity, graph export, and generic inspection must use the existing canonical semantic infrastructure rather than method-decorator lookups or runtime callbacks.

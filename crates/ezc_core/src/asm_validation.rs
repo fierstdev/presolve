@@ -90,12 +90,37 @@ pub fn validate_application_semantic_model(
     validate_context_resolution(model, &mut diagnostics);
     validate_context_typing(model, &mut diagnostics);
     validate_context_ownership(model, &mut diagnostics);
+    validate_context_dependency(model, &mut diagnostics);
     validate_effect_statement_types(model, &mut diagnostics);
     validate_effect_execution_plan(model, &mut diagnostics);
     validate_component_diagnostic_metadata(model, &mut diagnostics);
     validate_template_action_bindings(model, &mut diagnostics);
 
     diagnostics
+}
+
+fn validate_context_dependency(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    let expected = crate::collect_context_dependency_graph(
+        &model.components,
+        &model.contexts,
+        &model.providers,
+        &model.consumers,
+        &model.context_resolutions,
+        &model.context_types,
+        &model.provider_types,
+        &model.context_binding_types,
+        &model.computed_values,
+        &model.expression_graph,
+    );
+    if model.context_dependency != expected {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1189".to_string(),
+            message: "Context dependency graph does not match canonical ASM products".to_string(),
+        });
+    }
 }
 
 #[allow(clippy::too_many_lines)]

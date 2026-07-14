@@ -13,6 +13,7 @@ use crate::component_scope::ComponentScopeGraph;
 use crate::computed_value::{collect_computed_values, ComputedDiagnosticCode, ComputedValue};
 use crate::consumer::{collect_consumer_entities, ConsumerEntity, ContextResolutionState};
 use crate::context::{collect_context_entities, ContextEntity};
+use crate::context_dependency::{collect_context_dependency_graph, ContextDependencyGraph};
 use crate::context_ownership::{collect_context_ownership_graph, ContextOwnershipGraph};
 use crate::context_resolution::{
     collect_context_resolutions, ContextResolution, ContextResolutionResult,
@@ -52,6 +53,7 @@ pub struct ApplicationSemanticModel {
     pub providers: BTreeMap<ProviderId, ProviderEntity>,
     pub consumers: BTreeMap<ConsumerId, ConsumerEntity>,
     pub context_ownership: ContextOwnershipGraph,
+    pub context_dependency: ContextDependencyGraph,
     pub component_scope: ComponentScopeGraph,
     pub context_resolutions: BTreeMap<ConsumerId, ContextResolution>,
     pub context_types: BTreeMap<ContextId, ContextTypeRecord>,
@@ -342,6 +344,11 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub const fn context_ownership_graph(&self) -> &ContextOwnershipGraph {
         &self.context_ownership
+    }
+
+    #[must_use]
+    pub const fn context_dependency_graph(&self) -> &ContextDependencyGraph {
+        &self.context_dependency
     }
 
     #[must_use]
@@ -850,6 +857,18 @@ pub fn build_application_semantic_model_from_component_graph(
         &expression_graph,
         &semantic_types,
     );
+    let context_dependency = collect_context_dependency_graph(
+        &component_graph.components,
+        &contexts,
+        &providers,
+        &consumers,
+        &context_resolutions,
+        &context_type_products.contexts,
+        &context_type_products.providers,
+        &context_type_products.bindings,
+        &computed_values,
+        &expression_graph,
+    );
     let effects = validate_effects(
         &component_graph.components,
         effects,
@@ -907,6 +926,7 @@ pub fn build_application_semantic_model_from_component_graph(
         providers,
         consumers,
         context_ownership,
+        context_dependency,
         component_scope,
         context_resolutions,
         context_types: context_type_products.contexts,
@@ -1077,6 +1097,18 @@ fn build_application_semantic_model_from_files_with_bindings(
         &expression_graph,
         &semantic_types,
     );
+    let context_dependency = collect_context_dependency_graph(
+        &components,
+        &contexts,
+        &providers,
+        &consumers,
+        &context_resolutions,
+        &context_type_products.contexts,
+        &context_type_products.providers,
+        &context_type_products.bindings,
+        &computed_values,
+        &expression_graph,
+    );
     let effects = validate_effects(&components, effects, &effect_statements, &semantic_types);
     let (
         reactive_graph,
@@ -1127,6 +1159,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         providers,
         consumers,
         context_ownership,
+        context_dependency,
         component_scope,
         context_resolutions,
         context_types: context_type_products.contexts,
