@@ -75,6 +75,14 @@ pub fn collect_context_diagnostics(model: &ApplicationSemanticModel) -> Vec<Comp
             context_id: None,
             provider_id: None,
             consumer_id: None,
+            slot_id: None,
+            invocation_id: None,
+            component_instance_id: None,
+            slot_binding_id: None,
+            structural_region_id: None,
+            component_id: None,
+            provider_instance_id: None,
+            consumer_instance_id: None,
             secondary_labels: Vec::new(),
         });
     }
@@ -700,6 +708,14 @@ fn push(
         context_id: None,
         provider_id: None,
         consumer_id: None,
+        slot_id: None,
+        invocation_id: None,
+        component_instance_id: None,
+        slot_binding_id: None,
+        structural_region_id: None,
+        component_id: None,
+        provider_instance_id: None,
+        consumer_instance_id: None,
         secondary_labels: Vec::new(),
     });
 }

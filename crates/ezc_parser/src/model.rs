@@ -59,9 +59,17 @@ pub struct ParsedExportSpecifier {
 pub struct ParsedClass {
     pub name: String,
     pub span: SourceSpan,
+    pub heritage: Option<ParsedClassHeritage>,
     pub decorators: Vec<ParsedDecorator>,
     pub properties: Vec<ParsedProperty>,
     pub methods: Vec<ParsedMethod>,
+}
+
+/// Source-faithful class heritage retained for component-inheritance diagnostics.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedClassHeritage {
+    pub base: String,
+    pub span: SourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

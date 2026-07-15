@@ -29,8 +29,8 @@ use ezc_parser::{
 };
 use serde::Serialize;
 
-const ASM_INSPECTION_SCHEMA_VERSION: u32 = 7;
-const CHECK_JSON_SCHEMA_VERSION: u32 = 3;
+const ASM_INSPECTION_SCHEMA_VERSION: u32 = 8;
+const CHECK_JSON_SCHEMA_VERSION: u32 = 4;
 
 fn main() {
     let mut args = env::args().skip(1).collect::<Vec<_>>();
@@ -334,74 +334,8 @@ fn parser_diagnostic_json(path: &Path, diagnostic: &ParseDiagnostic) -> serde_js
 }
 
 fn compiler_diagnostic_json(diagnostic: &ezc_core::ComponentDiagnostic) -> serde_json::Value {
-    let mut document = serde_json::Map::new();
-    document.insert("code".to_string(), serde_json::json!(diagnostic.code));
-    document.insert(
-        "severity".to_string(),
-        serde_json::json!(diagnostic.severity.as_str()),
-    );
-    document.insert("message".to_string(), serde_json::json!(diagnostic.message));
-    document.insert(
-        "primary_provenance".to_string(),
-        diagnostic
-            .provenance
-            .as_ref()
-            .map(AsmInspectionProvenance::from)
-            .map_or(serde_json::Value::Null, |provenance| {
-                serde_json::to_value(provenance).expect("compiler provenance should serialize")
-            }),
-    );
-    document.insert(
-        "effect_id".to_string(),
-        diagnostic
-            .effect_id
-            .as_ref()
-            .map_or(serde_json::Value::Null, |id| serde_json::json!(id.as_str())),
-    );
-    document.insert(
-        "statement_id".to_string(),
-        diagnostic
-            .statement_id
-            .as_ref()
-            .map_or(serde_json::Value::Null, |id| serde_json::json!(id.as_str())),
-    );
-    for (name, value) in [
-        (
-            "context_declaration_candidate_id",
-            diagnostic
-                .context_declaration_candidate_id
-                .as_ref()
-                .map(ezc_core::ContextDeclarationCandidateId::as_str),
-        ),
-        (
-            "context_id",
-            diagnostic
-                .context_id
-                .as_ref()
-                .map(ezc_core::ContextId::as_str),
-        ),
-        (
-            "provider_id",
-            diagnostic
-                .provider_id
-                .as_ref()
-                .map(ezc_core::ProviderId::as_str),
-        ),
-        (
-            "consumer_id",
-            diagnostic
-                .consumer_id
-                .as_ref()
-                .map(ezc_core::ConsumerId::as_str),
-        ),
-    ] {
-        document.insert(
-            name.to_string(),
-            value.map_or(serde_json::Value::Null, serde_json::Value::from),
-        );
-    }
-    document.insert("secondary_labels".to_string(), serde_json::Value::Array(diagnostic.secondary_labels.iter().map(|label| serde_json::json!({"provenance": AsmInspectionProvenance::from(&label.provenance), "message": label.message})).collect()));
-    serde_json::Value::Object(document)
+    serde_json::to_value(AsmInspectionDiagnostic::from(diagnostic))
+        .expect("compiler diagnostic projection should serialize")
 }
 
 fn parser_diagnostics_fail(unit: &CompilationUnit, fail_on: &ParseSeverity) -> bool {
@@ -500,6 +434,9 @@ fn print_compiler_diagnostics(diagnostics: &[ezc_core::ComponentDiagnostic]) {
             if let Some(statement_id) = &diagnostic.statement_id {
                 println!("      = statement: {statement_id}");
             }
+            for (role, identity) in diagnostic_component_identities(diagnostic) {
+                println!("      = {role}: {identity}");
+            }
             for label in &diagnostic.secondary_labels {
                 println!(
                     "      = related: {} at {}:{}:{} span={}..{}",
@@ -513,6 +450,40 @@ fn print_compiler_diagnostics(diagnostics: &[ezc_core::ComponentDiagnostic]) {
             }
         }
     }
+}
+
+fn diagnostic_component_identities(
+    diagnostic: &ezc_core::ComponentDiagnostic,
+) -> Vec<(&'static str, String)> {
+    let mut identities = Vec::new();
+    macro_rules! push_identity {
+        ($role:literal, $value:expr) => {
+            if let Some(value) = $value {
+                identities.push(($role, value.to_string()));
+            }
+        };
+    }
+    push_identity!("slot", diagnostic.slot_id.as_ref());
+    push_identity!("invocation", diagnostic.invocation_id.as_ref());
+    push_identity!(
+        "component instance",
+        diagnostic.component_instance_id.as_ref()
+    );
+    push_identity!("slot binding", diagnostic.slot_binding_id.as_ref());
+    push_identity!(
+        "structural region",
+        diagnostic.structural_region_id.as_ref()
+    );
+    push_identity!("component", diagnostic.component_id.as_ref());
+    push_identity!(
+        "provider instance",
+        diagnostic.provider_instance_id.as_ref()
+    );
+    push_identity!(
+        "consumer instance",
+        diagnostic.consumer_instance_id.as_ref()
+    );
+    identities
 }
 
 fn asm_validation_diagnostics_text(validation: &[AsmValidationDiagnostic]) -> Option<String> {
@@ -576,6 +547,14 @@ fn asm_inspection_json(
             context_id: None,
             provider_id: None,
             consumer_id: None,
+            slot_id: None,
+            invocation_id: None,
+            component_instance_id: None,
+            slot_binding_id: None,
+            structural_region_id: None,
+            component_id: None,
+            provider_instance_id: None,
+            consumer_instance_id: None,
             secondary_labels: Vec::new(),
         })
         .collect::<Vec<_>>();
@@ -922,6 +901,38 @@ fn related_entity_diagnostics<'a>(
                     .consumer_id
                     .as_ref()
                     .is_some_and(|item| item.as_str() == id)
+                || diagnostic
+                    .slot_id
+                    .as_ref()
+                    .is_some_and(|item| item.as_str() == id)
+                || diagnostic
+                    .invocation_id
+                    .as_ref()
+                    .is_some_and(|item| item.as_str() == id)
+                || diagnostic
+                    .component_instance_id
+                    .as_ref()
+                    .is_some_and(|item| item.as_str() == id)
+                || diagnostic
+                    .slot_binding_id
+                    .as_ref()
+                    .is_some_and(|item| item.as_str() == id)
+                || diagnostic
+                    .structural_region_id
+                    .as_ref()
+                    .is_some_and(|item| item.as_str() == id)
+                || diagnostic
+                    .component_id
+                    .as_ref()
+                    .is_some_and(|item| item.as_str() == id)
+                || diagnostic
+                    .provider_instance_id
+                    .as_ref()
+                    .is_some_and(|item| item.to_string() == id)
+                || diagnostic
+                    .consumer_instance_id
+                    .as_ref()
+                    .is_some_and(|item| item.to_string() == id)
                 || diagnostic
                     .provenance
                     .as_ref()
@@ -1604,6 +1615,14 @@ struct AsmInspectionDiagnostic<'a> {
     context_id: Option<&'a str>,
     provider_id: Option<&'a str>,
     consumer_id: Option<&'a str>,
+    slot_id: Option<&'a str>,
+    invocation_id: Option<&'a str>,
+    component_instance_id: Option<&'a str>,
+    slot_binding_id: Option<&'a str>,
+    structural_region_id: Option<&'a str>,
+    component_id: Option<&'a str>,
+    provider_instance_id: Option<String>,
+    consumer_instance_id: Option<String>,
     secondary_labels: Vec<AsmInspectionSecondaryLabel>,
 }
 
@@ -1641,6 +1660,35 @@ impl<'a> From<&'a ezc_core::ComponentDiagnostic> for AsmInspectionDiagnostic<'a>
                 .consumer_id
                 .as_ref()
                 .map(ezc_core::ConsumerId::as_str),
+            slot_id: diagnostic.slot_id.as_ref().map(ezc_core::SlotId::as_str),
+            invocation_id: diagnostic
+                .invocation_id
+                .as_ref()
+                .map(ezc_core::ComponentInvocationId::as_str),
+            component_instance_id: diagnostic
+                .component_instance_id
+                .as_ref()
+                .map(ezc_core::ComponentInstanceId::as_str),
+            slot_binding_id: diagnostic
+                .slot_binding_id
+                .as_ref()
+                .map(ezc_core::SlotBindingId::as_str),
+            structural_region_id: diagnostic
+                .structural_region_id
+                .as_ref()
+                .map(ezc_core::ComponentStructuralRegionId::as_str),
+            component_id: diagnostic
+                .component_id
+                .as_ref()
+                .map(ezc_core::SemanticId::as_str),
+            provider_instance_id: diagnostic
+                .provider_instance_id
+                .as_ref()
+                .map(ToString::to_string),
+            consumer_instance_id: diagnostic
+                .consumer_instance_id
+                .as_ref()
+                .map(ToString::to_string),
             secondary_labels: diagnostic
                 .secondary_labels
                 .iter()

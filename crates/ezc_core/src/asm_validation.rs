@@ -1096,6 +1096,19 @@ fn validate_component_diagnostic_metadata(
     model: &ApplicationSemanticModel,
     diagnostics: &mut Vec<AsmValidationDiagnostic>,
 ) {
+    let actual_component_diagnostics = model
+        .diagnostics
+        .iter()
+        .filter(|item| ("EZC1068"..="EZC1083").contains(&item.code.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
+    let expected_component_diagnostics = crate::collect_component_diagnostics(model);
+    if actual_component_diagnostics != expected_component_diagnostics {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1201".to_string(),
+            message: "component diagnostics do not match the canonical H19 projection".to_string(),
+        });
+    }
     for diagnostic in &model.diagnostics {
         let valid_context = diagnostic
             .context_id

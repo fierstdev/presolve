@@ -4,9 +4,11 @@ use std::path::Path;
 
 use serde::Serialize;
 
+use crate::instance_context::{ConsumerInstanceId, ProviderInstanceId};
 use crate::semantic_id::{
-    ConsumerId, ContextDeclarationCandidateId, ContextId, EffectId, EffectStatementId, ProviderId,
-    SemanticId, SemanticOwner, SlotDeclarationCandidateId,
+    ComponentInstanceId, ComponentInvocationId, ComponentStructuralRegionId, ConsumerId,
+    ContextDeclarationCandidateId, ContextId, EffectId, EffectStatementId, ProviderId, SemanticId,
+    SemanticOwner, SlotBindingId, SlotDeclarationCandidateId, SlotId,
 };
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
@@ -38,6 +40,9 @@ pub struct ComponentNode {
     pub class_name: String,
     pub element_name: Option<String>,
     pub route_path: Option<String>,
+    /// Normalized authored heritage retained before unsupported inheritance is
+    /// excluded from every executable component product.
+    pub heritage: Option<AuthoredComponentHeritage>,
     pub state_fields: Vec<StateField>,
     pub context_declarations: Vec<ContextDeclaration>,
     pub provider_declarations: Vec<ProviderDeclaration>,
@@ -52,6 +57,12 @@ pub struct ComponentNode {
     pub methods: Vec<ComponentMethod>,
     pub actions: Vec<ComponentAction>,
     pub render: Option<RenderModel>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthoredComponentHeritage {
+    pub base: String,
+    pub provenance: SourceProvenance,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -941,7 +952,41 @@ pub struct ComponentDiagnostic {
     pub context_id: Option<ContextId>,
     pub provider_id: Option<ProviderId>,
     pub consumer_id: Option<ConsumerId>,
+    pub slot_id: Option<SlotId>,
+    pub invocation_id: Option<ComponentInvocationId>,
+    pub component_instance_id: Option<ComponentInstanceId>,
+    pub slot_binding_id: Option<SlotBindingId>,
+    pub structural_region_id: Option<ComponentStructuralRegionId>,
+    pub component_id: Option<SemanticId>,
+    pub provider_instance_id: Option<ProviderInstanceId>,
+    pub consumer_instance_id: Option<ConsumerInstanceId>,
     pub secondary_labels: Vec<DiagnosticSecondaryLabel>,
+}
+
+impl ComponentDiagnostic {
+    pub(crate) fn error(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            code: code.into(),
+            severity: ComponentDiagnosticSeverity::Error,
+            message: message.into(),
+            provenance: None,
+            effect_id: None,
+            statement_id: None,
+            context_declaration_candidate_id: None,
+            context_id: None,
+            provider_id: None,
+            consumer_id: None,
+            slot_id: None,
+            invocation_id: None,
+            component_instance_id: None,
+            slot_binding_id: None,
+            structural_region_id: None,
+            component_id: None,
+            provider_instance_id: None,
+            consumer_instance_id: None,
+            secondary_labels: Vec::new(),
+        }
+    }
 }
 
 /// Shared severity classification for compiler diagnostics.
@@ -1016,6 +1061,14 @@ fn build_component_graph_with_identity(
             context_id: None,
             provider_id: None,
             consumer_id: None,
+            slot_id: None,
+            invocation_id: None,
+            component_instance_id: None,
+            slot_binding_id: None,
+            structural_region_id: None,
+            component_id: None,
+            provider_instance_id: None,
+            consumer_instance_id: None,
             secondary_labels: Vec::new(),
             provenance: None,
             code: "EZC1000".to_string(),
@@ -1041,19 +1094,10 @@ fn build_component_node(
     let route_path = decorator_argument(class, "route");
 
     if element_name.is_none() {
-        diagnostics.push(ComponentDiagnostic {
-            severity: ComponentDiagnosticSeverity::Error,
-            effect_id: None,
-            statement_id: None,
-            context_declaration_candidate_id: None,
-            context_id: None,
-            provider_id: None,
-            consumer_id: None,
-            secondary_labels: Vec::new(),
-            provenance: None,
-            code: "EZC1001".to_string(),
-            message: format!("class `{}` is missing @component(...)", class.name),
-        });
+        diagnostics.push(ComponentDiagnostic::error(
+            "EZC1001",
+            format!("class `{}` is missing @component(...)", class.name),
+        ));
     }
 
     let state_fields = state_fields_from_class(class, path, &id);
@@ -1096,19 +1140,10 @@ fn build_component_node(
         .map(|method| render_model_from_parsed_method(method, &id));
 
     if render.is_none() {
-        diagnostics.push(ComponentDiagnostic {
-            severity: ComponentDiagnosticSeverity::Error,
-            effect_id: None,
-            statement_id: None,
-            context_declaration_candidate_id: None,
-            context_id: None,
-            provider_id: None,
-            consumer_id: None,
-            secondary_labels: Vec::new(),
-            provenance: None,
-            code: "EZC1002".to_string(),
-            message: format!("class `{}` is missing render()", class.name),
-        });
+        diagnostics.push(ComponentDiagnostic::error(
+            "EZC1002",
+            format!("class `{}` is missing render()", class.name),
+        ));
     }
 
     if let Some(render) = &render {
@@ -1125,6 +1160,13 @@ fn build_component_node(
         class_name: class.name.clone(),
         element_name,
         route_path,
+        heritage: class
+            .heritage
+            .as_ref()
+            .map(|heritage| AuthoredComponentHeritage {
+                base: heritage.base.clone(),
+                provenance: SourceProvenance::new(path, heritage.span),
+            }),
         state_fields,
         context_declarations,
         provider_declarations,
@@ -2236,6 +2278,14 @@ fn collect_render_binding_diagnostics(
             context_id: None,
             provider_id: None,
             consumer_id: None,
+            slot_id: None,
+            invocation_id: None,
+            component_instance_id: None,
+            slot_binding_id: None,
+            structural_region_id: None,
+            component_id: None,
+            provider_instance_id: None,
+            consumer_instance_id: None,
             secondary_labels: Vec::new(),
                     provenance: None,
                     code: "EZC1003".to_string(),
@@ -2270,6 +2320,14 @@ fn collect_render_event_diagnostics(
                 context_id: None,
                 provider_id: None,
                 consumer_id: None,
+                slot_id: None,
+                invocation_id: None,
+                component_instance_id: None,
+                slot_binding_id: None,
+                structural_region_id: None,
+                component_id: None,
+                provider_instance_id: None,
+                consumer_instance_id: None,
                 secondary_labels: Vec::new(),
                 provenance: None,
                 code: "EZC1005".to_string(),
@@ -2290,6 +2348,14 @@ fn collect_render_event_diagnostics(
                     context_id: None,
                     provider_id: None,
                     consumer_id: None,
+                    slot_id: None,
+                    invocation_id: None,
+                    component_instance_id: None,
+                    slot_binding_id: None,
+                    structural_region_id: None,
+                    component_id: None,
+                    provider_instance_id: None,
+                    consumer_instance_id: None,
                     secondary_labels: Vec::new(),
                     provenance: None,
                     code: "EZC1004".to_string(),
@@ -2816,6 +2882,14 @@ fn collect_list_diagnostics(
             context_id: None,
             provider_id: None,
             consumer_id: None,
+            slot_id: None,
+            invocation_id: None,
+            component_instance_id: None,
+            slot_binding_id: None,
+            structural_region_id: None,
+            component_id: None,
+            provider_instance_id: None,
+            consumer_instance_id: None,
             secondary_labels: Vec::new(),
             provenance: None,
             code: "EZC1011".to_string(),
@@ -2836,6 +2910,14 @@ fn collect_list_diagnostics(
             context_id: None,
             provider_id: None,
             consumer_id: None,
+            slot_id: None,
+            invocation_id: None,
+            component_instance_id: None,
+            slot_binding_id: None,
+            structural_region_id: None,
+            component_id: None,
+            provider_instance_id: None,
+            consumer_instance_id: None,
             secondary_labels: Vec::new(),
             provenance: None,
             code: "EZC1012".to_string(),
@@ -2857,6 +2939,14 @@ fn collect_list_diagnostics(
             context_id: None,
             provider_id: None,
             consumer_id: None,
+            slot_id: None,
+            invocation_id: None,
+            component_instance_id: None,
+            slot_binding_id: None,
+            structural_region_id: None,
+            component_id: None,
+            provider_instance_id: None,
+            consumer_instance_id: None,
             secondary_labels: Vec::new(),
             provenance: None,
             code: "EZC1013".to_string(),
@@ -2891,6 +2981,14 @@ fn collect_list_diagnostics(
             context_id: None,
             provider_id: None,
             consumer_id: None,
+            slot_id: None,
+            invocation_id: None,
+            component_instance_id: None,
+            slot_binding_id: None,
+            structural_region_id: None,
+            component_id: None,
+            provider_instance_id: None,
+            consumer_instance_id: None,
             secondary_labels: Vec::new(),
                 provenance: None,
                 code: "EZC1015".to_string(),
@@ -2917,6 +3015,14 @@ fn collect_list_diagnostics(
             context_id: None,
             provider_id: None,
             consumer_id: None,
+            slot_id: None,
+            invocation_id: None,
+            component_instance_id: None,
+            slot_binding_id: None,
+            structural_region_id: None,
+            component_id: None,
+            provider_instance_id: None,
+            consumer_instance_id: None,
             secondary_labels: Vec::new(),
                 provenance: None,
                 code: "EZC1014".to_string(),
@@ -3018,6 +3124,14 @@ fn collect_attribute_diagnostics_for_attributes(
             context_id: None,
             provider_id: None,
             consumer_id: None,
+            slot_id: None,
+            invocation_id: None,
+            component_instance_id: None,
+            slot_binding_id: None,
+            structural_region_id: None,
+            component_id: None,
+            provider_instance_id: None,
+            consumer_instance_id: None,
             secondary_labels: Vec::new(),
                     provenance: None,
                     code: "EZC1007".to_string(),
@@ -3054,6 +3168,14 @@ fn collect_attribute_diagnostics_for_attributes(
             context_id: None,
             provider_id: None,
             consumer_id: None,
+            slot_id: None,
+            invocation_id: None,
+            component_instance_id: None,
+            slot_binding_id: None,
+            structural_region_id: None,
+            component_id: None,
+            provider_instance_id: None,
+            consumer_instance_id: None,
             secondary_labels: Vec::new(),
                         provenance: None,
                         code: "EZC1003".to_string(),
@@ -3070,6 +3192,14 @@ fn collect_attribute_diagnostics_for_attributes(
             context_id: None,
             provider_id: None,
             consumer_id: None,
+            slot_id: None,
+            invocation_id: None,
+            component_instance_id: None,
+            slot_binding_id: None,
+            structural_region_id: None,
+            component_id: None,
+            provider_instance_id: None,
+            consumer_instance_id: None,
             secondary_labels: Vec::new(),
                         provenance: None,
                         code: "EZC1008".to_string(),
@@ -3089,6 +3219,14 @@ fn collect_attribute_diagnostics_for_attributes(
                     context_id: None,
                     provider_id: None,
                     consumer_id: None,
+                    slot_id: None,
+                    invocation_id: None,
+                    component_instance_id: None,
+                    slot_binding_id: None,
+                    structural_region_id: None,
+                    component_id: None,
+                    provider_instance_id: None,
+                    consumer_instance_id: None,
                     secondary_labels: Vec::new(),
                     provenance: None,
                     code: "EZC1009".to_string(),
@@ -3106,6 +3244,14 @@ fn collect_attribute_diagnostics_for_attributes(
                     context_id: None,
                     provider_id: None,
                     consumer_id: None,
+                    slot_id: None,
+                    invocation_id: None,
+                    component_instance_id: None,
+                    slot_binding_id: None,
+                    structural_region_id: None,
+                    component_id: None,
+                    provider_instance_id: None,
+                    consumer_instance_id: None,
                     secondary_labels: Vec::new(),
                     provenance: None,
                     code: "EZC1010".to_string(),
@@ -3266,6 +3412,14 @@ fn collect_duplicate_events_for_handlers(
                 context_id: None,
                 provider_id: None,
                 consumer_id: None,
+                slot_id: None,
+                invocation_id: None,
+                component_instance_id: None,
+                slot_binding_id: None,
+                structural_region_id: None,
+                component_id: None,
+                provider_instance_id: None,
+                consumer_instance_id: None,
                 secondary_labels: Vec::new(),
                 provenance: None,
                 code: "EZC1006".to_string(),

@@ -10,6 +10,7 @@ pub mod binding_table;
 pub mod compilation_unit;
 pub mod compiler_pass;
 pub mod component_composition;
+pub mod component_diagnostics;
 pub mod component_graph;
 pub mod component_initialization;
 pub mod component_instance;
@@ -98,9 +99,12 @@ pub use compiler_pass::{
 pub use component_composition::{
     analyze_component_composition, ComponentCompositionAnalysis, ComponentCompositionCycle,
 };
+pub use component_diagnostics::{
+    collect_component_diagnostics, ComponentDiagnosticContract, COMPONENT_DIAGNOSTIC_CONTRACTS,
+};
 pub use component_graph::{
     build_component_graph, build_component_graph_for_module, ArithmeticEvaluationError,
-    ArithmeticExpression, ArithmeticExpressionKind, ArithmeticOperator,
+    ArithmeticExpression, ArithmeticExpressionKind, ArithmeticOperator, AuthoredComponentHeritage,
     AuthoredContextDeclarationCandidate, AuthoredDeclarationKind, AuthoredSlotDeclarationCandidate,
     ComparisonOperator, ComponentAction, ComponentDiagnostic, ComponentDiagnosticSeverity,
     ComponentGraph, ComponentMethod, ComponentNode, ComputedExpression, ComputedExpressionKind,
@@ -1407,6 +1411,7 @@ class Counter extends Component {
             classes: vec![ezc_parser::ParsedClass {
                 name: "DuplicateEvent".to_string(),
                 span: test_span(),
+                heritage: None,
                 decorators: vec![ezc_parser::ParsedDecorator {
                     name: "component".to_string(),
                     argument: Some("x-duplicate-event".to_string()),

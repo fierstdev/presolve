@@ -3,7 +3,7 @@ mod oxc_adapter;
 
 pub use model::{
     ParseDiagnostic, ParseLabel, ParseSeverity, ParsedArithmeticExpression,
-    ParsedArithmeticExpressionKind, ParsedArithmeticOperator, ParsedClass,
+    ParsedArithmeticExpressionKind, ParsedArithmeticOperator, ParsedClass, ParsedClassHeritage,
     ParsedComparisonOperator, ParsedComputedExpression, ParsedComputedExpressionKind,
     ParsedConstantExpression, ParsedConstantExpressionKind, ParsedDecorator, ParsedEffectBody,
     ParsedEffectExpression, ParsedEffectExpressionKind, ParsedEffectStatement,
@@ -20,6 +20,18 @@ pub use oxc_adapter::parse_file;
 #[cfg(test)]
 mod tests {
     use super::{parse_file, ParsedEffectStatementKind, ParsedUnsupportedEffectStatementKind};
+
+    #[test]
+    fn retains_source_faithful_class_heritage() {
+        let source = "@component(\"x-child\") class Child extends Base.Component {}";
+        let parsed = parse_file("src/Child.tsx", source);
+        let heritage = parsed.classes[0].heritage.as_ref().expect("heritage");
+        assert_eq!(heritage.base, "Base.Component");
+        assert_eq!(
+            &source[heritage.span.start..heritage.span.end],
+            "Base.Component"
+        );
+    }
 
     #[test]
     fn retains_decorated_context_field_declaration_facts() {

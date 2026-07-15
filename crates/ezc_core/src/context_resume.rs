@@ -124,7 +124,7 @@ class App extends Component {
         );
         assert_ne!(record.resume_slot.as_str(), record.runtime_slot.as_str());
         let manifest = build_resume_manifest(&plan);
-        assert_eq!(manifest.schema_version, 3);
+        assert_eq!(manifest.schema_version, 4);
         assert_eq!(manifest.context_slots.len(), 1);
     }
 }

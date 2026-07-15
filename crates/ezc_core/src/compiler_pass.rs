@@ -102,28 +102,19 @@ impl ImmutableAsmPass for ConstantFoldingPass {
                     Ok(value) => {
                         field.initial_value = Some(value);
                     }
-                    Err(error) => push_diagnostic_once(
-                        &mut folded.diagnostics,
-                        ComponentDiagnostic {
-                            severity: ComponentDiagnosticSeverity::Error,
-                            effect_id: None,
-                            statement_id: None,
-                            context_declaration_candidate_id: None,
-                            context_id: None,
-                            provider_id: None,
-                            consumer_id: None,
-                            secondary_labels: Vec::new(),
-                            provenance: Some(expression.provenance.clone()),
-                            code: constant_expression_diagnostic_code_from_node(&expression.kind)
-                                .as_str()
-                                .to_string(),
-                            message: format!(
+                    Err(error) => {
+                        let mut diagnostic = ComponentDiagnostic::error(
+                            constant_expression_diagnostic_code_from_node(&expression.kind)
+                                .as_str(),
+                            format!(
                                 "state field `{}` has an invalid {} initializer: {error}",
                                 field.name,
                                 constant_expression_kind_name_from_node(&expression.kind)
                             ),
-                        },
-                    ),
+                        );
+                        diagnostic.provenance = Some(expression.provenance.clone());
+                        push_diagnostic_once(&mut folded.diagnostics, diagnostic);
+                    }
                 }
             }
         }
@@ -283,6 +274,14 @@ fn folded_type_mismatch_diagnostic(
         context_id: None,
         provider_id: None,
         consumer_id: None,
+        slot_id: None,
+        invocation_id: None,
+        component_instance_id: None,
+        slot_binding_id: None,
+        structural_region_id: None,
+        component_id: None,
+        provider_instance_id: None,
+        consumer_instance_id: None,
         secondary_labels: Vec::new(),
         provenance: Some(declared_type.provenance.clone()),
         code: crate::TypeDiagnosticCode::IncompatibleStateInitializer
@@ -311,6 +310,14 @@ fn unknown_declared_type_diagnostic(
         context_id: None,
         provider_id: None,
         consumer_id: None,
+        slot_id: None,
+        invocation_id: None,
+        component_instance_id: None,
+        slot_binding_id: None,
+        structural_region_id: None,
+        component_id: None,
+        provider_instance_id: None,
+        consumer_instance_id: None,
         secondary_labels: Vec::new(),
         provenance: Some(declared_type.provenance.clone()),
         code: crate::TypeDiagnosticCode::UnknownType.as_str().to_string(),
@@ -344,6 +351,14 @@ fn action_assignment_mismatch_diagnostic(
         context_id: None,
         provider_id: None,
         consumer_id: None,
+        slot_id: None,
+        invocation_id: None,
+        component_instance_id: None,
+        slot_binding_id: None,
+        structural_region_id: None,
+        component_id: None,
+        provider_instance_id: None,
+        consumer_instance_id: None,
         secondary_labels: Vec::new(),
         provenance: model.provenance.get(&action.id).cloned(),
         code: crate::TypeDiagnosticCode::IncompatibleAssignment
@@ -394,6 +409,14 @@ fn compound_mutation_type_diagnostics(
             context_id: None,
             provider_id: None,
             consumer_id: None,
+            slot_id: None,
+            invocation_id: None,
+            component_instance_id: None,
+            slot_binding_id: None,
+            structural_region_id: None,
+            component_id: None,
+            provider_instance_id: None,
+            consumer_instance_id: None,
             secondary_labels: Vec::new(),
             provenance,
             code: crate::TypeDiagnosticCode::InvalidToggleTarget
@@ -418,6 +441,14 @@ fn compound_mutation_type_diagnostics(
             context_id: None,
             provider_id: None,
             consumer_id: None,
+            slot_id: None,
+            invocation_id: None,
+            component_instance_id: None,
+            slot_binding_id: None,
+            structural_region_id: None,
+            component_id: None,
+            provider_instance_id: None,
+            consumer_instance_id: None,
             secondary_labels: Vec::new(),
                 provenance,
                 code: crate::TypeDiagnosticCode::InvalidNumericMutationTarget
@@ -445,6 +476,14 @@ fn compound_mutation_type_diagnostics(
             context_id: None,
             provider_id: None,
             consumer_id: None,
+            slot_id: None,
+            invocation_id: None,
+            component_instance_id: None,
+            slot_binding_id: None,
+            structural_region_id: None,
+            component_id: None,
+            provider_instance_id: None,
+            consumer_instance_id: None,
             secondary_labels: Vec::new(),
                     provenance: provenance.clone(),
                     code: crate::TypeDiagnosticCode::InvalidCompoundMutationTarget
@@ -466,6 +505,14 @@ fn compound_mutation_type_diagnostics(
             context_id: None,
             provider_id: None,
             consumer_id: None,
+            slot_id: None,
+            invocation_id: None,
+            component_instance_id: None,
+            slot_binding_id: None,
+            structural_region_id: None,
+            component_id: None,
+            provider_instance_id: None,
+            consumer_instance_id: None,
             secondary_labels: Vec::new(),
                     provenance,
                     code: crate::TypeDiagnosticCode::InvalidCompoundMutationOperand
@@ -499,6 +546,14 @@ fn template_binding_type_diagnostic(
         context_id: None,
         provider_id: None,
         consumer_id: None,
+        slot_id: None,
+        invocation_id: None,
+        component_instance_id: None,
+        slot_binding_id: None,
+        structural_region_id: None,
+        component_id: None,
+        provider_instance_id: None,
+        consumer_instance_id: None,
         secondary_labels: Vec::new(),
         provenance: Some(entity.provenance.clone()),
         code: crate::TypeDiagnosticCode::NonRenderableValue
@@ -531,6 +586,14 @@ fn attribute_binding_type_diagnostic(
             context_id: None,
             provider_id: None,
             consumer_id: None,
+            slot_id: None,
+            invocation_id: None,
+            component_instance_id: None,
+            slot_binding_id: None,
+            structural_region_id: None,
+            component_id: None,
+            provider_instance_id: None,
+            consumer_instance_id: None,
             secondary_labels: Vec::new(),
             provenance: Some(entity.provenance.clone()),
             code: crate::TypeDiagnosticCode::InvalidBinding
@@ -567,6 +630,14 @@ fn conditional_type_diagnostic(
         context_id: None,
         provider_id: None,
         consumer_id: None,
+        slot_id: None,
+        invocation_id: None,
+        component_instance_id: None,
+        slot_binding_id: None,
+        structural_region_id: None,
+        component_id: None,
+        provider_instance_id: None,
+        consumer_instance_id: None,
         secondary_labels: Vec::new(),
         provenance: Some(entity.provenance.clone()),
         code: crate::TypeDiagnosticCode::InvalidCondition
@@ -602,6 +673,14 @@ fn list_iterable_type_diagnostic(
         context_id: None,
         provider_id: None,
         consumer_id: None,
+        slot_id: None,
+        invocation_id: None,
+        component_instance_id: None,
+        slot_binding_id: None,
+        structural_region_id: None,
+        component_id: None,
+        provider_instance_id: None,
+        consumer_instance_id: None,
         secondary_labels: Vec::new(),
         provenance: Some(entity.provenance.clone()),
         code: crate::TypeDiagnosticCode::NonIterableList
@@ -628,6 +707,14 @@ fn member_access_type_diagnostic(
         context_id: None,
         provider_id: None,
         consumer_id: None,
+        slot_id: None,
+        invocation_id: None,
+        component_instance_id: None,
+        slot_binding_id: None,
+        structural_region_id: None,
+        component_id: None,
+        provider_instance_id: None,
+        consumer_instance_id: None,
         secondary_labels: Vec::new(),
         provenance: Some(entity.provenance.clone()),
         code: crate::TypeDiagnosticCode::MissingMember

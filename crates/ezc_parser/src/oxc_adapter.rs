@@ -15,7 +15,7 @@ use oxc_span::{GetSpan, SourceType, Span};
 
 use crate::model::{
     ParseDiagnostic, ParseLabel, ParseSeverity, ParsedArithmeticExpression,
-    ParsedArithmeticExpressionKind, ParsedArithmeticOperator, ParsedClass,
+    ParsedArithmeticExpressionKind, ParsedArithmeticOperator, ParsedClass, ParsedClassHeritage,
     ParsedComparisonOperator, ParsedComputedExpression, ParsedComputedExpressionKind,
     ParsedConstantExpression, ParsedConstantExpressionKind, ParsedDecorator, ParsedEffectBody,
     ParsedEffectExpression, ParsedEffectExpressionKind, ParsedEffectStatement,
@@ -330,6 +330,17 @@ fn parse_class(class: &oxc_ast::ast::Class<'_>, source: &str) -> Option<ParsedCl
     Some(ParsedClass {
         name,
         span: source_span(source, class.span),
+        heritage: class.super_class.as_ref().map(|base| {
+            let span = base.span();
+            ParsedClassHeritage {
+                base: source
+                    .get(span.start as usize..span.end as usize)
+                    .unwrap_or_default()
+                    .trim()
+                    .to_string(),
+                span: source_span(source, span),
+            }
+        }),
         decorators,
         properties,
         methods,

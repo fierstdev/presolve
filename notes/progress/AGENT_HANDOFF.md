@@ -3,37 +3,46 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: H18 - Component inspection schema v7
-* Working tree: clean after the H18 inspection commit.
-* Date: 2026-07-14
+* Latest completed slice: H19 - Component diagnostics
+* Working tree: clean after the H19 component-diagnostics commit.
+* Date: 2026-07-15
 
 Last completed slice
 
-* Slice: H18 - Component inspection schema v7
-* Summary: H18 advances ASM inspection to v7 and projects canonical component definition, invocation, Slot, instance, batch, and structural-region facts.
-* Key files: crates/ezc_cli/src/main.rs
-* Schema decision: ASM inspection v7; resume manifest v4 and component artifact v2 remain frozen.
+* Slice: H19 - Component diagnostics
+* Summary: H19 projects the complete reserved `EZC1068`-`EZC1083` catalog from immutable H1-H17 component products, with typed component, invocation, Slot, instance, binding, structural-region, and instance-Context identities; exact canonical validation; derivative-only suppression; deterministic ordering/deduplication; and one public diagnostic projection shared by check, ASM, selected-entity inspection, and explain.
+* Key files: crates/ezc_core/src/component_diagnostics.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/asm_validation.rs, crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_cli/src/main.rs, crates/ezc_core/src/application_semantic_model.rs
+* Schema decision: ASM inspection advances from v7 to v8 and check JSON advances from v3 to v4 for the typed H19 diagnostic envelope. Resume manifest v4, component runtime artifact v2, semantic graph v5, Context runtime artifact v2, and template manifest v2 remain frozen.
 
 Current in-progress slice
 
 * Slice: none
-* Status: H18 is complete and committed. H19 has not started.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H18
-* Remaining in Phase H: H19 through H21.
+* Status: H19 is complete and committed. H20 has not started.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H19
+* Remaining in Phase H: H20 through H21.
 
 Verification
 
 * Phase H entry gate: `just check` pass (workspace formatting, strict workspace clippy, and complete workspace test matrix: 12 Context fixture/freeze, 125 CLI inspection/build, 24 real-browser, 244 core, 3 parser unit, and 26 parser integration tests)
-* cargo test -p ezc_parser: pass (5 unit; 26 integration)
-* cargo test -p ezc_core runtime_component::tests -- --nocapture: pass (1 focused)
-* cargo test -p ezc_core: pass (285)
+* cargo test -p ezc_parser: pass (6 unit; 26 integration)
+* cargo test -p ezc_core component_diagnostics::tests -- --nocapture: pass (6 focused)
+* cargo test -p ezc_core: pass (292)
 * cargo test -p ezc_cli --bin ezc_cli: pass (1)
-* cargo test -p ezc_cli --test explain: pass (125)
+* cargo test -p ezc_cli --test explain: pass (126)
+* cargo test -p ezc_cli --test context_fixtures: pass (12)
 * cargo clippy -p ezc_parser -p ezc_core -p ezc_cli --all-targets -- -D warnings: pass
 * cargo fmt --all --check: pass
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: H19 has one table-defined diagnostic contract and one canonical projector over H1-H17 ASM products. The projector adds only identities already owned by those products; invalid Slot candidates retain candidate/source evidence without a `SlotId`, and blocked invocations retain their canonical invocation identity without a fabricated target component identity. `EZASM1201` rejects any stored H19 diagnostic vector that differs from recomputation.
+* Reason: Check, full ASM, selected-entity ASM, and explain can consume the same validated diagnostic vector and serializer without reparsing source, reconstructing component relationships, or allowing public surfaces to invent identities or labels.
+* Tradeoff: The currently authored language subset naturally exercises declaration, invocation, cycle, Slot, and instance-Context failures. Independent H4/H7/H8 failure states used by `EZC1078`, `EZC1079`, `EZC1080`, `EZC1082`, and `EZC1083` are covered by canonical-product mutation tests because valid upstream construction normally prevents those retained states; no authored syntax or runtime fallback was invented to make them reachable.
+
+* Decision: suppression is subject-qualified and precedence ordered: inheritance suppresses downstream findings only for that component; unresolved invocations and cycles suppress only the same invocation; invalid Slot findings suppress only the same invocation or binding; unavailable instance Context suppresses only the same instance; and planning failures suppress only the derivative lowering failure for that instance.
+* Reason: This removes cascades caused by an already-reported authoritative failure while preserving diagnostics for unrelated components, invocations, bindings, regions, and instances in the same compilation.
+* Tradeoff: Adding a future diagnostic authority requires an explicit precedence and typed subject key in the H19 table/projector rather than relying on message, source proximity, or source order.
 
 * Decision: H13 builds a deterministic `RuntimeComponentRegistry` contract v1 from H10 and H12. It records only planned instances plus executable Slot/instance-Context binding records, all keyed by canonical IDs.
 * Reason: The runtime receives exact compiler-selected topology, prefixes, bindings, and batches without any tag/Slot/Context/Provider name lookup, ancestry traversal, Provider selection, or source reconstruction.

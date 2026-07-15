@@ -1394,6 +1394,9 @@ pub fn build_application_semantic_model_from_component_graph(
     model.component_ir = lower_component_ir(&model);
     model.component_ir_optimization = optimize_component_ir(&model.component_ir);
     model
+        .diagnostics
+        .extend(crate::collect_component_diagnostics(&model));
+    model
 }
 
 #[must_use]
@@ -1749,6 +1752,9 @@ fn build_application_semantic_model_from_files_with_bindings(
     model.component_ir = lower_component_ir(&model);
     model.component_ir_optimization = optimize_component_ir(&model.component_ir);
     model
+        .diagnostics
+        .extend(crate::collect_component_diagnostics(&model));
+    model
 }
 
 fn extend_template_entity_provenance(
@@ -1999,6 +2005,14 @@ fn classify_computed_values(
                 context_id: None,
                 provider_id: None,
                 consumer_id: None,
+                slot_id: None,
+                invocation_id: None,
+                component_instance_id: None,
+                slot_binding_id: None,
+                structural_region_id: None,
+                component_id: None,
+                provider_instance_id: None,
+                consumer_instance_id: None,
                 secondary_labels: Vec::new(),
                 code: ComputedDiagnosticCode::PurityViolation.as_str().to_string(),
                 message: format!(
@@ -2034,6 +2048,14 @@ fn collect_computed_cycle_diagnostics(
                 context_id: None,
                 provider_id: None,
                 consumer_id: None,
+                slot_id: None,
+                invocation_id: None,
+                component_instance_id: None,
+                slot_binding_id: None,
+                structural_region_id: None,
+                component_id: None,
+                provider_instance_id: None,
+                consumer_instance_id: None,
                 secondary_labels: Vec::new(),
                 code: ComputedDiagnosticCode::DependencyCycle.as_str().to_string(),
                 message: format!(
@@ -2089,6 +2111,14 @@ fn collect_invalid_computed_declaration_diagnostics(
             context_id: None,
             provider_id: None,
             consumer_id: None,
+            slot_id: None,
+            invocation_id: None,
+            component_instance_id: None,
+            slot_binding_id: None,
+            structural_region_id: None,
+            component_id: None,
+            provider_instance_id: None,
+            consumer_instance_id: None,
             secondary_labels: Vec::new(),
             code: ComputedDiagnosticCode::InvalidDeclaration
                 .as_str()
@@ -2138,6 +2168,14 @@ fn collect_computed_body_and_read_diagnostics(
                 context_id: None,
                 provider_id: None,
                 consumer_id: None,
+                slot_id: None,
+                invocation_id: None,
+                component_instance_id: None,
+                slot_binding_id: None,
+                structural_region_id: None,
+                component_id: None,
+                provider_instance_id: None,
+                consumer_instance_id: None,
                 secondary_labels: Vec::new(),
                 code: ComputedDiagnosticCode::UnsupportedBody.as_str().to_string(),
                 message: format!(
@@ -2183,6 +2221,14 @@ fn unresolved_computed_read_diagnostic(
         context_id: None,
         provider_id: None,
         consumer_id: None,
+        slot_id: None,
+        invocation_id: None,
+        component_instance_id: None,
+        slot_binding_id: None,
+        structural_region_id: None,
+        component_id: None,
+        provider_instance_id: None,
+        consumer_instance_id: None,
         secondary_labels: Vec::new(),
         code: ComputedDiagnosticCode::UnresolvedRead.as_str().to_string(),
         message: format!(
@@ -2216,6 +2262,14 @@ fn collect_computed_type_diagnostics(
                 context_id: None,
                 provider_id: None,
                 consumer_id: None,
+                slot_id: None,
+                invocation_id: None,
+                component_instance_id: None,
+                slot_binding_id: None,
+                structural_region_id: None,
+                component_id: None,
+                provider_instance_id: None,
+                consumer_instance_id: None,
                 secondary_labels: Vec::new(),
                 code: ComputedDiagnosticCode::TypeMismatch.as_str().to_string(),
                 message: format!(
@@ -2236,6 +2290,14 @@ fn collect_computed_type_diagnostics(
                 context_id: None,
                 provider_id: None,
                 consumer_id: None,
+                slot_id: None,
+                invocation_id: None,
+                component_instance_id: None,
+                slot_binding_id: None,
+                structural_region_id: None,
+                component_id: None,
+                provider_instance_id: None,
+                consumer_instance_id: None,
                 secondary_labels: Vec::new(),
                 code: ComputedDiagnosticCode::SerializationViolation
                     .as_str()

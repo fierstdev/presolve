@@ -204,7 +204,7 @@ fn asm_command_emits_deterministic_json_inspection() {
 
     let document: serde_json::Value =
         serde_json::from_slice(&first.stdout).expect("ASM inspection output was not valid JSON");
-    assert_eq!(document["schema_version"], 7);
+    assert_eq!(document["schema_version"], 8);
     assert_eq!(
         document["file"],
         "fixtures/0001-source-summary/input/Counter.tsx"
@@ -355,7 +355,7 @@ fn asm_command_inspects_one_semantic_entity() {
 
     assert!(output.status.success());
     let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("entity JSON");
-    assert_eq!(document["schema_version"], 7);
+    assert_eq!(document["schema_version"], 8);
     assert_eq!(document["entity"]["id"], entity_id);
     assert_eq!(document["entity"]["kind"], "state-field");
     assert_eq!(document["entity"]["semantic_type"]["type_text"], "number");
@@ -442,7 +442,7 @@ fn asm_and_explain_inspect_canonical_computed_metadata() {
 
     let document: serde_json::Value =
         serde_json::from_slice(&asm.stdout).expect("computed entity inspection JSON");
-    assert_eq!(document["schema_version"], 7);
+    assert_eq!(document["schema_version"], 8);
     assert_eq!(document["entity"]["computed"]["computed_type"], "number");
     assert_eq!(
         document["entity"]["computed"]["dependencies"],
@@ -519,7 +519,7 @@ fn asm_and_explain_project_one_canonical_effect_inspection_record() {
 
     let selected: serde_json::Value = serde_json::from_slice(&asm.stdout).expect("effect JSON");
     let inspection = &selected["entity"]["effect"];
-    assert_eq!(selected["schema_version"], 7);
+    assert_eq!(selected["schema_version"], 8);
     assert_eq!(inspection["validation"]["status"], "valid");
     assert_eq!(
         inspection["direct_dependencies"]["state"],
@@ -1542,7 +1542,7 @@ fn check_command_emits_json_diagnostics() {
         .output().expect("failed to run ezc_cli check");
     assert!(!output.status.success());
     let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("check JSON");
-    assert_eq!(document["schema_version"], 3);
+    assert_eq!(document["schema_version"], 4);
     assert_eq!(
         document["compiler_diagnostics"].as_array().map(Vec::len),
         Some(7)
@@ -1628,7 +1628,7 @@ fn effect_diagnostics_share_check_and_selected_explain_projection() {
     assert!(explain.status.success());
     let explain: serde_json::Value =
         serde_json::from_slice(&explain.stdout).expect("selected effect explain JSON");
-    assert_eq!(explain["schema_version"], 7);
+    assert_eq!(explain["schema_version"], 8);
     assert_eq!(explain["diagnostics"], serde_json::Value::Array(expected));
 }
 
@@ -1674,28 +1674,133 @@ fn context_diagnostics_share_check_full_asm_selected_asm_and_explain_projection(
     let check_output = run(&["check", path, "--format", "json"]);
     assert!(!check_output.status.success());
     let check = parse(&check_output);
-    assert_eq!(check["schema_version"], 3);
+    assert_eq!(check["schema_version"], 4);
     let expected = normalize(&check["compiler_diagnostics"]);
     assert_eq!(
         expected
             .iter()
             .map(|diagnostic| diagnostic["code"].as_str().unwrap())
             .collect::<Vec<_>>(),
-        ["EZC1060", "EZC1059", "EZC1062"]
+        ["EZC1060", "EZC1059", "EZC1062", "EZC1081"]
     );
 
     let full_asm_output = run(&["asm", path, "--format", "json"]);
     assert!(full_asm_output.status.success());
     let full_asm = parse(&full_asm_output);
-    assert_eq!(full_asm["schema_version"], 7);
+    assert_eq!(full_asm["schema_version"], 8);
     assert_eq!(normalize(&full_asm["diagnostics"]), expected);
 
     for command in ["asm", "explain"] {
         let output = run(&[command, "--entity", context_id, path, "--format", "json"]);
         assert!(output.status.success());
         let selected = parse(&output);
-        assert_eq!(selected["schema_version"], 7);
+        assert_eq!(selected["schema_version"], 8);
         assert_eq!(normalize(&selected["diagnostics"]), expected);
+    }
+}
+
+#[test]
+fn component_diagnostics_share_check_full_asm_selected_asm_and_explain_projection() {
+    let relative = "target/ezc-test-output/h19-component-diagnostic-parity.tsx";
+    let path = repo_root().join(relative);
+    std::fs::create_dir_all(path.parent().unwrap()).expect("H19 diagnostic test directory");
+    std::fs::write(
+        &path,
+        r#"@component("x-h19-parity") class H19Parity extends Component {
+  @slot("invalid") invalid!: SlotContent;
+  render() { return <main><Missing /></main>; }
+}"#,
+    )
+    .expect("H19 diagnostic source");
+    let component_id = concat!(
+        "module:target/ezc-test-output/h19-component-diagnostic-parity.tsx/",
+        "component:x-h19-parity"
+    );
+    let run = |args: &[&str]| {
+        Command::new(ezc_cli_bin())
+            .current_dir(repo_root())
+            .args(args)
+            .output()
+            .expect("failed to run component diagnostic surface")
+    };
+    let parse = |output: &std::process::Output| {
+        serde_json::from_slice::<serde_json::Value>(&output.stdout)
+            .expect("component diagnostic surface JSON")
+    };
+    let normalize = |diagnostics: &serde_json::Value| {
+        diagnostics
+            .as_array()
+            .expect("component diagnostics")
+            .iter()
+            .map(|diagnostic| {
+                serde_json::json!({
+                    "code": diagnostic["code"],
+                    "severity": diagnostic["severity"],
+                    "message": diagnostic["message"],
+                    "primary_provenance": diagnostic["primary_provenance"],
+                    "slot_id": diagnostic["slot_id"],
+                    "invocation_id": diagnostic["invocation_id"],
+                    "component_instance_id": diagnostic["component_instance_id"],
+                    "slot_binding_id": diagnostic["slot_binding_id"],
+                    "structural_region_id": diagnostic["structural_region_id"],
+                    "component_id": diagnostic["component_id"],
+                    "provider_instance_id": diagnostic["provider_instance_id"],
+                    "consumer_instance_id": diagnostic["consumer_instance_id"],
+                    "secondary_labels": diagnostic["secondary_labels"],
+                })
+            })
+            .collect::<Vec<_>>()
+    };
+
+    let check_output = run(&["check", relative, "--format", "json"]);
+    assert!(!check_output.status.success());
+    let check = parse(&check_output);
+    assert_eq!(check["schema_version"], 4);
+    let expected = normalize(&check["compiler_diagnostics"]);
+    assert_eq!(
+        expected
+            .iter()
+            .map(|diagnostic| diagnostic["code"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        ["EZC1068", "EZC1070"]
+    );
+    assert!(expected.iter().all(|diagnostic| {
+        diagnostic["component_id"] == component_id && diagnostic["primary_provenance"].is_object()
+    }));
+
+    let full_output = run(&["asm", relative, "--format", "json"]);
+    let repeated = run(&["asm", relative, "--format", "json"]);
+    assert!(full_output.status.success());
+    assert_eq!(full_output.stdout, repeated.stdout);
+    let full = parse(&full_output);
+    assert_eq!(full["schema_version"], 8);
+    assert_eq!(normalize(&full["diagnostics"]), expected);
+
+    for command in ["asm", "explain"] {
+        let output = run(&[
+            command,
+            relative,
+            "--entity",
+            component_id,
+            "--format",
+            "json",
+        ]);
+        assert!(output.status.success());
+        let selected = parse(&output);
+        assert_eq!(selected["schema_version"], 8);
+        assert_eq!(normalize(&selected["diagnostics"]), expected);
+    }
+
+    let check_text = run(&["check", relative]);
+    let asm_text = run(&["asm", relative]);
+    let check_text = String::from_utf8(check_text.stdout).unwrap();
+    let asm_text = String::from_utf8(asm_text.stdout).unwrap();
+    for (code, message) in [
+        ("EZC1068", "Invalid slot declaration."),
+        ("EZC1070", "Unresolved component symbol."),
+    ] {
+        assert!(check_text.contains(code) && check_text.contains(message));
+        assert!(asm_text.contains(code) && asm_text.contains(message));
     }
 }
 
