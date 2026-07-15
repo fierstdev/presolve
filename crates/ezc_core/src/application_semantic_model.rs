@@ -46,6 +46,7 @@ use crate::form_binding::{
     collect_form_field_binding_products, FormFieldBinding, FormFieldBindingCandidate,
 };
 use crate::form_field::{collect_form_field_products, FormFieldEntity};
+use crate::form_ownership::{collect_form_ownership_graph, FormOwnershipGraph};
 use crate::instance_context::{collect_instance_context_registry, InstanceContextRegistry};
 use crate::intermediate_representation::{
     IrComputedEvaluationPlan, IrReactiveCycleAnalysis, IrReactiveGraph,
@@ -87,6 +88,7 @@ pub struct ApplicationSemanticModel {
     pub form_fields: BTreeMap<FieldId, FormFieldEntity>,
     pub form_field_binding_candidates: Vec<FormFieldBindingCandidate>,
     pub form_field_bindings: BTreeMap<FieldBindingId, FormFieldBinding>,
+    pub form_ownership: FormOwnershipGraph,
     pub slots: BTreeMap<SlotId, SlotEntity>,
     pub component_invocations: BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
     pub component_instance_plan: ComponentInstancePlan,
@@ -441,6 +443,11 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub fn form_field_binding(&self, id: &FieldBindingId) -> Option<&FormFieldBinding> {
         self.form_field_bindings.get(id)
+    }
+
+    #[must_use]
+    pub const fn form_ownership(&self) -> &FormOwnershipGraph {
+        &self.form_ownership
     }
 
     #[must_use]
@@ -1351,6 +1358,17 @@ pub fn build_application_semantic_model_from_component_graph(
         &ownership,
     );
     references.extend(build_form_field_binding_references(&form_field_bindings));
+    let form_ownership = collect_form_ownership_graph(
+        &component_instance_plan.roots,
+        &component_graph.components,
+        &forms,
+        &form_fields,
+        &form_field_bindings,
+        &template_entities,
+        &ownership,
+        &references,
+        &provenance,
+    );
     let semantic_types = finalize_semantic_types(
         base_semantic_types,
         &component_graph.components,
@@ -1501,6 +1519,7 @@ pub fn build_application_semantic_model_from_component_graph(
         form_fields,
         form_field_binding_candidates,
         form_field_bindings,
+        form_ownership,
         slots,
         component_invocations,
         component_instance_plan,
@@ -1749,6 +1768,17 @@ fn build_application_semantic_model_from_files_with_bindings(
         &ownership,
     );
     references.extend(build_form_field_binding_references(&form_field_bindings));
+    let form_ownership = collect_form_ownership_graph(
+        &component_instance_plan.roots,
+        &components,
+        &forms,
+        &form_fields,
+        &form_field_bindings,
+        &template_entities,
+        &ownership,
+        &references,
+        &provenance,
+    );
     let semantic_types = finalize_semantic_types(
         base_semantic_types,
         &components,
@@ -1892,6 +1922,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         form_fields,
         form_field_binding_candidates,
         form_field_bindings,
+        form_ownership,
         slots,
         component_invocations,
         component_instance_plan,
@@ -2638,13 +2669,13 @@ fn build_form_field_binding_references(
                     kind: SemanticReferenceKind::FieldBindingField,
                     source: binding.id.as_semantic_id().clone(),
                     target: binding.field.as_semantic_id().clone(),
-                    provenance: binding.provenance.clone(),
+                    provenance: binding.expression_provenance.clone(),
                 },
                 SemanticReference {
                     kind: SemanticReferenceKind::FieldBindingForm,
                     source: binding.id.as_semantic_id().clone(),
                     target: binding.form.as_semantic_id().clone(),
-                    provenance: binding.provenance.clone(),
+                    provenance: binding.expression_provenance.clone(),
                 },
             ]
         })
@@ -3211,7 +3242,7 @@ fn collect_ownership(
     for binding in form_field_bindings.values() {
         ownership.insert(
             binding.id.as_semantic_id().clone(),
-            SemanticOwner::entity(binding.owner_template.clone()),
+            SemanticOwner::entity(binding.control_entity.clone()),
         );
     }
 

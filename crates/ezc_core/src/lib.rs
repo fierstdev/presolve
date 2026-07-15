@@ -46,6 +46,7 @@ pub mod form;
 pub mod form_binding;
 pub mod form_diagnostics;
 pub mod form_field;
+pub mod form_ownership;
 pub mod html_codegen;
 pub mod instance_context;
 pub mod intermediate_representation;
@@ -244,6 +245,12 @@ pub use form_binding::{
 };
 pub use form_diagnostics::{FormDiagnosticReservation, FORM_DIAGNOSTIC_RESERVATIONS};
 pub use form_field::{collect_form_field_products, FormFieldEntity, FormFieldProducts};
+pub use form_ownership::{
+    collect_form_ownership_graph, validate_form_ownership_graph, FormOwnershipEdge,
+    FormOwnershipEdgeKind, FormOwnershipGraph, FormOwnershipIntegrityDiagnostic,
+    FormOwnershipIntegrityKind, FormOwnershipNode, FormOwnershipNodeKey, FormOwnershipValidation,
+    FormReferenceEdge, FormReferenceKind,
+};
 pub use html_codegen::generate_static_html;
 pub use instance_context::{
     collect_instance_context_registry, ConsumerInstanceId, ConsumerInstanceRecord,
@@ -356,9 +363,9 @@ pub use semantic_id::{
     ComponentInstanceId, ComponentInvocationId, ComponentRootId, ComponentStructuralRegionId,
     ConsumerId, ContextDeclarationCandidateId, ContextId, EffectId, EffectStatementId,
     FieldBindingId, FieldId, FormDeclarationCandidateId, FormFieldBindingCandidateId,
-    FormFieldDeclarationCandidateId, FormId, FormInstanceId, ProviderId, SemanticId, SemanticOwner,
-    SlotBindingId, SlotContentFragmentId, SlotDeclarationCandidateId, SlotId, SlotOutletId,
-    TemplatePositionId,
+    FormFieldDeclarationCandidateId, FormId, FormInstanceId, FormOwnershipGraphId, ProviderId,
+    SemanticId, SemanticOwner, SlotBindingId, SlotContentFragmentId, SlotDeclarationCandidateId,
+    SlotId, SlotOutletId, TemplatePositionId,
 };
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};

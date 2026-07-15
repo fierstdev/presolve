@@ -92,6 +92,12 @@ pub struct FieldId(SemanticId);
 #[serde(transparent)]
 pub struct FieldBindingId(SemanticId);
 
+/// Stable identity for the declaration-level Form ownership projection of one
+/// canonical application/build-root set.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct FormOwnershipGraphId(SemanticId);
+
 /// Stable identity for one compiler-owned component Slot semantic entity.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -655,6 +661,37 @@ impl FieldBindingId {
     }
 }
 
+impl FormOwnershipGraphId {
+    /// Derives one product identity from the existing canonical build-root
+    /// identities. The root set is sorted and deduplicated so file input order
+    /// cannot affect the result.
+    #[must_use]
+    pub fn for_build_roots<'a>(roots: impl IntoIterator<Item = &'a ComponentRootId>) -> Self {
+        let mut roots = roots
+            .into_iter()
+            .map(ComponentRootId::as_str)
+            .collect::<Vec<_>>();
+        roots.sort_unstable();
+        roots.dedup();
+        let authority = if roots.is_empty() {
+            "application".to_string()
+        } else {
+            roots.join("+")
+        };
+        Self(SemanticId(format!("form-ownership-graph:{authority}")))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 impl SlotId {
     #[must_use]
     pub fn for_component(component: &SemanticId, name: &str) -> Self {
@@ -950,6 +987,12 @@ impl fmt::Display for FieldId {
 }
 
 impl fmt::Display for FieldBindingId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for FormOwnershipGraphId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(formatter)
     }

@@ -1138,7 +1138,7 @@ class ProfileEditor {
         assert_eq!(
             asm.owner(display_binding.id.as_semantic_id()),
             Some(&SemanticOwner::entity(
-                display_binding.owner_template.clone()
+                display_binding.control_entity.clone()
             ))
         );
         assert!(asm

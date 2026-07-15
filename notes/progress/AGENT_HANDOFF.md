@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: I4 - Canonical Form Control Binding
-* Working tree: clean after the I4 implementation commit.
+* Latest completed slice: I5 - Canonical Form Ownership Graph
+* Working tree: clean after the I5 implementation commit.
 * Date: 2026-07-15
 
 Last completed slice
 
-* Slice: I4 - Canonical Form Control Binding
-* Summary: I4 retains every authored JSX `field` attribute as a source-qualified immutable candidate and lowers only intrinsic `input`, `textarea`, and `select` controls using exact `field={this.<fieldName>}` resolution to one valid same-component I3 Field. Each valid occurrence receives a control-qualified `FieldBindingId`, compiler-selected channel and normalization policy, exact Form ownership evidence, Template ownership, and typed Field/Form references. Invalid, ambiguous, duplicate, conflicting, and incompatible candidates never receive binding identity or a source-order winner.
-* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/form_binding.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/semantic_reference.rs, crates/ezc_core/src/semantic_id.rs
-* Schema decision: I4 changes internal parser/template/ASM products only. Form Field bindings and their two reference kinds remain filtered from frozen semantic graph v5 and CLI ASM inspection v8. The compiler-only `field` attribute is not emitted as an executable template attribute; no runtime artifact, DOM behavior, public diagnostic, IR, validation, submission, serialization/reset plan, tracking, or resume product is introduced.
+* Slice: I5 - Canonical Form Ownership Graph
+* Summary: I5 projects valid I2-I4 entities and existing canonical ASM ownership/references into one immutable build-root-qualified `FormOwnershipGraph`. Existing Component, Form, Field, template-control, and Field-binding identities remain authoritative; declaration ownership is exactly `Component -> Form -> Field`, each binding is owned by its exact intrinsic template-control use site, and binding-to-Field/Form relations remain typed references. Deterministic validation rejects missing/multiple owners, cycles, unreachable or unknown endpoints, reciprocity/component mismatches, invalid-candidate promotion, instance leakage, incomplete provenance, stale validation, identity drift, and noncanonical ordering without repair.
+* Key files: crates/ezc_core/src/form_ownership.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/asm_validation.rs, crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/form_binding.rs
+* Schema decision: I5 is an in-memory ASM product only. Semantic graph v5, CLI ASM inspection v8, check JSON v4, template manifest v2, runtime artifacts, and resume manifest v4 remain unchanged and continue to filter Phase I entities. No internal graph serialization, `forms.runtime.json`, Form instance, runtime registry, IR, browser behavior, or public diagnostic is introduced.
 
 Current in-progress slice
 
-* Slice: I5 - Form ownership graph contract (blocked before implementation)
-* Status: Phase I is complete through I4. The attached roadmap defines I5 only as "Integrate forms into ownership graph" and does not freeze a distinct ownership-graph product, node/edge domains and directions, containment versus use-site relationships, Form-instance participation, invariants, queries, ordering, or schema boundary. Existing direct ASM ownership remains canonical but is not silently promoted into an invented I5 graph.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I4
-* Remaining in Phase I: I5 through I20.
+* Slice: I6 - Validation Graph (blocked before implementation)
+* Status: Phase I is complete through I5. The attached roadmap defines I6 only as "Create immutable validation graph" and does not freeze validation declaration syntax, ValidationRule identity, rule kinds and arguments, Field/Form targets, dependency inputs, execution boundaries, ordering, invalid-candidate retention, graph nodes/edges, or diagnostic/schema policy. I5 integrity validation is structural ASM validation and must not be reinterpreted as Form value-validation semantics.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I5
+* Remaining in Phase I: I6 through I20.
 
 Verification
 
@@ -30,6 +30,10 @@ Verification
 * `cargo test -p ezc_cli --test component_fixtures -- --nocapture`: pass (7)
 * `cargo clippy -p ezc_core -p ezc_cli --all-targets -- -D warnings`: pass
 * `cargo fmt --all --check`: pass
+* git diff --check: pass
+* `cargo test -p ezc_core form_ownership::tests -- --nocapture`: pass (7)
+* `cargo test -p ezc_parser -p ezc_core`: pass (10 parser unit, 26 parser integration, 319 core)
+* `just check`: pass (formatting, strict workspace clippy, 319 core, 10 parser unit, 26 parser integration, 1 CLI unit, 7 component fixtures, 12 Context fixtures, 126 CLI inspection/build, and 26 real-browser tests)
 * git diff --check: pass
 * `cargo test -p ezc_parser -p ezc_core`: pass (10 parser unit, 26 parser integration, 312 core)
 * `cargo test -p ezc_core form_binding::tests -- --nocapture`: pass (6)
@@ -52,6 +56,22 @@ Verification
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: `FormOwnershipGraphId` derives from the sorted, deduplicated Phase H `ComponentRootId` set, while graph nodes retain existing Component, Form, Field, template-control, and Field-binding identities in a typed sum key.
+* Reason: I5 identifies one application/build projection without manufacturing replacement semantic identities or depending on file order, spans, counts, runtime boot, or map insertion.
+* Tradeoff: The graph is an internal product identity, not an ASM semantic entity and not a public serialized schema.
+
+* Decision: Canonical ASM ownership now records each Field binding under its exact intrinsic template-control entity. The I5 projection consumes that owner together with the already-frozen `FieldBindingField` and `FieldBindingForm` references; Forms or Fields never own their template use sites.
+* Reason: The canonical control is the narrowest authored use-site identity and already participates in the Template ownership tree. Direct control ownership makes the target relationship exact without duplicating a `TargetsControl` reference.
+* Tradeoff: `FormFieldBinding.owner_template` remains the render-template metadata needed for authored ordering, while generic `owner_of(binding)` returns the exact control.
+
+* Decision: I5 validates immutable graph structure and canonical-product reciprocity through internal `EZASM1203` through `EZASM1220` integrity facts. Validation is deterministic, retained on the graph, recomputed by ASM validation, and never repairs malformed input.
+* Reason: Later compiler stages require trustworthy exact owners, endpoints, provenance, root reachability, acyclicity, component isolation, and ordering without returning to syntax or selecting fallback semantics.
+* Tradeoff: These are internal integrity diagnostics only; I18 still owns public Form diagnostics and I6 owns value-validation language semantics.
+
+* Decision: Component and Form instance identities are excluded from the declaration graph. Focused tests prove repeated component instances retain one declaration-level Form node while the reserved `(ComponentInstanceId, FormId)` constructor remains deterministic and distinct.
+* Reason: Phase H instance topology remains frozen, and no authorized runtime-planning slice has projected declaration Forms into mutable executions.
+* Tradeoff: Runtime Form/Field state cannot use declaration IDs directly; its qualification and creation authority remain deferred.
 
 * Decision: I4 recognizes exactly one compiler-owned `field={this.<identifier>}` JSX attribute on intrinsic `input`, `textarea`, or `select` elements. The direct member resolves only among valid I3 Fields authored on the template's canonical component, and Form identity is copied only from `FormFieldEntity.owner_form`.
 * Reason: The supplied contract makes the I3 declaration the sole Form-membership authority and prohibits HTML `name`, separate `form` attributes, template ancestry, Context, state/computed/method lookup, component adapters, imports, runtime instances, and DOM discovery.
@@ -955,8 +975,8 @@ Architecture decisions made
 
 Known limitations
 
-* Item: Phase I is complete through I4. Canonical Form declarations, Form Field declarations, and template-control bindings plus all retained invalid-candidate facts exist, but the dedicated Form ownership graph, validation, submission, serialization/reset plans, tracking, IR, runtime products, execution, public inspection, emitted diagnostics, fixtures, and resumability planning do not.
-* Item: I5 cannot be implemented from the attached one-line "Integrate forms into ownership graph" entry without inventing the product identity, node/edge domains and directions, containment versus binding-use relationships, Form-instance participation, invariants, queries, deterministic ordering, and public/internal schema boundary.
+* Item: Phase I is complete through I5. Canonical Form declarations, Fields, control bindings, and the immutable declaration ownership graph plus retained invalid-candidate facts exist, but Form value validation, cross-Field validation dependencies, tracking, submission, serialization/reset plans, IR, runtime products, execution, public inspection, emitted diagnostics, fixtures, and resumability planning do not.
+* Item: I6 cannot be implemented from the attached one-line "Create immutable validation graph" entry without inventing validation syntax, rule identity and kinds, arguments, exact targets, dependency semantics, execution boundary, ordering, invalid-candidate retention, graph shape, or schema/diagnostic policy.
 * Item: Phase H is frozen through H21. Semantic graph v5 intentionally omits Phase H entities, live component restoration remains deferred until Phase J, and every unsupported component behavior in `docs/component-contract.md` requires a later authoritative roadmap slice.
 * Item: Conditional rendering only supports simple `this.<stateField>` conditions with JSX element or fragment branches.
 * Item: Conditional branch snippets are replaced as static HTML. Bindings, events, and nested dynamic behavior inside swapped-in branch snippets are not re-registered yet.
@@ -995,14 +1015,13 @@ Known limitations
 
 Exact next step
 
-Commit the completed I4 slice, verify the worktree is clean, then obtain an
-authoritative I5 Form ownership-graph contract. At minimum it must freeze the
-graph/product identity, canonical node and edge domains/directions, containment
-versus use-site relationships, whether declaration-level Form instances
-participate, invariants and queries, deterministic ordering, validation, and
-inspection/schema policy. Do not reinterpret direct ASM ownership, template
-ancestry, HTML `<form>` nesting, DOM ancestry, or runtime registration as the
-missing I5 graph contract.
+Commit the completed I5 slice, verify the worktree is clean, then obtain an
+authoritative I6 Validation Graph contract. At minimum it must freeze authored
+validation syntax, `ValidationRuleId` inputs, rule catalog and arguments,
+Field/Form targeting, dependency and execution boundaries, invalid-candidate
+retention, graph nodes/edges, ordering, integrity validation, and public/internal
+schema policy. Do not reinterpret I5 ownership integrity diagnostics as Form
+value-validation rules.
 
 Useful commands
 
@@ -1033,4 +1052,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the I4 implementation commit (`compiler: bind canonical form controls`).
+* None after the I5 implementation commit (`compiler: project canonical form ownership`).

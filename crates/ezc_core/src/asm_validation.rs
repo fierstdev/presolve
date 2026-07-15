@@ -62,6 +62,10 @@ pub fn validate_application_semantic_model(
         }
         let source_provenance_matches = model.provenance(&reference.source)
             == Some(&reference.provenance)
+            || model.form_field_bindings.values().any(|binding| {
+                binding.id.as_semantic_id() == &reference.source
+                    && binding.expression_provenance == reference.provenance
+            })
             || model
                 .consumer_for_semantic_id(&reference.source)
                 .is_some_and(|consumer| {
@@ -85,6 +89,7 @@ pub fn validate_application_semantic_model(
 
     validate_semantic_types(model, &mut diagnostics);
     validate_form_field_bindings(model, &mut diagnostics);
+    validate_form_ownership(model, &mut diagnostics);
     validate_contexts(model, &mut diagnostics);
     validate_providers(model, &mut diagnostics);
     validate_consumers(model, &mut diagnostics);
@@ -108,6 +113,28 @@ pub fn validate_application_semantic_model(
     validate_template_action_bindings(model, &mut diagnostics);
 
     diagnostics
+}
+
+fn validate_form_ownership(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    let validation = crate::validate_form_ownership_graph(&model.form_ownership, model);
+    diagnostics.extend(
+        validation
+            .diagnostics
+            .iter()
+            .map(|diagnostic| AsmValidationDiagnostic {
+                code: diagnostic.code.clone(),
+                message: diagnostic.message.clone(),
+            }),
+    );
+    if model.form_ownership.validation != validation {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1220".to_string(),
+            message: "Form ownership graph retained stale validation facts".to_string(),
+        });
+    }
 }
 
 fn validate_form_field_bindings(
