@@ -3,30 +3,30 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: H10 - Component initialization and Slot planning
-* Working tree: clean after the H10 initialization-plan commit.
+* Latest completed slice: H11 - Component initialization IR
+* Working tree: clean after the H11 component-IR commit.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: H10 - Component initialization and Slot planning
-* Summary: H10 uses the existing compiler scheduler to batch canonical H4 instances, retain selected H6 Context readiness, and schedule H7 bindings after exact caller/callee prerequisites. Roots and blocked records remain explicit; ineligible/blocked bindings are excluded.
-* Key files: crates/ezc_core/src/component_initialization.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs
-* Schema decision: no serialized shape changed in H10. Semantic graph remains v5, Context runtime artifact v2, template manifest v2, resume manifest v3, ASM inspection v6, and check JSON v3.
+* Slice: H11 - Component initialization IR
+* Summary: H11 lowers H10 batches into canonical typed create, initialize, materialize, and bind instructions. Instance Context slots and caller-owned Slot content retain their exact H6/H7 identities; destruction is represented but unplanned until H16.
+* Key files: crates/ezc_core/src/component_ir.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs
+* Schema decision: no serialized shape changed in H11. Semantic graph remains v5, Context runtime artifact v2, template manifest v2, resume manifest v3, ASM inspection v6, and check JSON v3.
 
 Current in-progress slice
 
 * Slice: none
-* Status: H10 is complete and committed. H11 has not started.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H10
-* Remaining in Phase H: H11 through H21.
+* Status: H11 is complete and committed. H12 has not started.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H11
+* Remaining in Phase H: H12 through H21.
 
 Verification
 
 * Phase H entry gate: `just check` pass (workspace formatting, strict workspace clippy, and complete workspace test matrix: 12 Context fixture/freeze, 125 CLI inspection/build, 24 real-browser, 244 core, 3 parser unit, and 26 parser integration tests)
 * cargo test -p ezc_parser: pass (5 unit; 26 integration)
-* cargo test -p ezc_core component_initialization::tests -- --nocapture: pass (3 focused)
-* cargo test -p ezc_core: pass (280)
+* cargo test -p ezc_core component_ir::tests -- --nocapture: pass (2 focused)
+* cargo test -p ezc_core: pass (282)
 * cargo test -p ezc_cli --bin ezc_cli: pass (1)
 * cargo test -p ezc_cli --test explain: pass (125)
 * cargo clippy -p ezc_parser -p ezc_core -p ezc_cli --all-targets -- -D warnings: pass
@@ -34,6 +34,10 @@ Verification
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: H11 lowers immutable H10 instance and Slot batches into a dedicated canonical `ComponentIrReport`. Create, initialize, and materialize operations preserve instance order; Slot binds retain exact caller-owned fragment and callee outlet placement. `DestroyComponentInstance` is a typed reserved operation and is not emitted before H16.
+* Reason: Runtime-facing phases receive compiler-owned operation IDs and instance-qualified Context slots without declaration-slot aliases, parser walks, tag/slot-name lookup, DOM inspection, or generic rerendering.
+* Tradeoff: H11 does not optimize, serialize, execute, or structurally update the report. Internal `EZASM1199` rejects IR drift; public inspection and schemas wait for their roadmap slices.
 
 * Decision: H10 projects H4 instance topology through the existing `IrUpdateScheduler`, then schedules compatible H7 binding insertion only after exact caller/callee batches. Instance Context source readiness travels with the owning instance batch.
 * Reason: The compiler retains stable initial ordering and prerequisites without a second scheduler, runtime traversal, DOM inspection, or executing structural updates early.

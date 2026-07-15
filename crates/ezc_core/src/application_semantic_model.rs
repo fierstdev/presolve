@@ -19,6 +19,7 @@ use crate::component_instance_scope::{
     build_component_instance_scope_graph, ComponentInstanceScopeGraph,
 };
 use crate::component_invocation::{collect_component_invocations, ComponentInvocationEntity};
+use crate::component_ir::{lower_component_ir, ComponentIrReport};
 use crate::component_scope::ComponentScopeGraph;
 use crate::composition_typing::{collect_composition_type_products, CompositionTypeProducts};
 use crate::computed_value::{collect_computed_values, ComputedDiagnosticCode, ComputedValue};
@@ -81,6 +82,7 @@ pub struct ApplicationSemanticModel {
     pub component_instance_scope: ComponentInstanceScopeGraph,
     pub component_composition: ComponentCompositionAnalysis,
     pub component_initialization: ComponentInitializationPlan,
+    pub component_ir: ComponentIrReport,
     pub instance_context: InstanceContextRegistry,
     pub slot_content_fragments: BTreeMap<SlotContentFragmentId, SlotContentFragment>,
     pub slot_outlets: BTreeMap<SlotOutletId, SlotOutlet>,
@@ -546,6 +548,11 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub const fn component_initialization_plan(&self) -> &ComponentInitializationPlan {
         &self.component_initialization
+    }
+
+    #[must_use]
+    pub const fn component_ir_report(&self) -> &ComponentIrReport {
+        &self.component_ir
     }
 
     #[must_use]
@@ -1334,6 +1341,7 @@ pub fn build_application_semantic_model_from_component_graph(
         component_instance_scope,
         component_composition,
         component_initialization,
+        component_ir: ComponentIrReport::default(),
         instance_context,
         slot_content_fragments: slot_composition.fragments,
         slot_outlets: slot_composition.outlets,
@@ -1375,6 +1383,7 @@ pub fn build_application_semantic_model_from_component_graph(
     model
         .diagnostics
         .extend(crate::collect_context_diagnostics(&model));
+    model.component_ir = lower_component_ir(&model);
     model
 }
 
@@ -1685,6 +1694,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         component_instance_scope,
         component_composition,
         component_initialization,
+        component_ir: ComponentIrReport::default(),
         instance_context,
         slot_content_fragments: slot_composition.fragments,
         slot_outlets: slot_composition.outlets,
@@ -1726,6 +1736,7 @@ fn build_application_semantic_model_from_files_with_bindings(
     model
         .diagnostics
         .extend(crate::collect_context_diagnostics(&model));
+    model.component_ir = lower_component_ir(&model);
     model
 }
 
