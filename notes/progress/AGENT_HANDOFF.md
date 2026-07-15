@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: I2 - Canonical Form declarations
-* Working tree: clean after the I2 canonical-declaration commit.
+* Working tree: clean after the I3 contract-blocker documentation commit.
 * Date: 2026-07-15
 
 Last completed slice
@@ -16,8 +16,8 @@ Last completed slice
 
 Current in-progress slice
 
-* Slice: I3 - Field syntax (contract review pending after I2 commit)
-* Status: I2 is implemented and verified. The attached roadmap defines I3 only as "Lower `@field()`" and supplies no declaration, ownership, naming, type, arity, duplicate, or invalid-candidate contract; no I3 semantics have been inferred.
+* Slice: I3 - Field syntax (blocked before implementation)
+* Status: Phase I is committed through I2. The attached roadmap defines I3 only as "Lower `@field()`" and supplies no declaration, ownership, naming, type/value, arity, duplicate, or invalid-candidate identity/retention contract; no I3 semantics have been inferred.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I2
 * Remaining in Phase I: I3 through I20.
 
@@ -985,4 +985,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the I2 slice commit (`compiler: lower canonical form declarations`).
+* None after the I3 blocker documentation commit (`docs(forms): record I3 field contract blocker`).
