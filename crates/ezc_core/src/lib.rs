@@ -264,8 +264,9 @@ pub use module_graph::{
     build_module_graph, ModuleEdge, ModuleEdgeKind, ModuleGraph, ModuleNode, ModuleTarget,
 };
 pub use page_codegen::{
-    generate_standalone_page, generate_standalone_page_with_computed_runtime,
-    generate_standalone_page_with_context_runtime, generate_standalone_page_with_effect_runtime,
+    generate_standalone_page, generate_standalone_page_with_component_runtime,
+    generate_standalone_page_with_computed_runtime, generate_standalone_page_with_context_runtime,
+    generate_standalone_page_with_effect_runtime,
 };
 pub use provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
 pub use resume_manifest::{

@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: H14 - Component runtime artifact v1
-* Working tree: clean after the H14 artifact commit.
+* Latest completed slice: H15 - Initial component runtime boot
+* Working tree: clean after the H15 runtime commit.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: H14 - Component runtime artifact v1
-* Summary: H14 serializes validated compiler-owned component metadata as `component.runtime.json` v1 and the CLI build writes it.
-* Key files: crates/ezc_core/src/runtime_component_artifact.rs; crates/ezc_cli/src/main.rs
-* Schema decision: new public component runtime artifact v1; frozen existing schemas remain unchanged.
+* Slice: H15 - Initial component runtime boot
+* Summary: H15 embeds and validates `component.runtime.json` v1, then initializes closed compiler-ID-keyed component, Slot-binding, and instance-Context tables with deterministic debug evidence.
+* Key files: crates/ezc_core/src/runtime_codegen.rs; crates/ezc_core/src/page_codegen.rs; crates/ezc_cli/src/main.rs
+* Schema decision: no schema change; component runtime artifact remains v1.
 
 Current in-progress slice
 
 * Slice: none
-* Status: H14 is complete and committed. H15 has not started.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H14
-* Remaining in Phase H: H15 through H21.
+* Status: H15 is complete and committed. H16 has not started.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H15
+* Remaining in Phase H: H16 through H21.
 
 Verification
 

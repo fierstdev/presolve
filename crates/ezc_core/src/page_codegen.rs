@@ -1,7 +1,7 @@
 use crate::{
-    runtime_computed_artifact_json, runtime_context_artifact_json, runtime_effect_artifact_json,
-    template_manifest_json, RuntimeComputedArtifact, RuntimeContextArtifact, RuntimeEffectArtifact,
-    TemplateManifest,
+    runtime_component_artifact_json, runtime_computed_artifact_json, runtime_context_artifact_json,
+    runtime_effect_artifact_json, template_manifest_json, RuntimeComponentArtifact,
+    RuntimeComputedArtifact, RuntimeContextArtifact, RuntimeEffectArtifact, TemplateManifest,
 };
 
 #[must_use]
@@ -10,7 +10,7 @@ pub fn generate_standalone_page(
     body_html: &str,
     manifest: &TemplateManifest,
 ) -> String {
-    generate_page(title, body_html, manifest, None, None, None)
+    generate_page(title, body_html, manifest, None, None, None, None)
 }
 
 /// Generate a standalone page with compiler-generated computed runtime data.
@@ -21,7 +21,7 @@ pub fn generate_standalone_page_with_computed_runtime(
     manifest: &TemplateManifest,
     computed: &RuntimeComputedArtifact,
 ) -> String {
-    generate_page(title, body_html, manifest, Some(computed), None, None)
+    generate_page(title, body_html, manifest, Some(computed), None, None, None)
 }
 
 /// Generate a standalone page with compiler-generated computed and effect runtime data.
@@ -40,6 +40,7 @@ pub fn generate_standalone_page_with_effect_runtime(
         Some(computed),
         None,
         Some(effects),
+        None,
     )
 }
 
@@ -60,6 +61,29 @@ pub fn generate_standalone_page_with_context_runtime(
         Some(computed),
         Some(context),
         Some(effects),
+        None,
+    )
+}
+
+/// Generate a standalone page with all compiler-generated runtime artifacts.
+#[must_use]
+pub fn generate_standalone_page_with_component_runtime(
+    title: &str,
+    body_html: &str,
+    manifest: &TemplateManifest,
+    computed: &RuntimeComputedArtifact,
+    context: &RuntimeContextArtifact,
+    effects: &RuntimeEffectArtifact,
+    components: &RuntimeComponentArtifact,
+) -> String {
+    generate_page(
+        title,
+        body_html,
+        manifest,
+        Some(computed),
+        Some(context),
+        Some(effects),
+        Some(components),
     )
 }
 
@@ -70,6 +94,7 @@ fn generate_page(
     computed: Option<&RuntimeComputedArtifact>,
     context: Option<&RuntimeContextArtifact>,
     effects: Option<&RuntimeEffectArtifact>,
+    components: Option<&RuntimeComponentArtifact>,
 ) -> String {
     let manifest_json = template_manifest_json(manifest);
 
@@ -121,6 +146,15 @@ fn generate_page(
     if let Some(effects) = effects {
         output.push_str("    <script type=\"application/json\" id=\"ez-effect-runtime\">\n");
         for line in runtime_effect_artifact_json(effects).lines() {
+            output.push_str("      ");
+            output.push_str(&escape_script_json_line(line));
+            output.push('\n');
+        }
+        output.push_str("    </script>\n");
+    }
+    if let Some(components) = components {
+        output.push_str("    <script type=\"application/json\" id=\"ez-component-runtime\">\n");
+        for line in runtime_component_artifact_json(components).lines() {
             output.push_str("      ");
             output.push_str(&escape_script_json_line(line));
             output.push('\n');

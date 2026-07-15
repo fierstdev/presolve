@@ -5,12 +5,14 @@ const RUNTIME_STUB: &str = r#"(() => {
   const COMPUTED_ARTIFACT_ELEMENT_ID = "ez-computed-runtime";
   const EFFECT_ARTIFACT_ELEMENT_ID = "ez-effect-runtime";
   const CONTEXT_ARTIFACT_ELEMENT_ID = "ez-context-runtime";
+  const COMPONENT_ARTIFACT_ELEMENT_ID = "ez-component-runtime";
   const RUNTIME_VERSION = "0.0.0";
   const SUPPORTED_SCHEMA_VERSION = 2;
   const LEGACY_MANIFEST_SCHEMA_VERSION = 1;
   const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 3;
   const SUPPORTED_EFFECT_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 2;
+  const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = 1;
 
   class EdgeZeroBootError extends Error {
     constructor(code) {
@@ -261,6 +263,32 @@ const RUNTIME_STUB: &str = r#"(() => {
         true
       );
       throw new EdgeZeroBootError("EZR_UNSUPPORTED_EFFECT_ARTIFACT_SCHEMA");
+    }
+  }
+
+  function readComponentArtifact(diagnostics) {
+    const element = document.getElementById(COMPONENT_ARTIFACT_ELEMENT_ID);
+    if (element === null) return null;
+    if (!(element instanceof HTMLScriptElement)) {
+      reportDiagnostic(diagnostics, "EZR_INVALID_COMPONENT_ARTIFACT", "Component runtime metadata was not stored in a script element", { artifactElementId: COMPONENT_ARTIFACT_ELEMENT_ID }, true);
+      throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+    }
+    try { return JSON.parse(element.textContent ?? ""); } catch (error) {
+      reportDiagnostic(diagnostics, "EZR_INVALID_COMPONENT_ARTIFACT", "Component runtime metadata JSON could not be parsed", { message: error instanceof Error ? error.message : String(error) }, true);
+      throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+    }
+  }
+
+  function validateComponentArtifactSchema(artifact, diagnostics) {
+    if (artifact === null) return;
+    if (artifact.schema_version !== SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION || !Array.isArray(artifact.instances) || !Array.isArray(artifact.initialization_batches)) {
+      reportDiagnostic(diagnostics, "EZR_INVALID_COMPONENT_ARTIFACT", "Component runtime metadata did not match the compiler artifact contract", { schema_version: artifact.schema_version }, true);
+      throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const instances = new Set(artifact.instances.map((instance) => instance.instance));
+    for (const instance of artifact.instances) if (instance.parent !== null && instance.parent !== undefined && !instances.has(instance.parent)) {
+      reportDiagnostic(diagnostics, "EZR_INVALID_COMPONENT_ARTIFACT", "Component runtime metadata referenced an unknown parent instance", { instance: instance.instance, parent: instance.parent }, true);
+      throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
     }
   }
 
@@ -1818,6 +1846,10 @@ const RUNTIME_STUB: &str = r#"(() => {
     context_consumer_bindings = [],
     context_failures = [],
     context_update_source_runs = [],
+    component_initialization_runs = [],
+    component_instance_tree = [],
+    slot_binding_runs = [],
+    component_failures = [],
     diagnostics
   }) {
     return {
@@ -1836,16 +1868,24 @@ const RUNTIME_STUB: &str = r#"(() => {
       context_slots,
       context_consumer_bindings,
       context_failures,
-      context_update_source_runs
+      context_update_source_runs,
+      component_initialization_runs,
+      component_instance_tree,
+      slot_binding_runs,
+      component_failures
     };
   }
 
-  function initializeRuntime(manifest, computedArtifact, contextArtifact, effectArtifact, diagnostics) {
+  function initializeRuntime(manifest, computedArtifact, contextArtifact, effectArtifact, componentArtifact, diagnostics) {
     const bindingAnchors = collectBindingAnchors();
     const conditionalAnchors = collectConditionalAnchors();
     const listAnchors = collectListAnchors();
     const elementsByNode = collectElementAnchors();
     const store = createRuntimeStore(elementsByNode, diagnostics, computedArtifact, contextArtifact, effectArtifact);
+    store.componentArtifact = componentArtifact;
+    store.componentInstances = new Map((componentArtifact?.instances ?? []).map((instance) => [instance.instance, { ...instance, status: "created" }]));
+    store.slotBindings = new Map((componentArtifact?.slot_binding_programs ?? []).map((binding) => [binding.binding, binding]));
+    store.instanceContextBindings = new Map((componentArtifact?.instance_context_bindings ?? []).map((binding) => [binding.consumer_instance, binding]));
     const missingAnchors = collectMissingAnchors(
       manifest,
       bindingAnchors,
@@ -1902,7 +1942,11 @@ const RUNTIME_STUB: &str = r#"(() => {
       context_slots: [...store.contextSlots.entries()],
       context_consumer_bindings: [...store.contextConsumerBindings.entries()],
       context_failures: store.contextFailures,
-      context_update_source_runs: store.contextUpdateSourceRuns
+      context_update_source_runs: store.contextUpdateSourceRuns,
+      component_initialization_runs: (componentArtifact?.initialization_batches ?? []).map((batch) => batch.index),
+      component_instance_tree: [...store.componentInstances.values()],
+      slot_binding_runs: [...store.slotBindings.keys()],
+      component_failures: []
     });
   }
 
@@ -1917,9 +1961,11 @@ const RUNTIME_STUB: &str = r#"(() => {
       validateContextArtifactSchema(contextArtifact, diagnostics);
       const effectArtifact = readEffectArtifact(diagnostics);
       validateEffectArtifactSchema(effectArtifact, diagnostics);
+      const componentArtifact = readComponentArtifact(diagnostics);
+      validateComponentArtifactSchema(componentArtifact, diagnostics);
       validateManifestSchema(manifest, effectArtifact, diagnostics);
 
-      const state = initializeRuntime(manifest, computedArtifact, contextArtifact, effectArtifact, diagnostics);
+      const state = initializeRuntime(manifest, computedArtifact, contextArtifact, effectArtifact, componentArtifact, diagnostics);
       const status = state.diagnostics.some((diagnostic) => diagnostic.fatal)
         || state.missingAnchors.length > 0
         ? "error"

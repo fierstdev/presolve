@@ -12,7 +12,7 @@ use ezc_core::{
     build_runtime_component_artifact, build_runtime_computed_artifact,
     build_runtime_context_artifact, build_runtime_effect_artifact, build_semantic_graph,
     build_template_graph, build_template_manifest_from_asm, explain_json, explain_text,
-    fold_component_graph, generate_runtime_stub, generate_standalone_page_with_context_runtime,
+    fold_component_graph, generate_runtime_stub, generate_standalone_page_with_component_runtime,
     generate_static_html, lower_components_to_ir, optimize_context_ir, optimize_effect_ir,
     runtime_component_artifact_json, runtime_computed_artifact_json, runtime_context_artifact_json,
     runtime_effect_artifact_json, semantic_graph_json, semantic_type_text, summarize_source,
@@ -1694,13 +1694,14 @@ fn run_build(mut args: Vec<String>) {
     let manifest = build_template_manifest_from_asm(&asm);
     let manifest_json = template_manifest_json(&manifest);
     let page_title = page_title_from_graph(&template_graph);
-    let page_html = generate_standalone_page_with_context_runtime(
+    let page_html = generate_standalone_page_with_component_runtime(
         &page_title,
         &html_fragment,
         &manifest,
         &computed_runtime_artifact,
         &context_runtime_artifact,
         &effect_runtime_artifact,
+        &component_runtime_artifact,
     );
     let runtime_js = generate_runtime_stub();
 
