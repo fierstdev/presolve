@@ -29,7 +29,7 @@ use ezc_parser::{
 };
 use serde::Serialize;
 
-const ASM_INSPECTION_SCHEMA_VERSION: u32 = 6;
+const ASM_INSPECTION_SCHEMA_VERSION: u32 = 7;
 const CHECK_JSON_SCHEMA_VERSION: u32 = 3;
 
 fn main() {
@@ -1281,7 +1281,97 @@ fn asm_inspection_entity<'a>(
         computed: asm_computed_inspection(asm, id, computed_functions),
         effect: effect_inspections.records.get(id).cloned(),
         context: context_inspections.records.get(id).cloned(),
+        component: asm_component_inspection(asm, id),
     }
+}
+
+fn asm_component_inspection(
+    asm: &ApplicationSemanticModel,
+    id: &SemanticId,
+) -> Option<AsmInspectionComponent> {
+    if let Some(slot) = asm
+        .slots
+        .values()
+        .find(|slot| slot.id.as_semantic_id() == id)
+    {
+        return Some(AsmInspectionComponent {
+            role: "slot",
+            slots: vec![slot.id.to_string()],
+            invocations: Vec::new(),
+            instances: Vec::new(),
+            initialization_batches: Vec::new(),
+            structural_regions: Vec::new(),
+        });
+    }
+    if let Some(invocation) = asm
+        .component_invocations
+        .values()
+        .find(|invocation| invocation.id.as_semantic_id() == id)
+    {
+        let instances = asm
+            .component_instance_plan
+            .instances
+            .values()
+            .filter(|instance| instance.invocation.as_ref() == Some(&invocation.id))
+            .map(|instance| instance.id.to_string())
+            .collect();
+        return Some(AsmInspectionComponent {
+            role: "invocation",
+            slots: Vec::new(),
+            invocations: vec![invocation.id.to_string()],
+            instances,
+            initialization_batches: Vec::new(),
+            structural_regions: Vec::new(),
+        });
+    }
+    let component = asm
+        .components
+        .iter()
+        .find(|component| component.id == *id)?;
+    Some(AsmInspectionComponent {
+        role: "definition",
+        slots: asm
+            .slots
+            .values()
+            .filter(|slot| slot.owner == component.id)
+            .map(|slot| slot.id.to_string())
+            .collect(),
+        invocations: asm
+            .component_invocations
+            .values()
+            .filter(|invocation| invocation.owner_component == component.id)
+            .map(|invocation| invocation.id.to_string())
+            .collect(),
+        instances: asm
+            .component_instance_plan
+            .instances
+            .values()
+            .filter(|instance| instance.component == component.id)
+            .map(|instance| instance.id.to_string())
+            .collect(),
+        initialization_batches: asm
+            .component_initialization
+            .instance_batches
+            .iter()
+            .filter(|batch| {
+                batch.instances.iter().any(|instance| {
+                    asm.component_instance_plan
+                        .instances
+                        .get(instance)
+                        .is_some_and(|record| record.component == component.id)
+                })
+            })
+            .map(|batch| batch.index)
+            .collect(),
+        structural_regions: asm
+            .component_instance_plan
+            .instances
+            .values()
+            .filter(|instance| instance.component == component.id)
+            .filter_map(|instance| instance.structural_region.as_ref())
+            .map(ToString::to_string)
+            .collect(),
+    })
 }
 
 fn asm_computed_inspection(
@@ -1431,6 +1521,18 @@ struct AsmInspectionEntity<'a> {
     effect: Option<EffectInspection>,
     #[serde(skip_serializing_if = "Option::is_none")]
     context: Option<ezc_core::ContextInspection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    component: Option<AsmInspectionComponent>,
+}
+
+#[derive(Serialize)]
+struct AsmInspectionComponent {
+    role: &'static str,
+    slots: Vec<String>,
+    invocations: Vec<String>,
+    instances: Vec<String>,
+    initialization_batches: Vec<usize>,
+    structural_regions: Vec<String>,
 }
 
 #[derive(Serialize)]

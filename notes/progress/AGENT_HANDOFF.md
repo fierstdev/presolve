@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: H17 - Component resumability planning
-* Working tree: clean after the H17 resume-manifest commit.
+* Latest completed slice: H18 - Component inspection schema v7
+* Working tree: clean after the H18 inspection commit.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: H17 - Component resumability planning
-* Summary: H17 advances the shared resume manifest to v4 with deterministic component-instance, structural-region, and Slot-binding resume records.
-* Key files: crates/ezc_core/src/resume_plan.rs; crates/ezc_core/src/resume_manifest.rs
-* Schema decision: resume manifest v4; component artifact remains v2 and other frozen schemas are unchanged.
+* Slice: H18 - Component inspection schema v7
+* Summary: H18 advances ASM inspection to v7 and projects canonical component definition, invocation, Slot, instance, batch, and structural-region facts.
+* Key files: crates/ezc_cli/src/main.rs
+* Schema decision: ASM inspection v7; resume manifest v4 and component artifact v2 remain frozen.
 
 Current in-progress slice
 
 * Slice: none
-* Status: H17 is complete and committed. H18 has not started.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H17
-* Remaining in Phase H: H18 through H21.
+* Status: H18 is complete and committed. H19 has not started.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H18
+* Remaining in Phase H: H19 through H21.
 
 Verification
 
