@@ -95,6 +95,7 @@ pub fn validate_application_semantic_model(
     validate_context_evaluation(model, &mut diagnostics);
     validate_component_instance_scope(model, &mut diagnostics);
     validate_component_composition(model, &mut diagnostics);
+    validate_component_initialization(model, &mut diagnostics);
     validate_instance_context(model, &mut diagnostics);
     validate_slot_bindings(model, &mut diagnostics);
     validate_composition_types(model, &mut diagnostics);
@@ -104,6 +105,25 @@ pub fn validate_application_semantic_model(
     validate_template_action_bindings(model, &mut diagnostics);
 
     diagnostics
+}
+
+fn validate_component_initialization(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    let expected = crate::plan_component_initialization(
+        &model.component_instance_plan,
+        &model.slot_bindings,
+        &model.composition_types,
+        &model.instance_context,
+    );
+    if model.component_initialization != expected {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1198".to_string(),
+            message: "component initialization plan does not match canonical H4/H6/H7/H8 products"
+                .to_string(),
+        });
+    }
 }
 
 fn validate_component_composition(

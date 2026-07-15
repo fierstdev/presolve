@@ -3,30 +3,30 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: H9 - Component composition cycle analysis
-* Working tree: clean after the H9 composition cycle commit.
+* Latest completed slice: H10 - Component initialization and Slot planning
+* Working tree: clean after the H10 initialization-plan commit.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: H9 - Component composition cycle analysis
-* Summary: H9 derives deterministic SCC cycles from resolved component-definition invocation edges only and links every existing H4 first-cycle blocked boundary to its exact cycle. Self, multi-node, and acyclic graphs remain finite and sorted; Slot ownership creates no reverse edge.
-* Key files: crates/ezc_core/src/component_composition.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs
-* Schema decision: no serialized shape changed in H9. Semantic graph remains v5, Context runtime artifact v2, template manifest v2, resume manifest v3, ASM inspection v6, and check JSON v3.
+* Slice: H10 - Component initialization and Slot planning
+* Summary: H10 uses the existing compiler scheduler to batch canonical H4 instances, retain selected H6 Context readiness, and schedule H7 bindings after exact caller/callee prerequisites. Roots and blocked records remain explicit; ineligible/blocked bindings are excluded.
+* Key files: crates/ezc_core/src/component_initialization.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs
+* Schema decision: no serialized shape changed in H10. Semantic graph remains v5, Context runtime artifact v2, template manifest v2, resume manifest v3, ASM inspection v6, and check JSON v3.
 
 Current in-progress slice
 
 * Slice: none
-* Status: H9 is complete and committed. H10 has not started.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H9
-* Remaining in Phase H: H10 through H21.
+* Status: H10 is complete and committed. H11 has not started.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H10
+* Remaining in Phase H: H11 through H21.
 
 Verification
 
 * Phase H entry gate: `just check` pass (workspace formatting, strict workspace clippy, and complete workspace test matrix: 12 Context fixture/freeze, 125 CLI inspection/build, 24 real-browser, 244 core, 3 parser unit, and 26 parser integration tests)
 * cargo test -p ezc_parser: pass (5 unit; 26 integration)
-* cargo test -p ezc_core component_composition::tests -- --nocapture: pass (3 focused)
-* cargo test -p ezc_core: pass (277)
+* cargo test -p ezc_core component_initialization::tests -- --nocapture: pass (3 focused)
+* cargo test -p ezc_core: pass (280)
 * cargo test -p ezc_cli --bin ezc_cli: pass (1)
 * cargo test -p ezc_cli --test explain: pass (125)
 * cargo clippy -p ezc_parser -p ezc_core -p ezc_cli --all-targets -- -D warnings: pass
@@ -34,6 +34,10 @@ Verification
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: H10 projects H4 instance topology through the existing `IrUpdateScheduler`, then schedules compatible H7 binding insertion only after exact caller/callee batches. Instance Context source readiness travels with the owning instance batch.
+* Reason: The compiler retains stable initial ordering and prerequisites without a second scheduler, runtime traversal, DOM inspection, or executing structural updates early.
+* Tradeoff: H10 is initial planning only. It adds no IR/runtime/schema or public diagnostic surface; `EZASM1198` detects retained-plan drift.
 
 * Decision: H9 SCC analysis consumes only canonical resolved H2 definition edges and maps H4 `CompositionCycleBoundary` records to sorted cycle indexes. Slot ownership/content placement and unresolved invocation attempts never contribute edges.
 * Reason: Static recursion is inspectable and finite without parser rewalk, runtime discovery, or accidental callee-to-caller edges from lexical Slot ownership.
@@ -825,7 +829,7 @@ Architecture decisions made
 
 Known limitations
 
-* Item: H1-H9 support Slot declarations/composition, static invocations, finite instance plans, validated ancestry, instance Context selection, composition eligibility, and deterministic finite cycle analysis only. Initialization planning, IR, runtime artifacts/execution, resumability, inspection, and diagnostics remain H10-H19 work. Phase H entities are intentionally absent from frozen semantic graph v5 and ASM inspection v6 until H18.
+* Item: H1-H10 support compiler-owned component composition through deterministic initial creation/Slot binding plans only. Canonical IR, runtime artifacts/execution, resumability, inspection, and diagnostics remain H11-H19 work. Phase H entities are intentionally absent from frozen semantic graph v5 and ASM inspection v6 until H18.
 * Item: Conditional rendering only supports simple `this.<stateField>` conditions with JSX element or fragment branches.
 * Item: Conditional branch snippets are replaced as static HTML. Bindings, events, and nested dynamic behavior inside swapped-in branch snippets are not re-registered yet.
 * Item: Keyed lists currently accept only `iterable.map((item, index?) => <element>...</element>)` with identifier parameters and an expression-bodied callback. Static and runtime reconciliation support a direct primitive item key or a dot-member key such as `item.id` that resolves to a unique primitive.
@@ -863,7 +867,7 @@ Known limitations
 
 Exact next step
 
-Implement H10 deterministic component initialization and Slot materialization planning. Reuse the established scheduler contract, batch independent siblings, order parents before children and callee creation before Slot binding, exclude blocked/ineligible records, and retain exact prerequisite identities.
+Implement H11 canonical component and Slot IR from executable H10 records. Lower exact create, initialize, materialize, bind, and instance-qualified Context slot operations; validate endpoints/order and retain caller slot ownership.
 
 Useful commands
 
@@ -894,4 +898,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the H9 commit (`feat(core): analyze component composition cycles`).
+* None after the H10 commit (`feat(core): plan component initialization`).

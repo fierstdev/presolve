@@ -11,6 +11,7 @@ pub mod compilation_unit;
 pub mod compiler_pass;
 pub mod component_composition;
 pub mod component_graph;
+pub mod component_initialization;
 pub mod component_instance;
 pub mod component_instance_scope;
 pub mod component_invocation;
@@ -107,6 +108,10 @@ pub use component_graph::{
     RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler, RenderFragment,
     RenderList, RenderModel, SerializableValue, SlotDeclaration, SlotDeclarationViolation,
     SlotKind, StateField, StateOperation, UnsupportedEffectStatementKind,
+};
+pub use component_initialization::{
+    plan_component_initialization, ComponentInitializationPlan, ComponentInstanceBatch,
+    SlotBindingBatch,
 };
 pub use component_instance::{
     plan_component_instances, BlockedComponentInstancePlan, BlockedComponentInstanceReason,

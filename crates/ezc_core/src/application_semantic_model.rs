@@ -10,6 +10,7 @@ use crate::component_graph::{
     ComponentDiagnosticSeverity, ComponentMethod, ComponentNode, MethodLocalVariable,
     RenderEventHandler, StateField,
 };
+use crate::component_initialization::{plan_component_initialization, ComponentInitializationPlan};
 use crate::component_instance::{
     plan_component_instances, BlockedComponentInstancePlan, ComponentInstance,
     ComponentInstancePlan,
@@ -79,6 +80,7 @@ pub struct ApplicationSemanticModel {
     pub component_instance_plan: ComponentInstancePlan,
     pub component_instance_scope: ComponentInstanceScopeGraph,
     pub component_composition: ComponentCompositionAnalysis,
+    pub component_initialization: ComponentInitializationPlan,
     pub instance_context: InstanceContextRegistry,
     pub slot_content_fragments: BTreeMap<SlotContentFragmentId, SlotContentFragment>,
     pub slot_outlets: BTreeMap<SlotOutletId, SlotOutlet>,
@@ -539,6 +541,11 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub const fn component_composition_analysis(&self) -> &ComponentCompositionAnalysis {
         &self.component_composition
+    }
+
+    #[must_use]
+    pub const fn component_initialization_plan(&self) -> &ComponentInitializationPlan {
+        &self.component_initialization
     }
 
     #[must_use]
@@ -1308,6 +1315,12 @@ pub fn build_application_semantic_model_from_component_graph(
         &ownership,
         &references,
     );
+    let component_initialization = plan_component_initialization(
+        &component_instance_plan,
+        &slot_bindings,
+        &composition_types,
+        &instance_context,
+    );
     let mut model = ApplicationSemanticModel {
         expression_graph,
         semantic_types,
@@ -1320,6 +1333,7 @@ pub fn build_application_semantic_model_from_component_graph(
         component_instance_plan,
         component_instance_scope,
         component_composition,
+        component_initialization,
         instance_context,
         slot_content_fragments: slot_composition.fragments,
         slot_outlets: slot_composition.outlets,
@@ -1652,6 +1666,12 @@ fn build_application_semantic_model_from_files_with_bindings(
         &ownership,
         &references,
     );
+    let component_initialization = plan_component_initialization(
+        &component_instance_plan,
+        &slot_bindings,
+        &composition_types,
+        &instance_context,
+    );
     let mut model = ApplicationSemanticModel {
         expression_graph,
         semantic_types,
@@ -1664,6 +1684,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         component_instance_plan,
         component_instance_scope,
         component_composition,
+        component_initialization,
         instance_context,
         slot_content_fragments: slot_composition.fragments,
         slot_outlets: slot_composition.outlets,
