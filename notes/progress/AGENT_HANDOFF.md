@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: H16 - Structural component programs
-* Working tree: clean after the H16 structural-program commit.
+* Latest completed slice: H17 - Component resumability planning
+* Working tree: clean after the H17 resume-manifest commit.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: H16 - Structural component programs
-* Summary: H16 advances `component.runtime.json` to v2 with canonical region programs and ordered create/destroy template identities; runtime boot installs a closed region table.
-* Key files: crates/ezc_core/src/runtime_component_artifact.rs; crates/ezc_core/src/runtime_codegen.rs
-* Schema decision: component runtime artifact v2; frozen existing public schemas remain unchanged.
+* Slice: H17 - Component resumability planning
+* Summary: H17 advances the shared resume manifest to v4 with deterministic component-instance, structural-region, and Slot-binding resume records.
+* Key files: crates/ezc_core/src/resume_plan.rs; crates/ezc_core/src/resume_manifest.rs
+* Schema decision: resume manifest v4; component artifact remains v2 and other frozen schemas are unchanged.
 
 Current in-progress slice
 
 * Slice: none
-* Status: H16 is complete and committed. H17 has not started.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H16
-* Remaining in Phase H: H17 through H21.
+* Status: H17 is complete and committed. H18 has not started.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H17
+* Remaining in Phase H: H18 through H21.
 
 Verification
 

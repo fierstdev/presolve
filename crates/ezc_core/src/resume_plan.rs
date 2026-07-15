@@ -14,6 +14,31 @@ pub struct ResumePlan {
     pub components: Vec<ResumeComponentPlan>,
     pub effects: EffectResumePlan,
     pub contexts: ContextResumePlan,
+    pub component_instances: Vec<ComponentInstanceResumePlan>,
+    pub structural_regions: Vec<StructuralRegionResumePlan>,
+    pub slot_bindings: Vec<SlotBindingResumePlan>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ComponentInstanceResumePlan {
+    pub instance: String,
+    pub resume_id: String,
+    pub component: String,
+    pub parent_instance: Option<String>,
+    pub active_status: String,
+    pub structural_region: Option<String>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StructuralRegionResumePlan {
+    pub region: String,
+    pub resume_id: String,
+    pub active_status: String,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SlotBindingResumePlan {
+    pub binding: String,
+    pub resume_id: String,
+    pub caller_instance: String,
+    pub callee_instance: String,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResumeComponentPlan {
@@ -77,6 +102,47 @@ pub fn build_resume_plan(model: &ApplicationSemanticModel) -> ResumePlan {
             .collect(),
         effects: build_effect_resume_plan(model, &effect_registry),
         contexts: build_context_resume_plan(&context_registry, &context_updates),
+        component_instances: model
+            .component_instance_plan
+            .instances
+            .values()
+            .map(|instance| ComponentInstanceResumePlan {
+                instance: instance.id.to_string(),
+                resume_id: format!("resume-instance:{}", instance.id),
+                component: instance.component.to_string(),
+                parent_instance: instance.parent_instance.as_ref().map(ToString::to_string),
+                active_status: if instance.status == crate::ComponentInstanceStatus::Planned {
+                    "active".to_string()
+                } else {
+                    "inactive".to_string()
+                },
+                structural_region: instance.structural_region.as_ref().map(ToString::to_string),
+            })
+            .collect(),
+        structural_regions: model
+            .component_instance_plan
+            .instances
+            .values()
+            .filter_map(|instance| instance.structural_region.as_ref())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .map(|region| StructuralRegionResumePlan {
+                region: region.to_string(),
+                resume_id: format!("resume-region:{region}"),
+                active_status: "inactive".to_string(),
+            })
+            .collect(),
+        slot_bindings: model
+            .slot_bindings
+            .bindings
+            .values()
+            .map(|binding| SlotBindingResumePlan {
+                binding: binding.id.to_string(),
+                resume_id: format!("resume-slot-binding:{}", binding.id),
+                caller_instance: binding.caller_instance.to_string(),
+                callee_instance: binding.callee_instance.to_string(),
+            })
+            .collect(),
     }
 }
 

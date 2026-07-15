@@ -7,7 +7,7 @@ use crate::effect_resume::{EffectActivationSlotId, EffectActivationStatus};
 use crate::resume_plan::ResumePlan;
 use crate::semantic_type::ExecutionBoundary;
 
-pub const RESUME_MANIFEST_SCHEMA_VERSION: u32 = 3;
+pub const RESUME_MANIFEST_SCHEMA_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResumeManifest {
@@ -19,6 +19,12 @@ pub struct ResumeManifest {
     pub effects: Vec<ResumeManifestEffectRecord>,
     #[serde(default)]
     pub context_slots: Vec<ResumeManifestContextSlotRecord>,
+    #[serde(default)]
+    pub component_instances: Vec<crate::resume_plan::ComponentInstanceResumePlan>,
+    #[serde(default)]
+    pub structural_regions: Vec<crate::resume_plan::StructuralRegionResumePlan>,
+    #[serde(default)]
+    pub slot_bindings: Vec<crate::resume_plan::SlotBindingResumePlan>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -152,6 +158,9 @@ pub fn build_resume_manifest(plan: &ResumePlan) -> ResumeManifest {
                 execution_boundary: execution_boundary(record.boundary),
             })
             .collect(),
+        component_instances: plan.component_instances.clone(),
+        structural_regions: plan.structural_regions.clone(),
+        slot_bindings: plan.slot_bindings.clone(),
     }
 }
 
@@ -288,7 +297,7 @@ class ResumeManifestComputed extends Component {
         let json: serde_json::Value =
             serde_json::from_str(&resume_manifest_json(&manifest)).expect("resume manifest JSON");
 
-        assert_eq!(json["schema_version"], 3);
+        assert_eq!(json["schema_version"], 4);
         assert_eq!(json["effects"], serde_json::json!([]));
         assert_eq!(
             json["components"][0]["computed"][0]["computed"],
@@ -327,7 +336,7 @@ class ResumeManifestEffect extends Component {
         let effect = &value["effects"][0];
 
         assert_eq!(json, repeated);
-        assert_eq!(value["schema_version"], 3);
+        assert_eq!(value["schema_version"], 4);
         assert_eq!(effect["initial_status"], "pending");
         assert_eq!(
             effect["activation_slot_id"],

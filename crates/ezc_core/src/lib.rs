@@ -274,7 +274,10 @@ pub use resume_manifest::{
     ResumeManifestContextSlotRecord, ResumeManifestEffectRecord,
     ResumeManifestValidationDiagnostic, RESUME_MANIFEST_SCHEMA_VERSION,
 };
-pub use resume_plan::{build_resume_plan, ResumeComponentPlan, ResumeComputedPlan, ResumePlan};
+pub use resume_plan::{
+    build_resume_plan, ComponentInstanceResumePlan, ResumeComponentPlan, ResumeComputedPlan,
+    ResumePlan, SlotBindingResumePlan, StructuralRegionResumePlan,
+};
 pub use runtime_codegen::generate_runtime_stub;
 pub use runtime_component::{
     build_runtime_component_registry, RuntimeComponentContextBindingRecord,
