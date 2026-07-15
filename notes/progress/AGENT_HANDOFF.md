@@ -16,8 +16,8 @@ Last completed slice
 
 Current in-progress slice
 
-* Slice: none
-* Status: Phase I is committed through I1.
+* Slice: I2 - Form syntax (blocked before implementation)
+* Status: Phase I is committed through I1. I2 cannot begin without an authored `@form()` declaration contract.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I1
 * Remaining in Phase I: I2 through I20.
 
@@ -33,6 +33,10 @@ Verification
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: Stop before I2 rather than assign `@form()` to a class, property, or method or choose a Form name source.
+* Reason: The authoritative roadmap says only "Lower `@form()`". The existing parser retains decorators on all three declaration kinds, while frozen A-H products provide no Form-specific ownership rule. A canonical `FormId` requires both an owner and name, so any lowering choice would add language semantics not present in the roadmap.
+* Tradeoff: I0 and I1 are complete and committed, but I2-I20 remain untouched. Continuation requires an amended authoritative contract stating the valid decorated declaration kind, canonical name source, component/Form multiplicity, argument/arity rules, and invalid-candidate retention needed for I18 diagnostics.
 
 * Decision: I1 defines a Form independently of its executions, a Field under its exact Form, and a Form instance from the exact compiler-owned `ComponentInstanceId` plus `FormId`.
 * Reason: One component definition may execute in multiple component instances; runtime-generated IDs or definition-ID reuse would collapse dirty, touched, validation, submission, serialization, and reset state across those executions.
@@ -884,6 +888,7 @@ Architecture decisions made
 
 Known limitations
 
+* Item: I2 is blocked because the roadmap does not define the valid declaration target or canonical naming/ownership rule for `@form()`. Parser support for decorators on multiple declaration kinds cannot select semantics on the compiler's behalf.
 * Item: Phase I is complete only through I1. Canonical Form/instance/Field ID types exist, but form syntax, entities, bindings, graphs, plans, IR, runtime products, execution, inspection, emitted diagnostics, fixtures, and resumability planning do not.
 * Item: Phase H is frozen through H21. Semantic graph v5 intentionally omits Phase H entities, live component restoration remains deferred until Phase J, and every unsupported component behavior in `docs/component-contract.md` requires a later authoritative roadmap slice.
 * Item: Conditional rendering only supports simple `this.<stateField>` conditions with JSX element or fragment branches.
@@ -923,8 +928,11 @@ Known limitations
 
 Exact next step
 
-Begin I2: lower the roadmap's `@form()` syntax into canonical Form products,
-without adding `@field()` lowering or any I4+ binding/graph/planning behavior.
+Obtain an amended authoritative Phase I contract for I2 that states whether
+`@form()` decorates a class, property, or method; how the canonical Form name is
+derived; whether one component can own multiple Forms; the decorator's argument
+and arity rules; and which invalid candidates must be retained for I18. Then
+implement I2 without entering I3.
 
 Useful commands
 
@@ -955,4 +963,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the I1 commit (`compiler: add canonical form identities`).
+* None after the blocker documentation commit (`docs(forms): record I2 syntax contract blocker`).
