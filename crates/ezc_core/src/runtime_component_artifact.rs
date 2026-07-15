@@ -5,7 +5,7 @@ use crate::{
     RuntimeComponentRegistry,
 };
 
-pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 1;
+pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 2;
 
 /// Public H14 compiler artifact. All executable references are canonical IDs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -17,6 +17,7 @@ pub struct RuntimeComponentArtifact {
     pub slot_binding_programs: Vec<SerializedSlotBinding>,
     pub instance_context_bindings: Vec<SerializedInstanceContextBinding>,
     pub destruction: SerializedDestructionMetadata,
+    pub structural_programs: Vec<SerializedStructuralComponentProgram>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -69,13 +70,43 @@ pub struct SerializedDestructionMetadata {
     pub operation: String,
     pub enabled: bool,
 }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SerializedStructuralComponentProgram {
+    pub region: String,
+    pub template_instances: Vec<String>,
+    pub destroy_order: Vec<String>,
+    pub create_order: Vec<String>,
+}
 
 #[must_use]
 pub fn build_runtime_component_artifact(
     model: &ApplicationSemanticModel,
     optimized: &OptimizedComponentIrReport,
 ) -> RuntimeComponentArtifact {
-    artifact_from_registry(&build_runtime_component_registry(model, optimized))
+    let mut artifact = artifact_from_registry(&build_runtime_component_registry(model, optimized));
+    let mut programs = std::collections::BTreeMap::<String, Vec<String>>::new();
+    for instance in model.component_instance_plan.instances.values() {
+        if instance.status == crate::ComponentInstanceStatus::StructuralTemplate {
+            if let Some(region) = &instance.structural_region {
+                programs
+                    .entry(region.to_string())
+                    .or_default()
+                    .push(instance.id.to_string());
+            }
+        }
+    }
+    artifact.structural_programs = programs
+        .into_iter()
+        .map(
+            |(region, template_instances)| SerializedStructuralComponentProgram {
+                region,
+                create_order: template_instances.clone(),
+                destroy_order: template_instances.iter().rev().cloned().collect(),
+                template_instances,
+            },
+        )
+        .collect();
+    artifact
 }
 
 #[must_use]
@@ -144,8 +175,9 @@ pub fn artifact_from_registry(registry: &RuntimeComponentRegistry) -> RuntimeCom
             .collect(),
         destruction: SerializedDestructionMetadata {
             operation: "destroy_component_instance".to_string(),
-            enabled: false,
+            enabled: true,
         },
+        structural_programs: Vec::new(),
     }
 }
 
@@ -165,6 +197,18 @@ pub fn validate_runtime_component_artifact(
 ) -> Result<(), String> {
     if artifact.schema_version != RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION {
         return Err("unsupported component runtime artifact schema version".to_string());
+    }
+    if artifact.structural_programs.iter().any(|program| {
+        program.create_order != program.template_instances
+            || program
+                .destroy_order
+                .iter()
+                .rev()
+                .cloned()
+                .collect::<Vec<_>>()
+                != program.template_instances
+    }) {
+        return Err("component artifact has invalid structural program ordering".to_string());
     }
     let instances = artifact
         .instances

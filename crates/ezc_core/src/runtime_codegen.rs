@@ -12,7 +12,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 3;
   const SUPPORTED_EFFECT_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 2;
-  const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = 1;
+  const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2;
 
   class EdgeZeroBootError extends Error {
     constructor(code) {
@@ -1886,6 +1886,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     store.componentInstances = new Map((componentArtifact?.instances ?? []).map((instance) => [instance.instance, { ...instance, status: "created" }]));
     store.slotBindings = new Map((componentArtifact?.slot_binding_programs ?? []).map((binding) => [binding.binding, binding]));
     store.instanceContextBindings = new Map((componentArtifact?.instance_context_bindings ?? []).map((binding) => [binding.consumer_instance, binding]));
+    store.componentRegions = new Map((componentArtifact?.structural_programs ?? []).map((program) => [program.region, program]));
     const missingAnchors = collectMissingAnchors(
       manifest,
       bindingAnchors,
