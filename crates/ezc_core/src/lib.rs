@@ -44,6 +44,7 @@ pub mod explain;
 pub mod expression_graph;
 pub mod form;
 pub mod form_diagnostics;
+pub mod form_field;
 pub mod html_codegen;
 pub mod instance_context;
 pub mod intermediate_representation;
@@ -115,10 +116,12 @@ pub use component_graph::{
     ContextDesignator, DeclaredStateType, DeclaredStateTypeKind, DiagnosticSecondaryLabel,
     EffectBodySyntax, EffectExpression, EffectExpressionKind, EffectStatementSyntax,
     EffectStatementSyntaxKind, FormDeclarationCandidate, FormDeclarationStatus,
-    FormDeclarationViolation, LogicalOperator, MethodCall, MethodLocalVariable, MethodParameter,
-    RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler, RenderFragment,
-    RenderList, RenderModel, SerializableValue, SlotDeclaration, SlotDeclarationViolation,
-    SlotKind, StateField, StateOperation, UnsupportedEffectStatementKind,
+    FormDeclarationViolation, FormDesignatorFact, FormFieldDeclarationCandidate,
+    FormFieldDeclarationViolation, LogicalOperator, MethodCall, MethodLocalVariable,
+    MethodParameter, RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler,
+    RenderFragment, RenderList, RenderModel, SerializableValue, SlotDeclaration,
+    SlotDeclarationViolation, SlotKind, StateField, StateOperation, UnsupportedEffectStatementKind,
+    UnsupportedFormDesignatorFact,
 };
 pub use component_initialization::{
     plan_component_initialization, ComponentInitializationPlan, ComponentInstanceBatch,
@@ -233,6 +236,7 @@ pub use explain::{explain_json, explain_text};
 pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 pub use form::{collect_form_entities, FormEntity};
 pub use form_diagnostics::{FormDiagnosticReservation, FORM_DIAGNOSTIC_RESERVATIONS};
+pub use form_field::{collect_form_field_products, FormFieldEntity, FormFieldProducts};
 pub use html_codegen::generate_static_html;
 pub use instance_context::{
     collect_instance_context_registry, ConsumerInstanceId, ConsumerInstanceRecord,
@@ -344,18 +348,19 @@ pub use semantic_graph::{
 pub use semantic_id::{
     ComponentInstanceId, ComponentInvocationId, ComponentRootId, ComponentStructuralRegionId,
     ConsumerId, ContextDeclarationCandidateId, ContextId, EffectId, EffectStatementId, FieldId,
-    FormDeclarationCandidateId, FormId, FormInstanceId, ProviderId, SemanticId, SemanticOwner,
-    SlotBindingId, SlotContentFragmentId, SlotDeclarationCandidateId, SlotId, SlotOutletId,
-    TemplatePositionId,
+    FormDeclarationCandidateId, FormFieldDeclarationCandidateId, FormId, FormInstanceId,
+    ProviderId, SemanticId, SemanticOwner, SlotBindingId, SlotContentFragmentId,
+    SlotDeclarationCandidateId, SlotId, SlotOutletId, TemplatePositionId,
 };
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
 pub use semantic_type::{
-    boundary_compatibility, dom_binding_contract, is_assignable, is_state_initializer_assignable,
-    operator_result_type, semantic_type_text, serialization_compatibility,
-    state_initializer_value_type, BoundaryCompatibility, BuiltinTypeAuthority, ComputedValueType,
-    DomBindingContract, DomBindingKind, EffectCompatibility, EffectOperationClassification,
-    EffectStatementTypeRecord, ExecutionBoundary, ObjectType, ResourceExecutionBoundary,
+    boundary_compatibility, dom_binding_contract, infer_serializable_value_type, is_assignable,
+    is_state_initializer_assignable, operator_result_type, semantic_type_text,
+    serialization_compatibility, state_initializer_value_type, BoundaryCompatibility,
+    BuiltinTypeAuthority, ComputedValueType, DomBindingContract, DomBindingKind,
+    EffectCompatibility, EffectOperationClassification, EffectStatementTypeRecord,
+    ExecutionBoundary, ObjectType, ResolvedDeclaredSemanticType, ResourceExecutionBoundary,
     ResourceType, SemanticOperator, SemanticType, SemanticTypeAlias, SemanticTypeAssignment,
     SemanticTypeId, SemanticTypeModel, SemanticTypeStatus, SerializationCompatibility,
     TypeDiagnosticCode, TypeDiagnosticFamily,
@@ -1427,6 +1432,7 @@ class Counter extends Component {
                     argument_count: 1,
                     argument_spans: vec![test_span()],
                     static_member_argument: None,
+                    this_member_argument: None,
                     span: test_span(),
                 }],
                 properties: Vec::new(),

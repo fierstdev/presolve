@@ -7,9 +7,9 @@ use serde::Serialize;
 use crate::instance_context::{ConsumerInstanceId, ProviderInstanceId};
 use crate::semantic_id::{
     ComponentInstanceId, ComponentInvocationId, ComponentStructuralRegionId, ConsumerId,
-    ContextDeclarationCandidateId, ContextId, EffectId, EffectStatementId,
-    FormDeclarationCandidateId, FormId, ProviderId, SemanticId, SemanticOwner, SlotBindingId,
-    SlotDeclarationCandidateId, SlotId,
+    ContextDeclarationCandidateId, ContextId, EffectId, EffectStatementId, FieldId,
+    FormDeclarationCandidateId, FormFieldDeclarationCandidateId, FormId, ProviderId, SemanticId,
+    SemanticOwner, SlotBindingId, SlotDeclarationCandidateId, SlotId,
 };
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
@@ -58,6 +58,10 @@ pub struct ComponentNode {
     /// Normalized source facts retained for every recognized `@form`
     /// declaration, including targets without canonical Form identity inputs.
     pub form_declaration_candidates: Vec<FormDeclarationCandidate>,
+    /// Normalized I3 candidates. Canonical Form resolution, type assignment,
+    /// duplicate grouping, and `FieldId` construction occur during ASM
+    /// assembly over existing immutable authorities.
+    pub form_field_declaration_candidates: Vec<FormFieldDeclarationCandidate>,
     pub methods: Vec<ComponentMethod>,
     pub actions: Vec<ComponentAction>,
     pub render: Option<RenderModel>,
@@ -253,6 +257,85 @@ impl FormDeclarationCandidate {
             FormDeclarationStatus::Valid => &[],
             FormDeclarationStatus::Invalid(violations) => violations,
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FormDesignatorFact {
+    pub authored_name: String,
+    pub provenance: SourceProvenance,
+    pub name_provenance: SourceProvenance,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnsupportedFormDesignatorFact {
+    pub object: String,
+    pub member: String,
+    pub provenance: SourceProvenance,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FormFieldDeclarationViolation {
+    InvalidOwner,
+    InvalidTarget { actual: AuthoredDeclarationKind },
+    InvalidDecoratorInvocation,
+    InvalidDecoratorArity { actual: usize, expected: usize },
+    DuplicateFieldDecorator,
+    InvalidFormDesignator,
+    UnresolvedForm,
+    InvalidForm,
+    CrossComponentForm,
+    StaticField,
+    MissingInitializer,
+    UnsupportedInitializer,
+    InvalidDeclaredType,
+    InitializerTypeMismatch,
+    NonSerializableType,
+    DuplicateName,
+    ConflictingSemanticDecorator,
+    InheritedDeclaration,
+    UnsupportedFieldName,
+}
+
+/// Immutable I3 candidate retained for every recognized `@field` placement.
+/// `field_id` and `type_assignment` remain absent unless the declaration is
+/// valid after canonical Form, type, value, and duplicate resolution.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FormFieldDeclarationCandidate {
+    pub id: FormFieldDeclarationCandidateId,
+    pub owner_component: Option<SemanticId>,
+    pub declaration_field: Option<SemanticId>,
+    pub authored_name: Option<String>,
+    pub field_id: Option<FieldId>,
+    pub decorator_invoked: bool,
+    pub decorator_argument_count: usize,
+    pub decorator_argument_provenance: Vec<SourceProvenance>,
+    pub form_designator: Option<FormDesignatorFact>,
+    pub unsupported_form_designator: Option<UnsupportedFormDesignatorFact>,
+    pub resolved_form: Option<FormId>,
+    pub declaration_kind: AuthoredDeclarationKind,
+    pub is_static: bool,
+    pub declared_type: Option<DeclaredStateType>,
+    pub semantic_type: Option<crate::SemanticType>,
+    pub type_assignment: Option<crate::SemanticTypeAssignment>,
+    pub initializer: Option<SerializableValue>,
+    pub conflicting_decorators: Vec<String>,
+    pub decorator_provenance: SourceProvenance,
+    pub name_provenance: Option<SourceProvenance>,
+    pub initializer_provenance: Option<SourceProvenance>,
+    pub provenance: SourceProvenance,
+    pub violations: Vec<FormFieldDeclarationViolation>,
+}
+
+impl FormFieldDeclarationCandidate {
+    #[must_use]
+    pub fn is_valid(&self) -> bool {
+        self.violations.is_empty()
+    }
+
+    pub(crate) fn add_violation(&mut self, violation: FormFieldDeclarationViolation) {
+        self.violations.push(violation);
+        canonicalize_form_field_violations(&mut self.violations);
     }
 }
 
@@ -1182,6 +1265,8 @@ fn build_component_node(
         &id,
         builtin_types,
     );
+    let form_field_declaration_candidates =
+        form_field_declaration_candidates_from_class(class, path, element_name.is_some(), &id);
 
     let methods = class
         .methods
@@ -1249,6 +1334,7 @@ fn build_component_node(
         context_declaration_candidates,
         slot_declaration_candidates,
         form_declaration_candidates,
+        form_field_declaration_candidates,
         methods,
         actions,
         render,
@@ -1551,13 +1637,343 @@ fn retain_non_field_form_candidates(
     }
 }
 
+#[allow(clippy::too_many_lines)]
+fn form_field_declaration_candidates_from_class(
+    class: &ParsedClass,
+    path: &Path,
+    is_canonical_component: bool,
+    component: &SemanticId,
+) -> Vec<FormFieldDeclarationCandidate> {
+    let owner = is_canonical_component.then_some(component.clone());
+    let mut candidates = Vec::new();
+
+    retain_non_property_form_field_candidates(
+        &mut candidates,
+        owner.as_ref(),
+        path,
+        &class.name,
+        AuthoredDeclarationKind::Class,
+        &class.decorators,
+        class.span,
+    );
+
+    for property in &class.properties {
+        let field_decorator_count = property
+            .decorators
+            .iter()
+            .filter(|decorator| decorator.name == "field")
+            .count();
+        for decorator in property
+            .decorators
+            .iter()
+            .filter(|decorator| decorator.name == "field")
+        {
+            let declaration_kind = if property.is_static {
+                AuthoredDeclarationKind::StaticField
+            } else {
+                AuthoredDeclarationKind::InstanceField
+            };
+            let initializer = property
+                .initializer_literal
+                .as_ref()
+                .map(serializable_value_from_parsed)
+                .or_else(|| {
+                    property
+                        .initializer_constant_expression
+                        .as_ref()
+                        .map(constant_expression_from_parsed)
+                        .and_then(|expression| expression.evaluate().ok())
+                });
+            let declared_type =
+                property
+                    .type_annotation
+                    .as_ref()
+                    .map(|annotation| DeclaredStateType {
+                        kind: declared_state_type_kind(&annotation.text),
+                        text: annotation.text.clone(),
+                        provenance: SourceProvenance::new(path, annotation.span),
+                    });
+            let mut conflicting_decorators = property
+                .decorators
+                .iter()
+                .filter(|other| other.name != "field")
+                .map(|other| other.name.clone())
+                .collect::<Vec<_>>();
+            conflicting_decorators.sort();
+            conflicting_decorators.dedup();
+            let (form_designator, unsupported_form_designator) =
+                normalized_form_designator(decorator, path);
+            let mut violations = Vec::new();
+            if owner.is_none() {
+                violations.push(FormFieldDeclarationViolation::InvalidOwner);
+            }
+            if !property.is_identifier_name {
+                violations.push(FormFieldDeclarationViolation::UnsupportedFieldName);
+            }
+            if !decorator.is_invoked {
+                violations.push(FormFieldDeclarationViolation::InvalidDecoratorInvocation);
+            }
+            if decorator.argument_count != 1 {
+                violations.push(FormFieldDeclarationViolation::InvalidDecoratorArity {
+                    actual: decorator.argument_count,
+                    expected: 1,
+                });
+            }
+            if field_decorator_count != 1 {
+                violations.push(FormFieldDeclarationViolation::DuplicateFieldDecorator);
+            }
+            if form_designator.is_none() {
+                violations.push(FormFieldDeclarationViolation::InvalidFormDesignator);
+            }
+            if property.is_static {
+                violations.push(FormFieldDeclarationViolation::StaticField);
+            }
+            if property.initializer_span.is_none() {
+                violations.push(FormFieldDeclarationViolation::MissingInitializer);
+            } else if initializer.is_none() {
+                violations.push(FormFieldDeclarationViolation::UnsupportedInitializer);
+            }
+            if !conflicting_decorators.is_empty() {
+                violations.push(FormFieldDeclarationViolation::ConflictingSemanticDecorator);
+            }
+            canonicalize_form_field_violations(&mut violations);
+
+            candidates.push(FormFieldDeclarationCandidate {
+                id: FormFieldDeclarationCandidateId::for_source_position(
+                    path,
+                    decorator.span.start,
+                ),
+                owner_component: owner.clone(),
+                declaration_field: (owner.is_some() && property.is_identifier_name).then(|| {
+                    owner
+                        .as_ref()
+                        .expect("authored field identity requires component owner")
+                        .field(&property.name)
+                }),
+                authored_name: property.is_identifier_name.then(|| property.name.clone()),
+                field_id: None,
+                decorator_invoked: decorator.is_invoked,
+                decorator_argument_count: decorator.argument_count,
+                decorator_argument_provenance: decorator
+                    .argument_spans
+                    .iter()
+                    .copied()
+                    .map(|span| SourceProvenance::new(path, span))
+                    .collect(),
+                form_designator,
+                unsupported_form_designator,
+                resolved_form: None,
+                declaration_kind,
+                is_static: property.is_static,
+                declared_type,
+                semantic_type: None,
+                type_assignment: None,
+                initializer,
+                conflicting_decorators,
+                decorator_provenance: SourceProvenance::new(path, decorator.span),
+                name_provenance: property
+                    .is_identifier_name
+                    .then(|| SourceProvenance::new(path, property.name_span)),
+                initializer_provenance: property
+                    .initializer_span
+                    .map(|span| SourceProvenance::new(path, span)),
+                provenance: SourceProvenance::new(path, property.span),
+                violations,
+            });
+        }
+    }
+
+    for method in &class.methods {
+        let kind = if method.is_getter {
+            AuthoredDeclarationKind::Getter
+        } else if method.is_setter {
+            AuthoredDeclarationKind::Setter
+        } else {
+            AuthoredDeclarationKind::Method
+        };
+        retain_non_property_form_field_candidates(
+            &mut candidates,
+            owner.as_ref(),
+            path,
+            &method.name,
+            kind,
+            &method.decorators,
+            method.span,
+        );
+        for parameter in &method.parameters {
+            retain_non_property_form_field_candidates(
+                &mut candidates,
+                owner.as_ref(),
+                path,
+                &parameter.name,
+                AuthoredDeclarationKind::Parameter,
+                &parameter.decorators,
+                parameter.span,
+            );
+        }
+    }
+
+    candidates.sort_by(form_field_candidate_source_order);
+    candidates
+}
+
+fn retain_non_property_form_field_candidates(
+    candidates: &mut Vec<FormFieldDeclarationCandidate>,
+    owner: Option<&SemanticId>,
+    path: &Path,
+    authored_name: &str,
+    declaration_kind: AuthoredDeclarationKind,
+    decorators: &[ezc_parser::ParsedDecorator],
+    span: SourceSpan,
+) {
+    let field_decorator_count = decorators
+        .iter()
+        .filter(|decorator| decorator.name == "field")
+        .count();
+    for decorator in decorators
+        .iter()
+        .filter(|decorator| decorator.name == "field")
+    {
+        let (form_designator, unsupported_form_designator) =
+            normalized_form_designator(decorator, path);
+        let mut violations = vec![FormFieldDeclarationViolation::InvalidTarget {
+            actual: declaration_kind,
+        }];
+        if owner.is_none() {
+            violations.push(FormFieldDeclarationViolation::InvalidOwner);
+        }
+        if !decorator.is_invoked {
+            violations.push(FormFieldDeclarationViolation::InvalidDecoratorInvocation);
+        }
+        if decorator.argument_count != 1 {
+            violations.push(FormFieldDeclarationViolation::InvalidDecoratorArity {
+                actual: decorator.argument_count,
+                expected: 1,
+            });
+        }
+        if field_decorator_count != 1 {
+            violations.push(FormFieldDeclarationViolation::DuplicateFieldDecorator);
+        }
+        if form_designator.is_none() {
+            violations.push(FormFieldDeclarationViolation::InvalidFormDesignator);
+        }
+        canonicalize_form_field_violations(&mut violations);
+        candidates.push(FormFieldDeclarationCandidate {
+            id: FormFieldDeclarationCandidateId::for_source_position(path, decorator.span.start),
+            owner_component: owner.cloned(),
+            declaration_field: None,
+            authored_name: Some(authored_name.to_string()),
+            field_id: None,
+            decorator_invoked: decorator.is_invoked,
+            decorator_argument_count: decorator.argument_count,
+            decorator_argument_provenance: decorator
+                .argument_spans
+                .iter()
+                .copied()
+                .map(|argument| SourceProvenance::new(path, argument))
+                .collect(),
+            form_designator,
+            unsupported_form_designator,
+            resolved_form: None,
+            declaration_kind,
+            is_static: false,
+            declared_type: None,
+            semantic_type: None,
+            type_assignment: None,
+            initializer: None,
+            conflicting_decorators: Vec::new(),
+            decorator_provenance: SourceProvenance::new(path, decorator.span),
+            name_provenance: None,
+            initializer_provenance: None,
+            provenance: SourceProvenance::new(path, span),
+            violations,
+        });
+    }
+}
+
+fn normalized_form_designator(
+    decorator: &ezc_parser::ParsedDecorator,
+    path: &Path,
+) -> (
+    Option<FormDesignatorFact>,
+    Option<UnsupportedFormDesignatorFact>,
+) {
+    let designator = decorator
+        .this_member_argument
+        .as_ref()
+        .map(|designator| FormDesignatorFact {
+            authored_name: designator.member.clone(),
+            provenance: SourceProvenance::new(path, designator.span),
+            name_provenance: SourceProvenance::new(path, designator.member_span),
+        });
+    let unsupported =
+        decorator
+            .static_member_argument
+            .as_ref()
+            .map(|designator| UnsupportedFormDesignatorFact {
+                object: designator.object.clone(),
+                member: designator.member.clone(),
+                provenance: SourceProvenance::new(path, designator.span),
+            });
+    (designator, unsupported)
+}
+
+fn canonicalize_form_field_violations(violations: &mut Vec<FormFieldDeclarationViolation>) {
+    violations.sort_by_key(form_field_declaration_violation_rank);
+    violations.dedup();
+}
+
+fn form_field_declaration_violation_rank(violation: &FormFieldDeclarationViolation) -> u8 {
+    match violation {
+        FormFieldDeclarationViolation::InvalidOwner => 0,
+        FormFieldDeclarationViolation::InvalidTarget { .. }
+        | FormFieldDeclarationViolation::StaticField
+        | FormFieldDeclarationViolation::InheritedDeclaration
+        | FormFieldDeclarationViolation::UnsupportedFieldName => 1,
+        FormFieldDeclarationViolation::InvalidDecoratorInvocation
+        | FormFieldDeclarationViolation::InvalidDecoratorArity { .. }
+        | FormFieldDeclarationViolation::DuplicateFieldDecorator => 2,
+        FormFieldDeclarationViolation::InvalidFormDesignator
+        | FormFieldDeclarationViolation::UnresolvedForm
+        | FormFieldDeclarationViolation::InvalidForm
+        | FormFieldDeclarationViolation::CrossComponentForm => 3,
+        FormFieldDeclarationViolation::MissingInitializer
+        | FormFieldDeclarationViolation::UnsupportedInitializer => 4,
+        FormFieldDeclarationViolation::InvalidDeclaredType
+        | FormFieldDeclarationViolation::InitializerTypeMismatch
+        | FormFieldDeclarationViolation::NonSerializableType => 5,
+        FormFieldDeclarationViolation::ConflictingSemanticDecorator => 6,
+        FormFieldDeclarationViolation::DuplicateName => 7,
+    }
+}
+
+fn form_field_candidate_source_order(
+    left: &FormFieldDeclarationCandidate,
+    right: &FormFieldDeclarationCandidate,
+) -> std::cmp::Ordering {
+    (
+        left.provenance.path.as_path(),
+        left.provenance.span.start,
+        left.provenance.span.end,
+        left.id.as_str(),
+    )
+        .cmp(&(
+            right.provenance.path.as_path(),
+            right.provenance.span.start,
+            right.provenance.span.end,
+            right.id.as_str(),
+        ))
+}
+
 fn is_edgezero_semantic_decorator(name: &str) -> bool {
     matches!(
         name,
         "state"
             | "context"
             | "provide"
+            | "provider"
             | "consume"
+            | "consumer"
             | "computed"
             | "effect"
             | "action"
@@ -1647,6 +2063,7 @@ fn context_declaration_candidates_from_class(
                             | "resource"
                             | "slot"
                             | "form"
+                            | "field"
                     )
             });
             if has_conflict {
@@ -1820,6 +2237,7 @@ fn slot_declaration_candidates_from_class(
                                 | "action"
                                 | "resource"
                                 | "form"
+                                | "field"
                         )
                 });
             if has_conflict {
@@ -2121,7 +2539,7 @@ fn state_fields_from_class(class: &ParsedClass, path: &Path, id: &SemanticId) ->
                 && !property.decorators.iter().any(|decorator| {
                     matches!(
                         decorator.name.as_str(),
-                        "context" | "provide" | "consume" | "slot" | "form"
+                        "context" | "provide" | "consume" | "slot" | "form" | "field"
                     )
                 })
         })
@@ -2173,7 +2591,7 @@ fn context_declarations_from_class(
                 && !property.decorators.iter().any(|decorator| {
                     matches!(
                         decorator.name.as_str(),
-                        "provide" | "consume" | "slot" | "form"
+                        "provide" | "consume" | "slot" | "form" | "field"
                     )
                 })
                 && property
@@ -2228,7 +2646,7 @@ fn provider_declarations_from_class(
                 && !property.decorators.iter().any(|decorator| {
                     matches!(
                         decorator.name.as_str(),
-                        "context" | "consume" | "slot" | "form"
+                        "context" | "consume" | "slot" | "form" | "field"
                     )
                 }))
             .then(|| ProviderDeclaration {
@@ -2276,6 +2694,7 @@ fn consumer_declarations_from_class(
                         | "resource"
                         | "slot"
                         | "form"
+                        | "field"
                 )
             });
 

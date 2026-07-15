@@ -139,6 +139,7 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
                 asm.entity(id),
                 Some(
                     SemanticEntity::Form(_)
+                        | SemanticEntity::FormField(_)
                         | SemanticEntity::Slot(_)
                         | SemanticEntity::ComponentInvocation(_)
                         | SemanticEntity::ComponentInstance(_)
@@ -174,6 +175,7 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
                 asm.entity(id),
                 Some(
                     SemanticEntity::Form(_)
+                        | SemanticEntity::FormField(_)
                         | SemanticEntity::Slot(_)
                         | SemanticEntity::ComponentInvocation(_)
                         | SemanticEntity::ComponentInstance(_)
@@ -193,6 +195,7 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
                 asm.entity(target),
                 Some(
                     SemanticEntity::Form(_)
+                        | SemanticEntity::FormField(_)
                         | SemanticEntity::Slot(_)
                         | SemanticEntity::ComponentInvocation(_)
                         | SemanticEntity::ComponentInstance(_)
@@ -291,6 +294,9 @@ fn semantic_graph_node_kind(entity: SemanticEntity<'_>) -> SemanticGraphNodeKind
         SemanticEntity::Consumer(_) => SemanticGraphNodeKind::Consumer,
         SemanticEntity::Form(_) => {
             unreachable!("Forms are not projected into frozen semantic graph schema v5")
+        }
+        SemanticEntity::FormField(_) => {
+            unreachable!("Form Fields are not projected into frozen semantic graph schema v5")
         }
         SemanticEntity::Slot(_) => {
             unreachable!("Slots are not projected into frozen semantic graph schema v5")

@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: I2 - Canonical Form declarations
-* Working tree: clean after the I3 contract-blocker documentation commit.
+* Latest completed slice: I3 - Canonical Form Field declarations
+* Working tree: clean after the I3 implementation commit.
 * Date: 2026-07-15
 
 Last completed slice
 
-* Slice: I2 - Canonical Form declarations
-* Summary: I2 retains every recognized `@form` declaration as an immutable normalized candidate and lowers only direct, non-static, declaration-only canonical component fields with one zero-argument invocation and the unshadowed compiler-owned `Form` marker into `FormEntity` records. Canonical identity is `<ComponentId>/form:<field-name>`; duplicates retain all candidates and publish no winner.
-* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/form.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/semantic_id.rs
-* Schema decision: I2 changes internal parser and ASM products only. Forms remain filtered from frozen semantic graph v5 and CLI ASM inspection v8; no runtime, public diagnostic, IR, resume, browser, validation, submission, serialization, reset, or Field product is introduced.
+* Slice: I3 - Canonical Form Field declarations
+* Summary: I3 retains every recognized `@field` placement as an immutable source-qualified candidate and lowers only direct, non-static canonical component fields with exactly one `@field(this.<formName>)`, one valid same-component I2 Form owner, an identifier name, one compiler-known serializable initializer, and no conflicting decorator into `FormFieldEntity` records. Canonical identity is `<FormId>/field:<field-name>`; invalid and duplicate candidates never receive fabricated Field identity or a source-order winner.
+* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/form_field.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/semantic_id.rs
+* Schema decision: I3 changes internal parser and ASM products only. Form Fields remain filtered from frozen semantic graph v5 and CLI ASM inspection v8; no template binding, validation, submission, serialization plan, reset plan, tracking, IR, runtime, browser, public diagnostic, or resume product is introduced.
 
 Current in-progress slice
 
-* Slice: I3 - Field syntax (blocked before implementation)
-* Status: Phase I is committed through I2. The attached roadmap defines I3 only as "Lower `@field()`" and supplies no declaration, ownership, naming, type/value, arity, duplicate, or invalid-candidate identity/retention contract; no I3 semantics have been inferred.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I2
-* Remaining in Phase I: I3 through I20.
+* Slice: I4 - Template-control binding contract (blocked before implementation)
+* Status: Phase I is complete through I3. The attached roadmap defines I4 only as "Bind template controls to canonical fields" and supplies no authored binding syntax, supported control set, exact Form/Field resolution, multiplicity, compatibility, ownership, ambiguity, or invalid-candidate contract. No I4 semantics have been inferred from HTML or browser behavior.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I3
+* Remaining in Phase I: I4 through I20.
 
 Verification
 
@@ -36,8 +36,31 @@ Verification
 * `cargo test -p ezc_cli --test explain`: pass (126)
 * `cargo test -p ezc_cli --test component_fixtures phase_h_freezes_authorities_schemas_and_no_discovery_contract -- --nocapture`: pass (1)
 * `cargo clippy --workspace --all-targets -- -D warnings`: pass
+* `cargo test -p ezc_parser -p ezc_core`: pass (9 parser unit, 26 parser integration, 306 core)
+* `cargo test -p ezc_core form_field::tests -- --nocapture`: pass (5)
+* `cargo test -p ezc_cli --test explain`: pass (126)
+* `cargo test -p ezc_cli --test component_fixtures phase_h_freezes_authorities_schemas_and_no_discovery_contract -- --nocapture`: pass (1)
+* `cargo clippy --workspace --all-targets -- -D warnings`: pass
+* `cargo fmt --all --check`: pass
+* git diff --check: pass
 
 Architecture decisions made
+
+* Decision: I3 accepts only a directly authored canonical component instance field decorated by exactly one invoked `@field(this.<formName>)`. The designator must resolve to one valid, nonduplicate I2 `FormEntity` authored on the same component, and the authored identifier supplies the Field name.
+* Reason: The supplied I3 contract freezes exact declaration-level Form ownership and prohibits default-Form, inheritance, composition, template-ancestry, import, runtime-instance, and DOM-derived resolution.
+* Tradeoff: I3 introduces no template-control association, event behavior, validation, submission, serialization/reset plan, dirty/touched state, IR storage, runtime registry, or resume execution.
+
+* Decision: Every recognized `@field` placement receives a source-qualified `FormFieldDeclarationCandidateId`, while only a candidate with no violations receives the existing Form-owned `FieldId` and a `FormFieldEntity`. Duplicate groups retain every candidate, invalidate the whole `(FormId, authored name)` key, and select no source-order winner.
+* Reason: `FieldId` was introduced in I1 specifically as the canonical identity of a Field owned by an exact Form. Keeping invalid syntax candidate-only follows the frozen Phase H Slot model and prevents plausible partial paths from becoming semantic identity.
+* Tradeoff: Invalid candidates may retain canonical component/Form evidence and complete provenance for I18, but cannot enter executable downstream Field products.
+
+* Decision: I3 reuses Phase C semantic-type lowering, import/local alias resolution, normalization, inference, `is_assignable`, serialization compatibility, and immutable constant folding. A valid initial value is the existing compiler-owned recursive serializable value or an already-supported folded constant expression.
+* Reason: Forms must consume canonical immutable authorities rather than create a Form-specific type parser, resolver, evaluator, assignability engine, or serializer checker.
+* Tradeoff: Unsupported calls, state wrappers, resource/unknown/never/function-shaped types, unresolved aliases, and values outside the frozen constant subset remain invalid facts; I3 does not independently execute JavaScript.
+
+* Decision: Valid Form Fields participate internally in `Component -> Form -> Field` ownership, canonical provenance, semantic typing, and explicit per-Form authored declaration order. Frozen semantic graph v5 and CLI ASM inspection v8 continue to filter the new entity kind.
+* Reason: Later serialization, validation, submission, and reset slices require deterministic declaration order, while I3 explicitly forbids unrelated public inspection/schema changes.
+* Tradeoff: Any public projection remains owned by its later roadmap slice and must version the affected schema explicitly.
 
 * Decision: I2 lowers `@form()` only from a directly authored canonical component instance field whose authored identifier supplies the Form name. The field must be declaration-only, non-static, initialized by neither expression nor constructor, and decorated by exactly one invoked zero-argument `@form()`.
 * Reason: The supplied I2 contract freezes declaration ownership, naming, multiplicity, arity, and marker semantics. `FormId` therefore derives only from the direct `ComponentId` plus authored field name, and every valid Form has the client execution boundary without implying a JavaScript `Form` object.
@@ -909,8 +932,8 @@ Architecture decisions made
 
 Known limitations
 
-* Item: Phase I is complete through I2. Canonical Form declarations and invalid-candidate facts exist, but `@field()` semantics, bindings, form ownership graphs beyond direct Form ownership, plans, IR, runtime products, execution, inspection, emitted diagnostics, fixtures, and resumability planning do not.
-* Item: I3 cannot be implemented from the attached one-line "Lower `@field()`" roadmap entry without inventing the Field declaration target, owning Form reference, name/type/value contract, decorator arity, duplicate policy, and invalid-candidate identity/retention rules.
+* Item: Phase I is complete through I3. Canonical Form and Form Field declarations plus retained invalid-candidate facts exist, but template-control bindings, validation, submission, serialization/reset plans, tracking, IR, runtime products, execution, public inspection, emitted diagnostics, fixtures, and resumability planning do not.
+* Item: I4 cannot be implemented from the attached one-line "Bind template controls to canonical fields" roadmap entry without inventing authored binding syntax, supported controls, exact Form/Field designators, multiplicity, type/control compatibility, ownership, ambiguity, and invalid-candidate retention rules.
 * Item: Phase H is frozen through H21. Semantic graph v5 intentionally omits Phase H entities, live component restoration remains deferred until Phase J, and every unsupported component behavior in `docs/component-contract.md` requires a later authoritative roadmap slice.
 * Item: Conditional rendering only supports simple `this.<stateField>` conditions with JSX element or fragment branches.
 * Item: Conditional branch snippets are replaced as static HTML. Bindings, events, and nested dynamic behavior inside swapped-in branch snippets are not re-registered yet.
@@ -949,12 +972,13 @@ Known limitations
 
 Exact next step
 
-Commit the completed I2 slice, verify the worktree is clean, then obtain an
-authoritative I3 `@field()` contract. At minimum it must freeze the valid
-declaration target, exact owning-Form reference, Field name and type/value
-sources, decorator invocation/arity, multiplicity and duplicate policy, and
-invalid-candidate identity/retention rules. Do not infer these semantics from
-templates, HTML controls, validation, submission, runtime behavior, or I2.
+Commit the completed I3 slice, verify the worktree is clean, then obtain an
+authoritative I4 template-control binding contract. At minimum it must freeze
+the authored binding syntax, supported control declarations, exact Form/Field
+resolution, ownership and multiplicity, type/control compatibility, ambiguity
+and duplicate policy, provenance, and invalid-candidate identity/retention.
+Do not infer these semantics from browser-native form behavior, DOM discovery,
+HTML naming conventions, runtime registration, validation, or submission.
 
 Useful commands
 
@@ -985,4 +1009,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the I3 blocker documentation commit (`docs(forms): record I3 field contract blocker`).
+* None after the I3 implementation commit (`compiler: lower canonical form fields`).

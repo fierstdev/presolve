@@ -42,6 +42,7 @@ use crate::context_typing::{
 };
 use crate::expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 use crate::form::{collect_form_entities, FormEntity};
+use crate::form_field::{collect_form_field_products, FormFieldEntity};
 use crate::instance_context::{collect_instance_context_registry, InstanceContextRegistry};
 use crate::intermediate_representation::{
     IrComputedEvaluationPlan, IrReactiveCycleAnalysis, IrReactiveGraph,
@@ -49,8 +50,8 @@ use crate::intermediate_representation::{
 };
 use crate::provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
 use crate::semantic_id::{
-    ComponentInvocationId, ConsumerId, ContextId, FormId, ProviderId, SemanticId, SemanticOwner,
-    SlotBindingId, SlotContentFragmentId, SlotId, SlotOutletId,
+    ComponentInvocationId, ConsumerId, ContextId, FieldId, FormId, ProviderId, SemanticId,
+    SemanticOwner, SlotBindingId, SlotContentFragmentId, SlotId, SlotOutletId,
 };
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
@@ -79,6 +80,8 @@ pub struct ApplicationSemanticModel {
     pub providers: BTreeMap<ProviderId, ProviderEntity>,
     pub consumers: BTreeMap<ConsumerId, ConsumerEntity>,
     pub forms: BTreeMap<FormId, FormEntity>,
+    pub form_field_declaration_candidates: Vec<crate::FormFieldDeclarationCandidate>,
+    pub form_fields: BTreeMap<FieldId, FormFieldEntity>,
     pub slots: BTreeMap<SlotId, SlotEntity>,
     pub component_invocations: BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
     pub component_instance_plan: ComponentInstancePlan,
@@ -132,6 +135,7 @@ pub enum SemanticEntity<'a> {
     Provider(&'a ProviderEntity),
     Consumer(&'a ConsumerEntity),
     Form(&'a FormEntity),
+    FormField(&'a FormFieldEntity),
     Slot(&'a SlotEntity),
     ComponentInvocation(&'a ComponentInvocationEntity),
     ComponentInstance(&'a ComponentInstance),
@@ -157,6 +161,7 @@ pub enum SemanticEntityKind {
     Provider,
     Consumer,
     Form,
+    FormField,
     Slot,
     ComponentInvocation,
     ComponentInstance,
@@ -184,6 +189,7 @@ impl SemanticEntity<'_> {
             Self::Provider(_) => SemanticEntityKind::Provider,
             Self::Consumer(_) => SemanticEntityKind::Consumer,
             Self::Form(_) => SemanticEntityKind::Form,
+            Self::FormField(_) => SemanticEntityKind::FormField,
             Self::Slot(_) => SemanticEntityKind::Slot,
             Self::ComponentInvocation(_) => SemanticEntityKind::ComponentInvocation,
             Self::ComponentInstance(_) => SemanticEntityKind::ComponentInstance,
@@ -276,6 +282,13 @@ impl ApplicationSemanticModel {
         {
             return Some(SemanticEntity::Form(form));
         }
+        if let Some(field) = self
+            .form_fields
+            .values()
+            .find(|field| field.id.as_semantic_id() == id)
+        {
+            return Some(SemanticEntity::FormField(field));
+        }
         if let Some(slot) = self
             .slots
             .values()
@@ -367,6 +380,29 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub fn form(&self, id: &FormId) -> Option<&FormEntity> {
         self.forms.get(id)
+    }
+
+    #[must_use]
+    pub fn form_fields(&self) -> Vec<&FormFieldEntity> {
+        let mut fields = self.form_fields.values().collect::<Vec<_>>();
+        fields.sort_by(|left, right| {
+            (&left.owner_form, left.declaration_order, &left.id).cmp(&(
+                &right.owner_form,
+                right.declaration_order,
+                &right.id,
+            ))
+        });
+        fields
+    }
+
+    #[must_use]
+    pub fn form_field(&self, id: &FieldId) -> Option<&FormFieldEntity> {
+        self.form_fields.get(id)
+    }
+
+    #[must_use]
+    pub fn form_field_declaration_candidates(&self) -> &[crate::FormFieldDeclarationCandidate] {
+        &self.form_field_declaration_candidates
     }
 
     #[must_use]
@@ -1151,6 +1187,18 @@ pub fn build_application_semantic_model_from_component_graph(
         ExpressionGraph::from_components(&component_graph.components, &component_graph.provenance);
     let contexts = collect_context_entities(&component_graph.components, &expression_graph);
     let forms = collect_form_entities(&component_graph.components);
+    let base_semantic_types = SemanticTypeModel::from_components(
+        &component_graph.components,
+        &component_graph.provenance,
+    );
+    let form_field_products = collect_form_field_products(
+        &component_graph.components,
+        &forms,
+        &base_semantic_types,
+        None,
+    );
+    let form_field_declaration_candidates = form_field_products.candidates;
+    let form_fields = form_field_products.fields;
     let slots = collect_slot_entities(&component_graph.components);
     let slot_composition = collect_slot_composition(&templates, &component_invocations, &slots);
     let slot_bindings = collect_slot_bindings(
@@ -1193,6 +1241,7 @@ pub fn build_application_semantic_model_from_component_graph(
         &mut provenance,
         &contexts,
         &forms,
+        &form_fields,
         &providers,
         &consumers,
         &slots,
@@ -1207,6 +1256,7 @@ pub fn build_application_semantic_model_from_component_graph(
         &component_graph.components,
         &contexts,
         &forms,
+        &form_fields,
         &providers,
         &consumers,
         &slots,
@@ -1252,10 +1302,11 @@ pub fn build_application_semantic_model_from_component_graph(
         &ownership,
     );
     let semantic_types = finalize_semantic_types(
-        SemanticTypeModel::from_components(&component_graph.components, &provenance),
+        base_semantic_types,
         &component_graph.components,
         &contexts,
         &forms,
+        &form_fields,
         &providers,
         &consumers,
         &slots,
@@ -1388,11 +1439,16 @@ pub fn build_application_semantic_model_from_component_graph(
     let mut model = ApplicationSemanticModel {
         expression_graph,
         semantic_types,
-        components: component_graph.components.clone(),
+        components: components_with_resolved_form_field_candidates(
+            &component_graph.components,
+            &form_field_declaration_candidates,
+        ),
         contexts,
         providers,
         consumers,
         forms,
+        form_field_declaration_candidates,
+        form_fields,
         slots,
         component_invocations,
         component_instance_plan,
@@ -1527,6 +1583,16 @@ fn build_application_semantic_model_from_files_with_bindings(
     let expression_graph = ExpressionGraph::from_components(&components, &provenance);
     let contexts = collect_context_entities(&components, &expression_graph);
     let forms = collect_form_entities(&components);
+    let base_semantic_types = SemanticTypeModel::from_components_with_aliases_and_bindings(
+        &components,
+        &provenance,
+        &type_aliases,
+        bindings,
+    );
+    let form_field_products =
+        collect_form_field_products(&components, &forms, &base_semantic_types, bindings);
+    let form_field_declaration_candidates = form_field_products.candidates;
+    let form_fields = form_field_products.fields;
     let slots = collect_slot_entities(&components);
     let slot_composition = collect_slot_composition(&templates, &component_invocations, &slots);
     let slot_bindings = collect_slot_bindings(
@@ -1560,6 +1626,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         &mut provenance,
         &contexts,
         &forms,
+        &form_fields,
         &providers,
         &consumers,
         &slots,
@@ -1574,6 +1641,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         &components,
         &contexts,
         &forms,
+        &form_fields,
         &providers,
         &consumers,
         &slots,
@@ -1618,15 +1686,11 @@ fn build_application_semantic_model_from_files_with_bindings(
         &ownership,
     );
     let semantic_types = finalize_semantic_types(
-        SemanticTypeModel::from_components_with_aliases_and_bindings(
-            &components,
-            &provenance,
-            &type_aliases,
-            bindings,
-        ),
+        base_semantic_types,
         &components,
         &contexts,
         &forms,
+        &form_fields,
         &providers,
         &consumers,
         &slots,
@@ -1748,6 +1812,10 @@ fn build_application_semantic_model_from_files_with_bindings(
         &composition_types,
         &instance_context,
     );
+    let components = components_with_resolved_form_field_candidates(
+        &components,
+        &form_field_declaration_candidates,
+    );
     let mut model = ApplicationSemanticModel {
         expression_graph,
         semantic_types,
@@ -1756,6 +1824,8 @@ fn build_application_semantic_model_from_files_with_bindings(
         providers,
         consumers,
         forms,
+        form_field_declaration_candidates,
+        form_fields,
         slots,
         component_invocations,
         component_instance_plan,
@@ -1813,6 +1883,25 @@ fn build_application_semantic_model_from_files_with_bindings(
     model
 }
 
+fn components_with_resolved_form_field_candidates(
+    components: &[ComponentNode],
+    candidates: &[crate::FormFieldDeclarationCandidate],
+) -> Vec<ComponentNode> {
+    let candidates = candidates
+        .iter()
+        .map(|candidate| (candidate.id.clone(), candidate))
+        .collect::<BTreeMap<_, _>>();
+    let mut components = components.to_vec();
+    for component in &mut components {
+        for candidate in &mut component.form_field_declaration_candidates {
+            if let Some(resolved) = candidates.get(&candidate.id) {
+                *candidate = (*resolved).clone();
+            }
+        }
+    }
+    components
+}
+
 fn extend_template_entity_provenance(
     provenance: &mut BTreeMap<SemanticId, SourceProvenance>,
     template_entities: &[TemplateSemanticEntity],
@@ -1829,6 +1918,7 @@ fn extend_derived_entity_provenance(
     provenance: &mut BTreeMap<SemanticId, SourceProvenance>,
     contexts: &BTreeMap<ContextId, ContextEntity>,
     forms: &BTreeMap<FormId, FormEntity>,
+    form_fields: &BTreeMap<FieldId, FormFieldEntity>,
     providers: &BTreeMap<ProviderId, ProviderEntity>,
     consumers: &BTreeMap<ConsumerId, ConsumerEntity>,
     slots: &BTreeMap<SlotId, SlotEntity>,
@@ -1849,6 +1939,11 @@ fn extend_derived_entity_provenance(
         forms
             .values()
             .map(|form| (form.id.as_semantic_id().clone(), form.provenance.clone())),
+    );
+    provenance.extend(
+        form_fields
+            .values()
+            .map(|field| (field.id.as_semantic_id().clone(), field.provenance.clone())),
     );
     provenance.extend(providers.values().map(|provider| {
         (
@@ -1915,6 +2010,7 @@ fn finalize_semantic_types(
     components: &[ComponentNode],
     contexts: &BTreeMap<ContextId, ContextEntity>,
     forms: &BTreeMap<FormId, FormEntity>,
+    form_fields: &BTreeMap<FieldId, FormFieldEntity>,
     providers: &BTreeMap<ProviderId, ProviderEntity>,
     consumers: &BTreeMap<ConsumerId, ConsumerEntity>,
     slots: &BTreeMap<SlotId, SlotEntity>,
@@ -1928,6 +2024,7 @@ fn finalize_semantic_types(
     semantic_types
         .with_slot_types(slots)
         .with_form_types(forms)
+        .with_form_field_types(form_fields)
         .with_context_types(contexts)
         .with_provider_types(providers)
         .with_consumer_types(consumers)
@@ -2854,6 +2951,7 @@ fn collect_ownership(
     components: &[ComponentNode],
     contexts: &BTreeMap<ContextId, ContextEntity>,
     forms: &BTreeMap<FormId, FormEntity>,
+    form_fields: &BTreeMap<FieldId, FormFieldEntity>,
     providers: &BTreeMap<ProviderId, ProviderEntity>,
     consumers: &BTreeMap<ConsumerId, ConsumerEntity>,
     slots: &BTreeMap<SlotId, SlotEntity>,
@@ -2909,6 +3007,15 @@ fn collect_ownership(
             .filter(|form| form.owner.entity_id() == Some(&component.id))
         {
             ownership.insert(form.id.as_semantic_id().clone(), form.owner.clone());
+        }
+        for field in form_fields
+            .values()
+            .filter(|field| field.owner_component == component.id)
+        {
+            ownership.insert(
+                field.id.as_semantic_id().clone(),
+                SemanticOwner::entity(field.owner_form.as_semantic_id().clone()),
+            );
         }
         for provider in providers
             .values()
@@ -4292,6 +4399,7 @@ class Counter extends Component {
 
         let ownership = collect_ownership(
             &component_graph.components,
+            &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),

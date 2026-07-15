@@ -24,8 +24,9 @@ use crate::model::{
     ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional, ParsedJsxElement,
     ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLocalVariable, ParsedLogicalOperator,
     ParsedMethod, ParsedMethodCall, ParsedMethodParameter, ParsedProperty, ParsedSerializableValue,
-    ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator, ParsedTypeAlias,
-    ParsedTypeAnnotation, ParsedUnaryOperator, ParsedUnsupportedEffectStatementKind, SourceSpan,
+    ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator,
+    ParsedThisMemberDesignator, ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator,
+    ParsedUnsupportedEffectStatementKind, SourceSpan,
 };
 
 pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
@@ -407,6 +408,10 @@ fn parse_decorator(
                     .arguments
                     .first()
                     .and_then(|argument| parsed_static_member_designator(argument, source)),
+                this_member_argument: call
+                    .arguments
+                    .first()
+                    .and_then(|argument| parsed_this_member_designator(argument, source)),
                 span: source_span(source, decorator.span),
             })
         }
@@ -417,6 +422,7 @@ fn parse_decorator(
             argument_count: 0,
             argument_spans: Vec::new(),
             static_member_argument: None,
+            this_member_argument: None,
             span: source_span(source, decorator.span),
         }),
         _ => None,
@@ -424,10 +430,31 @@ fn parse_decorator(
 }
 
 fn normalized_decorators(mut decorators: Vec<ParsedDecorator>) -> Vec<ParsedDecorator> {
-    if !decorators.iter().any(|decorator| decorator.name == "form") {
+    if !decorators
+        .iter()
+        .any(|decorator| matches!(decorator.name.as_str(), "form" | "field"))
+    {
         decorators.retain(|decorator| decorator.is_invoked);
     }
     decorators
+}
+
+fn parsed_this_member_designator(
+    argument: &Argument<'_>,
+    source: &str,
+) -> Option<ParsedThisMemberDesignator> {
+    let Expression::StaticMemberExpression(member) = argument.as_expression()? else {
+        return None;
+    };
+    let Expression::ThisExpression(this) = &member.object else {
+        return None;
+    };
+    Some(ParsedThisMemberDesignator {
+        member: member.property.name.to_string(),
+        span: source_span(source, member.span),
+        this_span: source_span(source, this.span),
+        member_span: source_span(source, member.property.span),
+    })
 }
 
 fn parsed_static_member_designator(
@@ -471,20 +498,32 @@ fn parse_property(
         PropertyKey::StaticIdentifier(identifier) => (identifier.name.to_string(), true),
         key => match property_key_name(key) {
             Some(name) => (name, false),
-            None if decorators.iter().any(|decorator| decorator.name == "form") => (
-                format!("<unsupported:{}>", property.key.span().start),
-                false,
-            ),
+            None if decorators
+                .iter()
+                .any(|decorator| matches!(decorator.name.as_str(), "form" | "field")) =>
+            {
+                (
+                    format!("<unsupported:{}>", property.key.span().start),
+                    false,
+                )
+            }
             None => return None,
         },
     };
 
     let initializer = property.value.as_ref().and_then(expression_summary);
-    let initializer_literal = property.value.as_ref().and_then(parsed_serializable_value);
+    let initializer_literal = property
+        .value
+        .as_ref()
+        .and_then(serializable_value_from_expression);
     let initializer_expression = property
         .value
         .as_ref()
         .and_then(|expression| parsed_computed_expression(expression, source));
+    let initializer_constant_expression = property
+        .value
+        .as_ref()
+        .and_then(|expression| parsed_constant_expression(expression, source));
     let initializer_span = property
         .value
         .as_ref()
@@ -515,6 +554,7 @@ fn parse_property(
         initializer,
         initializer_literal,
         initializer_expression,
+        initializer_constant_expression,
         initializer_span,
         state_initial_value,
         state_initial_expression,
@@ -1612,22 +1652,6 @@ fn state_initial_value(expression: &Expression<'_>) -> Option<ParsedSerializable
     }
 
     call.arguments.first().and_then(state_argument_literal)
-}
-
-fn parsed_serializable_value(expression: &Expression<'_>) -> Option<ParsedSerializableValue> {
-    match expression {
-        Expression::NullLiteral(_) => Some(ParsedSerializableValue::Null),
-        Expression::BooleanLiteral(literal) => {
-            Some(ParsedSerializableValue::Boolean(literal.value))
-        }
-        Expression::NumericLiteral(literal) => Some(ParsedSerializableValue::Number(
-            literal.raw.as_ref()?.to_string(),
-        )),
-        Expression::StringLiteral(literal) => {
-            Some(ParsedSerializableValue::String(literal.value.to_string()))
-        }
-        _ => None,
-    }
 }
 
 fn state_initial_constant_expression(

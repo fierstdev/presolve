@@ -12,14 +12,18 @@ pub use model::{
     ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional, ParsedJsxElement,
     ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLocalVariable, ParsedLogicalOperator,
     ParsedMethod, ParsedMethodCall, ParsedMethodParameter, ParsedProperty, ParsedSerializableValue,
-    ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator, ParsedTypeAlias,
-    ParsedTypeAnnotation, ParsedUnaryOperator, ParsedUnsupportedEffectStatementKind, SourceSpan,
+    ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator,
+    ParsedThisMemberDesignator, ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator,
+    ParsedUnsupportedEffectStatementKind, SourceSpan,
 };
 pub use oxc_adapter::parse_file;
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_file, ParsedEffectStatementKind, ParsedUnsupportedEffectStatementKind};
+    use super::{
+        parse_file, ParsedEffectStatementKind, ParsedSerializableValue,
+        ParsedUnsupportedEffectStatementKind,
+    };
 
     #[test]
     fn retains_source_faithful_class_heritage() {
@@ -182,6 +186,64 @@ import ImportEqualsType = require("./type");
                 "ImportEqualsType",
                 "InterfaceType",
             ]
+        );
+    }
+
+    #[test]
+    fn retains_normalized_form_field_designators_targets_values_and_provenance() {
+        let source = r#"
+@field(this.profileForm)
+class InvalidTarget {}
+
+@component("profile-editor")
+class ProfileEditor {
+  @form() profileForm!: Form;
+  @field(this.profileForm) displayName = "Austin";
+  @field(this.profileForm) address = { city: "", postalCode: "" };
+  @field
+  bare = "";
+  @field("profileForm") stringDesignator = "";
+  @field(this.forms.profile) chained = "";
+  @field(this.profileForm) ["computed"] = "";
+  @field(this.profileForm) #privateName = "";
+  @field(this.profileForm) method() {}
+  parameter(@field(this.profileForm) value: string) {}
+}
+"#;
+        let parsed = parse_file("src/ProfileEditor.tsx", source);
+        let editor = &parsed.classes[1];
+        let display = &editor.properties[1];
+
+        assert_eq!(display.decorators[0].argument_count, 1);
+        assert_eq!(
+            display.decorators[0]
+                .this_member_argument
+                .as_ref()
+                .map(|designator| designator.member.as_str()),
+            Some("profileForm")
+        );
+        assert_eq!(
+            display.initializer_literal,
+            Some(ParsedSerializableValue::String("Austin".to_string()))
+        );
+        assert!(matches!(
+            editor.properties[2].initializer_literal,
+            Some(ParsedSerializableValue::Object(_))
+        ));
+        assert!(!editor.properties[3].decorators[0].is_invoked);
+        assert!(editor.properties[4].decorators[0]
+            .this_member_argument
+            .is_none());
+        assert!(editor.properties[5].decorators[0]
+            .this_member_argument
+            .is_none());
+        assert!(!editor.properties[6].is_identifier_name);
+        assert!(!editor.properties[7].is_identifier_name);
+        assert_eq!(editor.methods[0].decorators[0].name, "field");
+        assert_eq!(editor.methods[1].parameters[0].decorators[0].name, "field");
+        assert_eq!(
+            display.span.start,
+            source.find("@field(this.profileForm) displayName").unwrap()
         );
     }
 

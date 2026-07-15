@@ -844,6 +844,7 @@ fn is_phase_g_inspection_entity(asm: &ApplicationSemanticModel, id: &SemanticId)
         asm.entity(id),
         Some(
             SemanticEntity::Form(_)
+                | SemanticEntity::FormField(_)
                 | SemanticEntity::Slot(_)
                 | SemanticEntity::ComponentInvocation(_)
                 | SemanticEntity::ComponentInstance(_)
@@ -1181,6 +1182,7 @@ fn semantic_entity_kind(entity: SemanticEntity<'_>) -> &'static str {
         SemanticEntity::Provider(_) => "provider",
         SemanticEntity::Consumer(_) => "consumer",
         SemanticEntity::Form(_) => "form",
+        SemanticEntity::FormField(_) => "form-field",
         SemanticEntity::Slot(_) => "slot",
         SemanticEntity::ComponentInvocation(_) => "component-invocation",
         SemanticEntity::ComponentInstance(_) => "component-instance",

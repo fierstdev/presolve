@@ -4,10 +4,10 @@ use std::path::PathBuf;
 
 use crate::{
     BindingTable, CapabilityOperationId, CapabilityOperationKind, CapabilityParameters,
-    CapabilityValueContract, ComponentNode, ComputedValue, ConsumerEntity, ContextEntity, Effect,
-    EffectStatement, EffectStatementKind, ExpressionGraph, ExpressionNodeKind, ImportBindingTarget,
-    ProviderEntity, SemanticId, SerializableValue, SlotEntity, SourceProvenance, SymbolKind,
-    EFFECT_CAPABILITY_REGISTRY,
+    CapabilityValueContract, ComponentNode, ComputedValue, ConsumerEntity, ContextEntity,
+    DeclaredStateType, Effect, EffectStatement, EffectStatementKind, ExpressionGraph,
+    ExpressionNodeKind, ImportBindingTarget, ProviderEntity, SemanticId, SerializableValue,
+    SlotEntity, SourceProvenance, SymbolKind, EFFECT_CAPABILITY_REGISTRY,
 };
 use crate::{
     SemanticReference, SemanticReferenceKind, TemplateSemanticEntity, TemplateSemanticKind,
@@ -565,7 +565,45 @@ pub struct SemanticTypeAlias {
     pub provenance: SourceProvenance,
 }
 
+/// Canonical result of resolving one authored type annotation through the
+/// existing type and binding authorities.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedDeclaredSemanticType {
+    pub semantic_type: SemanticType,
+    pub alias_origin: Option<SemanticId>,
+}
+
 impl SemanticTypeModel {
+    #[must_use]
+    pub fn resolve_declared_type(
+        &self,
+        declared_type: &DeclaredStateType,
+        bindings: Option<&BindingTable>,
+    ) -> Option<ResolvedDeclaredSemanticType> {
+        let local_alias = self.aliases.values().find(|alias| {
+            alias.provenance.path == declared_type.provenance.path
+                && alias.name == declared_type.text
+        });
+        let imported_alias = bindings
+            .and_then(|bindings| {
+                bindings.resolve_import(&declared_type.provenance.path, &declared_type.text)
+            })
+            .and_then(|binding| match &binding.target {
+                ImportBindingTarget::Symbol(symbol) if symbol.kind == SymbolKind::TypeAlias => {
+                    self.aliases.get(&symbol.id)
+                }
+                _ => None,
+            });
+        let alias = local_alias.or(imported_alias);
+        let semantic_type = alias
+            .map(|alias| alias.semantic_type.clone())
+            .or_else(|| semantic_type_from_annotation(&declared_type.text))?;
+        Some(ResolvedDeclaredSemanticType {
+            semantic_type: normalize_semantic_type(semantic_type),
+            alias_origin: alias.map(|alias| alias.id.clone()),
+        })
+    }
+
     #[must_use]
     pub fn from_components(
         components: &[ComponentNode],
@@ -664,7 +702,7 @@ impl SemanticTypeModel {
                         continue;
                     };
                     (
-                        semantic_type_from_serializable_value(value),
+                        infer_serializable_value_type(value),
                         field.id.clone(),
                         SemanticTypeStatus::Inferred,
                         field_provenance.clone(),
@@ -775,6 +813,22 @@ impl SemanticTypeModel {
                 },
             );
         }
+        self
+    }
+
+    /// Attaches I3 Form Field assignments produced by the canonical field
+    /// resolver. No annotation parsing, inference, or assignability is repeated.
+    #[must_use]
+    pub fn with_form_field_types(
+        mut self,
+        fields: &BTreeMap<crate::FieldId, crate::FormFieldEntity>,
+    ) -> Self {
+        self.assignments.extend(fields.values().map(|field| {
+            (
+                field.id.as_semantic_id().clone(),
+                field.type_assignment.clone(),
+            )
+        }));
         self
     }
 
@@ -1463,7 +1517,7 @@ fn extend_with_local_type_assignments(
             SemanticTypeAssignment {
                 id: SemanticTypeId::for_subject(&local.id),
                 subject: local.id.clone(),
-                semantic_type: semantic_type_from_serializable_value(&local.value),
+                semantic_type: infer_serializable_value_type(&local.value),
                 origin: local.id.clone(),
                 status: SemanticTypeStatus::Inferred,
                 provenance: local_provenance.clone(),
@@ -1604,7 +1658,7 @@ fn extend_with_method_return_type_assignments(
 fn inferred_return_type(values: &[SerializableValue]) -> Option<SemanticType> {
     let mut types = values
         .iter()
-        .map(semantic_type_from_serializable_value)
+        .map(infer_serializable_value_type)
         .collect::<Vec<_>>();
     match types.as_slice() {
         [] => None,
@@ -2529,7 +2583,8 @@ fn remove_null(semantic_type: &SemanticType) -> SemanticType {
     }
 }
 
-fn semantic_type_from_serializable_value(value: &SerializableValue) -> SemanticType {
+#[must_use]
+pub fn infer_serializable_value_type(value: &SerializableValue) -> SemanticType {
     match value {
         SerializableValue::Null => SemanticType::Null,
         SerializableValue::Number(_) => SemanticType::Number,
@@ -2541,10 +2596,10 @@ fn semantic_type_from_serializable_value(value: &SerializableValue) -> SemanticT
         SerializableValue::Array(values) => {
             let mut types = values
                 .iter()
-                .map(semantic_type_from_serializable_value)
+                .map(infer_serializable_value_type)
                 .collect::<Vec<_>>();
             let element = if types.windows(2).all(|window| window[0] == window[1]) {
-                types.pop().expect("non-empty array should have a type")
+                types.pop().unwrap_or(SemanticType::Unknown)
             } else {
                 SemanticType::Union(types)
             };
@@ -2553,7 +2608,7 @@ fn semantic_type_from_serializable_value(value: &SerializableValue) -> SemanticT
         SerializableValue::Object(values) => SemanticType::Object(ObjectType {
             properties: values
                 .iter()
-                .map(|(name, value)| (name.clone(), semantic_type_from_serializable_value(value)))
+                .map(|(name, value)| (name.clone(), infer_serializable_value_type(value)))
                 .collect(),
         }),
     }
