@@ -3,38 +3,50 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: H19 - Component diagnostics
-* Working tree: clean after the H19 component-diagnostics commit.
+* Latest completed slice: H20 - Component fixture expansion
+* Working tree: clean after the H20 component-fixture commit.
 * Date: 2026-07-15
 
 Last completed slice
 
-* Slice: H19 - Component diagnostics
-* Summary: H19 projects the complete reserved `EZC1068`-`EZC1083` catalog from immutable H1-H17 component products, with typed component, invocation, Slot, instance, binding, structural-region, and instance-Context identities; exact canonical validation; derivative-only suppression; deterministic ordering/deduplication; and one public diagnostic projection shared by check, ASM, selected-entity inspection, and explain.
-* Key files: crates/ezc_core/src/component_diagnostics.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/asm_validation.rs, crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_cli/src/main.rs, crates/ezc_core/src/application_semantic_model.rs
-* Schema decision: ASM inspection advances from v7 to v8 and check JSON advances from v3 to v4 for the typed H19 diagnostic envelope. Resume manifest v4, component runtime artifact v2, semantic graph v5, Context runtime artifact v2, and template manifest v2 remain frozen.
+* Slice: H20 - Component fixture expansion
+* Summary: H20 adds fixture families `0062`-`0066` for declarations, composition/Slots, instance Context, component runtime/structure/resumability, and one source fixture per `EZC1068`-`EZC1083`; the compiler matrix proves topology, caller ownership, exact instance Context sources, blocked/failure exclusion, schema-v4 resume records, and byte-deterministic compiler/CLI surfaces, while real-browser probes cover closed component tables and structural DOM identity.
+* Key files: crates/ezc_cli/tests/component_fixtures.rs, crates/ezc_cli/tests/runtime_browser.rs, fixtures/0062-component-declarations through fixtures/0066-component-diagnostics, crates/ezc_core/src/composition_typing.rs, crates/ezc_core/src/component_diagnostics.rs
+* Schema decision: H20 is fixture expansion only. ASM inspection remains v8, check JSON v4, resume manifest v4, component runtime artifact v2, semantic graph v5, Context runtime artifact v2, and template manifest v2.
 
 Current in-progress slice
 
 * Slice: none
-* Status: H19 is complete and committed. H20 has not started.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H19
-* Remaining in Phase H: H20 through H21.
+* Status: H20 is complete and committed. H21 has not started.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H20
+* Remaining in Phase H: H21.
 
 Verification
 
-* Phase H entry gate: `just check` pass (workspace formatting, strict workspace clippy, and complete workspace test matrix: 12 Context fixture/freeze, 125 CLI inspection/build, 24 real-browser, 244 core, 3 parser unit, and 26 parser integration tests)
-* cargo test -p ezc_parser: pass (6 unit; 26 integration)
-* cargo test -p ezc_core component_diagnostics::tests -- --nocapture: pass (6 focused)
-* cargo test -p ezc_core: pass (292)
+* Pre-H20 Phase H entry gate: `just check` pass (workspace formatting, strict workspace clippy, and the then-complete workspace test matrix)
+* cargo test -p ezc_parser -p ezc_core: pass (292 core; 6 parser unit; 26 parser integration)
 * cargo test -p ezc_cli --bin ezc_cli: pass (1)
+* cargo test -p ezc_cli --test component_fixtures: pass (6)
 * cargo test -p ezc_cli --test explain: pass (126)
 * cargo test -p ezc_cli --test context_fixtures: pass (12)
+* RUST_TEST_THREADS=1 cargo test -p ezc_cli --test runtime_browser -- --nocapture: pass (26 real-browser)
 * cargo clippy -p ezc_parser -p ezc_core -p ezc_cli --all-targets -- -D warnings: pass
 * cargo fmt --all --check: pass
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: H20 organizes the authored regression matrix into five fixture families: declaration/import facts, composition and Slot facts, instance Context reprojection, runtime/structural/resume products, and one source file per reserved H19 diagnostic code. Compiler assertions stay in `component_fixtures`; browser-only behavior stays in `runtime_browser`.
+* Reason: Every Phase H contract now has an authored, repeatable proof without duplicating semantic authority in fixtures or using browser probes for compiler-only products. Reversing multi-file inputs and rebuilding every serialized surface verifies canonical ordering rather than source discovery order.
+* Tradeoff: The five H19 states that canonical valid construction prevents (`EZC1078`, `EZC1079`, `EZC1080`, `EZC1082`, and `EZC1083`) still use the H19-approved mutation of retained authoritative products after parsing their focused source fixture.
+
+* Decision: instance-qualified Context selection supersedes declaration-only Phase G lifetime compatibility only inside H8 composition typing. The frozen Phase G lifetime record and `EZC1065` projection remain available and unchanged.
+* Reason: An H6-selected ancestor Provider or root-qualified default outlives its exact Consumer instance even when the retained declaration graph cannot express the composed ancestry. Runtime-facing Phase H eligibility must use that exact instance fact without rewriting frozen Phase G evidence.
+* Tradeoff: Valid composed Context fixtures may retain a declaration-level Phase G lifetime diagnostic while emitting no Phase H component diagnostic and producing compatible instance-qualified runtime records.
+
+* Decision: duplicate Slot outlets emit one `EZC1076` per component/Slot-name group, with deterministic secondary outlet evidence, rather than one public diagnostic per duplicated outlet record.
+* Reason: H19 freezes group-level deduplication and the H20 duplicate-outlet fixture exposed the per-record projector leak.
+* Tradeoff: Independent duplicate outlet groups remain independent findings; only records in the same canonical owner/name group coalesce.
 
 * Decision: H19 has one table-defined diagnostic contract and one canonical projector over H1-H17 ASM products. The projector adds only identities already owned by those products; invalid Slot candidates retain candidate/source evidence without a `SlotId`, and blocked invocations retain their canonical invocation identity without a fabricated target component identity. `EZASM1201` rejects any stored H19 diagnostic vector that differs from recomputation.
 * Reason: Check, full ASM, selected-entity ASM, and explain can consume the same validated diagnostic vector and serializer without reparsing source, reconstructing component relationships, or allowing public surfaces to invent identities or labels.
@@ -850,7 +862,7 @@ Architecture decisions made
 
 Known limitations
 
-* Item: H1-H10 support compiler-owned component composition through deterministic initial creation/Slot binding plans only. Canonical IR, runtime artifacts/execution, resumability, inspection, and diagnostics remain H11-H19 work. Phase H entities are intentionally absent from frozen semantic graph v5 and ASM inspection v6 until H18.
+* Item: H1-H20 now cover canonical component/Slot semantics, runtime metadata, resumability, inspection, diagnostics, and broad fixtures. H21 remains the required stability/duplicate-logic audit and Phase H freeze; semantic graph v5 continues to omit Phase H entities by its frozen H18 authority table.
 * Item: Conditional rendering only supports simple `this.<stateField>` conditions with JSX element or fragment branches.
 * Item: Conditional branch snippets are replaced as static HTML. Bindings, events, and nested dynamic behavior inside swapped-in branch snippets are not re-registered yet.
 * Item: Keyed lists currently accept only `iterable.map((item, index?) => <element>...</element>)` with identifier parameters and an expression-bodied callback. Static and runtime reconciliation support a direct primitive item key or a dot-member key such as `item.id` that resolves to a unique primitive.
@@ -888,7 +900,7 @@ Known limitations
 
 Exact next step
 
-Implement H11 canonical component and Slot IR from executable H10 records. Lower exact create, initialize, materialize, bind, and instance-qualified Context slot operations; validate endpoints/order and retain caller slot ownership.
+Implement H21, the Phase H stability audit and freeze. Audit every authority boundary and duplicate logic path, run the established full gate, record all frozen schema targets and unsupported semantics, then commit the Phase H freeze without adding new language behavior.
 
 Useful commands
 
@@ -919,4 +931,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the H10 commit (`feat(core): plan component initialization`).
+* None after the H20 commit (`test(components): expand phase h fixtures`).

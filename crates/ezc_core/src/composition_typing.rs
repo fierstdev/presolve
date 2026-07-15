@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     CompatibilityStatus, ComponentInvocationEntity, ComponentInvocationId,
-    ComponentInvocationResolutionStatus, ConsumerInstanceId, ContextBindingLifetimeStatus,
-    ContextBindingTypeRecord, ContextDefaultSourceInstanceId, ContextId, ContextLifetimeAnalysis,
+    ComponentInvocationResolutionStatus, ConsumerInstanceId, ContextBindingTypeRecord,
+    ContextDefaultSourceInstanceId, ContextId, ContextLifetimeAnalysis,
     ContextSerializationCompatibility, ContextTypeRecord, ExecutionBoundary,
     InstanceContextRegistry, InstanceContextResolutionStatus, ProviderId, ProviderTypeRecord,
     SemanticId, SemanticOwner, SemanticReference, SemanticType, SlotBinding, SlotBindingId,
@@ -78,7 +78,7 @@ pub fn collect_composition_type_products(
     context_binding_types: &BTreeMap<crate::ConsumerId, ContextBindingTypeRecord>,
     context_types: &BTreeMap<ContextId, ContextTypeRecord>,
     provider_types: &BTreeMap<ProviderId, ProviderTypeRecord>,
-    context_lifetime: &ContextLifetimeAnalysis,
+    _context_lifetime: &ContextLifetimeAnalysis,
     ownership: &BTreeMap<SemanticId, SemanticOwner>,
     references: &[SemanticReference],
 ) -> CompositionTypeProducts {
@@ -146,7 +146,6 @@ pub fn collect_composition_type_products(
                     .context
                     .as_ref()
                     .and_then(|context| context_types.get(context)),
-                context_lifetime,
             );
             (resolution.consumer_instance.clone(), record)
         })
@@ -259,7 +258,6 @@ fn collect_instance_context_type(
     declaration: Option<&ContextBindingTypeRecord>,
     provider: Option<&ProviderTypeRecord>,
     context: Option<&ContextTypeRecord>,
-    lifetime: &ContextLifetimeAnalysis,
 ) -> InstanceContextBindingTypeRecord {
     let type_compatibility = match resolution.status {
         InstanceContextResolutionStatus::ProviderSelected => {
@@ -287,19 +285,14 @@ fn collect_instance_context_type(
             CompositionCompatibility::Unresolved
         }
     };
+    // H6 has already selected a source through the canonical instance ancestry
+    // graph. A selected ancestor Provider or root-qualified default therefore
+    // outlives this Consumer instance even when the retained Phase G
+    // declaration-only graph could not express that composed relationship.
     let lifetime_compatibility = match resolution.status {
         InstanceContextResolutionStatus::ProviderSelected
         | InstanceContextResolutionStatus::ContextDefaultSelected => {
-            match lifetime
-                .context_binding_lifetime(&resolution.consumer_instance.consumer)
-                .map(|record| record.compatibility)
-            {
-                Some(ContextBindingLifetimeStatus::Incompatible) => {
-                    CompositionCompatibility::Incompatible
-                }
-                Some(ContextBindingLifetimeStatus::Unknown) => CompositionCompatibility::Unknown,
-                _ => CompositionCompatibility::Compatible,
-            }
+            CompositionCompatibility::Compatible
         }
         _ => CompositionCompatibility::Unresolved,
     };

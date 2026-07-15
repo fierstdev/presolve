@@ -77,6 +77,248 @@ fn run_chrome_probe(chrome: PathBuf, user_data_dir: &str, probe_url: &str) -> Ou
 }
 
 #[test]
+fn component_runtime_consumes_only_compiler_plans_in_a_real_browser() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/component-runtime");
+
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean previous browser test output");
+    }
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0065-component-runtime/input/RuntimeComponents.tsx",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("browser test output path was not valid UTF-8"),
+        ])
+        .output()
+        .expect("failed to build component runtime fixture");
+    assert!(
+        output.status.success(),
+        "expected build to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    write_component_runtime_probe_page(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile dir");
+    let user_data_dir = format!(
+        "--user-data-dir={}",
+        profile_dir
+            .to_str()
+            .expect("Chrome profile path was not valid UTF-8")
+    );
+    let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
+    let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+
+    assert!(
+        stdout.contains("EDGEZERO_COMPONENT_RUNTIME_BROWSER_TEST_PASS"),
+        "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn component_structural_programs_preserve_host_dom_identity_in_a_real_browser() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/component-structural-runtime");
+
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean previous browser test output");
+    }
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0065-component-runtime/input/StructuralComponents.tsx",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("browser test output path was not valid UTF-8"),
+        ])
+        .output()
+        .expect("failed to build structural component fixture");
+    assert!(
+        output.status.success(),
+        "expected build to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    write_component_structural_probe_page(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile dir");
+    let user_data_dir = format!(
+        "--user-data-dir={}",
+        profile_dir
+            .to_str()
+            .expect("Chrome profile path was not valid UTF-8")
+    );
+    let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
+    let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+
+    assert!(
+        stdout.contains("EDGEZERO_COMPONENT_STRUCTURAL_BROWSER_TEST_PASS"),
+        "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[allow(clippy::too_many_lines)]
+fn write_component_structural_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
+    let probe = index.replace(
+        "</body>",
+        r#"<script>
+const fail = (message) => { throw new Error(message); };
+const waitFor = (predicate, label) => new Promise((resolve, reject) => {
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    if (predicate()) { resolve(); return; }
+    if (Date.now() > deadline) { reject(new Error(`Timed out waiting for ${label}`)); return; }
+    setTimeout(tick, 20);
+  };
+  tick();
+});
+(async () => {
+  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  const runtime = window.__EDGEZERO__;
+  const artifact = JSON.parse(document.getElementById("ez-component-runtime").textContent);
+  if (artifact.schema_version !== 2 || artifact.structural_programs.length !== 2) fail("structural component programs were missing");
+  if (runtime.store.componentRegions.size !== artifact.structural_programs.length) fail("closed structural region table diverged from the artifact");
+  if (!artifact.structural_programs.every((program) => JSON.stringify(runtime.store.componentRegions.get(program.region)) === JSON.stringify(program))) {
+    fail("runtime structural regions were not keyed by compiler IDs");
+  }
+  const serialized = JSON.stringify(artifact).toLowerCase();
+  if (serialized.includes("virtual_dom") || serialized.includes("vdom")) fail("component artifact introduced virtual DOM authority");
+
+  const manifest = runtime.manifest.components.find((component) => component.name === "StructuralPage");
+  const conditional = manifest.template.nodes.find((node) => node.kind === "conditional");
+  const list = manifest.template.nodes.find((node) => node.kind === "list");
+  if (conditional === undefined || list === undefined) fail("structural host plans were missing");
+  const buttons = [...document.querySelectorAll("main button")];
+  if (buttons.length !== 3) fail("structural controls were missing");
+  const main = document.querySelector("main");
+  const listParent = document.querySelector("main ul");
+  const row = (key) => document.querySelector(`[data-ez-node='${list.item_root}:${key}']`);
+  const a = row("a");
+  const b = row("b");
+  const c = row("c");
+  if (main === null || listParent === null || a === null || b === null || c === null) fail("initial structural DOM was incomplete");
+
+  buttons[0].click();
+  await waitFor(() => document.querySelector("main aside") !== null, "conditional subtree swap");
+  if (document.querySelector("main div") !== null) fail("outgoing conditional subtree survived");
+  if (document.querySelector("main") !== main || document.querySelector("main ul") !== listParent) fail("unaffected sibling identity changed");
+  if (row("a") !== a || row("b") !== b || row("c") !== c) fail("conditional swap recreated unaffected keyed rows");
+
+  buttons[1].click();
+  await waitFor(() => row("d") !== null && row("b") === null, "keyed component reconciliation");
+  const d = row("d");
+  if (row("a") !== a || row("c") !== c) fail("moved keyed component rows were recreated");
+  if (d === null) fail("new keyed component row was not created");
+
+  buttons[2].click();
+  await waitFor(() => row("a") === null && row("c") === null, "nested keyed destruction");
+  if (row("d") !== d) fail("retained keyed component row was recreated");
+  if (document.querySelector("main") !== main || document.querySelector("main ul") !== listParent) fail("unaffected host identity changed after list destruction");
+  if (runtime.component_failures.length !== 0) fail("structural component runtime reported failures");
+  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_COMPONENT_STRUCTURAL_BROWSER_TEST_PASS</div>");
+})().catch((error) => {
+  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_COMPONENT_STRUCTURAL_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  console.error(error);
+});
+</script>
+</body>"#,
+    );
+
+    fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
+}
+
+fn write_component_runtime_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
+    let probe = index.replace(
+        "</body>",
+        r#"<script>
+const fail = (message) => { throw new Error(message); };
+const waitFor = (predicate, label) => new Promise((resolve, reject) => {
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    if (predicate()) { resolve(); return; }
+    if (Date.now() > deadline) { reject(new Error(`Timed out waiting for ${label}`)); return; }
+    setTimeout(tick, 20);
+  };
+  tick();
+});
+(async () => {
+  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  const runtime = window.__EDGEZERO__;
+  const artifact = JSON.parse(document.getElementById("ez-component-runtime").textContent);
+  if (artifact.schema_version !== 2) fail("component artifact schema was not v2");
+  if (artifact.instances.length < 6) fail("component instances were not materialized from the plan");
+  if (runtime.store.componentInstances.size !== artifact.instances.length) fail("instance plan was not loaded exactly once");
+  if (runtime.component_instance_tree.length !== artifact.instances.length) fail("debug instance tree diverged from the compiler artifact");
+  if (runtime.component_initialization_runs.join(",") !== artifact.initialization_batches.map((batch) => batch.index).join(",")) {
+    fail("initialization batch order diverged from the compiler artifact");
+  }
+  for (const instance of artifact.instances) {
+    if (instance.parent !== null) {
+      const parent = artifact.instances.find((candidate) => candidate.instance === instance.parent);
+      if (parent === undefined || parent.depth >= instance.depth || parent.initialization_batch >= instance.initialization_batch) {
+        fail("parent-before-child order was not preserved");
+      }
+    }
+  }
+  if (new Set(artifact.instances.map((instance) => instance.storage_prefix)).size !== artifact.instances.length) {
+    fail("repeated instances shared storage identity");
+  }
+  if (runtime.slot_binding_runs.length !== artifact.slot_binding_programs.length) fail("slot programs were not loaded exactly");
+  if (runtime.store.instanceContextBindings.size !== artifact.instance_context_bindings.length) fail("instance Context plans were not loaded exactly");
+  if (!artifact.slot_binding_programs.every((binding) => binding.content_owner_instance === binding.caller_instance)) {
+    fail("slotted content lost caller ownership");
+  }
+  const serialized = JSON.stringify(artifact).toLowerCase();
+  for (const forbidden of ["lookup", "resolve", "traverse", "ancestry", "virtual_dom", "vdom"]) {
+    if (serialized.includes(forbidden)) fail(`component artifact contained forbidden runtime authority: ${forbidden}`);
+  }
+  if (runtime.component_failures.length !== 0) fail("component runtime reported failures");
+  document.body.dataset.browserTest = "pass";
+  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_COMPONENT_RUNTIME_BROWSER_TEST_PASS</div>");
+})().catch((error) => {
+  document.body.dataset.browserTest = "fail";
+  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_COMPONENT_RUNTIME_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  console.error(error);
+});
+</script>
+</body>"#,
+    );
+
+    fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
+}
+
+#[test]
 fn double_binding_counter_increments_in_a_real_browser() {
     let _guard = browser_test_guard();
     let repo_root = repo_root();

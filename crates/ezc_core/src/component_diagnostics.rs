@@ -434,11 +434,19 @@ fn collect_slot_composition(
             .collect();
         diagnostics.push(item);
     }
+    let mut emitted_outlet_groups = BTreeSet::new();
     for outlet in model.slot_outlets.values().filter(|outlet| {
         outlet
             .violations
             .contains(&SlotOutletViolation::DuplicateOutlet)
     }) {
+        let group = (
+            outlet.owner_component.clone(),
+            outlet.requested_slot_name.clone(),
+        );
+        if !emitted_outlet_groups.insert(group) {
+            continue;
+        }
         let mut item = diagnostic(
             "EZC1076",
             outlet.provenance.clone(),
