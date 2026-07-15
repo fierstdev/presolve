@@ -443,7 +443,14 @@ fn parsed_this_member_designator(
     argument: &Argument<'_>,
     source: &str,
 ) -> Option<ParsedThisMemberDesignator> {
-    let Expression::StaticMemberExpression(member) = argument.as_expression()? else {
+    parsed_this_member_expression(argument.as_expression()?, source)
+}
+
+fn parsed_this_member_expression(
+    expression: &Expression<'_>,
+    source: &str,
+) -> Option<ParsedThisMemberDesignator> {
+    let Expression::StaticMemberExpression(member) = expression else {
         return None;
     };
     let Expression::ThisExpression(this) = &member.object else {
@@ -2024,6 +2031,12 @@ fn parsed_jsx_attribute(attribute: &JSXAttributeItem<'_>, source: &str) -> Parse
     match attribute {
         JSXAttributeItem::Attribute(attribute) => {
             let name = jsx_attribute_name(&attribute.name);
+            let expression = attribute.value.as_ref().and_then(|value| match value {
+                JSXAttributeValue::ExpressionContainer(container) => {
+                    container.expression.as_expression()
+                }
+                _ => None,
+            });
             let value = match &attribute.value {
                 Some(JSXAttributeValue::StringLiteral(literal)) => {
                     ParsedJsxAttributeValue::Static(literal.value.to_string())
@@ -2042,12 +2055,36 @@ fn parsed_jsx_attribute(attribute: &JSXAttributeItem<'_>, source: &str) -> Parse
             ParsedJsxAttribute {
                 name,
                 value,
+                name_span: source_span(source, attribute.name.span()),
+                value_span: attribute
+                    .value
+                    .as_ref()
+                    .map(|value| source_span(source, value.span())),
+                expression_span: expression
+                    .map(|expression| source_span(source, expression.span())),
+                this_member: expression
+                    .and_then(|expression| parsed_this_member_expression(expression, source)),
+                constant_value: match &attribute.value {
+                    Some(JSXAttributeValue::StringLiteral(literal)) => {
+                        Some(ParsedSerializableValue::String(literal.value.to_string()))
+                    }
+                    Some(JSXAttributeValue::ExpressionContainer(container)) => container
+                        .expression
+                        .as_expression()
+                        .and_then(serializable_value_from_expression),
+                    _ => None,
+                },
                 span: source_span(source, attribute.span),
             }
         }
         JSXAttributeItem::SpreadAttribute(spread) => ParsedJsxAttribute {
             name: "{...}".to_string(),
             value: ParsedJsxAttributeValue::Spread(expression_summary(&spread.argument)),
+            name_span: source_span(source, spread.span),
+            value_span: Some(source_span(source, spread.argument.span())),
+            expression_span: Some(source_span(source, spread.argument.span())),
+            this_member: parsed_this_member_expression(&spread.argument, source),
+            constant_value: serializable_value_from_expression(&spread.argument),
             span: source_span(source, spread.span),
         },
     }

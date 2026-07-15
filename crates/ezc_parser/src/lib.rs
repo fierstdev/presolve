@@ -21,7 +21,7 @@ pub use oxc_adapter::parse_file;
 #[cfg(test)]
 mod tests {
     use super::{
-        parse_file, ParsedEffectStatementKind, ParsedSerializableValue,
+        parse_file, ParsedEffectStatementKind, ParsedJsxAttributeValue, ParsedSerializableValue,
         ParsedUnsupportedEffectStatementKind,
     };
 
@@ -245,6 +245,74 @@ class ProfileEditor {
             display.span.start,
             source.find("@field(this.profileForm) displayName").unwrap()
         );
+    }
+
+    #[test]
+    fn retains_normalized_form_control_attribute_facts() {
+        let source = r#"
+@component("profile-editor")
+class ProfileEditor {
+  render() {
+    return <main>
+      <input type="radio" value="email" field={this.contact} />
+      <input type={this.kind} field={this.contact} {...props} />
+      <input field={this["contact"]} />
+      <select multiple={this.multiple} field={this.tags} />
+    </main>;
+  }
+}
+"#;
+        let parsed = parse_file("src/ProfileEditor.tsx", source);
+        let super::ParsedJsxNode::Element(root) = &parsed.classes[0].methods[0].jsx_roots[0] else {
+            panic!("element root");
+        };
+        let elements = root
+            .children
+            .iter()
+            .filter_map(|child| match child {
+                super::ParsedJsxChild::Element(element) => Some(element),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        let radio = &elements[0];
+        let value = radio
+            .attributes
+            .iter()
+            .find(|attribute| attribute.name == "value")
+            .expect("radio value");
+        let field = radio
+            .attributes
+            .iter()
+            .find(|attribute| attribute.name == "field")
+            .expect("field binding");
+        assert_eq!(
+            value.constant_value,
+            Some(ParsedSerializableValue::String("email".to_string()))
+        );
+        assert_eq!(
+            field
+                .this_member
+                .as_ref()
+                .map(|member| member.member.as_str()),
+            Some("contact")
+        );
+        assert_eq!(
+            &source[field.expression_span.unwrap().start..field.expression_span.unwrap().end],
+            "this.contact"
+        );
+        assert!(elements[1]
+            .attributes
+            .iter()
+            .any(|attribute| matches!(attribute.value, ParsedJsxAttributeValue::Spread(_))));
+        assert!(elements[2].attributes[0].this_member.is_none());
+        assert!(elements[3]
+            .attributes
+            .iter()
+            .find(|attribute| attribute.name == "multiple")
+            .expect("multiple")
+            .this_member
+            .is_some());
     }
 
     #[test]

@@ -84,6 +84,7 @@ pub fn validate_application_semantic_model(
     }
 
     validate_semantic_types(model, &mut diagnostics);
+    validate_form_field_bindings(model, &mut diagnostics);
     validate_contexts(model, &mut diagnostics);
     validate_providers(model, &mut diagnostics);
     validate_consumers(model, &mut diagnostics);
@@ -107,6 +108,27 @@ pub fn validate_application_semantic_model(
     validate_template_action_bindings(model, &mut diagnostics);
 
     diagnostics
+}
+
+fn validate_form_field_bindings(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    let expected = crate::collect_form_field_binding_products(
+        &model.components,
+        &model.templates,
+        &model.forms,
+        &model.form_fields,
+        &model.form_field_declaration_candidates,
+    );
+    if model.form_field_binding_candidates != expected.candidates
+        || model.form_field_bindings != expected.bindings
+    {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1202".to_string(),
+            message: "Form Field bindings do not match canonical I3/template lowering".to_string(),
+        });
+    }
 }
 
 fn validate_component_ir(

@@ -378,7 +378,19 @@ fn print_asm_text(
     println!("  components: {}", asm.components.len());
     println!("  templates: {}", asm.templates.len());
     println!("  ownership: {}", projected_entities.len());
-    println!("  references: {}", asm.references.len());
+    println!(
+        "  references: {}",
+        asm.references
+            .iter()
+            .filter(|reference| {
+                !matches!(
+                    reference.kind,
+                    SemanticReferenceKind::FieldBindingField
+                        | SemanticReferenceKind::FieldBindingForm
+                )
+            })
+            .count()
+    );
     println!(
         "  provenance: {}",
         projected_entities
@@ -517,6 +529,12 @@ fn asm_inspection_json(
     let mut references = asm
         .references
         .iter()
+        .filter(|reference| {
+            !matches!(
+                reference.kind,
+                SemanticReferenceKind::FieldBindingField | SemanticReferenceKind::FieldBindingForm
+            )
+        })
         .map(|reference| AsmInspectionReference {
             kind: semantic_reference_kind(reference.kind),
             source: reference.source.as_str(),
@@ -845,6 +863,7 @@ fn is_phase_g_inspection_entity(asm: &ApplicationSemanticModel, id: &SemanticId)
         Some(
             SemanticEntity::Form(_)
                 | SemanticEntity::FormField(_)
+                | SemanticEntity::FormFieldBinding(_)
                 | SemanticEntity::Slot(_)
                 | SemanticEntity::ComponentInvocation(_)
                 | SemanticEntity::ComponentInstance(_)
@@ -861,6 +880,12 @@ fn filtered_entity_references(
 ) -> Vec<&ezc_core::SemanticReference> {
     let mut references = references
         .into_iter()
+        .filter(|reference| {
+            !matches!(
+                reference.kind,
+                SemanticReferenceKind::FieldBindingField | SemanticReferenceKind::FieldBindingForm
+            )
+        })
         .filter(|reference| {
             filters
                 .reference_kind
@@ -1183,6 +1208,7 @@ fn semantic_entity_kind(entity: SemanticEntity<'_>) -> &'static str {
         SemanticEntity::Consumer(_) => "consumer",
         SemanticEntity::Form(_) => "form",
         SemanticEntity::FormField(_) => "form-field",
+        SemanticEntity::FormFieldBinding(_) => "form-field-binding",
         SemanticEntity::Slot(_) => "slot",
         SemanticEntity::ComponentInvocation(_) => "component-invocation",
         SemanticEntity::ComponentInstance(_) => "component-instance",
@@ -1228,6 +1254,8 @@ fn semantic_reference_kind(kind: SemanticReferenceKind) -> &'static str {
         SemanticReferenceKind::TemplateState => "template-state",
         SemanticReferenceKind::TemplateComputed => "template-computed",
         SemanticReferenceKind::TemplateLocal => "template-local",
+        SemanticReferenceKind::FieldBindingField => "field-binding-field",
+        SemanticReferenceKind::FieldBindingForm => "field-binding-form",
     }
 }
 

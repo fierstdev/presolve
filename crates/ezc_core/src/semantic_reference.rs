@@ -24,4 +24,6 @@ pub enum SemanticReferenceKind {
     TemplateState,
     TemplateComputed,
     TemplateLocal,
+    FieldBindingField,
+    FieldBindingForm,
 }

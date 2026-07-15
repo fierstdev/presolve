@@ -43,6 +43,7 @@ pub mod effect_resume;
 pub mod explain;
 pub mod expression_graph;
 pub mod form;
+pub mod form_binding;
 pub mod form_diagnostics;
 pub mod form_field;
 pub mod html_codegen;
@@ -235,6 +236,12 @@ pub use effect_resume::{
 pub use explain::{explain_json, explain_text};
 pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 pub use form::{collect_form_entities, FormEntity};
+pub use form_binding::{
+    collect_form_field_binding_products, FormControlChannel, FormControlCompatibility,
+    FormControlNormalization, FormFieldBinding, FormFieldBindingCandidate,
+    FormFieldBindingEvidence, FormFieldBindingEvidenceKind, FormFieldBindingExpressionFact,
+    FormFieldBindingProducts, FormFieldBindingViolation, FormInputKind,
+};
 pub use form_diagnostics::{FormDiagnosticReservation, FORM_DIAGNOSTIC_RESERVATIONS};
 pub use form_field::{collect_form_field_products, FormFieldEntity, FormFieldProducts};
 pub use html_codegen::generate_static_html;
@@ -347,10 +354,11 @@ pub use semantic_graph::{
 };
 pub use semantic_id::{
     ComponentInstanceId, ComponentInvocationId, ComponentRootId, ComponentStructuralRegionId,
-    ConsumerId, ContextDeclarationCandidateId, ContextId, EffectId, EffectStatementId, FieldId,
-    FormDeclarationCandidateId, FormFieldDeclarationCandidateId, FormId, FormInstanceId,
-    ProviderId, SemanticId, SemanticOwner, SlotBindingId, SlotContentFragmentId,
-    SlotDeclarationCandidateId, SlotId, SlotOutletId, TemplatePositionId,
+    ConsumerId, ContextDeclarationCandidateId, ContextId, EffectId, EffectStatementId,
+    FieldBindingId, FieldId, FormDeclarationCandidateId, FormFieldBindingCandidateId,
+    FormFieldDeclarationCandidateId, FormId, FormInstanceId, ProviderId, SemanticId, SemanticOwner,
+    SlotBindingId, SlotContentFragmentId, SlotDeclarationCandidateId, SlotId, SlotOutletId,
+    TemplatePositionId,
 };
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};

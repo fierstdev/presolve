@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: I3 - Canonical Form Field declarations
-* Working tree: clean after the I3 implementation commit.
+* Latest completed slice: I4 - Canonical Form Control Binding
+* Working tree: clean after the I4 implementation commit.
 * Date: 2026-07-15
 
 Last completed slice
 
-* Slice: I3 - Canonical Form Field declarations
-* Summary: I3 retains every recognized `@field` placement as an immutable source-qualified candidate and lowers only direct, non-static canonical component fields with exactly one `@field(this.<formName>)`, one valid same-component I2 Form owner, an identifier name, one compiler-known serializable initializer, and no conflicting decorator into `FormFieldEntity` records. Canonical identity is `<FormId>/field:<field-name>`; invalid and duplicate candidates never receive fabricated Field identity or a source-order winner.
-* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/form_field.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/semantic_id.rs
-* Schema decision: I3 changes internal parser and ASM products only. Form Fields remain filtered from frozen semantic graph v5 and CLI ASM inspection v8; no template binding, validation, submission, serialization plan, reset plan, tracking, IR, runtime, browser, public diagnostic, or resume product is introduced.
+* Slice: I4 - Canonical Form Control Binding
+* Summary: I4 retains every authored JSX `field` attribute as a source-qualified immutable candidate and lowers only intrinsic `input`, `textarea`, and `select` controls using exact `field={this.<fieldName>}` resolution to one valid same-component I3 Field. Each valid occurrence receives a control-qualified `FieldBindingId`, compiler-selected channel and normalization policy, exact Form ownership evidence, Template ownership, and typed Field/Form references. Invalid, ambiguous, duplicate, conflicting, and incompatible candidates never receive binding identity or a source-order winner.
+* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/template_graph.rs, crates/ezc_core/src/form_binding.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/semantic_reference.rs, crates/ezc_core/src/semantic_id.rs
+* Schema decision: I4 changes internal parser/template/ASM products only. Form Field bindings and their two reference kinds remain filtered from frozen semantic graph v5 and CLI ASM inspection v8. The compiler-only `field` attribute is not emitted as an executable template attribute; no runtime artifact, DOM behavior, public diagnostic, IR, validation, submission, serialization/reset plan, tracking, or resume product is introduced.
 
 Current in-progress slice
 
-* Slice: I4 - Template-control binding contract (blocked before implementation)
-* Status: Phase I is complete through I3. The attached roadmap defines I4 only as "Bind template controls to canonical fields" and supplies no authored binding syntax, supported control set, exact Form/Field resolution, multiplicity, compatibility, ownership, ambiguity, or invalid-candidate contract. No I4 semantics have been inferred from HTML or browser behavior.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I3
-* Remaining in Phase I: I4 through I20.
+* Slice: I5 - Form ownership graph contract (blocked before implementation)
+* Status: Phase I is complete through I4. The attached roadmap defines I5 only as "Integrate forms into ownership graph" and does not freeze a distinct ownership-graph product, node/edge domains and directions, containment versus use-site relationships, Form-instance participation, invariants, queries, ordering, or schema boundary. Existing direct ASM ownership remains canonical but is not silently promoted into an invented I5 graph.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I4
+* Remaining in Phase I: I5 through I20.
 
 Verification
 
@@ -29,6 +29,13 @@ Verification
 * `cargo test -p ezc_cli --test component_fixtures phase_h_freezes_authorities_schemas_and_no_discovery_contract -- --nocapture`: pass (1)
 * `cargo test -p ezc_cli --test component_fixtures -- --nocapture`: pass (7)
 * `cargo clippy -p ezc_core -p ezc_cli --all-targets -- -D warnings`: pass
+* `cargo fmt --all --check`: pass
+* git diff --check: pass
+* `cargo test -p ezc_parser -p ezc_core`: pass (10 parser unit, 26 parser integration, 312 core)
+* `cargo test -p ezc_core form_binding::tests -- --nocapture`: pass (6)
+* `cargo test -p ezc_cli --test explain`: pass (126)
+* `cargo test -p ezc_cli --test component_fixtures -- --nocapture`: pass (7)
+* `cargo clippy --workspace --all-targets -- -D warnings`: pass
 * `cargo fmt --all --check`: pass
 * git diff --check: pass
 * `cargo test -p ezc_parser -p ezc_core`: pass (8 parser unit, 26 parser integration, 301 core)
@@ -45,6 +52,22 @@ Verification
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: I4 recognizes exactly one compiler-owned `field={this.<identifier>}` JSX attribute on intrinsic `input`, `textarea`, or `select` elements. The direct member resolves only among valid I3 Fields authored on the template's canonical component, and Form identity is copied only from `FormFieldEntity.owner_form`.
+* Reason: The supplied contract makes the I3 declaration the sole Form-membership authority and prohibits HTML `name`, separate `form` attributes, template ancestry, Context, state/computed/method lookup, component adapters, imports, runtime instances, and DOM discovery.
+* Tradeoff: Custom controls, authored `<form>` ownership, forwarding/adapters, file inputs, checkbox groups, and uncontrolled bindings remain absent.
+
+* Decision: The normalized parser/render/template boundary retains raw immutable attribute facts, exact direct-this designators, literal values, expression/name/value spans, spreads, conflicts, and complete control children alongside backend-facing executable attributes. The compiler-only `field` attribute is deliberately excluded from executable Template attributes.
+* Reason: I4 diagnostics and later planning must consume canonical candidate provenance without reparsing JSX, while no runtime or HTML path may treat the semantic binding marker as an ordinary dynamic DOM attribute.
+* Tradeoff: Typed Template elements now carry an additional compiler-analysis attribute vector, but existing HTML, manifest, runtime, and browser contracts remain unchanged.
+
+* Decision: Every recognized binding gets `FormFieldBindingCandidateId`; only a violation-free occurrence gets `FieldBindingId`, derived from its canonical control semantic entity plus `FieldId`. Valid bindings are Template-owned use sites with dedicated `FieldBindingField` and `FieldBindingForm` references; they never own the Form or Field.
+* Reason: A Field declaration and each authored control occurrence are different identity domains. Candidate-only invalid identity preserves ambiguity, duplicate, partial resolution, compatibility, and provenance evidence without fabricating executable semantics.
+* Tradeoff: Frozen semantic graph v5 and CLI ASM inspection v8 filter bindings and their references until a roadmap-owned versioned projection. Internal `EZASM1202` detects retained-product drift.
+
+* Decision: Control channels and normalization are compiler-selected immutable metadata. Text/null, numeric/null, checkbox, radio, single-select, and multiple-select compatibility reuse canonical `SemanticType`, literal-value typing, and `is_assignable`; non-radio multiplicity considers otherwise-valid candidates only, while radio groups use exact `(ComponentId, FieldId)` ownership and static value identity.
+* Reason: Later runtime execution must consume an exact channel and normalization policy without inspecting DOM element type or reconstructing group membership. Invalid controls must not poison unrelated valid bindings merely because partial Field resolution succeeded.
+* Tradeoff: I4 records no read/write execution, event ordering, dirty/touched state, validation, submission, reset, serialization, IR, runtime artifact, or resumability behavior.
 
 * Decision: I3 accepts only a directly authored canonical component instance field decorated by exactly one invoked `@field(this.<formName>)`. The designator must resolve to one valid, nonduplicate I2 `FormEntity` authored on the same component, and the authored identifier supplies the Field name.
 * Reason: The supplied I3 contract freezes exact declaration-level Form ownership and prohibits default-Form, inheritance, composition, template-ancestry, import, runtime-instance, and DOM-derived resolution.
@@ -932,8 +955,8 @@ Architecture decisions made
 
 Known limitations
 
-* Item: Phase I is complete through I3. Canonical Form and Form Field declarations plus retained invalid-candidate facts exist, but template-control bindings, validation, submission, serialization/reset plans, tracking, IR, runtime products, execution, public inspection, emitted diagnostics, fixtures, and resumability planning do not.
-* Item: I4 cannot be implemented from the attached one-line "Bind template controls to canonical fields" roadmap entry without inventing authored binding syntax, supported controls, exact Form/Field designators, multiplicity, type/control compatibility, ownership, ambiguity, and invalid-candidate retention rules.
+* Item: Phase I is complete through I4. Canonical Form declarations, Form Field declarations, and template-control bindings plus all retained invalid-candidate facts exist, but the dedicated Form ownership graph, validation, submission, serialization/reset plans, tracking, IR, runtime products, execution, public inspection, emitted diagnostics, fixtures, and resumability planning do not.
+* Item: I5 cannot be implemented from the attached one-line "Integrate forms into ownership graph" entry without inventing the product identity, node/edge domains and directions, containment versus binding-use relationships, Form-instance participation, invariants, queries, deterministic ordering, and public/internal schema boundary.
 * Item: Phase H is frozen through H21. Semantic graph v5 intentionally omits Phase H entities, live component restoration remains deferred until Phase J, and every unsupported component behavior in `docs/component-contract.md` requires a later authoritative roadmap slice.
 * Item: Conditional rendering only supports simple `this.<stateField>` conditions with JSX element or fragment branches.
 * Item: Conditional branch snippets are replaced as static HTML. Bindings, events, and nested dynamic behavior inside swapped-in branch snippets are not re-registered yet.
@@ -972,13 +995,14 @@ Known limitations
 
 Exact next step
 
-Commit the completed I3 slice, verify the worktree is clean, then obtain an
-authoritative I4 template-control binding contract. At minimum it must freeze
-the authored binding syntax, supported control declarations, exact Form/Field
-resolution, ownership and multiplicity, type/control compatibility, ambiguity
-and duplicate policy, provenance, and invalid-candidate identity/retention.
-Do not infer these semantics from browser-native form behavior, DOM discovery,
-HTML naming conventions, runtime registration, validation, or submission.
+Commit the completed I4 slice, verify the worktree is clean, then obtain an
+authoritative I5 Form ownership-graph contract. At minimum it must freeze the
+graph/product identity, canonical node and edge domains/directions, containment
+versus use-site relationships, whether declaration-level Form instances
+participate, invariants and queries, deterministic ordering, validation, and
+inspection/schema policy. Do not reinterpret direct ASM ownership, template
+ancestry, HTML `<form>` nesting, DOM ancestry, or runtime registration as the
+missing I5 graph contract.
 
 Useful commands
 
@@ -1009,4 +1033,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the I3 implementation commit (`compiler: lower canonical form fields`).
+* None after the I4 implementation commit (`compiler: bind canonical form controls`).

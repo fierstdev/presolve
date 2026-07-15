@@ -43,6 +43,10 @@ pub struct ElementNode {
     pub tag_name_span: SourceSpan,
     pub span: SourceSpan,
     pub attributes: Vec<TemplateAttribute>,
+    /// Complete normalized authored attributes retained for compiler analyses.
+    /// Backend-facing `attributes` intentionally contains only executable
+    /// template attributes.
+    pub authored_attributes: Vec<RenderAttribute>,
     pub children: Vec<TemplateChild>,
 }
 
@@ -214,6 +218,7 @@ fn element_from_render(
         tag_name_span,
         span,
         attributes,
+        authored_attributes: render.attributes.clone(),
         children,
     })
 }
@@ -241,6 +246,7 @@ fn element_from_render_element(
             ids,
             list_scope,
         ),
+        authored_attributes: element.attributes.clone(),
         children: element
             .children
             .iter()
@@ -283,6 +289,9 @@ fn template_attributes(
     let mut attributes = Vec::new();
 
     for attribute in static_attributes {
+        if attribute.name == "field" {
+            continue;
+        }
         match &attribute.value {
             RenderAttributeValue::Boolean if !is_event_attribute(&attribute.name) => {
                 attributes.push(TemplateAttribute {

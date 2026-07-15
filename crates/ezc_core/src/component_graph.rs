@@ -1054,6 +1054,11 @@ pub struct RenderList {
 pub struct RenderAttribute {
     pub name: String,
     pub value: RenderAttributeValue,
+    pub name_span: SourceSpan,
+    pub value_span: Option<SourceSpan>,
+    pub expression_span: Option<SourceSpan>,
+    pub this_member: Option<ezc_parser::ParsedThisMemberDesignator>,
+    pub constant_value: Option<SerializableValue>,
     pub span: SourceSpan,
 }
 
@@ -3413,6 +3418,14 @@ fn render_attribute_from_parsed(attribute: &ParsedJsxAttribute) -> RenderAttribu
             }
             ParsedJsxAttributeValue::Unsupported => RenderAttributeValue::Unsupported,
         },
+        name_span: attribute.name_span,
+        value_span: attribute.value_span,
+        expression_span: attribute.expression_span,
+        this_member: attribute.this_member.clone(),
+        constant_value: attribute
+            .constant_value
+            .as_ref()
+            .map(serializable_value_from_parsed),
         span: attribute.span,
     }
 }
@@ -3964,6 +3977,12 @@ fn collect_attribute_diagnostics_for_attributes(
     let mut seen = Vec::<&str>::new();
 
     for attribute in attributes {
+        // Phase I Form control bindings are compiler-owned candidates. Their
+        // validity and later diagnostics consume I4 products rather than the
+        // legacy ordinary-state attribute checker.
+        if attribute.name == "field" {
+            continue;
+        }
         if !attribute.name.starts_with("on") {
             if seen.contains(&attribute.name.as_str()) {
                 diagnostics.push(ComponentDiagnostic {

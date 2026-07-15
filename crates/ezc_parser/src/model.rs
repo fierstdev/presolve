@@ -469,6 +469,11 @@ pub struct ParsedJsxList {
 pub struct ParsedJsxAttribute {
     pub name: String,
     pub value: ParsedJsxAttributeValue,
+    pub name_span: SourceSpan,
+    pub value_span: Option<SourceSpan>,
+    pub expression_span: Option<SourceSpan>,
+    pub this_member: Option<ParsedThisMemberDesignator>,
+    pub constant_value: Option<ParsedSerializableValue>,
     pub span: SourceSpan,
 }
 

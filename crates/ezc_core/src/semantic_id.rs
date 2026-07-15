@@ -75,10 +75,22 @@ pub struct FormDeclarationCandidateId(SemanticId);
 #[serde(transparent)]
 pub struct FormFieldDeclarationCandidateId(SemanticId);
 
+/// Source-qualified identity for one recognized JSX `field` binding candidate.
+/// It remains distinct from a valid template-occurrence binding identity.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct FormFieldBindingCandidateId(SemanticId);
+
 /// Stable identity for one compiler-owned Field owned by a Form.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct FieldId(SemanticId);
+
+/// Stable identity for one authored template control occurrence bound to a
+/// canonical Form Field.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct FieldBindingId(SemanticId);
 
 /// Stable identity for one compiler-owned component Slot semantic entity.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -277,6 +289,17 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn form_field_binding_candidate_in_module(
+        module_path: impl AsRef<Path>,
+        position: usize,
+    ) -> Self {
+        Self(format!(
+            "module:{}/form-field-binding-candidate:{position}",
+            normalized_module_path(module_path.as_ref())
+        ))
+    }
+
+    #[must_use]
     pub fn field(&self, name: &str) -> Self {
         self.child("field", name)
     }
@@ -387,6 +410,11 @@ impl SemanticId {
     #[must_use]
     pub fn template_position(&self) -> Self {
         self.child("template-position", "authored")
+    }
+
+    #[must_use]
+    pub fn field_binding(&self, field: &str) -> Self {
+        self.child("field-binding", field)
     }
 
     #[must_use]
@@ -573,10 +601,47 @@ impl FormFieldDeclarationCandidateId {
     }
 }
 
+impl FormFieldBindingCandidateId {
+    #[must_use]
+    pub fn for_source_position(module_path: impl AsRef<Path>, position: usize) -> Self {
+        Self(SemanticId::form_field_binding_candidate_in_module(
+            module_path,
+            position,
+        ))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 impl FieldId {
     #[must_use]
     pub fn for_form(form: &FormId, name: &str) -> Self {
         Self(form.as_semantic_id().field(name))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl FieldBindingId {
+    #[must_use]
+    pub fn for_control(control: &SemanticId, field: &FieldId) -> Self {
+        Self(control.field_binding(field.as_str()))
     }
 
     #[must_use]
@@ -872,7 +937,19 @@ impl fmt::Display for FormFieldDeclarationCandidateId {
     }
 }
 
+impl fmt::Display for FormFieldBindingCandidateId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
 impl fmt::Display for FieldId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for FieldBindingId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(formatter)
     }

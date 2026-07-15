@@ -140,6 +140,7 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
                 Some(
                     SemanticEntity::Form(_)
                         | SemanticEntity::FormField(_)
+                        | SemanticEntity::FormFieldBinding(_)
                         | SemanticEntity::Slot(_)
                         | SemanticEntity::ComponentInvocation(_)
                         | SemanticEntity::ComponentInstance(_)
@@ -176,6 +177,7 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
                 Some(
                     SemanticEntity::Form(_)
                         | SemanticEntity::FormField(_)
+                        | SemanticEntity::FormFieldBinding(_)
                         | SemanticEntity::Slot(_)
                         | SemanticEntity::ComponentInvocation(_)
                         | SemanticEntity::ComponentInstance(_)
@@ -196,6 +198,7 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
                 Some(
                     SemanticEntity::Form(_)
                         | SemanticEntity::FormField(_)
+                        | SemanticEntity::FormFieldBinding(_)
                         | SemanticEntity::Slot(_)
                         | SemanticEntity::ComponentInvocation(_)
                         | SemanticEntity::ComponentInstance(_)
@@ -215,11 +218,22 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
                 }),
             }
         })
-        .chain(asm.references.iter().map(|reference| SemanticGraphEdge {
-            kind: semantic_graph_edge_kind(reference.kind),
-            source: reference.source.clone(),
-            target: reference.target.clone(),
-        }))
+        .chain(
+            asm.references
+                .iter()
+                .filter(|reference| {
+                    !matches!(
+                        reference.kind,
+                        SemanticReferenceKind::FieldBindingField
+                            | SemanticReferenceKind::FieldBindingForm
+                    )
+                })
+                .map(|reference| SemanticGraphEdge {
+                    kind: semantic_graph_edge_kind(reference.kind),
+                    source: reference.source.clone(),
+                    target: reference.target.clone(),
+                }),
+        )
         .collect::<Vec<_>>();
     edges.sort_by(|left, right| {
         (
@@ -297,6 +311,9 @@ fn semantic_graph_node_kind(entity: SemanticEntity<'_>) -> SemanticGraphNodeKind
         }
         SemanticEntity::FormField(_) => {
             unreachable!("Form Fields are not projected into frozen semantic graph schema v5")
+        }
+        SemanticEntity::FormFieldBinding(_) => {
+            unreachable!("Form Field bindings are not projected into semantic graph schema v5")
         }
         SemanticEntity::Slot(_) => {
             unreachable!("Slots are not projected into frozen semantic graph schema v5")
@@ -421,6 +438,9 @@ fn semantic_graph_edge_kind(kind: SemanticReferenceKind) -> SemanticGraphEdgeKin
         SemanticReferenceKind::TemplateState => SemanticGraphEdgeKind::TemplateState,
         SemanticReferenceKind::TemplateComputed => SemanticGraphEdgeKind::TemplateComputed,
         SemanticReferenceKind::TemplateLocal => SemanticGraphEdgeKind::TemplateLocal,
+        SemanticReferenceKind::FieldBindingField | SemanticReferenceKind::FieldBindingForm => {
+            unreachable!("Form Field bindings are not projected into semantic graph schema v5")
+        }
     }
 }
 
