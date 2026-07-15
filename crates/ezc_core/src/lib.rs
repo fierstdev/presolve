@@ -59,6 +59,7 @@ pub mod resume_plan;
 pub mod route_graph;
 pub mod runtime_codegen;
 pub mod runtime_component;
+pub mod runtime_component_artifact;
 pub mod runtime_computed;
 pub mod runtime_computed_artifact;
 pub mod runtime_context;
@@ -279,6 +280,11 @@ pub use runtime_component::{
     RuntimeComponentDefinitionRecord, RuntimeComponentInitializationBatch,
     RuntimeComponentInstanceRecord, RuntimeComponentRegistry, RuntimeComponentSlotBindingRecord,
     RUNTIME_COMPONENT_REGISTRY_SCHEMA_CONTRACT_VERSION,
+};
+pub use runtime_component_artifact::{
+    build_runtime_component_artifact, runtime_component_artifact_json,
+    validate_runtime_component_artifact, RuntimeComponentArtifact,
+    RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION,
 };
 pub use runtime_computed::{
     build_runtime_computed_registry, RuntimeComputedCacheSlot, RuntimeComputedDirtyFlag,

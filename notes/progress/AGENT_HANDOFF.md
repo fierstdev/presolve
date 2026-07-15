@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: H13 - Runtime component registry
-* Working tree: clean after the H13 registry commit.
+* Latest completed slice: H14 - Component runtime artifact v1
+* Working tree: clean after the H14 artifact commit.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: H13 - Runtime component registry
-* Summary: H13 projects H10/H12 into versioned internal runtime metadata for definitions, planned instances, Slot bindings, compatible instance Context bindings, and initialization batches. It grants no runtime discovery authority.
-* Key files: crates/ezc_core/src/runtime_component.rs; crates/ezc_core/src/lib.rs
-* Schema decision: the internal registry contract is v1; no public serialized shape changes. Semantic graph remains v5, Context runtime artifact v2, template manifest v2, resume manifest v3, ASM inspection v6, and check JSON v3.
+* Slice: H14 - Component runtime artifact v1
+* Summary: H14 serializes validated compiler-owned component metadata as `component.runtime.json` v1 and the CLI build writes it.
+* Key files: crates/ezc_core/src/runtime_component_artifact.rs; crates/ezc_cli/src/main.rs
+* Schema decision: new public component runtime artifact v1; frozen existing schemas remain unchanged.
 
 Current in-progress slice
 
 * Slice: none
-* Status: H13 is complete and committed. H14 has not started.
+* Status: H14 is complete and committed. H15 has not started.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H13
-* Remaining in Phase H: H14 through H21.
+* Remaining in Phase H: H15 through H21.
 
 Verification
 
