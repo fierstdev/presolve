@@ -18,7 +18,7 @@ Current in-progress slice
 
 * Slice: none
 * Status: H14 is complete and committed. H15 has not started.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H13
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H14
 * Remaining in Phase H: H15 through H21.
 
 Verification
