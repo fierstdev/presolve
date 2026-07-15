@@ -18,6 +18,7 @@ use crate::component_instance_scope::{
 };
 use crate::component_invocation::{collect_component_invocations, ComponentInvocationEntity};
 use crate::component_scope::ComponentScopeGraph;
+use crate::composition_typing::{collect_composition_type_products, CompositionTypeProducts};
 use crate::computed_value::{collect_computed_values, ComputedDiagnosticCode, ComputedValue};
 use crate::consumer::{collect_consumer_entities, ConsumerEntity, ContextResolutionState};
 use crate::context::{collect_context_entities, ContextEntity};
@@ -80,6 +81,7 @@ pub struct ApplicationSemanticModel {
     pub slot_content_fragments: BTreeMap<SlotContentFragmentId, SlotContentFragment>,
     pub slot_outlets: BTreeMap<SlotOutletId, SlotOutlet>,
     pub slot_bindings: SlotBindingRegistry,
+    pub composition_types: CompositionTypeProducts,
     pub context_declaration_candidates: ContextDeclarationCandidateRegistry,
     pub context_ownership: ContextOwnershipGraph,
     pub context_dependency: ContextDependencyGraph,
@@ -545,6 +547,11 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub const fn slot_binding_registry(&self) -> &SlotBindingRegistry {
         &self.slot_bindings
+    }
+
+    #[must_use]
+    pub const fn composition_type_products(&self) -> &CompositionTypeProducts {
+        &self.composition_types
     }
 
     #[must_use]
@@ -1265,6 +1272,26 @@ pub fn build_application_semantic_model_from_component_graph(
         &reactive_cycle_analysis,
         &provenance,
     );
+    let component_ids = component_graph
+        .components
+        .iter()
+        .map(|component| component.id.clone())
+        .collect::<BTreeSet<_>>();
+    let composition_types = collect_composition_type_products(
+        &component_ids,
+        &component_invocations,
+        &slot_bindings,
+        &slots,
+        &slot_composition.fragments,
+        &slot_composition.outlets,
+        &instance_context,
+        &context_type_products.bindings,
+        &context_type_products.contexts,
+        &context_type_products.providers,
+        &context_lifetime,
+        &ownership,
+        &references,
+    );
     let mut model = ApplicationSemanticModel {
         expression_graph,
         semantic_types,
@@ -1280,6 +1307,7 @@ pub fn build_application_semantic_model_from_component_graph(
         slot_content_fragments: slot_composition.fragments,
         slot_outlets: slot_composition.outlets,
         slot_bindings,
+        composition_types,
         context_declaration_candidates,
         context_ownership,
         context_dependency,
@@ -1580,6 +1608,25 @@ fn build_application_semantic_model_from_files_with_bindings(
         &reactive_cycle_analysis,
         &provenance,
     );
+    let component_ids = components
+        .iter()
+        .map(|component| component.id.clone())
+        .collect::<BTreeSet<_>>();
+    let composition_types = collect_composition_type_products(
+        &component_ids,
+        &component_invocations,
+        &slot_bindings,
+        &slots,
+        &slot_composition.fragments,
+        &slot_composition.outlets,
+        &instance_context,
+        &context_type_products.bindings,
+        &context_type_products.contexts,
+        &context_type_products.providers,
+        &context_lifetime,
+        &ownership,
+        &references,
+    );
     let mut model = ApplicationSemanticModel {
         expression_graph,
         semantic_types,
@@ -1595,6 +1642,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         slot_content_fragments: slot_composition.fragments,
         slot_outlets: slot_composition.outlets,
         slot_bindings,
+        composition_types,
         context_declaration_candidates,
         context_ownership,
         context_dependency,

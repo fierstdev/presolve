@@ -14,6 +14,7 @@ pub mod component_instance;
 pub mod component_instance_scope;
 pub mod component_invocation;
 pub mod component_scope;
+pub mod composition_typing;
 pub mod computed_value;
 pub mod consumer;
 pub mod context;
@@ -117,6 +118,10 @@ pub use component_invocation::{
     collect_component_invocations, ComponentInvocationEntity, ComponentInvocationResolutionStatus,
 };
 pub use component_scope::{ComponentScopeDiagnostic, ComponentScopeGraph};
+pub use composition_typing::{
+    collect_composition_type_products, ComponentInvocationTypeRecord, CompositionCompatibility,
+    CompositionTypeProducts, InstanceContextBindingTypeRecord, SlotBindingTypeRecord,
+};
 pub use computed_value::{
     collect_computed_values, ComputedCachePolicy, ComputedDiagnosticCode, ComputedPurity,
     ComputedPurityViolation, ComputedPurityViolationKind, ComputedValue,

@@ -96,12 +96,45 @@ pub fn validate_application_semantic_model(
     validate_component_instance_scope(model, &mut diagnostics);
     validate_instance_context(model, &mut diagnostics);
     validate_slot_bindings(model, &mut diagnostics);
+    validate_composition_types(model, &mut diagnostics);
     validate_effect_statement_types(model, &mut diagnostics);
     validate_effect_execution_plan(model, &mut diagnostics);
     validate_component_diagnostic_metadata(model, &mut diagnostics);
     validate_template_action_bindings(model, &mut diagnostics);
 
     diagnostics
+}
+
+fn validate_composition_types(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    let component_ids = model
+        .components
+        .iter()
+        .map(|component| component.id.clone())
+        .collect();
+    let expected = crate::collect_composition_type_products(
+        &component_ids,
+        &model.component_invocations,
+        &model.slot_bindings,
+        &model.slots,
+        &model.slot_content_fragments,
+        &model.slot_outlets,
+        &model.instance_context,
+        &model.context_binding_types,
+        &model.context_types,
+        &model.provider_types,
+        &model.context_lifetime,
+        &model.ownership,
+        &model.references,
+    );
+    if model.composition_types != expected {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1196".to_string(),
+            message: "composition typing does not match canonical H2/H6/H7 products".to_string(),
+        });
+    }
 }
 
 fn validate_slot_bindings(
