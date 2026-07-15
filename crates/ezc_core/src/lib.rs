@@ -9,6 +9,7 @@ pub mod asm_validation;
 pub mod binding_table;
 pub mod compilation_unit;
 pub mod compiler_pass;
+pub mod component_composition;
 pub mod component_graph;
 pub mod component_instance;
 pub mod component_instance_scope;
@@ -88,6 +89,9 @@ pub use compilation_unit::CompilationUnit;
 pub use compiler_pass::{
     fold_component_graph, AnalysisPass, ConstantEvaluation, ConstantEvaluationPass,
     ConstantFoldingPass, DependencyAnalysis, DependencyAnalysisPass, ImmutableAsmPass,
+};
+pub use component_composition::{
+    analyze_component_composition, ComponentCompositionAnalysis, ComponentCompositionCycle,
 };
 pub use component_graph::{
     build_component_graph, build_component_graph_for_module, ArithmeticEvaluationError,

@@ -4,6 +4,7 @@ use std::path::Path;
 use ezc_parser::ParsedFile;
 
 use crate::compilation_unit::CompilationUnit;
+use crate::component_composition::{analyze_component_composition, ComponentCompositionAnalysis};
 use crate::component_graph::{
     build_component_graph_for_module, render_event_handlers, ComponentAction, ComponentDiagnostic,
     ComponentDiagnosticSeverity, ComponentMethod, ComponentNode, MethodLocalVariable,
@@ -77,6 +78,7 @@ pub struct ApplicationSemanticModel {
     pub component_invocations: BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
     pub component_instance_plan: ComponentInstancePlan,
     pub component_instance_scope: ComponentInstanceScopeGraph,
+    pub component_composition: ComponentCompositionAnalysis,
     pub instance_context: InstanceContextRegistry,
     pub slot_content_fragments: BTreeMap<SlotContentFragmentId, SlotContentFragment>,
     pub slot_outlets: BTreeMap<SlotOutletId, SlotOutlet>,
@@ -532,6 +534,11 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub const fn component_instance_scope_graph(&self) -> &ComponentInstanceScopeGraph {
         &self.component_instance_scope
+    }
+
+    #[must_use]
+    pub const fn component_composition_analysis(&self) -> &ComponentCompositionAnalysis {
+        &self.component_composition
     }
 
     #[must_use]
@@ -1058,6 +1065,15 @@ pub fn build_application_semantic_model_from_component_graph(
         &component_graph.provenance,
     );
     let component_instance_scope = build_component_instance_scope_graph(&component_instance_plan);
+    let component_composition = analyze_component_composition(
+        &component_graph
+            .components
+            .iter()
+            .map(|component| component.id.clone())
+            .collect(),
+        &component_invocations,
+        &component_instance_plan,
+    );
     let (computed_values, computed_diagnostics) = classify_computed_values(
         &component_graph.components,
         collect_computed_values(&component_graph.components, &component_graph.provenance),
@@ -1303,6 +1319,7 @@ pub fn build_application_semantic_model_from_component_graph(
         component_invocations,
         component_instance_plan,
         component_instance_scope,
+        component_composition,
         instance_context,
         slot_content_fragments: slot_composition.fragments,
         slot_outlets: slot_composition.outlets,
@@ -1406,6 +1423,14 @@ fn build_application_semantic_model_from_files_with_bindings(
         &provenance,
     );
     let component_instance_scope = build_component_instance_scope_graph(&component_instance_plan);
+    let component_composition = analyze_component_composition(
+        &components
+            .iter()
+            .map(|component| component.id.clone())
+            .collect(),
+        &component_invocations,
+        &component_instance_plan,
+    );
 
     let (computed_values, computed_diagnostics) = classify_computed_values(
         &components,
@@ -1638,6 +1663,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         component_invocations,
         component_instance_plan,
         component_instance_scope,
+        component_composition,
         instance_context,
         slot_content_fragments: slot_composition.fragments,
         slot_outlets: slot_composition.outlets,

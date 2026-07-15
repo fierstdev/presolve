@@ -94,6 +94,7 @@ pub fn validate_application_semantic_model(
     validate_context_lifetime(model, &mut diagnostics);
     validate_context_evaluation(model, &mut diagnostics);
     validate_component_instance_scope(model, &mut diagnostics);
+    validate_component_composition(model, &mut diagnostics);
     validate_instance_context(model, &mut diagnostics);
     validate_slot_bindings(model, &mut diagnostics);
     validate_composition_types(model, &mut diagnostics);
@@ -103,6 +104,29 @@ pub fn validate_application_semantic_model(
     validate_template_action_bindings(model, &mut diagnostics);
 
     diagnostics
+}
+
+fn validate_component_composition(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    let components = model
+        .components
+        .iter()
+        .map(|component| component.id.clone())
+        .collect();
+    let expected = crate::analyze_component_composition(
+        &components,
+        &model.component_invocations,
+        &model.component_instance_plan,
+    );
+    if model.component_composition != expected {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1197".to_string(),
+            message: "component composition cycles do not match canonical resolved invocations"
+                .to_string(),
+        });
+    }
 }
 
 fn validate_composition_types(
