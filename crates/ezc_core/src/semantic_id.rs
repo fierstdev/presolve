@@ -81,6 +81,11 @@ pub struct SlotContentFragmentId(SemanticId);
 #[serde(transparent)]
 pub struct SlotOutletId(SemanticId);
 
+/// Stable identity for one invocation- and callee-instance-specific Slot binding.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SlotBindingId(SemanticId);
+
 /// Stable identity for one compiler-owned build/page component root.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -321,6 +326,11 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn slot_binding(&self, binding_key: &str) -> Self {
+        self.child("slot-binding", binding_key)
+    }
+
+    #[must_use]
     pub fn component_instance_invocation(&self, invocation: &str) -> Self {
         self.child("invocation", invocation)
     }
@@ -517,6 +527,23 @@ impl SlotOutletId {
     }
 }
 
+impl SlotBindingId {
+    #[must_use]
+    pub fn for_instance(instance: &ComponentInstanceId, binding_key: &str) -> Self {
+        Self(instance.as_semantic_id().slot_binding(binding_key))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 impl ComponentRootId {
     #[must_use]
     pub fn for_component(component: &SemanticId) -> Self {
@@ -687,6 +714,12 @@ impl fmt::Display for SlotContentFragmentId {
 }
 
 impl fmt::Display for SlotOutletId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for SlotBindingId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(formatter)
     }

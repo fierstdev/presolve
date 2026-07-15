@@ -3,38 +3,41 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: H6 - Instance-aware Context reprojection
-* Working tree: clean after the H6 instance Context reprojection commit.
+* Latest completed slice: H7 - Instance-specific Slot binding resolution
+* Working tree: clean after the H7 Slot binding commit.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: H6 - Instance-aware Context reprojection
-* Summary: H6 derives a canonical `InstanceContextRegistry` from frozen Phase G declarations and H5 executable ancestry. Provider, Consumer, Context source/default, and runtime value-slot identities are instance qualified; nearest Provider selection and root-qualified defaults never alter Phase G declaration records or reselect on later failure.
-* Key files: crates/ezc_core/src/instance_context.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs
-* Schema decision: no serialized shape changed in H6. Semantic graph remains v5, Context runtime artifact v2, template manifest v2, resume manifest v3, ASM inspection v6, and check JSON v3.
+* Slice: H7 - Instance-specific Slot binding resolution
+* Summary: H7 joins H3 fragments/outlets to exact H4 caller/callee instances in a deterministic `SlotBindingRegistry`. Binding IDs are callee-instance-qualified, all eight roadmap statuses are retained, and caller-owned content keeps caller lexical/semantic ownership despite callee outlet placement.
+* Key files: crates/ezc_core/src/slot_binding.rs; crates/ezc_core/src/semantic_id.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs
+* Schema decision: no serialized shape changed in H7. Semantic graph remains v5, Context runtime artifact v2, template manifest v2, resume manifest v3, ASM inspection v6, and check JSON v3.
 
 Current in-progress slice
 
 * Slice: none
-* Status: H6 is complete and committed. H7 has not started.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H6
-* Remaining in Phase H: H7 through H21.
+* Status: H7 is complete and committed. H8 has not started.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H7
+* Remaining in Phase H: H8 through H21.
 
 Verification
 
 * Phase H entry gate: `just check` pass (workspace formatting, strict workspace clippy, and complete workspace test matrix: 12 Context fixture/freeze, 125 CLI inspection/build, 24 real-browser, 244 core, 3 parser unit, and 26 parser integration tests)
 * cargo test -p ezc_parser: pass (5 unit; 26 integration)
-* cargo test -p ezc_core instance_context -- --nocapture: pass (3 focused)
-* cargo test -p ezc_core: pass (268)
+* cargo test -p ezc_core slot_binding::tests -- --nocapture: pass (3 focused)
+* cargo test -p ezc_core: pass (271)
 * cargo test -p ezc_cli --bin ezc_cli: pass (1)
-* cargo test -p ezc_cli --test context_fixtures: pass (12)
 * cargo test -p ezc_cli --test explain: pass (125)
 * cargo clippy -p ezc_parser -p ezc_core -p ezc_cli --all-targets -- -D warnings: pass
 * cargo fmt --all --check: pass
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: H7 creates one callee-instance-qualified `SlotBindingId` per declared Slot, supplied unknown fragment, or otherwise empty blocked invocation boundary. Status is closed over `Bound`, `Empty`, `MissingOutlet`, `UnknownSlot`, `DuplicateContent`, `DuplicateOutlet`, `InvalidOwnership`, and `BlockedInvocation`.
+* Reason: Later IR/runtime stages receive exact IDs and cardinality facts for every caller/callee relationship without matching slot names, inspecting templates, or inferring placement at runtime.
+* Tradeoff: The binding record deliberately separates caller `content_owner_instance` from callee outlet placement and does not enter generic declaration ownership. H7 adds no props, forwarding, fallback/required Slots, runtime execution, public inspection shape, or user-facing diagnostics; internal `EZASM1195` rejects registry drift.
 
 * Decision: H6 retains Phase G declaration-level Context facts and adds a parallel `InstanceContextRegistry` derived only from exact `ContextId` relations and canonical H5 self-to-root ancestry. `ProviderInstanceId`, `ConsumerInstanceId`, `ContextSourceInstanceId`, root default sources, and value slots are all instance qualified.
 * Reason: Repeated component definitions can bind to different Provider instances while every later compiler/runtime product consumes an immutable selected source and never discovers Providers by names, parent traversal, DOM state, or runtime typing.
@@ -814,7 +817,7 @@ Architecture decisions made
 
 Known limitations
 
-* Item: H1-H6 support Slot declarations, static invocations, unbound fragments/outlets, finite instance plans, validated executable instance ancestry, and instance-aware Context selection only. Fragment/outlet binding, IR, runtime artifacts/execution, resumability, inspection, and diagnostics remain H7-H19 work. Phase H entities are intentionally absent from frozen semantic graph v5 and ASM inspection v6 until H18.
+* Item: H1-H7 support Slot declarations, static invocations, caller-owned fragments/callee outlets, finite instance plans, validated executable instance ancestry, instance-aware Context selection, and exact instance Slot bindings only. Composition typing, IR, runtime artifacts/execution, resumability, inspection, and diagnostics remain H8-H19 work. Phase H entities are intentionally absent from frozen semantic graph v5 and ASM inspection v6 until H18.
 * Item: Conditional rendering only supports simple `this.<stateField>` conditions with JSX element or fragment branches.
 * Item: Conditional branch snippets are replaced as static HTML. Bindings, events, and nested dynamic behavior inside swapped-in branch snippets are not re-registered yet.
 * Item: Keyed lists currently accept only `iterable.map((item, index?) => <element>...</element>)` with identifier parameters and an expression-bodied callback. Static and runtime reconciliation support a direct primitive item key or a dot-member key such as `item.id` that resolves to a unique primitive.
@@ -852,7 +855,7 @@ Known limitations
 
 Exact next step
 
-Implement H7 Slot binding resolution by joining H3 caller-owned fragments and callee outlets to exact H4/H5 invocation instances. Preserve caller lexical/semantic ownership, represent empty and blocked bindings explicitly, and perform no runtime name lookup or ownership transfer.
+Implement H8 composition typing and boundary validation as immutable records for component invocations, Slot bindings, and instance Context bindings. Reuse canonical `SlotContent`, execution-boundary, and Phase G G5/G8 facts; never change H2/H6/H7 resolution or select another Provider.
 
 Useful commands
 
@@ -883,4 +886,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the H6 commit (`feat(core): resolve context per component instance`).
+* None after the H7 commit (`feat(core): bind slots to component instances`).

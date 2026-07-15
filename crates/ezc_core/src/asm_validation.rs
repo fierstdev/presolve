@@ -95,12 +95,33 @@ pub fn validate_application_semantic_model(
     validate_context_evaluation(model, &mut diagnostics);
     validate_component_instance_scope(model, &mut diagnostics);
     validate_instance_context(model, &mut diagnostics);
+    validate_slot_bindings(model, &mut diagnostics);
     validate_effect_statement_types(model, &mut diagnostics);
     validate_effect_execution_plan(model, &mut diagnostics);
     validate_component_diagnostic_metadata(model, &mut diagnostics);
     validate_template_action_bindings(model, &mut diagnostics);
 
     diagnostics
+}
+
+fn validate_slot_bindings(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    let expected = crate::collect_slot_bindings(
+        &model.component_instance_plan,
+        &model.component_invocations,
+        &model.slots,
+        &model.slot_content_fragments,
+        &model.slot_outlets,
+    );
+    if model.slot_bindings != expected {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1195".to_string(),
+            message: "Slot binding registry does not match canonical H3 facts and H4 instances"
+                .to_string(),
+        });
+    }
 }
 
 fn validate_instance_context(

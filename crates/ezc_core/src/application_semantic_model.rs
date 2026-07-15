@@ -44,12 +44,13 @@ use crate::intermediate_representation::{
 use crate::provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
 use crate::semantic_id::{
     ComponentInvocationId, ConsumerId, ContextId, ProviderId, SemanticId, SemanticOwner,
-    SlotContentFragmentId, SlotId, SlotOutletId,
+    SlotBindingId, SlotContentFragmentId, SlotId, SlotOutletId,
 };
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
 use crate::semantic_type::{EffectStatementTypeRecord, SemanticTypeModel};
 use crate::slot::{collect_slot_entities, SlotEntity};
+use crate::slot_binding::{collect_slot_bindings, SlotBinding, SlotBindingRegistry};
 use crate::slot_content::{collect_slot_composition, SlotContentFragment, SlotOutlet};
 use crate::template_graph::{build_template_graph, TemplateNode};
 use crate::template_semantics::{
@@ -78,6 +79,7 @@ pub struct ApplicationSemanticModel {
     pub instance_context: InstanceContextRegistry,
     pub slot_content_fragments: BTreeMap<SlotContentFragmentId, SlotContentFragment>,
     pub slot_outlets: BTreeMap<SlotOutletId, SlotOutlet>,
+    pub slot_bindings: SlotBindingRegistry,
     pub context_declaration_candidates: ContextDeclarationCandidateRegistry,
     pub context_ownership: ContextOwnershipGraph,
     pub context_dependency: ContextDependencyGraph,
@@ -538,6 +540,29 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub fn slot_content_fragments(&self) -> Vec<&SlotContentFragment> {
         self.slot_content_fragments.values().collect()
+    }
+
+    #[must_use]
+    pub const fn slot_binding_registry(&self) -> &SlotBindingRegistry {
+        &self.slot_bindings
+    }
+
+    #[must_use]
+    pub fn slot_bindings(&self) -> Vec<&SlotBinding> {
+        self.slot_bindings.bindings.values().collect()
+    }
+
+    #[must_use]
+    pub fn slot_binding(&self, id: &SlotBindingId) -> Option<&SlotBinding> {
+        self.slot_bindings.binding(id)
+    }
+
+    #[must_use]
+    pub fn slot_bindings_for_callee(
+        &self,
+        callee: &crate::ComponentInstanceId,
+    ) -> Vec<&SlotBinding> {
+        self.slot_bindings.for_callee(callee)
     }
 
     #[must_use]
@@ -1037,6 +1062,13 @@ pub fn build_application_semantic_model_from_component_graph(
     let contexts = collect_context_entities(&component_graph.components, &expression_graph);
     let slots = collect_slot_entities(&component_graph.components);
     let slot_composition = collect_slot_composition(&templates, &component_invocations, &slots);
+    let slot_bindings = collect_slot_bindings(
+        &component_instance_plan,
+        &component_invocations,
+        &slots,
+        &slot_composition.fragments,
+        &slot_composition.outlets,
+    );
     let (providers, duplicate_provider_declarations) = collect_provider_entities(
         &component_graph.components,
         &contexts,
@@ -1247,6 +1279,7 @@ pub fn build_application_semantic_model_from_component_graph(
         instance_context,
         slot_content_fragments: slot_composition.fragments,
         slot_outlets: slot_composition.outlets,
+        slot_bindings,
         context_declaration_candidates,
         context_ownership,
         context_dependency,
@@ -1356,6 +1389,13 @@ fn build_application_semantic_model_from_files_with_bindings(
     let contexts = collect_context_entities(&components, &expression_graph);
     let slots = collect_slot_entities(&components);
     let slot_composition = collect_slot_composition(&templates, &component_invocations, &slots);
+    let slot_bindings = collect_slot_bindings(
+        &component_instance_plan,
+        &component_invocations,
+        &slots,
+        &slot_composition.fragments,
+        &slot_composition.outlets,
+    );
     let (providers, duplicate_provider_declarations) =
         collect_provider_entities(&components, &contexts, &expression_graph, bindings);
     let consumers = collect_consumer_entities(&components, &contexts, bindings);
@@ -1554,6 +1594,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         instance_context,
         slot_content_fragments: slot_composition.fragments,
         slot_outlets: slot_composition.outlets,
+        slot_bindings,
         context_declaration_candidates,
         context_ownership,
         context_dependency,
