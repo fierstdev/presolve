@@ -12,7 +12,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 3;
   const SUPPORTED_EFFECT_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 2;
-  const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2;
+  const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = __EZ_COMPONENT_SCHEMA_VERSION__;
 
   class EdgeZeroBootError extends Error {
     constructor(code) {
@@ -2016,7 +2016,10 @@ const RUNTIME_STUB: &str = r#"(() => {
 
 #[must_use]
 pub fn generate_runtime_stub() -> String {
-    RUNTIME_STUB.to_string()
+    RUNTIME_STUB.replace(
+        "__EZ_COMPONENT_SCHEMA_VERSION__",
+        &crate::RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION.to_string(),
+    )
 }
 
 #[cfg(test)]

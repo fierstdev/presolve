@@ -8,15 +8,18 @@ use std::process::Command;
 use ezc_core::{
     build_application_semantic_model, build_application_semantic_model_for_unit,
     build_resume_manifest, build_resume_plan, build_runtime_component_artifact,
-    build_runtime_context_artifact, build_semantic_graph, build_template_manifest_from_asm,
-    collect_component_diagnostics, lower_components_to_ir, optimize_context_ir,
-    resume_manifest_json, runtime_component_artifact_json, runtime_context_artifact_json,
-    semantic_graph_json, template_manifest_json, validate_application_semantic_model,
-    validate_resume_manifest, validate_runtime_component_artifact, BlockedComponentInstancePlan,
+    build_runtime_component_registry, build_runtime_context_artifact, build_semantic_graph,
+    build_template_manifest_from_asm, collect_component_diagnostics, generate_runtime_stub,
+    lower_components_to_ir, optimize_context_ir, resume_manifest_json,
+    runtime_component_artifact_json, runtime_context_artifact_json, semantic_graph_json,
+    template_manifest_json, validate_application_semantic_model, validate_resume_manifest,
+    validate_runtime_component_artifact, BlockedComponentInstancePlan,
     BlockedComponentInstanceReason, CompilationUnit, ComponentInstanceStatus,
     ComponentInvocationResolutionStatus, CompositionCompatibility, InstanceContextResolutionStatus,
     SlotBindingStatus, COMPONENT_DIAGNOSTIC_CONTRACTS, RESUME_MANIFEST_SCHEMA_VERSION,
-    RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION,
+    RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION, RUNTIME_COMPONENT_REGISTRY_SCHEMA_CONTRACT_VERSION,
+    RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, SEMANTIC_GRAPH_SCHEMA_VERSION,
+    TEMPLATE_MANIFEST_SCHEMA_VERSION,
 };
 
 fn repo_root() -> PathBuf {
@@ -472,6 +475,157 @@ fn component_outputs_are_byte_deterministic_across_compiler_and_cli_surfaces() {
         let explain = cli_output(&["explain", args[0], args[1], args[2], args[3], args[4]]);
         assert_eq!(asm, explain, "ASM/explain {format} parity");
     }
+}
+
+#[test]
+fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
+    let path = "fixtures/0065-component-runtime/input/RuntimeComponents.tsx";
+    let model = fixture_model(path);
+    assert!(validate_application_semantic_model(&model).is_empty());
+
+    let definition = model
+        .components
+        .iter()
+        .find(|component| component.element_name.as_deref() == Some("x-runtime-page"))
+        .unwrap();
+    let invocation = model.component_invocations.values().next().unwrap();
+    let instance = model
+        .component_instance_plan
+        .instances
+        .values()
+        .next()
+        .unwrap();
+    assert!(definition.id.as_str().contains("/component:"));
+    assert!(invocation.id.as_str().contains("/component-invocation:"));
+    assert!(instance.id.as_str().starts_with("root:"));
+    assert_ne!(definition.id.as_str(), invocation.id.as_str());
+    assert_ne!(definition.id.as_str(), instance.id.as_str());
+
+    let registry = build_runtime_component_registry(&model, &model.component_ir_optimization);
+    assert_eq!(
+        registry.schema_contract_version,
+        RUNTIME_COMPONENT_REGISTRY_SCHEMA_CONTRACT_VERSION
+    );
+    assert!(registry.instances.len() >= 6);
+    assert_eq!(
+        registry
+            .instances
+            .iter()
+            .map(|record| &record.instance)
+            .collect::<BTreeSet<_>>()
+            .len(),
+        registry.instances.len()
+    );
+    assert!(registry
+        .slot_bindings
+        .iter()
+        .all(|binding| binding.content_owner_instance == binding.caller_instance));
+    assert!(registry
+        .instance_context_bindings
+        .iter()
+        .all(
+            |binding| binding.selected_source.to_string() != binding.consumer_instance.to_string()
+        ));
+
+    let component_artifact =
+        build_runtime_component_artifact(&model, &model.component_ir_optimization);
+    assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 5);
+    assert_eq!(RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION, 2);
+    assert_eq!(RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, 2);
+    assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 4);
+    assert_eq!(TEMPLATE_MANIFEST_SCHEMA_VERSION, 2);
+    assert_eq!(component_artifact.schema_version, 2);
+    assert!(validate_runtime_component_artifact(&component_artifact).is_ok());
+    assert_eq!(build_semantic_graph(&model).schema_version, 5);
+    assert_eq!(
+        build_resume_manifest(&build_resume_plan(&model)).schema_version,
+        4
+    );
+    assert_eq!(build_template_manifest_from_asm(&model).schema_version, 1);
+
+    for (args, expected_status, expected_schema) in [
+        (vec!["check", path, "--format", "json"], Some(1), 4),
+        (vec!["asm", path, "--format", "json"], Some(0), 8),
+    ] {
+        let (status, stdout, stderr) = cli_result(&args);
+        assert_eq!(
+            status,
+            expected_status,
+            "{}",
+            String::from_utf8_lossy(&stderr)
+        );
+        let document: serde_json::Value = serde_json::from_slice(&stdout).unwrap();
+        assert_eq!(document["schema_version"], expected_schema);
+    }
+
+    let runtime = generate_runtime_stub();
+    assert!(runtime.contains("SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2"));
+    assert!(!runtime.contains("__EZ_COMPONENT_SCHEMA_VERSION__"));
+    for forbidden in [
+        "resolveComponent",
+        "componentByTag",
+        "componentTag",
+        "resolveSlot",
+        "slotByName",
+        "findProvider",
+        "providerSearch",
+        "componentAncestors",
+        "reconstructComponent",
+        "virtualDom",
+        "virtualDOM",
+    ] {
+        assert!(!runtime.contains(forbidden), "runtime contains {forbidden}");
+    }
+    let component_tables = runtime.find("store.componentInstances = new Map").unwrap();
+    let context_execution = runtime.rfind("executeInitialContext(store);").unwrap();
+    let effect_execution = runtime.rfind("executeInitialEffects(store);").unwrap();
+    assert!(component_tables < context_execution && context_execution < effect_execution);
+    assert!(runtime.contains("store.componentRegions = new Map"));
+
+    let core = repo_root().join("crates/ezc_core/src");
+    for (needle, authority) in [
+        ("ComponentInstanceId::for_", "component_instance.rs"),
+        ("ComponentStructuralRegionId::for_", "component_instance.rs"),
+        ("SlotBindingId::for_instance", "slot_binding.rs"),
+        ("ProviderInstanceId::new", "instance_context.rs"),
+        ("ConsumerInstanceId::new", "instance_context.rs"),
+    ] {
+        let owners = fs::read_dir(&core)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| {
+                entry
+                    .path()
+                    .extension()
+                    .is_some_and(|extension| extension == "rs")
+            })
+            .filter(|entry| fs::read_to_string(entry.path()).unwrap().contains(needle))
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(owners, BTreeSet::from([authority.to_string()]), "{needle}");
+    }
+
+    for file in [
+        "runtime_component.rs",
+        "runtime_component_artifact.rs",
+        "runtime_codegen.rs",
+        "resume_plan.rs",
+    ] {
+        let source = fs::read_to_string(core.join(file)).unwrap();
+        for forbidden in [
+            "resolve_invocation_target",
+            "authored_symbol",
+            "requested_slot_name",
+            "tag_name",
+            "element_name",
+        ] {
+            assert!(!source.contains(forbidden), "{file} contains {forbidden}");
+        }
+    }
+    let diagnostics_source = fs::read_to_string(core.join("component_diagnostics.rs")).unwrap();
+    let diagnostics = diagnostics_source.split("#[cfg(test)]").next().unwrap();
+    assert!(!diagnostics.contains("ezc_parser"));
+    assert!(!diagnostics.contains("parse_file"));
 }
 
 #[test]

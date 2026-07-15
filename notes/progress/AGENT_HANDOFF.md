@@ -3,38 +3,42 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: H20 - Component fixture expansion
-* Working tree: clean after the H20 component-fixture commit.
+* Latest completed slice: H21 - Component stability audit and Phase H freeze
+* Working tree: clean after the H21 component-architecture freeze commit.
 * Date: 2026-07-15
 
 Last completed slice
 
-* Slice: H20 - Component fixture expansion
-* Summary: H20 adds fixture families `0062`-`0066` for declarations, composition/Slots, instance Context, component runtime/structure/resumability, and one source fixture per `EZC1068`-`EZC1083`; the compiler matrix proves topology, caller ownership, exact instance Context sources, blocked/failure exclusion, schema-v4 resume records, and byte-deterministic compiler/CLI surfaces, while real-browser probes cover closed component tables and structural DOM identity.
-* Key files: crates/ezc_cli/tests/component_fixtures.rs, crates/ezc_cli/tests/runtime_browser.rs, fixtures/0062-component-declarations through fixtures/0066-component-diagnostics, crates/ezc_core/src/composition_typing.rs, crates/ezc_core/src/component_diagnostics.rs
-* Schema decision: H20 is fixture expansion only. ASM inspection remains v8, check JSON v4, resume manifest v4, component runtime artifact v2, semantic graph v5, Context runtime artifact v2, and template manifest v2.
+* Slice: H21 - Component stability audit and Phase H freeze
+* Summary: H21 audits and freezes the H1-H20 authority table, executable identity domains, compiler-owned Slot/Context/structural boundaries, serialized schemas, diagnostics, unsupported semantics, and no-runtime-discovery invariants. The runtime component schema check now derives from the Rust artifact constant instead of duplicating v2 in JavaScript, and an executable freeze test guards constructor ownership, canonical CLI/schema projection, closed runtime ordering, authored-name lookup bans, and parser-free diagnostics.
+* Key files: crates/ezc_cli/tests/component_fixtures.rs, crates/ezc_core/src/runtime_codegen.rs, docs/component-contract.md, docs/runtime-contract.md, README.md
+* Schema decision: Phase H freezes component runtime artifact v2, resume manifest v4, ASM inspection v8, check JSON v4, template manifest v2 with conditional legacy-v1 output/acceptance, Context runtime artifact v2, semantic graph v5, and internal runtime component registry contract v1.
 
 Current in-progress slice
 
 * Slice: none
-* Status: H20 is complete and committed. H21 has not started.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H20
-* Remaining in Phase H: H21.
+* Status: Phase H is complete, frozen, and committed through H21.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21
+* Remaining in Phase H: none.
 
 Verification
 
-* Pre-H20 Phase H entry gate: `just check` pass (workspace formatting, strict workspace clippy, and the then-complete workspace test matrix)
-* cargo test -p ezc_parser -p ezc_core: pass (292 core; 6 parser unit; 26 parser integration)
-* cargo test -p ezc_cli --bin ezc_cli: pass (1)
-* cargo test -p ezc_cli --test component_fixtures: pass (6)
-* cargo test -p ezc_cli --test explain: pass (126)
-* cargo test -p ezc_cli --test context_fixtures: pass (12)
-* RUST_TEST_THREADS=1 cargo test -p ezc_cli --test runtime_browser -- --nocapture: pass (26 real-browser)
-* cargo clippy -p ezc_parser -p ezc_core -p ezc_cli --all-targets -- -D warnings: pass
-* cargo fmt --all --check: pass
+* `just check`: pass (workspace formatting, strict workspace clippy, 292 core, 6 parser unit, 26 parser integration, 1 CLI unit, 7 component fixture/audit, 12 Context fixture/freeze, 126 CLI inspection/build, and 26 real-browser tests)
+* `cargo test -p ezc_cli --test component_fixtures phase_h_freezes_authorities_schemas_and_no_discovery_contract -- --nocapture`: pass (1)
+* `cargo test -p ezc_cli --test component_fixtures -- --nocapture`: pass (7)
+* `cargo clippy -p ezc_core -p ezc_cli --all-targets -- -D warnings`: pass
+* `cargo fmt --all --check`: pass
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: H21 freezes one authority for each Component/Slot concern from H1 through H20 and makes the runtime's supported component artifact version derive from `RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION` rather than a second JavaScript literal. An executable audit test guards identity-constructor ownership, distinct definition/invocation/instance domains, repeated-instance separation, caller-owned Slot bindings, exact instance Context sources, actual public schemas, CLI projection, closed runtime order, parser-free diagnostics, and no authored-name runtime lookup.
+* Reason: Phase H can be frozen only if later compiler, CLI, serializer, and runtime layers consume immutable canonical facts and schema authorities instead of reconstructing or rediscovering them.
+* Tradeoff: The audit intentionally enforces architectural source boundaries as well as behavior. Moving an identity constructor or adding a runtime field with an authored-name-shaped identifier now requires an explicit authority/schema review and corresponding audit update.
+
+* Decision: `docs/component-contract.md` is the public Phase H contract and records exact syntax, identity domains, ownership, instance Context selection, cold/action ordering, structural programs, schema versions, diagnostics, unsupported semantics, and no-runtime-discovery invariants. `docs/runtime-contract.md` now records template manifest v2 plus the narrow legacy-v1 compatibility rule and component runtime artifact v2.
+* Reason: Consumers need the actual completed contract, including conditional legacy behavior, rather than roadmap target assumptions or stale schema-one runtime prose.
+* Tradeoff: Phase H remains deliberately narrow: every unsupported feature listed in the component contract requires a later authoritative slice and deliberate identity/schema review.
 
 * Decision: H20 organizes the authored regression matrix into five fixture families: declaration/import facts, composition and Slot facts, instance Context reprojection, runtime/structural/resume products, and one source file per reserved H19 diagnostic code. Compiler assertions stay in `component_fixtures`; browser-only behavior stays in `runtime_browser`.
 * Reason: Every Phase H contract now has an authored, repeatable proof without duplicating semantic authority in fixtures or using browser probes for compiler-only products. Reversing multi-file inputs and rebuilding every serialized surface verifies canonical ordering rather than source discovery order.
@@ -862,7 +866,7 @@ Architecture decisions made
 
 Known limitations
 
-* Item: H1-H20 now cover canonical component/Slot semantics, runtime metadata, resumability, inspection, diagnostics, and broad fixtures. H21 remains the required stability/duplicate-logic audit and Phase H freeze; semantic graph v5 continues to omit Phase H entities by its frozen H18 authority table.
+* Item: Phase H is frozen through H21. Semantic graph v5 intentionally omits Phase H entities, live component restoration remains deferred until Phase J, and every unsupported component behavior in `docs/component-contract.md` requires a later authoritative roadmap slice.
 * Item: Conditional rendering only supports simple `this.<stateField>` conditions with JSX element or fragment branches.
 * Item: Conditional branch snippets are replaced as static HTML. Bindings, events, and nested dynamic behavior inside swapped-in branch snippets are not re-registered yet.
 * Item: Keyed lists currently accept only `iterable.map((item, index?) => <element>...</element>)` with identifier parameters and an expression-bodied callback. Static and runtime reconciliation support a direct primitive item key or a dot-member key such as `item.id` that resolves to a unique primitive.
@@ -900,7 +904,7 @@ Known limitations
 
 Exact next step
 
-Implement H21, the Phase H stability audit and freeze. Audit every authority boundary and duplicate logic path, run the established full gate, record all frozen schema targets and unsupported semantics, then commit the Phase H freeze without adding new language behavior.
+Phase H is complete and frozen. Do not begin Phase I or Phase J work without an authoritative roadmap contract; no such next-phase contract has been started in this handoff.
 
 Useful commands
 
@@ -931,4 +935,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the H20 commit (`test(components): expand phase h fixtures`).
+* None after the H21 commit (`refactor: freeze phase H component architecture`).

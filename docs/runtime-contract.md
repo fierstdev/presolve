@@ -5,11 +5,22 @@ EdgeZero compiler output and the browser runtime communicate through the templat
 ## Versioning
 
 - `schema_version` is required at the manifest root.
-- The current supported manifest schema is `1`.
+- The current template manifest schema is `2`.
+- Legacy template manifest schema `1` remains accepted only when the effect
+  artifact contains no completed-action activation plans.
 - The current browser runtime version is `0.0.0` and is exposed as `window.__EDGEZERO__.runtime_version`.
 - Runtime state also exposes `window.__EDGEZERO__.supported_schema_version`.
 
-The runtime accepts only manifests whose `schema_version` exactly matches its supported schema version. Missing, older, or future schema versions are fatal boot errors until an explicit compatibility policy is added.
+The runtime rejects missing, future, or otherwise unsupported manifest
+versions. Schema `2` validates compiler-generated action-batch identities;
+legacy schema `1` cannot activate completed-action effects.
+
+Phase H also embeds and emits `component.runtime.json` schema `2`. The runtime
+requires that exact version and consumes only compiler-generated definition,
+instance, initialization-batch, Slot-binding, instance-Context, and structural
+region identities. It performs no tag lookup, Slot-name matching, parent or
+Provider search, component discovery, or virtual-DOM diffing. The complete
+frozen component boundary is documented in [Component contract](component-contract.md).
 
 ## Diagnostics
 

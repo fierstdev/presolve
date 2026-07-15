@@ -132,6 +132,15 @@ uses compiler-generated Context slot identities only; it performs no Provider
 lookup, Context-name matching, ancestry traversal, dependency reconstruction,
 or binding reselection.
 
+## Component contract
+
+Phase H Component and Slot syntax, canonical identities, instance Context,
+caller-owned Slot content, compiler-planned runtime ordering and structural
+updates, frozen schemas and diagnostics, and unsupported behavior are documented
+in [`docs/component-contract.md`](docs/component-contract.md). The runtime
+consumes closed compiler-ID tables and performs no component or Slot discovery,
+Provider or parent search, authored-name lookup, or virtual-DOM diffing.
+
 ## Computed values: supported contract and limits
 
 `@computed()` currently applies only to synchronous getters with one supported
