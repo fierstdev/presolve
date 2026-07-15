@@ -3,27 +3,28 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: H21 - Component stability audit and Phase H freeze
-* Working tree: clean after the H21 component-architecture freeze commit.
+* Latest completed slice: I0 - Forms entry audit
+* Working tree: clean after the I0 forms-entry-audit commit.
 * Date: 2026-07-15
 
 Last completed slice
 
-* Slice: H21 - Component stability audit and Phase H freeze
-* Summary: H21 audits and freezes the H1-H20 authority table, executable identity domains, compiler-owned Slot/Context/structural boundaries, serialized schemas, diagnostics, unsupported semantics, and no-runtime-discovery invariants. The runtime component schema check now derives from the Rust artifact constant instead of duplicating v2 in JavaScript, and an executable freeze test guards constructor ownership, canonical CLI/schema projection, closed runtime ordering, authored-name lookup bans, and parser-free diagnostics.
-* Key files: crates/ezc_cli/tests/component_fixtures.rs, crates/ezc_core/src/runtime_codegen.rs, docs/component-contract.md, docs/runtime-contract.md, README.md
-* Schema decision: Phase H freezes component runtime artifact v2, resume manifest v4, ASM inspection v8, check JSON v4, template manifest v2 with conditional legacy-v1 output/acceptance, Context runtime artifact v2, semantic graph v5, and internal runtime component registry contract v1.
+* Slice: I0 - Forms entry audit
+* Summary: I0 verifies the committed H21 freeze, records the unchanged schema baseline, and reserves the next public compiler diagnostic range (`EZC1084`-`EZC1095`) one-for-one for the twelve Phase I diagnostic meanings. The reservation is data only: no form diagnostic is emitted before the canonical I18 projector exists.
+* Key files: crates/ezc_core/src/form_diagnostics.rs, crates/ezc_core/src/lib.rs, notes/progress/AGENT_HANDOFF.md, notes/progress/2026-W28.md
+* Schema decision: I0 changes no schema. The entry baseline remains component runtime artifact v2, resume manifest v4, ASM inspection v8, check JSON v4, template manifest v2 with conditional legacy-v1 output/acceptance, Context runtime artifact v2, semantic graph v5, and internal runtime component registry contract v1.
 
 Current in-progress slice
 
 * Slice: none
-* Status: Phase H is complete, frozen, and committed through H21.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21
-* Remaining in Phase H: none.
+* Status: Phase I has started and is committed through I0.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0
+* Remaining in Phase I: I1 through I20.
 
 Verification
 
-* `just check`: pass (workspace formatting, strict workspace clippy, 292 core, 6 parser unit, 26 parser integration, 1 CLI unit, 7 component fixture/audit, 12 Context fixture/freeze, 126 CLI inspection/build, and 26 real-browser tests)
+* I0 entry `just check`: pass (workspace formatting, strict workspace clippy, 292 baseline core, 6 parser unit, 26 parser integration, 1 CLI unit, 7 component fixture/audit, 12 Context fixture/freeze, 126 CLI inspection/build, and 26 real-browser tests)
+* `cargo test -p ezc_core form_diagnostics::tests -- --nocapture`: pass (2)
 * `cargo test -p ezc_cli --test component_fixtures phase_h_freezes_authorities_schemas_and_no_discovery_contract -- --nocapture`: pass (1)
 * `cargo test -p ezc_cli --test component_fixtures -- --nocapture`: pass (7)
 * `cargo clippy -p ezc_core -p ezc_cli --all-targets -- -D warnings`: pass
@@ -31,6 +32,14 @@ Verification
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: I0 reserves `EZC1084` through `EZC1095` in one ordered `FORM_DIAGNOSTIC_RESERVATIONS` authority matching the roadmap's twelve diagnostic meanings.
+* Reason: Phase I needs a deterministic range after frozen Phase H without allowing early slices to emit ad hoc diagnostics or duplicate code ownership.
+* Tradeoff: The table reserves codes and meanings only. Identity requirements, provenance, suppression, deduplication, messages, and projection remain I18 work over canonical I1-I17 products.
+
+* Decision: I0 retains every frozen Phase H schema exactly and introduces no Forms schema authority before its roadmap-owned slice.
+* Reason: The entry audit must prove a clean architectural boundary rather than advance unrelated public products merely because Forms will eventually participate in runtime, resume, inspection, and check output.
+* Tradeoff: Forms remain absent from semantic graph v5, resume manifest v4, ASM inspection v8, check JSON v4, template manifest v2, and every runtime artifact until the corresponding Phase I slice deliberately versions its boundary.
 
 * Decision: H21 freezes one authority for each Component/Slot concern from H1 through H20 and makes the runtime's supported component artifact version derive from `RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION` rather than a second JavaScript literal. An executable audit test guards identity-constructor ownership, distinct definition/invocation/instance domains, repeated-instance separation, caller-owned Slot bindings, exact instance Context sources, actual public schemas, CLI projection, closed runtime order, parser-free diagnostics, and no authored-name runtime lookup.
 * Reason: Phase H can be frozen only if later compiler, CLI, serializer, and runtime layers consume immutable canonical facts and schema authorities instead of reconstructing or rediscovering them.
@@ -866,6 +875,7 @@ Architecture decisions made
 
 Known limitations
 
+* Item: Phase I is complete only through I0. Form syntax, entities, fields, bindings, graphs, plans, IR, runtime products, execution, inspection, emitted diagnostics, fixtures, and resumability planning do not exist yet.
 * Item: Phase H is frozen through H21. Semantic graph v5 intentionally omits Phase H entities, live component restoration remains deferred until Phase J, and every unsupported component behavior in `docs/component-contract.md` requires a later authoritative roadmap slice.
 * Item: Conditional rendering only supports simple `this.<stateField>` conditions with JSX element or fragment branches.
 * Item: Conditional branch snippets are replaced as static HTML. Bindings, events, and nested dynamic behavior inside swapped-in branch snippets are not re-registered yet.
@@ -904,7 +914,9 @@ Known limitations
 
 Exact next step
 
-Phase H is complete and frozen. Do not begin Phase I or Phase J work without an authoritative roadmap contract; no such next-phase contract has been started in this handoff.
+Begin I1: introduce the canonical `FormId`, `FormInstanceId`, and `FieldId`
+identity domains without lowering form syntax or introducing later validation,
+planning, runtime, inspection, diagnostic, or resumability semantics.
 
 Useful commands
 
@@ -935,4 +947,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the H21 commit (`refactor: freeze phase H component architecture`).
+* None after the I0 commit (`compiler: audit phase I forms entry`).

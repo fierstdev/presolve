@@ -42,6 +42,7 @@ pub mod effect_inspection;
 pub mod effect_resume;
 pub mod explain;
 pub mod expression_graph;
+pub mod form_diagnostics;
 pub mod html_codegen;
 pub mod instance_context;
 pub mod intermediate_representation;
@@ -228,6 +229,7 @@ pub use effect_resume::{
 };
 pub use explain::{explain_json, explain_text};
 pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
+pub use form_diagnostics::{FormDiagnosticReservation, FORM_DIAGNOSTIC_RESERVATIONS};
 pub use html_codegen::generate_static_html;
 pub use instance_context::{
     collect_instance_context_registry, ConsumerInstanceId, ConsumerInstanceRecord,
