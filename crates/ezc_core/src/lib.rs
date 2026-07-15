@@ -37,6 +37,7 @@ pub mod effect_resume;
 pub mod explain;
 pub mod expression_graph;
 pub mod html_codegen;
+pub mod instance_context;
 pub mod intermediate_representation;
 pub mod layout_graph;
 pub mod lazy_action_chunks;
@@ -198,6 +199,12 @@ pub use effect_resume::{
 pub use explain::{explain_json, explain_text};
 pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
 pub use html_codegen::generate_static_html;
+pub use instance_context::{
+    collect_instance_context_registry, ConsumerInstanceId, ConsumerInstanceRecord,
+    ContextDefaultSourceInstanceId, ContextSourceInstanceId, ContextSourceInstanceOwner,
+    InstanceContextRegistry, InstanceContextResolution, InstanceContextResolutionStatus,
+    InstanceContextValueSlotId, ProviderInstanceId, ProviderInstanceRecord,
+};
 pub use intermediate_representation::{
     analyze_constant_propagation, analyze_dead_assignments, analyze_definition_uses,
     analyze_liveness, analyze_reachability, analyze_reactive_cycles,

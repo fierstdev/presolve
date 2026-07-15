@@ -3,36 +3,42 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: H5 - Component instance scope graph
-* Working tree: clean after the H5 component instance scope graph commit.
+* Latest completed slice: H6 - Instance-aware Context reprojection
+* Working tree: clean after the H6 instance Context reprojection commit.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: H5 - Component instance scope graph
-* Summary: H5 projects only executable H4 instances into one canonical `ComponentInstanceScopeGraph` with typed nodes, parent/child indexes, roots, and ancestry queries. Deterministic validation covers unknown endpoints, missing/multiple parents, reciprocity, roots, depth, owner-root consistency, cycles, reachability, and ordering; blocked H4 records are excluded from the node domain.
-* Key files: crates/ezc_core/src/component_instance_scope.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs
-* Schema decision: no serialized shape changed in H5. Semantic graph remains v5, Context runtime artifact v2, template manifest v2, resume manifest v3, ASM inspection v6, and check JSON v3.
+* Slice: H6 - Instance-aware Context reprojection
+* Summary: H6 derives a canonical `InstanceContextRegistry` from frozen Phase G declarations and H5 executable ancestry. Provider, Consumer, Context source/default, and runtime value-slot identities are instance qualified; nearest Provider selection and root-qualified defaults never alter Phase G declaration records or reselect on later failure.
+* Key files: crates/ezc_core/src/instance_context.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs
+* Schema decision: no serialized shape changed in H6. Semantic graph remains v5, Context runtime artifact v2, template manifest v2, resume manifest v3, ASM inspection v6, and check JSON v3.
 
 Current in-progress slice
 
 * Slice: none
-* Status: H5 is complete and committed. H6 has not started.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H5
-* Remaining in Phase H: H6 through H21.
+* Status: H6 is complete and committed. H7 has not started.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H6
+* Remaining in Phase H: H7 through H21.
 
 Verification
 
 * Phase H entry gate: `just check` pass (workspace formatting, strict workspace clippy, and complete workspace test matrix: 12 Context fixture/freeze, 125 CLI inspection/build, 24 real-browser, 244 core, 3 parser unit, and 26 parser integration tests)
 * cargo test -p ezc_parser: pass (5 unit; 26 integration)
-* cargo test -p ezc_core component_instance_scope --lib: pass (2 focused)
-* cargo test -p ezc_core --lib: pass (265)
+* cargo test -p ezc_core instance_context -- --nocapture: pass (3 focused)
+* cargo test -p ezc_core: pass (268)
+* cargo test -p ezc_cli --bin ezc_cli: pass (1)
+* cargo test -p ezc_cli --test context_fixtures: pass (12)
 * cargo test -p ezc_cli --test explain: pass (125)
 * cargo clippy -p ezc_parser -p ezc_core -p ezc_cli --all-targets -- -D warnings: pass
 * cargo fmt --all --check: pass
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: H6 retains Phase G declaration-level Context facts and adds a parallel `InstanceContextRegistry` derived only from exact `ContextId` relations and canonical H5 self-to-root ancestry. `ProviderInstanceId`, `ConsumerInstanceId`, `ContextSourceInstanceId`, root default sources, and value slots are all instance qualified.
+* Reason: Repeated component definitions can bind to different Provider instances while every later compiler/runtime product consumes an immutable selected source and never discovers Providers by names, parent traversal, DOM state, or runtime typing.
+* Tradeoff: Invalid declarations without canonical Phase G identities remain excluded rather than receiving fabricated identities. Same-scope candidate ordering and ambiguity are represented, but H6 performs no runtime execution, slot binding, public inspection projection, or user-facing H19 diagnostics. Shared ASM validation uses internal `EZASM1194` for a noncanonical retained registry.
 
 * Decision: H5 derives the executable instance scope graph exclusively from H4 `instances`; H4 `blocked` records never enter its nodes, parent map, child map, roots, or traversal queries. Node metadata retains definition, owner root, depth, structural region, and planned/template status.
 * Reason: This graph is the sole future runtime ancestry authority while declaration ownership and Phase G `ComponentScopeGraph` remain unchanged. Independent deterministic validation exposes mutated/corrupt topology without inferring parents from templates, imports, DOM, or runtime traversal.
@@ -808,7 +814,7 @@ Architecture decisions made
 
 Known limitations
 
-* Item: H1-H5 support Slot declarations, static invocations, unbound fragments/outlets, finite instance plans, and validated executable instance ancestry only. Fragment/outlet binding, Context reprojection, IR, runtime artifacts/execution, resumability, inspection, and diagnostics remain H6-H19 work. Phase H entities are intentionally absent from frozen semantic graph v5 and ASM inspection v6 until H18.
+* Item: H1-H6 support Slot declarations, static invocations, unbound fragments/outlets, finite instance plans, validated executable instance ancestry, and instance-aware Context selection only. Fragment/outlet binding, IR, runtime artifacts/execution, resumability, inspection, and diagnostics remain H7-H19 work. Phase H entities are intentionally absent from frozen semantic graph v5 and ASM inspection v6 until H18.
 * Item: Conditional rendering only supports simple `this.<stateField>` conditions with JSX element or fragment branches.
 * Item: Conditional branch snippets are replaced as static HTML. Bindings, events, and nested dynamic behavior inside swapped-in branch snippets are not re-registered yet.
 * Item: Keyed lists currently accept only `iterable.map((item, index?) => <element>...</element>)` with identifier parameters and an expression-bodied callback. Static and runtime reconciliation support a direct primitive item key or a dot-member key such as `item.id` that resolves to a unique primitive.
@@ -846,7 +852,7 @@ Known limitations
 
 Exact next step
 
-Implement H6 instance-aware Context reprojection using H5 ancestry and exact Phase G declaration-level results. Introduce instance-qualified Provider, Consumer, Context source, and value-slot identities; select the nearest visible Provider per instance without modifying any Phase G declaration record or reselecting on later failure.
+Implement H7 Slot binding resolution by joining H3 caller-owned fragments and callee outlets to exact H4/H5 invocation instances. Preserve caller lexical/semantic ownership, represent empty and blocked bindings explicitly, and perform no runtime name lookup or ownership transfer.
 
 Useful commands
 
@@ -877,4 +883,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the H5 commit (`feat(core): build component instance scope graph`).
+* None after the H6 commit (`feat(core): resolve context per component instance`).

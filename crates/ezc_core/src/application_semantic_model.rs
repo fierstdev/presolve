@@ -36,6 +36,7 @@ use crate::context_typing::{
     ContextBindingTypeRecord, ContextTypeRecord, ProviderTypeRecord,
 };
 use crate::expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
+use crate::instance_context::{collect_instance_context_registry, InstanceContextRegistry};
 use crate::intermediate_representation::{
     IrComputedEvaluationPlan, IrReactiveCycleAnalysis, IrReactiveGraph,
     IrReactiveTransitiveAnalysis,
@@ -74,6 +75,7 @@ pub struct ApplicationSemanticModel {
     pub component_invocations: BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
     pub component_instance_plan: ComponentInstancePlan,
     pub component_instance_scope: ComponentInstanceScopeGraph,
+    pub instance_context: InstanceContextRegistry,
     pub slot_content_fragments: BTreeMap<SlotContentFragmentId, SlotContentFragment>,
     pub slot_outlets: BTreeMap<SlotOutletId, SlotOutlet>,
     pub context_declaration_candidates: ContextDeclarationCandidateRegistry,
@@ -526,6 +528,11 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub const fn component_instance_scope_graph(&self) -> &ComponentInstanceScopeGraph {
         &self.component_instance_scope
+    }
+
+    #[must_use]
+    pub const fn instance_context_registry(&self) -> &InstanceContextRegistry {
+        &self.instance_context
     }
 
     #[must_use]
@@ -1037,6 +1044,12 @@ pub fn build_application_semantic_model_from_component_graph(
         None,
     );
     let consumers = collect_consumer_entities(&component_graph.components, &contexts, None);
+    let instance_context = collect_instance_context_registry(
+        &component_instance_scope,
+        &contexts,
+        &providers,
+        &consumers,
+    );
     let context_declaration_candidates = collect_context_declaration_candidates(
         &component_graph.components,
         &contexts,
@@ -1231,6 +1244,7 @@ pub fn build_application_semantic_model_from_component_graph(
         component_invocations,
         component_instance_plan,
         component_instance_scope,
+        instance_context,
         slot_content_fragments: slot_composition.fragments,
         slot_outlets: slot_composition.outlets,
         context_declaration_candidates,
@@ -1345,6 +1359,12 @@ fn build_application_semantic_model_from_files_with_bindings(
     let (providers, duplicate_provider_declarations) =
         collect_provider_entities(&components, &contexts, &expression_graph, bindings);
     let consumers = collect_consumer_entities(&components, &contexts, bindings);
+    let instance_context = collect_instance_context_registry(
+        &component_instance_scope,
+        &contexts,
+        &providers,
+        &consumers,
+    );
     let context_declaration_candidates =
         collect_context_declaration_candidates(&components, &contexts, &providers, &consumers);
     let component_scope = ComponentScopeGraph::reflexive(&components);
@@ -1531,6 +1551,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         component_invocations,
         component_instance_plan,
         component_instance_scope,
+        instance_context,
         slot_content_fragments: slot_composition.fragments,
         slot_outlets: slot_composition.outlets,
         context_declaration_candidates,
