@@ -3,28 +3,29 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: I0 - Forms entry audit
-* Working tree: clean after the I0 forms-entry-audit commit.
+* Latest completed slice: I1 - Canonical Form identities
+* Working tree: clean after the I1 canonical-identity commit.
 * Date: 2026-07-15
 
 Last completed slice
 
-* Slice: I0 - Forms entry audit
-* Summary: I0 verifies the committed H21 freeze, records the unchanged schema baseline, and reserves the next public compiler diagnostic range (`EZC1084`-`EZC1095`) one-for-one for the twelve Phase I diagnostic meanings. The reservation is data only: no form diagnostic is emitted before the canonical I18 projector exists.
-* Key files: crates/ezc_core/src/form_diagnostics.rs, crates/ezc_core/src/lib.rs, notes/progress/AGENT_HANDOFF.md, notes/progress/2026-W28.md
-* Schema decision: I0 changes no schema. The entry baseline remains component runtime artifact v2, resume manifest v4, ASM inspection v8, check JSON v4, template manifest v2 with conditional legacy-v1 output/acceptance, Context runtime artifact v2, semantic graph v5, and internal runtime component registry contract v1.
+* Slice: I1 - Canonical Form identities
+* Summary: I1 introduces distinct immutable `FormId`, `FormInstanceId`, and `FieldId` domains in the canonical semantic-ID authority. Definitions are semantic-owner qualified, Fields are Form-qualified, and Form instances are exact component-instance/Form pairs, so repeated component instances never share Form execution identity.
+* Key files: crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/lib.rs, notes/progress/AGENT_HANDOFF.md, notes/progress/2026-W28.md
+* Schema decision: I1 changes no public or runtime schema and adds no semantic entity, syntax, graph, plan, runtime, inspection, diagnostic, or resume projection.
 
 Current in-progress slice
 
 * Slice: none
-* Status: Phase I has started and is committed through I0.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0
-* Remaining in Phase I: I1 through I20.
+* Status: Phase I is committed through I1.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I1
+* Remaining in Phase I: I2 through I20.
 
 Verification
 
 * I0 entry `just check`: pass (workspace formatting, strict workspace clippy, 292 baseline core, 6 parser unit, 26 parser integration, 1 CLI unit, 7 component fixture/audit, 12 Context fixture/freeze, 126 CLI inspection/build, and 26 real-browser tests)
-* `cargo test -p ezc_core form_diagnostics::tests -- --nocapture`: pass (2)
+* `cargo test -p ezc_core`: pass (295)
+* `cargo test -p ezc_core semantic_id::tests::derives_distinct_form_definition_instance_and_field_identities -- --nocapture`: pass (1)
 * `cargo test -p ezc_cli --test component_fixtures phase_h_freezes_authorities_schemas_and_no_discovery_contract -- --nocapture`: pass (1)
 * `cargo test -p ezc_cli --test component_fixtures -- --nocapture`: pass (7)
 * `cargo clippy -p ezc_core -p ezc_cli --all-targets -- -D warnings`: pass
@@ -32,6 +33,14 @@ Verification
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: I1 defines a Form independently of its executions, a Field under its exact Form, and a Form instance from the exact compiler-owned `ComponentInstanceId` plus `FormId`.
+* Reason: One component definition may execute in multiple component instances; runtime-generated IDs or definition-ID reuse would collapse dirty, touched, validation, submission, serialization, and reset state across those executions.
+* Tradeoff: I1 defines identity composition only. The syntax-owned Form name and the exact set of valid semantic owners remain I2/I3 lowering facts rather than assumptions in the ID layer.
+
+* Decision: I1 consumes existing component-instance identities without constructing or rediscovering component instances. The H21 authority audit remains unchanged and passing.
+* Reason: Phase H freezes `ComponentInstanceId` constructors to component-instance planning; Forms must qualify against that immutable product instead of creating parallel instance topology.
+* Tradeoff: Form instances cannot exist before a canonical component instance exists, and I1 intentionally creates no fallback identity.
 
 * Decision: I0 reserves `EZC1084` through `EZC1095` in one ordered `FORM_DIAGNOSTIC_RESERVATIONS` authority matching the roadmap's twelve diagnostic meanings.
 * Reason: Phase I needs a deterministic range after frozen Phase H without allowing early slices to emit ad hoc diagnostics or duplicate code ownership.
@@ -875,7 +884,7 @@ Architecture decisions made
 
 Known limitations
 
-* Item: Phase I is complete only through I0. Form syntax, entities, fields, bindings, graphs, plans, IR, runtime products, execution, inspection, emitted diagnostics, fixtures, and resumability planning do not exist yet.
+* Item: Phase I is complete only through I1. Canonical Form/instance/Field ID types exist, but form syntax, entities, bindings, graphs, plans, IR, runtime products, execution, inspection, emitted diagnostics, fixtures, and resumability planning do not.
 * Item: Phase H is frozen through H21. Semantic graph v5 intentionally omits Phase H entities, live component restoration remains deferred until Phase J, and every unsupported component behavior in `docs/component-contract.md` requires a later authoritative roadmap slice.
 * Item: Conditional rendering only supports simple `this.<stateField>` conditions with JSX element or fragment branches.
 * Item: Conditional branch snippets are replaced as static HTML. Bindings, events, and nested dynamic behavior inside swapped-in branch snippets are not re-registered yet.
@@ -914,9 +923,8 @@ Known limitations
 
 Exact next step
 
-Begin I1: introduce the canonical `FormId`, `FormInstanceId`, and `FieldId`
-identity domains without lowering form syntax or introducing later validation,
-planning, runtime, inspection, diagnostic, or resumability semantics.
+Begin I2: lower the roadmap's `@form()` syntax into canonical Form products,
+without adding `@field()` lowering or any I4+ binding/graph/planning behavior.
 
 Useful commands
 
@@ -947,4 +955,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the I0 commit (`compiler: audit phase I forms entry`).
+* None after the I1 commit (`compiler: add canonical form identities`).

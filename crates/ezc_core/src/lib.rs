@@ -340,9 +340,9 @@ pub use semantic_graph::{
 };
 pub use semantic_id::{
     ComponentInstanceId, ComponentInvocationId, ComponentRootId, ComponentStructuralRegionId,
-    ConsumerId, ContextDeclarationCandidateId, ContextId, EffectId, EffectStatementId, ProviderId,
-    SemanticId, SemanticOwner, SlotBindingId, SlotContentFragmentId, SlotDeclarationCandidateId,
-    SlotId, SlotOutletId, TemplatePositionId,
+    ConsumerId, ContextDeclarationCandidateId, ContextId, EffectId, EffectStatementId, FieldId,
+    FormId, FormInstanceId, ProviderId, SemanticId, SemanticOwner, SlotBindingId,
+    SlotContentFragmentId, SlotDeclarationCandidateId, SlotId, SlotOutletId, TemplatePositionId,
 };
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};

@@ -48,6 +48,24 @@ pub struct ProviderId(SemanticId);
 #[serde(transparent)]
 pub struct ConsumerId(SemanticId);
 
+/// Stable identity for one compiler-owned Form semantic entity.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct FormId(SemanticId);
+
+/// Stable identity for one compiler-owned Form instance.
+///
+/// A Form definition and each of its component-instance-qualified executions
+/// are distinct identity domains.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct FormInstanceId(SemanticId);
+
+/// Stable identity for one compiler-owned Field owned by a Form.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct FieldId(SemanticId);
+
 /// Stable identity for one compiler-owned component Slot semantic entity.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -210,6 +228,21 @@ impl SemanticId {
     #[must_use]
     pub fn consumer_field(&self, name: &str) -> Self {
         self.child("consumer-field", name)
+    }
+
+    #[must_use]
+    pub fn form(&self, name: &str) -> Self {
+        self.child("form", name)
+    }
+
+    #[must_use]
+    pub fn field(&self, name: &str) -> Self {
+        self.child("field", name)
+    }
+
+    #[must_use]
+    pub fn form_instance(&self, form: &str) -> Self {
+        self.child("form-instance", form)
     }
 
     #[must_use]
@@ -412,6 +445,57 @@ impl ConsumerId {
     #[must_use]
     pub fn for_component(component: &SemanticId, name: &str) -> Self {
         Self(component.consumer(name))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl FormId {
+    #[must_use]
+    pub fn for_owner(owner: &SemanticId, name: &str) -> Self {
+        Self(owner.form(name))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl FormInstanceId {
+    #[must_use]
+    pub fn for_component_instance(instance: &ComponentInstanceId, form: &FormId) -> Self {
+        Self(instance.as_semantic_id().form_instance(form.as_str()))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl FieldId {
+    #[must_use]
+    pub fn for_form(form: &FormId, name: &str) -> Self {
+        Self(form.as_semantic_id().field(name))
     }
 
     #[must_use]
@@ -683,6 +767,24 @@ impl fmt::Display for ConsumerId {
     }
 }
 
+impl fmt::Display for FormId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for FormInstanceId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for FieldId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
 impl fmt::Display for SlotId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(formatter)
@@ -752,8 +854,8 @@ impl fmt::Display for ContextDeclarationCandidateId {
 #[cfg(test)]
 mod tests {
     use super::{
-        ComponentInvocationId, ConsumerId, ContextId, ProviderId, SemanticId, SemanticOwner,
-        SlotId, TemplatePositionId,
+        ComponentInstanceId, ComponentInvocationId, ConsumerId, ContextId, FieldId, FormId,
+        FormInstanceId, ProviderId, SemanticId, SemanticOwner, SlotId, TemplatePositionId,
     };
 
     #[test]
@@ -840,6 +942,42 @@ mod tests {
             component.state_field("count").as_str(),
             "module:src/Counter.tsx/component:x-counter/state:count"
         );
+    }
+
+    #[test]
+    fn derives_distinct_form_definition_instance_and_field_identities() {
+        let component =
+            SemanticId::component_in_module("src/Profile.tsx", Some("x-profile"), "Profile");
+        let component_instance = serde_json::from_str::<ComponentInstanceId>(
+            r#""root:module:src/Profile.tsx/component:x-profile""#,
+        )
+        .expect("canonical component instance id");
+        let form = FormId::for_owner(&component, "profile");
+        let instance = FormInstanceId::for_component_instance(&component_instance, &form);
+        let nested_component_instance = serde_json::from_str::<ComponentInstanceId>(
+            r#""root:module:src/Profile.tsx/component:x-profile/invocation:nested""#,
+        )
+        .expect("canonical nested component instance id");
+        let nested_instance =
+            FormInstanceId::for_component_instance(&nested_component_instance, &form);
+        let field = FieldId::for_form(&form, "email");
+
+        assert_eq!(
+            form.as_str(),
+            "module:src/Profile.tsx/component:x-profile/form:profile"
+        );
+        assert_eq!(
+            field.as_str(),
+            "module:src/Profile.tsx/component:x-profile/form:profile/field:email"
+        );
+        assert_eq!(
+            instance.as_str(),
+            "root:module:src/Profile.tsx/component:x-profile/form-instance:module:src/Profile.tsx/component:x-profile/form:profile"
+        );
+        assert_ne!(form.as_semantic_id(), field.as_semantic_id());
+        assert_ne!(form.as_semantic_id(), instance.as_semantic_id());
+        assert_ne!(field.as_semantic_id(), instance.as_semantic_id());
+        assert_ne!(instance, nested_instance);
     }
 
     #[test]
