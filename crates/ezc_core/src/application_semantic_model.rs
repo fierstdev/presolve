@@ -20,6 +20,7 @@ use crate::component_instance_scope::{
 };
 use crate::component_invocation::{collect_component_invocations, ComponentInvocationEntity};
 use crate::component_ir::{lower_component_ir, ComponentIrReport};
+use crate::component_ir_optimization::{optimize_component_ir, OptimizedComponentIrReport};
 use crate::component_scope::ComponentScopeGraph;
 use crate::composition_typing::{collect_composition_type_products, CompositionTypeProducts};
 use crate::computed_value::{collect_computed_values, ComputedDiagnosticCode, ComputedValue};
@@ -83,6 +84,7 @@ pub struct ApplicationSemanticModel {
     pub component_composition: ComponentCompositionAnalysis,
     pub component_initialization: ComponentInitializationPlan,
     pub component_ir: ComponentIrReport,
+    pub component_ir_optimization: OptimizedComponentIrReport,
     pub instance_context: InstanceContextRegistry,
     pub slot_content_fragments: BTreeMap<SlotContentFragmentId, SlotContentFragment>,
     pub slot_outlets: BTreeMap<SlotOutletId, SlotOutlet>,
@@ -553,6 +555,11 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub const fn component_ir_report(&self) -> &ComponentIrReport {
         &self.component_ir
+    }
+
+    #[must_use]
+    pub const fn optimized_component_ir_report(&self) -> &OptimizedComponentIrReport {
+        &self.component_ir_optimization
     }
 
     #[must_use]
@@ -1342,6 +1349,7 @@ pub fn build_application_semantic_model_from_component_graph(
         component_composition,
         component_initialization,
         component_ir: ComponentIrReport::default(),
+        component_ir_optimization: OptimizedComponentIrReport::default(),
         instance_context,
         slot_content_fragments: slot_composition.fragments,
         slot_outlets: slot_composition.outlets,
@@ -1384,6 +1392,7 @@ pub fn build_application_semantic_model_from_component_graph(
         .diagnostics
         .extend(crate::collect_context_diagnostics(&model));
     model.component_ir = lower_component_ir(&model);
+    model.component_ir_optimization = optimize_component_ir(&model.component_ir);
     model
 }
 
@@ -1695,6 +1704,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         component_composition,
         component_initialization,
         component_ir: ComponentIrReport::default(),
+        component_ir_optimization: OptimizedComponentIrReport::default(),
         instance_context,
         slot_content_fragments: slot_composition.fragments,
         slot_outlets: slot_composition.outlets,
@@ -1737,6 +1747,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         .diagnostics
         .extend(crate::collect_context_diagnostics(&model));
     model.component_ir = lower_component_ir(&model);
+    model.component_ir_optimization = optimize_component_ir(&model.component_ir);
     model
 }
 

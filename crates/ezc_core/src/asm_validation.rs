@@ -97,6 +97,7 @@ pub fn validate_application_semantic_model(
     validate_component_composition(model, &mut diagnostics);
     validate_component_initialization(model, &mut diagnostics);
     validate_component_ir(model, &mut diagnostics);
+    validate_optimized_component_ir(model, &mut diagnostics);
     validate_instance_context(model, &mut diagnostics);
     validate_slot_bindings(model, &mut diagnostics);
     validate_composition_types(model, &mut diagnostics);
@@ -116,6 +117,19 @@ fn validate_component_ir(
         diagnostics.push(AsmValidationDiagnostic {
             code: "EZASM1199".to_string(),
             message: "component IR does not match canonical H10 operations".to_string(),
+        });
+    }
+}
+
+fn validate_optimized_component_ir(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    if !crate::validate_optimized_component_ir(&model.component_ir_optimization).is_empty() {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1200".to_string(),
+            message: "optimized component IR does not match the canonical H12 projection"
+                .to_string(),
         });
     }
 }

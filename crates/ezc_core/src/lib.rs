@@ -16,6 +16,7 @@ pub mod component_instance;
 pub mod component_instance_scope;
 pub mod component_invocation;
 pub mod component_ir;
+pub mod component_ir_optimization;
 pub mod component_scope;
 pub mod composition_typing;
 pub mod computed_value;
@@ -130,6 +131,9 @@ pub use component_invocation::{
 pub use component_ir::{
     lower_component_ir, validate_component_ir, ComponentIrInstruction, ComponentIrOperation,
     ComponentIrReport,
+};
+pub use component_ir_optimization::{
+    optimize_component_ir, validate_optimized_component_ir, OptimizedComponentIrReport,
 };
 pub use component_scope::{ComponentScopeDiagnostic, ComponentScopeGraph};
 pub use composition_typing::{

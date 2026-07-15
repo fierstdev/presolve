@@ -3,30 +3,30 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: H11 - Component initialization IR
-* Working tree: clean after the H11 component-IR commit.
+* Latest completed slice: H12 - Immutable component IR optimization
+* Working tree: clean after the H12 optimization commit.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: H11 - Component initialization IR
-* Summary: H11 lowers H10 batches into canonical typed create, initialize, materialize, and bind instructions. Instance Context slots and caller-owned Slot content retain their exact H6/H7 identities; destruction is represented but unplanned until H16.
-* Key files: crates/ezc_core/src/component_ir.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs
-* Schema decision: no serialized shape changed in H11. Semantic graph remains v5, Context runtime artifact v2, template manifest v2, resume manifest v3, ASM inspection v6, and check JSON v3.
+* Slice: H12 - Immutable component IR optimization
+* Summary: H12 retains the H11 component IR and a separately immutable optimized projection. All current operations are observable roots, so the canonical projection is identity and records no eliminations.
+* Key files: crates/ezc_core/src/component_ir_optimization.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs
+* Schema decision: no serialized shape changed in H12. Semantic graph remains v5, Context runtime artifact v2, template manifest v2, resume manifest v3, ASM inspection v6, and check JSON v3.
 
 Current in-progress slice
 
 * Slice: none
-* Status: H11 is complete and committed. H12 has not started.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H11
-* Remaining in Phase H: H12 through H21.
+* Status: H12 is complete and committed. H13 has not started.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H12
+* Remaining in Phase H: H13 through H21.
 
 Verification
 
 * Phase H entry gate: `just check` pass (workspace formatting, strict workspace clippy, and complete workspace test matrix: 12 Context fixture/freeze, 125 CLI inspection/build, 24 real-browser, 244 core, 3 parser unit, and 26 parser integration tests)
 * cargo test -p ezc_parser: pass (5 unit; 26 integration)
-* cargo test -p ezc_core component_ir::tests -- --nocapture: pass (2 focused)
-* cargo test -p ezc_core: pass (282)
+* cargo test -p ezc_core component_ir_optimization::tests -- --nocapture: pass (2 focused)
+* cargo test -p ezc_core: pass (284)
 * cargo test -p ezc_cli --bin ezc_cli: pass (1)
 * cargo test -p ezc_cli --test explain: pass (125)
 * cargo clippy -p ezc_parser -p ezc_core -p ezc_cli --all-targets -- -D warnings: pass
@@ -34,6 +34,10 @@ Verification
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: H12 has an explicit immutable `OptimizedComponentIrReport`, but preserves the full H11 stream because every current operation is observable and H11 already excludes blocked/static-empty work.
+* Reason: The optimizer boundary is canonical and testable without granting it authority to merge instances/bindings/Context slots, move caller-owned content, or change parent/child operation order.
+* Tradeoff: H12 adds no lowered simplification, runtime behavior, or public schema. Internal `EZASM1200` rejects source/optimized projection drift.
 
 * Decision: H11 lowers immutable H10 instance and Slot batches into a dedicated canonical `ComponentIrReport`. Create, initialize, and materialize operations preserve instance order; Slot binds retain exact caller-owned fragment and callee outlet placement. `DestroyComponentInstance` is a typed reserved operation and is not emitted before H16.
 * Reason: Runtime-facing phases receive compiler-owned operation IDs and instance-qualified Context slots without declaration-slot aliases, parser walks, tag/slot-name lookup, DOM inspection, or generic rerendering.
