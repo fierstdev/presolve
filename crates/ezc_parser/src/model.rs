@@ -7,6 +7,10 @@ pub struct ParsedFile {
     pub path: PathBuf,
     pub classes: Vec<ParsedClass>,
     pub type_aliases: Vec<ParsedTypeAlias>,
+    /// Module-local declarations that bind a name in TypeScript's type
+    /// namespace. The compiler uses this normalized fact to distinguish its
+    /// built-in marker types from authored lookalikes.
+    pub local_type_bindings: Vec<String>,
     pub imports: Vec<ParsedImport>,
     pub exports: Vec<ParsedExport>,
     pub diagnostics: Vec<ParseDiagnostic>,
@@ -75,8 +79,10 @@ pub struct ParsedClassHeritage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedDecorator {
     pub name: String,
+    pub is_invoked: bool,
     pub argument: Option<String>,
     pub argument_count: usize,
+    pub argument_spans: Vec<SourceSpan>,
     pub static_member_argument: Option<ParsedStaticMemberDesignator>,
     pub span: SourceSpan,
 }
@@ -94,6 +100,7 @@ pub struct ParsedStaticMemberDesignator {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedProperty {
     pub name: String,
+    pub is_identifier_name: bool,
     pub decorators: Vec<ParsedDecorator>,
     pub initializer: Option<String>,
     pub initializer_literal: Option<ParsedSerializableValue>,
@@ -106,6 +113,7 @@ pub struct ParsedProperty {
     pub name_span: SourceSpan,
     pub is_static: bool,
     pub is_definite_assignment: bool,
+    pub is_declare: bool,
     pub span: SourceSpan,
 }
 
@@ -254,6 +262,7 @@ pub struct ParsedMethod {
     pub span: SourceSpan,
     pub decorators: Vec<ParsedDecorator>,
     pub is_getter: bool,
+    pub is_setter: bool,
     pub is_async: bool,
     pub jsx_roots: Vec<ParsedJsxNode>,
     pub bindings: Vec<String>,

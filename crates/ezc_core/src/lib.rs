@@ -42,6 +42,7 @@ pub mod effect_inspection;
 pub mod effect_resume;
 pub mod explain;
 pub mod expression_graph;
+pub mod form;
 pub mod form_diagnostics;
 pub mod html_codegen;
 pub mod instance_context;
@@ -113,7 +114,8 @@ pub use component_graph::{
     ContextDeclaration, ContextDeclarationCandidateKind, ContextDeclarationViolation,
     ContextDesignator, DeclaredStateType, DeclaredStateTypeKind, DiagnosticSecondaryLabel,
     EffectBodySyntax, EffectExpression, EffectExpressionKind, EffectStatementSyntax,
-    EffectStatementSyntaxKind, LogicalOperator, MethodCall, MethodLocalVariable, MethodParameter,
+    EffectStatementSyntaxKind, FormDeclarationCandidate, FormDeclarationStatus,
+    FormDeclarationViolation, LogicalOperator, MethodCall, MethodLocalVariable, MethodParameter,
     RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler, RenderFragment,
     RenderList, RenderModel, SerializableValue, SlotDeclaration, SlotDeclarationViolation,
     SlotKind, StateField, StateOperation, UnsupportedEffectStatementKind,
@@ -229,6 +231,7 @@ pub use effect_resume::{
 };
 pub use explain::{explain_json, explain_text};
 pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
+pub use form::{collect_form_entities, FormEntity};
 pub use form_diagnostics::{FormDiagnosticReservation, FORM_DIAGNOSTIC_RESERVATIONS};
 pub use html_codegen::generate_static_html;
 pub use instance_context::{
@@ -341,19 +344,21 @@ pub use semantic_graph::{
 pub use semantic_id::{
     ComponentInstanceId, ComponentInvocationId, ComponentRootId, ComponentStructuralRegionId,
     ConsumerId, ContextDeclarationCandidateId, ContextId, EffectId, EffectStatementId, FieldId,
-    FormId, FormInstanceId, ProviderId, SemanticId, SemanticOwner, SlotBindingId,
-    SlotContentFragmentId, SlotDeclarationCandidateId, SlotId, SlotOutletId, TemplatePositionId,
+    FormDeclarationCandidateId, FormId, FormInstanceId, ProviderId, SemanticId, SemanticOwner,
+    SlotBindingId, SlotContentFragmentId, SlotDeclarationCandidateId, SlotId, SlotOutletId,
+    TemplatePositionId,
 };
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
 pub use semantic_type::{
     boundary_compatibility, dom_binding_contract, is_assignable, is_state_initializer_assignable,
     operator_result_type, semantic_type_text, serialization_compatibility,
-    state_initializer_value_type, BoundaryCompatibility, ComputedValueType, DomBindingContract,
-    DomBindingKind, EffectCompatibility, EffectOperationClassification, EffectStatementTypeRecord,
-    ExecutionBoundary, ObjectType, ResourceExecutionBoundary, ResourceType, SemanticOperator,
-    SemanticType, SemanticTypeAlias, SemanticTypeAssignment, SemanticTypeId, SemanticTypeModel,
-    SemanticTypeStatus, SerializationCompatibility, TypeDiagnosticCode, TypeDiagnosticFamily,
+    state_initializer_value_type, BoundaryCompatibility, BuiltinTypeAuthority, ComputedValueType,
+    DomBindingContract, DomBindingKind, EffectCompatibility, EffectOperationClassification,
+    EffectStatementTypeRecord, ExecutionBoundary, ObjectType, ResourceExecutionBoundary,
+    ResourceType, SemanticOperator, SemanticType, SemanticTypeAlias, SemanticTypeAssignment,
+    SemanticTypeId, SemanticTypeModel, SemanticTypeStatus, SerializationCompatibility,
+    TypeDiagnosticCode, TypeDiagnosticFamily,
 };
 pub use slot::{collect_slot_entities, SlotEntity};
 pub use slot_binding::{
@@ -1410,14 +1415,17 @@ class Counter extends Component {
             imports: Vec::new(),
             exports: Vec::new(),
             type_aliases: Vec::new(),
+            local_type_bindings: Vec::new(),
             classes: vec![ezc_parser::ParsedClass {
                 name: "DuplicateEvent".to_string(),
                 span: test_span(),
                 heritage: None,
                 decorators: vec![ezc_parser::ParsedDecorator {
                     name: "component".to_string(),
+                    is_invoked: true,
                     argument: Some("x-duplicate-event".to_string()),
                     argument_count: 1,
+                    argument_spans: vec![test_span()],
                     static_member_argument: None,
                     span: test_span(),
                 }],
@@ -1427,6 +1435,7 @@ class Counter extends Component {
                     span: test_span(),
                     decorators: Vec::new(),
                     is_getter: false,
+                    is_setter: false,
                     is_async: false,
                     jsx_roots: vec![ezc_parser::ParsedJsxNode::Element(
                         ezc_parser::ParsedJsxElement {

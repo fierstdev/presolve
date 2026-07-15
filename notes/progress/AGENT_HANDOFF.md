@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: I1 - Canonical Form identities
-* Working tree: clean after the I1 canonical-identity commit.
+* Latest completed slice: I2 - Canonical Form declarations
+* Working tree: clean after the I2 canonical-declaration commit.
 * Date: 2026-07-15
 
 Last completed slice
 
-* Slice: I1 - Canonical Form identities
-* Summary: I1 introduces distinct immutable `FormId`, `FormInstanceId`, and `FieldId` domains in the canonical semantic-ID authority. Definitions are semantic-owner qualified, Fields are Form-qualified, and Form instances are exact component-instance/Form pairs, so repeated component instances never share Form execution identity.
-* Key files: crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/lib.rs, notes/progress/AGENT_HANDOFF.md, notes/progress/2026-W28.md
-* Schema decision: I1 changes no public or runtime schema and adds no semantic entity, syntax, graph, plan, runtime, inspection, diagnostic, or resume projection.
+* Slice: I2 - Canonical Form declarations
+* Summary: I2 retains every recognized `@form` declaration as an immutable normalized candidate and lowers only direct, non-static, declaration-only canonical component fields with one zero-argument invocation and the unshadowed compiler-owned `Form` marker into `FormEntity` records. Canonical identity is `<ComponentId>/form:<field-name>`; duplicates retain all candidates and publish no winner.
+* Key files: crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/form.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/semantic_type.rs, crates/ezc_core/src/semantic_id.rs
+* Schema decision: I2 changes internal parser and ASM products only. Forms remain filtered from frozen semantic graph v5 and CLI ASM inspection v8; no runtime, public diagnostic, IR, resume, browser, validation, submission, serialization, reset, or Field product is introduced.
 
 Current in-progress slice
 
-* Slice: I2 - Form syntax (blocked before implementation)
-* Status: Phase I is committed through I1. I2 cannot begin without an authored `@form()` declaration contract.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I1
-* Remaining in Phase I: I2 through I20.
+* Slice: I3 - Field syntax (contract review pending after I2 commit)
+* Status: I2 is implemented and verified. The attached roadmap defines I3 only as "Lower `@field()`" and supplies no declaration, ownership, naming, type, arity, duplicate, or invalid-candidate contract; no I3 semantics have been inferred.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I2
+* Remaining in Phase I: I3 through I20.
 
 Verification
 
@@ -31,8 +31,29 @@ Verification
 * `cargo clippy -p ezc_core -p ezc_cli --all-targets -- -D warnings`: pass
 * `cargo fmt --all --check`: pass
 * git diff --check: pass
+* `cargo test -p ezc_parser -p ezc_core`: pass (8 parser unit, 26 parser integration, 301 core)
+* `cargo test -p ezc_core form::tests -- --nocapture`: pass (6)
+* `cargo test -p ezc_cli --test explain`: pass (126)
+* `cargo test -p ezc_cli --test component_fixtures phase_h_freezes_authorities_schemas_and_no_discovery_contract -- --nocapture`: pass (1)
+* `cargo clippy --workspace --all-targets -- -D warnings`: pass
 
 Architecture decisions made
+
+* Decision: I2 lowers `@form()` only from a directly authored canonical component instance field whose authored identifier supplies the Form name. The field must be declaration-only, non-static, initialized by neither expression nor constructor, and decorated by exactly one invoked zero-argument `@form()`.
+* Reason: The supplied I2 contract freezes declaration ownership, naming, multiplicity, arity, and marker semantics. `FormId` therefore derives only from the direct `ComponentId` plus authored field name, and every valid Form has the client execution boundary without implying a JavaScript `Form` object.
+* Tradeoff: I2 creates no Form instances, Fields, bindings, validation, submission, serialization, reset, tracking, IR, runtime, inspection, public diagnostics, or resume products.
+
+* Decision: Every recognized `@form` occurrence becomes an immutable `FormDeclarationCandidate`; independently true violations are retained in canonical order. Identity-capable invalid fields retain their deterministic `FormId`, while classes, methods, accessors, parameters, unsupported field names, declarations outside canonical components, and inherited non-declarations never receive fabricated Form identity.
+* Reason: Later diagnostics must consume canonical retained facts and provenance without revisiting parser syntax. Duplicate declarations retain all candidates, mark the whole owner/name group invalid, and select no source-order winner.
+* Tradeoff: Invalid candidates remain internal ASM inputs and cannot enter downstream executable Form products.
+
+* Decision: The exact `Form` annotation resolves through a compiler-owned module type authority, not downstream text matching. Module-local type declarations and imports named `Form`, aliases, subclasses, unions, and generic applications remain invalid even when structurally compatible.
+* Reason: `Form` is a nominal compile-time marker; user-authored lookalikes must never acquire canonical Form semantics.
+* Tradeoff: I2 assumes the repository's established global built-in marker model. It does not add an importable runtime `Form` constructor or value.
+
+* Decision: `FormEntity` participates in internal canonical ASM identity, ownership, provenance, and semantic typing, while frozen semantic graph v5 and CLI ASM inspection v8 explicitly filter it.
+* Reason: I2 needs a first-class compiler-owned product, but the contract forbids unrelated public schema changes and runtime behavior.
+* Tradeoff: A later roadmap-owned inspection/schema slice must version any public Form projection deliberately.
 
 * Decision: Stop before I2 rather than assign `@form()` to a class, property, or method or choose a Form name source.
 * Reason: The authoritative roadmap says only "Lower `@form()`". The existing parser retains decorators on all three declaration kinds, while frozen A-H products provide no Form-specific ownership rule. A canonical `FormId` requires both an owner and name, so any lowering choice would add language semantics not present in the roadmap.
@@ -888,8 +909,8 @@ Architecture decisions made
 
 Known limitations
 
-* Item: I2 is blocked because the roadmap does not define the valid declaration target or canonical naming/ownership rule for `@form()`. Parser support for decorators on multiple declaration kinds cannot select semantics on the compiler's behalf.
-* Item: Phase I is complete only through I1. Canonical Form/instance/Field ID types exist, but form syntax, entities, bindings, graphs, plans, IR, runtime products, execution, inspection, emitted diagnostics, fixtures, and resumability planning do not.
+* Item: Phase I is complete through I2. Canonical Form declarations and invalid-candidate facts exist, but `@field()` semantics, bindings, form ownership graphs beyond direct Form ownership, plans, IR, runtime products, execution, inspection, emitted diagnostics, fixtures, and resumability planning do not.
+* Item: I3 cannot be implemented from the attached one-line "Lower `@field()`" roadmap entry without inventing the Field declaration target, owning Form reference, name/type/value contract, decorator arity, duplicate policy, and invalid-candidate identity/retention rules.
 * Item: Phase H is frozen through H21. Semantic graph v5 intentionally omits Phase H entities, live component restoration remains deferred until Phase J, and every unsupported component behavior in `docs/component-contract.md` requires a later authoritative roadmap slice.
 * Item: Conditional rendering only supports simple `this.<stateField>` conditions with JSX element or fragment branches.
 * Item: Conditional branch snippets are replaced as static HTML. Bindings, events, and nested dynamic behavior inside swapped-in branch snippets are not re-registered yet.
@@ -928,11 +949,12 @@ Known limitations
 
 Exact next step
 
-Obtain an amended authoritative Phase I contract for I2 that states whether
-`@form()` decorates a class, property, or method; how the canonical Form name is
-derived; whether one component can own multiple Forms; the decorator's argument
-and arity rules; and which invalid candidates must be retained for I18. Then
-implement I2 without entering I3.
+Commit the completed I2 slice, verify the worktree is clean, then obtain an
+authoritative I3 `@field()` contract. At minimum it must freeze the valid
+declaration target, exact owning-Form reference, Field name and type/value
+sources, decorator invocation/arity, multiplicity and duplicate policy, and
+invalid-candidate identity/retention rules. Do not infer these semantics from
+templates, HTML controls, validation, submission, runtime behavior, or I2.
 
 Useful commands
 
@@ -963,4 +985,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the blocker documentation commit (`docs(forms): record I2 syntax contract blocker`).
+* None after the I2 slice commit (`compiler: lower canonical form declarations`).

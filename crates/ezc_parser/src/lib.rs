@@ -95,6 +95,97 @@ class Card extends Component {
     }
 
     #[test]
+    fn retains_normalized_form_declaration_targets_and_invocation_facts() {
+        let source = r#"
+@form()
+class NotAFormField {}
+
+@component("x-profile")
+class Profile extends Component {
+  @form()
+  profile!: Form;
+
+  @form()
+  declare settings: Form;
+
+  @form
+  bare!: Form;
+
+  @form("named")
+  named!: Form;
+
+  @form()
+  @state
+  conflicting!: Form;
+
+  @form()
+  get current(): Form { return this.profile; }
+
+  @form()
+  set current(value: Form) {}
+
+  parameter(@form() value: Form) {}
+}
+"#;
+        let parsed = parse_file("src/Profile.tsx", source);
+
+        assert!(parsed.diagnostics.is_empty(), "{:#?}", parsed.diagnostics);
+        assert!(parsed.classes[0].decorators[0].is_invoked);
+        let profile = &parsed.classes[1];
+        assert!(profile.properties[0].is_identifier_name);
+        assert!(profile.properties[0].is_definite_assignment);
+        assert!(!profile.properties[0].is_declare);
+        assert!(profile.properties[1].is_declare);
+        assert!(!profile.properties[2].decorators[0].is_invoked);
+        assert_eq!(profile.properties[2].decorators[0].argument_count, 0);
+        assert!(profile.properties[3].decorators[0].is_invoked);
+        assert_eq!(profile.properties[3].decorators[0].argument_count, 1);
+        assert_eq!(profile.properties[3].decorators[0].argument_spans.len(), 1);
+        let named_argument = profile.properties[3].decorators[0].argument_spans[0];
+        assert_eq!(
+            &source[named_argument.start..named_argument.end],
+            "\"named\""
+        );
+        assert_eq!(profile.properties[4].decorators.len(), 2);
+        assert_eq!(profile.properties[4].decorators[1].name, "state");
+        assert!(!profile.properties[4].decorators[1].is_invoked);
+        assert!(profile.methods[0].is_getter);
+        assert!(!profile.methods[0].is_setter);
+        assert!(profile.methods[1].is_setter);
+        assert_eq!(profile.methods[2].parameters[0].decorators[0].name, "form");
+        assert_eq!(
+            profile.properties[0].span.start,
+            source.find("@form()\n  profile").unwrap()
+        );
+        assert!(parsed.local_type_bindings.contains(&"Profile".to_string()));
+    }
+
+    #[test]
+    fn retains_module_local_type_namespace_bindings() {
+        let parsed = parse_file(
+            "src/types.ts",
+            r#"
+class ClassType {}
+type AliasType = string;
+interface InterfaceType {}
+enum EnumType { Value }
+import ImportEqualsType = require("./type");
+"#,
+        );
+
+        assert_eq!(
+            parsed.local_type_bindings,
+            [
+                "AliasType",
+                "ClassType",
+                "EnumType",
+                "ImportEqualsType",
+                "InterfaceType",
+            ]
+        );
+    }
+
+    #[test]
     fn retains_canonical_component_tag_names_and_exact_name_spans() {
         let source = r#"
 @component("x-page")

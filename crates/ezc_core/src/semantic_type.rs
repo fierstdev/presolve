@@ -12,7 +12,7 @@ use crate::{
 use crate::{
     SemanticReference, SemanticReferenceKind, TemplateSemanticEntity, TemplateSemanticKind,
 };
-use ezc_parser::ParsedTypeAlias;
+use ezc_parser::{ParsedFile, ParsedTypeAlias};
 
 /// A compiler-owned operator category used by semantic expression typing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,6 +71,8 @@ pub enum SemanticType {
     Boolean,
     Number,
     String,
+    /// Nominal compile-time marker accepted only by canonical Form declarations.
+    Form,
     /// Nominal built-in type accepted only by canonical Slot declarations.
     SlotContent,
     BooleanLiteral(bool),
@@ -93,6 +95,7 @@ pub fn semantic_type_text(semantic_type: &SemanticType) -> String {
         SemanticType::Boolean => "boolean".to_string(),
         SemanticType::Number => "number".to_string(),
         SemanticType::String => "string".to_string(),
+        SemanticType::Form => "Form".to_string(),
         SemanticType::SlotContent => "SlotContent".to_string(),
         SemanticType::BooleanLiteral(value) => value.to_string(),
         SemanticType::NumberLiteral(value) => value.clone(),
@@ -128,6 +131,41 @@ pub fn semantic_type_text(semantic_type: &SemanticType) -> String {
             semantic_type_text(&resource.data),
             semantic_type_text(&resource.error)
         ),
+    }
+}
+
+/// Module-scoped authority for compiler-owned built-in marker types.
+///
+/// The parser supplies binding facts; this authority decides whether an exact
+/// authored marker spelling resolves to the compiler built-in rather than a
+/// module-local declaration or import. Downstream stages consume the resulting
+/// canonical entity and never repeat source-text recognition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BuiltinTypeAuthority {
+    form_marker_is_unshadowed: bool,
+}
+
+impl BuiltinTypeAuthority {
+    #[must_use]
+    pub fn for_file(parsed: &ParsedFile) -> Self {
+        let has_local_binding = parsed
+            .local_type_bindings
+            .iter()
+            .any(|binding| binding == "Form");
+        let has_import_binding = parsed.imports.iter().any(|import| {
+            import
+                .specifiers
+                .iter()
+                .any(|specifier| specifier.local == "Form")
+        });
+        Self {
+            form_marker_is_unshadowed: !has_local_binding && !has_import_binding,
+        }
+    }
+
+    #[must_use]
+    pub fn recognizes_form_marker(self, type_text: &str) -> bool {
+        self.form_marker_is_unshadowed && type_text == "Form"
     }
 }
 
@@ -250,7 +288,10 @@ fn semantic_type_sort_key(semantic_type: &SemanticType) -> String {
 #[must_use]
 pub fn serialization_compatibility(semantic_type: &SemanticType) -> SerializationCompatibility {
     let serializable = match semantic_type {
-        SemanticType::Unknown | SemanticType::Never | SemanticType::SlotContent => false,
+        SemanticType::Unknown
+        | SemanticType::Never
+        | SemanticType::Form
+        | SemanticType::SlotContent => false,
         SemanticType::Null
         | SemanticType::Boolean
         | SemanticType::Number
@@ -709,6 +750,28 @@ impl SemanticTypeModel {
                     origin: subject,
                     status: SemanticTypeStatus::Declared,
                     provenance: slot.provenance.clone(),
+                },
+            );
+        }
+        self
+    }
+
+    /// Attaches the exact nominal I2 `Form` marker to canonical Form entities.
+    /// Aliases, unions, generics, and structural compatibility never enter
+    /// this authority because invalid declaration candidates do not lower.
+    #[must_use]
+    pub fn with_form_types(mut self, forms: &BTreeMap<crate::FormId, crate::FormEntity>) -> Self {
+        for form in forms.values() {
+            let subject = form.id.as_semantic_id().clone();
+            self.assignments.insert(
+                subject.clone(),
+                SemanticTypeAssignment {
+                    id: SemanticTypeId::for_subject(&subject),
+                    subject: subject.clone(),
+                    semantic_type: SemanticType::Form,
+                    origin: subject,
+                    status: SemanticTypeStatus::Declared,
+                    provenance: form.provenance.clone(),
                 },
             );
         }
@@ -2605,6 +2668,7 @@ pub fn is_assignable(source: &SemanticType, target: &SemanticType) -> bool {
         | (SemanticType::Boolean | SemanticType::BooleanLiteral(_), SemanticType::Boolean)
         | (SemanticType::Number | SemanticType::NumberLiteral(_), SemanticType::Number)
         | (SemanticType::String | SemanticType::StringLiteral(_), SemanticType::String)
+        | (SemanticType::Form, SemanticType::Form)
         | (SemanticType::SlotContent, SemanticType::SlotContent) => true,
         (SemanticType::BooleanLiteral(source), SemanticType::BooleanLiteral(target)) => {
             source == target

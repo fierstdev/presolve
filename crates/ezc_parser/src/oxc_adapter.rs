@@ -38,7 +38,13 @@ pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
     let allocator = Allocator::default();
     let ret = Parser::new(&allocator, source, source_type).parse();
 
-    let (classes, type_aliases, imports, exports) = parse_program(&ret.program, source);
+    let ParsedProgramFacts {
+        classes,
+        type_aliases,
+        local_type_bindings,
+        imports,
+        exports,
+    } = parse_program(&ret.program, source);
     let diagnostics = ret
         .errors
         .iter()
@@ -49,23 +55,25 @@ pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
         path: PathBuf::from(path),
         classes,
         type_aliases,
+        local_type_bindings,
         imports,
         exports,
         diagnostics,
     }
 }
 
-fn parse_program(
-    program: &Program<'_>,
-    source: &str,
-) -> (
-    Vec<ParsedClass>,
-    Vec<ParsedTypeAlias>,
-    Vec<ParsedImport>,
-    Vec<ParsedExport>,
-) {
+struct ParsedProgramFacts {
+    classes: Vec<ParsedClass>,
+    type_aliases: Vec<ParsedTypeAlias>,
+    local_type_bindings: Vec<String>,
+    imports: Vec<ParsedImport>,
+    exports: Vec<ParsedExport>,
+}
+
+fn parse_program(program: &Program<'_>, source: &str) -> ParsedProgramFacts {
     let mut classes = Vec::new();
     let mut type_aliases = Vec::new();
+    let mut local_type_bindings = Vec::new();
     let mut imports = Vec::new();
     let mut exports = Vec::new();
 
@@ -78,6 +86,7 @@ fn parse_program(
             Statement::ExportNamedDeclaration(declaration) => {
                 exports.push(parse_named_export_declaration(declaration, source));
                 if let Some(declaration) = &declaration.declaration {
+                    retain_local_type_binding(declaration, &mut local_type_bindings);
                     if let Some(class) = parse_declaration(declaration, source) {
                         classes.push(class);
                     }
@@ -93,6 +102,7 @@ fn parse_program(
                     &declaration.declaration
                 {
                     if let Some(class) = parse_class(class, source) {
+                        local_type_bindings.push(class.name.clone());
                         classes.push(class);
                     }
                 }
@@ -120,6 +130,7 @@ fn parse_program(
         }
 
         if let Some(declaration) = statement.as_declaration() {
+            retain_local_type_binding(declaration, &mut local_type_bindings);
             if let Some(class) = parse_declaration(declaration, source) {
                 classes.push(class);
             }
@@ -129,7 +140,31 @@ fn parse_program(
         }
     }
 
-    (classes, type_aliases, imports, exports)
+    local_type_bindings.sort();
+    local_type_bindings.dedup();
+    ParsedProgramFacts {
+        classes,
+        type_aliases,
+        local_type_bindings,
+        imports,
+        exports,
+    }
+}
+
+fn retain_local_type_binding(declaration: &Declaration<'_>, bindings: &mut Vec<String>) {
+    let name = match declaration {
+        Declaration::ClassDeclaration(class) => class.id.as_ref().map(|id| id.name.as_str()),
+        Declaration::TSTypeAliasDeclaration(alias) => Some(alias.id.name.as_str()),
+        Declaration::TSInterfaceDeclaration(interface) => Some(interface.id.name.as_str()),
+        Declaration::TSEnumDeclaration(r#enum) => Some(r#enum.id.name.as_str()),
+        Declaration::TSImportEqualsDeclaration(import) => Some(import.id.name.as_str()),
+        Declaration::VariableDeclaration(_)
+        | Declaration::FunctionDeclaration(_)
+        | Declaration::TSModuleDeclaration(_) => None,
+    };
+    if let Some(name) = name {
+        bindings.push(name.to_string());
+    }
 }
 
 fn parse_type_alias_declaration(
@@ -302,11 +337,13 @@ fn parse_class(class: &oxc_ast::ast::Class<'_>, source: &str) -> Option<ParsedCl
         .map(|id| id.name.to_string())
         .unwrap_or_else(|| "<anonymous>".to_string());
 
-    let decorators = class
-        .decorators
-        .iter()
-        .filter_map(|decorator| parse_decorator(decorator, source))
-        .collect::<Vec<_>>();
+    let decorators = normalized_decorators(
+        class
+            .decorators
+            .iter()
+            .filter_map(|decorator| parse_decorator(decorator, source))
+            .collect::<Vec<_>>(),
+    );
 
     let mut properties = Vec::new();
     let mut methods = Vec::new();
@@ -351,27 +388,46 @@ fn parse_decorator(
     decorator: &oxc_ast::ast::Decorator<'_>,
     source: &str,
 ) -> Option<ParsedDecorator> {
-    let Expression::CallExpression(call) = &decorator.expression else {
-        return None;
-    };
+    match &decorator.expression {
+        Expression::CallExpression(call) => {
+            let Expression::Identifier(callee) = &call.callee else {
+                return None;
+            };
+            Some(ParsedDecorator {
+                name: callee.name.to_string(),
+                is_invoked: true,
+                argument: call.arguments.first().and_then(argument_string_value),
+                argument_count: call.arguments.len(),
+                argument_spans: call
+                    .arguments
+                    .iter()
+                    .map(|argument| source_span(source, argument.span()))
+                    .collect(),
+                static_member_argument: call
+                    .arguments
+                    .first()
+                    .and_then(|argument| parsed_static_member_designator(argument, source)),
+                span: source_span(source, decorator.span),
+            })
+        }
+        Expression::Identifier(identifier) => Some(ParsedDecorator {
+            name: identifier.name.to_string(),
+            is_invoked: false,
+            argument: None,
+            argument_count: 0,
+            argument_spans: Vec::new(),
+            static_member_argument: None,
+            span: source_span(source, decorator.span),
+        }),
+        _ => None,
+    }
+}
 
-    let Expression::Identifier(callee) = &call.callee else {
-        return None;
-    };
-
-    let argument = call.arguments.first().and_then(argument_string_value);
-    let static_member_argument = call
-        .arguments
-        .first()
-        .and_then(|argument| parsed_static_member_designator(argument, source));
-
-    Some(ParsedDecorator {
-        name: callee.name.to_string(),
-        argument,
-        argument_count: call.arguments.len(),
-        static_member_argument,
-        span: source_span(source, decorator.span),
-    })
+fn normalized_decorators(mut decorators: Vec<ParsedDecorator>) -> Vec<ParsedDecorator> {
+    if !decorators.iter().any(|decorator| decorator.name == "form") {
+        decorators.retain(|decorator| decorator.is_invoked);
+    }
+    decorators
 }
 
 fn parsed_static_member_designator(
@@ -404,13 +460,24 @@ fn parse_property(
     property: &oxc_ast::ast::PropertyDefinition<'_>,
     source: &str,
 ) -> Option<ParsedProperty> {
-    let name = property_key_name(&property.key)?;
-
-    let decorators = property
-        .decorators
-        .iter()
-        .filter_map(|decorator| parse_decorator(decorator, source))
-        .collect::<Vec<_>>();
+    let decorators = normalized_decorators(
+        property
+            .decorators
+            .iter()
+            .filter_map(|decorator| parse_decorator(decorator, source))
+            .collect::<Vec<_>>(),
+    );
+    let (name, is_identifier_name) = match &property.key {
+        PropertyKey::StaticIdentifier(identifier) => (identifier.name.to_string(), true),
+        key => match property_key_name(key) {
+            Some(name) => (name, false),
+            None if decorators.iter().any(|decorator| decorator.name == "form") => (
+                format!("<unsupported:{}>", property.key.span().start),
+                false,
+            ),
+            None => return None,
+        },
+    };
 
     let initializer = property.value.as_ref().and_then(expression_summary);
     let initializer_literal = property.value.as_ref().and_then(parsed_serializable_value);
@@ -443,6 +510,7 @@ fn parse_property(
 
     Some(ParsedProperty {
         name,
+        is_identifier_name,
         decorators,
         initializer,
         initializer_literal,
@@ -455,6 +523,7 @@ fn parse_property(
         name_span: source_span(source, property.key.span()),
         is_static: property.r#static,
         is_definite_assignment: property.definite,
+        is_declare: property.declare,
         span: source_span_from_offsets(source, declaration_start, property.span.end as usize),
     })
 }
@@ -472,11 +541,13 @@ fn parsed_type_annotation(span: Span, source: &str) -> ParsedTypeAnnotation {
 
 fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Option<ParsedMethod> {
     let name = property_key_name(&method.key)?;
-    let decorators = method
-        .decorators
-        .iter()
-        .filter_map(|decorator| parse_decorator(decorator, source))
-        .collect::<Vec<_>>();
+    let decorators = normalized_decorators(
+        method
+            .decorators
+            .iter()
+            .filter_map(|decorator| parse_decorator(decorator, source))
+            .collect::<Vec<_>>(),
+    );
 
     let mut jsx_roots = Vec::new();
     let mut bindings = Vec::new();
@@ -492,11 +563,13 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
         .filter_map(|parameter| {
             Some(ParsedMethodParameter {
                 name: binding_identifier_name(&parameter.pattern.kind)?,
-                decorators: parameter
-                    .decorators
-                    .iter()
-                    .filter_map(|decorator| parse_decorator(decorator, source))
-                    .collect(),
+                decorators: normalized_decorators(
+                    parameter
+                        .decorators
+                        .iter()
+                        .filter_map(|decorator| parse_decorator(decorator, source))
+                        .collect(),
+                ),
                 span: source_span(source, parameter.span),
                 type_annotation: parameter
                     .pattern
@@ -550,6 +623,7 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
         span: source_span(source, method.span),
         decorators,
         is_getter: method.kind == oxc_ast::ast::MethodDefinitionKind::Get,
+        is_setter: method.kind == oxc_ast::ast::MethodDefinitionKind::Set,
         is_async: method.value.r#async,
         jsx_roots,
         bindings,

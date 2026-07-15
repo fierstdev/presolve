@@ -843,7 +843,8 @@ fn is_phase_g_inspection_entity(asm: &ApplicationSemanticModel, id: &SemanticId)
     !matches!(
         asm.entity(id),
         Some(
-            SemanticEntity::Slot(_)
+            SemanticEntity::Form(_)
+                | SemanticEntity::Slot(_)
                 | SemanticEntity::ComponentInvocation(_)
                 | SemanticEntity::ComponentInstance(_)
                 | SemanticEntity::BlockedComponentInstance(_)
@@ -1179,6 +1180,7 @@ fn semantic_entity_kind(entity: SemanticEntity<'_>) -> &'static str {
         SemanticEntity::Context(_) => "context",
         SemanticEntity::Provider(_) => "provider",
         SemanticEntity::Consumer(_) => "consumer",
+        SemanticEntity::Form(_) => "form",
         SemanticEntity::Slot(_) => "slot",
         SemanticEntity::ComponentInvocation(_) => "component-invocation",
         SemanticEntity::ComponentInstance(_) => "component-instance",

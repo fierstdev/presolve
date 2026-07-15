@@ -61,6 +61,14 @@ pub struct FormId(SemanticId);
 #[serde(transparent)]
 pub struct FormInstanceId(SemanticId);
 
+/// Source-qualified identity for one recognized `@form` declaration candidate.
+///
+/// Candidate identity remains available even when no canonical Form identity
+/// can be constructed from the authored target.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct FormDeclarationCandidateId(SemanticId);
+
 /// Stable identity for one compiler-owned Field owned by a Form.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -233,6 +241,22 @@ impl SemanticId {
     #[must_use]
     pub fn form(&self, name: &str) -> Self {
         self.child("form", name)
+    }
+
+    #[must_use]
+    pub fn form_field(&self, name: &str) -> Self {
+        self.child("form-field", name)
+    }
+
+    #[must_use]
+    pub fn form_declaration_candidate_in_module(
+        module_path: impl AsRef<Path>,
+        position: usize,
+    ) -> Self {
+        Self(format!(
+            "module:{}/form-declaration:{position}",
+            normalized_module_path(module_path.as_ref())
+        ))
     }
 
     #[must_use]
@@ -479,6 +503,26 @@ impl FormInstanceId {
     #[must_use]
     pub fn for_component_instance(instance: &ComponentInstanceId, form: &FormId) -> Self {
         Self(instance.as_semantic_id().form_instance(form.as_str()))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl FormDeclarationCandidateId {
+    #[must_use]
+    pub fn for_source_position(module_path: impl AsRef<Path>, position: usize) -> Self {
+        Self(SemanticId::form_declaration_candidate_in_module(
+            module_path,
+            position,
+        ))
     }
 
     #[must_use]
@@ -774,6 +818,12 @@ impl fmt::Display for FormId {
 }
 
 impl fmt::Display for FormInstanceId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for FormDeclarationCandidateId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(formatter)
     }

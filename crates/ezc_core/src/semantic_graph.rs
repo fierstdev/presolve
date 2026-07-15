@@ -138,7 +138,8 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
             !matches!(
                 asm.entity(id),
                 Some(
-                    SemanticEntity::Slot(_)
+                    SemanticEntity::Form(_)
+                        | SemanticEntity::Slot(_)
                         | SemanticEntity::ComponentInvocation(_)
                         | SemanticEntity::ComponentInstance(_)
                         | SemanticEntity::BlockedComponentInstance(_)
@@ -172,7 +173,8 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
             !matches!(
                 asm.entity(id),
                 Some(
-                    SemanticEntity::Slot(_)
+                    SemanticEntity::Form(_)
+                        | SemanticEntity::Slot(_)
                         | SemanticEntity::ComponentInvocation(_)
                         | SemanticEntity::ComponentInstance(_)
                         | SemanticEntity::BlockedComponentInstance(_)
@@ -190,7 +192,8 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
             if matches!(
                 asm.entity(target),
                 Some(
-                    SemanticEntity::Slot(_)
+                    SemanticEntity::Form(_)
+                        | SemanticEntity::Slot(_)
                         | SemanticEntity::ComponentInvocation(_)
                         | SemanticEntity::ComponentInstance(_)
                         | SemanticEntity::BlockedComponentInstance(_)
@@ -286,6 +289,9 @@ fn semantic_graph_node_kind(entity: SemanticEntity<'_>) -> SemanticGraphNodeKind
         SemanticEntity::Context(_) => SemanticGraphNodeKind::Context,
         SemanticEntity::Provider(_) => SemanticGraphNodeKind::Provider,
         SemanticEntity::Consumer(_) => SemanticGraphNodeKind::Consumer,
+        SemanticEntity::Form(_) => {
+            unreachable!("Forms are not projected into frozen semantic graph schema v5")
+        }
         SemanticEntity::Slot(_) => {
             unreachable!("Slots are not projected into frozen semantic graph schema v5")
         }
