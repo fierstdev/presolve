@@ -204,7 +204,7 @@ fn asm_command_emits_deterministic_json_inspection() {
 
     let document: serde_json::Value =
         serde_json::from_slice(&first.stdout).expect("ASM inspection output was not valid JSON");
-    assert_eq!(document["schema_version"], 6);
+    assert_eq!(document["schema_version"], 7);
     assert_eq!(
         document["file"],
         "fixtures/0001-source-summary/input/Counter.tsx"
@@ -355,7 +355,7 @@ fn asm_command_inspects_one_semantic_entity() {
 
     assert!(output.status.success());
     let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("entity JSON");
-    assert_eq!(document["schema_version"], 6);
+    assert_eq!(document["schema_version"], 7);
     assert_eq!(document["entity"]["id"], entity_id);
     assert_eq!(document["entity"]["kind"], "state-field");
     assert_eq!(document["entity"]["semantic_type"]["type_text"], "number");
@@ -442,7 +442,7 @@ fn asm_and_explain_inspect_canonical_computed_metadata() {
 
     let document: serde_json::Value =
         serde_json::from_slice(&asm.stdout).expect("computed entity inspection JSON");
-    assert_eq!(document["schema_version"], 6);
+    assert_eq!(document["schema_version"], 7);
     assert_eq!(document["entity"]["computed"]["computed_type"], "number");
     assert_eq!(
         document["entity"]["computed"]["dependencies"],
@@ -519,7 +519,7 @@ fn asm_and_explain_project_one_canonical_effect_inspection_record() {
 
     let selected: serde_json::Value = serde_json::from_slice(&asm.stdout).expect("effect JSON");
     let inspection = &selected["entity"]["effect"];
-    assert_eq!(selected["schema_version"], 6);
+    assert_eq!(selected["schema_version"], 7);
     assert_eq!(inspection["validation"]["status"], "valid");
     assert_eq!(
         inspection["direct_dependencies"]["state"],
@@ -1628,7 +1628,7 @@ fn effect_diagnostics_share_check_and_selected_explain_projection() {
     assert!(explain.status.success());
     let explain: serde_json::Value =
         serde_json::from_slice(&explain.stdout).expect("selected effect explain JSON");
-    assert_eq!(explain["schema_version"], 6);
+    assert_eq!(explain["schema_version"], 7);
     assert_eq!(explain["diagnostics"], serde_json::Value::Array(expected));
 }
 
@@ -1687,14 +1687,14 @@ fn context_diagnostics_share_check_full_asm_selected_asm_and_explain_projection(
     let full_asm_output = run(&["asm", path, "--format", "json"]);
     assert!(full_asm_output.status.success());
     let full_asm = parse(&full_asm_output);
-    assert_eq!(full_asm["schema_version"], 6);
+    assert_eq!(full_asm["schema_version"], 7);
     assert_eq!(normalize(&full_asm["diagnostics"]), expected);
 
     for command in ["asm", "explain"] {
         let output = run(&[command, "--entity", context_id, path, "--format", "json"]);
         assert!(output.status.success());
         let selected = parse(&output);
-        assert_eq!(selected["schema_version"], 6);
+        assert_eq!(selected["schema_version"], 7);
         assert_eq!(normalize(&selected["diagnostics"]), expected);
     }
 }

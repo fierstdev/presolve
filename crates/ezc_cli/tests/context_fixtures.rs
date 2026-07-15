@@ -273,7 +273,7 @@ fn context_compiler_fixture_covers_resume_and_candidate_exclusion() {
     let total_provider = ProviderId::for_component(component, "providedTotal");
     let resume = build_resume_plan(&model);
     let manifest = build_resume_manifest(&resume);
-    assert_eq!(manifest.schema_version, 3);
+    assert_eq!(manifest.schema_version, 4);
     assert_eq!(manifest.context_slots.len(), 3);
     assert!(manifest
         .context_slots
@@ -718,7 +718,7 @@ fn phase_g_freezes_schema_versions_runtime_order_and_no_discovery_contract() {
     assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 5);
     assert_eq!(RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, 2);
     assert_eq!(TEMPLATE_MANIFEST_SCHEMA_VERSION, 2);
-    assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 3);
+    assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 4);
 
     let path = "fixtures/0059-context-runtime-matrix/input/ContextRuntimeMatrix.tsx";
     let model = fixture_model(path);
@@ -734,13 +734,13 @@ fn phase_g_freezes_schema_versions_runtime_order_and_no_discovery_contract() {
         2
     );
     let resume = build_resume_manifest(&build_resume_plan(&model));
-    assert_eq!(resume.schema_version, 3);
+    assert_eq!(resume.schema_version, 4);
     assert!(validate_resume_manifest(&resume).is_empty());
     assert_eq!(build_template_manifest_from_asm(&model).schema_version, 2);
 
     for (args, expected) in [
         (vec!["check", path, "--format", "json"], 3),
-        (vec!["asm", path, "--format", "json"], 6),
+        (vec!["asm", path, "--format", "json"], 7),
     ] {
         let output = run_cli(&args);
         assert!(output.status.success());
