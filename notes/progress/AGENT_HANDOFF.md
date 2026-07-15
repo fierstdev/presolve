@@ -3,30 +3,30 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: H12 - Immutable component IR optimization
-* Working tree: clean after the H12 optimization commit.
+* Latest completed slice: H13 - Runtime component registry
+* Working tree: clean after the H13 registry commit.
 * Date: 2026-07-14
 
 Last completed slice
 
-* Slice: H12 - Immutable component IR optimization
-* Summary: H12 retains the H11 component IR and a separately immutable optimized projection. All current operations are observable roots, so the canonical projection is identity and records no eliminations.
-* Key files: crates/ezc_core/src/component_ir_optimization.rs; crates/ezc_core/src/application_semantic_model.rs; crates/ezc_core/src/asm_validation.rs
-* Schema decision: no serialized shape changed in H12. Semantic graph remains v5, Context runtime artifact v2, template manifest v2, resume manifest v3, ASM inspection v6, and check JSON v3.
+* Slice: H13 - Runtime component registry
+* Summary: H13 projects H10/H12 into versioned internal runtime metadata for definitions, planned instances, Slot bindings, compatible instance Context bindings, and initialization batches. It grants no runtime discovery authority.
+* Key files: crates/ezc_core/src/runtime_component.rs; crates/ezc_core/src/lib.rs
+* Schema decision: the internal registry contract is v1; no public serialized shape changes. Semantic graph remains v5, Context runtime artifact v2, template manifest v2, resume manifest v3, ASM inspection v6, and check JSON v3.
 
 Current in-progress slice
 
 * Slice: none
-* Status: H12 is complete and committed. H13 has not started.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H12
-* Remaining in Phase H: H13 through H21.
+* Status: H13 is complete and committed. H14 has not started.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H13
+* Remaining in Phase H: H14 through H21.
 
 Verification
 
 * Phase H entry gate: `just check` pass (workspace formatting, strict workspace clippy, and complete workspace test matrix: 12 Context fixture/freeze, 125 CLI inspection/build, 24 real-browser, 244 core, 3 parser unit, and 26 parser integration tests)
 * cargo test -p ezc_parser: pass (5 unit; 26 integration)
-* cargo test -p ezc_core component_ir_optimization::tests -- --nocapture: pass (2 focused)
-* cargo test -p ezc_core: pass (284)
+* cargo test -p ezc_core runtime_component::tests -- --nocapture: pass (1 focused)
+* cargo test -p ezc_core: pass (285)
 * cargo test -p ezc_cli --bin ezc_cli: pass (1)
 * cargo test -p ezc_cli --test explain: pass (125)
 * cargo clippy -p ezc_parser -p ezc_core -p ezc_cli --all-targets -- -D warnings: pass
@@ -34,6 +34,10 @@ Verification
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: H13 builds a deterministic `RuntimeComponentRegistry` contract v1 from H10 and H12. It records only planned instances plus executable Slot/instance-Context binding records, all keyed by canonical IDs.
+* Reason: The runtime receives exact compiler-selected topology, prefixes, bindings, and batches without any tag/Slot/Context/Provider name lookup, ancestry traversal, Provider selection, or source reconstruction.
+* Tradeoff: H13 is metadata only: it neither serializes a public artifact nor allocates, initializes, renders, updates, or destroys components.
 
 * Decision: H12 has an explicit immutable `OptimizedComponentIrReport`, but preserves the full H11 stream because every current operation is observable and H11 already excludes blocked/static-empty work.
 * Reason: The optimizer boundary is canonical and testable without granting it authority to merge instances/bindings/Context slots, move caller-owned content, or change parent/child operation order.

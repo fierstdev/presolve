@@ -58,6 +58,7 @@ pub mod resume_manifest;
 pub mod resume_plan;
 pub mod route_graph;
 pub mod runtime_codegen;
+pub mod runtime_component;
 pub mod runtime_computed;
 pub mod runtime_computed_artifact;
 pub mod runtime_context;
@@ -273,6 +274,12 @@ pub use resume_manifest::{
 };
 pub use resume_plan::{build_resume_plan, ResumeComponentPlan, ResumeComputedPlan, ResumePlan};
 pub use runtime_codegen::generate_runtime_stub;
+pub use runtime_component::{
+    build_runtime_component_registry, RuntimeComponentContextBindingRecord,
+    RuntimeComponentDefinitionRecord, RuntimeComponentInitializationBatch,
+    RuntimeComponentInstanceRecord, RuntimeComponentRegistry, RuntimeComponentSlotBindingRecord,
+    RUNTIME_COMPONENT_REGISTRY_SCHEMA_CONTRACT_VERSION,
+};
 pub use runtime_computed::{
     build_runtime_computed_registry, RuntimeComputedCacheSlot, RuntimeComputedDirtyFlag,
     RuntimeComputedRecord, RuntimeComputedRegistry,
