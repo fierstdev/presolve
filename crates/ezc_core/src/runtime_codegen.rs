@@ -8,13 +8,15 @@ const RUNTIME_STUB: &str = r#"(() => {
   const COMPONENT_ARTIFACT_ELEMENT_ID = "ez-component-runtime";
   const FORMS_ARTIFACT_ELEMENT_ID = "ez-forms-runtime";
   const RUNTIME_VERSION = "0.0.0";
-  const SUPPORTED_SCHEMA_VERSION = 3;
+  const SUPPORTED_SCHEMA_VERSION = 4;
   const ACTION_MANIFEST_SCHEMA_VERSION = 2;
+  const FORMS_MANIFEST_SCHEMA_VERSION = 3;
   const LEGACY_MANIFEST_SCHEMA_VERSION = 1;
   const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 3;
   const SUPPORTED_EFFECT_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = __EZ_COMPONENT_SCHEMA_VERSION__;
+  const LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 1;
 
   class EdgeZeroBootError extends Error {
@@ -128,9 +130,10 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
-  function validateManifestSchema(manifest, effectArtifact, diagnostics) {
+  function validateManifestSchema(manifest, effectArtifact, componentArtifact, diagnostics) {
     if (
       manifest?.schema_version !== SUPPORTED_SCHEMA_VERSION &&
+      manifest?.schema_version !== FORMS_MANIFEST_SCHEMA_VERSION &&
       manifest?.schema_version !== ACTION_MANIFEST_SCHEMA_VERSION &&
       manifest?.schema_version !== LEGACY_MANIFEST_SCHEMA_VERSION
     ) {
@@ -142,6 +145,21 @@ const RUNTIME_STUB: &str = r#"(() => {
           schema_version: manifest?.schema_version,
           supported_schema_version: SUPPORTED_SCHEMA_VERSION
         },
+        true
+      );
+      throw new EdgeZeroBootError("EZR_UNSUPPORTED_SCHEMA");
+    }
+
+    const isOrdinaryInstancePair = manifest.schema_version === SUPPORTED_SCHEMA_VERSION
+      && componentArtifact?.schema_version === SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION;
+    const isLegacyColdPair = manifest.schema_version === FORMS_MANIFEST_SCHEMA_VERSION
+      && componentArtifact?.schema_version === LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION;
+    if (!isOrdinaryInstancePair && !isLegacyColdPair) {
+      reportDiagnostic(
+        diagnostics,
+        "EZR_UNSUPPORTED_SCHEMA",
+        "Template manifest and component artifact are not an exact runtime contract pair",
+        { manifest_schema_version: manifest.schema_version, component_schema_version: componentArtifact?.schema_version },
         true
       );
       throw new EdgeZeroBootError("EZR_UNSUPPORTED_SCHEMA");
@@ -332,7 +350,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
   function validateComponentArtifactSchema(artifact, diagnostics) {
     if (artifact === null) return;
-    if (artifact.schema_version !== SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION || !Array.isArray(artifact.instances) || !Array.isArray(artifact.initialization_batches)) {
+    if ((artifact.schema_version !== SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION && artifact.schema_version !== LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION) || !Array.isArray(artifact.instances) || !Array.isArray(artifact.initialization_batches)) {
       reportDiagnostic(diagnostics, "EZR_INVALID_COMPONENT_ARTIFACT", "Component runtime metadata did not match the compiler artifact contract", { schema_version: artifact.schema_version }, true);
       throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
     }
@@ -1512,7 +1530,6 @@ const RUNTIME_STUB: &str = r#"(() => {
     const actionsByMethod = buildActionsByMethod(manifestComponent);
 
     for (const [methodId, actionRecord] of actionsByMethod) {
-      actionRecord.component = component;
       store.actionsByMethod.set(methodId, actionRecord);
     }
   }
@@ -1555,8 +1572,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       return;
     }
 
-    eventsByNode.set(event.node, {
-      component,
+      eventsByNode.set(event.node, {
+        component,
       action_batch_id: event.action_batch_id,
       actions: actionRecord.actions
     });
@@ -1792,8 +1809,9 @@ const RUNTIME_STUB: &str = r#"(() => {
     writeField(store, component, action.field, current + delta);
   }
 
-  function executeActions(store, component, actionBatchId, actions) {
+  function executeActions(store, component, actionBatchId, actions, executionContext = null) {
     store.activeActionBatch = actionBatchId;
+    store.activeExecutionContext = executionContext;
 
     try {
       for (const action of actions) {
@@ -1805,6 +1823,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       executeCompletedActionEffects(store, actionBatchId);
     } finally {
       store.activeActionBatch = null;
+      store.activeExecutionContext = null;
       refreshComputedDebugState(store);
     }
   }
@@ -1859,6 +1878,127 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
+  function collectOrdinaryTargetAnchors() {
+    const targets = new Map();
+    const duplicates = new Set();
+    for (const element of document.querySelectorAll("[data-ez-ti]")) {
+      const id = element.getAttribute("data-ez-ti");
+      if (id === null) continue;
+      if (targets.has(id)) duplicates.add(id);
+      targets.set(id, element);
+    }
+    return { targets, duplicates };
+  }
+
+  function ordinaryEventKey(targetId, eventType) {
+    return `${targetId}\u001f${eventType}`;
+  }
+
+  function ordinaryTextBindingNode(bindingId) {
+    const walker = document.createTreeWalker(document, NodeFilter.SHOW_COMMENT);
+    const start = `ez-ti-binding-start:${bindingId}`;
+    const end = `ez-ti-binding-end:${bindingId}`;
+    let startMarker = null;
+    while (walker.nextNode()) {
+      if (walker.currentNode.data === start) { startMarker = walker.currentNode; continue; }
+      if (startMarker !== null && walker.currentNode.data === end) {
+        const text = startMarker.nextSibling;
+        return text instanceof Text ? text : null;
+      }
+    }
+    return null;
+  }
+
+  function registerOrdinaryBinding(store, binding) {
+    const component = store.components.get(binding.component_instance_id);
+    const field = fieldNameFromThisMember(binding.expression);
+    if (component === undefined || field === null) throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_BINDING");
+    const target = store.templateTargetsById.get(binding.instance_target_id);
+    const context = { component_instance_id: binding.component_instance_id };
+    let update = null;
+    if (binding.kind === "text") {
+      const text = ordinaryTextBindingNode(binding.instance_binding_id);
+      if (text !== null) update = (value) => { void context; text.data = formatBindingValue(value); };
+    } else if ((binding.kind === "attribute" || binding.kind === "property") && target instanceof Element && typeof binding.attribute_name === "string") {
+      update = (value) => { void context; updateAttributeBinding(target, binding.attribute_name, value); };
+    }
+    if (update === null) throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_BINDING");
+    update(component.state[field]);
+    registerBinding(store, component, field, update);
+  }
+
+  function initializeOrdinaryInstanceRuntime(store, manifest, componentArtifact) {
+    if (manifest.schema_version !== SUPPORTED_SCHEMA_VERSION) return;
+    const anchors = collectOrdinaryTargetAnchors();
+    const artifactTargets = new Map((componentArtifact.ordinary_template_targets ?? []).map((target) => [target.id, target]));
+    const artifactBindings = new Map((componentArtifact.ordinary_template_bindings ?? []).map((binding) => [binding.id, binding]));
+    const artifactEvents = new Map((componentArtifact.ordinary_template_events ?? []).map((event) => [ordinaryEventKey(event.target_id, event.event_type), event]));
+    store.templateTargetsById = anchors.targets;
+    store.ordinaryBindingsById = new Map();
+    store.ordinaryEventsByTargetAndType = new Map();
+    for (const target of manifest.ordinary_targets ?? []) {
+      const artifactTarget = artifactTargets.get(target.id);
+      if (artifactTarget === undefined || artifactTarget.component_instance_id !== target.component_instance_id || anchors.duplicates.has(target.id) || !anchors.targets.has(target.id)) {
+        throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_TARGET");
+      }
+    }
+    for (const binding of manifest.ordinary_bindings ?? []) {
+      const artifactBinding = artifactBindings.get(binding.instance_binding_id);
+      if (artifactBinding === undefined || artifactBinding.component_instance_id !== binding.component_instance_id || artifactBinding.target_id !== binding.instance_target_id) {
+        throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_BINDING");
+      }
+      store.ordinaryBindingsById.set(binding.instance_binding_id, {
+        ...binding,
+        execution_context: { component_instance_id: binding.component_instance_id }
+      });
+      registerOrdinaryBinding(store, binding);
+    }
+    for (const event of manifest.ordinary_events ?? []) {
+      const key = ordinaryEventKey(event.instance_target_id, event.event_type);
+      const artifactEvent = artifactEvents.get(key);
+      if (artifactEvent === undefined || artifactEvent.component_instance_id !== event.component_instance_id || store.ordinaryEventsByTargetAndType.has(key)) {
+        throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_EVENT");
+      }
+      store.ordinaryEventsByTargetAndType.set(key, event);
+    }
+  }
+
+  function ordinaryTargetFromEvent(target) {
+    let current = target instanceof Element ? target : target?.parentElement;
+    while (current !== null && current !== undefined) {
+      const targetId = current.getAttribute("data-ez-ti");
+      if (targetId !== null) return targetId;
+      current = current.parentElement;
+    }
+    return null;
+  }
+
+  function dispatchOrdinaryInstanceEvent(store, event) {
+    const targetId = ordinaryTargetFromEvent(event.target);
+    if (targetId === null) return;
+    const record = store.ordinaryEventsByTargetAndType.get(ordinaryEventKey(targetId, event.type));
+    if (record === undefined) return;
+    const actionRecord = store.actionsByMethod.get(record.handler_method_id);
+    const component = store.components.get(record.component_instance_id);
+    if (actionRecord === undefined || component === undefined || actionRecord.action_batch_id !== record.action_batch_id) {
+      throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_EVENT");
+    }
+    const context = {
+      component_instance_id: record.component_instance_id,
+      trigger_target_id: record.instance_target_id,
+      declaration_event_id: record.declaration_event_id,
+      action_batch_id: record.action_batch_id
+    };
+    executeActions(store, component, record.action_batch_id, actionRecord.actions, context);
+  }
+
+  function installOrdinaryInstanceEventListeners(store) {
+    for (const key of store.ordinaryEventsByTargetAndType.keys()) {
+      const eventType = key.slice(key.lastIndexOf("\u001f") + 1);
+      document.addEventListener(eventType, (event) => dispatchOrdinaryInstanceEvent(store, event));
+    }
+  }
+
   // Forms are initialized exclusively from the compiler artifact and manifest
   // bridge. The DOM contributes only the user event value for a known anchor.
   function initializeFormsRuntime(store, formsArtifact, manifest, elementsByNode, diagnostics) {
@@ -1894,7 +2034,9 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
 
     for (const bridge of manifest.form_bindings ?? []) {
-      const element = elementsByNode.get(bridge.control_anchor);
+      const element = manifest.schema_version === SUPPORTED_SCHEMA_VERSION
+        ? store.templateTargetsById.get(bridge.instance_target_id)
+        : elementsByNode.get(bridge.control_anchor);
       const formInstance = store.formInstances.get(bridge.form_instance_id);
       if (element === undefined || formInstance === undefined) {
         reportDiagnostic(diagnostics, "EZR_FORMS_MANIFEST_MISMATCH", "Forms manifest bridge did not resolve an exact compiler anchor and instance", { bridge }, true);
@@ -1906,7 +2048,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         continue;
       }
       const record = { bridge, binding, element, formInstance };
-      store.formBindingsByAnchor.set(bridge.control_anchor, record);
+      store.formBindingsByAnchor.set(manifest.schema_version === SUPPORTED_SCHEMA_VERSION ? bridge.instance_target_id : bridge.control_anchor, record);
       const key = `${bridge.form_instance_id}|${binding.field}`;
       const bindings = store.formBindingsByField.get(key) ?? [];
       bindings.push(record);
@@ -1915,15 +2057,18 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
 
     for (const bridge of manifest.form_hosts ?? []) {
-      const element = elementsByNode.get(bridge.host_anchor);
+      const element = manifest.schema_version === SUPPORTED_SCHEMA_VERSION
+        ? store.templateTargetsById.get(bridge.instance_target_id)
+        : elementsByNode.get(bridge.host_anchor);
       const formInstance = store.formInstances.get(bridge.form_instance_id);
       const host = (formsArtifact.hosts ?? []).find((candidate) => candidate.host_anchor === bridge.host_anchor && candidate.form_instance === bridge.form_instance_id);
       if (!(element instanceof HTMLFormElement) || formInstance === undefined || host === undefined || host.event !== "submit") {
         reportDiagnostic(diagnostics, "EZR_FORMS_MANIFEST_MISMATCH", "Forms host bridge did not resolve an exact compiler-owned form anchor", { bridge }, true);
         continue;
       }
-      store.formHostsByAnchor.set(bridge.host_anchor, { bridge, host, element, formInstance });
-      element.addEventListener(host.event, (event) => dispatchFormSubmit(store, event, bridge.host_anchor));
+      const anchor = manifest.schema_version === SUPPORTED_SCHEMA_VERSION ? bridge.instance_target_id : bridge.host_anchor;
+      store.formHostsByAnchor.set(anchor, { bridge, host, element, formInstance });
+      element.addEventListener(host.event, (event) => dispatchFormSubmit(store, event, anchor));
     }
 
     document.addEventListener("input", (event) => dispatchFormEvent(store, event, false));
@@ -1942,7 +2087,8 @@ const RUNTIME_STUB: &str = r#"(() => {
     for (const fieldId of record.formInstance.fields.keys()) validateFormField(record.formInstance, fieldId);
     if (!record.formInstance.aggregate_valid) { record.formInstance.submission = "Invalid"; return; }
     const action = store.actionsByMethod.get(record.host.submit_action);
-    if (action === undefined || action.action_batch_id !== record.host.action_batch || action.component === undefined) {
+    const component = store.components.get(record.bridge.component_instance_id) ?? action?.component;
+    if (action === undefined || action.action_batch_id !== record.host.action_batch || component === undefined) {
       reportDiagnostic(store.diagnostics, "EZR_UNRESOLVED_FORM_SUBMIT_ACTION", "Submission host did not resolve its exact compiler action", { host: record.host }, true);
       record.formInstance.submission = "Failed";
       return;
@@ -1951,14 +2097,21 @@ const RUNTIME_STUB: &str = r#"(() => {
     // Serialization is deliberately compiler-record driven: field values come
     // from the instance store, never DOM scanning or a form-element snapshot.
     record.formInstance.serialized = [...record.formInstance.fields.entries()].map(([field, state]) => ({ field, value: state.value }));
-    executeActions(store, action.component, record.host.action_batch, action.actions);
+    executeActions(store, component, record.host.action_batch, action.actions, {
+      component_instance_id: record.bridge.component_instance_id,
+      trigger_target_id: record.bridge.instance_target_id,
+      declaration_event_id: record.host.submit_action,
+      action_batch_id: record.host.action_batch
+    });
     record.formInstance.submission = "Completed";
   }
 
   function dispatchFormEvent(store, event, blur) {
     const element = event.target;
     if (!(element instanceof HTMLElement)) return;
-    const anchor = element.getAttribute("data-ez-node");
+    const anchor = store.templateTargetsById instanceof Map
+      ? ordinaryTargetFromEvent(element)
+      : element.getAttribute("data-ez-node");
     const record = anchor === null ? undefined : store.formBindingsByAnchor.get(anchor);
     if (record === undefined) return;
     if (blur) {
@@ -2144,15 +2297,30 @@ const RUNTIME_STUB: &str = r#"(() => {
       );
     }
 
-    for (const manifestComponent of manifest.components ?? []) {
-      const component = initializeComponentRuntime(
-        store,
-        manifestComponent,
-        bindingAnchors,
-        conditionalAnchors,
-        listAnchors
-      );
-      registerComponentEvents(store, component);
+    if (manifest.schema_version === SUPPORTED_SCHEMA_VERSION) {
+      const definitions = new Map((manifest.components ?? []).map((component) => [component.component_id, component]));
+      for (const instance of componentArtifact.instances ?? []) {
+        const definition = definitions.get(instance.component);
+        if (definition === undefined) throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_COMPONENT");
+        const component = { name: instance.component, manifest: definition, state: {} };
+        for (const state of computedArtifact?.state ?? []) {
+          if (state.component === instance.component) component.state[state.field] = state.initial_value;
+        }
+        store.components.set(instance.instance, component);
+        registerActions(store, component, definition);
+      }
+      initializeOrdinaryInstanceRuntime(store, manifest, componentArtifact);
+    } else {
+      for (const manifestComponent of manifest.components ?? []) {
+        const component = initializeComponentRuntime(
+          store,
+          manifestComponent,
+          bindingAnchors,
+          conditionalAnchors,
+          listAnchors
+        );
+        registerComponentEvents(store, component);
+      }
     }
 
     executeComputedPlan(store);
@@ -2163,7 +2331,11 @@ const RUNTIME_STUB: &str = r#"(() => {
 
     executeInitialEffects(store);
 
-    installDelegatedEventListeners(store);
+    if (manifest.schema_version === SUPPORTED_SCHEMA_VERSION) {
+      installOrdinaryInstanceEventListeners(store);
+    } else {
+      installDelegatedEventListeners(store);
+    }
 
     return runtimeState({
       manifest,
@@ -2206,7 +2378,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       validateEffectArtifactSchema(effectArtifact, diagnostics);
       const componentArtifact = readComponentArtifact(diagnostics);
       validateComponentArtifactSchema(componentArtifact, diagnostics);
-      validateManifestSchema(manifest, effectArtifact, diagnostics);
+      validateManifestSchema(manifest, effectArtifact, componentArtifact, diagnostics);
       const formsArtifact = readFormsArtifact(diagnostics);
       validateFormsArtifact(formsArtifact, manifest, diagnostics);
 
@@ -2281,7 +2453,7 @@ mod tests {
         assert!(runtime.contains("executeContextUpdates(store, actionBatchId)"));
         assert!(runtime.contains("contextSlots: new Map()"));
         assert!(runtime.contains("RUNTIME_VERSION = \"0.0.0\""));
-        assert!(runtime.contains("SUPPORTED_SCHEMA_VERSION = 3"));
+        assert!(runtime.contains("SUPPORTED_SCHEMA_VERSION = 4"));
         assert!(runtime.contains("ez-forms-runtime"));
         assert!(runtime.contains("initializeFormsRuntime"));
         assert!(runtime.contains("dispatchFormSubmit"));
@@ -2291,6 +2463,9 @@ mod tests {
         assert!(runtime.contains("EZR_INVALID_MANIFEST_JSON"));
         assert!(runtime.contains("EZR_UNSUPPORTED_SCHEMA"));
         assert!(runtime.contains("data-ez-node"));
+        assert!(runtime.contains("ordinaryEventsByTargetAndType"));
+        assert!(runtime.contains("component_instance_id: record.component_instance_id"));
+        assert!(runtime.contains("LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2"));
         assert!(runtime.contains("ez-binding:"));
         assert!(runtime.contains("reportDiagnostic"));
         assert!(runtime.contains("validateManifestSchema"));

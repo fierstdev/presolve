@@ -159,7 +159,7 @@ fn generate_conditional_html(
     html
 }
 
-fn generate_list_html(list: &ListNode) -> String {
+pub(crate) fn generate_list_html(list: &ListNode) -> String {
     let mut html = String::new();
     html.push_str("<!-- ez-list-start:");
     html.push_str(&escape_comment(&list.start_id.0));

@@ -1,5 +1,17 @@
 # Resumability and Delivery
 
+## Phase J prerequisite: ordinary template instance context
+
+Before State retention, ordinary component-template execution is projected by
+the compiler from Phase H component instances and canonical template products.
+The runtime consumes the exact v4 template-manifest/v3 component-artifact
+pair, `data-ez-ti` target markers, and paired text-binding markers. It carries
+`RuntimeExecutionContext { component_instance_id, trigger_target_id,
+declaration_event_id, action_batch_id }` through ordinary action and binding
+execution. This is cold-runtime ownership infrastructure only: it does not
+emit resume anchors/events, lazy activation, chunks, snapshots, or J10
+markers. J1-A alone replaces declaration-level State storage addressing.
+
 ## Definition
 
 In EdgeZero, resumability means:

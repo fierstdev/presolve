@@ -152,24 +152,50 @@ they do not use generic virtual-DOM diffing. Runtime debug evidence exposes
 initialization runs, the instance tree, Slot binding runs, and failures without
 becoming semantic authority.
 
+## J1-P ordinary instance bridge
+
+J1-P projects Phase H's planned and structural-template component instances
+onto immutable ordinary template targets, bindings, and action events. The
+only execution identities are `TemplateInstanceTargetId` and
+`TemplateInstanceBindingId`, each formed from an exact `ComponentInstanceId`
+plus the existing declaration-level template entity or binding ID. Their text
+is serialization/debug output only; runtime authority remains the typed,
+compiler-emitted pair.
+
+Component runtime artifact v3 and template manifest v4 are one closed pair.
+Their ordinary tables carry exact instance/target/binding/event records and
+Forms records reciprocally name the same target. DOM has only `data-ez-ti` for
+executable element targets and paired `ez-ti-binding` comments for text
+bindings. Conditional/list payloads carry their precomputed target IDs.
+Neither resume anchors/events nor `data-ez-r`/`data-ez-e` are emitted here.
+
+The runtime may walk event bubbling only to the first exact `data-ez-ti`
+marker, then dispatches through `(target ID, event type)` and the serialized
+`RuntimeExecutionContext`. It never selects an instance by component name,
+DOM ancestry, order, or runtime counter. Structural program records retain
+precomputed ordinary target references for future materialization; caller Slot
+content remains caller-owned and callee outlets remain callee-owned.
+
 ## Frozen schemas
 
 Phase H completes with these actual versions:
 
 | Serialized boundary | Version |
 | --- | ---: |
-| Component runtime artifact | 2 |
+| Component runtime artifact | 3 |
 | Resume manifest | 4 |
 | ASM inspection | 8 |
 | Check JSON | 4 |
-| Template manifest | 2 |
+| Template manifest | 4 |
 | Context runtime artifact | 2 |
 | Semantic graph | 5 |
 
 The internal runtime component registry contract is version 1. Component
 runtime artifact v1 was the H14 initial-execution shape; H16 advanced it to v2
-for structural programs. Template-manifest v1 remains a legacy output for
-sources that do not require v2 action-batch metadata. Phase H adds no component
+for structural programs; J1-P advances it to v3 for the ordinary instance
+bridge. J1-P similarly advances the template manifest to v4. The v4/v3 pair
+cannot mix declaration-level execution records. The only retained legacy cold
+pair is manifest v3/component artifact v2 with no Phase-J product. Phase H adds no component
 nodes to frozen semantic-graph schema v5 and no instance-qualified fields to
 Context runtime artifact v2; those bindings live in the component artifact.
 

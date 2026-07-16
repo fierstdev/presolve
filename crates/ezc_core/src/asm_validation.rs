@@ -1,9 +1,11 @@
 use crate::application_semantic_model::ApplicationSemanticModel;
 use crate::semantic_id::SemanticOwner;
 use crate::{
-    build_template_manifest_from_asm, EffectOperationClassification, EffectRenderBoundary,
-    EffectValidation, ManifestEventKind, SemanticTypeId, EFFECT_CAPABILITY_REGISTRY,
-    TEMPLATE_MANIFEST_SCHEMA_VERSION,
+    build_ordinary_template_instance_registry, build_runtime_component_artifact,
+    build_template_manifest_from_asm, validate_ordinary_template_instance_registry,
+    validate_runtime_component_artifact, validate_template_manifest, EffectOperationClassification,
+    EffectRenderBoundary, EffectValidation, ManifestEventKind, OrdinaryTemplateIntegrityCode,
+    SemanticTypeId, EFFECT_CAPABILITY_REGISTRY, TEMPLATE_MANIFEST_SCHEMA_VERSION,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -121,8 +123,36 @@ pub fn validate_application_semantic_model(
     validate_effect_execution_plan(model, &mut diagnostics);
     validate_component_diagnostic_metadata(model, &mut diagnostics);
     validate_template_action_bindings(model, &mut diagnostics);
+    validate_ordinary_template_instance_projection(model, &mut diagnostics);
 
     diagnostics
+}
+
+fn validate_ordinary_template_instance_projection(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    let registry = build_ordinary_template_instance_registry(model);
+    let artifact = build_runtime_component_artifact(model, &model.component_ir_optimization);
+    let manifest = build_template_manifest_from_asm(model);
+    if validate_ordinary_template_instance_registry(model, &registry).is_err() {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: OrdinaryTemplateIntegrityCode::StaleRegistry
+                .as_str()
+                .to_string(),
+            message: "ordinary template registry drifted from canonical products".to_string(),
+        });
+    }
+    if validate_runtime_component_artifact(&artifact).is_err()
+        || validate_template_manifest(&manifest).is_err()
+    {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: OrdinaryTemplateIntegrityCode::ArtifactManifestDrift
+                .as_str()
+                .to_string(),
+            message: "ordinary template artifact or manifest projection is invalid".to_string(),
+        });
+    }
 }
 
 fn validate_form_validation(
@@ -1774,6 +1804,44 @@ fn validate_template_action_bindings(
 ) {
     let manifest = build_template_manifest_from_asm(model);
     if manifest.schema_version < 2 || manifest.schema_version > TEMPLATE_MANIFEST_SCHEMA_VERSION {
+        return;
+    }
+    if manifest.schema_version == TEMPLATE_MANIFEST_SCHEMA_VERSION {
+        for event in &manifest.ordinary_events {
+            let component = model
+                .components
+                .iter()
+                .find(|component| component.id.as_str() == event.component_id);
+            // The v4 execution table is the authority. Declaration-template
+            // events remain inspection context and deliberately need not be
+            // executable for every materialized instance.
+            let Some(component) = component else {
+                diagnostics.push(AsmValidationDiagnostic {
+                    code: "EZASM1126".to_string(),
+                    message: "ordinary event references a missing component".to_string(),
+                });
+                continue;
+            };
+            let method = component
+                .methods
+                .iter()
+                .find(|method| method.id.as_str() == event.handler_method_id);
+            let batch = method.and_then(|method| {
+                model
+                    .effect_trigger_plan
+                    .action_batches
+                    .values()
+                    .find(|batch| batch.authored_action_method == method.id)
+            });
+            if batch.is_none_or(|batch| Some(batch.id.as_str()) != event.action_batch_id.as_deref())
+            {
+                diagnostics.push(AsmValidationDiagnostic {
+                    code: "EZASM1128".to_string(),
+                    message: "ordinary event does not resolve to its canonical F8 action batch"
+                        .to_string(),
+                });
+            }
+        }
         return;
     }
     for component_manifest in &manifest.components {

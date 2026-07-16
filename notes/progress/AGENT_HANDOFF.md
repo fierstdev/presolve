@@ -3,8 +3,8 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: J1 - Canonical Resume Identities
-* Working tree: J1-A amendment blocker documentation pending commit. No partial J1-A product exists.
+* Latest completed slice: J1-P - Ordinary Template Instance Context Projection
+* Working tree: J1-P is ready for its atomic commit; J1-A has not begun.
 * Date: 2026-07-15
 
 Last completed slice
@@ -16,14 +16,15 @@ Last completed slice
 
 Current in-progress slice
 
-* Slice: J1-A - Instance-Qualified State Storage Bridge
-* Status: The supplied amendment resolves State slot identity but J1-A is blocked by the missing exact component-instance execution bridge for ordinary template events and bindings. No J1-A product was implemented.
+* Slice: J1-P - Ordinary Template Instance Context Projection
+* Status: Complete pending its atomic commit. J1-P owns the v4 template-manifest/v3 component-artifact bridge; J1-A must use its `RuntimeExecutionContext` and may not add another ordinary ownership product.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase I: none. Phase J cannot continue without an authoritative ordinary event/binding-to-ComponentInstanceId bridge.
+* Remaining in Phase I: none. Next after J1-P verification and commit: J1-A State-instance storage using the J1-P `RuntimeExecutionContext` as its sole ordinary action/binding instance source.
 
 Verification
 
-* J1-A amendment audit: `template_manifest.rs` gives normal `ManifestEvent` only `node`, `event`, `handler`, `method_id`, and `action_batch_id`; unlike Forms bridges, it has no `ComponentInstanceId`. Runtime components are keyed by declaration-level component names. Therefore an ordinary event/binding cannot execute in exact instance A rather than B without an unauthorized new bridge or runtime discovery.
+* J1-P implementation audit: ordinary targets/bindings/events are compiler projections of Phase H `ComponentInstanceId` and canonical template IDs. Runtime sees only exact marker indexes and `RuntimeExecutionContext`; it does not infer ownership from names, DOM ancestry, order, or counters. J1-P emits no J10 resume markers.
+* J1-P verification: `cargo test -p ezc_core --lib`, `cargo clippy -p ezc_core --all-targets -- -D warnings`, `cargo fmt --all --check`, `git diff --check`, `just check`, and `pnpm test:e2e` completed for the bridge. The focused marker/registry/manifest tests cover repeated component instances, paired binding markers, v4/v3 pair enforcement, reciprocal Forms target records, deterministic projections, and absence of J10 markers.
 
 * J1 `cargo test -p ezc_core resume_identity::tests::j1_resume_identities_are_typed_deterministic_and_instance_qualified`: pass
 * J1 `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass

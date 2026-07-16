@@ -64,6 +64,9 @@ pub mod layout_graph;
 pub mod lazy_action_chunks;
 pub mod model;
 pub mod module_graph;
+pub mod ordinary_html_codegen;
+pub mod ordinary_template_instance;
+pub mod ordinary_template_integrity;
 pub mod page_codegen;
 pub mod provider;
 pub mod resume_boot;
@@ -355,6 +358,15 @@ pub use model::{
 pub use module_graph::{
     build_module_graph, ModuleEdge, ModuleEdgeKind, ModuleGraph, ModuleNode, ModuleTarget,
 };
+pub use ordinary_html_codegen::generate_ordinary_instance_html;
+pub use ordinary_template_instance::{
+    build_ordinary_template_instance_registry, validate_ordinary_template_instance_registry,
+    OrdinaryTemplateBindingKind, OrdinaryTemplateInstanceBindingRecord,
+    OrdinaryTemplateInstanceEventRecord, OrdinaryTemplateInstanceRegistry,
+    OrdinaryTemplateInstanceTargetRecord, OrdinaryTemplateTargetKind,
+    ORDINARY_TEMPLATE_INSTANCE_REGISTRY_VERSION,
+};
+pub use ordinary_template_integrity::OrdinaryTemplateIntegrityCode;
 pub use page_codegen::{
     generate_standalone_page, generate_standalone_page_with_component_runtime,
     generate_standalone_page_with_component_runtime_and_forms,
@@ -370,7 +382,7 @@ pub use resume_identity::{
     ResumeActivationId, ResumeActivationRootKind, ResumeAnchorId, ResumeBoundaryId,
     ResumeBoundaryKind, ResumeBuildId, ResumeCaptureProgramId, ResumeChunkGroupId, ResumeChunkId,
     ResumeEventId, ResumeIdentityParseError, ResumeRestoreProgramId, ResumeSchemaId, ResumeSlotId,
-    ResumeSnapshotId, ResumeValueRecordId,
+    ResumeSnapshotId, ResumeValueRecordId, TemplateInstanceBindingId, TemplateInstanceTargetId,
 };
 pub use resume_manifest::{
     build_resume_manifest, resume_manifest_json, validate_resume_manifest, ResumeManifest,
@@ -495,9 +507,10 @@ pub use template_graph::{
 };
 pub use template_manifest::{
     build_template_manifest, build_template_manifest_from_asm, template_manifest_json,
-    ManifestAction, ManifestBindingTarget, ManifestComponent, ManifestEvent, ManifestEventKind,
-    ManifestNode, ManifestOperation, ManifestTemplate, TemplateManifest,
-    TEMPLATE_MANIFEST_SCHEMA_VERSION,
+    validate_template_manifest, ManifestAction, ManifestBindingTarget, ManifestComponent,
+    ManifestEvent, ManifestEventKind, ManifestFormBinding, ManifestFormHost, ManifestNode,
+    ManifestOperation, ManifestOrdinaryBinding, ManifestOrdinaryEvent, ManifestOrdinaryTarget,
+    ManifestTemplate, TemplateManifest, TEMPLATE_MANIFEST_SCHEMA_VERSION,
 };
 pub use template_semantics::{
     build_template_semantic_entities, TemplateSemanticEntity, TemplateSemanticKind,

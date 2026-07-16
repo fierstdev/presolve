@@ -13,8 +13,9 @@ use ezc_core::{
     build_runtime_computed_artifact, build_runtime_context_artifact, build_runtime_effect_artifact,
     build_runtime_forms_artifact, build_semantic_graph, build_template_graph,
     build_template_manifest_from_asm, explain_json, explain_text, fold_component_graph,
-    generate_runtime_stub, generate_standalone_page_with_component_runtime_and_forms,
-    generate_static_html, lower_components_to_ir, optimize_context_ir, optimize_effect_ir,
+    generate_ordinary_instance_html, generate_runtime_stub,
+    generate_standalone_page_with_component_runtime_and_forms, generate_static_html,
+    lower_components_to_ir, optimize_context_ir, optimize_effect_ir,
     runtime_component_artifact_json, runtime_computed_artifact_json, runtime_context_artifact_json,
     runtime_effect_artifact_json, runtime_forms_artifact_json, semantic_graph_json,
     semantic_type_text, summarize_source, template_manifest_json,
@@ -1888,7 +1889,7 @@ fn run_build(mut args: Vec<String>) {
     let forms_runtime_json = runtime_forms_artifact_json(&forms_runtime_artifact);
     let component_graph = fold_component_graph(&build_component_graph(&parsed));
     let template_graph = build_template_graph(&component_graph);
-    let html_fragment = generate_static_html(&template_graph);
+    let html_fragment = generate_ordinary_instance_html(&asm);
     let manifest = build_template_manifest_from_asm(&asm);
     let manifest_json = template_manifest_json(&manifest);
     let page_title = page_title_from_graph(&template_graph);

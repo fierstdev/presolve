@@ -8,11 +8,34 @@ use crate::template_graph::{
     AttributeValue, ConditionalNode, ElementNode, FragmentNode, ListNode, TemplateChild,
     TemplateGraph, TemplateNode,
 };
-use crate::ApplicationSemanticModel;
+use crate::{ApplicationSemanticModel, OrdinaryTemplateBindingKind, OrdinaryTemplateTargetKind};
 
-pub const TEMPLATE_MANIFEST_SCHEMA_VERSION: u32 = 3;
+pub const TEMPLATE_MANIFEST_SCHEMA_VERSION: u32 = 4;
 const LEGACY_TEMPLATE_MANIFEST_SCHEMA_VERSION: u32 = 1;
 const ACTION_TEMPLATE_MANIFEST_SCHEMA_VERSION: u32 = 2;
+
+const fn ordinary_target_kind_text(kind: OrdinaryTemplateTargetKind) -> &'static str {
+    match kind {
+        OrdinaryTemplateTargetKind::Element => "element",
+        OrdinaryTemplateTargetKind::AttributeOrPropertyHost => "attribute_or_property_host",
+        OrdinaryTemplateTargetKind::EventHost => "event_host",
+        OrdinaryTemplateTargetKind::ConditionalBoundary => "conditional_boundary",
+        OrdinaryTemplateTargetKind::ListBoundary => "list_boundary",
+        OrdinaryTemplateTargetKind::FormControlHost => "form_control_host",
+        OrdinaryTemplateTargetKind::FormSubmissionHost => "form_submission_host",
+    }
+}
+
+const fn ordinary_binding_kind_text(kind: OrdinaryTemplateBindingKind) -> &'static str {
+    match kind {
+        OrdinaryTemplateBindingKind::Text => "text",
+        OrdinaryTemplateBindingKind::Attribute => "attribute",
+        OrdinaryTemplateBindingKind::Property => "property",
+        OrdinaryTemplateBindingKind::Conditional => "conditional",
+        OrdinaryTemplateBindingKind::List => "list",
+        OrdinaryTemplateBindingKind::FormControl => "form_control",
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct TemplateManifest {
@@ -24,11 +47,49 @@ pub struct TemplateManifest {
     pub form_bindings: Vec<ManifestFormBinding>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub form_hosts: Vec<ManifestFormHost>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ordinary_targets: Vec<ManifestOrdinaryTarget>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ordinary_bindings: Vec<ManifestOrdinaryBinding>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ordinary_events: Vec<ManifestOrdinaryEvent>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ManifestOrdinaryTarget {
+    pub id: String,
+    pub component_instance_id: String,
+    pub template_entity_id: String,
+    pub kind: String,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ManifestOrdinaryBinding {
+    pub instance_binding_id: String,
+    pub component_instance_id: String,
+    pub instance_target_id: String,
+    pub declaration_binding_id: String,
+    pub kind: String,
+    pub program_id: String,
+    pub expression: Option<String>,
+    pub attribute_name: Option<String>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ManifestOrdinaryEvent {
+    pub component_instance_id: String,
+    pub component_id: String,
+    pub instance_target_id: String,
+    pub declaration_event_id: String,
+    pub event_type: String,
+    pub handler_method_id: String,
+    pub action_batch_id: Option<String>,
+    pub program_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ManifestFormBinding {
     pub control_anchor: String,
+    pub component_instance_id: String,
+    pub instance_target_id: String,
     pub field_binding_id: String,
     pub form_instance_id: String,
     pub input_program: String,
@@ -39,6 +100,8 @@ pub struct ManifestFormBinding {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ManifestFormHost {
     pub host_anchor: String,
+    pub component_instance_id: String,
+    pub instance_target_id: String,
     pub submission_host_id: String,
     pub form_instance_id: String,
     pub submission_plan: String,
@@ -51,6 +114,7 @@ pub struct ManifestFormHost {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ManifestComponent {
+    pub component_id: String,
     pub name: String,
     pub template: ManifestTemplate,
     pub actions: Vec<ManifestAction>,
@@ -180,6 +244,9 @@ pub fn build_template_manifest(
             .collect::<Vec<_>>(),
         form_bindings: Vec::new(),
         form_hosts: Vec::new(),
+        ordinary_targets: Vec::new(),
+        ordinary_bindings: Vec::new(),
+        ordinary_events: Vec::new(),
     }
 }
 
@@ -188,11 +255,14 @@ pub fn build_template_manifest(
 pub fn build_template_manifest_from_asm(model: &ApplicationSemanticModel) -> TemplateManifest {
     let form_bindings = form_binding_bridges(model);
     let form_hosts = form_host_bridges(model);
+    let ordinary = crate::build_ordinary_template_instance_registry(model);
     TemplateManifest {
         // A Forms artifact always requires its v3 instance-qualified bridge.
         // Otherwise preserve the pre-Forms v1/v2 compatibility boundary.
-        schema_version: if !form_bindings.is_empty() || !form_hosts.is_empty() {
+        schema_version: if !model.component_instance_plan.instances.is_empty() {
             TEMPLATE_MANIFEST_SCHEMA_VERSION
+        } else if !form_bindings.is_empty() || !form_hosts.is_empty() {
+            3
         } else if model.effect_trigger_plan.action_batches.is_empty() {
             LEGACY_TEMPLATE_MANIFEST_SCHEMA_VERSION
         } else {
@@ -213,6 +283,44 @@ pub fn build_template_manifest_from_asm(model: &ApplicationSemanticModel) -> Tem
             .collect(),
         form_bindings,
         form_hosts,
+        ordinary_targets: ordinary
+            .targets
+            .iter()
+            .map(|target| ManifestOrdinaryTarget {
+                id: target.target_id.to_string(),
+                component_instance_id: target.component_instance_id.to_string(),
+                template_entity_id: target.template_entity_id.to_string(),
+                kind: ordinary_target_kind_text(target.target_kind).to_string(),
+            })
+            .collect(),
+        ordinary_bindings: ordinary
+            .bindings
+            .iter()
+            .map(|binding| ManifestOrdinaryBinding {
+                instance_binding_id: binding.instance_binding_id.to_string(),
+                component_instance_id: binding.component_instance_id.to_string(),
+                instance_target_id: binding.target_id.to_string(),
+                declaration_binding_id: binding.declaration_binding_id.to_string(),
+                kind: ordinary_binding_kind_text(binding.binding_kind).to_string(),
+                program_id: binding.existing_program_identity.to_string(),
+                expression: binding.expression.clone(),
+                attribute_name: binding.attribute_name.clone(),
+            })
+            .collect(),
+        ordinary_events: ordinary
+            .events
+            .iter()
+            .map(|event| ManifestOrdinaryEvent {
+                component_instance_id: event.component_instance_id.to_string(),
+                component_id: event.component_id.to_string(),
+                instance_target_id: event.target_id.to_string(),
+                declaration_event_id: event.declaration_event_id.to_string(),
+                event_type: event.event_type.clone(),
+                handler_method_id: event.handler_method_id.to_string(),
+                action_batch_id: event.action_batch_id.as_ref().map(ToString::to_string),
+                program_id: event.existing_event_program_identity.to_string(),
+            })
+            .collect(),
     }
 }
 
@@ -242,6 +350,13 @@ fn form_host_bridges(model: &ApplicationSemanticModel) -> Vec<ManifestFormHost> 
                     )
                     .map(|host_anchor| ManifestFormHost {
                         host_anchor,
+                        component_instance_id: instance.component_instance.to_string(),
+                        instance_target_id:
+                            crate::TemplateInstanceTargetId::for_component_instance_template_entity(
+                                instance.component_instance.clone(),
+                                host.owner_template_element.clone(),
+                            )
+                            .to_string(),
                         submission_host_id: host.id.to_string(),
                         form_instance_id: instance.id.to_string(),
                         submission_plan: host.submission_plan.as_str().to_string(),
@@ -315,6 +430,13 @@ fn form_binding_bridges(model: &ApplicationSemanticModel) -> Vec<ManifestFormBin
             };
             bridges.push(ManifestFormBinding {
                 control_anchor,
+                component_instance_id: instance.component_instance.to_string(),
+                instance_target_id:
+                    crate::TemplateInstanceTargetId::for_component_instance_template_entity(
+                        instance.component_instance.clone(),
+                        binding.control_entity.clone(),
+                    )
+                    .to_string(),
                 field_binding_id: binding.id.to_string(),
                 form_instance_id: instance.id.to_string(),
                 input_program: format!("{}/input:{}", instance.id, binding.field),
@@ -382,6 +504,80 @@ pub fn template_manifest_json(manifest: &TemplateManifest) -> String {
     serde_json::to_string_pretty(manifest).expect("template manifest should serialize")
 }
 
+/// Validate the closed J1-P ordinary-instance projection in a v4 manifest.
+///
+/// v1-v3 remain declaration-level legacy products and intentionally have no
+/// ordinary-instance tables. A v4 manifest may not fall back to those records.
+///
+/// # Errors
+///
+/// Returns an error for unsupported schema versions or any missing, duplicate,
+/// malformed, or non-reciprocal ordinary-instance record.
+pub fn validate_template_manifest(manifest: &TemplateManifest) -> Result<(), String> {
+    if manifest.schema_version > TEMPLATE_MANIFEST_SCHEMA_VERSION || manifest.schema_version == 0 {
+        return Err("unsupported template manifest schema version".to_string());
+    }
+    if manifest.schema_version != TEMPLATE_MANIFEST_SCHEMA_VERSION {
+        if !manifest.ordinary_targets.is_empty()
+            || !manifest.ordinary_bindings.is_empty()
+            || !manifest.ordinary_events.is_empty()
+        {
+            return Err("legacy template manifest contains ordinary instance records".to_string());
+        }
+        return Ok(());
+    }
+    let targets = manifest
+        .ordinary_targets
+        .iter()
+        .map(|record| record.id.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    let bindings = manifest
+        .ordinary_bindings
+        .iter()
+        .map(|record| record.instance_binding_id.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    if targets.len() != manifest.ordinary_targets.len()
+        || bindings.len() != manifest.ordinary_bindings.len()
+        || manifest.ordinary_targets.iter().any(|record| {
+            record.component_instance_id.is_empty()
+                || !record.id.starts_with(&format!(
+                    "{}/template-target:",
+                    record.component_instance_id
+                ))
+        })
+        || manifest.ordinary_bindings.iter().any(|record| {
+            record.component_instance_id.is_empty()
+                || !targets.contains(record.instance_target_id.as_str())
+                || !record.instance_binding_id.starts_with(&format!(
+                    "{}/template-binding:",
+                    record.component_instance_id
+                ))
+        })
+        || manifest.ordinary_events.iter().any(|record| {
+            record.component_instance_id.is_empty()
+                || !targets.contains(record.instance_target_id.as_str())
+                || record.action_batch_id.is_none()
+        })
+        || manifest.form_bindings.iter().any(|record| {
+            !targets.contains(record.instance_target_id.as_str())
+                || !record.instance_target_id.starts_with(&format!(
+                    "{}/template-target:",
+                    record.component_instance_id
+                ))
+        })
+        || manifest.form_hosts.iter().any(|record| {
+            !targets.contains(record.instance_target_id.as_str())
+                || !record.instance_target_id.starts_with(&format!(
+                    "{}/template-target:",
+                    record.component_instance_id
+                ))
+        })
+    {
+        return Err("template manifest has an invalid ordinary instance projection".to_string());
+    }
+    Ok(())
+}
+
 fn manifest_component(
     component_graph: &ComponentGraph,
     template: &TemplateNode,
@@ -392,6 +588,7 @@ fn manifest_component(
         .find(|component| component.class_name == template.component_name)
         .map_or_else(
             || ManifestComponent {
+                component_id: String::new(),
                 name: template.component_name.clone(),
                 template: ManifestTemplate {
                     nodes: Vec::new(),
@@ -414,6 +611,7 @@ fn manifest_component_for(component: &ComponentNode, template: &TemplateNode) ->
     }
 
     ManifestComponent {
+        component_id: component.id.to_string(),
         name: template.component_name.clone(),
         template: ManifestTemplate { nodes, events },
         actions: manifest_actions(component),
@@ -627,8 +825,7 @@ fn collect_conditional(conditional: &ConditionalNode, nodes: &mut Vec<ManifestNo
 #[cfg(test)]
 mod tests {
     use super::{
-        build_template_manifest_from_asm, ManifestEventKind,
-        ACTION_TEMPLATE_MANIFEST_SCHEMA_VERSION,
+        build_template_manifest_from_asm, ManifestEventKind, TEMPLATE_MANIFEST_SCHEMA_VERSION,
     };
     use crate::build_application_semantic_model;
 
@@ -661,10 +858,7 @@ class TemplateActionBatch extends Component {
         let component_manifest = &manifest.components[0];
         let event = &component_manifest.template.events[0];
 
-        assert_eq!(
-            manifest.schema_version,
-            ACTION_TEMPLATE_MANIFEST_SCHEMA_VERSION
-        );
+        assert_eq!(manifest.schema_version, TEMPLATE_MANIFEST_SCHEMA_VERSION);
         assert_eq!(event.kind, Some(ManifestEventKind::Action));
         assert_eq!(event.method_id.as_deref(), Some(method.as_str()));
         assert_eq!(event.action_batch_id.as_deref(), Some(batch.id.as_str()));
@@ -672,6 +866,36 @@ class TemplateActionBatch extends Component {
         assert!(component_manifest.actions.iter().all(|action| {
             action.method_id.as_deref() == Some(method.as_str())
                 && action.action_batch_id.as_deref() == Some(batch.id.as_str())
+        }));
+    }
+
+    #[test]
+    fn v4_projects_only_exact_instance_qualified_ordinary_records() {
+        let model = build_application_semantic_model(&ezc_parser::parse_file(
+            "src/RepeatedManifest.tsx",
+            r#"
+@component("x-child") class Child {
+  count = state(0);
+  @action() increment() { this.count++; }
+  render() { return <button title={this.count} onClick={() => this.increment()}>{this.count}</button>; }
+}
+@component("x-parent") class Parent { render() { return <><Child /><Child /></>; } }
+"#,
+        ));
+        let manifest = build_template_manifest_from_asm(&model);
+        assert_eq!(manifest.schema_version, TEMPLATE_MANIFEST_SCHEMA_VERSION);
+        assert!(super::validate_template_manifest(&manifest).is_ok());
+        assert_eq!(manifest.ordinary_events.len(), 2);
+        assert!(manifest.ordinary_events.iter().all(|event| {
+            event
+                .instance_target_id
+                .starts_with(&format!("{}/template-target:", event.component_instance_id))
+        }));
+        assert!(manifest.ordinary_bindings.iter().all(|binding| {
+            binding.instance_binding_id.starts_with(&format!(
+                "{}/template-binding:",
+                binding.component_instance_id
+            ))
         }));
     }
 

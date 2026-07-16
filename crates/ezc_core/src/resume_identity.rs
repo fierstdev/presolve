@@ -107,6 +107,89 @@ resume_id!(ResumeSnapshotId);
 resume_id!(ResumeBuildId);
 resume_id!(ResumeValueRecordId);
 
+/// Exact ordinary-template target for one authored template entity materialized
+/// by one compiler-planned component instance.
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct TemplateInstanceTargetId {
+    component_instance_id: ComponentInstanceId,
+    template_entity_id: SemanticId,
+}
+
+impl TemplateInstanceTargetId {
+    #[must_use]
+    pub fn for_component_instance_template_entity(
+        component_instance_id: ComponentInstanceId,
+        template_entity_id: SemanticId,
+    ) -> Self {
+        Self {
+            component_instance_id,
+            template_entity_id,
+        }
+    }
+
+    #[must_use]
+    pub const fn component_instance_id(&self) -> &ComponentInstanceId {
+        &self.component_instance_id
+    }
+
+    #[must_use]
+    pub const fn template_entity_id(&self) -> &SemanticId {
+        &self.template_entity_id
+    }
+}
+
+impl fmt::Display for TemplateInstanceTargetId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "{}/template-target:{}",
+            self.component_instance_id,
+            percent_encode(self.template_entity_id.as_str())
+        )
+    }
+}
+
+/// Exact ordinary-template binding execution for one component instance.
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct TemplateInstanceBindingId {
+    component_instance_id: ComponentInstanceId,
+    binding_id: SemanticId,
+}
+
+impl TemplateInstanceBindingId {
+    #[must_use]
+    pub fn for_component_instance_binding(
+        component_instance_id: ComponentInstanceId,
+        binding_id: SemanticId,
+    ) -> Self {
+        Self {
+            component_instance_id,
+            binding_id,
+        }
+    }
+
+    #[must_use]
+    pub const fn component_instance_id(&self) -> &ComponentInstanceId {
+        &self.component_instance_id
+    }
+
+    #[must_use]
+    pub const fn binding_id(&self) -> &SemanticId {
+        &self.binding_id
+    }
+}
+
+impl fmt::Display for TemplateInstanceBindingId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "{}/template-binding:{}",
+            self.component_instance_id,
+            percent_encode(self.binding_id.as_str())
+        )
+    }
+}
+
 impl ResumeBoundaryId {
     #[must_use]
     pub fn application_root(root: &ComponentRootId) -> Self {
@@ -250,6 +333,18 @@ fn canonical_hash(value: &str) -> u64 {
         })
 }
 
+fn percent_encode(value: &str) -> String {
+    value.bytes().fold(String::new(), |mut encoded, byte| {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
+            encoded.push(char::from(byte));
+        } else {
+            use std::fmt::Write as _;
+            write!(encoded, "%{byte:02X}").expect("writing to a String cannot fail");
+        }
+        encoded
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -274,6 +369,23 @@ mod tests {
         assert_ne!(
             ResumeBoundaryId::form_instance(&first_form),
             ResumeBoundaryId::form_instance(&second_form)
+        );
+        let template_entity = component.template().template_entity("element", "root");
+        let binding = component.template().template_entity("binding", "root.0");
+        assert_ne!(
+            TemplateInstanceTargetId::for_component_instance_template_entity(
+                first.clone(),
+                template_entity.clone(),
+            ),
+            TemplateInstanceTargetId::for_component_instance_template_entity(
+                second.clone(),
+                template_entity,
+            )
+        );
+        assert!(
+            TemplateInstanceBindingId::for_component_instance_binding(first, binding)
+                .to_string()
+                .contains("/template-binding:")
         );
         let event = SemanticId::component(Some("x-one-event"), "Event");
         assert_eq!(
