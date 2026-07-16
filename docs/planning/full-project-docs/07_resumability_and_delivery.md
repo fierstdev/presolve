@@ -114,6 +114,18 @@ decision per boundary, exact prerequisites, known events/boundaries, source
 authority, lazy-payload handling, and deterministic order/indexes. No public
 schema or runtime behavior changes.
 
+## Phase J deterministic chunk graph
+
+J5 creates one eager chunk root and one isolated lazy chunk per exact J4
+Interaction root. Visible and Manual roots remain empty because J4 emitted no
+such policies. Program closure is drawn only from canonical activation
+prerequisites and J3 event/Form program references; there is no raw-source
+call graph, size splitting, root merging, shared lazy chunk, or lazy-to-lazy
+dependency. Module path stems are stable before deterministic content hashing.
+Internal integrity codes `EZASM1343` through `EZASM1348` cover duplicate
+inclusion, missing programs, dependency cycles, root correspondence, unrelated
+programs, and deterministic output drift. No public schema changes.
+
 ## Definition
 
 In EdgeZero, resumability means:

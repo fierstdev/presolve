@@ -73,6 +73,7 @@ pub mod provider;
 pub mod resume_activation;
 pub mod resume_boot;
 pub mod resume_boundary;
+pub mod resume_chunk;
 pub mod resume_diagnostics;
 pub mod resume_explain;
 pub mod resume_identity;
@@ -399,6 +400,12 @@ pub use resume_boundary::{
     ResumeBoundaryActivationReference, ResumeBoundaryBlock, ResumeBoundaryBlockSource,
     ResumeBoundaryGraph, ResumeBoundaryIntegrityCode, ResumeBoundaryIntegrityDiagnostic,
     ResumeBoundaryOwner, ResumeBoundaryOwnershipEdge, RESUME_BOUNDARY_GRAPH_VERSION,
+};
+pub use resume_chunk::{
+    build_resume_chunk_graph, validate_resume_chunk_graph, ResumeChunk, ResumeChunkBlock,
+    ResumeChunkBlockReason, ResumeChunkGraph, ResumeChunkIntegrityCode,
+    ResumeChunkIntegrityDiagnostic, ResumeChunkModulePlan, ResumeChunkProgram,
+    ResumeChunkProgramInclusion, ResumeChunkRootKind, RESUME_CHUNK_GRAPH_VERSION,
 };
 pub use resume_diagnostics::{
     ResumeDiagnosticReservation, RESUME_DIAGNOSTIC_RESERVATIONS, RESUME_INTEGRITY_RESERVATION_END,
