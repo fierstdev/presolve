@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: I19 - Fixture Expansion
-* Working tree: I19 is verified; commit pending.
+* Latest completed slice: I20 - Stability Audit and Freeze
+* Working tree: I20 is verified; commit pending.
 * Date: 2026-07-15
 
 Last completed slice
 
-* Slice: I19 - Fixture Expansion
-* Summary: The Forms determinism fixture now proves that reversed input order preserves byte-identical Forms runtime artifact, template manifest, and resume manifest output for multiple independent Form components.
-* Key files: crates/ezc_core/src/runtime_form_artifact.rs
-* Fixture decision: I19 adds verification only; no language semantics, runtime behavior, or schema versions changed.
+* Slice: I20 - Stability Audit and Freeze
+* Summary: Phase I Forms contracts are frozen in `docs/forms-contract.md`, including canonical authority, runtime no-discovery rules, schema versions, diagnostics, and the Phase J boundary.
+* Key files: docs/forms-contract.md
+* Frozen versions: semantic graph v6; ASM v9; check JSON v5; template manifest v3; Forms artifact v1; resume manifest v5; runtime Form registry v1.
 
 Current in-progress slice
 
-* Slice: I19 - Fixture Expansion
-* Status: complete through I19. Proceed to I20 only under its authoritative contract.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I19
-* Remaining in Phase I: I20.
+* Slice: I20 - Stability Audit and Freeze
+* Status: Phase I complete. Do not begin Phase J without its authoritative contract.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
+* Remaining in Phase I: none. Phase J is not started.
 
 Verification
 
