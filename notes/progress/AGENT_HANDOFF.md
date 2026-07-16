@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: J1 - Canonical Resume Identities
-* Working tree: J1 verified; commit pending. No public resume product exists.
+* Working tree: J2 blocker documentation pending commit. No partial J2 product exists.
 * Date: 2026-07-15
 
 Last completed slice
@@ -16,12 +16,14 @@ Last completed slice
 
 Current in-progress slice
 
-* Slice: J1 - Canonical Resume Identities
-* Status: Typed compiler-only Phase J identities are complete. No public serialization or schema change occurred.
+* Slice: J2 - Resumability Liveness and Retained Slots
+* Status: Blocked by the committed Phase I State runtime storage contract. No J2 product was implemented.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase I: none. Next slice: J2 - Resumability Liveness and Retained Slots.
+* Remaining in Phase I: none. Phase J cannot continue without an authoritative instance-qualified State storage identity/product.
 
 Verification
+
+* J2 blocker audit: `runtime_codegen.rs` initializes `storageValues` with declaration-level `state.storage`, while `RuntimeComponentInstanceRecord` exposes only an unused `instance_storage_prefix`; no frozen product maps an exact `ComponentInstanceId` plus State to one existing runtime slot.
 
 * J1 `cargo test -p ezc_core resume_identity::tests::j1_resume_identities_are_typed_deterministic_and_instance_qualified`: pass
 * J1 `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass
@@ -138,6 +140,10 @@ Architecture decisions made
 * Decision: J0 reserves `EZC1096` through `EZC1111` in exact roadmap order and internal `EZASM1289` through `EZASM1384` inclusive (96 codes).
 * Reason: Later Phase J validators and the J19 projector need monotonic, non-overlapping diagnostic space without prematurely creating identities, schemas, manifests, snapshots, chunks, or runtime behavior.
 * Tradeoff: The reservations are inert metadata and a freeze test only; diagnostics remain unprojected until J19.
+
+* Blocker: J2 requires every mutable/restored slot to use an exact existing instance-qualified identity. The committed Phase I State runtime stores values under declaration-level `state.storage`; component records carry a prefix but no canonical State-to-instance slot identity or runtime mapping.
+* Why alternatives are invalid: Deriving a new `prefix + state` string would invent a frozen storage identity; retaining declaration-level State would merge repeated component instances; runtime lookup from DOM/component shape would violate the no-discovery contract; cold-initializing State would violate J2's required retention policy.
+* Required authority: an authored amendment must define the canonical instance-qualified State storage slot identity, its compiler/runtime artifact projection, and its relationship to the existing `storageValues` runtime map. J2 and all later Phase J execution products remain unstarted.
 
 * Decision: I7 creates one declaration-level `ValidationPlanId::for_form(FormId)` for every valid Form, including empty Forms, and one `FieldDependencyId::for_rule_and_source(ValidationRuleId, FieldId)` for each eligible I6 direct dependency edge.
 * Reason: Form plans and dependency records need stable typed names independent of Rule counts, source order, Component instances, runtime registration, or DOM identity; future runtime planning can refer to a complete Form plan without using absence as policy.
