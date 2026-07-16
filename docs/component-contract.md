@@ -176,6 +176,24 @@ DOM ancestry, order, or runtime counter. Structural program records retain
 precomputed ordinary target references for future materialization; caller Slot
 content remains caller-owned and callee outlets remain callee-owned.
 
+## J1-C computed instance slots
+
+J1-C leaves E12 computed declarations, dependency topology, cache policy, and
+initial dirty facts intact. For each planned `ComponentInstanceId` it projects
+the owning declaration-level computed record into one exact
+`ComputedInstanceCacheSlotId` and one `ComputedInstanceDirtySlotId`. The v3
+component artifact serializes those complete IDs; runtime cache and dirty maps
+use only them in the v4/v3 ordinary path. A cache address begins without an
+invented evaluated value, while the dirty address begins with E12's existing
+initial dirty value. The runtime resolves both using the exact execution
+context already supplied by J1-P; it never uses a cache prefix, component name,
+DOM position, map order, or runtime ordinal as authority.
+
+These are runtime addressing products only. J1-C does not classify a cache or
+dirty slot as retained, serializable for a snapshot, restorable, cold on
+resume, or lazily activated; those decisions remain J2 and later Phase J
+slices.
+
 ## Frozen schemas
 
 Phase H completes with these actual versions:

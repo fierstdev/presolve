@@ -1064,6 +1064,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       computedDirty,
       computedValues: new Map(),
       computedCaches: new Map(),
+      computedSlotsByInstanceComputed: new Map(),
+      computedDirtySlots: new Map(),
       storageValues,
       storageByComponentField,
       invalidationsByStorage,
@@ -1072,6 +1074,44 @@ const RUNTIME_STUB: &str = r#"(() => {
       completedActionEffectRuns: [],
       activeActionBatch: null
     };
+  }
+
+  function computedSlotForExecution(store, computed) {
+    const componentInstanceId = store.activeExecutionContext?.component_instance_id;
+    if (componentInstanceId === undefined) return undefined;
+    const slot = store.computedSlotsByInstanceComputed.get(`${componentInstanceId}|${computed}`);
+    if (slot === undefined) throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+    return slot;
+  }
+
+  function isComputedDirty(store, computed) {
+    const slot = computedSlotForExecution(store, computed);
+    return slot === undefined
+      ? store.computedDirty.get(computed) === true
+      : store.computedDirtySlots.get(slot.dirty_slot_id) === true;
+  }
+
+  function setComputedDirty(store, computed, value) {
+    const slot = computedSlotForExecution(store, computed);
+    if (slot === undefined) store.computedDirty.set(computed, value);
+    else store.computedDirtySlots.set(slot.dirty_slot_id, value);
+  }
+
+  function computedValue(store, computed) {
+    const slot = computedSlotForExecution(store, computed);
+    return slot === undefined
+      ? store.computedValues.get(computed)
+      : store.computedCaches.get(slot.cache_slot_id);
+  }
+
+  function storeComputedValue(store, evaluation, value) {
+    const slot = computedSlotForExecution(store, evaluation.computed);
+    if (slot === undefined) {
+      store.computedValues.set(evaluation.computed, value);
+      store.computedCaches.set(evaluation.cache_slot, value);
+    } else {
+      store.computedCaches.set(slot.cache_slot_id, value);
+    }
   }
 
   function computedOperandValue(store, values, operand) {
@@ -1131,7 +1171,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
 
     if (instruction.kind === "load-computed") {
-      if (store.computedDirty.get(instruction.computed) === true) {
+      if (isComputedDirty(store, instruction.computed)) {
         reportDiagnostic(
           store.diagnostics,
           "EZR_UNPLANNED_COMPUTED_DEPENDENCY",
@@ -1140,7 +1180,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         );
         values.set(instruction.result, undefined);
       } else {
-        values.set(instruction.result, store.computedValues.get(instruction.computed));
+        values.set(instruction.result, computedValue(store, instruction.computed));
       }
       return true;
     }
@@ -1334,32 +1374,37 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
-  function executeComputedPlan(store) {
+  function executeComputedPlan(store, componentInstanceId = null) {
     if (store.computedArtifact === null) {
       return;
     }
 
-    for (const computed of store.computedArtifact.evaluation_order ?? []) {
-      const evaluation = store.computedEvaluations.get(computed);
+    const priorExecutionContext = store.activeExecutionContext;
+    if (componentInstanceId !== null) {
+      store.activeExecutionContext = { component_instance_id: componentInstanceId };
+    }
 
-      if (evaluation === undefined) {
-        reportDiagnostic(
-          store.diagnostics,
-          "EZR_UNPLANNED_COMPUTED_DEPENDENCY",
-          "Compiler plan referenced a missing computed evaluation",
-          { computed }
-        );
-        continue;
+    try {
+      for (const computed of store.computedArtifact.evaluation_order ?? []) {
+        const evaluation = store.computedEvaluations.get(computed);
+
+        if (evaluation === undefined) {
+          reportDiagnostic(
+            store.diagnostics,
+            "EZR_UNPLANNED_COMPUTED_DEPENDENCY",
+            "Compiler plan referenced a missing computed evaluation",
+            { computed }
+          );
+          continue;
+        }
+
+        if (!isComputedDirty(store, computed)) continue;
+
+        storeComputedValue(store, evaluation, executeComputedProgram(store, evaluation));
+        setComputedDirty(store, computed, false);
       }
-
-      if (store.computedDirty.get(computed) !== true) {
-        continue;
-      }
-
-      const value = executeComputedProgram(store, evaluation);
-      store.computedValues.set(computed, value);
-      store.computedCaches.set(evaluation.cache_slot, value);
-      store.computedDirty.set(computed, false);
+    } finally {
+      store.activeExecutionContext = priorExecutionContext;
     }
   }
 
@@ -1431,7 +1476,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
     for (const batch of store.computedArtifact.update_batches ?? []) {
       for (const computed of batch) {
-        if (store.computedDirty.get(computed) !== true) {
+        if (!isComputedDirty(store, computed)) {
           continue;
         }
 
@@ -1447,10 +1492,8 @@ const RUNTIME_STUB: &str = r#"(() => {
           continue;
         }
 
-        const value = executeComputedProgram(store, evaluation);
-        store.computedValues.set(computed, value);
-        store.computedCaches.set(evaluation.cache_slot, value);
-        store.computedDirty.set(computed, false);
+        storeComputedValue(store, evaluation, executeComputedProgram(store, evaluation));
+        setComputedDirty(store, computed, false);
         executed = true;
       }
     }
@@ -1493,7 +1536,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (storage !== undefined) {
       store.storageValues.set(storage, value);
       for (const computed of store.invalidationsByStorage.get(storage) ?? []) {
-        store.computedDirty.set(computed, true);
+        setComputedDirty(store, computed, true);
       }
     }
     notifyField(store, component, field);
@@ -2302,6 +2345,17 @@ const RUNTIME_STUB: &str = r#"(() => {
       for (const instance of componentArtifact.instances ?? []) {
         const definition = definitions.get(instance.component);
         if (definition === undefined) throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_COMPONENT");
+        for (const slot of instance.computed_slots ?? []) {
+          const pair = `${instance.instance}|${slot.computed_id}`;
+          if (!slot.cache_slot_id.startsWith(`${instance.instance}/computed-cache:`)
+            || !slot.dirty_slot_id.startsWith(`${instance.instance}/computed-dirty:`)
+            || store.computedSlotsByInstanceComputed.has(pair)
+            || store.computedDirtySlots.has(slot.dirty_slot_id)) {
+            throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+          }
+          store.computedSlotsByInstanceComputed.set(pair, slot);
+          store.computedDirtySlots.set(slot.dirty_slot_id, slot.dirty_initial_value === true);
+        }
         const component = { name: instance.component, manifest: definition, state: {} };
         for (const state of computedArtifact?.state ?? []) {
           if (state.component === instance.component) component.state[state.field] = state.initial_value;
@@ -2323,7 +2377,13 @@ const RUNTIME_STUB: &str = r#"(() => {
       }
     }
 
-    executeComputedPlan(store);
+    if (manifest.schema_version === SUPPORTED_SCHEMA_VERSION) {
+      for (const instance of componentArtifact.instances ?? []) {
+        executeComputedPlan(store, instance.instance);
+      }
+    } else {
+      executeComputedPlan(store);
+    }
 
     executeInitialContext(store);
 
@@ -2465,6 +2525,11 @@ mod tests {
         assert!(runtime.contains("data-ez-node"));
         assert!(runtime.contains("ordinaryEventsByTargetAndType"));
         assert!(runtime.contains("component_instance_id: record.component_instance_id"));
+        assert!(runtime.contains("computedSlotsByInstanceComputed: new Map()"));
+        assert!(runtime.contains("computedDirtySlots: new Map()"));
+        assert!(runtime.contains("function computedSlotForExecution"));
+        assert!(runtime.contains("/computed-cache:"));
+        assert!(runtime.contains("/computed-dirty:"));
         assert!(runtime.contains("LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2"));
         assert!(runtime.contains("ez-binding:"));
         assert!(runtime.contains("reportDiagnostic"));

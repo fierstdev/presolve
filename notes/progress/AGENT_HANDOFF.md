@@ -3,25 +3,27 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: J1-P - Ordinary Template Instance Context Projection
-* Working tree: J1-P is ready for its atomic commit; J1-A has not begun.
-* Date: 2026-07-15
+* Latest completed slice: J1-C - Instance-Qualified Computed Runtime Slots
+* Working tree: clean after J1-C commit `d2e9534`; J1-A is blocked pending its complete authored State-slot contract.
+* Date: 2026-07-16
 
 Last completed slice
 
-* Slice: I20 - Stability Audit and Freeze
-* Summary: Phase I Forms contracts are frozen in `docs/forms-contract.md`, including canonical authority, runtime no-discovery rules, schema versions, diagnostics, and the Phase J boundary.
-* Key files: docs/forms-contract.md
-* Frozen versions: semantic graph v6; ASM v9; check JSON v5; template manifest v3; Forms artifact v1; resume manifest v5; runtime Form registry v1.
+* Slice: J1-C - Instance-Qualified Computed Runtime Slots
+* Summary: E12 declaration cache/dirty records now project into exact per-instance runtime slots in component artifact v3 and the v4/v3 cold runtime selects them only through `RuntimeExecutionContext`.
+* Key files: `computed_instance_slots.rs`, `resume_identity.rs`, `runtime_component_artifact.rs`, `runtime_codegen.rs`, `runtime_browser.rs`
+* Boundary: no State slots, retention, snapshots, restoration, liveness, lazy activation, or J10 markers.
 
 Current in-progress slice
 
-* Slice: J1-P - Ordinary Template Instance Context Projection
-* Status: Complete pending its atomic commit. J1-P owns the v4 template-manifest/v3 component-artifact bridge; J1-A must use its `RuntimeExecutionContext` and may not add another ordinary ownership product.
+* Slice: J1-A - State-instance storage
+* Status: Blocked pending a complete authored contract. The available roadmap prose authorizes qualifying State storage through J1-P's `RuntimeExecutionContext`, but omits the exact State slot constructor, artifact fields, runtime map rules, and required action-isolation proof. Those details cannot be inferred.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase I: none. Next after J1-P verification and commit: J1-A State-instance storage using the J1-P `RuntimeExecutionContext` as its sole ordinary action/binding instance source.
+* Remaining in Phase I: none. Next after supplying the J1-A contract: State-instance storage using the J1-P `RuntimeExecutionContext` and J1-C computed slots.
 
 Verification
+
+* J1-C verification: `cargo test -p ezc_core --lib` (359), `cargo clippy -p ezc_core --all-targets -- -D warnings`, `cargo fmt --all --check`, `git diff --check`, and `cargo test -p ezc_cli --test runtime_browser` (27 real-browser probes) all pass. The component-runtime watchdog was a harness pipe backpressure failure, not a runtime-readiness regression: Chrome filled the piped DOM output while the runner waited to read it. The harness now drains both streams concurrently; the probe keeps its 20-second watchdog, removes parsed JSON metadata before DOM dumping, and reports terminal runtime errors immediately.
 
 * J1-P implementation audit: ordinary targets/bindings/events are compiler projections of Phase H `ComponentInstanceId` and canonical template IDs. Runtime sees only exact marker indexes and `RuntimeExecutionContext`; it does not infer ownership from names, DOM ancestry, order, or counters. J1-P emits no J10 resume markers.
 * J1-P verification: `cargo test -p ezc_core --lib`, `cargo clippy -p ezc_core --all-targets -- -D warnings`, `cargo fmt --all --check`, `git diff --check`, `just check`, and `pnpm test:e2e` completed for the bridge. The focused marker/registry/manifest tests cover repeated component instances, paired binding markers, v4/v3 pair enforcement, reciprocal Forms target records, deterministic projections, and absence of J10 markers.

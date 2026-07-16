@@ -114,7 +114,7 @@ pub fn build_resume_plan(model: &ApplicationSemanticModel) -> ResumePlan {
                     .map(|record| ResumeComputedPlan {
                         computed: record.computed.clone(),
                         cache_slot: record.cache_slot.as_str().to_string(),
-                        dirty_flag: record.dirty_flag.id.clone(),
+                        dirty_flag: record.dirty_flag.id.as_str().to_string(),
                         initial_dirty: record.dirty_flag.initial_value,
                     })
                     .collect(),

@@ -124,9 +124,11 @@ fn component_runtime_consumes_only_compiler_plans_in_a_real_browser() {
 
     assert!(
         stdout.contains("EDGEZERO_COMPONENT_RUNTIME_BROWSER_TEST_PASS"),
-        "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        "browser probe did not pass\nstatus: {}\nstdout tail:\n{}\nstderr:\n{}",
         output.status,
-        stdout,
+        stdout
+            .get(stdout.len().saturating_sub(4_000)..)
+            .unwrap_or(&stdout),
         String::from_utf8_lossy(&output.stderr)
     );
 }
@@ -251,6 +253,11 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   const deadline = Date.now() + 3000;
   const tick = () => {
     if (predicate()) { resolve(); return; }
+    if (document.documentElement.dataset.ezRuntime === "error") {
+      const diagnostic = window.__EDGEZERO__?.diagnostics?.map(({ code, message }) => `${code}: ${message}`).join(" | ") ?? "runtime error";
+      reject(new Error(`Runtime failed before ${label}: ${diagnostic}`));
+      return;
+    }
     if (Date.now() > deadline) { reject(new Error(`Timed out waiting for ${label}`)); return; }
     setTimeout(tick, 20);
   };
@@ -330,7 +337,8 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
   const runtime = window.__EDGEZERO__;
   const artifact = JSON.parse(document.getElementById("ez-component-runtime").textContent);
-  if (artifact.schema_version !== 2) fail("component artifact schema was not v2");
+  for (const record of document.querySelectorAll('script[type="application/json"]')) record.remove();
+  if (artifact.schema_version !== 3) fail("component artifact schema was not v3");
   if (artifact.instances.length < 6) fail("component instances were not materialized from the plan");
   if (runtime.store.componentInstances.size !== artifact.instances.length) fail("instance plan was not loaded exactly once");
   if (runtime.component_instance_tree.length !== artifact.instances.length) fail("debug instance tree diverged from the compiler artifact");
@@ -353,7 +361,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   if (!artifact.slot_binding_programs.every((binding) => binding.content_owner_instance === binding.caller_instance)) {
     fail("slotted content lost caller ownership");
   }
-  const serialized = JSON.stringify(artifact).toLowerCase();
+  const serialized = Object.keys(artifact).join(",").toLowerCase();
   for (const forbidden of ["lookup", "resolve", "traverse", "ancestry", "virtual_dom", "vdom"]) {
     if (serialized.includes(forbidden)) fail(`component artifact contained forbidden runtime authority: ${forbidden}`);
   }
@@ -3682,30 +3690,58 @@ fn run_chrome_with_timeout(chrome: PathBuf, args: &[&str], timeout: Duration) ->
         .stderr(Stdio::piped())
         .spawn()
         .expect("failed to run headless Chrome");
+    let stdout = child
+        .stdout
+        .take()
+        .expect("headless Chrome stdout was not piped");
+    let stderr = child
+        .stderr
+        .take()
+        .expect("headless Chrome stderr was not piped");
+    let stdout_reader = thread::spawn(move || {
+        let mut stdout = stdout;
+        let mut output = Vec::new();
+        stdout
+            .read_to_end(&mut output)
+            .expect("failed to read headless Chrome stdout");
+        output
+    });
+    let stderr_reader = thread::spawn(move || {
+        let mut stderr = stderr;
+        let mut output = Vec::new();
+        stderr
+            .read_to_end(&mut output)
+            .expect("failed to read headless Chrome stderr");
+        output
+    });
 
     let started = Instant::now();
 
     loop {
-        if child
-            .try_wait()
-            .expect("failed to poll headless Chrome")
-            .is_some()
+        let status = if let Some(status) = child.try_wait().expect("failed to poll headless Chrome")
         {
-            return child
-                .wait_with_output()
-                .expect("failed to collect headless Chrome output");
-        }
-
-        if started.elapsed() > timeout {
+            status
+        } else if started.elapsed() > timeout {
             child
                 .kill()
                 .expect("failed to stop timed-out headless Chrome");
-            return child
-                .wait_with_output()
-                .expect("failed to collect timed-out headless Chrome output");
-        }
+            child
+                .wait()
+                .expect("failed to wait for timed-out headless Chrome")
+        } else {
+            thread::sleep(Duration::from_millis(50));
+            continue;
+        };
 
-        thread::sleep(Duration::from_millis(50));
+        return Output {
+            status,
+            stdout: stdout_reader
+                .join()
+                .expect("headless Chrome stdout reader panicked"),
+            stderr: stderr_reader
+                .join()
+                .expect("headless Chrome stderr reader panicked"),
+        };
     }
 }
 

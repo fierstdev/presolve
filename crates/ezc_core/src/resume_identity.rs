@@ -7,7 +7,8 @@ use std::fmt;
 use std::str::FromStr;
 
 use crate::{
-    ComponentInstanceId, ComponentRootId, ComponentStructuralRegionId, FormInstanceId, SemanticId,
+    ComponentInstanceId, ComponentRootId, ComponentStructuralRegionId, ComputedCacheSlotId,
+    ComputedDirtyFlagId, FormInstanceId, SemanticId,
 };
 
 macro_rules! resume_id {
@@ -186,6 +187,90 @@ impl fmt::Display for TemplateInstanceBindingId {
             "{}/template-binding:{}",
             self.component_instance_id,
             percent_encode(self.binding_id.as_str())
+        )
+    }
+}
+
+/// Exact runtime cache address for one declaration-level computed cache in one
+/// compiler-planned component instance.
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct ComputedInstanceCacheSlotId {
+    component_instance_id: ComponentInstanceId,
+    cache_slot_id: ComputedCacheSlotId,
+}
+
+impl ComputedInstanceCacheSlotId {
+    #[must_use]
+    pub fn for_component_instance_cache_slot(
+        component_instance_id: ComponentInstanceId,
+        cache_slot_id: ComputedCacheSlotId,
+    ) -> Self {
+        Self {
+            component_instance_id,
+            cache_slot_id,
+        }
+    }
+
+    #[must_use]
+    pub const fn component_instance_id(&self) -> &ComponentInstanceId {
+        &self.component_instance_id
+    }
+
+    #[must_use]
+    pub const fn cache_slot_id(&self) -> &ComputedCacheSlotId {
+        &self.cache_slot_id
+    }
+}
+
+impl fmt::Display for ComputedInstanceCacheSlotId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "{}/computed-cache:{}",
+            self.component_instance_id,
+            percent_encode(self.cache_slot_id.as_str())
+        )
+    }
+}
+
+/// Exact runtime dirty address for one declaration-level computed dirty flag in
+/// one compiler-planned component instance.
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct ComputedInstanceDirtySlotId {
+    component_instance_id: ComponentInstanceId,
+    dirty_flag_id: ComputedDirtyFlagId,
+}
+
+impl ComputedInstanceDirtySlotId {
+    #[must_use]
+    pub fn for_component_instance_dirty_flag(
+        component_instance_id: ComponentInstanceId,
+        dirty_flag_id: ComputedDirtyFlagId,
+    ) -> Self {
+        Self {
+            component_instance_id,
+            dirty_flag_id,
+        }
+    }
+
+    #[must_use]
+    pub const fn component_instance_id(&self) -> &ComponentInstanceId {
+        &self.component_instance_id
+    }
+
+    #[must_use]
+    pub const fn dirty_flag_id(&self) -> &ComputedDirtyFlagId {
+        &self.dirty_flag_id
+    }
+}
+
+impl fmt::Display for ComputedInstanceDirtySlotId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "{}/computed-dirty:{}",
+            self.component_instance_id,
+            percent_encode(self.dirty_flag_id.as_str())
         )
     }
 }

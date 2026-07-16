@@ -2,6 +2,22 @@
 
 EdgeZero compiler output and the browser runtime communicate through the template manifest embedded in `#ez-template-manifest` and emitted as `template.manifest.json`.
 
+## J1-C computed instance slots
+
+For the ordinary template manifest v4/component artifact v3 path, the browser
+runtime registers compiler-emitted computed slot records before evaluation.
+`computedCaches` is keyed by `ComputedInstanceCacheSlotId` and computed dirty
+state by `ComputedInstanceDirtySlotId`; a declaration-level computed ID only
+selects the exact compiler-emitted slot under
+`RuntimeExecutionContext.component_instance_id`. Duplicate slot IDs, duplicate
+`(component instance, computed)` projections, malformed ownership prefixes, or
+missing projections are artifact-integrity failures and are not repaired.
+
+Cold boot evaluates only compiler-planned dirty slots. A cache has no made-up
+value before that evaluation; each dirty slot starts from the existing
+compiler-owned E12 initial value. This does not create a resume policy,
+snapshot record, retained-slot classification, or lazy activation behavior.
+
 ## Versioning
 
 - `schema_version` is required at the manifest root.

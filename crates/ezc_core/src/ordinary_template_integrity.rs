@@ -49,9 +49,36 @@ impl OrdinaryTemplateIntegrityCode {
     }
 }
 
+/// J1-C consumes the next reserved integrity codes before State addressing.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ComputedInstanceSlotIntegrityCode {
+    MissingProjection,
+    DuplicateCacheSlot,
+    DuplicateDirtySlot,
+    ConstructorMismatch,
+    OwnershipMismatch,
+    StaleRegistry,
+    ArtifactProjectionDrift,
+}
+
+impl ComputedInstanceSlotIntegrityCode {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::MissingProjection => "EZASM1305",
+            Self::DuplicateCacheSlot => "EZASM1306",
+            Self::DuplicateDirtySlot => "EZASM1307",
+            Self::ConstructorMismatch => "EZASM1308",
+            Self::OwnershipMismatch => "EZASM1309",
+            Self::StaleRegistry => "EZASM1310",
+            Self::ArtifactProjectionDrift => "EZASM1311",
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::OrdinaryTemplateIntegrityCode;
+    use super::{ComputedInstanceSlotIntegrityCode, OrdinaryTemplateIntegrityCode};
 
     #[test]
     fn reserves_j1p_codes_before_j2_in_amendment_order() {
@@ -75,5 +102,20 @@ mod tests {
         ];
         assert_eq!(codes.first().map(|code| code.as_str()), Some("EZASM1289"));
         assert_eq!(codes.last().map(|code| code.as_str()), Some("EZASM1304"));
+    }
+
+    #[test]
+    fn reserves_j1c_codes_before_state_storage_in_amendment_order() {
+        let codes = [
+            ComputedInstanceSlotIntegrityCode::MissingProjection,
+            ComputedInstanceSlotIntegrityCode::DuplicateCacheSlot,
+            ComputedInstanceSlotIntegrityCode::DuplicateDirtySlot,
+            ComputedInstanceSlotIntegrityCode::ConstructorMismatch,
+            ComputedInstanceSlotIntegrityCode::OwnershipMismatch,
+            ComputedInstanceSlotIntegrityCode::StaleRegistry,
+            ComputedInstanceSlotIntegrityCode::ArtifactProjectionDrift,
+        ];
+        assert_eq!(codes.first().map(|code| code.as_str()), Some("EZASM1305"));
+        assert_eq!(codes.last().map(|code| code.as_str()), Some("EZASM1311"));
     }
 }

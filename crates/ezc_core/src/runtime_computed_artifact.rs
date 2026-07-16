@@ -199,7 +199,7 @@ fn runtime_evaluations(
                 component: component.class_name.clone(),
                 cache_slot: record.cache_slot.as_str().to_string(),
                 dirty_flag: RuntimeComputedArtifactDirtyFlag {
-                    id: record.dirty_flag.id.clone(),
+                    id: record.dirty_flag.id.as_str().to_string(),
                     initial_value: record.dirty_flag.initial_value,
                 },
                 dependencies: record

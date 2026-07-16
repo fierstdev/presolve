@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    build_ordinary_template_instance_registry, build_runtime_component_registry,
-    ApplicationSemanticModel, OptimizedComponentIrReport, OrdinaryTemplateBindingKind,
-    OrdinaryTemplateTargetKind, RuntimeComponentRegistry,
+    build_computed_instance_slot_registry, build_ordinary_template_instance_registry,
+    build_runtime_component_registry, lower_components_to_ir, ApplicationSemanticModel,
+    OptimizedComponentIrReport, OrdinaryTemplateBindingKind, OrdinaryTemplateTargetKind,
+    RuntimeComponentRegistry,
 };
 
 pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 3;
@@ -43,10 +44,18 @@ pub struct SerializedComponentInstance {
     pub ordinary_template_bindings: Vec<String>,
     pub ordinary_template_events: Vec<String>,
     pub storage_prefix: String,
-    pub cache_prefix: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub computed_slots: Vec<SerializedRuntimeComputedSlot>,
     pub context_prefix: String,
     pub instruction_indices: Vec<usize>,
     pub structural_region: Option<String>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SerializedRuntimeComputedSlot {
+    pub computed_id: String,
+    pub cache_slot_id: String,
+    pub dirty_slot_id: String,
+    pub dirty_initial_value: bool,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SerializedOrdinaryTemplateTarget {
@@ -142,11 +151,14 @@ const fn binding_kind_text(kind: OrdinaryTemplateBindingKind) -> &'static str {
 }
 
 #[must_use]
+#[allow(clippy::too_many_lines)]
 pub fn build_runtime_component_artifact(
     model: &ApplicationSemanticModel,
     optimized: &OptimizedComponentIrReport,
 ) -> RuntimeComponentArtifact {
     let ordinary = build_ordinary_template_instance_registry(model);
+    let computed_slots =
+        build_computed_instance_slot_registry(model, &lower_components_to_ir(model));
     let mut artifact = artifact_from_registry(&build_runtime_component_registry(model, optimized));
     artifact.ordinary_template_targets = ordinary
         .targets
@@ -217,6 +229,17 @@ pub fn build_runtime_component_artifact(
             .filter(|event| event.component_instance_id == instance.instance)
             .map(|event| event.declaration_event_id.clone())
             .collect();
+        instance.computed_slots = computed_slots
+            .records
+            .iter()
+            .filter(|slot| slot.component_instance_id.to_string() == instance.instance)
+            .map(|slot| SerializedRuntimeComputedSlot {
+                computed_id: slot.computed_id.to_string(),
+                cache_slot_id: slot.cache_slot_id.to_string(),
+                dirty_slot_id: slot.dirty_slot_id.to_string(),
+                dirty_initial_value: slot.dirty_initial_value,
+            })
+            .collect();
     }
     let mut programs = std::collections::BTreeMap::<String, Vec<String>>::new();
     for instance in model.component_instance_plan.instances.values() {
@@ -271,7 +294,7 @@ pub fn artifact_from_registry(registry: &RuntimeComponentRegistry) -> RuntimeCom
                 ordinary_template_bindings: Vec::new(),
                 ordinary_template_events: Vec::new(),
                 storage_prefix: r.instance_storage_prefix.clone(),
-                cache_prefix: r.instance_cache_prefix.clone(),
+                computed_slots: Vec::new(),
                 context_prefix: r.instance_context_prefix.clone(),
                 instruction_indices: r.optimized_instruction_indices.clone(),
                 structural_region: r.structural_region.as_ref().map(ToString::to_string),
@@ -377,6 +400,9 @@ pub fn validate_runtime_component_artifact(
             )
         })
         .collect::<std::collections::BTreeSet<_>>();
+    let mut computed_cache_slots = std::collections::BTreeSet::new();
+    let mut computed_dirty_slots = std::collections::BTreeSet::new();
+    let mut computed_instance_pairs = std::collections::BTreeSet::new();
     if target_ids.len() != artifact.ordinary_template_targets.len()
         || binding_ids.len() != artifact.ordinary_template_bindings.len()
         || event_keys.len() != artifact.ordinary_template_events.len()
@@ -430,6 +456,18 @@ pub fn validate_runtime_component_artifact(
                         .filter(|event| event.component_instance_id == instance.instance)
                         .map(|event| event.declaration_event_id.clone())
                         .collect::<Vec<_>>()
+                || instance.computed_slots.iter().any(|slot| {
+                    !slot
+                        .cache_slot_id
+                        .starts_with(&format!("{}/computed-cache:", instance.instance))
+                        || !slot
+                            .dirty_slot_id
+                            .starts_with(&format!("{}/computed-dirty:", instance.instance))
+                        || !computed_cache_slots.insert(slot.cache_slot_id.as_str())
+                        || !computed_dirty_slots.insert(slot.dirty_slot_id.as_str())
+                        || !computed_instance_pairs
+                            .insert((instance.instance.as_str(), slot.computed_id.as_str()))
+                })
         })
     {
         return Err("component artifact has invalid ordinary template projection".to_string());
@@ -487,6 +525,37 @@ mod tests {
             ))
         );
         artifact.instances[0].parent = Some("missing".to_string());
+        assert!(validate_runtime_component_artifact(&artifact).is_err());
+    }
+
+    #[test]
+    fn projects_exact_computed_slots_for_each_repeated_instance() {
+        let model = build_application_semantic_model(&ezc_parser::parse_file(
+            "src/RepeatedComputedArtifact.tsx",
+            r#"@component("x-child") class Child { count = state(1); @computed() get doubled() { return this.count * 2; } render() { return <span>{this.doubled}</span>; } }
+@component("x-parent") class Parent { render() { return <><Child /><Child /></>; } }"#,
+        ));
+        let mut artifact =
+            build_runtime_component_artifact(&model, &model.component_ir_optimization);
+        let slots = artifact
+            .instances
+            .iter()
+            .flat_map(|instance| instance.computed_slots.iter())
+            .collect::<Vec<_>>();
+        assert_eq!(slots.len(), 2);
+        assert_ne!(slots[0].cache_slot_id, slots[1].cache_slot_id);
+        assert_ne!(slots[0].dirty_slot_id, slots[1].dirty_slot_id);
+        assert!(validate_runtime_component_artifact(&artifact).is_ok());
+        let computed_instances = artifact
+            .instances
+            .iter()
+            .enumerate()
+            .filter(|(_, instance)| !instance.computed_slots.is_empty())
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let duplicate = artifact.instances[computed_instances[0]].computed_slots[0].clone();
+        artifact.instances[computed_instances[1]].computed_slots[0].cache_slot_id =
+            duplicate.cache_slot_id;
         assert!(validate_runtime_component_artifact(&artifact).is_err());
     }
 }

@@ -12,6 +12,22 @@ execution. This is cold-runtime ownership infrastructure only: it does not
 emit resume anchors/events, lazy activation, chunks, snapshots, or J10
 markers. J1-A alone replaces declaration-level State storage addressing.
 
+## Phase J prerequisite: instance-qualified Computed runtime slots
+
+J1-C follows J1-P and precedes J1-A. It projects every executable component
+instance plus each existing declaration-level E12 computed record into exact
+`ComputedInstanceCacheSlotId` and `ComputedInstanceDirtySlotId` values. The
+component runtime artifact v3 carries those immutable slots, and the runtime
+resolves computed cache reads, writes, and dirtying through the active
+`RuntimeExecutionContext.component_instance_id`. Cold boot creates no
+fabricated cache value and initializes each dirty slot from E12's compiler
+owned initial dirty value. J1-C creates addresses only: it adds no snapshot,
+retention, restoration, resume-boundary, lazy-activation, or liveness policy.
+
+J1-A then uses the same execution context to qualify State storage. J2 alone
+classifies the already-existing State, computed-cache, and computed-dirty
+addresses for resumability.
+
 ## Definition
 
 In EdgeZero, resumability means:

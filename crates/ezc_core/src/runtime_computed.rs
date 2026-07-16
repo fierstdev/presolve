@@ -15,7 +15,7 @@ pub struct RuntimeComputedRegistry {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeComputedRecord {
     pub computed: SemanticId,
-    pub cache_slot: RuntimeComputedCacheSlot,
+    pub cache_slot: ComputedCacheSlotId,
     pub dirty_flag: RuntimeComputedDirtyFlag,
     pub dependencies: Vec<SemanticId>,
     pub evaluation_function: SemanticId,
@@ -25,9 +25,9 @@ pub struct RuntimeComputedRecord {
 
 /// Stable runtime cache-slot identity for one computed value.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct RuntimeComputedCacheSlot(String);
+pub struct ComputedCacheSlotId(String);
 
-impl RuntimeComputedCacheSlot {
+impl ComputedCacheSlotId {
     #[must_use]
     pub fn for_computed(computed: &SemanticId) -> Self {
         Self(format!("{computed}/runtime:cache"))
@@ -39,10 +39,29 @@ impl RuntimeComputedCacheSlot {
     }
 }
 
+/// Compatibility spelling for the declaration-level E12 cache identity.
+pub type RuntimeComputedCacheSlot = ComputedCacheSlotId;
+
+/// Stable declaration-level dirty-flag identity for one computed value.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ComputedDirtyFlagId(String);
+
+impl ComputedDirtyFlagId {
+    #[must_use]
+    pub fn for_computed(computed: &SemanticId) -> Self {
+        Self(format!("{computed}/runtime:dirty"))
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// Stable runtime dirty-flag identity and compiler-provided initial state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeComputedDirtyFlag {
-    pub id: String,
+    pub id: ComputedDirtyFlagId,
     pub initial_value: bool,
 }
 
@@ -50,7 +69,7 @@ impl RuntimeComputedDirtyFlag {
     #[must_use]
     pub fn for_computed(computed: &SemanticId) -> Self {
         Self {
-            id: format!("{computed}/runtime:dirty"),
+            id: ComputedDirtyFlagId::for_computed(computed),
             initial_value: true,
         }
     }
@@ -85,7 +104,7 @@ pub fn build_runtime_computed_registry(
                 computed.clone(),
                 RuntimeComputedRecord {
                     computed: computed.clone(),
-                    cache_slot: RuntimeComputedCacheSlot::for_computed(&computed),
+                    cache_slot: ComputedCacheSlotId::for_computed(&computed),
                     dirty_flag: RuntimeComputedDirtyFlag::for_computed(&computed),
                     dependencies: computed_dependencies(model, &computed),
                     evaluation_function,
@@ -163,7 +182,7 @@ class RuntimeComputed extends Component {
         );
         assert!(doubled_record.dirty_flag.initial_value);
         assert_eq!(
-            doubled_record.dirty_flag.id,
+            doubled_record.dirty_flag.id.as_str(),
             format!("{}/runtime:dirty", doubled_record.computed)
         );
         assert_eq!(

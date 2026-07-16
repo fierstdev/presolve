@@ -20,6 +20,7 @@ pub mod component_ir;
 pub mod component_ir_optimization;
 pub mod component_scope;
 pub mod composition_typing;
+pub mod computed_instance_slots;
 pub mod computed_value;
 pub mod consumer;
 pub mod context;
@@ -172,6 +173,11 @@ pub use component_scope::{ComponentScopeDiagnostic, ComponentScopeGraph};
 pub use composition_typing::{
     collect_composition_type_products, ComponentInvocationTypeRecord, CompositionCompatibility,
     CompositionTypeProducts, InstanceContextBindingTypeRecord, SlotBindingTypeRecord,
+};
+pub use computed_instance_slots::{
+    build_computed_instance_slot_registry, validate_computed_instance_slot_registry,
+    ComputedInstanceSlotRecord, ComputedInstanceSlotRegistry,
+    COMPUTED_INSTANCE_SLOT_REGISTRY_VERSION,
 };
 pub use computed_value::{
     collect_computed_values, ComputedCachePolicy, ComputedDiagnosticCode, ComputedPurity,
@@ -366,7 +372,9 @@ pub use ordinary_template_instance::{
     OrdinaryTemplateInstanceTargetRecord, OrdinaryTemplateTargetKind,
     ORDINARY_TEMPLATE_INSTANCE_REGISTRY_VERSION,
 };
-pub use ordinary_template_integrity::OrdinaryTemplateIntegrityCode;
+pub use ordinary_template_integrity::{
+    ComputedInstanceSlotIntegrityCode, OrdinaryTemplateIntegrityCode,
+};
 pub use page_codegen::{
     generate_standalone_page, generate_standalone_page_with_component_runtime,
     generate_standalone_page_with_component_runtime_and_forms,
@@ -379,9 +387,10 @@ pub use resume_diagnostics::{
     RESUME_INTEGRITY_RESERVATION_START,
 };
 pub use resume_identity::{
-    ResumeActivationId, ResumeActivationRootKind, ResumeAnchorId, ResumeBoundaryId,
-    ResumeBoundaryKind, ResumeBuildId, ResumeCaptureProgramId, ResumeChunkGroupId, ResumeChunkId,
-    ResumeEventId, ResumeIdentityParseError, ResumeRestoreProgramId, ResumeSchemaId, ResumeSlotId,
+    ComputedInstanceCacheSlotId, ComputedInstanceDirtySlotId, ResumeActivationId,
+    ResumeActivationRootKind, ResumeAnchorId, ResumeBoundaryId, ResumeBoundaryKind, ResumeBuildId,
+    ResumeCaptureProgramId, ResumeChunkGroupId, ResumeChunkId, ResumeEventId,
+    ResumeIdentityParseError, ResumeRestoreProgramId, ResumeSchemaId, ResumeSlotId,
     ResumeSnapshotId, ResumeValueRecordId, TemplateInstanceBindingId, TemplateInstanceTargetId,
 };
 pub use resume_manifest::{
@@ -407,8 +416,9 @@ pub use runtime_component_artifact::{
     RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION,
 };
 pub use runtime_computed::{
-    build_runtime_computed_registry, RuntimeComputedCacheSlot, RuntimeComputedDirtyFlag,
-    RuntimeComputedRecord, RuntimeComputedRegistry,
+    build_runtime_computed_registry, ComputedCacheSlotId, ComputedDirtyFlagId,
+    RuntimeComputedCacheSlot, RuntimeComputedDirtyFlag, RuntimeComputedRecord,
+    RuntimeComputedRegistry,
 };
 pub use runtime_computed_artifact::{
     build_runtime_computed_artifact, runtime_computed_artifact_json, RuntimeComputedArtifact,
