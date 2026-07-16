@@ -52,6 +52,9 @@ use crate::form_ownership::{collect_form_ownership_graph, FormOwnershipGraph};
 use crate::form_reset::{collect_reset_products, ResetProducts};
 use crate::form_serialization::{collect_serialization_products, SerializationProducts};
 use crate::form_submission::{collect_submission_products, SubmissionProducts};
+use crate::form_submission_host::{
+    collect_submission_host_products, SubmissionHost, SubmissionHostCandidate,
+};
 use crate::form_tracking::{collect_form_tracking_products, FormTrackingProducts};
 use crate::form_validation::{
     collect_validation_graph, collect_validation_products, ValidationGraph, ValidationRule,
@@ -108,6 +111,8 @@ pub struct ApplicationSemanticModel {
     pub validation_dependency_plans: ValidationDependencyPlans,
     pub form_tracking: FormTrackingProducts,
     pub submissions: SubmissionProducts,
+    pub submission_host_candidates: Vec<SubmissionHostCandidate>,
+    pub submission_hosts: BTreeMap<crate::SubmissionHostId, SubmissionHost>,
     pub serialization: SerializationProducts,
     pub reset: ResetProducts,
     pub form_ir: FormIrReport,
@@ -1607,6 +1612,15 @@ pub fn build_application_semantic_model_from_component_graph(
     let reset = collect_reset_products(&forms, &form_fields, &form_field_bindings, &form_tracking);
     let form_ir = lower_form_ir(&component_instance_plan, &forms, &form_fields);
     let optimized_form_ir = optimize_form_ir(&form_ir);
+    let submission_host_products = collect_submission_host_products(
+        &templates,
+        &component_graph.components,
+        &forms,
+        &form_field_bindings,
+        &submissions.plans,
+        &serialization.plans,
+        &optimized_form_ir.optimized,
+    );
     let runtime_forms = build_runtime_form_registry(
         &forms,
         &form_fields,
@@ -1616,6 +1630,7 @@ pub fn build_application_semantic_model_from_component_graph(
         &submissions,
         &serialization,
         &reset,
+        &submission_host_products.hosts,
     );
     let effect_execution_plan = plan_effect_execution(
         &computed_values,
@@ -1684,6 +1699,8 @@ pub fn build_application_semantic_model_from_component_graph(
         validation_dependency_plans,
         form_tracking,
         submissions,
+        submission_host_candidates: submission_host_products.candidates,
+        submission_hosts: submission_host_products.hosts,
         serialization,
         reset,
         form_ir,
@@ -2074,6 +2091,15 @@ fn build_application_semantic_model_from_files_with_bindings(
     let reset = collect_reset_products(&forms, &form_fields, &form_field_bindings, &form_tracking);
     let form_ir = lower_form_ir(&component_instance_plan, &forms, &form_fields);
     let optimized_form_ir = optimize_form_ir(&form_ir);
+    let submission_host_products = collect_submission_host_products(
+        &templates,
+        &components,
+        &forms,
+        &form_field_bindings,
+        &submissions.plans,
+        &serialization.plans,
+        &optimized_form_ir.optimized,
+    );
     let runtime_forms = build_runtime_form_registry(
         &forms,
         &form_fields,
@@ -2083,6 +2109,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         &submissions,
         &serialization,
         &reset,
+        &submission_host_products.hosts,
     );
     let effect_execution_plan = plan_effect_execution(
         &computed_values,
@@ -2149,6 +2176,8 @@ fn build_application_semantic_model_from_files_with_bindings(
         validation_dependency_plans,
         form_tracking,
         submissions,
+        submission_host_candidates: submission_host_products.candidates,
+        submission_hosts: submission_host_products.hosts,
         serialization,
         reset,
         form_ir,

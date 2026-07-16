@@ -52,6 +52,7 @@ pub mod form_ownership;
 pub mod form_reset;
 pub mod form_serialization;
 pub mod form_submission;
+pub mod form_submission_host;
 pub mod form_tracking;
 pub mod form_validation;
 pub mod form_validation_plan;
@@ -282,6 +283,10 @@ pub use form_submission::{
     collect_submission_products, FormSubmissionPlan, SubmissionDeclarationCandidate,
     SubmissionDeclarationViolation, SubmissionProducts, SubmitResetPolicy,
 };
+pub use form_submission_host::{
+    collect_submission_host_products, SubmissionHost, SubmissionHostCandidate,
+    SubmissionHostProducts, SubmissionHostViolation,
+};
 pub use form_tracking::{
     collect_form_tracking_products, structurally_equal_serializable_values,
     validate_dirty_tracking_graph, validate_touched_tracking_graph, DirtyTrackingGraph,
@@ -439,8 +444,9 @@ pub use semantic_id::{
     FormSubmissionStateSlotId, FormValidationAggregateSlotId, ProviderId, ResetPlanId, SemanticId,
     SemanticOwner, SerializationPlanId, SlotBindingId, SlotContentFragmentId,
     SlotDeclarationCandidateId, SlotId, SlotOutletId, SubmissionDeclarationCandidateId,
-    SubmissionPlanId, TemplatePositionId, TouchedTrackingPlanId, ValidationDependencyCycleId,
-    ValidationGraphId, ValidationPlanId, ValidationRuleCandidateId, ValidationRuleId,
+    SubmissionHostCandidateId, SubmissionHostId, SubmissionPlanId, TemplatePositionId,
+    TouchedTrackingPlanId, ValidationDependencyCycleId, ValidationGraphId, ValidationPlanId,
+    ValidationRuleCandidateId, ValidationRuleId,
 };
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};

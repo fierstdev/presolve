@@ -2,7 +2,7 @@
 use crate::{
     FieldId, FormEntity, FormFieldBinding, FormFieldEntity, FormId, FormInstanceId, FormIrReport,
     FormSerializationPlan, FormSubmissionPlan, ResetProducts, SerializationProducts,
-    SubmissionProducts, ValidationRule, ValidationRuleId,
+    SubmissionHost, SubmissionHostId, SubmissionProducts, ValidationRule, ValidationRuleId,
 };
 use std::collections::BTreeMap;
 pub const RUNTIME_FORM_REGISTRY_VERSION: u32 = 1;
@@ -27,6 +27,7 @@ pub struct RuntimeFormRegistry {
     pub bindings: Vec<FormFieldBinding>,
     pub rules: BTreeMap<ValidationRuleId, ValidationRule>,
     pub reset: ResetProducts,
+    pub hosts: BTreeMap<SubmissionHostId, SubmissionHost>,
 }
 #[must_use]
 #[allow(clippy::too_many_arguments)]
@@ -39,6 +40,7 @@ pub fn build_runtime_form_registry(
     submissions: &SubmissionProducts,
     serialization: &SerializationProducts,
     reset: &ResetProducts,
+    hosts: &BTreeMap<SubmissionHostId, SubmissionHost>,
 ) -> RuntimeFormRegistry {
     let forms = forms
         .values()
@@ -86,6 +88,7 @@ pub fn build_runtime_form_registry(
         bindings: bindings.values().cloned().collect(),
         rules: rules.clone(),
         reset: reset.clone(),
+        hosts: hosts.clone(),
     }
 }
 #[cfg(test)]

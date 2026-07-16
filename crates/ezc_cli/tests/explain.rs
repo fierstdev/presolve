@@ -4138,9 +4138,11 @@ fn build_command_writes_and_embeds_the_v1_forms_artifact() {
         r#"
 @component("form-artifact")
 class FormArtifact {
-  @form() profile!: Form;
+  @form() @serialize("json") profile!: Form;
   @field(this.profile) name = "";
-  render() { return <input field={this.name} />; }
+  submitted = 0;
+  @action() @submit(this.profile) save(): void { this.submitted += 1; }
+  render() { return <form form={this.profile}><input field={this.name} /></form>; }
 }
 "#,
     )
@@ -4170,16 +4172,20 @@ class FormArtifact {
     assert_eq!(forms["schema_version"], 1);
     assert_eq!(forms["forms"].as_array().map(Vec::len), Some(1));
     assert_eq!(forms["instances"].as_array().map(Vec::len), Some(1));
+    assert_eq!(forms["hosts"].as_array().map(Vec::len), Some(1));
+    assert_eq!(forms["hosts"][0]["event"], "submit");
 
     let manifest = std::fs::read_to_string(out_dir.join("template.manifest.json"))
         .expect("failed to read template manifest");
     let manifest: serde_json::Value = serde_json::from_str(&manifest).expect("manifest JSON");
     assert_eq!(manifest["schema_version"], 3);
     assert_eq!(manifest["form_bindings"].as_array().map(Vec::len), Some(1));
+    assert_eq!(manifest["form_hosts"].as_array().map(Vec::len), Some(1));
 
     let page = std::fs::read_to_string(out_dir.join("index.html"))
         .expect("failed to read Forms artifact page");
     assert!(page.contains("id=\"ez-forms-runtime\""));
+    assert!(!page.contains(" form=\""));
 }
 
 #[test]

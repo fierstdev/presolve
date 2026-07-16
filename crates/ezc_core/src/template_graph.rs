@@ -197,6 +197,7 @@ fn element_from_render(
     let direct_bindings = collect_direct_bindings_from_children(&render.children);
 
     let attributes = template_attributes(
+        &tag_name,
         &render.attributes,
         &render.event_handlers,
         &direct_bindings,
@@ -238,6 +239,7 @@ fn element_from_render_element(
         tag_name_span: element.tag_name_span,
         span: element.span,
         attributes: template_attributes(
+            &element.tag_name,
             &element.attributes,
             &element.event_handlers,
             &collect_direct_bindings_from_children(&element.children),
@@ -277,7 +279,9 @@ fn fragment_from_render_fragment(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn template_attributes(
+    tag_name: &str,
     static_attributes: &[RenderAttribute],
     event_handlers: &[RenderEventHandler],
     bindings: &[String],
@@ -289,7 +293,9 @@ fn template_attributes(
     let mut attributes = Vec::new();
 
     for attribute in static_attributes {
-        if attribute.name == "field" {
+        // `field` and the explicit intrinsic-form host marker are compiler
+        // facts, not ordinary HTML attributes.
+        if attribute.name == "field" || (tag_name == "form" && attribute.name == "form") {
             continue;
         }
         match &attribute.value {

@@ -92,6 +92,17 @@ pub struct FieldId(SemanticId);
 #[serde(transparent)]
 pub struct FieldBindingId(SemanticId);
 
+/// Source-qualified candidate identity for a compiler-owned submission-host
+/// attribute. Invalid candidates never acquire a host semantic identity.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SubmissionHostCandidateId(SemanticId);
+
+/// Stable declaration-level identity for one explicit template submission host.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SubmissionHostId(SemanticId);
+
 /// Stable identity for the declaration-level Form ownership projection of one
 /// canonical application/build-root set.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -823,6 +834,38 @@ impl FieldBindingId {
     }
 }
 
+impl SubmissionHostCandidateId {
+    #[must_use]
+    pub fn for_source_position(module_path: impl AsRef<Path>, position: usize) -> Self {
+        Self(
+            SemanticId::form_field_binding_candidate_in_module(module_path, position)
+                .child("submission-host-candidate", "host"),
+        )
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl SubmissionHostId {
+    #[must_use]
+    pub fn for_element(element: &SemanticId, form: &FormId) -> Self {
+        Self(element.child("submission-host", form.as_str()))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 impl FormOwnershipGraphId {
     /// Derives one product identity from the existing canonical build-root
     /// identities. The root set is sorted and deduplicated so file input order
@@ -1444,6 +1487,17 @@ impl fmt::Display for FieldId {
 }
 
 impl fmt::Display for FieldBindingId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for SubmissionHostCandidateId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+impl fmt::Display for SubmissionHostId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(formatter)
     }

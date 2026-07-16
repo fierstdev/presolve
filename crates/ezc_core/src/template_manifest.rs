@@ -22,6 +22,8 @@ pub struct TemplateManifest {
     /// instance-qualified Forms programs. Empty for v1/v2 manifests.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub form_bindings: Vec<ManifestFormBinding>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub form_hosts: Vec<ManifestFormHost>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -32,6 +34,19 @@ pub struct ManifestFormBinding {
     pub input_program: String,
     pub blur_program: String,
     pub channel: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ManifestFormHost {
+    pub host_anchor: String,
+    pub submission_host_id: String,
+    pub form_instance_id: String,
+    pub submission_plan: String,
+    pub submit_action: String,
+    pub action_batch: String,
+    pub serialization_plan: String,
+    pub event: String,
+    pub prevent_default: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -164,6 +179,7 @@ pub fn build_template_manifest(
             .map(|template| manifest_component(component_graph, template))
             .collect::<Vec<_>>(),
         form_bindings: Vec::new(),
+        form_hosts: Vec::new(),
     }
 }
 
@@ -171,10 +187,11 @@ pub fn build_template_manifest(
 #[must_use]
 pub fn build_template_manifest_from_asm(model: &ApplicationSemanticModel) -> TemplateManifest {
     let form_bindings = form_binding_bridges(model);
+    let form_hosts = form_host_bridges(model);
     TemplateManifest {
         // A Forms artifact always requires its v3 instance-qualified bridge.
         // Otherwise preserve the pre-Forms v1/v2 compatibility boundary.
-        schema_version: if !form_bindings.is_empty() {
+        schema_version: if !form_bindings.is_empty() || !form_hosts.is_empty() {
             TEMPLATE_MANIFEST_SCHEMA_VERSION
         } else if model.effect_trigger_plan.action_batches.is_empty() {
             LEGACY_TEMPLATE_MANIFEST_SCHEMA_VERSION
@@ -195,7 +212,87 @@ pub fn build_template_manifest_from_asm(model: &ApplicationSemanticModel) -> Tem
             })
             .collect(),
         form_bindings,
+        form_hosts,
     }
+}
+
+fn form_host_bridges(model: &ApplicationSemanticModel) -> Vec<ManifestFormHost> {
+    let mut bridges = model
+        .submission_hosts
+        .values()
+        .flat_map(|host| {
+            model
+                .optimized_form_ir
+                .optimized
+                .instances
+                .values()
+                .filter(move |instance| {
+                    instance.form == host.form
+                        && model
+                            .component_instance_plan
+                            .instances
+                            .get(&instance.component_instance)
+                            .is_some_and(|component| component.component == host.component)
+                })
+                .filter_map(move |instance| {
+                    form_element_runtime_anchor(
+                        model,
+                        &host.owner_template,
+                        &host.owner_template_element,
+                    )
+                    .map(|host_anchor| ManifestFormHost {
+                        host_anchor,
+                        submission_host_id: host.id.to_string(),
+                        form_instance_id: instance.id.to_string(),
+                        submission_plan: host.submission_plan.as_str().to_string(),
+                        submit_action: host.submit_action.to_string(),
+                        action_batch: host.action_batch.to_string(),
+                        serialization_plan: host.serialization_plan.as_str().to_string(),
+                        event: host.event.to_string(),
+                        prevent_default: host.prevent_default,
+                    })
+                })
+        })
+        .collect::<Vec<_>>();
+    bridges.sort_by(|left, right| {
+        (&left.host_anchor, &left.form_instance_id)
+            .cmp(&(&right.host_anchor, &right.form_instance_id))
+    });
+    bridges
+}
+
+#[allow(clippy::items_after_statements)]
+fn form_element_runtime_anchor(
+    model: &ApplicationSemanticModel,
+    template_id: &crate::SemanticId,
+    target: &crate::SemanticId,
+) -> Option<String> {
+    let template = model
+        .templates
+        .iter()
+        .find(|template| &template.id == template_id)?;
+    fn find(
+        element: &ElementNode,
+        template: &TemplateNode,
+        path: &str,
+        target: &crate::SemanticId,
+    ) -> Option<String> {
+        if template.id.template_entity("element", path) == *target {
+            return Some(element.id.0.clone());
+        }
+        for (index, child) in element.children.iter().enumerate() {
+            if let TemplateChild::Element(child) = child {
+                if let Some(anchor) = find(child, template, &format!("{path}.{index}"), target) {
+                    return Some(anchor);
+                }
+            }
+        }
+        None
+    }
+    template
+        .root
+        .as_ref()
+        .and_then(|root| find(root, template, "root", target))
 }
 
 fn form_binding_bridges(model: &ApplicationSemanticModel) -> Vec<ManifestFormBinding> {
@@ -213,8 +310,11 @@ fn form_binding_bridges(model: &ApplicationSemanticModel) -> Vec<ManifestFormBin
             {
                 continue;
             }
+            let Some(control_anchor) = form_control_runtime_anchor(model, binding) else {
+                continue;
+            };
             bridges.push(ManifestFormBinding {
-                control_anchor: binding.control_entity.to_string(),
+                control_anchor,
                 field_binding_id: binding.id.to_string(),
                 form_instance_id: instance.id.to_string(),
                 input_program: format!("{}/input:{}", instance.id, binding.field),
@@ -236,6 +336,40 @@ fn form_binding_bridges(model: &ApplicationSemanticModel) -> Vec<ManifestFormBin
             ))
     });
     bridges
+}
+
+fn form_control_runtime_anchor(
+    model: &ApplicationSemanticModel,
+    binding: &crate::FormFieldBinding,
+) -> Option<String> {
+    let template = model
+        .templates
+        .iter()
+        .find(|template| template.id == binding.owner_template)?;
+    let root = template.root.as_ref()?;
+    form_control_anchor_in_element(root, template, "root", &binding.control_entity)
+}
+
+fn form_control_anchor_in_element(
+    element: &ElementNode,
+    template: &TemplateNode,
+    path: &str,
+    control: &crate::SemanticId,
+) -> Option<String> {
+    if template.id.template_entity("element", path) == *control {
+        return Some(element.id.0.clone());
+    }
+    for (index, child) in element.children.iter().enumerate() {
+        let TemplateChild::Element(child) = child else {
+            continue;
+        };
+        let child_path = format!("{path}.{index}");
+        if let Some(anchor) = form_control_anchor_in_element(child, template, &child_path, control)
+        {
+            return Some(anchor);
+        }
+    }
+    None
 }
 
 /// Serialize a template manifest as pretty JSON.

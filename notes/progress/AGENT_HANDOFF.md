@@ -3,21 +3,21 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: I15 - Runtime Form Artifact
-* Working tree: I15 is verified; commit pending.
+* Latest completed slice: I15-S - Canonical Form Submission Host Binding
+* Working tree: I16 runtime execution is in progress after the host amendment.
 * Date: 2026-07-15
 
 Last completed slice
 
-* Slice: I15 - Runtime Form Artifact
-* Summary: I15 emits `forms.runtime.json` schema v1 from the canonical I0–I14 products and embeds the exact document as `ez-forms-runtime`. It projects canonical Form/Field/Binding/Rule/Dependency/Submission/Serialization/Reset facts and instance-qualified slots/programs without source or DOM discovery.
-* Key files: crates/ezc_core/src/runtime_form_artifact.rs, crates/ezc_core/src/template_manifest.rs, crates/ezc_core/src/resume_{plan,manifest}.rs, crates/ezc_core/src/page_codegen.rs, crates/ezc_cli/src/main.rs
-* Schema decision: Template manifest v3 adds exact control-anchor/FieldBindingId/FormInstanceId/input/blur/channel bridges. Resume manifest v5 adds Form planning metadata only; v4 remains readable only for documents with no Forms records. Semantic graph v5, ASM inspection v8, and check JSON v4 remain frozen.
+* Slice: I15-S - Canonical Form Submission Host Binding
+* Summary: I15-S corrects the not-yet-frozen template manifest v3 and `forms.runtime.json` v1 Forms surfaces with explicit `<form form={this.<formName>}>` host facts. Every recognized placement has a candidate identity; only a valid same-Component Form with exact submission, serialization, and IR products receives `SubmissionHostId`. Hosts are template-element-owned and instance-qualified; no default, ancestor, control, button, authored-name, or DOM-discovery host exists.
+* Key files: crates/ezc_core/src/form_submission_host.rs, crates/ezc_core/src/{template_graph,template_manifest,runtime_form_artifact,runtime_form_registry}.rs
+* Schema decision: Template manifest v3 now includes exact instance-qualified host anchors/event/action records beside control bridges, and `forms.runtime.json` v1 includes matching exact host records. The compiler-only host `form` attribute is never emitted as HTML. Resume manifest v5, semantic graph v5, ASM inspection v8, and check JSON v4 remain frozen.
 
 Current in-progress slice
 
 * Slice: I16 - Runtime Form Execution
-* Status: begin only after committing the verified I15 artifact slice.
+* Status: host prerequisite completed. I16 may consume only I15-S's exact emitted host records; it must listen only to the emitted submit event and must not add nearest-form lookup, control scanning, authored-name authority, or `FormData(formElement)` semantics.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I15
 * Remaining in Phase I: I16 through I20.
 

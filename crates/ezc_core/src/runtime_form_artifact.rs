@@ -20,6 +20,9 @@ pub struct RuntimeFormsArtifact {
     pub registry_version: u32,
     pub forms: Vec<RuntimeFormsArtifactForm>,
     pub instances: Vec<RuntimeFormsArtifactInstance>,
+    /// Instance-qualified executable submit-host records. These are the only
+    /// runtime authority for locating and handling a native submit event.
+    pub hosts: Vec<RuntimeFormsArtifactHost>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -103,6 +106,20 @@ pub struct RuntimeFormsArtifactInstance {
     pub aggregate_validation_slot: String,
     pub submission_slot: String,
     pub programs: RuntimeFormsArtifactPrograms,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RuntimeFormsArtifactHost {
+    pub id: String,
+    pub host_anchor: String,
+    pub form: String,
+    pub form_instance: String,
+    pub submission_plan: String,
+    pub submit_action: String,
+    pub action_batch: String,
+    pub serialization_plan: String,
+    pub event: String,
+    pub prevent_default: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -280,14 +297,85 @@ pub fn build_runtime_forms_artifact(model: &ApplicationSemanticModel) -> Runtime
             },
         })
         .collect();
+    let hosts = model
+        .submission_hosts
+        .values()
+        .flat_map(|host| {
+            model
+                .optimized_form_ir
+                .optimized
+                .instances
+                .values()
+                .filter(move |instance| {
+                    instance.form == host.form
+                        && model
+                            .component_instance_plan
+                            .instances
+                            .get(&instance.component_instance)
+                            .is_some_and(|component| component.component == host.component)
+                })
+                .map(move |instance| RuntimeFormsArtifactHost {
+                    id: host.id.to_string(),
+                    host_anchor: runtime_anchor_for_element(
+                        model,
+                        &host.owner_template,
+                        &host.owner_template_element,
+                    )
+                    .expect("valid host has exact template anchor"),
+                    form: host.form.to_string(),
+                    form_instance: instance.id.to_string(),
+                    submission_plan: host.submission_plan.as_str().to_string(),
+                    submit_action: host.submit_action.to_string(),
+                    action_batch: host.action_batch.to_string(),
+                    serialization_plan: host.serialization_plan.as_str().to_string(),
+                    event: host.event.to_string(),
+                    prevent_default: host.prevent_default,
+                })
+        })
+        .collect();
     let artifact = RuntimeFormsArtifact {
         schema_version: RUNTIME_FORM_ARTIFACT_SCHEMA_VERSION,
         registry_version: RUNTIME_FORM_REGISTRY_VERSION,
         forms,
         instances,
+        hosts,
     };
     debug_assert!(validate_runtime_forms_artifact(&artifact).is_valid);
     artifact
+}
+
+#[allow(clippy::items_after_statements)]
+fn runtime_anchor_for_element(
+    model: &ApplicationSemanticModel,
+    template_id: &crate::SemanticId,
+    element: &crate::SemanticId,
+) -> Option<String> {
+    let template = model
+        .templates
+        .iter()
+        .find(|template| &template.id == template_id)?;
+    fn find(
+        element: &crate::ElementNode,
+        template: &crate::TemplateNode,
+        path: &str,
+        target: &crate::SemanticId,
+    ) -> Option<String> {
+        if template.id.template_entity("element", path) == *target {
+            return Some(element.id.0.clone());
+        }
+        for (index, child) in element.children.iter().enumerate() {
+            if let crate::TemplateChild::Element(child) = child {
+                if let Some(anchor) = find(child, template, &format!("{path}.{index}"), target) {
+                    return Some(anchor);
+                }
+            }
+        }
+        None
+    }
+    template
+        .root
+        .as_ref()
+        .and_then(|root| find(root, template, "root", element))
 }
 
 #[must_use]
@@ -317,6 +405,14 @@ pub fn validate_runtime_forms_artifact(
     for instance in &artifact.instances {
         if !forms.contains(instance.form.as_str()) {
             diagnostics.push(format!("unknown Form for instance {}", instance.id));
+        }
+    }
+    for host in &artifact.hosts {
+        if !instances.contains(host.form_instance.as_str())
+            || !forms.contains(host.form.as_str())
+            || host.event != "submit"
+        {
+            diagnostics.push(format!("invalid submission host {}", host.id));
         }
     }
     RuntimeFormsArtifactValidation {
