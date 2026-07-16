@@ -81,6 +81,7 @@ pub mod resume_instance;
 pub mod resume_liveness;
 pub mod resume_manifest;
 pub mod resume_plan;
+pub mod resume_schema;
 pub mod route_graph;
 pub mod runtime_codegen;
 pub mod runtime_component;
@@ -436,6 +437,12 @@ pub use resume_plan::{
     build_resume_plan, ComponentInstanceResumePlan, FormFieldResumePlan, FormInstanceResumePlan,
     ResumeComponentPlan, ResumeComputedPlan, ResumePlan, SlotBindingResumePlan,
     StructuralRegionResumePlan,
+};
+pub use resume_schema::{
+    build_resume_schema_registry, resume_value_codec, validate_resume_schema_registry,
+    ResumeBoundarySchema, ResumeObjectPropertyCodec, ResumeSchemaBlock, ResumeSchemaBlockReason,
+    ResumeSchemaIntegrityCode, ResumeSchemaIntegrityDiagnostic, ResumeSchemaRegistry,
+    ResumeSlotSchema, ResumeValueCodec, RESUME_SCHEMA_REGISTRY_VERSION,
 };
 pub use runtime_codegen::generate_runtime_stub;
 pub use runtime_component::{

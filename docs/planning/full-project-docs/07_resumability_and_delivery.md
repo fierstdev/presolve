@@ -126,6 +126,30 @@ Internal integrity codes `EZASM1343` through `EZASM1348` cover duplicate
 inclusion, missing programs, dependency cycles, root correspondence, unrelated
 programs, and deterministic output drift. No public schema changes.
 
+## Phase J canonical resume schemas
+
+J6 creates exactly one compiler-only `ResumeBoundarySchema` for every J3
+boundary. A schema contains only J2 retained and recomputable slots; J2 blocked
+slots remain explicit `ResumeSchemaBlock` records and excluded Effect scheduler
+metadata is never serialized. Every included slot reciprocally maps its exact
+existing runtime address to one `ResumeSlotId`, one canonical semantic type,
+and one closed codec.
+
+The codec vocabulary is limited to null, boolean, number, string, homogeneous
+array, canonically ordered object properties, and an explicit nullable wrapper.
+There is no reflective codec, runtime object walking, or runtime type guessing.
+Authored State, Computed cache, Context, and Form Field values derive codecs
+from canonical semantic types. Compiler-owned Form dirty/touched/aggregate
+slots are boolean, validation results are arrays of strings, and submission
+state is string-valued, matching the existing frozen runtime representations.
+Unsupported tuples, resources, and non-null unions block instead of acquiring a
+generic encoder.
+
+Internal integrity codes `EZASM1349` through `EZASM1354` cover malformed
+semantic types, duplicate object properties, unsupported values, missing slot
+reciprocity, identity collisions, and canonical ordering/index drift. J6 makes
+no public schema or runtime change.
+
 ## Definition
 
 In EdgeZero, resumability means:

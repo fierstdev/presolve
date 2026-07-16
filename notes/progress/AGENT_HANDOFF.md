@@ -3,25 +3,27 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: J5 - Deterministic Interaction Chunk Graph
-* Working tree: ready for the atomic J5 commit; the next authored slice is J6 resume schemas/codecs.
+* Latest completed slice: J6 - Canonical Resume Slot Schemas and Codecs
+* Working tree: ready for the atomic J6 commit; the next authored slice is J7 generated capture programs.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: J5 - Deterministic Interaction Chunk Graph
-* Summary: one eager root and one isolated lazy root per exact Interaction activation, with canonical program closures and deterministic module path/hash planning.
-* Key files: `resume_chunk.rs`, `lib.rs`, `07_resumability_and_delivery.md`
-* Boundary: no schema/codec, capture/restore program, public manifest, emitted JS, anchor, loader, or runtime behavior.
+* Slice: J6 - Canonical Resume Slot Schemas and Codecs
+* Summary: one exact schema per J3 boundary, closed semantic-type-derived codecs, explicit nullable representation, and reciprocal slot/schema indexes.
+* Key files: `resume_schema.rs`, `lib.rs`, `07_resumability_and_delivery.md`
+* Boundary: no capture/restore program, public manifest, emitted JS, anchor, loader, or runtime behavior.
 
 Current in-progress slice
 
-* Slice: J6 - Resume Slot Schemas and Codecs
-* Status: Ready after the atomic J5 commit.
+* Slice: J7 - Generated Capture Programs
+* Status: Ready after the atomic J6 commit.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase I: none. Next: J6 exact per-boundary schemas and closed codecs.
+* Remaining in Phase I: none. Next: J7 exact-slot capture programs and internal snapshot model v1.
 
 Verification
+
+* J6 verification: `cargo test -p ezc_core --lib` passes all 385 core tests; strict all-target core clippy, formatting, and `git diff --check` pass. Focused proofs cover canonical object order, explicit nullable codecs, non-null union rejection, one schema per boundary, exact J2 slot reciprocity, reverse-input determinism, frozen Form runtime slot codecs, and `EZASM1349`-`EZASM1354`.
 
 * J5 verification: `cargo test -p ezc_core --lib` passes all 379 core tests; strict all-target core clippy, formatting, and `git diff --check` pass. Focused proofs cover one eager root, isolated interaction roots, no lazy dependencies/shared chunks, exact action isolation, reversed-input determinism, and `EZASM1343`-`EZASM1348`.
 
@@ -174,6 +176,10 @@ Architecture decisions made
 * Decision: J5 duplicates required generated programs into each exact lazy root and permits no lazy-to-lazy dependency or shared lazy chunk.
 * Reason: This is the frozen Phase J v1 isolation contract and keeps activation roots independently loadable without size heuristics.
 * Tradeoff: deterministic duplication is accepted until Phase K; J5 plans module bytes/paths only and does not emit runnable chunks.
+
+* Decision: J6 includes exactly J2 retained and recomputable slots in one schema per J3 boundary; J2 blocks remain schema blocks and excluded Effect scheduler metadata has no codec.
+* Reason: Capture and restore generation need exact reciprocity with liveness and boundaries without turning blocked or intentionally excluded runtime metadata into snapshot values.
+* Tradeoff: Form validation, aggregate validity, and submission state use frozen compiler-owned types matching the existing runtime representation; unsupported tuples, resources, and non-null unions fail closed until a later contract extends the codec vocabulary.
 
 * Decision: I7 creates one declaration-level `ValidationPlanId::for_form(FormId)` for every valid Form, including empty Forms, and one `FieldDependencyId::for_rule_and_source(ValidationRuleId, FieldId)` for each eligible I6 direct dependency edge.
 * Reason: Form plans and dependency records need stable typed names independent of Rule counts, source order, Component instances, runtime registration, or DOM identity; future runtime planning can refer to a complete Form plan without using absence as policy.
@@ -1165,9 +1171,9 @@ Known limitations
 
 Exact next step
 
-Commit J5 atomically as `compiler: plan deterministic resume chunks`, verify
-the worktree is clean, then implement J6 exact per-boundary schemas and closed
-semantic-type-derived codecs without reflection or runtime type guessing.
+Commit J6 atomically as `compiler: define canonical resume schemas`, verify the
+worktree is clean, then implement J7 one exact-slot capture program per
+boundary plus the application envelope writer and internal snapshot model v1.
 
 Useful commands
 
@@ -1199,7 +1205,7 @@ Useful commands
 Changed but uncommitted files
 
 * `crates/ezc_core/src/lib.rs`
-* `crates/ezc_core/src/resume_chunk.rs`
+* `crates/ezc_core/src/resume_schema.rs`
 * `docs/planning/full-project-docs/07_resumability_and_delivery.md`
 * `notes/progress/2026-W28.md`
 * `notes/progress/AGENT_HANDOFF.md`
