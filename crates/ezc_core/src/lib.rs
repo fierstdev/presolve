@@ -47,6 +47,7 @@ pub mod form_binding;
 pub mod form_diagnostics;
 pub mod form_field;
 pub mod form_ir;
+pub mod form_ir_optimization;
 pub mod form_ownership;
 pub mod form_reset;
 pub mod form_serialization;
@@ -257,6 +258,9 @@ pub use form_diagnostics::{FormDiagnosticReservation, FORM_DIAGNOSTIC_RESERVATIO
 pub use form_field::{collect_form_field_products, FormFieldEntity, FormFieldProducts};
 pub use form_ir::{
     lower_form_ir, FormInstanceIr, FormIrOperation, FormIrReport, FormRuntimeStorage,
+};
+pub use form_ir_optimization::{
+    optimize_form_ir, FormIrOptimizationMetrics, OptimizedFormIrReport,
 };
 pub use form_ownership::{
     collect_form_ownership_graph, validate_form_ownership_graph, FormOwnershipEdge,

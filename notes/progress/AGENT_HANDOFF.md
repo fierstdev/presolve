@@ -3,25 +3,30 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: I12 - Canonical Form IR
-* Working tree: I12 is verified; commit pending.
+* Latest completed slice: I13 - Form IR Optimization
+* Working tree: I13 is verified; commit pending.
 * Date: 2026-07-15
 
 Last completed slice
 
-* Slice: I12 - Canonical Form IR
-* Summary: I12 projects each valid Form through every existing Phase H Component instance into a distinct `FormInstanceId`, with all mutable value/dirty/touched/validation/aggregate/submission slots derived from that exact instance. It emits compiler-owned typed initialize/input/blur/reset operation sequences; no declaration ID is a mutable storage key.
-* Key files: crates/ezc_core/src/form_ir.rs, crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/lib.rs
-* Schema decision: I12 is internal IR only. Existing public schemas and runtime artifacts remain unchanged; no Form execution occurs.
+* Slice: I13 - Form IR Optimization
+* Summary: I13 retains an immutable source `FormIrReport`, an independently owned optimized report, zero observable-changing metrics, and an explicit immutable-input proof. No instance, Field slot, control/validation write, submission transition, action invocation, or reset operation is removed, merged, or reordered.
+* Key files: crates/ezc_core/src/form_ir_optimization.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/lib.rs
+* Schema decision: I13 is internal only. Existing public schemas and runtime artifacts remain unchanged; no Form execution occurs.
 
 Current in-progress slice
 
-* Slice: I13 - Form IR Optimization
-* Status: I12 is complete and ready to commit. I13 may optimize only compiler-owned Form IR without changing identity, observable order, or plans.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I12
-* Remaining in Phase I: I13 through I20.
+* Slice: I14 - Runtime Form Registry
+* Status: I13 is complete and ready to commit. I14 may project compiler-owned I8–I13 metadata into a versioned internal runtime registry only; runtime discovery remains forbidden.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I13
+* Remaining in Phase I: I14 through I20.
 
 Verification
+
+* I13 `cargo test -p ezc_core`: pass (342 core tests, including immutable Form IR optimization coverage)
+* `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass
+* `cargo fmt --check`: pass
+* git diff --check: pass
 
 * I12 `cargo test -p ezc_core`: pass (341 core tests, including instance-qualified Form IR coverage)
 * `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass
