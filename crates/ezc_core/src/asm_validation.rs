@@ -96,6 +96,7 @@ pub fn validate_application_semantic_model(
     validate_form_ownership(model, &mut diagnostics);
     validate_form_validation(model, &mut diagnostics);
     validate_form_tracking(model, &mut diagnostics);
+    validate_form_submissions(model, &mut diagnostics);
     validate_contexts(model, &mut diagnostics);
     validate_providers(model, &mut diagnostics);
     validate_consumers(model, &mut diagnostics);
@@ -238,6 +239,26 @@ fn validate_form_tracking(
                 message: diagnostic.message.clone(),
             }),
     );
+}
+
+fn validate_form_submissions(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    let expected = crate::collect_submission_products(
+        &model.components,
+        &model.forms,
+        &model.form_fields,
+        &model.validation_rules,
+        &model.effect_trigger_plan,
+    );
+    if model.submissions != expected {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1286".to_string(),
+            message: "I9 submission products do not match canonical declaration planning"
+                .to_string(),
+        });
+    }
 }
 
 fn validate_form_ownership(

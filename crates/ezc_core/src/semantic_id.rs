@@ -146,6 +146,16 @@ pub struct TouchedTrackingPlanId(SemanticId);
 #[serde(transparent)]
 pub struct FieldTrackingId(SemanticId);
 
+/// Source-qualified identity for an authored `@submit` declaration candidate.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SubmissionDeclarationCandidateId(SemanticId);
+
+/// Stable identity for the submission plan of one canonical Form.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SubmissionPlanId(SemanticId);
+
 /// Stable identity for one compiler-owned component Slot semantic entity.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -365,6 +375,17 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn submission_declaration_candidate_in_module(
+        module_path: impl AsRef<Path>,
+        position: usize,
+    ) -> Self {
+        Self(format!(
+            "module:{}/submission-declaration-candidate:{position}",
+            normalized_module_path(module_path.as_ref())
+        ))
+    }
+
+    #[must_use]
     pub fn field(&self, name: &str) -> Self {
         self.child("field", name)
     }
@@ -397,6 +418,11 @@ impl SemanticId {
     #[must_use]
     pub fn field_tracking(&self) -> Self {
         Self(format!("{}/tracking", self.as_str()))
+    }
+
+    #[must_use]
+    pub fn submission_plan(&self) -> Self {
+        Self(format!("{}/submission-plan", self.as_str()))
     }
 
     #[must_use]
@@ -921,6 +947,43 @@ impl FieldTrackingId {
     #[must_use]
     pub fn for_field(field: &FieldId) -> Self {
         Self(field.as_semantic_id().field_tracking())
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl SubmissionDeclarationCandidateId {
+    #[must_use]
+    pub fn for_source_position(module_path: impl AsRef<Path>, position: usize) -> Self {
+        Self(SemanticId::submission_declaration_candidate_in_module(
+            module_path,
+            position,
+        ))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl SubmissionPlanId {
+    #[must_use]
+    pub fn for_form(form: &FormId) -> Self {
+        Self(form.as_semantic_id().submission_plan())
     }
 
     #[must_use]

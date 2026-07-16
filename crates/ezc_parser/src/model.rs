@@ -313,6 +313,7 @@ pub struct ParsedMethod {
     pub is_getter: bool,
     pub is_setter: bool,
     pub is_async: bool,
+    pub is_static: bool,
     pub jsx_roots: Vec<ParsedJsxNode>,
     pub bindings: Vec<String>,
     pub state_updates: Vec<ParsedStateUpdate>,

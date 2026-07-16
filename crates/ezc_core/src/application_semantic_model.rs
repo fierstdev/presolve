@@ -47,6 +47,7 @@ use crate::form_binding::{
 };
 use crate::form_field::{collect_form_field_products, FormFieldEntity};
 use crate::form_ownership::{collect_form_ownership_graph, FormOwnershipGraph};
+use crate::form_submission::{collect_submission_products, SubmissionProducts};
 use crate::form_tracking::{collect_form_tracking_products, FormTrackingProducts};
 use crate::form_validation::{
     collect_validation_graph, collect_validation_products, ValidationGraph, ValidationRule,
@@ -101,6 +102,7 @@ pub struct ApplicationSemanticModel {
     pub validation_graph: ValidationGraph,
     pub validation_dependency_plans: ValidationDependencyPlans,
     pub form_tracking: FormTrackingProducts,
+    pub submissions: SubmissionProducts,
     pub slots: BTreeMap<SlotId, SlotEntity>,
     pub component_invocations: BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
     pub component_instance_plan: ComponentInstancePlan,
@@ -523,6 +525,11 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub const fn form_tracking(&self) -> &FormTrackingProducts {
         &self.form_tracking
+    }
+
+    #[must_use]
+    pub const fn submissions(&self) -> &SubmissionProducts {
+        &self.submissions
     }
 
     #[must_use]
@@ -1564,6 +1571,13 @@ pub fn build_application_semantic_model_from_component_graph(
         &effect_reactive_analysis,
         &provenance,
     );
+    let submissions = collect_submission_products(
+        &component_graph.components,
+        &forms,
+        &form_fields,
+        &validation_rules,
+        &effect_trigger_plan,
+    );
     let effect_execution_plan = plan_effect_execution(
         &computed_values,
         &effects,
@@ -1630,6 +1644,7 @@ pub fn build_application_semantic_model_from_component_graph(
         validation_graph,
         validation_dependency_plans,
         form_tracking,
+        submissions,
         slots,
         component_invocations,
         component_instance_plan,
@@ -2003,6 +2018,13 @@ fn build_application_semantic_model_from_files_with_bindings(
         &effect_reactive_analysis,
         &provenance,
     );
+    let submissions = collect_submission_products(
+        &components,
+        &forms,
+        &form_fields,
+        &validation_rules,
+        &effect_trigger_plan,
+    );
     let effect_execution_plan = plan_effect_execution(
         &computed_values,
         &effects,
@@ -2067,6 +2089,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         validation_graph,
         validation_dependency_plans,
         form_tracking,
+        submissions,
         slots,
         component_invocations,
         component_instance_plan,

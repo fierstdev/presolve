@@ -9,7 +9,8 @@ use crate::semantic_id::{
     ComponentInstanceId, ComponentInvocationId, ComponentStructuralRegionId, ConsumerId,
     ContextDeclarationCandidateId, ContextId, EffectId, EffectStatementId, FieldId,
     FormDeclarationCandidateId, FormFieldDeclarationCandidateId, FormId, ProviderId, SemanticId,
-    SemanticOwner, SlotBindingId, SlotDeclarationCandidateId, SlotId, ValidationRuleCandidateId,
+    SemanticOwner, SlotBindingId, SlotDeclarationCandidateId, SlotId,
+    SubmissionDeclarationCandidateId, ValidationRuleCandidateId,
 };
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
@@ -65,6 +66,8 @@ pub struct ComponentNode {
     /// Parser-normalized source facts for every recognized `@validate`
     /// placement. I6 lowering consumes these facts without revisiting syntax.
     pub validation_rule_declaration_facts: Vec<AuthoredValidationRuleDeclarationFact>,
+    /// Parser-normalized source facts for every recognized `@submit` method.
+    pub submission_declaration_facts: Vec<AuthoredSubmissionDeclarationFact>,
     /// Module imports that shadow compiler-owned validation intrinsic names.
     pub shadowed_validation_intrinsics: BTreeSet<String>,
     pub methods: Vec<ComponentMethod>,
@@ -95,6 +98,30 @@ pub struct AuthoredValidationRuleDeclarationFact {
     pub decorator_provenance: SourceProvenance,
     pub name_provenance: Option<SourceProvenance>,
     pub provenance: SourceProvenance,
+}
+
+/// Source-faithful I9 facts retained before Form/action resolution.
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthoredSubmissionDeclarationFact {
+    pub id: SubmissionDeclarationCandidateId,
+    pub owner_component: Option<SemanticId>,
+    pub method: Option<SemanticId>,
+    pub method_name: Option<String>,
+    pub is_static: bool,
+    pub is_async: bool,
+    pub parameter_count: usize,
+    pub return_type: Option<String>,
+    pub submit_invoked: bool,
+    pub submit_argument_count: usize,
+    pub form_designator: Option<String>,
+    pub has_action: bool,
+    pub action_invoked: bool,
+    pub action_argument_count: usize,
+    pub inherited: bool,
+    pub decorator_provenance: SourceProvenance,
+    pub form_designator_provenance: Option<SourceProvenance>,
+    pub method_provenance: SourceProvenance,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -975,6 +1002,7 @@ pub struct ComponentMethod {
     pub name: String,
     pub is_getter: bool,
     pub is_async: bool,
+    pub is_static: bool,
     pub decorators: Vec<String>,
     pub semantic_role: MethodSemanticRole,
     pub local_variables: Vec<MethodLocalVariable>,
@@ -1392,6 +1420,9 @@ fn build_component_node(
         collect_render_list_diagnostics(render, &state_fields, &class.name, diagnostics);
     }
 
+    let submission_declaration_facts =
+        submission_declaration_facts_from_class(class, path, element_name.is_some(), &id);
+
     ComponentNode {
         id,
         owner: SemanticOwner::Application,
@@ -1415,6 +1446,7 @@ fn build_component_node(
         form_declaration_candidates,
         form_field_declaration_candidates,
         validation_rule_declaration_facts,
+        submission_declaration_facts,
         shadowed_validation_intrinsics,
         methods,
         actions,
@@ -1989,6 +2021,73 @@ fn validation_rule_declaration_facts_from_class(
         )
             .cmp(&(
                 right.provenance.path.as_path(),
+                right.decorator_provenance.span.start,
+                right.id.as_str(),
+            ))
+    });
+    facts
+}
+
+fn submission_declaration_facts_from_class(
+    class: &ParsedClass,
+    path: &Path,
+    is_canonical_component: bool,
+    component: &SemanticId,
+) -> Vec<AuthoredSubmissionDeclarationFact> {
+    let mut facts = class
+        .methods
+        .iter()
+        .flat_map(|method| {
+            let action = method
+                .decorators
+                .iter()
+                .find(|decorator| decorator.name == "action");
+            method
+                .decorators
+                .iter()
+                .filter(move |decorator| decorator.name == "submit")
+                .map(move |decorator| AuthoredSubmissionDeclarationFact {
+                    id: SubmissionDeclarationCandidateId::for_source_position(
+                        path,
+                        decorator.span.start,
+                    ),
+                    owner_component: is_canonical_component.then(|| component.clone()),
+                    method: is_canonical_component.then(|| component.method(&method.name)),
+                    method_name: Some(method.name.clone()),
+                    is_static: method.is_static,
+                    is_async: method.is_async,
+                    parameter_count: method.parameters.len(),
+                    return_type: method
+                        .return_type_annotation
+                        .as_ref()
+                        .map(|annotation| annotation.text.clone()),
+                    submit_invoked: decorator.is_invoked,
+                    submit_argument_count: decorator.argument_count,
+                    form_designator: decorator
+                        .this_member_argument
+                        .as_ref()
+                        .map(|designator| designator.member.clone()),
+                    has_action: action.is_some(),
+                    action_invoked: action.is_some_and(|decorator| decorator.is_invoked),
+                    action_argument_count: action.map_or(0, |decorator| decorator.argument_count),
+                    inherited: class.heritage.is_some(),
+                    decorator_provenance: SourceProvenance::new(path, decorator.span),
+                    form_designator_provenance: decorator
+                        .argument_spans
+                        .first()
+                        .map(|span| SourceProvenance::new(path, *span)),
+                    method_provenance: SourceProvenance::new(path, method.span),
+                })
+        })
+        .collect::<Vec<_>>();
+    facts.sort_by(|left, right| {
+        (
+            left.decorator_provenance.path.as_path(),
+            left.decorator_provenance.span.start,
+            left.id.as_str(),
+        )
+            .cmp(&(
+                right.decorator_provenance.path.as_path(),
                 right.decorator_provenance.span.start,
                 right.id.as_str(),
             ))
@@ -2741,6 +2840,7 @@ fn component_method_from_parsed(
         name: method.name.clone(),
         is_getter: method.is_getter,
         is_async: method.is_async,
+        is_static: method.is_static,
         decorators: method
             .decorators
             .iter()

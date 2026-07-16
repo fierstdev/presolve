@@ -3,25 +3,31 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: I8 - Dirty and Touched Tracking
-* Working tree: I8 is verified; commit pending.
+* Latest completed slice: I9 - Submission Planning
+* Working tree: I9 is verified; commit pending.
 * Date: 2026-07-15
 
 Last completed slice
 
-* Slice: I8 - Dirty and Touched Tracking
-* Summary: I8 consumes immutable I3 Form Fields, I4 bindings, and I5 ownership only. Every valid Form receives one `DirtyTrackingPlanId` and one `TouchedTrackingPlanId`; every valid Field, including unbound Fields, receives one shared declaration-level `FieldTrackingId`. Dirty is a pure structural comparison of a committed canonical value with the I3 initial value and clears on return/reset. Touched starts false and can be set only by a retained bound-control blur source; radio controls share the Field record, while unbound Fields retain no blur source. The plans record reset and future validation handoff facts but execute nothing and schedule nothing.
-* Key files: crates/ezc_core/src/form_tracking.rs, crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/asm_validation.rs, crates/ezc_core/src/lib.rs
-* Schema decision: I8 remains an in-memory declaration-planning product only. Semantic graph v5, CLI ASM inspection v8, check JSON v4, template manifest v2, resume manifest v4, all runtime artifacts, and browser output remain unchanged. No Form instance, tracking state/execution, validator execution, submission/reset/serialization execution, IR, runtime registry/artifact, public diagnostic, or resumability product is introduced.
+* Slice: I9 - Submission Planning
+* Summary: I9 retains every `@submit` method placement as a source-qualified candidate and lowers only direct, non-static, non-async, zero-parameter `@action() @submit(this.<form>)` methods with exact `void` return types. A valid plan is keyed solely by `SubmissionPlanId::for_form`, references the existing canonical action batch, validates every valid I6 Rule in I3 Field then I6 Rule order, blocks on any invalid rule, and has `SubmitResetPolicy::Never`.
+* Key files: crates/ezc_core/src/form_submission.rs, crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/application_semantic_model.rs
+* Schema decision: I9 remains an in-memory declaration-planning product only. Existing public schemas and runtime artifacts remain unchanged; no Form instance, submission execution, serializer, reset execution, runtime registry/artifact, public diagnostic, or browser behavior is introduced.
 
 Current in-progress slice
 
-* Slice: I9 - Submission Planning
-* Status: I8 is complete and ready to commit. The authoritative I9 contract defines direct `@action() @submit(this.<formName>)` declaration retention, exact action/Form resolution, full-Form rule ordering, and reset policy only; do not begin serialization or runtime execution.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I8
-* Remaining in Phase I: I9 through I20.
+* Slice: I10 - Serialization Planning
+* Status: I9 is complete and ready to commit. I10 may only add canonical serialization-format selection and ordered Form serialization plans; do not introduce submission execution, reset execution, or runtime artifacts.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I9
+* Remaining in Phase I: I10 through I20.
 
 Verification
+
+* I9 `cargo test -p ezc_parser`: pass (13 parser unit, 26 parser integration tests)
+* I9 `cargo test -p ezc_core`: pass (337 core tests, including 2 focused I9 tests)
+* `cargo clippy -p ezc_parser -p ezc_core --all-targets -- -D warnings`: pass
+* `cargo fmt --check`: pass
+* git diff --check: pass
 
 * I8 `cargo test -p ezc_core`: pass (334 core tests, including 4 focused I8 tests)
 * `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass

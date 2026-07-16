@@ -454,10 +454,12 @@ fn parse_decorator(
 }
 
 fn normalized_decorators(mut decorators: Vec<ParsedDecorator>) -> Vec<ParsedDecorator> {
-    if !decorators
-        .iter()
-        .any(|decorator| matches!(decorator.name.as_str(), "form" | "field" | "validate"))
-    {
+    if !decorators.iter().any(|decorator| {
+        matches!(
+            decorator.name.as_str(),
+            "form" | "field" | "validate" | "submit"
+        )
+    }) {
         decorators.retain(|decorator| decorator.is_invoked);
     }
     decorators
@@ -746,6 +748,7 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
         is_getter: method.kind == oxc_ast::ast::MethodDefinitionKind::Get,
         is_setter: method.kind == oxc_ast::ast::MethodDefinitionKind::Set,
         is_async: method.value.r#async,
+        is_static: method.r#static,
         jsx_roots,
         bindings,
         state_updates,

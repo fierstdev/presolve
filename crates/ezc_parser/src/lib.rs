@@ -532,4 +532,51 @@ class Effects extends Component {
             ParsedEffectStatementKind::Unsupported(ParsedUnsupportedEffectStatementKind::Branch)
         ));
     }
+
+    #[test]
+    fn retains_submit_decorator_designator_and_method_signature_facts() {
+        let parsed = parse_file(
+            "src/Profile.tsx",
+            r#"
+@component("profile")
+class Profile {
+  @action() @submit(this.profileForm) save(): void {}
+  @submit invalid(value: string): string { return ""; }
+  @action() @submit(this.profileForm) static saveStatic(): void {}
+}
+"#,
+        );
+        let methods = &parsed.classes[0].methods;
+        let submit = methods[0]
+            .decorators
+            .iter()
+            .find(|decorator| decorator.name == "submit")
+            .expect("submit decorator");
+        assert!(submit.is_invoked);
+        assert_eq!(submit.argument_count, 1);
+        assert_eq!(
+            submit
+                .this_member_argument
+                .as_ref()
+                .map(|value| value.member.as_str()),
+            Some("profileForm")
+        );
+        assert_eq!(
+            methods[0]
+                .return_type_annotation
+                .as_ref()
+                .map(|annotation| annotation.text.as_str()),
+            Some("void")
+        );
+        assert_eq!(methods[1].parameters.len(), 1);
+        assert!(
+            !methods[1]
+                .decorators
+                .iter()
+                .find(|decorator| decorator.name == "submit")
+                .expect("bare submit")
+                .is_invoked
+        );
+        assert!(methods[2].is_static);
+    }
 }

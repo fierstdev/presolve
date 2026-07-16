@@ -47,6 +47,7 @@ pub mod form_binding;
 pub mod form_diagnostics;
 pub mod form_field;
 pub mod form_ownership;
+pub mod form_submission;
 pub mod form_tracking;
 pub mod form_validation;
 pub mod form_validation_plan;
@@ -114,21 +115,22 @@ pub use component_graph::{
     build_component_graph, build_component_graph_for_module, ArithmeticEvaluationError,
     ArithmeticExpression, ArithmeticExpressionKind, ArithmeticOperator, AuthoredComponentHeritage,
     AuthoredContextDeclarationCandidate, AuthoredDeclarationKind, AuthoredSlotDeclarationCandidate,
-    AuthoredValidationRuleArgument, AuthoredValidationRuleArgumentKind,
-    AuthoredValidationRuleDeclarationFact, AuthoredValidationRuleExpression,
-    AuthoredValidationRuleExpressionKind, ComparisonOperator, ComponentAction, ComponentDiagnostic,
-    ComponentDiagnosticSeverity, ComponentGraph, ComponentMethod, ComponentNode,
-    ComputedExpression, ComputedExpressionKind, ConstantEvaluationError, ConstantExpression,
-    ConstantExpressionKind, ConsumerDeclaration, ContextDeclaration,
-    ContextDeclarationCandidateKind, ContextDeclarationViolation, ContextDesignator,
-    DeclaredStateType, DeclaredStateTypeKind, DiagnosticSecondaryLabel, EffectBodySyntax,
-    EffectExpression, EffectExpressionKind, EffectStatementSyntax, EffectStatementSyntaxKind,
-    FormDeclarationCandidate, FormDeclarationStatus, FormDeclarationViolation, FormDesignatorFact,
-    FormFieldDeclarationCandidate, FormFieldDeclarationViolation, LogicalOperator, MethodCall,
-    MethodLocalVariable, MethodParameter, RenderAttribute, RenderAttributeValue, RenderChild,
-    RenderEventHandler, RenderFragment, RenderList, RenderModel, SerializableValue,
-    SlotDeclaration, SlotDeclarationViolation, SlotKind, StateField, StateOperation,
-    UnsupportedEffectStatementKind, UnsupportedFormDesignatorFact,
+    AuthoredSubmissionDeclarationFact, AuthoredValidationRuleArgument,
+    AuthoredValidationRuleArgumentKind, AuthoredValidationRuleDeclarationFact,
+    AuthoredValidationRuleExpression, AuthoredValidationRuleExpressionKind, ComparisonOperator,
+    ComponentAction, ComponentDiagnostic, ComponentDiagnosticSeverity, ComponentGraph,
+    ComponentMethod, ComponentNode, ComputedExpression, ComputedExpressionKind,
+    ConstantEvaluationError, ConstantExpression, ConstantExpressionKind, ConsumerDeclaration,
+    ContextDeclaration, ContextDeclarationCandidateKind, ContextDeclarationViolation,
+    ContextDesignator, DeclaredStateType, DeclaredStateTypeKind, DiagnosticSecondaryLabel,
+    EffectBodySyntax, EffectExpression, EffectExpressionKind, EffectStatementSyntax,
+    EffectStatementSyntaxKind, FormDeclarationCandidate, FormDeclarationStatus,
+    FormDeclarationViolation, FormDesignatorFact, FormFieldDeclarationCandidate,
+    FormFieldDeclarationViolation, LogicalOperator, MethodCall, MethodLocalVariable,
+    MethodParameter, RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler,
+    RenderFragment, RenderList, RenderModel, SerializableValue, SlotDeclaration,
+    SlotDeclarationViolation, SlotKind, StateField, StateOperation, UnsupportedEffectStatementKind,
+    UnsupportedFormDesignatorFact,
 };
 pub use component_initialization::{
     plan_component_initialization, ComponentInitializationPlan, ComponentInstanceBatch,
@@ -255,6 +257,10 @@ pub use form_ownership::{
     FormOwnershipEdgeKind, FormOwnershipGraph, FormOwnershipIntegrityDiagnostic,
     FormOwnershipIntegrityKind, FormOwnershipNode, FormOwnershipNodeKey, FormOwnershipValidation,
     FormReferenceEdge, FormReferenceKind,
+};
+pub use form_submission::{
+    collect_submission_products, FormSubmissionPlan, SubmissionDeclarationCandidate,
+    SubmissionDeclarationViolation, SubmissionProducts, SubmitResetPolicy,
 };
 pub use form_tracking::{
     collect_form_tracking_products, structurally_equal_serializable_values,
@@ -395,8 +401,9 @@ pub use semantic_id::{
     FormDeclarationCandidateId, FormFieldBindingCandidateId, FormFieldDeclarationCandidateId,
     FormId, FormInstanceId, FormOwnershipGraphId, ProviderId, SemanticId, SemanticOwner,
     SlotBindingId, SlotContentFragmentId, SlotDeclarationCandidateId, SlotId, SlotOutletId,
-    TemplatePositionId, TouchedTrackingPlanId, ValidationDependencyCycleId, ValidationGraphId,
-    ValidationPlanId, ValidationRuleCandidateId, ValidationRuleId,
+    SubmissionDeclarationCandidateId, SubmissionPlanId, TemplatePositionId, TouchedTrackingPlanId,
+    ValidationDependencyCycleId, ValidationGraphId, ValidationPlanId, ValidationRuleCandidateId,
+    ValidationRuleId,
 };
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
@@ -1491,6 +1498,7 @@ class Counter extends Component {
                     is_getter: false,
                     is_setter: false,
                     is_async: false,
+                    is_static: false,
                     jsx_roots: vec![ezc_parser::ParsedJsxNode::Element(
                         ezc_parser::ParsedJsxElement {
                             name: "button".to_string(),
