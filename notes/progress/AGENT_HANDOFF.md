@@ -3,8 +3,8 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: I20 - Stability Audit and Freeze
-* Working tree: Phase I freeze gate repair verified; commit pending. No Phase J code exists.
+* Latest completed slice: J0 - Phase J Entry Audit and Reservations
+* Working tree: J0 verified; commit pending. No executable Phase J product exists.
 * Date: 2026-07-15
 
 Last completed slice
@@ -16,12 +16,17 @@ Last completed slice
 
 Current in-progress slice
 
-* Slice: I20 - Stability Audit and Freeze
-* Status: Phase I complete. The stale pre-I17 CLI assertions now match the frozen ASM v9 Forms inspection and check JSON v5 contracts; the full gate passed. Commit the repair before beginning Phase J.
+* Slice: J0 - Phase J Entry Audit and Reservations
+* Status: Phase I is committed and its repaired full gate passed. J0 reserves only public and internal diagnostic ranges; J1 has not started.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase I: none. Phase J is not started.
+* Remaining in Phase I: none. Next slice: J1 - Canonical Resume Identities.
 
 Verification
+
+* J0 `cargo test -p ezc_core j0_reserves_the_public_and_internal_resumability_ranges_without_products`: pass (1 focused entry-freeze test)
+* J0 `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass
+* J0 `cargo fmt --all --check`: pass
+* J0 `git diff --check`: pass
 
 * Phase I freeze repair `cargo test -p ezc_cli --bin ezc_cli i17_forms_inspection_projects_validation_rules_in_schema_v9`: pass (the committed Forms inspection now positively asserts `validation-rule` projection in ASM v9)
 * Phase I freeze repair `cargo clippy -p ezc_cli --all-targets -- -D warnings`: pass
@@ -124,6 +129,10 @@ Verification
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: J0 reserves `EZC1096` through `EZC1111` in exact roadmap order and internal `EZASM1289` through `EZASM1384` inclusive (96 codes).
+* Reason: Later Phase J validators and the J19 projector need monotonic, non-overlapping diagnostic space without prematurely creating identities, schemas, manifests, snapshots, chunks, or runtime behavior.
+* Tradeoff: The reservations are inert metadata and a freeze test only; diagnostics remain unprojected until J19.
 
 * Decision: I7 creates one declaration-level `ValidationPlanId::for_form(FormId)` for every valid Form, including empty Forms, and one `FieldDependencyId::for_rule_and_source(ValidationRuleId, FieldId)` for each eligible I6 direct dependency edge.
 * Reason: Form plans and dependency records need stable typed names independent of Rule counts, source order, Component instances, runtime registration, or DOM identity; future runtime planning can refer to a complete Form plan without using absence as policy.

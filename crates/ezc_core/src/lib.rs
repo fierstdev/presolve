@@ -361,6 +361,10 @@ pub use page_codegen::{
     generate_standalone_page_with_effect_runtime,
 };
 pub use provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
+pub use resume_diagnostics::{
+    ResumeDiagnosticReservation, RESUME_DIAGNOSTIC_RESERVATIONS, RESUME_INTEGRITY_RESERVATION_END,
+    RESUME_INTEGRITY_RESERVATION_START,
+};
 pub use resume_manifest::{
     build_resume_manifest, resume_manifest_json, validate_resume_manifest, ResumeManifest,
     ResumeManifestContextSlotRecord, ResumeManifestEffectRecord,
