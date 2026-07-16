@@ -132,6 +132,60 @@ fn component_runtime_consumes_only_compiler_plans_in_a_real_browser() {
 }
 
 #[test]
+fn explicit_form_hosts_submit_only_through_compiler_emitted_records() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/form-submission-host");
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean Forms browser output");
+    }
+    fs::create_dir_all(&out_dir).expect("failed to create Forms browser output");
+    let input = out_dir.join("FormHost.tsx");
+    fs::write(&input, r#"
+@component("form-host") class FormHost {
+  @form() @serialize("json") profile!: Form;
+  @field(this.profile) name = "";
+  submitted = 0;
+  @action() @submit(this.profile) save(): void { this.submitted += 1; }
+  render() { return <form form={this.profile}><input field={this.name}/><span>{this.submitted}</span></form>; }
+}"#).expect("failed to write Forms browser source");
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            input.to_str().expect("input UTF-8"),
+            "--out",
+            out_dir.to_str().expect("output UTF-8"),
+        ])
+        .output()
+        .expect("failed to build Forms browser source");
+    assert!(
+        output.status.success(),
+        "Forms build failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    write_form_submission_probe_page(&out_dir);
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile");
+    let output = run_chrome_probe(
+        chrome,
+        &format!("--user-data-dir={}", profile_dir.display()),
+        &format!("http://127.0.0.1:{}/probe.html", server.port),
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("EDGEZERO_FORM_SUBMISSION_BROWSER_TEST_PASS"),
+        "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn component_structural_programs_preserve_host_dom_identity_in_a_real_browser() {
     let _guard = browser_test_guard();
     let repo_root = repo_root();
@@ -316,6 +370,30 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     );
 
     fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
+}
+
+fn write_form_submission_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
+    let probe = index.replace("</body>", r#"<script>
+const fail = (message) => { throw new Error(message); };
+const waitFor = (predicate, label) => new Promise((resolve, reject) => { const deadline = Date.now() + 3000; const tick = () => predicate() ? resolve() : Date.now() > deadline ? reject(new Error(`Timed out waiting for ${label}`)) : setTimeout(tick, 20); tick(); });
+(async () => {
+  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  const forms = JSON.parse(document.getElementById("ez-forms-runtime").textContent);
+  const manifest = JSON.parse(document.getElementById("ez-template-manifest").textContent);
+  if (forms.hosts.length !== 1 || manifest.form_hosts.length !== 1) fail("exact host records were absent");
+  const host = document.querySelector("form");
+  const event = new Event("submit", { bubbles: true, cancelable: true });
+  host.dispatchEvent(event);
+  await waitFor(() => window.__EDGEZERO__.components[0].state.submitted === 1, "submit action");
+  if (!event.defaultPrevented) fail("compiler host policy did not prevent default");
+  if (window.__EDGEZERO__.forms[0].submission !== "Completed") fail("submission did not complete");
+  if (window.__EDGEZERO__.diagnostics.length !== 0) fail("runtime reported Forms diagnostics");
+  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_FORM_SUBMISSION_BROWSER_TEST_PASS</div>");
+})().catch((error) => { document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_FORM_SUBMISSION_BROWSER_TEST_FAIL: ${error.message}</div>`); console.error(error); });
+</script>
+</body>"#);
+    fs::write(out_dir.join("probe.html"), probe).expect("failed to write Forms probe page");
 }
 
 #[test]

@@ -6,13 +6,16 @@ const RUNTIME_STUB: &str = r#"(() => {
   const EFFECT_ARTIFACT_ELEMENT_ID = "ez-effect-runtime";
   const CONTEXT_ARTIFACT_ELEMENT_ID = "ez-context-runtime";
   const COMPONENT_ARTIFACT_ELEMENT_ID = "ez-component-runtime";
+  const FORMS_ARTIFACT_ELEMENT_ID = "ez-forms-runtime";
   const RUNTIME_VERSION = "0.0.0";
-  const SUPPORTED_SCHEMA_VERSION = 2;
+  const SUPPORTED_SCHEMA_VERSION = 3;
+  const ACTION_MANIFEST_SCHEMA_VERSION = 2;
   const LEGACY_MANIFEST_SCHEMA_VERSION = 1;
   const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 3;
   const SUPPORTED_EFFECT_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = __EZ_COMPONENT_SCHEMA_VERSION__;
+  const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 1;
 
   class EdgeZeroBootError extends Error {
     constructor(code) {
@@ -128,6 +131,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   function validateManifestSchema(manifest, effectArtifact, diagnostics) {
     if (
       manifest?.schema_version !== SUPPORTED_SCHEMA_VERSION &&
+      manifest?.schema_version !== ACTION_MANIFEST_SCHEMA_VERSION &&
       manifest?.schema_version !== LEGACY_MANIFEST_SCHEMA_VERSION
     ) {
       reportDiagnostic(
@@ -157,8 +161,55 @@ const RUNTIME_STUB: &str = r#"(() => {
       throw new EdgeZeroBootError("EZR_LEGACY_MANIFEST_EFFECT_ACTIONS");
     }
 
-    if (manifest.schema_version === SUPPORTED_SCHEMA_VERSION) {
+    if (manifest.schema_version >= ACTION_MANIFEST_SCHEMA_VERSION) {
       validateManifestActionBindings(manifest, diagnostics);
+    }
+  }
+
+  function readFormsArtifact(diagnostics) {
+    const element = document.getElementById(FORMS_ARTIFACT_ELEMENT_ID);
+    if (element === null) return null;
+    if (!(element instanceof HTMLScriptElement)) {
+      reportDiagnostic(diagnostics, "EZR_INVALID_FORMS_ARTIFACT", "Forms runtime metadata was not stored in a script element", { artifactElementId: FORMS_ARTIFACT_ELEMENT_ID }, true);
+      throw new EdgeZeroBootError("EZR_INVALID_FORMS_ARTIFACT");
+    }
+    try { return JSON.parse(element.textContent ?? ""); } catch (error) {
+      reportDiagnostic(diagnostics, "EZR_INVALID_FORMS_ARTIFACT", "Forms runtime metadata JSON could not be parsed", { message: error instanceof Error ? error.message : String(error) }, true);
+      throw new EdgeZeroBootError("EZR_INVALID_FORMS_ARTIFACT");
+    }
+  }
+
+  function validateFormsArtifact(formsArtifact, manifest, diagnostics) {
+    if (formsArtifact === null) {
+      if (manifest.schema_version === 3) {
+        reportDiagnostic(diagnostics, "EZR_MISSING_FORMS_ARTIFACT", "A schema-v3 template manifest requires Forms runtime metadata", {}, true);
+        throw new EdgeZeroBootError("EZR_MISSING_FORMS_ARTIFACT");
+      }
+      return;
+    }
+    if (formsArtifact.schema_version !== SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION || !Array.isArray(formsArtifact.forms) || !Array.isArray(formsArtifact.instances) || !Array.isArray(formsArtifact.hosts)) {
+      reportDiagnostic(diagnostics, "EZR_UNSUPPORTED_FORMS_ARTIFACT_SCHEMA", "Forms runtime metadata did not match the compiler artifact contract", { schema_version: formsArtifact.schema_version }, true);
+      throw new EdgeZeroBootError("EZR_UNSUPPORTED_FORMS_ARTIFACT_SCHEMA");
+    }
+    const hasForms = formsArtifact.forms.length > 0 || formsArtifact.instances.length > 0;
+    if (hasForms && manifest.schema_version !== 3) {
+      reportDiagnostic(diagnostics, "EZR_FORMS_MANIFEST_MISMATCH", "Forms runtime metadata requires a schema-v3 template manifest", { schema_version: manifest.schema_version }, true);
+      throw new EdgeZeroBootError("EZR_FORMS_MANIFEST_MISMATCH");
+    }
+    const instances = new Set(formsArtifact.instances.map((instance) => instance.id));
+    for (const binding of manifest.form_bindings ?? []) {
+      if (!instances.has(binding.form_instance_id)) {
+        reportDiagnostic(diagnostics, "EZR_FORMS_MANIFEST_MISMATCH", "Forms manifest bridge referenced an unknown Form instance", { binding }, true);
+        throw new EdgeZeroBootError("EZR_FORMS_MANIFEST_MISMATCH");
+      }
+    }
+    const artifactHosts = new Map(formsArtifact.hosts.map((host) => [`${host.host_anchor}|${host.form_instance}`, host]));
+    for (const host of manifest.form_hosts ?? []) {
+      const artifact = artifactHosts.get(`${host.host_anchor}|${host.form_instance_id}`);
+      if (artifact === undefined || artifact.id !== host.submission_host_id || artifact.event !== host.event || artifact.submit_action !== host.submit_action || artifact.action_batch !== host.action_batch || artifact.serialization_plan !== host.serialization_plan || artifact.prevent_default !== host.prevent_default) {
+        reportDiagnostic(diagnostics, "EZR_FORMS_MANIFEST_MISMATCH", "Forms manifest host bridge did not match an exact compiler host record", { host }, true);
+        throw new EdgeZeroBootError("EZR_FORMS_MANIFEST_MISMATCH");
+      }
     }
   }
 
@@ -1461,6 +1512,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     const actionsByMethod = buildActionsByMethod(manifestComponent);
 
     for (const [methodId, actionRecord] of actionsByMethod) {
+      actionRecord.component = component;
       store.actionsByMethod.set(methodId, actionRecord);
     }
   }
@@ -1807,6 +1859,188 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
+  // Forms are initialized exclusively from the compiler artifact and manifest
+  // bridge. The DOM contributes only the user event value for a known anchor.
+  function initializeFormsRuntime(store, formsArtifact, manifest, elementsByNode, diagnostics) {
+    store.forms = new Map();
+    store.formInstances = new Map();
+    store.formBindingsByAnchor = new Map();
+    store.formBindingsByField = new Map();
+    store.formHostsByAnchor = new Map();
+    if (formsArtifact === null) return;
+
+    const definitions = new Map(formsArtifact.forms.map((form) => [form.id, form]));
+    for (const instance of formsArtifact.instances) {
+      const definition = definitions.get(instance.form);
+      if (definition === undefined) {
+        reportDiagnostic(diagnostics, "EZR_UNKNOWN_FORM_INSTANCE", "Forms artifact referenced an unknown Form definition", { instance: instance.id, form: instance.form }, true);
+        continue;
+      }
+      const fields = new Map(definition.fields.map((field) => [field.id, {
+        value: field.initial_value,
+        initial: field.initial_value,
+        dirty: false,
+        touched: false,
+        validation: []
+      }]));
+      store.forms.set(definition.id, definition);
+      store.formInstances.set(instance.id, {
+        definition,
+        instance,
+        fields,
+        aggregate_valid: true,
+        submission: "Idle"
+      });
+    }
+
+    for (const bridge of manifest.form_bindings ?? []) {
+      const element = elementsByNode.get(bridge.control_anchor);
+      const formInstance = store.formInstances.get(bridge.form_instance_id);
+      if (element === undefined || formInstance === undefined) {
+        reportDiagnostic(diagnostics, "EZR_FORMS_MANIFEST_MISMATCH", "Forms manifest bridge did not resolve an exact compiler anchor and instance", { bridge }, true);
+        continue;
+      }
+      const binding = formInstance.definition.bindings.find((item) => item.id === bridge.field_binding_id);
+      if (binding === undefined || binding.field === undefined || binding.channel !== bridge.channel) {
+        reportDiagnostic(diagnostics, "EZR_UNKNOWN_FORM_BINDING", "Forms manifest bridge did not match an artifact binding", { bridge }, true);
+        continue;
+      }
+      const record = { bridge, binding, element, formInstance };
+      store.formBindingsByAnchor.set(bridge.control_anchor, record);
+      const key = `${bridge.form_instance_id}|${binding.field}`;
+      const bindings = store.formBindingsByField.get(key) ?? [];
+      bindings.push(record);
+      store.formBindingsByField.set(key, bindings);
+      writeFormControl(record, formInstance.fields.get(binding.field)?.value);
+    }
+
+    for (const bridge of manifest.form_hosts ?? []) {
+      const element = elementsByNode.get(bridge.host_anchor);
+      const formInstance = store.formInstances.get(bridge.form_instance_id);
+      const host = (formsArtifact.hosts ?? []).find((candidate) => candidate.host_anchor === bridge.host_anchor && candidate.form_instance === bridge.form_instance_id);
+      if (!(element instanceof HTMLFormElement) || formInstance === undefined || host === undefined || host.event !== "submit") {
+        reportDiagnostic(diagnostics, "EZR_FORMS_MANIFEST_MISMATCH", "Forms host bridge did not resolve an exact compiler-owned form anchor", { bridge }, true);
+        continue;
+      }
+      store.formHostsByAnchor.set(bridge.host_anchor, { bridge, host, element, formInstance });
+      element.addEventListener(host.event, (event) => dispatchFormSubmit(store, event, bridge.host_anchor));
+    }
+
+    document.addEventListener("input", (event) => dispatchFormEvent(store, event, false));
+    document.addEventListener("change", (event) => dispatchFormEvent(store, event, false));
+    document.addEventListener("focusout", (event) => dispatchFormEvent(store, event, true));
+    window.__EDGEZERO_FORMS__ = {
+      resetForm: (instanceId) => resetForm(store, instanceId),
+      resetField: (instanceId, fieldId) => resetField(store, instanceId, fieldId)
+    };
+  }
+
+  function dispatchFormSubmit(store, event, anchor) {
+    const record = store.formHostsByAnchor.get(anchor);
+    if (record === undefined || event.type !== record.host.event) return;
+    if (record.host.prevent_default === true) event.preventDefault();
+    for (const fieldId of record.formInstance.fields.keys()) validateFormField(record.formInstance, fieldId);
+    if (!record.formInstance.aggregate_valid) { record.formInstance.submission = "Invalid"; return; }
+    const action = store.actionsByMethod.get(record.host.submit_action);
+    if (action === undefined || action.action_batch_id !== record.host.action_batch || action.component === undefined) {
+      reportDiagnostic(store.diagnostics, "EZR_UNRESOLVED_FORM_SUBMIT_ACTION", "Submission host did not resolve its exact compiler action", { host: record.host }, true);
+      record.formInstance.submission = "Failed";
+      return;
+    }
+    record.formInstance.submission = "Submitting";
+    // Serialization is deliberately compiler-record driven: field values come
+    // from the instance store, never DOM scanning or a form-element snapshot.
+    record.formInstance.serialized = [...record.formInstance.fields.entries()].map(([field, state]) => ({ field, value: state.value }));
+    executeActions(store, action.component, record.host.action_batch, action.actions);
+    record.formInstance.submission = "Completed";
+  }
+
+  function dispatchFormEvent(store, event, blur) {
+    const element = event.target;
+    if (!(element instanceof HTMLElement)) return;
+    const anchor = element.getAttribute("data-ez-node");
+    const record = anchor === null ? undefined : store.formBindingsByAnchor.get(anchor);
+    if (record === undefined) return;
+    if (blur) {
+      const state = record.formInstance.fields.get(record.binding.field);
+      state.touched = true;
+      validateFormField(record.formInstance, record.binding.field);
+      return;
+    }
+    const expected = record.binding.channel === "Checked" || record.binding.channel === "RadioValue" ? "change" : "input";
+    if (event.type !== expected) return;
+    const value = readFormControl(record);
+    if (value === undefined) return;
+    writeFormField(store, record.formInstance, record.binding.field, value);
+  }
+
+  function readFormControl(record) {
+    const { element, binding } = record;
+    if (binding.channel === "Checked") return element.checked === true;
+    if (binding.channel === "NumericValue") {
+      if (element.value === "") return binding.normalization === "NullableNumber" ? null : undefined;
+      const value = Number(element.value);
+      return Number.isFinite(value) ? value : undefined;
+    }
+    if (binding.channel === "SelectedValues") return [...element.selectedOptions].map((option) => option.value);
+    return element.value;
+  }
+
+  function writeFormControl(record, value) {
+    const { element, binding } = record;
+    if (binding.channel === "Checked") element.checked = value === true;
+    else if (binding.channel === "SelectedValues") {
+      for (const option of element.options ?? []) option.selected = Array.isArray(value) && value.includes(option.value);
+    } else element.value = value === null ? "" : String(value ?? "");
+  }
+
+  function writeFormField(store, formInstance, fieldId, value) {
+    const state = formInstance.fields.get(fieldId);
+    if (state === undefined) return;
+    state.value = value;
+    state.dirty = JSON.stringify(value) !== JSON.stringify(state.initial);
+    validateFormField(formInstance, fieldId);
+    for (const dependency of formInstance.definition.validation_dependencies ?? []) {
+      if (dependency.source_field === fieldId) validateFormField(formInstance, dependency.target_field);
+    }
+    for (const record of store.formBindingsByField.get(`${formInstance.instance.id}|${fieldId}`) ?? []) writeFormControl(record, value);
+  }
+
+  function validateFormField(formInstance, fieldId) {
+    const state = formInstance.fields.get(fieldId);
+    if (state === undefined) return;
+    const rules = (formInstance.definition.validation_rules ?? []).filter((rule) => rule.target_field === fieldId);
+    state.validation = rules.filter((rule) => !validateFormRule(formInstance, state.value, rule)).map((rule) => rule.id);
+    formInstance.aggregate_valid = [...formInstance.fields.values()].every((field) => field.validation.length === 0);
+  }
+
+  function validateFormRule(formInstance, value, rule) {
+    const dependency = rule.dependency === undefined ? undefined : formInstance.fields.get(rule.dependency)?.value;
+    if (rule.kind === "Required") return !(value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0));
+    if (rule.kind === "Email") return value === "" || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(value));
+    if (rule.kind === "Equals") return value === dependency;
+    if (rule.kind === "NotEquals") return value !== dependency;
+    return true;
+  }
+
+  function resetField(store, instanceId, fieldId) {
+    const formInstance = store.formInstances?.get(instanceId);
+    const state = formInstance?.fields.get(fieldId);
+    if (state === undefined) return false;
+    state.value = state.initial; state.dirty = false; state.touched = false; state.validation = [];
+    for (const record of store.formBindingsByField.get(`${instanceId}|${fieldId}`) ?? []) writeFormControl(record, state.value);
+    formInstance.aggregate_valid = true;
+    return true;
+  }
+
+  function resetForm(store, instanceId) {
+    const formInstance = store.formInstances?.get(instanceId);
+    if (formInstance === undefined) return false;
+    for (const fieldId of formInstance.fields.keys()) resetField(store, instanceId, fieldId);
+    formInstance.submission = "Idle";
+    return true;
+  }
+
   function debugComponents(store) {
     return [...store.components.values()].map((component) => ({
       name: component.name,
@@ -1876,7 +2110,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     };
   }
 
-  function initializeRuntime(manifest, computedArtifact, contextArtifact, effectArtifact, componentArtifact, diagnostics) {
+  function initializeRuntime(manifest, computedArtifact, contextArtifact, effectArtifact, componentArtifact, formsArtifact, diagnostics) {
     const bindingAnchors = collectBindingAnchors();
     const conditionalAnchors = collectConditionalAnchors();
     const listAnchors = collectListAnchors();
@@ -1925,6 +2159,8 @@ const RUNTIME_STUB: &str = r#"(() => {
 
     executeInitialContext(store);
 
+    initializeFormsRuntime(store, formsArtifact, manifest, elementsByNode, diagnostics);
+
     executeInitialEffects(store);
 
     installDelegatedEventListeners(store);
@@ -1946,6 +2182,12 @@ const RUNTIME_STUB: &str = r#"(() => {
       context_update_source_runs: store.contextUpdateSourceRuns,
       component_initialization_runs: (componentArtifact?.initialization_batches ?? []).map((batch) => batch.index),
       component_instance_tree: [...store.componentInstances.values()],
+      forms: [...store.formInstances.values()].map((instance) => ({
+        id: instance.instance.id,
+        form: instance.definition.id,
+        aggregate_valid: instance.aggregate_valid,
+        submission: instance.submission
+      })),
       slot_binding_runs: [...store.slotBindings.keys()],
       component_failures: []
     });
@@ -1965,8 +2207,10 @@ const RUNTIME_STUB: &str = r#"(() => {
       const componentArtifact = readComponentArtifact(diagnostics);
       validateComponentArtifactSchema(componentArtifact, diagnostics);
       validateManifestSchema(manifest, effectArtifact, diagnostics);
+      const formsArtifact = readFormsArtifact(diagnostics);
+      validateFormsArtifact(formsArtifact, manifest, diagnostics);
 
-      const state = initializeRuntime(manifest, computedArtifact, contextArtifact, effectArtifact, componentArtifact, diagnostics);
+      const state = initializeRuntime(manifest, computedArtifact, contextArtifact, effectArtifact, componentArtifact, formsArtifact, diagnostics);
       const status = state.diagnostics.some((diagnostic) => diagnostic.fatal)
         || state.missingAnchors.length > 0
         ? "error"
@@ -2037,7 +2281,12 @@ mod tests {
         assert!(runtime.contains("executeContextUpdates(store, actionBatchId)"));
         assert!(runtime.contains("contextSlots: new Map()"));
         assert!(runtime.contains("RUNTIME_VERSION = \"0.0.0\""));
-        assert!(runtime.contains("SUPPORTED_SCHEMA_VERSION = 2"));
+        assert!(runtime.contains("SUPPORTED_SCHEMA_VERSION = 3"));
+        assert!(runtime.contains("ez-forms-runtime"));
+        assert!(runtime.contains("initializeFormsRuntime"));
+        assert!(runtime.contains("dispatchFormSubmit"));
+        assert!(runtime.contains("form_hosts"));
+        assert!(!runtime.contains("FormData(formElement)"));
         assert!(runtime.contains("EZR_MISSING_MANIFEST"));
         assert!(runtime.contains("EZR_INVALID_MANIFEST_JSON"));
         assert!(runtime.contains("EZR_UNSUPPORTED_SCHEMA"));
