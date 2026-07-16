@@ -715,7 +715,7 @@ fn phase_g_diagnostic_fixtures_are_canonically_validated() {
 
 #[test]
 fn phase_g_freezes_schema_versions_runtime_order_and_no_discovery_contract() {
-    assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 5);
+    assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 6);
     assert_eq!(RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, 2);
     assert_eq!(TEMPLATE_MANIFEST_SCHEMA_VERSION, 3);
     assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 5);
@@ -728,7 +728,7 @@ fn phase_g_freezes_schema_versions_runtime_order_and_no_discovery_contract() {
     assert!(validate_optimized_context_ir(&model, &ir, &optimized).is_empty());
     let registry = build_runtime_context_registry(&model, &optimized);
     assert!(validate_runtime_context_registry(&model, &optimized, &registry).is_empty());
-    assert_eq!(build_semantic_graph(&model).schema_version, 5);
+    assert_eq!(build_semantic_graph(&model).schema_version, 6);
     assert_eq!(
         build_runtime_context_artifact(&model, &optimized).schema_version,
         2
@@ -740,7 +740,7 @@ fn phase_g_freezes_schema_versions_runtime_order_and_no_discovery_contract() {
 
     for (args, expected) in [
         (vec!["check", path, "--format", "json"], 4),
-        (vec!["asm", path, "--format", "json"], 8),
+        (vec!["asm", path, "--format", "json"], 9),
     ] {
         let output = run_cli(&args);
         assert!(output.status.success());

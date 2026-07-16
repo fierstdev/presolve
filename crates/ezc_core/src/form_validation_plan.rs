@@ -1867,7 +1867,7 @@ class Profile {
             .plans
             .keys()
             .any(|plan| plan.as_str() == instance.as_str()));
-        assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 5);
+        assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 6);
         let graph: SemanticGraph = build_semantic_graph(&forward);
         let json = semantic_graph_json(&graph);
         assert!(!json.contains("validation-plan"));

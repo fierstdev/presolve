@@ -529,14 +529,14 @@ fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
 
     let component_artifact =
         build_runtime_component_artifact(&model, &model.component_ir_optimization);
-    assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 5);
+    assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 6);
     assert_eq!(RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION, 2);
     assert_eq!(RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, 2);
     assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 5);
     assert_eq!(TEMPLATE_MANIFEST_SCHEMA_VERSION, 3);
     assert_eq!(component_artifact.schema_version, 2);
     assert!(validate_runtime_component_artifact(&component_artifact).is_ok());
-    assert_eq!(build_semantic_graph(&model).schema_version, 5);
+    assert_eq!(build_semantic_graph(&model).schema_version, 6);
     assert_eq!(
         build_resume_manifest(&build_resume_plan(&model)).schema_version,
         5
@@ -545,7 +545,7 @@ fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
 
     for (args, expected_status, expected_schema) in [
         (vec!["check", path, "--format", "json"], Some(1), 4),
-        (vec!["asm", path, "--format", "json"], Some(0), 8),
+        (vec!["asm", path, "--format", "json"], Some(0), 9),
     ] {
         let (status, stdout, stderr) = cli_result(&args);
         assert_eq!(

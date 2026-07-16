@@ -46,6 +46,7 @@ pub mod form;
 pub mod form_binding;
 pub mod form_diagnostics;
 pub mod form_field;
+pub mod form_inspection;
 pub mod form_ir;
 pub mod form_ir_optimization;
 pub mod form_ownership;
@@ -259,6 +260,7 @@ pub use form_binding::{
 };
 pub use form_diagnostics::{FormDiagnosticReservation, FORM_DIAGNOSTIC_RESERVATIONS};
 pub use form_field::{collect_form_field_products, FormFieldEntity, FormFieldProducts};
+pub use form_inspection::{build_form_inspection_registry, FormInspection, FormInspectionRegistry};
 pub use form_ir::{
     lower_form_ir, FormInstanceIr, FormIrOperation, FormIrReport, FormRuntimeStorage,
 };

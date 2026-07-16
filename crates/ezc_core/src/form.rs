@@ -125,7 +125,7 @@ class UserProfile {
         assert!(graph
             .nodes
             .iter()
-            .all(|node| !node.id.as_str().contains("/form:")));
+            .any(|node| node.id == *profile.id.as_semantic_id()));
     }
 
     #[test]

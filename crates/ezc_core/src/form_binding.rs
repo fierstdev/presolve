@@ -1173,13 +1173,14 @@ class ProfileEditor {
         );
         assert!(validate_application_semantic_model(&asm).is_empty());
         let graph = build_semantic_graph(&asm);
-        assert!(graph.nodes.iter().all(|node| {
-            !node.id.as_str().contains("/field-binding:") && !node.id.as_str().contains("/field:")
-        }));
-        assert!(graph.edges.iter().all(|edge| {
-            !edge.source.as_str().contains("/field-binding:")
-                && !edge.target.as_str().contains("/field-binding:")
-        }));
+        assert!(graph
+            .nodes
+            .iter()
+            .any(|node| node.id.as_str().contains("/field-binding:")));
+        assert!(graph
+            .edges
+            .iter()
+            .any(|edge| edge.kind == crate::SemanticGraphEdgeKind::FieldBindingBindsField));
 
         let executable_attributes = &asm.templates[0]
             .root

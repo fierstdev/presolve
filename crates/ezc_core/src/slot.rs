@@ -291,7 +291,7 @@ class Card extends Component {
             .clone();
         let graph = build_semantic_graph(&asm);
 
-        assert_eq!(graph.schema_version, 5);
+        assert_eq!(graph.schema_version, 6);
         assert!(graph
             .nodes
             .iter()

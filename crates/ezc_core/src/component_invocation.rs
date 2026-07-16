@@ -270,7 +270,7 @@ mod tests {
             "canonical component invocations should pass ASM validation"
         );
         let graph = build_semantic_graph(&first);
-        assert_eq!(graph.schema_version, 5);
+        assert_eq!(graph.schema_version, 6);
         assert!(graph.nodes.iter().all(|node| {
             first
                 .component_invocations

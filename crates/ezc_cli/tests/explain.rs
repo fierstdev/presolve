@@ -204,7 +204,7 @@ fn asm_command_emits_deterministic_json_inspection() {
 
     let document: serde_json::Value =
         serde_json::from_slice(&first.stdout).expect("ASM inspection output was not valid JSON");
-    assert_eq!(document["schema_version"], 8);
+    assert_eq!(document["schema_version"], 9);
     assert_eq!(
         document["file"],
         "fixtures/0001-source-summary/input/Counter.tsx"
@@ -247,7 +247,7 @@ fn asm_command_exports_a_deterministic_semantic_graph() {
     let graph: serde_json::Value =
         serde_json::from_slice(&first.stdout).expect("semantic graph output was not valid JSON");
     let component_id = "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter";
-    assert_eq!(graph["schema_version"], 5);
+    assert_eq!(graph["schema_version"], 6);
     assert_eq!(graph["roots"], serde_json::json!([component_id]));
     assert_eq!(graph["nodes"].as_array().map(Vec::len), Some(11));
     assert_eq!(graph["edges"].as_array().map(Vec::len), Some(14));
@@ -355,7 +355,7 @@ fn asm_command_inspects_one_semantic_entity() {
 
     assert!(output.status.success());
     let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("entity JSON");
-    assert_eq!(document["schema_version"], 8);
+    assert_eq!(document["schema_version"], 9);
     assert_eq!(document["entity"]["id"], entity_id);
     assert_eq!(document["entity"]["kind"], "state-field");
     assert_eq!(document["entity"]["semantic_type"]["type_text"], "number");
@@ -442,7 +442,7 @@ fn asm_and_explain_inspect_canonical_computed_metadata() {
 
     let document: serde_json::Value =
         serde_json::from_slice(&asm.stdout).expect("computed entity inspection JSON");
-    assert_eq!(document["schema_version"], 8);
+    assert_eq!(document["schema_version"], 9);
     assert_eq!(document["entity"]["computed"]["computed_type"], "number");
     assert_eq!(
         document["entity"]["computed"]["dependencies"],
@@ -519,7 +519,7 @@ fn asm_and_explain_project_one_canonical_effect_inspection_record() {
 
     let selected: serde_json::Value = serde_json::from_slice(&asm.stdout).expect("effect JSON");
     let inspection = &selected["entity"]["effect"];
-    assert_eq!(selected["schema_version"], 8);
+    assert_eq!(selected["schema_version"], 9);
     assert_eq!(inspection["validation"]["status"], "valid");
     assert_eq!(
         inspection["direct_dependencies"]["state"],
@@ -1628,7 +1628,7 @@ fn effect_diagnostics_share_check_and_selected_explain_projection() {
     assert!(explain.status.success());
     let explain: serde_json::Value =
         serde_json::from_slice(&explain.stdout).expect("selected effect explain JSON");
-    assert_eq!(explain["schema_version"], 8);
+    assert_eq!(explain["schema_version"], 9);
     assert_eq!(explain["diagnostics"], serde_json::Value::Array(expected));
 }
 
@@ -1687,14 +1687,14 @@ fn context_diagnostics_share_check_full_asm_selected_asm_and_explain_projection(
     let full_asm_output = run(&["asm", path, "--format", "json"]);
     assert!(full_asm_output.status.success());
     let full_asm = parse(&full_asm_output);
-    assert_eq!(full_asm["schema_version"], 8);
+    assert_eq!(full_asm["schema_version"], 9);
     assert_eq!(normalize(&full_asm["diagnostics"]), expected);
 
     for command in ["asm", "explain"] {
         let output = run(&[command, "--entity", context_id, path, "--format", "json"]);
         assert!(output.status.success());
         let selected = parse(&output);
-        assert_eq!(selected["schema_version"], 8);
+        assert_eq!(selected["schema_version"], 9);
         assert_eq!(normalize(&selected["diagnostics"]), expected);
     }
 }
@@ -1773,7 +1773,7 @@ fn component_diagnostics_share_check_full_asm_selected_asm_and_explain_projectio
     assert!(full_output.status.success());
     assert_eq!(full_output.stdout, repeated.stdout);
     let full = parse(&full_output);
-    assert_eq!(full["schema_version"], 8);
+    assert_eq!(full["schema_version"], 9);
     assert_eq!(normalize(&full["diagnostics"]), expected);
 
     for command in ["asm", "explain"] {
@@ -1787,7 +1787,7 @@ fn component_diagnostics_share_check_full_asm_selected_asm_and_explain_projectio
         ]);
         assert!(output.status.success());
         let selected = parse(&output);
-        assert_eq!(selected["schema_version"], 8);
+        assert_eq!(selected["schema_version"], 9);
         assert_eq!(normalize(&selected["diagnostics"]), expected);
     }
 
@@ -4046,7 +4046,7 @@ fn build_command_writes_page_manifest_and_runtime_artifacts() {
         std::fs::read_to_string(out_dir.join("runtime.js")).expect("failed to read built runtime");
 
     assert!(actual_runtime.contains("ez-template-manifest"));
-    assert!(actual_runtime.contains("SUPPORTED_SCHEMA_VERSION = 2"));
+    assert!(actual_runtime.contains("SUPPORTED_SCHEMA_VERSION = 3"));
     assert!(actual_runtime.contains("RUNTIME_VERSION = \"0.0.0\""));
     assert!(actual_runtime.contains("validateManifestSchema"));
     assert!(actual_runtime.contains("EZR_UNSUPPORTED_SCHEMA"));
@@ -4186,6 +4186,102 @@ class FormArtifact {
         .expect("failed to read Forms artifact page");
     assert!(page.contains("id=\"ez-forms-runtime\""));
     assert!(!page.contains(" form=\""));
+}
+
+#[test]
+fn asm_and_explain_project_canonical_forms_from_one_core_registry() {
+    let repo_root = repo_root();
+    let test_dir = repo_root.join("target/ezc-test-output/forms-inspection");
+    if test_dir.exists() {
+        std::fs::remove_dir_all(&test_dir).expect("failed to clean Forms inspection output");
+    }
+    std::fs::create_dir_all(&test_dir).expect("failed to create Forms inspection directory");
+    let input = test_dir.join("FormsInspection.tsx");
+    std::fs::write(
+        &input,
+        r#"
+@component("forms-inspection")
+class FormsInspection {
+  @form() @serialize("json") profile!: Form;
+  @field(this.profile) name = "";
+  @validate(required()) @field(this.profile) email = "";
+  @action() @submit(this.profile) save(): void {}
+  render() { return <form form={this.profile}><input field={this.name} /><input field={this.email} /></form>; }
+}
+"#,
+    )
+    .expect("failed to write Forms inspection source");
+    let input = input.to_str().expect("test input path was not valid UTF-8");
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["asm", input, "--format", "json"])
+        .output()
+        .expect("failed to inspect Forms ASM");
+    assert!(
+        output.status.success(),
+        "Forms ASM failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let document: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("Forms ASM JSON");
+    assert_eq!(document["schema_version"], 9);
+    let form_id = document["entities"]
+        .as_array()
+        .expect("Forms ASM entities")
+        .iter()
+        .find(|entity| entity["kind"] == "form")
+        .and_then(|entity| entity["id"].as_str())
+        .expect("canonical Form entity")
+        .to_string();
+    let form = document["entities"]
+        .as_array()
+        .expect("Forms ASM entities")
+        .iter()
+        .find(|entity| entity["id"] == form_id)
+        .and_then(|entity| entity["form"].as_object())
+        .expect("Form inspection projection");
+    assert_eq!(form["role"], "form");
+    assert_eq!(form["field_order"].as_array().map(Vec::len), Some(2));
+    assert_eq!(form["runtime_artifact_member"], true);
+    assert_eq!(form["instances"].as_array().map(Vec::len), Some(1));
+
+    let graph = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["asm", input, "--format", "graph"])
+        .output()
+        .expect("failed to export the Forms semantic graph");
+    assert!(graph.status.success());
+    let graph: serde_json::Value = serde_json::from_slice(&graph.stdout).expect("Forms graph JSON");
+    assert_eq!(graph["schema_version"], 6);
+    assert!(graph["edges"].as_array().is_some_and(|edges| {
+        edges
+            .iter()
+            .any(|edge| edge["kind"] == "component-owns-form")
+            && edges.iter().any(|edge| edge["kind"] == "form-owns-field")
+            && edges
+                .iter()
+                .any(|edge| edge["kind"] == "field-binding-binds-field")
+            && edges
+                .iter()
+                .any(|edge| edge["kind"] == "field-owns-validation-rule")
+    }));
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args(["explain", input, "--entity", &form_id, "--format", "json"])
+        .output()
+        .expect("failed to inspect a Form through explain");
+    assert!(
+        output.status.success(),
+        "Forms explain failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let selected: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("Forms explain JSON");
+    assert_eq!(selected["schema_version"], 9);
+    assert_eq!(selected["entity"]["form"]["role"], "form");
+    assert_eq!(selected["entity"]["form"]["form"], form_id);
 }
 
 #[test]

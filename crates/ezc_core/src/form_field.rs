@@ -438,7 +438,7 @@ class ProfileEditor {
         assert!(graph
             .nodes
             .iter()
-            .all(|node| !node.id.as_str().contains("/field:")));
+            .any(|node| node.id == *display.id.as_semantic_id()));
     }
 
     #[test]

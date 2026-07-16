@@ -9,12 +9,12 @@ use std::process;
 use ezc_core::{
     build_application_semantic_model_for_unit, build_component_graph,
     build_context_inspection_registry, build_effect_inspection_registry,
-    build_runtime_component_artifact, build_runtime_computed_artifact,
-    build_runtime_context_artifact, build_runtime_effect_artifact, build_runtime_forms_artifact,
-    build_semantic_graph, build_template_graph, build_template_manifest_from_asm, explain_json,
-    explain_text, fold_component_graph, generate_runtime_stub,
-    generate_standalone_page_with_component_runtime_and_forms, generate_static_html,
-    lower_components_to_ir, optimize_context_ir, optimize_effect_ir,
+    build_form_inspection_registry, build_runtime_component_artifact,
+    build_runtime_computed_artifact, build_runtime_context_artifact, build_runtime_effect_artifact,
+    build_runtime_forms_artifact, build_semantic_graph, build_template_graph,
+    build_template_manifest_from_asm, explain_json, explain_text, fold_component_graph,
+    generate_runtime_stub, generate_standalone_page_with_component_runtime_and_forms,
+    generate_static_html, lower_components_to_ir, optimize_context_ir, optimize_effect_ir,
     runtime_component_artifact_json, runtime_computed_artifact_json, runtime_context_artifact_json,
     runtime_effect_artifact_json, runtime_forms_artifact_json, semantic_graph_json,
     semantic_type_text, summarize_source, template_manifest_json,
@@ -31,7 +31,7 @@ use ezc_parser::{
 };
 use serde::Serialize;
 
-const ASM_INSPECTION_SCHEMA_VERSION: u32 = 8;
+const ASM_INSPECTION_SCHEMA_VERSION: u32 = 9;
 const CHECK_JSON_SCHEMA_VERSION: u32 = 4;
 
 fn main() {
@@ -529,17 +529,10 @@ fn asm_inspection_json(
     let computed_functions = computed_evaluation_functions(asm);
     let effect_inspections = build_effect_inspection_registry(asm);
     let context_inspections = build_context_inspection_registry(asm);
+    let form_inspections = build_form_inspection_registry(asm);
     let mut references = asm
         .references
         .iter()
-        .filter(|reference| {
-            !matches!(
-                reference.kind,
-                SemanticReferenceKind::FieldBindingField
-                    | SemanticReferenceKind::FieldBindingForm
-                    | SemanticReferenceKind::ValidationRuleField
-            )
-        })
         .map(|reference| AsmInspectionReference {
             kind: semantic_reference_kind(reference.kind),
             source: reference.source.as_str(),
@@ -603,6 +596,7 @@ fn asm_inspection_json(
                     &computed_functions,
                     &effect_inspections,
                     &context_inspections,
+                    &form_inspections,
                 )
             })
             .collect(),
@@ -680,6 +674,7 @@ fn print_asm_entity_text(
 ) {
     let computed_functions = computed_evaluation_functions(asm);
     let effect_inspections = build_effect_inspection_registry(asm);
+    let form_inspections = build_form_inspection_registry(asm);
     let entity = asm
         .entity(id)
         .expect("ASM ownership should contain entities");
@@ -717,6 +712,21 @@ fn print_asm_entity_text(
     }
     if let Some(effect) = effect_inspections.records.get(id) {
         print_effect_inspection_text(effect);
+    }
+    if let Some(form) = form_inspections.records.get(id) {
+        println!("  Form:");
+        println!("    role: {}", form.role);
+        println!("    form: {}", form.form);
+        println!("    fields: {:?}", form.field_order);
+        println!("    bindings: {:?}", form.bindings);
+        println!("    rules: {:?}", form.validation_rules);
+        println!(
+            "    instances: {:?}",
+            form.instances
+                .iter()
+                .map(|instance| &instance.form_instance)
+                .collect::<Vec<_>>()
+        );
     }
     let parents = asm.ancestors_of(id);
     println!("  parents: {}", parents.len());
@@ -798,6 +808,7 @@ fn asm_entity_inspection_json(
     let computed_functions = computed_evaluation_functions(asm);
     let effect_inspections = build_effect_inspection_registry(asm);
     let context_inspections = build_context_inspection_registry(asm);
+    let form_inspections = build_form_inspection_registry(asm);
     let provenance = asm.provenance(id).expect("ASM entities have provenance");
     let document = AsmEntityInspectionDocument {
         schema_version: ASM_INSPECTION_SCHEMA_VERSION,
@@ -807,6 +818,7 @@ fn asm_entity_inspection_json(
             &computed_functions,
             &effect_inspections,
             &context_inspections,
+            &form_inspections,
         ),
         parents: asm
             .ancestors_of(id)
@@ -866,11 +878,7 @@ fn is_phase_g_inspection_entity(asm: &ApplicationSemanticModel, id: &SemanticId)
     !matches!(
         asm.entity(id),
         Some(
-            SemanticEntity::Form(_)
-                | SemanticEntity::FormField(_)
-                | SemanticEntity::FormFieldBinding(_)
-                | SemanticEntity::ValidationRule(_)
-                | SemanticEntity::Slot(_)
+            SemanticEntity::Slot(_)
                 | SemanticEntity::ComponentInvocation(_)
                 | SemanticEntity::ComponentInstance(_)
                 | SemanticEntity::BlockedComponentInstance(_)
@@ -886,14 +894,6 @@ fn filtered_entity_references(
 ) -> Vec<&ezc_core::SemanticReference> {
     let mut references = references
         .into_iter()
-        .filter(|reference| {
-            !matches!(
-                reference.kind,
-                SemanticReferenceKind::FieldBindingField
-                    | SemanticReferenceKind::FieldBindingForm
-                    | SemanticReferenceKind::ValidationRuleField
-            )
-        })
         .filter(|reference| {
             filters
                 .reference_kind
@@ -1315,6 +1315,7 @@ fn asm_inspection_entity<'a>(
     computed_functions: &BTreeMap<SemanticId, SemanticId>,
     effect_inspections: &EffectInspectionRegistry,
     context_inspections: &ezc_core::ContextInspectionRegistry,
+    form_inspections: &ezc_core::FormInspectionRegistry,
 ) -> AsmInspectionEntity<'a> {
     let entity = asm
         .entity(id)
@@ -1334,6 +1335,7 @@ fn asm_inspection_entity<'a>(
         computed: asm_computed_inspection(asm, id, computed_functions),
         effect: effect_inspections.records.get(id).cloned(),
         context: context_inspections.records.get(id).cloned(),
+        form: form_inspections.records.get(id).cloned(),
         component: asm_component_inspection(asm, id),
     }
 }
@@ -1574,6 +1576,8 @@ struct AsmInspectionEntity<'a> {
     effect: Option<EffectInspection>,
     #[serde(skip_serializing_if = "Option::is_none")]
     context: Option<ezc_core::ContextInspection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    form: Option<ezc_core::FormInspection>,
     #[serde(skip_serializing_if = "Option::is_none")]
     component: Option<AsmInspectionComponent>,
 }

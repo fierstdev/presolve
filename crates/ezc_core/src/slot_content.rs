@@ -681,7 +681,7 @@ mod tests {
             "canonical Slot composition should pass ASM validation"
         );
         let graph = build_semantic_graph(&asm);
-        assert_eq!(graph.schema_version, 5);
+        assert_eq!(graph.schema_version, 6);
         assert!(graph.nodes.iter().all(|node| {
             !asm.slot_content_fragments
                 .keys()

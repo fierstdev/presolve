@@ -1733,32 +1733,20 @@ class AppRoot {
     }
 
     #[test]
-    fn keeps_the_public_semantic_graph_schema_frozen_and_filters_form_products() {
+    fn projects_form_ownership_products_into_semantic_graph_v6() {
         let parsed = ezc_parser::parse_file("src/ProfileEditor.tsx", form_source());
         let asm = build_application_semantic_model(&parsed);
         let public = build_semantic_graph(&asm);
 
         assert_eq!(public.schema_version, SEMANTIC_GRAPH_SCHEMA_VERSION);
-        assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 5);
-        assert!(public.nodes.iter().all(|node| {
-            !asm.form_ownership
-                .nodes
-                .keys()
-                .filter(|form_node| {
-                    matches!(
-                        form_node,
-                        FormOwnershipNodeKey::Form(_)
-                            | FormOwnershipNodeKey::FormField(_)
-                            | FormOwnershipNodeKey::FieldBinding(_)
-                    )
-                })
-                .any(|form_node| form_node.semantic_id() == &node.id)
-        }));
-        assert!(public.edges.iter().all(|edge| {
-            !asm.form_ownership.reference_edges.iter().any(|reference| {
-                reference.source.semantic_id() == &edge.source
-                    && reference.target.semantic_id() == &edge.target
-            })
-        }));
+        assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 6);
+        assert!(public
+            .nodes
+            .iter()
+            .any(|node| matches!(node.kind, crate::SemanticGraphNodeKind::Form)));
+        assert!(public
+            .edges
+            .iter()
+            .any(|edge| matches!(edge.kind, crate::SemanticGraphEdgeKind::FormOwnsField)));
     }
 }

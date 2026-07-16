@@ -3,25 +3,31 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: I16 - Runtime Form Execution
-* Working tree: I16 is verified; commit pending.
+* Latest completed slice: I17 - Forms Inspection
+* Working tree: I17 is verified; commit pending.
 * Date: 2026-07-15
 
 Last completed slice
 
-* Slice: I16 - Runtime Form Execution
-* Summary: I16 initializes Form instance state from compiler artifacts, consumes only exact control and host bridges, evaluates submission validity, serializes from compiler-owned field state, invokes the exact submission action batch, and records completion. Native submit handling exists only on the compiler-emitted host element and emitted `submit` event.
-* Key files: crates/ezc_core/src/runtime_codegen.rs, crates/ezc_cli/tests/runtime_browser.rs
-* Runtime decision: `preventDefault()` follows the exact host artifact boolean. I16 never discovers a nearest form, scans DOM controls, uses authored names for authority, or constructs `FormData(formElement)`. Resume manifest v5, semantic graph v5, ASM inspection v8, check JSON v4, template manifest v3, and Forms artifact v1 remain their existing versions.
+* Slice: I17 - Forms Inspection
+* Summary: A single core-owned Forms inspection registry now projects Form, Field, FieldBinding, and ValidationRule records into full ASM, selected ASM, entity-mode explain, and the semantic graph. Form records include declaration ownership/order, binding channels, validation dependencies, tracking/submission/serialization/reset products, instance-qualified slots/programs, runtime/artifact/resume membership, and blocked reasons; Field records add canonical type, initial value, per-field tracking, and dependencies.
+* Key files: crates/ezc_core/src/form_inspection.rs, crates/ezc_core/src/semantic_graph.rs, crates/ezc_cli/src/main.rs, crates/ezc_cli/tests/explain.rs
+* Schema decision: semantic graph v6 adds first-class Forms nodes plus typed ownership/reference edges; ASM inspection v9 adds the shared `form` projection. Check JSON remains v4; template manifest remains v3; Forms artifact remains v1; resume manifest remains v5.
 
 Current in-progress slice
 
-* Slice: I16 - Runtime Form Execution
-* Status: complete through I16. Proceed to I17 only under its authoritative contract.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I15
-* Remaining in Phase I: I17 through I20.
+* Slice: I17 - Forms Inspection
+* Status: complete through I17. Proceed to I18 only under its authoritative contract.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I17
+* Remaining in Phase I: I18 through I20.
 
 Verification
+
+* I17 `cargo test -p ezc_core --lib`: pass (348 core tests, including canonical Forms inspection projection coverage)
+* I17 `cargo test -p ezc_cli --test explain --test component_fixtures --test context_fixtures`: pass (128 inspection/build, 7 component, and 12 context tests)
+* I17 `cargo clippy -p ezc_core -p ezc_cli --all-targets -- -D warnings`: pass
+* I17 `cargo fmt --check`: pass
+* I17 `git diff --check`: pass
 
 * I15 `cargo test -p ezc_core --lib`: pass (345 core tests)
 * I15 `cargo test -p ezc_cli`: pass (including Forms build/artifact/embed coverage and 26 browser tests)

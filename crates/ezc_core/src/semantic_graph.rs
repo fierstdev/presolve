@@ -5,7 +5,7 @@ use crate::{
     SemanticOwner, SemanticReferenceKind, SourceProvenance, TemplateSemanticKind,
 };
 
-pub const SEMANTIC_GRAPH_SCHEMA_VERSION: u32 = 5;
+pub const SEMANTIC_GRAPH_SCHEMA_VERSION: u32 = 6;
 
 /// A stable, backend-independent graph projection of the canonical ASM.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -70,6 +70,10 @@ pub enum SemanticGraphNodeKind {
     Context,
     Provider,
     Consumer,
+    Form,
+    FormField,
+    FormFieldBinding,
+    ValidationRule,
     Computed,
     Effect,
     Parameter,
@@ -120,6 +124,13 @@ pub enum SemanticGraphEdgeKind {
     TemplateState,
     TemplateComputed,
     TemplateLocal,
+    ComponentOwnsForm,
+    FormOwnsField,
+    FieldOwnsValidationRule,
+    ControlOwnsFieldBinding,
+    FieldBindingBindsField,
+    FieldBindingBelongsToForm,
+    ValidationRuleDependsOnField,
 }
 
 /// Build a deterministic graph export from canonical ASM semantics only.
@@ -138,11 +149,7 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
             !matches!(
                 asm.entity(id),
                 Some(
-                    SemanticEntity::Form(_)
-                        | SemanticEntity::FormField(_)
-                        | SemanticEntity::FormFieldBinding(_)
-                        | SemanticEntity::ValidationRule(_)
-                        | SemanticEntity::Slot(_)
+                    SemanticEntity::Slot(_)
                         | SemanticEntity::ComponentInvocation(_)
                         | SemanticEntity::ComponentInstance(_)
                         | SemanticEntity::BlockedComponentInstance(_)
@@ -176,11 +183,7 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
             !matches!(
                 asm.entity(id),
                 Some(
-                    SemanticEntity::Form(_)
-                        | SemanticEntity::FormField(_)
-                        | SemanticEntity::FormFieldBinding(_)
-                        | SemanticEntity::ValidationRule(_)
-                        | SemanticEntity::Slot(_)
+                    SemanticEntity::Slot(_)
                         | SemanticEntity::ComponentInvocation(_)
                         | SemanticEntity::ComponentInstance(_)
                         | SemanticEntity::BlockedComponentInstance(_)
@@ -198,11 +201,7 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
             if matches!(
                 asm.entity(target),
                 Some(
-                    SemanticEntity::Form(_)
-                        | SemanticEntity::FormField(_)
-                        | SemanticEntity::FormFieldBinding(_)
-                        | SemanticEntity::ValidationRule(_)
-                        | SemanticEntity::Slot(_)
+                    SemanticEntity::Slot(_)
                         | SemanticEntity::ComponentInvocation(_)
                         | SemanticEntity::ComponentInstance(_)
                         | SemanticEntity::BlockedComponentInstance(_)
@@ -215,29 +214,17 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
             match owner {
                 SemanticOwner::Application => None,
                 SemanticOwner::Entity(source) => Some(SemanticGraphEdge {
-                    kind: SemanticGraphEdgeKind::Ownership,
+                    kind: form_ownership_edge_kind(asm, source, target),
                     source: source.clone(),
                     target: target.clone(),
                 }),
             }
         })
-        .chain(
-            asm.references
-                .iter()
-                .filter(|reference| {
-                    !matches!(
-                        reference.kind,
-                        SemanticReferenceKind::FieldBindingField
-                            | SemanticReferenceKind::FieldBindingForm
-                            | SemanticReferenceKind::ValidationRuleField
-                    )
-                })
-                .map(|reference| SemanticGraphEdge {
-                    kind: semantic_graph_edge_kind(reference.kind),
-                    source: reference.source.clone(),
-                    target: reference.target.clone(),
-                }),
-        )
+        .chain(asm.references.iter().map(|reference| SemanticGraphEdge {
+            kind: semantic_graph_edge_kind(reference.kind),
+            source: reference.source.clone(),
+            target: reference.target.clone(),
+        }))
         .collect::<Vec<_>>();
     edges.sort_by(|left, right| {
         (
@@ -298,6 +285,13 @@ impl SemanticGraphEdgeKind {
             Self::TemplateState => "template-state",
             Self::TemplateComputed => "template-computed",
             Self::TemplateLocal => "template-local",
+            Self::ComponentOwnsForm => "component-owns-form",
+            Self::FormOwnsField => "form-owns-field",
+            Self::FieldOwnsValidationRule => "field-owns-validation-rule",
+            Self::ControlOwnsFieldBinding => "control-owns-field-binding",
+            Self::FieldBindingBindsField => "field-binding-binds-field",
+            Self::FieldBindingBelongsToForm => "field-binding-belongs-to-form",
+            Self::ValidationRuleDependsOnField => "validation-rule-depends-on-field",
         }
     }
 }
@@ -310,18 +304,10 @@ fn semantic_graph_node_kind(entity: SemanticEntity<'_>) -> SemanticGraphNodeKind
         SemanticEntity::Context(_) => SemanticGraphNodeKind::Context,
         SemanticEntity::Provider(_) => SemanticGraphNodeKind::Provider,
         SemanticEntity::Consumer(_) => SemanticGraphNodeKind::Consumer,
-        SemanticEntity::Form(_) => {
-            unreachable!("Forms are not projected into frozen semantic graph schema v5")
-        }
-        SemanticEntity::FormField(_) => {
-            unreachable!("Form Fields are not projected into frozen semantic graph schema v5")
-        }
-        SemanticEntity::FormFieldBinding(_) => {
-            unreachable!("Form Field bindings are not projected into semantic graph schema v5")
-        }
-        SemanticEntity::ValidationRule(_) => {
-            unreachable!("Validation rules are not projected into semantic graph schema v5")
-        }
+        SemanticEntity::Form(_) => SemanticGraphNodeKind::Form,
+        SemanticEntity::FormField(_) => SemanticGraphNodeKind::FormField,
+        SemanticEntity::FormFieldBinding(_) => SemanticGraphNodeKind::FormFieldBinding,
+        SemanticEntity::ValidationRule(_) => SemanticGraphNodeKind::ValidationRule,
         SemanticEntity::Slot(_) => {
             unreachable!("Slots are not projected into frozen semantic graph schema v5")
         }
@@ -445,11 +431,33 @@ fn semantic_graph_edge_kind(kind: SemanticReferenceKind) -> SemanticGraphEdgeKin
         SemanticReferenceKind::TemplateState => SemanticGraphEdgeKind::TemplateState,
         SemanticReferenceKind::TemplateComputed => SemanticGraphEdgeKind::TemplateComputed,
         SemanticReferenceKind::TemplateLocal => SemanticGraphEdgeKind::TemplateLocal,
-        SemanticReferenceKind::FieldBindingField
-        | SemanticReferenceKind::FieldBindingForm
-        | SemanticReferenceKind::ValidationRuleField => {
-            unreachable!("Form Field bindings are not projected into semantic graph schema v5")
+        SemanticReferenceKind::FieldBindingField => SemanticGraphEdgeKind::FieldBindingBindsField,
+        SemanticReferenceKind::FieldBindingForm => SemanticGraphEdgeKind::FieldBindingBelongsToForm,
+        SemanticReferenceKind::ValidationRuleField => {
+            SemanticGraphEdgeKind::ValidationRuleDependsOnField
         }
+    }
+}
+
+fn form_ownership_edge_kind(
+    asm: &ApplicationSemanticModel,
+    source: &SemanticId,
+    target: &SemanticId,
+) -> SemanticGraphEdgeKind {
+    match (asm.entity(source), asm.entity(target)) {
+        (Some(SemanticEntity::Component(_)), Some(SemanticEntity::Form(_))) => {
+            SemanticGraphEdgeKind::ComponentOwnsForm
+        }
+        (Some(SemanticEntity::Form(_)), Some(SemanticEntity::FormField(_))) => {
+            SemanticGraphEdgeKind::FormOwnsField
+        }
+        (Some(SemanticEntity::FormField(_)), Some(SemanticEntity::ValidationRule(_))) => {
+            SemanticGraphEdgeKind::FieldOwnsValidationRule
+        }
+        (Some(SemanticEntity::TemplateEntity(_)), Some(SemanticEntity::FormFieldBinding(_))) => {
+            SemanticGraphEdgeKind::ControlOwnsFieldBinding
+        }
+        _ => SemanticGraphEdgeKind::Ownership,
     }
 }
 
@@ -624,7 +632,7 @@ class Counter extends Component {
         let graph = build_semantic_graph(&asm);
         let component = &asm.components[0];
 
-        assert_eq!(graph.schema_version, 5);
+        assert_eq!(graph.schema_version, 6);
         assert_eq!(graph.roots, vec![component.id.clone()]);
         assert_eq!(
             graph.nodes.len(),
@@ -663,7 +671,7 @@ class Counter extends Component {
         assert_eq!(first, second);
         let document: serde_json::Value =
             serde_json::from_str(&first).expect("semantic graph JSON should parse");
-        assert_eq!(document["schema_version"], 5);
+        assert_eq!(document["schema_version"], 6);
         assert_eq!(document["nodes"][0]["kind"], "component");
     }
 

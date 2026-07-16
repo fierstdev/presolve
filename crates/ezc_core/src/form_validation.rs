@@ -2124,9 +2124,8 @@ class Profile {
         );
         assert_eq!(forward.validation_rules, reversed.validation_rules);
         assert_eq!(forward.validation_graph, reversed.validation_graph);
-        assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 5);
+        assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 6);
         let json = semantic_graph_json(&build_semantic_graph(&forward));
-        assert!(!json.contains("validation-rule"));
-        assert!(!json.contains("ValidationRule"));
+        assert!(json.contains("validation-rule"));
     }
 }
