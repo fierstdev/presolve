@@ -3,25 +3,30 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: I7 - Canonical Cross-Field Validation Dependency Planning
-* Working tree: I7 is verified; commit pending.
+* Latest completed slice: I8 - Dirty and Touched Tracking
+* Working tree: I8 is verified; commit pending.
 * Date: 2026-07-15
 
 Last completed slice
 
-* Slice: I7 - Canonical Cross-Field Validation Dependency Planning
-* Summary: I7 consumes only valid I3/I5/I6 canonical Form, Field, Rule, ownership, and direct `RuleDependsOnField` products. Every valid Form receives one immutable `ValidationPlanId`, including empty Forms. Every eligible direct cross-Field read receives one `FieldDependencyId` derived from its `ValidationRuleId` and source `FieldId`; source entries retain reverse invalidation evidence, target entries retain declaration-side dependency evidence, and unary Rules remain absent. Pure one-Field and change-set queries normalize changed Fields, retain every triggering dependency, schedule each direct Rule once by target-Field authored order then rule order then Rule ID, and never compute a transitive closure or treat validation as a Field write.
-* Key files: crates/ezc_core/src/form_validation_plan.rs, crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/asm_validation.rs, crates/ezc_core/src/lib.rs
-* Schema decision: I7 remains an in-memory declaration-planning product only. Semantic graph v5, CLI ASM inspection v8, check JSON v4, template manifest v2, resume manifest v4, all runtime artifacts, and browser output remain unchanged. No Form instance, validation state/execution, tracking, submission/reset/serialization plan, IR, runtime registry/artifact, public diagnostic, or resumability product is introduced.
+* Slice: I8 - Dirty and Touched Tracking
+* Summary: I8 consumes immutable I3 Form Fields, I4 bindings, and I5 ownership only. Every valid Form receives one `DirtyTrackingPlanId` and one `TouchedTrackingPlanId`; every valid Field, including unbound Fields, receives one shared declaration-level `FieldTrackingId`. Dirty is a pure structural comparison of a committed canonical value with the I3 initial value and clears on return/reset. Touched starts false and can be set only by a retained bound-control blur source; radio controls share the Field record, while unbound Fields retain no blur source. The plans record reset and future validation handoff facts but execute nothing and schedule nothing.
+* Key files: crates/ezc_core/src/form_tracking.rs, crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/asm_validation.rs, crates/ezc_core/src/lib.rs
+* Schema decision: I8 remains an in-memory declaration-planning product only. Semantic graph v5, CLI ASM inspection v8, check JSON v4, template manifest v2, resume manifest v4, all runtime artifacts, and browser output remain unchanged. No Form instance, tracking state/execution, validator execution, submission/reset/serialization execution, IR, runtime registry/artifact, public diagnostic, or resumability product is introduced.
 
 Current in-progress slice
 
-* Slice: I8 - Dirty and Touched Tracking (blocked before implementation)
-* Status: Phase I is complete through I7. I7 freezes only declaration-level direct validation dependency planning and pure scheduling. No complete authoritative I8 contract is present for dirty/touched identities, transitions, focus/blur/change mapping, reset interaction, state, runtime, or schema policy, so I8 has not begun.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I7
-* Remaining in Phase I: I8 through I20.
+* Slice: I9 - Submission Planning
+* Status: I8 is complete and ready to commit. The authoritative I9 contract defines direct `@action() @submit(this.<formName>)` declaration retention, exact action/Form resolution, full-Form rule ordering, and reset policy only; do not begin serialization or runtime execution.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I8
+* Remaining in Phase I: I9 through I20.
 
 Verification
+
+* I8 `cargo test -p ezc_core`: pass (334 core tests, including 4 focused I8 tests)
+* `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass
+* `cargo fmt --check`: pass
+* git diff --check: pass
 
 * I7 `just check`: pass (formatting, strict workspace clippy, 331 core tests, 12 parser unit tests, 26 parser integration tests, 2 CLI unit tests, 7 Component fixture/freeze tests, 12 Context fixture/freeze tests, all 126 CLI inspection/build tests, and all 26 real-browser tests)
 * `cargo test -p ezc_core form_validation_plan --lib`: pass (5 focused I7 planning tests)

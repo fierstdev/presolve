@@ -47,6 +47,7 @@ use crate::form_binding::{
 };
 use crate::form_field::{collect_form_field_products, FormFieldEntity};
 use crate::form_ownership::{collect_form_ownership_graph, FormOwnershipGraph};
+use crate::form_tracking::{collect_form_tracking_products, FormTrackingProducts};
 use crate::form_validation::{
     collect_validation_graph, collect_validation_products, ValidationGraph, ValidationRule,
     ValidationRuleCandidate,
@@ -99,6 +100,7 @@ pub struct ApplicationSemanticModel {
     pub validation_rules: BTreeMap<ValidationRuleId, ValidationRule>,
     pub validation_graph: ValidationGraph,
     pub validation_dependency_plans: ValidationDependencyPlans,
+    pub form_tracking: FormTrackingProducts,
     pub slots: BTreeMap<SlotId, SlotEntity>,
     pub component_invocations: BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
     pub component_instance_plan: ComponentInstancePlan,
@@ -516,6 +518,11 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub const fn validation_dependency_plans(&self) -> &ValidationDependencyPlans {
         &self.validation_dependency_plans
+    }
+
+    #[must_use]
+    pub const fn form_tracking(&self) -> &FormTrackingProducts {
+        &self.form_tracking
     }
 
     #[must_use]
@@ -1465,6 +1472,8 @@ pub fn build_application_semantic_model_from_component_graph(
         &form_ownership,
         &validation_graph,
     );
+    let form_tracking =
+        collect_form_tracking_products(&forms, &form_fields, &form_field_bindings, &form_ownership);
     let semantic_types = finalize_semantic_types(
         base_semantic_types,
         &component_graph.components,
@@ -1620,6 +1629,7 @@ pub fn build_application_semantic_model_from_component_graph(
         validation_rules,
         validation_graph,
         validation_dependency_plans,
+        form_tracking,
         slots,
         component_invocations,
         component_instance_plan,
@@ -1906,6 +1916,8 @@ fn build_application_semantic_model_from_files_with_bindings(
         &form_ownership,
         &validation_graph,
     );
+    let form_tracking =
+        collect_form_tracking_products(&forms, &form_fields, &form_field_bindings, &form_ownership);
     let semantic_types = finalize_semantic_types(
         base_semantic_types,
         &components,
@@ -2054,6 +2066,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         validation_rules,
         validation_graph,
         validation_dependency_plans,
+        form_tracking,
         slots,
         component_invocations,
         component_instance_plan,

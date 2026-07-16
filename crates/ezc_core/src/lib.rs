@@ -47,6 +47,7 @@ pub mod form_binding;
 pub mod form_diagnostics;
 pub mod form_field;
 pub mod form_ownership;
+pub mod form_tracking;
 pub mod form_validation;
 pub mod form_validation_plan;
 pub mod html_codegen;
@@ -255,6 +256,14 @@ pub use form_ownership::{
     FormOwnershipIntegrityKind, FormOwnershipNode, FormOwnershipNodeKey, FormOwnershipValidation,
     FormReferenceEdge, FormReferenceKind,
 };
+pub use form_tracking::{
+    collect_form_tracking_products, structurally_equal_serializable_values,
+    validate_dirty_tracking_graph, validate_touched_tracking_graph, DirtyTrackingGraph,
+    DirtyTrackingPlan, DirtyTransitionCause, DirtyTransitionPlan, FieldDirtyTracking,
+    FieldTouchedTracking, FormTrackingIntegrityDiagnostic, FormTrackingIntegrityKind,
+    FormTrackingProducts, FormTrackingValidation, TouchedTrackingGraph, TouchedTrackingPlan,
+    TouchedTransitionCause, TouchedTransitionPlan,
+};
 pub use form_validation::{
     collect_validation_graph, collect_validation_products, validate_validation_graph,
     ValidationCompatibility, ValidationDependencyCycle, ValidationDependencyDesignator,
@@ -381,13 +390,13 @@ pub use semantic_graph::{
 };
 pub use semantic_id::{
     ComponentInstanceId, ComponentInvocationId, ComponentRootId, ComponentStructuralRegionId,
-    ConsumerId, ContextDeclarationCandidateId, ContextId, EffectId, EffectStatementId,
-    FieldBindingId, FieldDependencyId, FieldId, FormDeclarationCandidateId,
-    FormFieldBindingCandidateId, FormFieldDeclarationCandidateId, FormId, FormInstanceId,
-    FormOwnershipGraphId, ProviderId, SemanticId, SemanticOwner, SlotBindingId,
-    SlotContentFragmentId, SlotDeclarationCandidateId, SlotId, SlotOutletId, TemplatePositionId,
-    ValidationDependencyCycleId, ValidationGraphId, ValidationPlanId, ValidationRuleCandidateId,
-    ValidationRuleId,
+    ConsumerId, ContextDeclarationCandidateId, ContextId, DirtyTrackingPlanId, EffectId,
+    EffectStatementId, FieldBindingId, FieldDependencyId, FieldId, FieldTrackingId,
+    FormDeclarationCandidateId, FormFieldBindingCandidateId, FormFieldDeclarationCandidateId,
+    FormId, FormInstanceId, FormOwnershipGraphId, ProviderId, SemanticId, SemanticOwner,
+    SlotBindingId, SlotContentFragmentId, SlotDeclarationCandidateId, SlotId, SlotOutletId,
+    TemplatePositionId, TouchedTrackingPlanId, ValidationDependencyCycleId, ValidationGraphId,
+    ValidationPlanId, ValidationRuleCandidateId, ValidationRuleId,
 };
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};

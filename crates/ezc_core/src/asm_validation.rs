@@ -95,6 +95,7 @@ pub fn validate_application_semantic_model(
     validate_form_field_bindings(model, &mut diagnostics);
     validate_form_ownership(model, &mut diagnostics);
     validate_form_validation(model, &mut diagnostics);
+    validate_form_tracking(model, &mut diagnostics);
     validate_contexts(model, &mut diagnostics);
     validate_providers(model, &mut diagnostics);
     validate_consumers(model, &mut diagnostics);
@@ -194,6 +195,49 @@ fn validate_form_validation(
             message: "validation dependency plans retained stale validation facts".to_string(),
         });
     }
+}
+
+fn validate_form_tracking(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    let expected = crate::collect_form_tracking_products(
+        &model.forms,
+        &model.form_fields,
+        &model.form_field_bindings,
+        &model.form_ownership,
+    );
+    if model.form_tracking != expected {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1285".to_string(),
+            message: "I8 form tracking products do not match canonical declaration planning"
+                .to_string(),
+        });
+    }
+    let dirty = crate::validate_dirty_tracking_graph(
+        &model.form_tracking.dirty,
+        &model.forms,
+        &model.form_fields,
+        &model.form_field_bindings,
+        &model.form_ownership,
+    );
+    let touched = crate::validate_touched_tracking_graph(
+        &model.form_tracking.touched,
+        &model.forms,
+        &model.form_fields,
+        &model.form_field_bindings,
+        &model.form_ownership,
+    );
+    diagnostics.extend(
+        dirty
+            .diagnostics
+            .iter()
+            .chain(touched.diagnostics.iter())
+            .map(|diagnostic| AsmValidationDiagnostic {
+                code: diagnostic.code.clone(),
+                message: diagnostic.message.clone(),
+            }),
+    );
 }
 
 fn validate_form_ownership(

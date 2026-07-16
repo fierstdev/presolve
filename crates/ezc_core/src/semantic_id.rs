@@ -130,6 +130,22 @@ pub struct FieldDependencyId(SemanticId);
 #[serde(transparent)]
 pub struct ValidationDependencyCycleId(SemanticId);
 
+/// Stable identity for one declaration-level Form dirty-tracking plan.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct DirtyTrackingPlanId(SemanticId);
+
+/// Stable identity for one declaration-level Form touched-tracking plan.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct TouchedTrackingPlanId(SemanticId);
+
+/// Stable identity for the tracking facts associated with one declaration-level
+/// Form Field. It is intentionally not a runtime storage identity.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct FieldTrackingId(SemanticId);
+
 /// Stable identity for one compiler-owned component Slot semantic entity.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -366,6 +382,21 @@ impl SemanticId {
     #[must_use]
     pub fn field_dependency(&self, source_field: &Self) -> Self {
         self.child("field-dependency", source_field.as_str())
+    }
+
+    #[must_use]
+    pub fn dirty_tracking_plan(&self) -> Self {
+        Self(format!("{}/dirty-plan", self.as_str()))
+    }
+
+    #[must_use]
+    pub fn touched_tracking_plan(&self) -> Self {
+        Self(format!("{}/touched-plan", self.as_str()))
+    }
+
+    #[must_use]
+    pub fn field_tracking(&self) -> Self {
+        Self(format!("{}/tracking", self.as_str()))
     }
 
     #[must_use]
@@ -839,6 +870,57 @@ impl FieldDependencyId {
             rule.as_semantic_id()
                 .field_dependency(source_field.as_semantic_id()),
         )
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl DirtyTrackingPlanId {
+    #[must_use]
+    pub fn for_form(form: &FormId) -> Self {
+        Self(form.as_semantic_id().dirty_tracking_plan())
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl TouchedTrackingPlanId {
+    #[must_use]
+    pub fn for_form(form: &FormId) -> Self {
+        Self(form.as_semantic_id().touched_tracking_plan())
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl FieldTrackingId {
+    #[must_use]
+    pub fn for_field(field: &FieldId) -> Self {
+        Self(field.as_semantic_id().field_tracking())
     }
 
     #[must_use]
