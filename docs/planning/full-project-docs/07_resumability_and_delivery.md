@@ -44,6 +44,32 @@ accepted only with the legacy manifest-v3 cold path and no Phase J resume
 product. J1-A adds no liveness, retention, snapshot, restore, activation, or
 chunk policy; J2 classifies these now-canonical runtime addresses.
 
+## Phase J canonical liveness
+
+J2 creates one compiler-only `ResumeLivenessPlan` over existing runtime
+storage. Every exact State slot, Computed cache/dirty slot, instance-selected
+Context value slot, Form v5 value/dirty/touched/rule-result/aggregate/submission
+slot, and Effect activation-metadata slot appears exactly once as retained,
+recomputable, excluded, or blocked.
+
+Mutable serializable State and required Form values are retained. Pure,
+deterministic, eagerly scheduled Computed caches are recomputable only when
+their exact direct and transitive State/Computed dependencies are themselves
+retained or recomputable; otherwise a serializable cache is retained or the
+required value is blocked. Context liveness combines the exact Phase H
+instance-selected source slot with the canonical Context evaluation source
+entry, preserving one shared provider slot for all consumers and carrying its
+exact dependency evidence. Effect bodies are never snapshot values; existing
+activation metadata is explicitly excluded from value capture.
+
+The plan is deterministic and queryable by existing slot, owner, boundary
+candidate, and retention reason. Internal integrity codes `EZASM1320` through
+`EZASM1327` reject duplicate classification, missing storage ownership,
+unknown dependencies, invalid policy reasons, recomputation without complete
+proof, unsupported required values, invalid boundary promotion, and canonical
+provenance/order/index drift. J2 changes no public schema and emits no boundary
+graph, snapshot, program, marker, chunk, loader, or runtime resume behavior.
+
 ## Definition
 
 In EdgeZero, resumability means:

@@ -75,6 +75,7 @@ pub mod resume_diagnostics;
 pub mod resume_explain;
 pub mod resume_identity;
 pub mod resume_instance;
+pub mod resume_liveness;
 pub mod resume_manifest;
 pub mod resume_plan;
 pub mod route_graph;
@@ -395,6 +396,14 @@ pub use resume_identity::{
     ResumeIdentityParseError, ResumeRestoreProgramId, ResumeSchemaId, ResumeSlotId,
     ResumeSnapshotId, ResumeValueRecordId, StateInstanceSlotId, TemplateInstanceBindingId,
     TemplateInstanceTargetId,
+};
+pub use resume_liveness::{
+    build_resume_liveness_plan, validate_resume_liveness_plan, ResumeExcludedSlot,
+    ResumeExistingSlot, ResumeLivenessBlock, ResumeLivenessBlockReason,
+    ResumeLivenessClassificationKind, ResumeLivenessClassificationRef, ResumeLivenessIntegrityCode,
+    ResumeLivenessIntegrityDiagnostic, ResumeLivenessOwner, ResumeLivenessPlan, ResumeLivenessSlot,
+    ResumeRecomputableSlot, ResumeRecomputationProof, ResumeRetainedSlot, ResumeRetentionReason,
+    RESUME_LIVENESS_PLAN_VERSION,
 };
 pub use resume_manifest::{
     build_resume_manifest, resume_manifest_json, validate_resume_manifest, ResumeManifest,

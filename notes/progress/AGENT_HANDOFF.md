@@ -3,25 +3,27 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: J1-A - Instance-Qualified State Storage
-* Working tree: ready for the atomic J1-A commit; the next authored slice is J2 resumability liveness.
+* Latest completed slice: J2 - Resumability Liveness and Retained Slots
+* Working tree: ready for the atomic J2 commit; the next authored slice is J3 resume boundary graph.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: J1-A - Instance-Qualified State Storage
-* Summary: every executable `(ComponentInstanceId, IrStorageId)` pair now owns one canonical `StateInstanceSlotId`; component artifact v3 serializes the exact slots and the v4/v3 runtime uses only those keys for cold initialization, action writes, bindings, and computed invalidation.
-* Key files: `state_instance_storage.rs`, `resume_identity.rs`, `runtime_component_artifact.rs`, `runtime_codegen.rs`, `template_manifest.rs`, `runtime_browser.rs`
-* Boundary: no retention classification, snapshot, restoration, liveness, lazy activation, chunking, or J10 markers.
+* Slice: J2 - Resumability Liveness and Retained Slots
+* Summary: `ResumeLivenessPlan` classifies every valid exact State, Computed cache/dirty, Context, Form v5, and Effect activation metadata slot exactly once as retained, recomputable, excluded, or blocked. It consumes canonical instance/storage/type/purity/dependency products, carries exact transitive dependency evidence, and never reads runtime objects.
+* Key files: `resume_liveness.rs`, `lib.rs`, `07_resumability_and_delivery.md`
+* Boundary: no resume boundary graph, snapshot, capture/restore program, anchor, event, lazy activation, chunk, loader, or runtime resume behavior.
 
 Current in-progress slice
 
-* Slice: J2 - Resumability Liveness and Retained Slots
-* Status: Ready. The authoritative Phase J roadmap now has canonical instance-qualified State, computed-cache, and computed-dirty addresses to classify.
+* Slice: J3 - Resume Boundary Graph
+* Status: Ready after the atomic J2 commit. The authoritative roadmap defines the boundary graph over canonical application roots, component instances, ordinary template interaction authorities, Forms, and J2 liveness.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase I: none. Next: J2 `ResumeLivenessPlan`, retained/recomputable/excluded/blocked classification, integrity validation, focused proofs, progress update, and atomic commit.
+* Remaining in Phase I: none. Next: J3 boundary identity/membership/edge products, deterministic queries, integrity validation, focused proofs, progress update, and atomic commit.
 
 Verification
+
+* J2 verification: `cargo test -p ezc_core --lib` passes all 368 core tests; `cargo clippy -p ezc_core --all-targets -- -D warnings`, `cargo fmt --all --check`, and `git diff --check` pass. Focused proofs cover repeated exact State/Computed slots, one shared instance-qualified Context provider slot with exact State dependency evidence, all six Form v5 slot classes, deterministic transitive Computed evidence, input-order determinism, classification uniqueness, and dedicated policy/owner/boundary/proof integrity failures.
 
 * J1-A verification: `just check` passes formatting, strict workspace clippy, 2 CLI units, 7 Component fixtures, 12 Context fixtures, 128 CLI inspection/build tests, 29 sequential real-browser probes, 364 core tests, 13 parser units, and 26 parser integrations. Focused browser proofs cover repeated State cold initialization, A-only action/binding updates, computed invalidation isolation, exact State-slot-only runtime keys, malformed/missing projection failure, Phase J component-v2 rejection, and retained legacy v2 cold compatibility.
 * J1-A fixture repair: all template-manifest goldens now match the already-authorized v4 ordinary-instance contract, including canonical action `storage_id` operands; stale Phase G/H schema assertions now acknowledge template v4/component artifact v3.
@@ -150,6 +152,10 @@ Architecture decisions made
 * Decision: J1-A owns the sole `StateInstanceSlotId` constructor from the exact typed pair `(ComponentInstanceId, IrStorageId)` and the immutable registry ordered by canonical instance then storage.
 * Reason: declaration-level IR storage remains the correct program operand, but repeated component executions require exact mutable addresses before J2 can classify retained values.
 * Tradeoff: component artifact v3 removes `instance_storage_prefix`; manifest v4 actions carry a canonical storage operand; the browser builds the closed pair-to-slot index only from serialized records. Manifest v3/component artifact v2 remains a cold-only legacy pair and cannot participate in Phase J resume products.
+
+* Decision: J2 classifies the closed set of existing compiler-owned runtime slots into retained, recomputable, excluded, or blocked records and builds deterministic indexes by exact slot, owner, boundary candidate, and policy reason.
+* Reason: capture and restore slices need one canonical liveness authority that preserves mutable State and Form values, proves pure eager Computed recomputation transitively, retains exact Context source dependencies, excludes Effect-body state, and fails closed for unsupported required values.
+* Tradeoff: J2 creates no boundary graph or executable resume artifact. Instance-selected Context values combine the exact Phase H runtime binding with the canonical Context evaluation source entry; a shared provider remains one shared runtime slot even when multiple consumers read it.
 
 * Decision: I7 creates one declaration-level `ValidationPlanId::for_form(FormId)` for every valid Form, including empty Forms, and one `FieldDependencyId::for_rule_and_source(ValidationRuleId, FieldId)` for each eligible I6 direct dependency edge.
 * Reason: Form plans and dependency records need stable typed names independent of Rule counts, source order, Component instances, runtime registration, or DOM identity; future runtime planning can refer to a complete Form plan without using absence as policy.
@@ -1141,13 +1147,12 @@ Known limitations
 
 Exact next step
 
-Commit the completed I6 slice, verify the worktree is clean, then obtain an
-authoritative I7 Cross-Field Dependency Planning contract. At minimum it must
-freeze whether and how direct I6 dependencies produce invalidation propagation,
-dependency schedules, update triggers, derived plan identities and membership,
-ordering, execution boundaries, retained blocked facts, graph integrity, and
-public/internal schema policy. Do not reinterpret I6 dependency edges as an
-implicit execution or runtime-state plan.
+Commit J2 atomically as `compiler: plan canonical resume liveness`, verify the
+worktree is clean, then implement J3 exactly from the authoritative Phase J
+roadmap. J3 may consume J2 liveness and existing application-root, component
+instance, ordinary interaction, and Form products; it must not emit anchors,
+events, snapshots, capture/restore programs, lazy activation, chunks, loaders,
+or runtime resume behavior from later slices.
 
 Useful commands
 
@@ -1178,4 +1183,8 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the I6 implementation commit (`compiler: build canonical form validation graph`).
+* `crates/ezc_core/src/lib.rs`
+* `crates/ezc_core/src/resume_liveness.rs`
+* `docs/planning/full-project-docs/07_resumability_and_delivery.md`
+* `notes/progress/2026-W28.md`
+* `notes/progress/AGENT_HANDOFF.md`
