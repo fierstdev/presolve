@@ -3,25 +3,30 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: I13 - Form IR Optimization
-* Working tree: I13 is verified; commit pending.
+* Latest completed slice: I14 - Runtime Form Registry
+* Working tree: I14 is verified; commit pending.
 * Date: 2026-07-15
 
 Last completed slice
 
-* Slice: I13 - Form IR Optimization
-* Summary: I13 retains an immutable source `FormIrReport`, an independently owned optimized report, zero observable-changing metrics, and an explicit immutable-input proof. No instance, Field slot, control/validation write, submission transition, action invocation, or reset operation is removed, merged, or reordered.
-* Key files: crates/ezc_core/src/form_ir_optimization.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/lib.rs
-* Schema decision: I13 is internal only. Existing public schemas and runtime artifacts remain unchanged; no Form execution occurs.
+* Slice: I14 - Runtime Form Registry
+* Summary: I14 creates compiler-generated `RuntimeFormRegistry` v1 records from I8–I13 only. Definitions, instances, fields, bindings, rules, plans, reset data, and program counts are keyed by canonical identities; no raw name, DOM query, dynamic registration, or runtime semantic-ID generation is an authority.
+* Key files: crates/ezc_core/src/runtime_form_registry.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/lib.rs
+* Schema decision: I14 is internal only. Existing public schemas and runtime artifacts remain unchanged; runtime execution remains I16.
 
 Current in-progress slice
 
-* Slice: I14 - Runtime Form Registry
-* Status: I13 is complete and ready to commit. I14 may project compiler-owned I8–I13 metadata into a versioned internal runtime registry only; runtime discovery remains forbidden.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I13
-* Remaining in Phase I: I14 through I20.
+* Slice: I15 - Runtime Form Artifact
+* Status: I14 is complete and ready to commit. I15 owns the first public forms runtime artifact and the template/resume manifest versions.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I14
+* Remaining in Phase I: I15 through I20.
 
 Verification
+
+* I14 `cargo test -p ezc_core`: pass (343 core tests, including versioned instance-qualified registry coverage)
+* `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass
+* `cargo fmt --check`: pass
+* git diff --check: pass
 
 * I13 `cargo test -p ezc_core`: pass (342 core tests, including immutable Form IR optimization coverage)
 * `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass

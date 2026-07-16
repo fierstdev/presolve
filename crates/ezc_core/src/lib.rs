@@ -80,6 +80,7 @@ pub mod runtime_context;
 pub mod runtime_context_artifact;
 pub mod runtime_effect;
 pub mod runtime_effect_artifact;
+pub mod runtime_form_registry;
 pub mod semantic_graph;
 pub mod semantic_id;
 pub mod semantic_provenance;
@@ -405,6 +406,10 @@ pub use runtime_effect_artifact::{
     RuntimeEffectArtifactInitialTrigger, RuntimeEffectArtifactInstruction,
     RuntimeEffectArtifactPrerequisiteBatch, RuntimeEffectArtifactProgram,
     RuntimeEffectArtifactRenderBoundary, RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION,
+};
+pub use runtime_form_registry::{
+    build_runtime_form_registry, RuntimeFormInstanceRecord, RuntimeFormRecord, RuntimeFormRegistry,
+    RUNTIME_FORM_REGISTRY_VERSION,
 };
 pub use semantic_graph::{
     build_semantic_graph, semantic_graph_json, SemanticGraph, SemanticGraphConsumer,

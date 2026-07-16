@@ -64,6 +64,7 @@ use crate::intermediate_representation::{
     IrReactiveTransitiveAnalysis,
 };
 use crate::provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
+use crate::runtime_form_registry::{build_runtime_form_registry, RuntimeFormRegistry};
 use crate::semantic_id::{
     ComponentInvocationId, ConsumerId, ContextId, FieldBindingId, FieldId, FormId, ProviderId,
     SemanticId, SemanticOwner, SlotBindingId, SlotContentFragmentId, SlotId, SlotOutletId,
@@ -111,6 +112,7 @@ pub struct ApplicationSemanticModel {
     pub reset: ResetProducts,
     pub form_ir: FormIrReport,
     pub optimized_form_ir: OptimizedFormIrReport,
+    pub runtime_forms: RuntimeFormRegistry,
     pub slots: BTreeMap<SlotId, SlotEntity>,
     pub component_invocations: BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
     pub component_instance_plan: ComponentInstancePlan,
@@ -1605,6 +1607,16 @@ pub fn build_application_semantic_model_from_component_graph(
     let reset = collect_reset_products(&forms, &form_fields, &form_field_bindings, &form_tracking);
     let form_ir = lower_form_ir(&component_instance_plan, &forms, &form_fields);
     let optimized_form_ir = optimize_form_ir(&form_ir);
+    let runtime_forms = build_runtime_form_registry(
+        &forms,
+        &form_fields,
+        &form_field_bindings,
+        &validation_rules,
+        &optimized_form_ir.optimized,
+        &submissions,
+        &serialization,
+        &reset,
+    );
     let effect_execution_plan = plan_effect_execution(
         &computed_values,
         &effects,
@@ -1676,6 +1688,7 @@ pub fn build_application_semantic_model_from_component_graph(
         reset,
         form_ir,
         optimized_form_ir,
+        runtime_forms,
         slots,
         component_invocations,
         component_instance_plan,
@@ -2061,6 +2074,16 @@ fn build_application_semantic_model_from_files_with_bindings(
     let reset = collect_reset_products(&forms, &form_fields, &form_field_bindings, &form_tracking);
     let form_ir = lower_form_ir(&component_instance_plan, &forms, &form_fields);
     let optimized_form_ir = optimize_form_ir(&form_ir);
+    let runtime_forms = build_runtime_form_registry(
+        &forms,
+        &form_fields,
+        &form_field_bindings,
+        &validation_rules,
+        &optimized_form_ir.optimized,
+        &submissions,
+        &serialization,
+        &reset,
+    );
     let effect_execution_plan = plan_effect_execution(
         &computed_values,
         &effects,
@@ -2130,6 +2153,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         reset,
         form_ir,
         optimized_form_ir,
+        runtime_forms,
         slots,
         component_invocations,
         component_instance_plan,
