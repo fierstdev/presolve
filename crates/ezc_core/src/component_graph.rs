@@ -68,6 +68,8 @@ pub struct ComponentNode {
     pub validation_rule_declaration_facts: Vec<AuthoredValidationRuleDeclarationFact>,
     /// Parser-normalized source facts for every recognized `@submit` method.
     pub submission_declaration_facts: Vec<AuthoredSubmissionDeclarationFact>,
+    /// Parser-normalized source facts for every recognized `@serialize` placement.
+    pub serialization_declaration_facts: Vec<AuthoredSerializationDeclarationFact>,
     /// Module imports that shadow compiler-owned validation intrinsic names.
     pub shadowed_validation_intrinsics: BTreeSet<String>,
     pub methods: Vec<ComponentMethod>,
@@ -122,6 +124,18 @@ pub struct AuthoredSubmissionDeclarationFact {
     pub decorator_provenance: SourceProvenance,
     pub form_designator_provenance: Option<SourceProvenance>,
     pub method_provenance: SourceProvenance,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthoredSerializationDeclarationFact {
+    pub owner_component: Option<SemanticId>,
+    pub declaration_field: Option<SemanticId>,
+    pub authored_name: Option<String>,
+    pub invoked: bool,
+    pub argument_count: usize,
+    pub format: Option<String>,
+    pub provenance: SourceProvenance,
+    pub decorator_provenance: SourceProvenance,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1337,6 +1351,7 @@ fn build_component_graph_with_identity(
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn build_component_node(
     class: &ParsedClass,
     path: &Path,
@@ -1422,6 +1437,8 @@ fn build_component_node(
 
     let submission_declaration_facts =
         submission_declaration_facts_from_class(class, path, element_name.is_some(), &id);
+    let serialization_declaration_facts =
+        serialization_declaration_facts_from_class(class, path, element_name.is_some(), &id);
 
     ComponentNode {
         id,
@@ -1447,6 +1464,7 @@ fn build_component_node(
         form_field_declaration_candidates,
         validation_rule_declaration_facts,
         submission_declaration_facts,
+        serialization_declaration_facts,
         shadowed_validation_intrinsics,
         methods,
         actions,
@@ -2090,6 +2108,46 @@ fn submission_declaration_facts_from_class(
                 right.decorator_provenance.path.as_path(),
                 right.decorator_provenance.span.start,
                 right.id.as_str(),
+            ))
+    });
+    facts
+}
+
+fn serialization_declaration_facts_from_class(
+    class: &ParsedClass,
+    path: &Path,
+    is_canonical_component: bool,
+    component: &SemanticId,
+) -> Vec<AuthoredSerializationDeclarationFact> {
+    let mut facts = class
+        .properties
+        .iter()
+        .flat_map(|property| {
+            property
+                .decorators
+                .iter()
+                .filter(|decorator| decorator.name == "serialize")
+                .map(|decorator| AuthoredSerializationDeclarationFact {
+                    owner_component: is_canonical_component.then(|| component.clone()),
+                    declaration_field: (is_canonical_component && property.is_identifier_name)
+                        .then(|| component.form_field(&property.name)),
+                    authored_name: property.is_identifier_name.then(|| property.name.clone()),
+                    invoked: decorator.is_invoked,
+                    argument_count: decorator.argument_count,
+                    format: decorator.argument.clone(),
+                    provenance: SourceProvenance::new(path, property.span),
+                    decorator_provenance: SourceProvenance::new(path, decorator.span),
+                })
+        })
+        .collect::<Vec<_>>();
+    facts.sort_by(|left, right| {
+        (
+            left.decorator_provenance.path.as_path(),
+            left.decorator_provenance.span.start,
+        )
+            .cmp(&(
+                right.decorator_provenance.path.as_path(),
+                right.decorator_provenance.span.start,
             ))
     });
     facts

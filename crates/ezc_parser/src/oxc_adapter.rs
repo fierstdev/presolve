@@ -457,7 +457,7 @@ fn normalized_decorators(mut decorators: Vec<ParsedDecorator>) -> Vec<ParsedDeco
     if !decorators.iter().any(|decorator| {
         matches!(
             decorator.name.as_str(),
-            "form" | "field" | "validate" | "submit"
+            "form" | "field" | "validate" | "submit" | "serialize"
         )
     }) {
         decorators.retain(|decorator| decorator.is_invoked);

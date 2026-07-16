@@ -97,6 +97,7 @@ pub fn validate_application_semantic_model(
     validate_form_validation(model, &mut diagnostics);
     validate_form_tracking(model, &mut diagnostics);
     validate_form_submissions(model, &mut diagnostics);
+    validate_form_serialization(model, &mut diagnostics);
     validate_contexts(model, &mut diagnostics);
     validate_providers(model, &mut diagnostics);
     validate_consumers(model, &mut diagnostics);
@@ -256,6 +257,25 @@ fn validate_form_submissions(
         diagnostics.push(AsmValidationDiagnostic {
             code: "EZASM1286".to_string(),
             message: "I9 submission products do not match canonical declaration planning"
+                .to_string(),
+        });
+    }
+}
+
+fn validate_form_serialization(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    let expected = crate::collect_serialization_products(
+        &model.components,
+        &model.forms,
+        &model.form_fields,
+        &model.submissions.plans,
+    );
+    if model.serialization != expected {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1287".to_string(),
+            message: "I10 serialization products do not match canonical declaration planning"
                 .to_string(),
         });
     }

@@ -156,6 +156,11 @@ pub struct SubmissionDeclarationCandidateId(SemanticId);
 #[serde(transparent)]
 pub struct SubmissionPlanId(SemanticId);
 
+/// Stable identity for the serialization plan of one canonical Form.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SerializationPlanId(SemanticId);
+
 /// Stable identity for one compiler-owned component Slot semantic entity.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -423,6 +428,11 @@ impl SemanticId {
     #[must_use]
     pub fn submission_plan(&self) -> Self {
         Self(format!("{}/submission-plan", self.as_str()))
+    }
+
+    #[must_use]
+    pub fn serialization_plan(&self) -> Self {
+        Self(format!("{}/serialization-plan", self.as_str()))
     }
 
     #[must_use]
@@ -984,6 +994,23 @@ impl SubmissionPlanId {
     #[must_use]
     pub fn for_form(form: &FormId) -> Self {
         Self(form.as_semantic_id().submission_plan())
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl SerializationPlanId {
+    #[must_use]
+    pub fn for_form(form: &FormId) -> Self {
+        Self(form.as_semantic_id().serialization_plan())
     }
 
     #[must_use]

@@ -47,6 +47,7 @@ pub mod form_binding;
 pub mod form_diagnostics;
 pub mod form_field;
 pub mod form_ownership;
+pub mod form_serialization;
 pub mod form_submission;
 pub mod form_tracking;
 pub mod form_validation;
@@ -258,6 +259,11 @@ pub use form_ownership::{
     FormOwnershipIntegrityKind, FormOwnershipNode, FormOwnershipNodeKey, FormOwnershipValidation,
     FormReferenceEdge, FormReferenceKind,
 };
+pub use form_serialization::{
+    collect_serialization_products, FormFieldSerializationConversion, FormSerializationFormat,
+    FormSerializationPlan, SerializationDeclarationFact, SerializationPlanStatus,
+    SerializationProducts, SerializedFieldPlan,
+};
 pub use form_submission::{
     collect_submission_products, FormSubmissionPlan, SubmissionDeclarationCandidate,
     SubmissionDeclarationViolation, SubmissionProducts, SubmitResetPolicy,
@@ -400,10 +406,10 @@ pub use semantic_id::{
     EffectStatementId, FieldBindingId, FieldDependencyId, FieldId, FieldTrackingId,
     FormDeclarationCandidateId, FormFieldBindingCandidateId, FormFieldDeclarationCandidateId,
     FormId, FormInstanceId, FormOwnershipGraphId, ProviderId, SemanticId, SemanticOwner,
-    SlotBindingId, SlotContentFragmentId, SlotDeclarationCandidateId, SlotId, SlotOutletId,
-    SubmissionDeclarationCandidateId, SubmissionPlanId, TemplatePositionId, TouchedTrackingPlanId,
-    ValidationDependencyCycleId, ValidationGraphId, ValidationPlanId, ValidationRuleCandidateId,
-    ValidationRuleId,
+    SerializationPlanId, SlotBindingId, SlotContentFragmentId, SlotDeclarationCandidateId, SlotId,
+    SlotOutletId, SubmissionDeclarationCandidateId, SubmissionPlanId, TemplatePositionId,
+    TouchedTrackingPlanId, ValidationDependencyCycleId, ValidationGraphId, ValidationPlanId,
+    ValidationRuleCandidateId, ValidationRuleId,
 };
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
