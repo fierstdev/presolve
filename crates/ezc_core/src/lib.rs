@@ -71,6 +71,7 @@ pub mod ordinary_template_integrity;
 pub mod page_codegen;
 pub mod provider;
 pub mod resume_boot;
+pub mod resume_boundary;
 pub mod resume_diagnostics;
 pub mod resume_explain;
 pub mod resume_identity;
@@ -385,6 +386,13 @@ pub use page_codegen::{
     generate_standalone_page_with_effect_runtime,
 };
 pub use provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
+pub use resume_boundary::{
+    build_resume_boundary_graph, validate_resume_boundary_graph, ResumeBoundary,
+    ResumeBoundaryActivationIdentity, ResumeBoundaryActivationProgram,
+    ResumeBoundaryActivationReference, ResumeBoundaryBlock, ResumeBoundaryBlockSource,
+    ResumeBoundaryGraph, ResumeBoundaryIntegrityCode, ResumeBoundaryIntegrityDiagnostic,
+    ResumeBoundaryOwner, ResumeBoundaryOwnershipEdge, RESUME_BOUNDARY_GRAPH_VERSION,
+};
 pub use resume_diagnostics::{
     ResumeDiagnosticReservation, RESUME_DIAGNOSTIC_RESERVATIONS, RESUME_INTEGRITY_RESERVATION_END,
     RESUME_INTEGRITY_RESERVATION_START,

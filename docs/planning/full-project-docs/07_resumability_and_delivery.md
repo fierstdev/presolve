@@ -70,6 +70,31 @@ proof, unsupported required values, invalid boundary promotion, and canonical
 provenance/order/index drift. J2 changes no public schema and emits no boundary
 graph, snapshot, program, marker, chunk, loader, or runtime resume behavior.
 
+## Phase J canonical boundary graph
+
+J3 creates one compiler-only `ResumeBoundaryGraph` from exact Phase H
+component-instance, structural-region, ordinary-event, and Phase I Form
+products plus J2 liveness. Each build root has one application-root boundary;
+each planned or structural-template Component instance, structural region,
+Form instance, resumable ordinary event, and enhanced Form submit has its own
+unmerged boundary identity.
+
+Ownership parentage is compiler-derived and parent-before-child:
+application roots own root Components; Component boundaries own direct nested
+Components, structural regions, and Forms; structural regions own their
+structural-template Component boundaries. Interaction boundaries are not
+ownership parents or children. Their activation references point to exact
+owner/required boundaries, existing event or submission programs, and J2
+retained slots without duplicating application state.
+
+Blocked Component-instance and J2 liveness products remain explicit
+`ResumeBoundaryBlock` records. Internal integrity codes `EZASM1328` through
+`EZASM1336` reject duplicate identities, invalid owners, missing/multiple
+parents, cycles, unreachable boundaries, nonreciprocal edges, Phase H/I
+correspondence drift, provenance drift, and ordering/index drift. J3 changes
+no public schema and emits no policy, marker, snapshot, capture/restore
+program, chunk, loader, or runtime resume behavior.
+
 ## Definition
 
 In EdgeZero, resumability means:

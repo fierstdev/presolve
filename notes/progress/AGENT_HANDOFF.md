@@ -3,25 +3,27 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: J2 - Resumability Liveness and Retained Slots
-* Working tree: ready for the atomic J2 commit; the next authored slice is J3 resume boundary graph.
+* Latest completed slice: J3 - Resume Boundary Graph
+* Working tree: ready for the atomic J3 commit; the next authored slice is J4 activation policy planning.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: J2 - Resumability Liveness and Retained Slots
-* Summary: `ResumeLivenessPlan` classifies every valid exact State, Computed cache/dirty, Context, Form v5, and Effect activation metadata slot exactly once as retained, recomputable, excluded, or blocked. It consumes canonical instance/storage/type/purity/dependency products, carries exact transitive dependency evidence, and never reads runtime objects.
-* Key files: `resume_liveness.rs`, `lib.rs`, `07_resumability_and_delivery.md`
-* Boundary: no resume boundary graph, snapshot, capture/restore program, anchor, event, lazy activation, chunk, loader, or runtime resume behavior.
+* Slice: J3 - Resume Boundary Graph
+* Summary: `ResumeBoundaryGraph` creates distinct application-root, planned/structural-template Component, structural-region, Form, ordinary-event Interaction, and enhanced Form-submit Interaction boundaries from exact Phase H/I/J2 products. Ownership parentage and activation references remain separate.
+* Key files: `resume_boundary.rs`, `lib.rs`, `07_resumability_and_delivery.md`
+* Boundary: no activation policy, anchor, event serialization, snapshot, capture/restore program, lazy loader, chunk, or runtime resume behavior.
 
 Current in-progress slice
 
-* Slice: J3 - Resume Boundary Graph
-* Status: Ready after the atomic J2 commit. The authoritative roadmap defines the boundary graph over canonical application roots, component instances, ordinary template interaction authorities, Forms, and J2 liveness.
+* Slice: J4 - Activation Policy Planning
+* Status: Ready after the atomic J3 commit. The authoritative roadmap supplies the closed precedence and forbids heuristic Visible/Manual policy.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase I: none. Next: J3 boundary identity/membership/edge products, deterministic queries, integrity validation, focused proofs, progress update, and atomic commit.
+* Remaining in Phase I: none. Next: J4 policy decisions/prerequisites/blocks, deterministic validation, focused proofs, progress update, and atomic commit.
 
 Verification
+
+* J3 verification: `cargo test -p ezc_core --lib` passes all 372 core tests; `cargo clippy -p ezc_core --all-targets -- -D warnings`, `cargo fmt --all --check`, and `git diff --check` pass. Focused proofs cover parent-before-child application/Component/structural/Form ownership, structural-template event ownership, ordinary and Form-submit activation references, upstream Component/liveness block preservation, reverse-input determinism, invalid parent reciprocity, and the complete `EZASM1328`-`EZASM1336` range.
 
 * J2 verification: `cargo test -p ezc_core --lib` passes all 368 core tests; `cargo clippy -p ezc_core --all-targets -- -D warnings`, `cargo fmt --all --check`, and `git diff --check` pass. Focused proofs cover repeated exact State/Computed slots, one shared instance-qualified Context provider slot with exact State dependency evidence, all six Form v5 slot classes, deterministic transitive Computed evidence, input-order determinism, classification uniqueness, and dedicated policy/owner/boundary/proof integrity failures.
 
@@ -156,6 +158,10 @@ Architecture decisions made
 * Decision: J2 classifies the closed set of existing compiler-owned runtime slots into retained, recomputable, excluded, or blocked records and builds deterministic indexes by exact slot, owner, boundary candidate, and policy reason.
 * Reason: capture and restore slices need one canonical liveness authority that preserves mutable State and Form values, proves pure eager Computed recomputation transitively, retains exact Context source dependencies, excludes Effect-body state, and fails closed for unsupported required values.
 * Tradeoff: J2 creates no boundary graph or executable resume artifact. Instance-selected Context values combine the exact Phase H runtime binding with the canonical Context evaluation source entry; a shared provider remains one shared runtime slot even when multiple consumers read it.
+
+* Decision: J3 retains structural-template Component instances as distinct Component boundaries parented by their exact structural-region boundary, while Interaction boundaries carry activation references and no ownership parent.
+* Reason: Phase H ordinary events can belong to a structural-template instance, and the graph must give that event an exact owner without collapsing the Component into its region or discovering a parent from DOM ancestry. Form submits likewise need both their Component host and Form boundary references.
+* Tradeoff: Structural-template boundaries currently own no J1-A/J1-C storage because those registries project executable planned instances only. J3 records the identity/parentage without inventing dynamic instance storage; later policy/program slices must preserve this boundary.
 
 * Decision: I7 creates one declaration-level `ValidationPlanId::for_form(FormId)` for every valid Form, including empty Forms, and one `FieldDependencyId::for_rule_and_source(ValidationRuleId, FieldId)` for each eligible I6 direct dependency edge.
 * Reason: Form plans and dependency records need stable typed names independent of Rule counts, source order, Component instances, runtime registration, or DOM identity; future runtime planning can refer to a complete Form plan without using absence as policy.
@@ -1147,12 +1153,12 @@ Known limitations
 
 Exact next step
 
-Commit J2 atomically as `compiler: plan canonical resume liveness`, verify the
-worktree is clean, then implement J3 exactly from the authoritative Phase J
-roadmap. J3 may consume J2 liveness and existing application-root, component
-instance, ordinary interaction, and Form products; it must not emit anchors,
-events, snapshots, capture/restore programs, lazy activation, chunks, loaders,
-or runtime resume behavior from later slices.
+Commit J3 atomically as `compiler: build canonical resume boundary graph`,
+verify the worktree is clean, then implement J4 exactly from the authoritative
+Phase J roadmap. J4 may assign only the closed Eager/Interaction/Visible/Manual/
+None policy with the frozen precedence; it must emit zero heuristic Visible or
+Manual policies and must not create anchors, snapshots, programs, chunks,
+loaders, or runtime resume behavior from later slices.
 
 Useful commands
 
@@ -1184,7 +1190,7 @@ Useful commands
 Changed but uncommitted files
 
 * `crates/ezc_core/src/lib.rs`
-* `crates/ezc_core/src/resume_liveness.rs`
+* `crates/ezc_core/src/resume_boundary.rs`
 * `docs/planning/full-project-docs/07_resumability_and_delivery.md`
 * `notes/progress/2026-W28.md`
 * `notes/progress/AGENT_HANDOFF.md`
