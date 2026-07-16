@@ -2800,7 +2800,7 @@ mod tests {
     }
 
     #[test]
-    fn i6_validation_products_do_not_leak_into_asm_inspection_schema_v8() {
+    fn i17_forms_inspection_projects_validation_rules_in_schema_v9() {
         let path = PathBuf::from("src/Profile.tsx");
         let parsed = ezc_parser::parse_file(
             &path,
@@ -2823,7 +2823,8 @@ class Profile {
         let document = asm_inspection_json(&[path], &asm, &[]);
         let json: serde_json::Value = serde_json::from_str(&document).unwrap();
         assert_eq!(json["schema_version"], ASM_INSPECTION_SCHEMA_VERSION);
-        assert!(!document.contains("validation-rule"));
-        assert!(!document.contains("validation_rule"));
+        assert_eq!(json["schema_version"], 9);
+        assert!(document.contains("validation-rule"));
+        assert!(document.contains("validation_rule"));
     }
 }

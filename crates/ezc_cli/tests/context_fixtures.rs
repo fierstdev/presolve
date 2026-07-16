@@ -739,7 +739,7 @@ fn phase_g_freezes_schema_versions_runtime_order_and_no_discovery_contract() {
     assert_eq!(build_template_manifest_from_asm(&model).schema_version, 2);
 
     for (args, expected) in [
-        (vec!["check", path, "--format", "json"], 4),
+        (vec!["check", path, "--format", "json"], 5),
         (vec!["asm", path, "--format", "json"], 9),
     ] {
         let output = run_cli(&args);

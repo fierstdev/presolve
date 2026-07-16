@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: I20 - Stability Audit and Freeze
-* Working tree: I20 is verified; commit pending.
+* Working tree: Phase I freeze gate repair verified; commit pending. No Phase J code exists.
 * Date: 2026-07-15
 
 Last completed slice
@@ -17,11 +17,17 @@ Last completed slice
 Current in-progress slice
 
 * Slice: I20 - Stability Audit and Freeze
-* Status: Phase I complete. Do not begin Phase J without its authoritative contract.
+* Status: Phase I complete. The stale pre-I17 CLI assertions now match the frozen ASM v9 Forms inspection and check JSON v5 contracts; the full gate passed. Commit the repair before beginning Phase J.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
 * Remaining in Phase I: none. Phase J is not started.
 
 Verification
+
+* Phase I freeze repair `cargo test -p ezc_cli --bin ezc_cli i17_forms_inspection_projects_validation_rules_in_schema_v9`: pass (the committed Forms inspection now positively asserts `validation-rule` projection in ASM v9)
+* Phase I freeze repair `cargo clippy -p ezc_cli --all-targets -- -D warnings`: pass
+* Phase I freeze repair `cargo fmt --all --check`: pass
+* Phase I freeze repair `git diff --check`: pass
+* Phase I freeze repair `just check`: pass (strict workspace clippy; 2 CLI units; 7 Component fixtures; 12 Context fixtures; 128 CLI tests; 27 sequential real-browser tests; 350 core tests; 13 parser units; 26 parser integrations)
 
 * I17 `cargo test -p ezc_core --lib`: pass (348 core tests, including canonical Forms inspection projection coverage)
 * I17 `cargo test -p ezc_cli --test explain --test component_fixtures --test context_fixtures`: pass (128 inspection/build, 7 component, and 12 context tests)

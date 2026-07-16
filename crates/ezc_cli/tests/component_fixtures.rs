@@ -544,7 +544,7 @@ fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
     assert_eq!(build_template_manifest_from_asm(&model).schema_version, 1);
 
     for (args, expected_status, expected_schema) in [
-        (vec!["check", path, "--format", "json"], Some(1), 4),
+        (vec!["check", path, "--format", "json"], Some(1), 5),
         (vec!["asm", path, "--format", "json"], Some(0), 9),
     ] {
         let (status, stdout, stderr) = cli_result(&args);
