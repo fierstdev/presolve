@@ -7,7 +7,7 @@ use crate::effect_resume::{EffectActivationSlotId, EffectActivationStatus};
 use crate::resume_plan::ResumePlan;
 use crate::semantic_type::ExecutionBoundary;
 
-pub const RESUME_MANIFEST_SCHEMA_VERSION: u32 = 4;
+pub const RESUME_MANIFEST_SCHEMA_VERSION: u32 = 5;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResumeManifest {
@@ -25,6 +25,8 @@ pub struct ResumeManifest {
     pub structural_regions: Vec<crate::resume_plan::StructuralRegionResumePlan>,
     #[serde(default)]
     pub slot_bindings: Vec<crate::resume_plan::SlotBindingResumePlan>,
+    #[serde(default)]
+    pub form_instances: Vec<crate::resume_plan::FormInstanceResumePlan>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -161,6 +163,7 @@ pub fn build_resume_manifest(plan: &ResumePlan) -> ResumeManifest {
         component_instances: plan.component_instances.clone(),
         structural_regions: plan.structural_regions.clone(),
         slot_bindings: plan.slot_bindings.clone(),
+        form_instances: plan.form_instances.clone(),
     }
 }
 
@@ -183,6 +186,11 @@ pub fn validate_resume_manifest(
     manifest: &ResumeManifest,
 ) -> Vec<ResumeManifestValidationDiagnostic> {
     let mut diagnostics = Vec::new();
+    // Pre-Forms v4 documents remain readable when they carry no Forms
+    // planning metadata. A Forms-bearing document must use the v5 contract.
+    if manifest.schema_version == 4 && manifest.form_instances.is_empty() {
+        return diagnostics;
+    }
     if manifest.schema_version != RESUME_MANIFEST_SCHEMA_VERSION {
         diagnostics.push(diagnostic(
             "EZRSM1201",
@@ -297,7 +305,7 @@ class ResumeManifestComputed extends Component {
         let json: serde_json::Value =
             serde_json::from_str(&resume_manifest_json(&manifest)).expect("resume manifest JSON");
 
-        assert_eq!(json["schema_version"], 4);
+        assert_eq!(json["schema_version"], 5);
         assert_eq!(json["effects"], serde_json::json!([]));
         assert_eq!(
             json["components"][0]["computed"][0]["computed"],
@@ -336,7 +344,7 @@ class ResumeManifestEffect extends Component {
         let effect = &value["effects"][0];
 
         assert_eq!(json, repeated);
-        assert_eq!(value["schema_version"], 4);
+        assert_eq!(value["schema_version"], 5);
         assert_eq!(effect["initial_status"], "pending");
         assert_eq!(
             effect["activation_slot_id"],

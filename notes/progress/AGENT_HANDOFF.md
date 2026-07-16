@@ -3,25 +3,31 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: I14 - Runtime Form Registry
-* Working tree: I14 is verified; commit pending.
+* Latest completed slice: I15 - Runtime Form Artifact
+* Working tree: I15 is verified; commit pending.
 * Date: 2026-07-15
 
 Last completed slice
 
-* Slice: I14 - Runtime Form Registry
-* Summary: I14 creates compiler-generated `RuntimeFormRegistry` v1 records from I8–I13 only. Definitions, instances, fields, bindings, rules, plans, reset data, and program counts are keyed by canonical identities; no raw name, DOM query, dynamic registration, or runtime semantic-ID generation is an authority.
-* Key files: crates/ezc_core/src/runtime_form_registry.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/lib.rs
-* Schema decision: I14 is internal only. Existing public schemas and runtime artifacts remain unchanged; runtime execution remains I16.
+* Slice: I15 - Runtime Form Artifact
+* Summary: I15 emits `forms.runtime.json` schema v1 from the canonical I0–I14 products and embeds the exact document as `ez-forms-runtime`. It projects canonical Form/Field/Binding/Rule/Dependency/Submission/Serialization/Reset facts and instance-qualified slots/programs without source or DOM discovery.
+* Key files: crates/ezc_core/src/runtime_form_artifact.rs, crates/ezc_core/src/template_manifest.rs, crates/ezc_core/src/resume_{plan,manifest}.rs, crates/ezc_core/src/page_codegen.rs, crates/ezc_cli/src/main.rs
+* Schema decision: Template manifest v3 adds exact control-anchor/FieldBindingId/FormInstanceId/input/blur/channel bridges. Resume manifest v5 adds Form planning metadata only; v4 remains readable only for documents with no Forms records. Semantic graph v5, ASM inspection v8, and check JSON v4 remain frozen.
 
 Current in-progress slice
 
-* Slice: I15 - Runtime Form Artifact
-* Status: I14 is complete and ready to commit. I15 owns the first public forms runtime artifact and the template/resume manifest versions.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I14
-* Remaining in Phase I: I15 through I20.
+* Slice: I16 - Runtime Form Execution
+* Status: begin only after committing the verified I15 artifact slice.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I15
+* Remaining in Phase I: I16 through I20.
 
 Verification
+
+* I15 `cargo test -p ezc_core --lib`: pass (345 core tests)
+* I15 `cargo test -p ezc_cli`: pass (including Forms build/artifact/embed coverage and 26 browser tests)
+* `cargo clippy -p ezc_core -p ezc_cli --all-targets -- -D warnings`: pass
+* `cargo fmt --check`: pass
+* `git diff --check`: pass
 
 * I14 `cargo test -p ezc_core`: pass (343 core tests, including versioned instance-qualified registry coverage)
 * `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass

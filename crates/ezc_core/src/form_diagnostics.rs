@@ -99,10 +99,10 @@ mod tests {
     }
 
     #[test]
-    fn phase_i_entry_retains_the_frozen_phase_h_core_schema_baseline() {
+    fn phase_i_i15_updates_only_forms_runtime_contract_versions() {
         assert_eq!(RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION, 2);
-        assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 4);
-        assert_eq!(TEMPLATE_MANIFEST_SCHEMA_VERSION, 2);
+        assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 5);
+        assert_eq!(TEMPLATE_MANIFEST_SCHEMA_VERSION, 3);
         assert_eq!(RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, 2);
         assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 5);
     }

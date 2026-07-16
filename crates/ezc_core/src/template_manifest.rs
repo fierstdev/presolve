@@ -10,13 +10,28 @@ use crate::template_graph::{
 };
 use crate::ApplicationSemanticModel;
 
-pub const TEMPLATE_MANIFEST_SCHEMA_VERSION: u32 = 2;
+pub const TEMPLATE_MANIFEST_SCHEMA_VERSION: u32 = 3;
 const LEGACY_TEMPLATE_MANIFEST_SCHEMA_VERSION: u32 = 1;
+const ACTION_TEMPLATE_MANIFEST_SCHEMA_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct TemplateManifest {
     pub schema_version: u32,
     pub components: Vec<ManifestComponent>,
+    /// Exact compiler-generated bridges from template control anchors to
+    /// instance-qualified Forms programs. Empty for v1/v2 manifests.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub form_bindings: Vec<ManifestFormBinding>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ManifestFormBinding {
+    pub control_anchor: String,
+    pub field_binding_id: String,
+    pub form_instance_id: String,
+    pub input_program: String,
+    pub blur_program: String,
+    pub channel: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -148,20 +163,23 @@ pub fn build_template_manifest(
             .iter()
             .map(|template| manifest_component(component_graph, template))
             .collect::<Vec<_>>(),
+        form_bindings: Vec::new(),
     }
 }
 
 /// Build schema-v2 template metadata from canonical ASM action-batch facts.
 #[must_use]
 pub fn build_template_manifest_from_asm(model: &ApplicationSemanticModel) -> TemplateManifest {
+    let form_bindings = form_binding_bridges(model);
     TemplateManifest {
-        // A source unit without F8 action batches remains a legacy manifest: it
-        // cannot activate completed-action effects and therefore must not claim
-        // to provide the v2 action-batch bridge.
-        schema_version: if model.effect_trigger_plan.action_batches.is_empty() {
+        // A Forms artifact always requires its v3 instance-qualified bridge.
+        // Otherwise preserve the pre-Forms v1/v2 compatibility boundary.
+        schema_version: if !form_bindings.is_empty() {
+            TEMPLATE_MANIFEST_SCHEMA_VERSION
+        } else if model.effect_trigger_plan.action_batches.is_empty() {
             LEGACY_TEMPLATE_MANIFEST_SCHEMA_VERSION
         } else {
-            TEMPLATE_MANIFEST_SCHEMA_VERSION
+            ACTION_TEMPLATE_MANIFEST_SCHEMA_VERSION
         },
         components: model
             .templates
@@ -176,7 +194,48 @@ pub fn build_template_manifest_from_asm(model: &ApplicationSemanticModel) -> Tem
                 Some(manifest)
             })
             .collect(),
+        form_bindings,
     }
+}
+
+fn form_binding_bridges(model: &ApplicationSemanticModel) -> Vec<ManifestFormBinding> {
+    let mut bridges = Vec::new();
+    for binding in model.form_field_bindings.values() {
+        for instance in model
+            .optimized_form_ir
+            .optimized
+            .instances
+            .values()
+            .filter(|instance| instance.form == binding.form)
+        {
+            if !instance.input.contains_key(&binding.field)
+                || !instance.blur.contains_key(&binding.field)
+            {
+                continue;
+            }
+            bridges.push(ManifestFormBinding {
+                control_anchor: binding.control_entity.to_string(),
+                field_binding_id: binding.id.to_string(),
+                form_instance_id: instance.id.to_string(),
+                input_program: format!("{}/input:{}", instance.id, binding.field),
+                blur_program: format!("{}/blur:{}", instance.id, binding.field),
+                channel: format!("{:?}", binding.channel),
+            });
+        }
+    }
+    bridges.sort_by(|left, right| {
+        (
+            left.control_anchor.as_str(),
+            left.field_binding_id.as_str(),
+            left.form_instance_id.as_str(),
+        )
+            .cmp(&(
+                right.control_anchor.as_str(),
+                right.field_binding_id.as_str(),
+                right.form_instance_id.as_str(),
+            ))
+    });
+    bridges
 }
 
 /// Serialize a template manifest as pretty JSON.
@@ -434,7 +493,8 @@ fn collect_conditional(conditional: &ConditionalNode, nodes: &mut Vec<ManifestNo
 #[cfg(test)]
 mod tests {
     use super::{
-        build_template_manifest_from_asm, ManifestEventKind, TEMPLATE_MANIFEST_SCHEMA_VERSION,
+        build_template_manifest_from_asm, ManifestEventKind,
+        ACTION_TEMPLATE_MANIFEST_SCHEMA_VERSION,
     };
     use crate::build_application_semantic_model;
 
@@ -467,7 +527,10 @@ class TemplateActionBatch extends Component {
         let component_manifest = &manifest.components[0];
         let event = &component_manifest.template.events[0];
 
-        assert_eq!(manifest.schema_version, TEMPLATE_MANIFEST_SCHEMA_VERSION);
+        assert_eq!(
+            manifest.schema_version,
+            ACTION_TEMPLATE_MANIFEST_SCHEMA_VERSION
+        );
         assert_eq!(event.kind, Some(ManifestEventKind::Action));
         assert_eq!(event.method_id.as_deref(), Some(method.as_str()));
         assert_eq!(event.action_batch_id.as_deref(), Some(batch.id.as_str()));
@@ -476,5 +539,32 @@ class TemplateActionBatch extends Component {
             action.method_id.as_deref() == Some(method.as_str())
                 && action.action_batch_id.as_deref() == Some(batch.id.as_str())
         }));
+    }
+
+    #[test]
+    fn emits_v3_instance_qualified_form_bridges() {
+        let parsed = ezc_parser::parse_file(
+            "src/FormManifest.tsx",
+            r#"
+@component("form-manifest")
+class FormManifest {
+  @form() profile!: Form;
+  @field(this.profile) name = "";
+  render() { return <input field={this.name} />; }
+}
+"#,
+        );
+        let model = build_application_semantic_model(&parsed);
+        let manifest = build_template_manifest_from_asm(&model);
+        assert_eq!(
+            manifest.schema_version,
+            super::TEMPLATE_MANIFEST_SCHEMA_VERSION
+        );
+        assert_eq!(manifest.form_bindings.len(), 1);
+        let bridge = &manifest.form_bindings[0];
+        assert!(bridge.field_binding_id.contains("field-binding"));
+        assert!(bridge.form_instance_id.contains("form-instance"));
+        assert!(bridge.input_program.contains("/input:"));
+        assert!(bridge.blur_program.contains("/blur:"));
     }
 }

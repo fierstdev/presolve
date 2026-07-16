@@ -17,6 +17,31 @@ pub struct ResumePlan {
     pub component_instances: Vec<ComponentInstanceResumePlan>,
     pub structural_regions: Vec<StructuralRegionResumePlan>,
     pub slot_bindings: Vec<SlotBindingResumePlan>,
+    /// I15 planning metadata only. It deliberately carries no live browser
+    /// state and Phase J remains the sole restoration authority.
+    pub form_instances: Vec<FormInstanceResumePlan>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FormInstanceResumePlan {
+    pub form_instance: String,
+    pub form: String,
+    pub component_instance: String,
+    pub fields: Vec<FormFieldResumePlan>,
+    pub aggregate_validation_slot: String,
+    pub submission_slot: String,
+    pub serializable: bool,
+    pub pending_validation_status: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FormFieldResumePlan {
+    pub field: String,
+    pub value_slot: String,
+    pub dirty_slot: String,
+    pub touched_slot: String,
+    pub validation_slot: String,
+    pub serializable: bool,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ComponentInstanceResumePlan {
@@ -58,6 +83,7 @@ pub struct ResumeComputedPlan {
 }
 
 #[must_use]
+#[allow(clippy::too_many_lines)]
 pub fn build_resume_plan(model: &ApplicationSemanticModel) -> ResumePlan {
     let ir = lower_components_to_ir(model);
     let registry = build_runtime_computed_registry(model, &ir);
@@ -141,6 +167,44 @@ pub fn build_resume_plan(model: &ApplicationSemanticModel) -> ResumePlan {
                 resume_id: format!("resume-slot-binding:{}", binding.id),
                 caller_instance: binding.caller_instance.to_string(),
                 callee_instance: binding.callee_instance.to_string(),
+            })
+            .collect(),
+        form_instances: model
+            .optimized_form_ir
+            .optimized
+            .instances
+            .values()
+            .map(|instance| FormInstanceResumePlan {
+                form_instance: instance.id.to_string(),
+                form: instance.form.to_string(),
+                component_instance: instance.component_instance.to_string(),
+                fields: instance
+                    .storage
+                    .value
+                    .iter()
+                    .map(|(field, value_slot)| FormFieldResumePlan {
+                        field: field.to_string(),
+                        value_slot: value_slot.as_str().to_string(),
+                        dirty_slot: instance.storage.dirty[field].as_str().to_string(),
+                        touched_slot: instance.storage.touched[field].as_str().to_string(),
+                        validation_slot: instance.storage.validation[field].as_str().to_string(),
+                        serializable: model.form_fields.get(field).is_some_and(|field| {
+                            crate::serialization_compatibility(&field.semantic_type)
+                                == crate::SerializationCompatibility::Serializable
+                        }),
+                    })
+                    .collect(),
+                aggregate_validation_slot: instance.storage.aggregate.as_str().to_string(),
+                submission_slot: instance.storage.submission.as_str().to_string(),
+                serializable: model
+                    .form_fields
+                    .values()
+                    .filter(|field| field.owner_form == instance.form)
+                    .all(|field| {
+                        crate::serialization_compatibility(&field.semantic_type)
+                            == crate::SerializationCompatibility::Serializable
+                    }),
+                pending_validation_status: "none".to_string(),
             })
             .collect(),
     }

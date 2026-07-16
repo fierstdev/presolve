@@ -4124,6 +4124,65 @@ fn build_command_writes_compiler_generated_computed_runtime_metadata() {
 }
 
 #[test]
+fn build_command_writes_and_embeds_the_v1_forms_artifact() {
+    let repo_root = repo_root();
+    let test_dir = repo_root.join("target/ezc-test-output/forms-runtime-artifact");
+    let out_dir = test_dir.join("out");
+    if test_dir.exists() {
+        std::fs::remove_dir_all(&test_dir).expect("failed to clean previous Forms test output");
+    }
+    std::fs::create_dir_all(&test_dir).expect("failed to create Forms test directory");
+    let input = test_dir.join("FormArtifact.tsx");
+    std::fs::write(
+        &input,
+        r#"
+@component("form-artifact")
+class FormArtifact {
+  @form() profile!: Form;
+  @field(this.profile) name = "";
+  render() { return <input field={this.name} />; }
+}
+"#,
+    )
+    .expect("failed to write Forms test source");
+
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            input.to_str().expect("test input path was not valid UTF-8"),
+            "--out",
+            out_dir
+                .to_str()
+                .expect("test output path was not valid UTF-8"),
+        ])
+        .output()
+        .expect("failed to build Forms artifact fixture");
+    assert!(
+        output.status.success(),
+        "Forms build failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let forms = std::fs::read_to_string(out_dir.join("forms.runtime.json"))
+        .expect("failed to read Forms runtime artifact");
+    let forms: serde_json::Value = serde_json::from_str(&forms).expect("Forms artifact JSON");
+    assert_eq!(forms["schema_version"], 1);
+    assert_eq!(forms["forms"].as_array().map(Vec::len), Some(1));
+    assert_eq!(forms["instances"].as_array().map(Vec::len), Some(1));
+
+    let manifest = std::fs::read_to_string(out_dir.join("template.manifest.json"))
+        .expect("failed to read template manifest");
+    let manifest: serde_json::Value = serde_json::from_str(&manifest).expect("manifest JSON");
+    assert_eq!(manifest["schema_version"], 3);
+    assert_eq!(manifest["form_bindings"].as_array().map(Vec::len), Some(1));
+
+    let page = std::fs::read_to_string(out_dir.join("index.html"))
+        .expect("failed to read Forms artifact page");
+    assert!(page.contains("id=\"ez-forms-runtime\""));
+}
+
+#[test]
 fn build_command_writes_compiler_generated_effect_runtime_metadata() {
     let repo_root = repo_root();
     let out_dir = repo_root.join("target/ezc-test-output/effect-runtime-artifact");

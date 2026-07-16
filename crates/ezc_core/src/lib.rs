@@ -80,6 +80,7 @@ pub mod runtime_context;
 pub mod runtime_context_artifact;
 pub mod runtime_effect;
 pub mod runtime_effect_artifact;
+pub mod runtime_form_artifact;
 pub mod runtime_form_registry;
 pub mod semantic_graph;
 pub mod semantic_id;
@@ -346,6 +347,7 @@ pub use module_graph::{
 };
 pub use page_codegen::{
     generate_standalone_page, generate_standalone_page_with_component_runtime,
+    generate_standalone_page_with_component_runtime_and_forms,
     generate_standalone_page_with_computed_runtime, generate_standalone_page_with_context_runtime,
     generate_standalone_page_with_effect_runtime,
 };
@@ -356,8 +358,9 @@ pub use resume_manifest::{
     ResumeManifestValidationDiagnostic, RESUME_MANIFEST_SCHEMA_VERSION,
 };
 pub use resume_plan::{
-    build_resume_plan, ComponentInstanceResumePlan, ResumeComponentPlan, ResumeComputedPlan,
-    ResumePlan, SlotBindingResumePlan, StructuralRegionResumePlan,
+    build_resume_plan, ComponentInstanceResumePlan, FormFieldResumePlan, FormInstanceResumePlan,
+    ResumeComponentPlan, ResumeComputedPlan, ResumePlan, SlotBindingResumePlan,
+    StructuralRegionResumePlan,
 };
 pub use runtime_codegen::generate_runtime_stub;
 pub use runtime_component::{
@@ -406,6 +409,15 @@ pub use runtime_effect_artifact::{
     RuntimeEffectArtifactInitialTrigger, RuntimeEffectArtifactInstruction,
     RuntimeEffectArtifactPrerequisiteBatch, RuntimeEffectArtifactProgram,
     RuntimeEffectArtifactRenderBoundary, RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION,
+};
+pub use runtime_form_artifact::{
+    build_runtime_forms_artifact, runtime_forms_artifact_json, validate_runtime_forms_artifact,
+    RuntimeFormsArtifact, RuntimeFormsArtifactBinding, RuntimeFormsArtifactDependency,
+    RuntimeFormsArtifactField, RuntimeFormsArtifactFieldProgram, RuntimeFormsArtifactFieldSlots,
+    RuntimeFormsArtifactForm, RuntimeFormsArtifactInstance, RuntimeFormsArtifactPrograms,
+    RuntimeFormsArtifactReset, RuntimeFormsArtifactRule, RuntimeFormsArtifactSerialization,
+    RuntimeFormsArtifactSubmission, RuntimeFormsArtifactValidation,
+    RUNTIME_FORM_ARTIFACT_SCHEMA_VERSION,
 };
 pub use runtime_form_registry::{
     build_runtime_form_registry, RuntimeFormInstanceRecord, RuntimeFormRecord, RuntimeFormRegistry,

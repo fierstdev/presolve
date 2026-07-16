@@ -1105,6 +1105,16 @@ macro_rules! impl_form_slot_id {
                         .child("form-slot", &format!("{}:{name}", stringify!($name))),
                 )
             }
+
+            #[must_use]
+            pub const fn as_semantic_id(&self) -> &SemanticId {
+                &self.0
+            }
+
+            #[must_use]
+            pub fn as_str(&self) -> &str {
+                self.0.as_str()
+            }
         }
     };
 }

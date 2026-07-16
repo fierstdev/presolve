@@ -1773,7 +1773,7 @@ fn validate_template_action_bindings(
     diagnostics: &mut Vec<AsmValidationDiagnostic>,
 ) {
     let manifest = build_template_manifest_from_asm(model);
-    if manifest.schema_version != TEMPLATE_MANIFEST_SCHEMA_VERSION {
+    if manifest.schema_version < 2 || manifest.schema_version > TEMPLATE_MANIFEST_SCHEMA_VERSION {
         return;
     }
     for component_manifest in &manifest.components {
