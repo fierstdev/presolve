@@ -73,6 +73,7 @@ pub mod provider;
 pub mod resume_activation;
 pub mod resume_boot;
 pub mod resume_boundary;
+pub mod resume_capture;
 pub mod resume_chunk;
 pub mod resume_diagnostics;
 pub mod resume_explain;
@@ -401,6 +402,16 @@ pub use resume_boundary::{
     ResumeBoundaryActivationReference, ResumeBoundaryBlock, ResumeBoundaryBlockSource,
     ResumeBoundaryGraph, ResumeBoundaryIntegrityCode, ResumeBoundaryIntegrityDiagnostic,
     ResumeBoundaryOwner, ResumeBoundaryOwnershipEdge, RESUME_BOUNDARY_GRAPH_VERSION,
+};
+pub use resume_capture::{
+    build_resume_capture_plan, capture_resume_snapshot, encode_resume_value,
+    resume_snapshot_artifact_json, resume_snapshot_json, validate_resume_capture_plan,
+    ResumeCaptureBlock, ResumeCaptureBlockReason, ResumeCaptureError, ResumeCaptureErrorKind,
+    ResumeCaptureInstruction, ResumeCaptureIntegrityCode, ResumeCaptureIntegrityDiagnostic,
+    ResumeCapturePlan, ResumeCaptureProgram, ResumeEncodedValue, ResumeEnvelopeWriterPlan,
+    ResumeSnapshotBoundaryV1, ResumeSnapshotV1, ResumeSnapshotValueRecordV1,
+    RuntimeQuiescenceState, RESUME_CAPTURE_MANIFEST_VERSION, RESUME_CAPTURE_PLAN_VERSION,
+    RESUME_SNAPSHOT_SCHEMA_VERSION,
 };
 pub use resume_chunk::{
     build_resume_chunk_graph, validate_resume_chunk_graph, ResumeChunk, ResumeChunkBlock,

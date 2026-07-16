@@ -150,6 +150,31 @@ semantic types, duplicate object properties, unsupported values, missing slot
 reciprocity, identity collisions, and canonical ordering/index drift. J6 makes
 no public schema or runtime change.
 
+## Phase J generated capture programs
+
+J7 creates one `ResumeCaptureProgram` per boundary in canonical
+parent-before-child order. Only J2 retained slots receive instructions;
+recomputable slots remain absent from snapshot values. Each retained slot has
+one closed `ReadSlot`, `EncodeSlot`, and `AppendValueRecord` triple using the
+exact J6 slot ID and codec. There is no generic callback, reflection, property
+walking, application mutation, or wait-for-quiescence loop.
+
+Internal snapshot model v1 uses an application-atomic envelope with fixed
+manifest version 6, `capturedAt: null`, build-derived snapshot identity,
+canonical boundary/value order, and compact canonical JSON. Standalone
+artifact encoding adds exactly one trailing newline; embedded encoding does
+not. The generated encoder accepts only the closed null/boolean/number/string/
+array/object/nullable shapes, writes object properties in schema order, and
+rejects non-finite numbers, negative zero, missing/extra object properties,
+and runtime shape guessing.
+
+Capture proceeds only when the full compiler-defined quiescence vector is
+clear. Pending or unknown Form submission state is rejected; stable states are
+`Idle`, `Invalid`, `Failed`, and `Completed`. Internal integrity codes
+`EZASM1355` through `EZASM1358` cover program correspondence, instruction
+shape, capture-envelope policy, and ordering/output drift. J7 does not expose
+snapshot build output or add browser runtime behavior.
+
 ## Definition
 
 In EdgeZero, resumability means:

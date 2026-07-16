@@ -3,25 +3,27 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: J6 - Canonical Resume Slot Schemas and Codecs
-* Working tree: J6 is committed; a narrow parent-before-child ordering correction is ready to commit before J7.
+* Latest completed slice: J7 - Generated Capture Programs and Snapshot Model v1
+* Working tree: ready for the atomic J7 commit; the next authored slice is J8 generated restore programs.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: J6 - Canonical Resume Slot Schemas and Codecs
-* Summary: one exact schema per J3 boundary, closed semantic-type-derived codecs, explicit nullable representation, and reciprocal slot/schema indexes.
-* Key files: `resume_schema.rs`, `lib.rs`, `07_resumability_and_delivery.md`
-* Boundary: no capture/restore program, public manifest, emitted JS, anchor, loader, or runtime behavior.
+* Slice: J7 - Generated Capture Programs and Snapshot Model v1
+* Summary: one exact-slot capture program per boundary, closed canonical encoders, strict quiescence/stable-state checks, and an internal deterministic snapshot envelope.
+* Key files: `resume_capture.rs`, `lib.rs`, `07_resumability_and_delivery.md`
+* Boundary: no restore program, public manifest/build output, emitted JS, anchor, loader, or browser runtime behavior.
 
 Current in-progress slice
 
-* Slice: J7 - Generated Capture Programs
-* Status: Ready after the J6 parent-before-child ordering correction commit.
+* Slice: J8 - Generated Restore Programs
+* Status: Ready after the atomic J7 commit.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase I: none. Next: J7 exact-slot capture programs and internal snapshot model v1.
+* Remaining in Phase I: none. Next: J8 closed restore instructions and fixed R0-R20 schedule.
 
 Verification
+
+* J7 verification: `cargo test -p ezc_core --lib` passes all 395 core tests; strict all-target core clippy, formatting, and `git diff --check` pass. Nine focused proofs cover every value variant, canonical object/number encoding, negative zero/non-finite rejection, unsupported runtime shape rejection, retained-only program generation, equal-state byte equality, no mutation/timestamp, full quiescence, stable Form submission, malformed product rejection, reverse-input determinism, and `EZASM1355`-`EZASM1358`.
 
 * J6 verification: `cargo test -p ezc_core --lib` passes all 385 core tests; strict all-target core clippy, formatting, and `git diff --check` pass. Focused proofs cover canonical object order, explicit nullable codecs, non-null union rejection, one schema per boundary, exact J2 slot reciprocity, reverse-input determinism, frozen Form runtime slot codecs, and `EZASM1349`-`EZASM1354`. The J7 entry audit additionally corrected schema collection order to preserve J3 parent-before-child ordering; all 7 focused schema tests and strict all-target core clippy pass after the correction.
 
@@ -180,6 +182,10 @@ Architecture decisions made
 * Decision: J6 includes exactly J2 retained and recomputable slots in one schema per J3 boundary; J2 blocks remain schema blocks and excluded Effect scheduler metadata has no codec.
 * Reason: Capture and restore generation need exact reciprocity with liveness and boundaries without turning blocked or intentionally excluded runtime metadata into snapshot values.
 * Tradeoff: Form validation, aggregate validity, and submission state use frozen compiler-owned types matching the existing runtime representation; unsupported tuples, resources, and non-null unions fail closed until a later contract extends the codec vocabulary.
+
+* Decision: J7 emits one closed read/encode/append triple per retained slot and omits recomputable slots from snapshot values.
+* Reason: Snapshot capture must consume J2 liveness and J6 schemas exactly without replaying computation, walking arbitrary runtime objects, or serializing values that J8 will regenerate.
+* Tradeoff: Snapshot model v1 is internal until J9. Form submission uses the existing runtime string states with an explicit stable-state allowlist; pending/unknown states and any non-quiescent runtime are rejected immediately.
 
 * Decision: I7 creates one declaration-level `ValidationPlanId::for_form(FormId)` for every valid Form, including empty Forms, and one `FieldDependencyId::for_rule_and_source(ValidationRuleId, FieldId)` for each eligible I6 direct dependency edge.
 * Reason: Form plans and dependency records need stable typed names independent of Rule counts, source order, Component instances, runtime registration, or DOM identity; future runtime planning can refer to a complete Form plan without using absence as policy.
@@ -1171,9 +1177,9 @@ Known limitations
 
 Exact next step
 
-Commit the narrow J6 parent-before-child schema-order correction, verify the
-worktree is clean, then implement J7 one exact-slot capture program per
-boundary plus the application envelope writer and internal snapshot model v1.
+Commit J7 atomically as `compiler: generate resume capture programs`, verify
+the worktree is clean, then implement J8 one closed restore program per
+boundary and the fixed application R0-R20 restore schedule.
 
 Useful commands
 
@@ -1204,6 +1210,8 @@ Useful commands
 
 Changed but uncommitted files
 
-* `crates/ezc_core/src/resume_schema.rs`
+* `crates/ezc_core/src/lib.rs`
+* `crates/ezc_core/src/resume_capture.rs`
+* `docs/planning/full-project-docs/07_resumability_and_delivery.md`
 * `notes/progress/2026-W28.md`
 * `notes/progress/AGENT_HANDOFF.md`
