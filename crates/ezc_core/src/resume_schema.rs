@@ -191,7 +191,6 @@ pub fn build_resume_schema_registry(model: &ApplicationSemanticModel) -> ResumeS
             slots: Vec::new(),
         })
         .collect::<Vec<_>>();
-    schemas.sort_by(|left, right| left.boundary.cmp(&right.boundary));
     let schema_index = schemas
         .iter()
         .enumerate()
@@ -391,22 +390,22 @@ pub fn validate_resume_schema_registry(
     let mut diagnostics = Vec::new();
     let boundaries = build_resume_boundary_graph(model);
     let liveness = build_resume_liveness_plan(model);
-    let expected_boundaries = boundaries
+    let expected_boundary_order = boundaries
         .boundaries
         .iter()
         .map(|boundary| boundary.id.clone())
-        .collect::<BTreeSet<_>>();
-    let actual_boundaries = registry
+        .collect::<Vec<_>>();
+    let actual_boundary_order = registry
         .schemas
         .iter()
         .map(|schema| schema.boundary.clone())
-        .collect::<BTreeSet<_>>();
-    if expected_boundaries != actual_boundaries {
+        .collect::<Vec<_>>();
+    if expected_boundary_order != actual_boundary_order {
         diagnostics.push(diagnostic(
-            ResumeSchemaIntegrityCode::MissingSlot,
+            ResumeSchemaIntegrityCode::OrderingOrIndexDrift,
             None,
             None,
-            "resume schemas do not cover every canonical boundary",
+            "resume schemas do not preserve canonical parent-before-child boundary order",
         ));
     }
 
@@ -599,6 +598,18 @@ mod tests {
         let liveness = build_resume_liveness_plan(&model);
         let registry = build_resume_schema_registry(&model);
         assert_eq!(registry.schemas.len(), graph.boundaries.len());
+        assert_eq!(
+            registry
+                .schemas
+                .iter()
+                .map(|schema| &schema.boundary)
+                .collect::<Vec<_>>(),
+            graph
+                .boundaries
+                .iter()
+                .map(|boundary| &boundary.id)
+                .collect::<Vec<_>>()
+        );
         let expected = capture_eligible_slots(&liveness)
             .into_iter()
             .map(|slot| slot.existing_slot.clone())
@@ -680,6 +691,28 @@ mod tests {
         assert_eq!(
             build_resume_schema_registry(&forward),
             build_resume_schema_registry(&reverse)
+        );
+    }
+
+    #[test]
+    fn schema_order_keeps_nested_boundaries_parent_before_child() {
+        let model = model(
+            r#"@component("x-child") class Child { value = state(1); render() { return <span>{this.value}</span>; } }
+@component("x-parent") @route("/") class Parent { render() { return <Child />; } }"#,
+        );
+        let graph = build_resume_boundary_graph(&model);
+        let registry = build_resume_schema_registry(&model);
+        assert_eq!(
+            registry
+                .schemas
+                .iter()
+                .map(|schema| &schema.boundary)
+                .collect::<Vec<_>>(),
+            graph
+                .boundaries
+                .iter()
+                .map(|boundary| &boundary.id)
+                .collect::<Vec<_>>()
         );
     }
 

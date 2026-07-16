@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: J6 - Canonical Resume Slot Schemas and Codecs
-* Working tree: ready for the atomic J6 commit; the next authored slice is J7 generated capture programs.
+* Working tree: J6 is committed; a narrow parent-before-child ordering correction is ready to commit before J7.
 * Date: 2026-07-16
 
 Last completed slice
@@ -17,13 +17,13 @@ Last completed slice
 Current in-progress slice
 
 * Slice: J7 - Generated Capture Programs
-* Status: Ready after the atomic J6 commit.
+* Status: Ready after the J6 parent-before-child ordering correction commit.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
 * Remaining in Phase I: none. Next: J7 exact-slot capture programs and internal snapshot model v1.
 
 Verification
 
-* J6 verification: `cargo test -p ezc_core --lib` passes all 385 core tests; strict all-target core clippy, formatting, and `git diff --check` pass. Focused proofs cover canonical object order, explicit nullable codecs, non-null union rejection, one schema per boundary, exact J2 slot reciprocity, reverse-input determinism, frozen Form runtime slot codecs, and `EZASM1349`-`EZASM1354`.
+* J6 verification: `cargo test -p ezc_core --lib` passes all 385 core tests; strict all-target core clippy, formatting, and `git diff --check` pass. Focused proofs cover canonical object order, explicit nullable codecs, non-null union rejection, one schema per boundary, exact J2 slot reciprocity, reverse-input determinism, frozen Form runtime slot codecs, and `EZASM1349`-`EZASM1354`. The J7 entry audit additionally corrected schema collection order to preserve J3 parent-before-child ordering; all 7 focused schema tests and strict all-target core clippy pass after the correction.
 
 * J5 verification: `cargo test -p ezc_core --lib` passes all 379 core tests; strict all-target core clippy, formatting, and `git diff --check` pass. Focused proofs cover one eager root, isolated interaction roots, no lazy dependencies/shared chunks, exact action isolation, reversed-input determinism, and `EZASM1343`-`EZASM1348`.
 
@@ -1171,7 +1171,7 @@ Known limitations
 
 Exact next step
 
-Commit J6 atomically as `compiler: define canonical resume schemas`, verify the
+Commit the narrow J6 parent-before-child schema-order correction, verify the
 worktree is clean, then implement J7 one exact-slot capture program per
 boundary plus the application envelope writer and internal snapshot model v1.
 
@@ -1204,8 +1204,6 @@ Useful commands
 
 Changed but uncommitted files
 
-* `crates/ezc_core/src/lib.rs`
 * `crates/ezc_core/src/resume_schema.rs`
-* `docs/planning/full-project-docs/07_resumability_and_delivery.md`
 * `notes/progress/2026-W28.md`
 * `notes/progress/AGENT_HANDOFF.md`
