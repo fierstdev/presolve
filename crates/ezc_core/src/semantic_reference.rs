@@ -10,7 +10,7 @@ pub struct SemanticReference {
     pub provenance: SourceProvenance,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SemanticReferenceKind {
     ActionState,
     ComputedState,
@@ -26,4 +26,5 @@ pub enum SemanticReferenceKind {
     TemplateLocal,
     FieldBindingField,
     FieldBindingForm,
+    ValidationRuleField,
 }

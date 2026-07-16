@@ -26,7 +26,9 @@ use crate::model::{
     ParsedMethod, ParsedMethodCall, ParsedMethodParameter, ParsedProperty, ParsedSerializableValue,
     ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator,
     ParsedThisMemberDesignator, ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator,
-    ParsedUnsupportedEffectStatementKind, SourceSpan,
+    ParsedUnsupportedEffectStatementKind, ParsedValidationRuleArgument,
+    ParsedValidationRuleArgumentKind, ParsedValidationRuleExpression,
+    ParsedValidationRuleExpressionKind, SourceSpan,
 };
 
 pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
@@ -43,6 +45,7 @@ pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
         classes,
         type_aliases,
         local_type_bindings,
+        local_value_bindings,
         imports,
         exports,
     } = parse_program(&ret.program, source);
@@ -57,6 +60,7 @@ pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
         classes,
         type_aliases,
         local_type_bindings,
+        local_value_bindings,
         imports,
         exports,
         diagnostics,
@@ -67,6 +71,7 @@ struct ParsedProgramFacts {
     classes: Vec<ParsedClass>,
     type_aliases: Vec<ParsedTypeAlias>,
     local_type_bindings: Vec<String>,
+    local_value_bindings: Vec<String>,
     imports: Vec<ParsedImport>,
     exports: Vec<ParsedExport>,
 }
@@ -75,6 +80,7 @@ fn parse_program(program: &Program<'_>, source: &str) -> ParsedProgramFacts {
     let mut classes = Vec::new();
     let mut type_aliases = Vec::new();
     let mut local_type_bindings = Vec::new();
+    let mut local_value_bindings = Vec::new();
     let mut imports = Vec::new();
     let mut exports = Vec::new();
 
@@ -88,6 +94,7 @@ fn parse_program(program: &Program<'_>, source: &str) -> ParsedProgramFacts {
                 exports.push(parse_named_export_declaration(declaration, source));
                 if let Some(declaration) = &declaration.declaration {
                     retain_local_type_binding(declaration, &mut local_type_bindings);
+                    retain_local_value_binding(declaration, &mut local_value_bindings);
                     if let Some(class) = parse_declaration(declaration, source) {
                         classes.push(class);
                     }
@@ -132,6 +139,7 @@ fn parse_program(program: &Program<'_>, source: &str) -> ParsedProgramFacts {
 
         if let Some(declaration) = statement.as_declaration() {
             retain_local_type_binding(declaration, &mut local_type_bindings);
+            retain_local_value_binding(declaration, &mut local_value_bindings);
             if let Some(class) = parse_declaration(declaration, source) {
                 classes.push(class);
             }
@@ -143,12 +151,23 @@ fn parse_program(program: &Program<'_>, source: &str) -> ParsedProgramFacts {
 
     local_type_bindings.sort();
     local_type_bindings.dedup();
+    local_value_bindings.sort();
+    local_value_bindings.dedup();
     ParsedProgramFacts {
         classes,
         type_aliases,
         local_type_bindings,
+        local_value_bindings,
         imports,
         exports,
+    }
+}
+
+fn retain_local_value_binding(declaration: &Declaration<'_>, bindings: &mut Vec<String>) {
+    if let Declaration::FunctionDeclaration(function) = declaration {
+        if let Some(id) = &function.id {
+            bindings.push(id.name.to_string());
+        }
     }
 }
 
@@ -412,6 +431,10 @@ fn parse_decorator(
                     .arguments
                     .first()
                     .and_then(|argument| parsed_this_member_designator(argument, source)),
+                validation_rule_expression: (callee.name == "validate")
+                    .then(|| call.arguments.first()?.as_expression())
+                    .flatten()
+                    .map(|expression| parsed_validation_rule_expression(expression, source)),
                 span: source_span(source, decorator.span),
             })
         }
@@ -423,6 +446,7 @@ fn parse_decorator(
             argument_spans: Vec::new(),
             static_member_argument: None,
             this_member_argument: None,
+            validation_rule_expression: None,
             span: source_span(source, decorator.span),
         }),
         _ => None,
@@ -432,11 +456,61 @@ fn parse_decorator(
 fn normalized_decorators(mut decorators: Vec<ParsedDecorator>) -> Vec<ParsedDecorator> {
     if !decorators
         .iter()
-        .any(|decorator| matches!(decorator.name.as_str(), "form" | "field"))
+        .any(|decorator| matches!(decorator.name.as_str(), "form" | "field" | "validate"))
     {
         decorators.retain(|decorator| decorator.is_invoked);
     }
     decorators
+}
+
+fn parsed_validation_rule_expression(
+    expression: &Expression<'_>,
+    source: &str,
+) -> ParsedValidationRuleExpression {
+    let kind = match expression {
+        Expression::CallExpression(call) => ParsedValidationRuleExpressionKind::Call {
+            callee: match &call.callee {
+                Expression::Identifier(identifier) => Some(identifier.name.to_string()),
+                _ => None,
+            },
+            arguments: call
+                .arguments
+                .iter()
+                .map(|argument| parsed_validation_rule_argument(argument, source))
+                .collect(),
+        },
+        Expression::Identifier(identifier) => {
+            ParsedValidationRuleExpressionKind::Identifier(identifier.name.to_string())
+        }
+        _ => ParsedValidationRuleExpressionKind::Unsupported,
+    };
+    ParsedValidationRuleExpression {
+        kind,
+        span: source_span(source, expression.span()),
+    }
+}
+
+fn parsed_validation_rule_argument(
+    argument: &Argument<'_>,
+    source: &str,
+) -> ParsedValidationRuleArgument {
+    let span = source_span(source, argument.span());
+    let kind = argument.as_expression().map_or(
+        ParsedValidationRuleArgumentKind::Unsupported,
+        |expression| {
+            if let Expression::StringLiteral(literal) = expression {
+                return ParsedValidationRuleArgumentKind::StringLiteral(literal.value.to_string());
+            }
+            if let Some(designator) = parsed_this_member_expression(expression, source) {
+                return ParsedValidationRuleArgumentKind::ThisMember(designator);
+            }
+            parsed_constant_expression(expression, source).map_or(
+                ParsedValidationRuleArgumentKind::Unsupported,
+                ParsedValidationRuleArgumentKind::Constant,
+            )
+        },
+    );
+    ParsedValidationRuleArgument { kind, span }
 }
 
 fn parsed_this_member_designator(

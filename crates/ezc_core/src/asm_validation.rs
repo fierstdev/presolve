@@ -66,6 +66,10 @@ pub fn validate_application_semantic_model(
                 binding.id.as_semantic_id() == &reference.source
                     && binding.expression_provenance == reference.provenance
             })
+            || model.validation_rules.values().any(|rule| {
+                rule.id.as_semantic_id() == &reference.source
+                    && rule.argument_provenance.as_ref() == Some(&reference.provenance)
+            })
             || model
                 .consumer_for_semantic_id(&reference.source)
                 .is_some_and(|consumer| {
@@ -90,6 +94,7 @@ pub fn validate_application_semantic_model(
     validate_semantic_types(model, &mut diagnostics);
     validate_form_field_bindings(model, &mut diagnostics);
     validate_form_ownership(model, &mut diagnostics);
+    validate_form_validation(model, &mut diagnostics);
     validate_contexts(model, &mut diagnostics);
     validate_providers(model, &mut diagnostics);
     validate_consumers(model, &mut diagnostics);
@@ -113,6 +118,46 @@ pub fn validate_application_semantic_model(
     validate_template_action_bindings(model, &mut diagnostics);
 
     diagnostics
+}
+
+fn validate_form_validation(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    let expected_products =
+        crate::collect_validation_products(&model.components, &model.forms, &model.form_fields);
+    if model.validation_rule_candidates != expected_products.candidates
+        || model.validation_rules != expected_products.rules
+    {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1241".to_string(),
+            message: "validation products do not match canonical I6 lowering".to_string(),
+        });
+    }
+    let validation = crate::validate_validation_graph(
+        &model.validation_graph,
+        &model.component_instance_plan.roots,
+        &model.form_ownership,
+        &model.forms,
+        &model.form_fields,
+        &model.validation_rules,
+        &model.validation_rule_candidates,
+    );
+    diagnostics.extend(
+        validation
+            .diagnostics
+            .iter()
+            .map(|diagnostic| AsmValidationDiagnostic {
+                code: diagnostic.code.clone(),
+                message: diagnostic.message.clone(),
+            }),
+    );
+    if model.validation_graph.validation != validation {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1240".to_string(),
+            message: "validation graph retained stale validation facts".to_string(),
+        });
+    }
 }
 
 fn validate_form_ownership(

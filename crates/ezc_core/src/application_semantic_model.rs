@@ -47,6 +47,10 @@ use crate::form_binding::{
 };
 use crate::form_field::{collect_form_field_products, FormFieldEntity};
 use crate::form_ownership::{collect_form_ownership_graph, FormOwnershipGraph};
+use crate::form_validation::{
+    collect_validation_graph, collect_validation_products, ValidationGraph, ValidationRule,
+    ValidationRuleCandidate,
+};
 use crate::instance_context::{collect_instance_context_registry, InstanceContextRegistry};
 use crate::intermediate_representation::{
     IrComputedEvaluationPlan, IrReactiveCycleAnalysis, IrReactiveGraph,
@@ -56,6 +60,7 @@ use crate::provider::{collect_provider_entities, DuplicateProviderDeclaration, P
 use crate::semantic_id::{
     ComponentInvocationId, ConsumerId, ContextId, FieldBindingId, FieldId, FormId, ProviderId,
     SemanticId, SemanticOwner, SlotBindingId, SlotContentFragmentId, SlotId, SlotOutletId,
+    ValidationRuleId,
 };
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
@@ -89,6 +94,9 @@ pub struct ApplicationSemanticModel {
     pub form_field_binding_candidates: Vec<FormFieldBindingCandidate>,
     pub form_field_bindings: BTreeMap<FieldBindingId, FormFieldBinding>,
     pub form_ownership: FormOwnershipGraph,
+    pub validation_rule_candidates: Vec<ValidationRuleCandidate>,
+    pub validation_rules: BTreeMap<ValidationRuleId, ValidationRule>,
+    pub validation_graph: ValidationGraph,
     pub slots: BTreeMap<SlotId, SlotEntity>,
     pub component_invocations: BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
     pub component_instance_plan: ComponentInstancePlan,
@@ -144,6 +152,7 @@ pub enum SemanticEntity<'a> {
     Form(&'a FormEntity),
     FormField(&'a FormFieldEntity),
     FormFieldBinding(&'a FormFieldBinding),
+    ValidationRule(&'a ValidationRule),
     Slot(&'a SlotEntity),
     ComponentInvocation(&'a ComponentInvocationEntity),
     ComponentInstance(&'a ComponentInstance),
@@ -171,6 +180,7 @@ pub enum SemanticEntityKind {
     Form,
     FormField,
     FormFieldBinding,
+    ValidationRule,
     Slot,
     ComponentInvocation,
     ComponentInstance,
@@ -200,6 +210,7 @@ impl SemanticEntity<'_> {
             Self::Form(_) => SemanticEntityKind::Form,
             Self::FormField(_) => SemanticEntityKind::FormField,
             Self::FormFieldBinding(_) => SemanticEntityKind::FormFieldBinding,
+            Self::ValidationRule(_) => SemanticEntityKind::ValidationRule,
             Self::Slot(_) => SemanticEntityKind::Slot,
             Self::ComponentInvocation(_) => SemanticEntityKind::ComponentInvocation,
             Self::ComponentInstance(_) => SemanticEntityKind::ComponentInstance,
@@ -305,6 +316,13 @@ impl ApplicationSemanticModel {
             .find(|binding| binding.id.as_semantic_id() == id)
         {
             return Some(SemanticEntity::FormFieldBinding(binding));
+        }
+        if let Some(rule) = self
+            .validation_rules
+            .values()
+            .find(|rule| rule.id.as_semantic_id() == id)
+        {
+            return Some(SemanticEntity::ValidationRule(rule));
         }
         if let Some(slot) = self
             .slots
@@ -448,6 +466,49 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub const fn form_ownership(&self) -> &FormOwnershipGraph {
         &self.form_ownership
+    }
+
+    #[must_use]
+    pub fn validation_rule_candidates(&self) -> &[ValidationRuleCandidate] {
+        &self.validation_rule_candidates
+    }
+
+    #[must_use]
+    pub fn validation_candidates_of(&self, field: &FieldId) -> Vec<&ValidationRuleCandidate> {
+        self.validation_rule_candidates
+            .iter()
+            .filter(|candidate| candidate.target_field.as_ref() == Some(field))
+            .collect()
+    }
+
+    #[must_use]
+    pub fn validation_rule(&self, id: &ValidationRuleId) -> Option<&ValidationRule> {
+        self.validation_rules.get(id)
+    }
+
+    #[must_use]
+    pub fn validation_rules(&self) -> Vec<&ValidationRule> {
+        let mut rules = self.validation_rules.values().collect::<Vec<_>>();
+        rules.sort_by(|left, right| {
+            (
+                &left.owner_form,
+                left.field_authored_order,
+                left.rule_authored_order,
+                &left.id,
+            )
+                .cmp(&(
+                    &right.owner_form,
+                    right.field_authored_order,
+                    right.rule_authored_order,
+                    &right.id,
+                ))
+        });
+        rules
+    }
+
+    #[must_use]
+    pub const fn validation_graph(&self) -> &ValidationGraph {
+        &self.validation_graph
     }
 
     #[must_use]
@@ -1307,7 +1368,7 @@ pub fn build_application_semantic_model_from_component_graph(
         &computed_values,
         &effects,
     );
-    let ownership = collect_ownership(
+    let mut ownership = collect_ownership(
         &component_graph.components,
         &contexts,
         &forms,
@@ -1368,6 +1429,27 @@ pub fn build_application_semantic_model_from_component_graph(
         &ownership,
         &references,
         &provenance,
+    );
+    let validation_products =
+        collect_validation_products(&component_graph.components, &forms, &form_fields);
+    let validation_rule_candidates = validation_products.candidates;
+    let validation_rules = validation_products.rules;
+    extend_validation_products(
+        &mut provenance,
+        &mut ownership,
+        &mut references,
+        &validation_rules,
+    );
+    let validation_graph = collect_validation_graph(
+        &component_instance_plan.roots,
+        &form_ownership,
+        &forms,
+        &form_fields,
+        &validation_rules,
+        &validation_rule_candidates,
+        &validation_products.cycles,
+        &ownership,
+        &references,
     );
     let semantic_types = finalize_semantic_types(
         base_semantic_types,
@@ -1520,6 +1602,9 @@ pub fn build_application_semantic_model_from_component_graph(
         form_field_binding_candidates,
         form_field_bindings,
         form_ownership,
+        validation_rule_candidates,
+        validation_rules,
+        validation_graph,
         slots,
         component_invocations,
         component_instance_plan,
@@ -1718,7 +1803,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         &computed_values,
         &effects,
     );
-    let ownership = collect_ownership(
+    let mut ownership = collect_ownership(
         &components,
         &contexts,
         &forms,
@@ -1778,6 +1863,26 @@ fn build_application_semantic_model_from_files_with_bindings(
         &ownership,
         &references,
         &provenance,
+    );
+    let validation_products = collect_validation_products(&components, &forms, &form_fields);
+    let validation_rule_candidates = validation_products.candidates;
+    let validation_rules = validation_products.rules;
+    extend_validation_products(
+        &mut provenance,
+        &mut ownership,
+        &mut references,
+        &validation_rules,
+    );
+    let validation_graph = collect_validation_graph(
+        &component_instance_plan.roots,
+        &form_ownership,
+        &forms,
+        &form_fields,
+        &validation_rules,
+        &validation_rule_candidates,
+        &validation_products.cycles,
+        &ownership,
+        &references,
     );
     let semantic_types = finalize_semantic_types(
         base_semantic_types,
@@ -1923,6 +2028,9 @@ fn build_application_semantic_model_from_files_with_bindings(
         form_field_binding_candidates,
         form_field_bindings,
         form_ownership,
+        validation_rule_candidates,
+        validation_rules,
+        validation_graph,
         slots,
         component_invocations,
         component_instance_plan,
@@ -2008,6 +2116,40 @@ fn extend_template_entity_provenance(
             .iter()
             .map(|entity| (entity.id.clone(), entity.provenance.clone())),
     );
+}
+
+fn extend_validation_products(
+    provenance: &mut BTreeMap<SemanticId, SourceProvenance>,
+    ownership: &mut BTreeMap<SemanticId, SemanticOwner>,
+    references: &mut Vec<SemanticReference>,
+    rules: &BTreeMap<ValidationRuleId, ValidationRule>,
+) {
+    for rule in rules.values() {
+        provenance.insert(rule.id.as_semantic_id().clone(), rule.provenance.clone());
+        ownership.insert(
+            rule.id.as_semantic_id().clone(),
+            SemanticOwner::entity(rule.target_field.as_semantic_id().clone()),
+        );
+        if let Some(dependency) = &rule.dependency {
+            references.push(SemanticReference {
+                kind: SemanticReferenceKind::ValidationRuleField,
+                source: rule.id.as_semantic_id().clone(),
+                target: dependency.as_semantic_id().clone(),
+                provenance: rule
+                    .argument_provenance
+                    .clone()
+                    .unwrap_or_else(|| rule.decorator_provenance.clone()),
+            });
+        }
+    }
+    references.sort_by(|left, right| {
+        (left.source.as_str(), left.kind, left.target.as_str()).cmp(&(
+            right.source.as_str(),
+            right.kind,
+            right.target.as_str(),
+        ))
+    });
+    references.dedup();
 }
 
 #[allow(clippy::too_many_arguments)]

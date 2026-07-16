@@ -3,25 +3,32 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: I5 - Canonical Form Ownership Graph
-* Working tree: clean after the I5 implementation commit.
+* Latest completed slice: I6 - Canonical Form Validation Graph
+* Working tree: clean after the I6 implementation commit.
 * Date: 2026-07-15
 
 Last completed slice
 
-* Slice: I5 - Canonical Form Ownership Graph
-* Summary: I5 projects valid I2-I4 entities and existing canonical ASM ownership/references into one immutable build-root-qualified `FormOwnershipGraph`. Existing Component, Form, Field, template-control, and Field-binding identities remain authoritative; declaration ownership is exactly `Component -> Form -> Field`, each binding is owned by its exact intrinsic template-control use site, and binding-to-Field/Form relations remain typed references. Deterministic validation rejects missing/multiple owners, cycles, unreachable or unknown endpoints, reciprocity/component mismatches, invalid-candidate promotion, instance leakage, incomplete provenance, stale validation, identity drift, and noncanonical ordering without repair.
-* Key files: crates/ezc_core/src/form_ownership.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/asm_validation.rs, crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/form_binding.rs
-* Schema decision: I5 is an in-memory ASM product only. Semantic graph v5, CLI ASM inspection v8, check JSON v4, template manifest v2, runtime artifacts, and resume manifest v4 remain unchanged and continue to filter Phase I entities. No internal graph serialization, `forms.runtime.json`, Form instance, runtime registry, IR, browser behavior, or public diagnostic is introduced.
+* Slice: I6 - Canonical Form Validation Graph
+* Summary: I6 retains every `@validate(<rule-expression>)` placement under a source-qualified `ValidationRuleCandidateId`, resolves only exact valid I3 target Fields and same-Form direct `this.<field>` dependencies, classifies and normalizes the closed nine-rule catalog through existing constant/type authorities, invalidates complete duplicate/contradiction/cycle groups without a winner, and lowers only violation-free candidates to client-boundary `ValidationRule` entities. The immutable build-root-qualified `ValidationGraph` projects I5 Form/Field ownership plus canonical ASM Field-owned rules and dependency references, validates deterministic integrity without repair, and exposes read-only rule/dependency/cycle queries.
+* Key files: crates/ezc_core/src/form_validation.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/asm_validation.rs, crates/ezc_core/src/semantic_id.rs
+* Schema decision: I6 is an in-memory ASM product only. Semantic graph v5, CLI ASM inspection v8, check JSON v4, template manifest v2, runtime artifacts, and resume manifest v4 remain unchanged and explicitly filter Validation Rules and their references. No `forms.runtime.json`, `validation.runtime.json`, Form instance, validation execution/state, registry, IR, browser behavior, public diagnostic, or resumability product is introduced.
 
 Current in-progress slice
 
-* Slice: I6 - Validation Graph (blocked before implementation)
-* Status: Phase I is complete through I5. The attached roadmap defines I6 only as "Create immutable validation graph" and does not freeze validation declaration syntax, ValidationRule identity, rule kinds and arguments, Field/Form targets, dependency inputs, execution boundaries, ordering, invalid-candidate retention, graph nodes/edges, or diagnostic/schema policy. I5 integrity validation is structural ASM validation and must not be reinterpreted as Form value-validation semantics.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I5
-* Remaining in Phase I: I6 through I20.
+* Slice: I7 - Cross-Field Dependency Planning (blocked before implementation)
+* Status: Phase I is complete through I6. I6 freezes and records only direct same-Form validation dependencies and deterministic cycle exclusion. No complete authoritative I7 contract is present for invalidation propagation, dependency scheduling, update triggers, derived plans, execution, or runtime state, so I7 has not begun.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I6
+* Remaining in Phase I: I7 through I20.
 
 Verification
+
+* I6 `just check`: pass (formatting, strict workspace clippy, 326 core tests, 12 parser unit tests, 26 parser integration tests, 2 CLI unit tests, 7 Component fixture/freeze tests, 12 Context fixture/freeze tests, all 126 CLI inspection/build tests, and all 26 real-browser tests)
+* `cargo test -p ezc_core form_validation`: pass (7 focused I6 tests)
+* `cargo test -p ezc_parser validation`: pass (2 focused parser-retention tests)
+* `cargo clippy -p ezc_parser -p ezc_core -p ezc_cli --all-targets --all-features -- -D warnings`: pass
+* `cargo fmt --all --check`: pass
+* git diff --check: pass
 
 * I0 entry `just check`: pass (workspace formatting, strict workspace clippy, 292 baseline core, 6 parser unit, 26 parser integration, 1 CLI unit, 7 component fixture/audit, 12 Context fixture/freeze, 126 CLI inspection/build, and 26 real-browser tests)
 * `cargo test -p ezc_core`: pass (295)
@@ -56,6 +63,26 @@ Verification
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: The parser retains the outer `@validate` invocation shape and one normalized nested rule-expression fact, including direct call identity, ordered arguments, exact `this.<identifier>` designators, compiler constant expressions, literal strings, spans, and unsupported shapes. Canonical I6 lowering alone resolves target Fields, dependencies, rule kinds, normalized arguments, compatibility, duplicates, contradictions, cycles, and validity.
+* Reason: Later diagnostics and planning must consume immutable normalized evidence without reparsing TypeScript, while the parser must not become a semantic validation authority.
+* Tradeoff: The parser adds the pinned OXC ECMAScript regular-expression grammar as the pattern-syntax authority and retains module-local/imported value bindings only to reject authored shadows of compiler-owned rule names; it does not execute validators or resolve Forms/Fields.
+
+* Decision: Every recognized placement receives `ValidationRuleCandidateId`; only a violation-free candidate receives `ValidationRuleId::for_field(FieldId, authored_validation_ordinal)`. The closed catalog is `required`, `min`, `max`, `minLength`, `maxLength`, `pattern`, `email`, `equals`, and `notEquals`, and every valid rule has the Client boundary.
+* Reason: Candidate and executable identity domains must remain distinct, while valid identity depends only on the canonical target Field and authored decorator position rather than source allocation, map order, or runtime registration.
+* Tradeoff: Invalid candidates retain partial Component/Form/Field/dependency/type/provenance evidence but never acquire a plausible valid rule identity. Public diagnostic codes and messages remain I18 work.
+
+* Decision: Rule compatibility consumes I3's normalized canonical `SemanticType`, Phase C `is_assignable`, serialization compatibility, and the existing constant folder. Numeric and length arguments normalize before duplicate/contradiction analysis, and flags-free `pattern` arguments use the frontend's pinned ECMAScript regex parser.
+* Reason: I6 must not introduce a Form-specific type parser, assignability engine, constant evaluator, serializer checker, or regular-expression dialect.
+* Tradeoff: Unsupported/unresolved types, values outside the frozen constant subset, non-finite numbers, invalid lengths/patterns, shadowed rule names, cross-Form/cross-Component/self dependencies, and incompatible domains remain candidate violations with no executable rule.
+
+* Decision: Duplicate normalized rule groups, contradictory min/max or length ranges, equals/notEquals pairs on the same dependency, and deterministic strongly connected dependency groups are invalidated wholesale with no source-order winner. Cycle-participating candidates remain retained but cannot enter executable membership.
+* Reason: No runtime precedence, fallback, scheduling, or partial-cycle semantics are authorized. Deterministic group exclusion preserves all evidence without inventing execution behavior.
+* Tradeoff: I6 records direct dependency facts and cycle products only. I7 must define any invalidation propagation, scheduling, derived update plans, or execution semantics before they can exist.
+
+* Decision: `ValidationGraphId` derives from the same sorted Phase H build-root authority as I5. Graph nodes retain canonical Form, Field, and ValidationRule identities; `FormOwnsField` projects I5, `FieldOwnsRule` projects ASM ownership, and `RuleDependsOnField` projects canonical references.
+* Reason: I5 remains the sole declaration-ownership authority, and the validation graph is an immutable typed projection/validator rather than a competing owner map or a syntax-derived graph.
+* Tradeoff: Internal `EZASM1221` through `EZASM1239` cover validation-graph integrity, `EZASM1240` detects stale retained graph validation, and `EZASM1241` detects stale candidate/rule products. No public EZC diagnostic or public schema projection changes in I6.
 
 * Decision: `FormOwnershipGraphId` derives from the sorted, deduplicated Phase H `ComponentRootId` set, while graph nodes retain existing Component, Form, Field, template-control, and Field-binding identities in a typed sum key.
 * Reason: I5 identifies one application/build projection without manufacturing replacement semantic identities or depending on file order, spans, counts, runtime boot, or map insertion.
@@ -975,8 +1002,8 @@ Architecture decisions made
 
 Known limitations
 
-* Item: Phase I is complete through I5. Canonical Form declarations, Fields, control bindings, and the immutable declaration ownership graph plus retained invalid-candidate facts exist, but Form value validation, cross-Field validation dependencies, tracking, submission, serialization/reset plans, IR, runtime products, execution, public inspection, emitted diagnostics, fixtures, and resumability planning do not.
-* Item: I6 cannot be implemented from the attached one-line "Create immutable validation graph" entry without inventing validation syntax, rule identity and kinds, arguments, exact targets, dependency semantics, execution boundary, ordering, invalid-candidate retention, graph shape, or schema/diagnostic policy.
+* Item: Phase I is complete through I6. Canonical Form declarations, Fields, control bindings, declaration ownership, retained validation candidates, valid Validation Rules, direct same-Form dependency facts, duplicate/contradiction/cycle exclusion, and the immutable validation graph exist. Cross-Field invalidation/scheduling, validation execution/state/messages, tracking, submission, serialization/reset plans, IR, runtime products, public inspection/diagnostics, fixtures, and resumability planning do not.
+* Item: I7 cannot be implemented from the roadmap's one-line cross-Field dependency-planning entry without inventing invalidation propagation, dependency scheduling, update triggers, derived plan identities/products, ordering, execution boundaries, runtime state, or schema policy. I6's direct dependency edges and cycle facts are immutable inputs only.
 * Item: Phase H is frozen through H21. Semantic graph v5 intentionally omits Phase H entities, live component restoration remains deferred until Phase J, and every unsupported component behavior in `docs/component-contract.md` requires a later authoritative roadmap slice.
 * Item: Conditional rendering only supports simple `this.<stateField>` conditions with JSX element or fragment branches.
 * Item: Conditional branch snippets are replaced as static HTML. Bindings, events, and nested dynamic behavior inside swapped-in branch snippets are not re-registered yet.
@@ -1015,13 +1042,13 @@ Known limitations
 
 Exact next step
 
-Commit the completed I5 slice, verify the worktree is clean, then obtain an
-authoritative I6 Validation Graph contract. At minimum it must freeze authored
-validation syntax, `ValidationRuleId` inputs, rule catalog and arguments,
-Field/Form targeting, dependency and execution boundaries, invalid-candidate
-retention, graph nodes/edges, ordering, integrity validation, and public/internal
-schema policy. Do not reinterpret I5 ownership integrity diagnostics as Form
-value-validation rules.
+Commit the completed I6 slice, verify the worktree is clean, then obtain an
+authoritative I7 Cross-Field Dependency Planning contract. At minimum it must
+freeze whether and how direct I6 dependencies produce invalidation propagation,
+dependency schedules, update triggers, derived plan identities and membership,
+ordering, execution boundaries, retained blocked facts, graph integrity, and
+public/internal schema policy. Do not reinterpret I6 dependency edges as an
+implicit execution or runtime-state plan.
 
 Useful commands
 
@@ -1052,4 +1079,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the I5 implementation commit (`compiler: project canonical form ownership`).
+* None after the I6 implementation commit (`compiler: build canonical form validation graph`).

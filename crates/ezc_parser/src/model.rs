@@ -11,6 +11,10 @@ pub struct ParsedFile {
     /// namespace. The compiler uses this normalized fact to distinguish its
     /// built-in marker types from authored lookalikes.
     pub local_type_bindings: Vec<String>,
+    /// Module-local declarations in the value namespace. I6 uses this
+    /// normalized fact to reject authored functions that shadow compiler-owned
+    /// validation intrinsics.
+    pub local_value_bindings: Vec<String>,
     pub imports: Vec<ParsedImport>,
     pub exports: Vec<ParsedExport>,
     pub diagnostics: Vec<ParseDiagnostic>,
@@ -85,7 +89,41 @@ pub struct ParsedDecorator {
     pub argument_spans: Vec<SourceSpan>,
     pub static_member_argument: Option<ParsedStaticMemberDesignator>,
     pub this_member_argument: Option<ParsedThisMemberDesignator>,
+    /// Normalized syntax for the sole outer argument of `@validate(...)`.
+    /// Semantic rule classification remains a core lowering responsibility.
+    pub validation_rule_expression: Option<ParsedValidationRuleExpression>,
     pub span: SourceSpan,
+}
+
+/// Parser-owned syntax facts for one authored validation rule expression.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedValidationRuleExpression {
+    pub kind: ParsedValidationRuleExpressionKind,
+    pub span: SourceSpan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParsedValidationRuleExpressionKind {
+    Call {
+        callee: Option<String>,
+        arguments: Vec<ParsedValidationRuleArgument>,
+    },
+    Identifier(String),
+    Unsupported,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedValidationRuleArgument {
+    pub kind: ParsedValidationRuleArgumentKind,
+    pub span: SourceSpan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParsedValidationRuleArgumentKind {
+    StringLiteral(String),
+    Constant(ParsedConstantExpression),
+    ThisMember(ParsedThisMemberDesignator),
+    Unsupported,
 }
 
 /// An exact direct `this.<identifier>` decorator argument.

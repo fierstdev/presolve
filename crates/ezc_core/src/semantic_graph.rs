@@ -141,6 +141,7 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
                     SemanticEntity::Form(_)
                         | SemanticEntity::FormField(_)
                         | SemanticEntity::FormFieldBinding(_)
+                        | SemanticEntity::ValidationRule(_)
                         | SemanticEntity::Slot(_)
                         | SemanticEntity::ComponentInvocation(_)
                         | SemanticEntity::ComponentInstance(_)
@@ -178,6 +179,7 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
                     SemanticEntity::Form(_)
                         | SemanticEntity::FormField(_)
                         | SemanticEntity::FormFieldBinding(_)
+                        | SemanticEntity::ValidationRule(_)
                         | SemanticEntity::Slot(_)
                         | SemanticEntity::ComponentInvocation(_)
                         | SemanticEntity::ComponentInstance(_)
@@ -199,6 +201,7 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
                     SemanticEntity::Form(_)
                         | SemanticEntity::FormField(_)
                         | SemanticEntity::FormFieldBinding(_)
+                        | SemanticEntity::ValidationRule(_)
                         | SemanticEntity::Slot(_)
                         | SemanticEntity::ComponentInvocation(_)
                         | SemanticEntity::ComponentInstance(_)
@@ -226,6 +229,7 @@ pub fn build_semantic_graph(asm: &ApplicationSemanticModel) -> SemanticGraph {
                         reference.kind,
                         SemanticReferenceKind::FieldBindingField
                             | SemanticReferenceKind::FieldBindingForm
+                            | SemanticReferenceKind::ValidationRuleField
                     )
                 })
                 .map(|reference| SemanticGraphEdge {
@@ -314,6 +318,9 @@ fn semantic_graph_node_kind(entity: SemanticEntity<'_>) -> SemanticGraphNodeKind
         }
         SemanticEntity::FormFieldBinding(_) => {
             unreachable!("Form Field bindings are not projected into semantic graph schema v5")
+        }
+        SemanticEntity::ValidationRule(_) => {
+            unreachable!("Validation rules are not projected into semantic graph schema v5")
         }
         SemanticEntity::Slot(_) => {
             unreachable!("Slots are not projected into frozen semantic graph schema v5")
@@ -438,7 +445,9 @@ fn semantic_graph_edge_kind(kind: SemanticReferenceKind) -> SemanticGraphEdgeKin
         SemanticReferenceKind::TemplateState => SemanticGraphEdgeKind::TemplateState,
         SemanticReferenceKind::TemplateComputed => SemanticGraphEdgeKind::TemplateComputed,
         SemanticReferenceKind::TemplateLocal => SemanticGraphEdgeKind::TemplateLocal,
-        SemanticReferenceKind::FieldBindingField | SemanticReferenceKind::FieldBindingForm => {
+        SemanticReferenceKind::FieldBindingField
+        | SemanticReferenceKind::FieldBindingForm
+        | SemanticReferenceKind::ValidationRuleField => {
             unreachable!("Form Field bindings are not projected into semantic graph schema v5")
         }
     }

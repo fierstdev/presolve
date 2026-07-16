@@ -98,6 +98,26 @@ pub struct FieldBindingId(SemanticId);
 #[serde(transparent)]
 pub struct FormOwnershipGraphId(SemanticId);
 
+/// Source-qualified identity for every recognized `@validate` placement.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ValidationRuleCandidateId(SemanticId);
+
+/// Stable identity for one valid compiler-owned validation rule.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ValidationRuleId(SemanticId);
+
+/// Stable identity for the declaration-level validation graph of one build.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ValidationGraphId(SemanticId);
+
+/// Stable identity for one canonical dependency-cycle field set.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ValidationDependencyCycleId(SemanticId);
+
 /// Stable identity for one compiler-owned component Slot semantic entity.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -306,8 +326,24 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn validation_rule_candidate_in_module(
+        module_path: impl AsRef<Path>,
+        position: usize,
+    ) -> Self {
+        Self(format!(
+            "module:{}/validation-rule-candidate:{position}",
+            normalized_module_path(module_path.as_ref())
+        ))
+    }
+
+    #[must_use]
     pub fn field(&self, name: &str) -> Self {
         self.child("field", name)
+    }
+
+    #[must_use]
+    pub fn validation_rule(&self, ordinal: usize) -> Self {
+        self.child("validation-rule", &ordinal.to_string())
     }
 
     #[must_use]
@@ -692,6 +728,95 @@ impl FormOwnershipGraphId {
     }
 }
 
+impl ValidationRuleCandidateId {
+    #[must_use]
+    pub fn for_source_position(module_path: impl AsRef<Path>, position: usize) -> Self {
+        Self(SemanticId::validation_rule_candidate_in_module(
+            module_path,
+            position,
+        ))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl ValidationRuleId {
+    #[must_use]
+    pub fn for_field(field: &FieldId, authored_ordinal: usize) -> Self {
+        Self(field.as_semantic_id().validation_rule(authored_ordinal))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl ValidationGraphId {
+    #[must_use]
+    pub fn for_build_roots<'a>(roots: impl IntoIterator<Item = &'a ComponentRootId>) -> Self {
+        let mut roots = roots
+            .into_iter()
+            .map(ComponentRootId::as_str)
+            .collect::<Vec<_>>();
+        roots.sort_unstable();
+        roots.dedup();
+        let authority = if roots.is_empty() {
+            "application".to_string()
+        } else {
+            roots.join("+")
+        };
+        Self(SemanticId(format!("validation-graph:{authority}")))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl ValidationDependencyCycleId {
+    #[must_use]
+    pub fn for_fields(form: &FormId, fields: &[FieldId]) -> Self {
+        let mut fields = fields.iter().map(FieldId::as_str).collect::<Vec<_>>();
+        fields.sort_unstable();
+        fields.dedup();
+        Self(SemanticId(format!(
+            "validation-cycle:{}/{}",
+            form.as_str(),
+            fields.join("+")
+        )))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 impl SlotId {
     #[must_use]
     pub fn for_component(component: &SemanticId, name: &str) -> Self {
@@ -993,6 +1118,30 @@ impl fmt::Display for FieldBindingId {
 }
 
 impl fmt::Display for FormOwnershipGraphId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for ValidationRuleCandidateId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for ValidationRuleId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for ValidationGraphId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for ValidationDependencyCycleId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(formatter)
     }

@@ -9,7 +9,7 @@ use crate::semantic_id::{
     ComponentInstanceId, ComponentInvocationId, ComponentStructuralRegionId, ConsumerId,
     ContextDeclarationCandidateId, ContextId, EffectId, EffectStatementId, FieldId,
     FormDeclarationCandidateId, FormFieldDeclarationCandidateId, FormId, ProviderId, SemanticId,
-    SemanticOwner, SlotBindingId, SlotDeclarationCandidateId, SlotId,
+    SemanticOwner, SlotBindingId, SlotDeclarationCandidateId, SlotId, ValidationRuleCandidateId,
 };
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
@@ -23,7 +23,7 @@ use ezc_parser::{
     ParsedJsxConditional, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLogicalOperator,
     ParsedMethod, ParsedMethodCall, ParsedSerializableValue, ParsedStateOperation,
     ParsedStaticMemberDesignator, ParsedUnaryOperator, ParsedUnsupportedEffectStatementKind,
-    SourceSpan,
+    ParsedValidationRuleArgumentKind, ParsedValidationRuleExpressionKind, SourceSpan,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -62,6 +62,11 @@ pub struct ComponentNode {
     /// duplicate grouping, and `FieldId` construction occur during ASM
     /// assembly over existing immutable authorities.
     pub form_field_declaration_candidates: Vec<FormFieldDeclarationCandidate>,
+    /// Parser-normalized source facts for every recognized `@validate`
+    /// placement. I6 lowering consumes these facts without revisiting syntax.
+    pub validation_rule_declaration_facts: Vec<AuthoredValidationRuleDeclarationFact>,
+    /// Module imports that shadow compiler-owned validation intrinsic names.
+    pub shadowed_validation_intrinsics: BTreeSet<String>,
     pub methods: Vec<ComponentMethod>,
     pub actions: Vec<ComponentAction>,
     pub render: Option<RenderModel>,
@@ -71,6 +76,58 @@ pub struct ComponentNode {
 pub struct AuthoredComponentHeritage {
     pub base: String,
     pub provenance: SourceProvenance,
+}
+
+/// Source-faithful I6 declaration facts retained before semantic validation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthoredValidationRuleDeclarationFact {
+    pub id: ValidationRuleCandidateId,
+    pub owner_component: Option<SemanticId>,
+    pub declaration_field: Option<SemanticId>,
+    pub authored_name: Option<String>,
+    pub declaration_kind: AuthoredDeclarationKind,
+    pub is_static: bool,
+    pub authored_ordinal: usize,
+    pub decorator_invoked: bool,
+    pub decorator_argument_count: usize,
+    pub expression: Option<AuthoredValidationRuleExpression>,
+    pub conflicting_decorators: Vec<String>,
+    pub decorator_provenance: SourceProvenance,
+    pub name_provenance: Option<SourceProvenance>,
+    pub provenance: SourceProvenance,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthoredValidationRuleExpression {
+    pub kind: AuthoredValidationRuleExpressionKind,
+    pub provenance: SourceProvenance,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AuthoredValidationRuleExpressionKind {
+    Call {
+        callee: Option<String>,
+        arguments: Vec<AuthoredValidationRuleArgument>,
+    },
+    Identifier(String),
+    Unsupported,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthoredValidationRuleArgument {
+    pub kind: AuthoredValidationRuleArgumentKind,
+    pub provenance: SourceProvenance,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AuthoredValidationRuleArgumentKind {
+    StringLiteral(String),
+    Constant(ConstantExpression),
+    ThisMember {
+        name: String,
+        name_provenance: SourceProvenance,
+    },
+    Unsupported,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1195,8 +1252,22 @@ fn build_component_graph_with_identity(
         } else {
             SemanticId::component(element_name.as_deref(), &class.name)
         };
-        let component =
-            build_component_node(class, &parsed.path, id, builtin_types, &mut diagnostics);
+        let shadowed_validation_intrinsics = parsed
+            .imports
+            .iter()
+            .flat_map(|import| import.specifiers.iter())
+            .map(|specifier| specifier.local.clone())
+            .chain(parsed.local_value_bindings.iter().cloned())
+            .filter(|name| is_validation_intrinsic_name(name))
+            .collect();
+        let component = build_component_node(
+            class,
+            &parsed.path,
+            id,
+            builtin_types,
+            shadowed_validation_intrinsics,
+            &mut diagnostics,
+        );
         let component_provenance = collect_component_provenance(class, &component, &parsed.path);
         references.extend(collect_semantic_references(
             &component,
@@ -1243,6 +1314,7 @@ fn build_component_node(
     path: &Path,
     id: SemanticId,
     builtin_types: crate::BuiltinTypeAuthority,
+    shadowed_validation_intrinsics: BTreeSet<String>,
     diagnostics: &mut Vec<ComponentDiagnostic>,
 ) -> ComponentNode {
     let element_name = decorator_argument(class, "component");
@@ -1272,6 +1344,8 @@ fn build_component_node(
     );
     let form_field_declaration_candidates =
         form_field_declaration_candidates_from_class(class, path, element_name.is_some(), &id);
+    let validation_rule_declaration_facts =
+        validation_rule_declaration_facts_from_class(class, path, element_name.is_some(), &id);
 
     let methods = class
         .methods
@@ -1340,6 +1414,8 @@ fn build_component_node(
         slot_declaration_candidates,
         form_declaration_candidates,
         form_field_declaration_candidates,
+        validation_rule_declaration_facts,
+        shadowed_validation_intrinsics,
         methods,
         actions,
         render,
@@ -1701,7 +1777,7 @@ fn form_field_declaration_candidates_from_class(
             let mut conflicting_decorators = property
                 .decorators
                 .iter()
-                .filter(|other| other.name != "field")
+                .filter(|other| !matches!(other.name.as_str(), "field" | "validate"))
                 .map(|other| other.name.clone())
                 .collect::<Vec<_>>();
             conflicting_decorators.sort();
@@ -1820,6 +1896,206 @@ fn form_field_declaration_candidates_from_class(
 
     candidates.sort_by(form_field_candidate_source_order);
     candidates
+}
+
+#[allow(clippy::too_many_lines)]
+fn validation_rule_declaration_facts_from_class(
+    class: &ParsedClass,
+    path: &Path,
+    is_canonical_component: bool,
+    component: &SemanticId,
+) -> Vec<AuthoredValidationRuleDeclarationFact> {
+    let owner = is_canonical_component.then_some(component);
+    let mut facts = Vec::new();
+
+    retain_validation_rule_facts(
+        &mut facts,
+        owner,
+        None,
+        Some(class.name.as_str()),
+        AuthoredDeclarationKind::Class,
+        false,
+        &class.decorators,
+        None,
+        class.span,
+        path,
+    );
+
+    for property in &class.properties {
+        let declaration_field = (owner.is_some() && property.is_identifier_name)
+            .then(|| component.field(&property.name));
+        let kind = if property.is_static {
+            AuthoredDeclarationKind::StaticField
+        } else {
+            AuthoredDeclarationKind::InstanceField
+        };
+        retain_validation_rule_facts(
+            &mut facts,
+            owner,
+            declaration_field.as_ref(),
+            property
+                .is_identifier_name
+                .then_some(property.name.as_str()),
+            kind,
+            property.is_static,
+            &property.decorators,
+            property.is_identifier_name.then_some(property.name_span),
+            property.span,
+            path,
+        );
+    }
+
+    for method in &class.methods {
+        let kind = if method.is_getter {
+            AuthoredDeclarationKind::Getter
+        } else if method.is_setter {
+            AuthoredDeclarationKind::Setter
+        } else {
+            AuthoredDeclarationKind::Method
+        };
+        retain_validation_rule_facts(
+            &mut facts,
+            owner,
+            None,
+            Some(method.name.as_str()),
+            kind,
+            false,
+            &method.decorators,
+            None,
+            method.span,
+            path,
+        );
+        for parameter in &method.parameters {
+            retain_validation_rule_facts(
+                &mut facts,
+                owner,
+                None,
+                Some(parameter.name.as_str()),
+                AuthoredDeclarationKind::Parameter,
+                false,
+                &parameter.decorators,
+                None,
+                parameter.span,
+                path,
+            );
+        }
+    }
+
+    facts.sort_by(|left, right| {
+        (
+            left.provenance.path.as_path(),
+            left.decorator_provenance.span.start,
+            left.id.as_str(),
+        )
+            .cmp(&(
+                right.provenance.path.as_path(),
+                right.decorator_provenance.span.start,
+                right.id.as_str(),
+            ))
+    });
+    facts
+}
+
+#[allow(clippy::too_many_arguments)]
+fn retain_validation_rule_facts(
+    facts: &mut Vec<AuthoredValidationRuleDeclarationFact>,
+    owner: Option<&SemanticId>,
+    declaration_field: Option<&SemanticId>,
+    authored_name: Option<&str>,
+    declaration_kind: AuthoredDeclarationKind,
+    is_static: bool,
+    decorators: &[ezc_parser::ParsedDecorator],
+    name_span: Option<SourceSpan>,
+    declaration_span: SourceSpan,
+    path: &Path,
+) {
+    let mut conflicting_decorators = decorators
+        .iter()
+        .filter(|decorator| {
+            !matches!(decorator.name.as_str(), "field" | "validate")
+                && is_edgezero_semantic_decorator(&decorator.name)
+        })
+        .map(|decorator| decorator.name.clone())
+        .collect::<Vec<_>>();
+    conflicting_decorators.sort();
+    conflicting_decorators.dedup();
+
+    for (authored_ordinal, decorator) in decorators
+        .iter()
+        .filter(|decorator| decorator.name == "validate")
+        .enumerate()
+    {
+        facts.push(AuthoredValidationRuleDeclarationFact {
+            id: ValidationRuleCandidateId::for_source_position(path, decorator.span.start),
+            owner_component: owner.cloned(),
+            declaration_field: declaration_field.cloned(),
+            authored_name: authored_name.map(str::to_string),
+            declaration_kind,
+            is_static,
+            authored_ordinal,
+            decorator_invoked: decorator.is_invoked,
+            decorator_argument_count: decorator.argument_count,
+            expression: decorator
+                .validation_rule_expression
+                .as_ref()
+                .map(|expression| authored_validation_rule_expression(expression, path)),
+            conflicting_decorators: conflicting_decorators.clone(),
+            decorator_provenance: SourceProvenance::new(path, decorator.span),
+            name_provenance: name_span.map(|span| SourceProvenance::new(path, span)),
+            provenance: SourceProvenance::new(path, declaration_span),
+        });
+    }
+}
+
+fn authored_validation_rule_expression(
+    expression: &ezc_parser::ParsedValidationRuleExpression,
+    path: &Path,
+) -> AuthoredValidationRuleExpression {
+    let kind = match &expression.kind {
+        ParsedValidationRuleExpressionKind::Call { callee, arguments } => {
+            AuthoredValidationRuleExpressionKind::Call {
+                callee: callee.clone(),
+                arguments: arguments
+                    .iter()
+                    .map(|argument| AuthoredValidationRuleArgument {
+                        kind: match &argument.kind {
+                            ParsedValidationRuleArgumentKind::StringLiteral(value) => {
+                                AuthoredValidationRuleArgumentKind::StringLiteral(value.clone())
+                            }
+                            ParsedValidationRuleArgumentKind::Constant(constant) => {
+                                AuthoredValidationRuleArgumentKind::Constant(
+                                    constant_expression_from_parsed(constant),
+                                )
+                            }
+                            ParsedValidationRuleArgumentKind::ThisMember(designator) => {
+                                AuthoredValidationRuleArgumentKind::ThisMember {
+                                    name: designator.member.clone(),
+                                    name_provenance: SourceProvenance::new(
+                                        path,
+                                        designator.member_span,
+                                    ),
+                                }
+                            }
+                            ParsedValidationRuleArgumentKind::Unsupported => {
+                                AuthoredValidationRuleArgumentKind::Unsupported
+                            }
+                        },
+                        provenance: SourceProvenance::new(path, argument.span),
+                    })
+                    .collect(),
+            }
+        }
+        ParsedValidationRuleExpressionKind::Identifier(identifier) => {
+            AuthoredValidationRuleExpressionKind::Identifier(identifier.clone())
+        }
+        ParsedValidationRuleExpressionKind::Unsupported => {
+            AuthoredValidationRuleExpressionKind::Unsupported
+        }
+    };
+    AuthoredValidationRuleExpression {
+        kind,
+        provenance: SourceProvenance::new(path, expression.span),
+    }
 }
 
 fn retain_non_property_form_field_candidates(
@@ -1973,7 +2249,8 @@ fn form_field_candidate_source_order(
 fn is_edgezero_semantic_decorator(name: &str) -> bool {
     matches!(
         name,
-        "state"
+        "form"
+            | "state"
             | "context"
             | "provide"
             | "provider"
@@ -1987,6 +2264,21 @@ fn is_edgezero_semantic_decorator(name: &str) -> bool {
             | "field"
             | "submit"
             | "validate"
+    )
+}
+
+fn is_validation_intrinsic_name(name: &str) -> bool {
+    matches!(
+        name,
+        "required"
+            | "min"
+            | "max"
+            | "minLength"
+            | "maxLength"
+            | "pattern"
+            | "email"
+            | "equals"
+            | "notEquals"
     )
 }
 

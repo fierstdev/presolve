@@ -387,6 +387,7 @@ fn print_asm_text(
                     reference.kind,
                     SemanticReferenceKind::FieldBindingField
                         | SemanticReferenceKind::FieldBindingForm
+                        | SemanticReferenceKind::ValidationRuleField
                 )
             })
             .count()
@@ -532,7 +533,9 @@ fn asm_inspection_json(
         .filter(|reference| {
             !matches!(
                 reference.kind,
-                SemanticReferenceKind::FieldBindingField | SemanticReferenceKind::FieldBindingForm
+                SemanticReferenceKind::FieldBindingField
+                    | SemanticReferenceKind::FieldBindingForm
+                    | SemanticReferenceKind::ValidationRuleField
             )
         })
         .map(|reference| AsmInspectionReference {
@@ -864,6 +867,7 @@ fn is_phase_g_inspection_entity(asm: &ApplicationSemanticModel, id: &SemanticId)
             SemanticEntity::Form(_)
                 | SemanticEntity::FormField(_)
                 | SemanticEntity::FormFieldBinding(_)
+                | SemanticEntity::ValidationRule(_)
                 | SemanticEntity::Slot(_)
                 | SemanticEntity::ComponentInvocation(_)
                 | SemanticEntity::ComponentInstance(_)
@@ -883,7 +887,9 @@ fn filtered_entity_references(
         .filter(|reference| {
             !matches!(
                 reference.kind,
-                SemanticReferenceKind::FieldBindingField | SemanticReferenceKind::FieldBindingForm
+                SemanticReferenceKind::FieldBindingField
+                    | SemanticReferenceKind::FieldBindingForm
+                    | SemanticReferenceKind::ValidationRuleField
             )
         })
         .filter(|reference| {
@@ -1209,6 +1215,7 @@ fn semantic_entity_kind(entity: SemanticEntity<'_>) -> &'static str {
         SemanticEntity::Form(_) => "form",
         SemanticEntity::FormField(_) => "form-field",
         SemanticEntity::FormFieldBinding(_) => "form-field-binding",
+        SemanticEntity::ValidationRule(_) => "validation-rule",
         SemanticEntity::Slot(_) => "slot",
         SemanticEntity::ComponentInvocation(_) => "component-invocation",
         SemanticEntity::ComponentInstance(_) => "component-instance",
@@ -1256,6 +1263,7 @@ fn semantic_reference_kind(kind: SemanticReferenceKind) -> &'static str {
         SemanticReferenceKind::TemplateLocal => "template-local",
         SemanticReferenceKind::FieldBindingField => "field-binding-field",
         SemanticReferenceKind::FieldBindingForm => "field-binding-form",
+        SemanticReferenceKind::ValidationRuleField => "validation-rule-field",
     }
 }
 
@@ -2776,5 +2784,33 @@ mod tests {
                     .to_string()
             )
         );
+    }
+
+    #[test]
+    fn i6_validation_products_do_not_leak_into_asm_inspection_schema_v8() {
+        let path = PathBuf::from("src/Profile.tsx");
+        let parsed = ezc_parser::parse_file(
+            &path,
+            r#"
+@component("profile")
+class Profile {
+  @form() profile!: Form;
+  @validate(required())
+  @field(this.profile)
+  name = "";
+  render() { return <div />; }
+}
+"#,
+        );
+        let asm =
+            build_application_semantic_model_for_unit(&CompilationUnit::from_parsed_files(vec![
+                parsed,
+            ]));
+        assert_eq!(asm.validation_rules.len(), 1);
+        let document = asm_inspection_json(&[path], &asm, &[]);
+        let json: serde_json::Value = serde_json::from_str(&document).unwrap();
+        assert_eq!(json["schema_version"], ASM_INSPECTION_SCHEMA_VERSION);
+        assert!(!document.contains("validation-rule"));
+        assert!(!document.contains("validation_rule"));
     }
 }

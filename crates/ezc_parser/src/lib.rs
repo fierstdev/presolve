@@ -14,16 +14,127 @@ pub use model::{
     ParsedMethod, ParsedMethodCall, ParsedMethodParameter, ParsedProperty, ParsedSerializableValue,
     ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator,
     ParsedThisMemberDesignator, ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator,
-    ParsedUnsupportedEffectStatementKind, SourceSpan,
+    ParsedUnsupportedEffectStatementKind, ParsedValidationRuleArgument,
+    ParsedValidationRuleArgumentKind, ParsedValidationRuleExpression,
+    ParsedValidationRuleExpressionKind, SourceSpan,
 };
 pub use oxc_adapter::parse_file;
+
+/// Validates one flags-free ECMAScript pattern using the compiler frontend's
+/// pinned ECMAScript grammar authority.
+#[must_use]
+pub fn is_valid_ecmascript_pattern(pattern: &str) -> bool {
+    let allocator = oxc_allocator::Allocator::default();
+    oxc_regular_expression::LiteralParser::new(
+        &allocator,
+        pattern,
+        None,
+        oxc_regular_expression::Options {
+            pattern_span_offset: 0,
+            flags_span_offset: 0,
+        },
+    )
+    .parse()
+    .is_ok()
+}
 
 #[cfg(test)]
 mod tests {
     use super::{
         parse_file, ParsedEffectStatementKind, ParsedJsxAttributeValue, ParsedSerializableValue,
-        ParsedUnsupportedEffectStatementKind,
+        ParsedUnsupportedEffectStatementKind, ParsedValidationRuleArgumentKind,
+        ParsedValidationRuleExpressionKind,
     };
+
+    #[test]
+    fn retains_validation_rule_calls_constants_and_direct_field_designators() {
+        let source = r#"
+@component("profile")
+class Profile {
+  @form() profile!: Form;
+
+  @validate(min(1 + 2))
+  @validate(pattern("^[a-z]+$"))
+  @field(this.profile)
+  name = "";
+
+  @validate(equals(this.name))
+  @field(this.profile)
+  confirmation = "";
+}
+"#;
+        let parsed = parse_file("src/Profile.tsx", source);
+        let name = &parsed.classes[0].properties[1];
+        let validations = name
+            .decorators
+            .iter()
+            .filter(|decorator| decorator.name == "validate")
+            .collect::<Vec<_>>();
+        assert_eq!(validations.len(), 2);
+        let expression = validations[0]
+            .validation_rule_expression
+            .as_ref()
+            .expect("rule expression");
+        let ParsedValidationRuleExpressionKind::Call { callee, arguments } = &expression.kind
+        else {
+            panic!("expected validation call");
+        };
+        assert_eq!(callee.as_deref(), Some("min"));
+        assert!(matches!(
+            arguments[0].kind,
+            ParsedValidationRuleArgumentKind::Constant(_)
+        ));
+        let equals = parsed.classes[0].properties[2]
+            .decorators
+            .iter()
+            .find(|decorator| decorator.name == "validate")
+            .unwrap()
+            .validation_rule_expression
+            .as_ref()
+            .unwrap();
+        let ParsedValidationRuleExpressionKind::Call { arguments, .. } = &equals.kind else {
+            panic!("expected equals call");
+        };
+        assert!(matches!(
+            &arguments[0].kind,
+            ParsedValidationRuleArgumentKind::ThisMember(designator)
+                if designator.member == "name"
+        ));
+    }
+
+    #[test]
+    fn retains_invalid_outer_validation_invocation_and_expression_shapes() {
+        let source = r#"
+@component("profile")
+class Profile {
+  @validate
+  first = "";
+  @validate()
+  second = "";
+  @validate(required(), email())
+  third = "";
+  @validate(schema.required())
+  fourth = "";
+}
+"#;
+        let parsed = parse_file("src/Profile.tsx", source);
+        let decorators = parsed.classes[0]
+            .properties
+            .iter()
+            .map(|property| &property.decorators[0])
+            .collect::<Vec<_>>();
+        assert!(!decorators[0].is_invoked);
+        assert_eq!(decorators[1].argument_count, 0);
+        assert_eq!(decorators[2].argument_count, 2);
+        assert!(matches!(
+            decorators[3]
+                .validation_rule_expression
+                .as_ref()
+                .unwrap()
+                .kind,
+            ParsedValidationRuleExpressionKind::Call { callee: None, .. }
+        ));
+    }
 
     #[test]
     fn retains_source_faithful_class_heritage() {
