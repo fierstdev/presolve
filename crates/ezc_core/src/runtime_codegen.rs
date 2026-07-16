@@ -82,7 +82,11 @@ const RUNTIME_STUB: &str = r#"(() => {
       const actionsByMethod = new Map();
 
       for (const action of component.actions ?? []) {
-        if (typeof action.method_id !== "string" || typeof action.action_batch_id !== "string") {
+        if (
+          typeof action.method_id !== "string"
+          || typeof action.action_batch_id !== "string"
+          || (manifest.schema_version === SUPPORTED_SCHEMA_VERSION && typeof action.storage_id !== "string")
+        ) {
           reportDiagnostic(
             diagnostics,
             "EZR_INVALID_ACTION_BINDING",
@@ -348,6 +352,17 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
+  function canonicalStateSlotId(componentInstanceId, storageId) {
+    const encoded = [...new TextEncoder().encode(storageId)].map((byte) => {
+      const unreserved = (byte >= 65 && byte <= 90)
+        || (byte >= 97 && byte <= 122)
+        || (byte >= 48 && byte <= 57)
+        || byte === 45 || byte === 46 || byte === 95 || byte === 126;
+      return unreserved ? String.fromCharCode(byte) : `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;
+    }).join("");
+    return `${componentInstanceId}/state-slot:${encoded}`;
+  }
+
   function validateComponentArtifactSchema(artifact, diagnostics) {
     if (artifact === null) return;
     if ((artifact.schema_version !== SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION && artifact.schema_version !== LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION) || !Array.isArray(artifact.instances) || !Array.isArray(artifact.initialization_batches)) {
@@ -355,9 +370,32 @@ const RUNTIME_STUB: &str = r#"(() => {
       throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
     }
     const instances = new Set(artifact.instances.map((instance) => instance.instance));
+    const stateSlots = new Set();
+    const statePairs = new Set();
     for (const instance of artifact.instances) if (instance.parent !== null && instance.parent !== undefined && !instances.has(instance.parent)) {
       reportDiagnostic(diagnostics, "EZR_INVALID_COMPONENT_ARTIFACT", "Component runtime metadata referenced an unknown parent instance", { instance: instance.instance, parent: instance.parent }, true);
       throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+    }
+    if (artifact.schema_version === SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION) {
+      for (const instance of artifact.instances) {
+        if (!Array.isArray(instance.state_slots)) throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+        for (const slot of instance.state_slots) {
+          const pair = `${instance.instance}|${slot.storage_id}`;
+          if (
+            typeof slot.slot_id !== "string"
+            || slot.slot_id !== canonicalStateSlotId(instance.instance, slot.storage_id)
+            || typeof slot.state_id !== "string"
+            || typeof slot.storage_id !== "string"
+            || slot.storage_id !== `storage:${slot.state_id}`
+            || stateSlots.has(slot.slot_id)
+            || statePairs.has(pair)
+          ) {
+            throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+          }
+          stateSlots.add(slot.slot_id);
+          statePairs.add(pair);
+        }
+      }
     }
   }
 
@@ -1021,19 +1059,22 @@ const RUNTIME_STUB: &str = r#"(() => {
     return nextInstances;
   }
 
-  function createRuntimeStore(elementsByNode, diagnostics, computedArtifact, contextArtifact, effectArtifact) {
+  function createRuntimeStore(elementsByNode, diagnostics, computedArtifact, contextArtifact, effectArtifact, componentArtifact) {
     const computedEvaluations = new Map();
     const storageValues = new Map();
     const storageByComponentField = new Map();
+    const instanceQualifiedState = componentArtifact?.schema_version === SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION;
     const invalidationsByStorage = new Map();
     const computedDirty = new Map();
 
-    for (const state of computedArtifact?.state ?? []) {
-      storageValues.set(state.storage, state.initial_value);
-      storageByComponentField.set(
-        componentFieldKey(state.component, state.field),
-        state.storage
-      );
+    if (!instanceQualifiedState) {
+      for (const state of computedArtifact?.state ?? []) {
+        storageValues.set(state.storage, state.initial_value);
+        storageByComponentField.set(
+          componentFieldKey(state.component, state.field),
+          state.storage
+        );
+      }
     }
 
     for (const invalidation of computedArtifact?.invalidations ?? []) {
@@ -1048,6 +1089,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     return {
       components: new Map(),
       bindingsByField: new Map(),
+      bindingsByStateSlot: new Map(),
       actionsByMethod: new Map(),
       eventsByType: new Map(),
       elementsByNode,
@@ -1068,6 +1110,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       computedDirtySlots: new Map(),
       storageValues,
       storageByComponentField,
+      stateSlotsByInstanceStorage: new Map(),
+      instanceQualifiedState,
       invalidationsByStorage,
       computedUpdateRuns: 0,
       initialEffectRuns: [],
@@ -1082,6 +1126,21 @@ const RUNTIME_STUB: &str = r#"(() => {
     const slot = store.computedSlotsByInstanceComputed.get(`${componentInstanceId}|${computed}`);
     if (slot === undefined) throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
     return slot;
+  }
+
+  function stateSlotForInstanceStorage(store, componentInstanceId, storage) {
+    const slot = store.stateSlotsByInstanceStorage.get(`${componentInstanceId}|${storage}`);
+    if (slot === undefined) throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+    return slot;
+  }
+
+  function stateValueForStorage(store, storage) {
+    if (!store.instanceQualifiedState) return store.storageValues.get(storage);
+    const componentInstanceId = store.activeExecutionContext?.component_instance_id;
+    if (componentInstanceId === undefined) throw new EdgeZeroBootError("EZR_MISSING_EXECUTION_CONTEXT");
+    return store.storageValues.get(
+      stateSlotForInstanceStorage(store, componentInstanceId, storage).slot_id
+    );
   }
 
   function isComputedDirty(store, computed) {
@@ -1124,7 +1183,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
 
     if (operand?.kind === "storage") {
-      return store.storageValues.get(operand.storage);
+      return stateValueForStorage(store, operand.storage);
     }
 
     return undefined;
@@ -1166,7 +1225,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
 
     if (instruction.kind === "load-state") {
-      values.set(instruction.result, store.storageValues.get(instruction.storage));
+      values.set(instruction.result, stateValueForStorage(store, instruction.storage));
       return true;
     }
 
@@ -1503,7 +1562,15 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
-  function readField(store, component, field) {
+  function readField(store, component, field, storageId = null) {
+    if (store.instanceQualifiedState) {
+      if (typeof component.instance_id !== "string" || typeof storageId !== "string") {
+        throw new EdgeZeroBootError("EZR_INVALID_STATE_OPERATION");
+      }
+      return store.storageValues.get(
+        stateSlotForInstanceStorage(store, component.instance_id, storageId).slot_id
+      );
+    }
     if (!(field in component.state)) {
       reportDiagnostic(
         store.diagnostics,
@@ -1517,7 +1584,20 @@ const RUNTIME_STUB: &str = r#"(() => {
     return component.state[field];
   }
 
-  function writeField(store, component, field, value) {
+  function writeField(store, component, field, value, storageId = null) {
+    if (store.instanceQualifiedState) {
+      if (typeof component.instance_id !== "string" || typeof storageId !== "string") {
+        throw new EdgeZeroBootError("EZR_INVALID_STATE_OPERATION");
+      }
+      const slot = stateSlotForInstanceStorage(store, component.instance_id, storageId);
+      store.storageValues.set(slot.slot_id, value);
+      component.state[field] = value;
+      for (const computed of store.invalidationsByStorage.get(storageId) ?? []) {
+        setComputedDirty(store, computed, true);
+      }
+      notifyField(store, component, field, slot.slot_id);
+      return;
+    }
     if (!(field in component.state)) {
       reportDiagnostic(
         store.diagnostics,
@@ -1539,13 +1619,13 @@ const RUNTIME_STUB: &str = r#"(() => {
         setComputedDirty(store, computed, true);
       }
     }
-    notifyField(store, component, field);
+    notifyField(store, component, field, null);
   }
 
-  function notifyField(store, component, field) {
-    const bindings = store.bindingsByField.get(
-      componentFieldKey(component.name, field)
-    );
+  function notifyField(store, component, field, stateSlotId) {
+    const bindings = stateSlotId === null
+      ? store.bindingsByField.get(componentFieldKey(component.name, field))
+      : store.bindingsByStateSlot.get(stateSlotId);
 
     if (bindings === undefined) {
       reportDiagnostic(
@@ -1558,11 +1638,21 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
 
     for (const updateBinding of bindings) {
-      updateBinding(component.state[field]);
+      updateBinding(stateSlotId === null ? component.state[field] : store.storageValues.get(stateSlotId));
     }
   }
 
-  function registerBinding(store, component, field, updateBinding) {
+  function registerBinding(store, component, field, updateBinding, storageId = null) {
+    if (store.instanceQualifiedState) {
+      if (typeof component.instance_id !== "string" || typeof storageId !== "string") {
+        throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_BINDING");
+      }
+      const slot = stateSlotForInstanceStorage(store, component.instance_id, storageId);
+      const bindings = store.bindingsByStateSlot.get(slot.slot_id) ?? [];
+      bindings.push(updateBinding);
+      store.bindingsByStateSlot.set(slot.slot_id, bindings);
+      return;
+    }
     const key = componentFieldKey(component.name, field);
     const bindings = store.bindingsByField.get(key) ?? [];
     bindings.push(updateBinding);
@@ -1810,7 +1900,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
 
     if (action.operation === "toggle") {
-      const current = readField(store, component, action.field);
+      const current = readField(store, component, action.field, action.storage_id);
 
       if (typeof current !== "boolean") {
         reportDiagnostic(
@@ -1822,16 +1912,16 @@ const RUNTIME_STUB: &str = r#"(() => {
         return;
       }
 
-      writeField(store, component, action.field, !current);
+      writeField(store, component, action.field, !current, action.storage_id);
       return;
     }
 
     if (action.operation === "assign") {
-      writeField(store, component, action.field, action.operand);
+      writeField(store, component, action.field, action.operand, action.storage_id);
       return;
     }
 
-    const current = Number(readField(store, component, action.field));
+    const current = Number(readField(store, component, action.field, action.storage_id));
 
     if (Number.isNaN(current)) {
       reportDiagnostic(
@@ -1849,7 +1939,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       return;
     }
 
-    writeField(store, component, action.field, current + delta);
+    writeField(store, component, action.field, current + delta, action.storage_id);
   }
 
   function executeActions(store, component, actionBatchId, actions, executionContext = null) {
@@ -1952,22 +2042,25 @@ const RUNTIME_STUB: &str = r#"(() => {
     return null;
   }
 
-  function registerOrdinaryBinding(store, binding) {
+  function registerOrdinaryBinding(store, binding, artifactBinding) {
     const component = store.components.get(binding.component_instance_id);
     const field = fieldNameFromThisMember(binding.expression);
-    if (component === undefined || field === null) throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_BINDING");
+    const storageId = artifactBinding.state_storage_ids?.length === 1
+      ? artifactBinding.state_storage_ids[0]
+      : null;
+    if (component === undefined || field === null || storageId === null) throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_BINDING");
     const target = store.templateTargetsById.get(binding.instance_target_id);
-    const context = { component_instance_id: binding.component_instance_id };
+    const slot = stateSlotForInstanceStorage(store, binding.component_instance_id, storageId);
     let update = null;
     if (binding.kind === "text") {
       const text = ordinaryTextBindingNode(binding.instance_binding_id);
-      if (text !== null) update = (value) => { void context; text.data = formatBindingValue(value); };
+      if (text !== null) update = (value) => { text.data = formatBindingValue(value); };
     } else if ((binding.kind === "attribute" || binding.kind === "property") && target instanceof Element && typeof binding.attribute_name === "string") {
-      update = (value) => { void context; updateAttributeBinding(target, binding.attribute_name, value); };
+      update = (value) => { updateAttributeBinding(target, binding.attribute_name, value); };
     }
     if (update === null) throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_BINDING");
-    update(component.state[field]);
-    registerBinding(store, component, field, update);
+    update(store.storageValues.get(slot.slot_id));
+    registerBinding(store, component, field, update, storageId);
   }
 
   function initializeOrdinaryInstanceRuntime(store, manifest, componentArtifact) {
@@ -1994,7 +2087,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         ...binding,
         execution_context: { component_instance_id: binding.component_instance_id }
       });
-      registerOrdinaryBinding(store, binding);
+      registerOrdinaryBinding(store, binding, artifactBinding);
     }
     for (const event of manifest.ordinary_events ?? []) {
       const key = ordinaryEventKey(event.instance_target_id, event.event_type);
@@ -2311,7 +2404,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     const conditionalAnchors = collectConditionalAnchors();
     const listAnchors = collectListAnchors();
     const elementsByNode = collectElementAnchors();
-    const store = createRuntimeStore(elementsByNode, diagnostics, computedArtifact, contextArtifact, effectArtifact);
+    const store = createRuntimeStore(elementsByNode, diagnostics, computedArtifact, contextArtifact, effectArtifact, componentArtifact);
     store.componentArtifact = componentArtifact;
     store.componentInstances = new Map((componentArtifact?.instances ?? []).map((instance) => [instance.instance, { ...instance, status: "created" }]));
     store.slotBindings = new Map((componentArtifact?.slot_binding_programs ?? []).map((binding) => [binding.binding, binding]));
@@ -2345,6 +2438,28 @@ const RUNTIME_STUB: &str = r#"(() => {
       for (const instance of componentArtifact.instances ?? []) {
         const definition = definitions.get(instance.component);
         if (definition === undefined) throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_COMPONENT");
+        const definitionStates = (computedArtifact?.state ?? []).filter(
+          (state) => state.component === instance.component
+        );
+        if ((instance.state_slots ?? []).length !== definitionStates.length) {
+          throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+        }
+        for (const slot of instance.state_slots ?? []) {
+          const pair = `${instance.instance}|${slot.storage_id}`;
+          if (
+            store.stateSlotsByInstanceStorage.has(pair)
+            || store.storageValues.has(slot.slot_id)
+          ) {
+            throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+          }
+          store.stateSlotsByInstanceStorage.set(pair, slot);
+          store.storageValues.set(slot.slot_id, slot.initial_value);
+        }
+        for (const state of definitionStates) {
+          if (!store.stateSlotsByInstanceStorage.has(`${instance.instance}|${state.storage}`)) {
+            throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+          }
+        }
         for (const slot of instance.computed_slots ?? []) {
           const pair = `${instance.instance}|${slot.computed_id}`;
           if (!slot.cache_slot_id.startsWith(`${instance.instance}/computed-cache:`)
@@ -2356,9 +2471,11 @@ const RUNTIME_STUB: &str = r#"(() => {
           store.computedSlotsByInstanceComputed.set(pair, slot);
           store.computedDirtySlots.set(slot.dirty_slot_id, slot.dirty_initial_value === true);
         }
-        const component = { name: instance.component, manifest: definition, state: {} };
+        const component = { instance_id: instance.instance, name: instance.component, manifest: definition, state: {} };
         for (const state of computedArtifact?.state ?? []) {
-          if (state.component === instance.component) component.state[state.field] = state.initial_value;
+          if (state.component !== instance.component) continue;
+          const slot = store.stateSlotsByInstanceStorage.get(`${instance.instance}|${state.storage}`);
+          if (slot !== undefined) component.state[state.field] = store.storageValues.get(slot.slot_id);
         }
         store.components.set(instance.instance, component);
         registerActions(store, component, definition);

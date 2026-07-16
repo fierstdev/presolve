@@ -134,6 +134,135 @@ fn component_runtime_consumes_only_compiler_plans_in_a_real_browser() {
 }
 
 #[test]
+fn repeated_component_state_and_computed_updates_stay_instance_qualified_in_a_real_browser() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/state-instance-storage");
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean State instance browser output");
+    }
+    fs::create_dir_all(&out_dir).expect("failed to create State instance browser output");
+    let input = out_dir.join("RepeatedCounter.tsx");
+    fs::write(
+        &input,
+        r#"
+@component("x-repeated-counter") class RepeatedCounter extends Component {
+  count = state(1);
+  @computed() get doubled() { return this.count * 2; }
+  @action() increment() { this.count += 1; }
+  render() { return <button onClick={this.increment}>{this.count}</button>; }
+}
+@component("x-repeated-page") @route("/") class RepeatedPage extends Component {
+  render() { return <main><RepeatedCounter /><RepeatedCounter /></main>; }
+}"#,
+    )
+    .expect("failed to write repeated State browser source");
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            input.to_str().expect("input UTF-8"),
+            "--out",
+            out_dir.to_str().expect("output UTF-8"),
+        ])
+        .output()
+        .expect("failed to build repeated State browser source");
+    assert!(
+        output.status.success(),
+        "repeated State build failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    write_state_instance_storage_probe_page(&out_dir);
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile");
+    let output = run_chrome_probe(
+        chrome,
+        &format!("--user-data-dir={}", profile_dir.display()),
+        &format!("http://127.0.0.1:{}/probe.html", server.port),
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("EDGEZERO_STATE_INSTANCE_STORAGE_BROWSER_TEST_PASS"),
+        "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn phase_j_rejects_component_v2_while_legacy_v2_cold_boot_remains_accepted() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/state-instance-compatibility");
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean State compatibility output");
+    }
+    fs::create_dir_all(&out_dir).expect("failed to create State compatibility output");
+    let input = out_dir.join("StaticPage.tsx");
+    fs::write(
+        &input,
+        r#"
+@component("x-static-page") @route("/") class StaticPage extends Component {
+  render() { return <main>Static</main>; }
+}"#,
+    )
+    .expect("failed to write State compatibility source");
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            input.to_str().expect("input UTF-8"),
+            "--out",
+            out_dir.to_str().expect("output UTF-8"),
+        ])
+        .output()
+        .expect("failed to build State compatibility source");
+    assert!(
+        output.status.success(),
+        "State compatibility build failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    write_state_instance_compatibility_probe_pages(&out_dir);
+
+    for (index, (file_name, marker)) in [
+        (
+            "phase-j-component-v2.html",
+            "EDGEZERO_PHASE_J_COMPONENT_V2_REJECTION_PASS",
+        ),
+        (
+            "legacy-component-v2-cold.html",
+            "EDGEZERO_LEGACY_COMPONENT_V2_COLD_PASS",
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let server = StaticServer::start(out_dir.clone());
+        let chrome = chrome_bin().expect("headless Chrome was not found");
+        let profile_dir = out_dir.join(format!("chrome-profile-{index}"));
+        fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile");
+        let output = run_chrome_probe(
+            chrome,
+            &format!("--user-data-dir={}", profile_dir.display()),
+            &format!("http://127.0.0.1:{}/{file_name}", server.port),
+        );
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        server.stop();
+        assert!(
+            stdout.contains(marker),
+            "browser probe did not pass for {file_name}\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+            output.status,
+            stdout,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[test]
 fn explicit_form_hosts_submit_only_through_compiler_emitted_records() {
     let _guard = browser_test_guard();
     let repo_root = repo_root();
@@ -318,6 +447,173 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
 }
 
+fn write_state_instance_storage_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
+    let probe = index.replace(
+        "</body>",
+        r#"<script>
+const fail = (message) => { throw new Error(message); };
+const waitFor = (predicate, label) => new Promise((resolve, reject) => {
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    if (predicate()) { resolve(); return; }
+    if (document.documentElement.dataset.ezRuntime === "error") {
+      reject(new Error(`Runtime failed before ${label}`));
+      return;
+    }
+    if (Date.now() > deadline) { reject(new Error(`Timed out waiting for ${label}`)); return; }
+    setTimeout(tick, 20);
+  };
+  tick();
+});
+(async () => {
+  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  const runtime = window.__EDGEZERO__;
+  const artifact = JSON.parse(document.getElementById("ez-component-runtime").textContent);
+  const instances = artifact.instances.filter((instance) => instance.component.endsWith("/component:x-repeated-counter"));
+  if (instances.length !== 2) fail("repeated component instances were not planned exactly");
+  const firstState = instances[0].state_slots[0];
+  const secondState = instances[1].state_slots[0];
+  const firstComputed = instances[0].computed_slots[0];
+  const secondComputed = instances[1].computed_slots[0];
+  if (firstState.storage_id !== secondState.storage_id || firstState.slot_id === secondState.slot_id) {
+    fail("one declaration storage did not receive two exact instance slots");
+  }
+  if (Number(runtime.store.storageValues.get(firstState.slot_id)) !== 1
+    || Number(runtime.store.storageValues.get(secondState.slot_id)) !== 1) {
+    fail("cold boot did not initialize both State instance slots independently");
+  }
+  if (runtime.store.computedCaches.get(firstComputed.cache_slot_id) !== 2
+    || runtime.store.computedCaches.get(secondComputed.cache_slot_id) !== 2) {
+    fail("cold boot did not evaluate both computed instance caches");
+  }
+  const buttons = [...document.querySelectorAll("button")];
+  if (buttons.length !== 2 || buttons[0].textContent !== "1" || buttons[1].textContent !== "1") {
+    fail("repeated State bindings did not initialize independently");
+  }
+  buttons[0].click();
+  await waitFor(() => buttons[0].textContent === "2", "first instance update");
+  if (buttons[1].textContent !== "1") fail("first action updated the second instance binding");
+  if (Number(runtime.store.storageValues.get(firstState.slot_id)) !== 2
+    || Number(runtime.store.storageValues.get(secondState.slot_id)) !== 1) {
+    fail("first action crossed the State instance storage boundary");
+  }
+  if (runtime.store.computedCaches.get(firstComputed.cache_slot_id) !== 4
+    || runtime.store.computedCaches.get(secondComputed.cache_slot_id) !== 2) {
+    fail("computed invalidation crossed the component instance boundary");
+  }
+  if (runtime.store.computedDirtySlots.get(firstComputed.dirty_slot_id) !== false
+    || runtime.store.computedDirtySlots.get(secondComputed.dirty_slot_id) !== false) {
+    fail("computed dirty flags did not settle independently");
+  }
+  const exactStateSlotIds = new Set([firstState.slot_id, secondState.slot_id]);
+  if ([...runtime.store.storageValues.keys()].some((key) => !exactStateSlotIds.has(key))) {
+    fail("schema-v3 runtime exposed a declaration-level State storage key");
+  }
+  document.body.dataset.browserTest = "pass";
+  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_STATE_INSTANCE_STORAGE_BROWSER_TEST_PASS</div>");
+})().catch((error) => {
+  document.body.dataset.browserTest = "fail";
+  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_STATE_INSTANCE_STORAGE_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  console.error(error);
+});
+</script>
+</body>"#,
+    );
+    fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
+}
+
+fn replace_json_script(
+    page: &str,
+    element_id: &str,
+    transform: impl FnOnce(&mut serde_json::Value),
+) -> String {
+    let id = format!("id=\"{element_id}\"");
+    let id_start = page.find(&id).expect("JSON script id was missing");
+    let content_start = page[id_start..]
+        .find('>')
+        .map(|offset| id_start + offset + 1)
+        .expect("JSON script opening tag was malformed");
+    let content_end = page[content_start..]
+        .find("</script>")
+        .map(|offset| content_start + offset)
+        .expect("JSON script closing tag was missing");
+    let mut value: serde_json::Value =
+        serde_json::from_str(&page[content_start..content_end]).expect("JSON script was invalid");
+    transform(&mut value);
+    let json = serde_json::to_string_pretty(&value).expect("JSON script should serialize");
+    format!(
+        "{}{}\n{}",
+        &page[..content_start],
+        json,
+        &page[content_end..]
+    )
+}
+
+fn downgrade_component_artifact_to_v2(value: &mut serde_json::Value) {
+    value["schema_version"] = serde_json::json!(2);
+    for instance in value["instances"]
+        .as_array_mut()
+        .expect("component instances should be an array")
+    {
+        instance
+            .as_object_mut()
+            .expect("component instance should be an object")
+            .remove("state_slots");
+    }
+}
+
+fn write_state_instance_compatibility_probe_pages(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
+
+    let rejected = replace_json_script(
+        &index,
+        "ez-component-runtime",
+        downgrade_component_artifact_to_v2,
+    );
+    let rejected = rejected.replace(
+        "</body>",
+        r#"<script>
+const wait = setInterval(() => {
+  if (document.documentElement.dataset.ezRuntime !== "error") return;
+  clearInterval(wait);
+  const codes = window.__EDGEZERO__?.diagnostics?.map((diagnostic) => diagnostic.code) ?? [];
+  if (codes.includes("EZR_UNSUPPORTED_SCHEMA")) {
+    document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_PHASE_J_COMPONENT_V2_REJECTION_PASS</div>");
+  }
+}, 20);
+</script>
+</body>"#,
+    );
+    fs::write(out_dir.join("phase-j-component-v2.html"), rejected)
+        .expect("failed to write Phase J v2 rejection probe");
+
+    let legacy = replace_json_script(&index, "ez-template-manifest", |value| {
+        value["schema_version"] = serde_json::json!(3);
+        value["ordinary_targets"] = serde_json::json!([]);
+        value["ordinary_bindings"] = serde_json::json!([]);
+        value["ordinary_events"] = serde_json::json!([]);
+    });
+    let legacy = replace_json_script(
+        &legacy,
+        "ez-component-runtime",
+        downgrade_component_artifact_to_v2,
+    );
+    let legacy = legacy.replace(
+        "</body>",
+        r#"<script>
+const wait = setInterval(() => {
+  if (document.documentElement.dataset.ezRuntime !== "ready") return;
+  clearInterval(wait);
+  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_LEGACY_COMPONENT_V2_COLD_PASS</div>");
+}, 20);
+</script>
+</body>"#,
+    );
+    fs::write(out_dir.join("legacy-component-v2-cold.html"), legacy)
+        .expect("failed to write legacy v2 cold probe");
+}
+
 fn write_component_runtime_probe_page(out_dir: &Path) {
     let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
     let probe = index.replace(
@@ -353,8 +649,15 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
       }
     }
   }
-  if (new Set(artifact.instances.map((instance) => instance.storage_prefix)).size !== artifact.instances.length) {
-    fail("repeated instances shared storage identity");
+  const stateSlots = artifact.instances.flatMap((instance) => instance.state_slots);
+  if (new Set(stateSlots.map((slot) => slot.slot_id)).size !== stateSlots.length) {
+    fail("repeated instances shared State slot identity");
+  }
+  if (stateSlots.some((slot) => !runtime.store.storageValues.has(slot.slot_id))) {
+    fail("cold boot did not initialize every exact State instance slot");
+  }
+  if ([...runtime.store.storageValues.keys()].some((key) => !stateSlots.some((slot) => slot.slot_id === key))) {
+    fail("schema-v3 runtime retained a declaration-level State storage key");
   }
   if (runtime.slot_binding_runs.length !== artifact.slot_binding_programs.length) fail("slot programs were not loaded exactly");
   if (runtime.store.instanceContextBindings.size !== artifact.instance_context_bindings.length) fail("instance Context plans were not loaded exactly");
@@ -2214,7 +2517,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     fail("runtime version was not exposed");
   }
 
-  if (window.__EDGEZERO__.supported_schema_version !== 2) {
+  if (window.__EDGEZERO__.supported_schema_version !== 4) {
     fail("supported schema version was not exposed");
   }
 
@@ -3430,7 +3733,7 @@ fn write_runtime_contract_probe_page(
     page.push_str("(async () => {\n");
     page.push_str("  await waitFor(() => document.documentElement.dataset.ezRuntime === \"error\" && window.__EDGEZERO__, \"runtime error\");\n");
     page.push_str("  if (window.__EDGEZERO__.runtime_version !== \"0.0.0\") fail(\"runtime version was not exposed\");\n");
-    page.push_str("  if (window.__EDGEZERO__.supported_schema_version !== 2) fail(\"supported schema version was not exposed\");\n");
+    page.push_str("  if (window.__EDGEZERO__.supported_schema_version !== 4) fail(\"supported schema version was not exposed\");\n");
     page.push_str("  const diagnostics = window.__EDGEZERO__.diagnostics;\n");
     page.push_str("  if (!Array.isArray(diagnostics) || diagnostics.length === 0) fail(\"diagnostics were not exposed\");\n");
     page.push_str("  if (diagnostics[0].code !== \"");

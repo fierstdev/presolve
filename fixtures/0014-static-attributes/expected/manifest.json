@@ -1,7 +1,8 @@
 {
-  "schema_version": 1,
+  "schema_version": 4,
   "components": [
     {
+      "component_id": "module:fixtures/0014-static-attributes/input/StaticAttributePanel.tsx/component:x-static-attribute-panel",
       "name": "StaticAttributePanel",
       "template": {
         "nodes": [
@@ -25,6 +26,26 @@
         "events": []
       },
       "actions": []
+    }
+  ],
+  "ordinary_targets": [
+    {
+      "id": "root:module:fixtures/0014-static-attributes/input/StaticAttributePanel.tsx/component:x-static-attribute-panel/template-target:module%3Afixtures%2F0014-static-attributes%2Finput%2FStaticAttributePanel.tsx%2Fcomponent%3Ax-static-attribute-panel%2Ftemplate%3Arender%2Fbinding%3Aroot.0.1",
+      "component_instance_id": "root:module:fixtures/0014-static-attributes/input/StaticAttributePanel.tsx/component:x-static-attribute-panel",
+      "template_entity_id": "module:fixtures/0014-static-attributes/input/StaticAttributePanel.tsx/component:x-static-attribute-panel/template:render/binding:root.0.1",
+      "kind": "element"
+    }
+  ],
+  "ordinary_bindings": [
+    {
+      "instance_binding_id": "root:module:fixtures/0014-static-attributes/input/StaticAttributePanel.tsx/component:x-static-attribute-panel/template-binding:module%3Afixtures%2F0014-static-attributes%2Finput%2FStaticAttributePanel.tsx%2Fcomponent%3Ax-static-attribute-panel%2Ftemplate%3Arender%2Fbinding%3Aroot.0.1",
+      "component_instance_id": "root:module:fixtures/0014-static-attributes/input/StaticAttributePanel.tsx/component:x-static-attribute-panel",
+      "instance_target_id": "root:module:fixtures/0014-static-attributes/input/StaticAttributePanel.tsx/component:x-static-attribute-panel/template-target:module%3Afixtures%2F0014-static-attributes%2Finput%2FStaticAttributePanel.tsx%2Fcomponent%3Ax-static-attribute-panel%2Ftemplate%3Arender%2Fbinding%3Aroot.0.1",
+      "declaration_binding_id": "module:fixtures/0014-static-attributes/input/StaticAttributePanel.tsx/component:x-static-attribute-panel/template:render/binding:root.0.1",
+      "kind": "text",
+      "program_id": "module:fixtures/0014-static-attributes/input/StaticAttributePanel.tsx/component:x-static-attribute-panel/template:render/binding:root.0.1",
+      "expression": "this.label",
+      "attribute_name": null
     }
   ]
 }

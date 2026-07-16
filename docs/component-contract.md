@@ -194,6 +194,31 @@ dirty slot as retained, serializable for a snapshot, restorable, cold on
 resume, or lazily activated; those decisions remain J2 and later Phase J
 slices.
 
+## J1-A State instance storage
+
+Every valid State declaration remains definition-level in ASM and IR, but each
+planned component instance receives one exact `StateInstanceSlotId` formed
+only from `(ComponentInstanceId, IrStorageId)`. The immutable
+`StateInstanceStorageRegistry` copies the canonical State value, type,
+serialization status, and provenance into instance order, with storage order
+inside each instance. Repeated component instances therefore share the same
+definition-level `IrStorageId` operand while owning distinct runtime slots.
+
+Component artifact v3 serializes the complete `state_slots` records on each
+instance. The former `instance_storage_prefix` is removed and is not an alias,
+derivation input, or fallback. The v4 template manifest carries the exact
+definition-level storage operand on action records; ordinary binding records
+already carry their canonical storage dependencies. Runtime execution combines
+those operands only with the compiler-emitted J1-P execution context and the
+serialized `(component instance, storage) -> StateInstanceSlotId` index.
+
+Cold boot registers and initializes each exact slot once. A duplicate,
+malformed, missing, stale, or cross-instance projection is fatal; the runtime
+does not repair it with a State name, component name, DOM relationship,
+registration order, or declaration-level storage key. The legacy manifest
+v3/component-artifact v2 cold pair remains accepted without any Phase J resume
+product, while a Phase J manifest v4 path rejects component artifact v2.
+
 ## Frozen schemas
 
 Phase H completes with these actual versions:

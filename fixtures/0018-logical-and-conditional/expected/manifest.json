@@ -1,7 +1,8 @@
 {
-  "schema_version": 1,
+  "schema_version": 4,
   "components": [
     {
+      "component_id": "module:fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx/component:x-logical-and-status",
       "name": "LogicalAndStatus",
       "template": {
         "nodes": [
@@ -33,9 +34,30 @@
         {
           "method": "toggle",
           "operation": "toggle",
-          "field": "enabled"
+          "field": "enabled",
+          "storage_id": "storage:module:fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx/component:x-logical-and-status/state:enabled"
         }
       ]
+    }
+  ],
+  "ordinary_targets": [
+    {
+      "id": "root:module:fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx/component:x-logical-and-status/template-target:module%3Afixtures%2F0018-logical-and-conditional%2Finput%2FLogicalAndStatus.tsx%2Fcomponent%3Ax-logical-and-status%2Ftemplate%3Arender%2Fconditional%3Aroot.0",
+      "component_instance_id": "root:module:fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx/component:x-logical-and-status",
+      "template_entity_id": "module:fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx/component:x-logical-and-status/template:render/conditional:root.0",
+      "kind": "conditional_boundary"
+    }
+  ],
+  "ordinary_bindings": [
+    {
+      "instance_binding_id": "root:module:fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx/component:x-logical-and-status/template-binding:module%3Afixtures%2F0018-logical-and-conditional%2Finput%2FLogicalAndStatus.tsx%2Fcomponent%3Ax-logical-and-status%2Ftemplate%3Arender%2Fconditional%3Aroot.0",
+      "component_instance_id": "root:module:fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx/component:x-logical-and-status",
+      "instance_target_id": "root:module:fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx/component:x-logical-and-status/template-target:module%3Afixtures%2F0018-logical-and-conditional%2Finput%2FLogicalAndStatus.tsx%2Fcomponent%3Ax-logical-and-status%2Ftemplate%3Arender%2Fconditional%3Aroot.0",
+      "declaration_binding_id": "module:fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx/component:x-logical-and-status/template:render/conditional:root.0",
+      "kind": "conditional",
+      "program_id": "module:fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx/component:x-logical-and-status/template:render/conditional:root.0",
+      "expression": "this.enabled",
+      "attribute_name": null
     }
   ]
 }

@@ -2,9 +2,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     build_computed_instance_slot_registry, build_ordinary_template_instance_registry,
-    build_runtime_component_registry, lower_components_to_ir, ApplicationSemanticModel,
+    build_runtime_component_registry, build_state_instance_storage_registry,
+    lower_components_to_ir, semantic_type_text, ApplicationSemanticModel,
     OptimizedComponentIrReport, OrdinaryTemplateBindingKind, OrdinaryTemplateTargetKind,
-    RuntimeComponentRegistry,
+    RuntimeComponentRegistry, SerializationCompatibility,
 };
 
 pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 3;
@@ -43,12 +44,21 @@ pub struct SerializedComponentInstance {
     pub ordinary_template_targets: Vec<String>,
     pub ordinary_template_bindings: Vec<String>,
     pub ordinary_template_events: Vec<String>,
-    pub storage_prefix: String,
+    pub state_slots: Vec<SerializedRuntimeStateSlot>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub computed_slots: Vec<SerializedRuntimeComputedSlot>,
     pub context_prefix: String,
     pub instruction_indices: Vec<usize>,
     pub structural_region: Option<String>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SerializedRuntimeStateSlot {
+    pub slot_id: String,
+    pub state_id: String,
+    pub storage_id: String,
+    pub initial_value: crate::SerializableValue,
+    pub semantic_type: String,
+    pub serializable: bool,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SerializedRuntimeComputedSlot {
@@ -157,8 +167,9 @@ pub fn build_runtime_component_artifact(
     optimized: &OptimizedComponentIrReport,
 ) -> RuntimeComponentArtifact {
     let ordinary = build_ordinary_template_instance_registry(model);
-    let computed_slots =
-        build_computed_instance_slot_registry(model, &lower_components_to_ir(model));
+    let ir = lower_components_to_ir(model);
+    let state_slots = build_state_instance_storage_registry(model, &ir);
+    let computed_slots = build_computed_instance_slot_registry(model, &ir);
     let mut artifact = artifact_from_registry(&build_runtime_component_registry(model, optimized));
     artifact.ordinary_template_targets = ordinary
         .targets
@@ -229,6 +240,19 @@ pub fn build_runtime_component_artifact(
             .filter(|event| event.component_instance_id == instance.instance)
             .map(|event| event.declaration_event_id.clone())
             .collect();
+        instance.state_slots = state_slots
+            .records
+            .iter()
+            .filter(|slot| slot.component_instance_id.to_string() == instance.instance)
+            .map(|slot| SerializedRuntimeStateSlot {
+                slot_id: slot.slot_id.to_string(),
+                state_id: slot.state_id.to_string(),
+                storage_id: slot.storage_id.to_string(),
+                initial_value: slot.initial_value.clone(),
+                semantic_type: semantic_type_text(&slot.semantic_type),
+                serializable: slot.serialization == SerializationCompatibility::Serializable,
+            })
+            .collect();
         instance.computed_slots = computed_slots
             .records
             .iter()
@@ -293,7 +317,7 @@ pub fn artifact_from_registry(registry: &RuntimeComponentRegistry) -> RuntimeCom
                 ordinary_template_targets: Vec::new(),
                 ordinary_template_bindings: Vec::new(),
                 ordinary_template_events: Vec::new(),
-                storage_prefix: r.instance_storage_prefix.clone(),
+                state_slots: Vec::new(),
                 computed_slots: Vec::new(),
                 context_prefix: r.instance_context_prefix.clone(),
                 instruction_indices: r.optimized_instruction_indices.clone(),
@@ -403,6 +427,8 @@ pub fn validate_runtime_component_artifact(
     let mut computed_cache_slots = std::collections::BTreeSet::new();
     let mut computed_dirty_slots = std::collections::BTreeSet::new();
     let mut computed_instance_pairs = std::collections::BTreeSet::new();
+    let mut state_slots = std::collections::BTreeSet::new();
+    let mut state_instance_pairs = std::collections::BTreeSet::new();
     if target_ids.len() != artifact.ordinary_template_targets.len()
         || binding_ids.len() != artifact.ordinary_template_bindings.len()
         || event_keys.len() != artifact.ordinary_template_events.len()
@@ -456,6 +482,13 @@ pub fn validate_runtime_component_artifact(
                         .filter(|event| event.component_instance_id == instance.instance)
                         .map(|event| event.declaration_event_id.clone())
                         .collect::<Vec<_>>()
+                || instance.state_slots.iter().any(|slot| {
+                    slot.slot_id != canonical_state_slot_text(&instance.instance, &slot.storage_id)
+                        || slot.storage_id != format!("storage:{}", slot.state_id)
+                        || !state_slots.insert(slot.slot_id.as_str())
+                        || !state_instance_pairs
+                            .insert((instance.instance.as_str(), slot.storage_id.as_str()))
+                })
                 || instance.computed_slots.iter().any(|slot| {
                     !slot
                         .cache_slot_id
@@ -500,6 +533,19 @@ pub fn validate_runtime_component_artifact(
         return Err("component artifact has invalid initialization ordering".to_string());
     }
     Ok(())
+}
+
+fn canonical_state_slot_text(instance: &str, storage: &str) -> String {
+    let encoded = storage.bytes().fold(String::new(), |mut encoded, byte| {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
+            encoded.push(char::from(byte));
+        } else {
+            use std::fmt::Write as _;
+            write!(encoded, "%{byte:02X}").expect("writing to a String cannot fail");
+        }
+        encoded
+    });
+    format!("{instance}/state-slot:{encoded}")
 }
 
 #[cfg(test)]
@@ -556,6 +602,33 @@ mod tests {
         let duplicate = artifact.instances[computed_instances[0]].computed_slots[0].clone();
         artifact.instances[computed_instances[1]].computed_slots[0].cache_slot_id =
             duplicate.cache_slot_id;
+        assert!(validate_runtime_component_artifact(&artifact).is_err());
+    }
+
+    #[test]
+    fn projects_and_validates_exact_state_slots_for_repeated_instances() {
+        let model = build_application_semantic_model(&ezc_parser::parse_file(
+            "src/RepeatedStateArtifact.tsx",
+            r#"@component("x-child") class Child { count = state(1); render() { return <span>{this.count}</span>; } }
+@component("x-parent") class Parent { render() { return <><Child /><Child /></>; } }"#,
+        ));
+        let mut artifact =
+            build_runtime_component_artifact(&model, &model.component_ir_optimization);
+        let state_instances = artifact
+            .instances
+            .iter()
+            .enumerate()
+            .filter(|(_, instance)| !instance.state_slots.is_empty())
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        assert_eq!(state_instances.len(), 2);
+        let first = &artifact.instances[state_instances[0]].state_slots[0];
+        let second = &artifact.instances[state_instances[1]].state_slots[0];
+        assert_eq!(first.storage_id, second.storage_id);
+        assert_ne!(first.slot_id, second.slot_id);
+        assert!(validate_runtime_component_artifact(&artifact).is_ok());
+
+        artifact.instances[state_instances[1]].state_slots[0].slot_id = first.slot_id.clone();
         assert!(validate_runtime_component_artifact(&artifact).is_err());
     }
 }

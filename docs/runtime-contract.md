@@ -2,6 +2,27 @@
 
 EdgeZero compiler output and the browser runtime communicate through the template manifest embedded in `#ez-template-manifest` and emitted as `template.manifest.json`.
 
+## J1-A State instance storage
+
+In the template-manifest-v4/component-artifact-v3 path, `storageValues` is
+keyed only by the exact compiler-emitted `StateInstanceSlotId`. Component
+artifact records provide both the complete slot ID and the closed
+`(component_instance_id, storage_id)` index. Runtime State programs retain
+definition-level `IrStorageId` operands, but every read or write resolves that
+operand under `RuntimeExecutionContext.component_instance_id` before touching
+the map.
+
+Cold boot initializes every serialized State slot exactly once. Actions,
+ordinary bindings, computed invalidation, Context/effect programs, Forms
+bridges, and later resume operations may not use State names, component names,
+DOM ancestry, map order, runtime counters, or declaration-level storage IDs as
+runtime keys. A missing, duplicate, malformed, stale, or cross-instance slot
+is a fatal artifact-integrity error.
+
+The manifest-v3/component-artifact-v2 pair remains a legacy cold-boot
+compatibility path only. Manifest v4 rejects component artifact v2, and no
+Phase J resume product may use that legacy pair.
+
 ## J1-C computed instance slots
 
 For the ordinary template manifest v4/component artifact v3 path, the browser
@@ -21,22 +42,22 @@ snapshot record, retained-slot classification, or lazy activation behavior.
 ## Versioning
 
 - `schema_version` is required at the manifest root.
-- The current template manifest schema is `2`.
-- Legacy template manifest schema `1` remains accepted only when the effect
-  artifact contains no completed-action activation plans.
+- The current template manifest schema is `4`.
+- The current component runtime artifact schema is `3`.
+- The exact Phase J cold runtime pair is template manifest v4/component
+  artifact v3.
+- Template manifest v3/component artifact v2 remains accepted only as the
+  legacy cold-boot pair without a Phase J resume product or snapshot.
 - The current browser runtime version is `0.0.0` and is exposed as `window.__EDGEZERO__.runtime_version`.
 - Runtime state also exposes `window.__EDGEZERO__.supported_schema_version`.
 
-The runtime rejects missing, future, or otherwise unsupported manifest
-versions. Schema `2` validates compiler-generated action-batch identities;
-legacy schema `1` cannot activate completed-action effects.
-
-Phase H also embeds and emits `component.runtime.json` schema `2`. The runtime
-requires that exact version and consumes only compiler-generated definition,
-instance, initialization-batch, Slot-binding, instance-Context, and structural
-region identities. It performs no tag lookup, Slot-name matching, parent or
-Provider search, component discovery, or virtual-DOM diffing. The complete
-frozen component boundary is documented in [Component contract](component-contract.md).
+The runtime rejects missing, future, mixed, or otherwise unsupported manifest
+and component-artifact versions. It consumes only compiler-generated
+definition, instance, State/computed slot, initialization-batch, Slot-binding,
+instance-Context, ordinary-template, and structural-region identities. It
+performs no tag lookup, Slot-name matching, parent or Provider search,
+component discovery, or virtual-DOM diffing. The complete frozen component
+boundary is documented in [Component contract](component-contract.md).
 
 ## Diagnostics
 

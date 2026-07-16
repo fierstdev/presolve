@@ -313,12 +313,26 @@ fn component_runtime_and_resume_fixtures_preserve_order_isolation_structure_and_
         ))
     );
     assert!(artifact.instances.len() >= 6);
-    let storage = artifact
+    let state_slots = artifact
         .instances
         .iter()
-        .map(|instance| instance.storage_prefix.as_str())
+        .flat_map(|instance| instance.state_slots.iter())
+        .map(|slot| slot.slot_id.as_str())
         .collect::<BTreeSet<_>>();
-    assert_eq!(storage.len(), artifact.instances.len());
+    assert_eq!(
+        state_slots.len(),
+        artifact
+            .instances
+            .iter()
+            .map(|instance| instance.state_slots.len())
+            .sum::<usize>()
+    );
+    assert!(artifact.instances.iter().all(|instance| {
+        instance.state_slots.iter().all(|slot| {
+            slot.slot_id
+                .starts_with(&format!("{}/state-slot:", instance.instance))
+        })
+    }));
     assert!(artifact.instances.iter().all(|instance| {
         instance.parent.as_ref().is_none_or(|parent| {
             artifact
@@ -530,18 +544,18 @@ fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
     let component_artifact =
         build_runtime_component_artifact(&model, &model.component_ir_optimization);
     assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 6);
-    assert_eq!(RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION, 2);
+    assert_eq!(RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION, 3);
     assert_eq!(RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, 2);
     assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 5);
-    assert_eq!(TEMPLATE_MANIFEST_SCHEMA_VERSION, 3);
-    assert_eq!(component_artifact.schema_version, 2);
+    assert_eq!(TEMPLATE_MANIFEST_SCHEMA_VERSION, 4);
+    assert_eq!(component_artifact.schema_version, 3);
     assert!(validate_runtime_component_artifact(&component_artifact).is_ok());
     assert_eq!(build_semantic_graph(&model).schema_version, 6);
     assert_eq!(
         build_resume_manifest(&build_resume_plan(&model)).schema_version,
         5
     );
-    assert_eq!(build_template_manifest_from_asm(&model).schema_version, 1);
+    assert_eq!(build_template_manifest_from_asm(&model).schema_version, 4);
 
     for (args, expected_status, expected_schema) in [
         (vec!["check", path, "--format", "json"], Some(1), 5),
@@ -559,7 +573,7 @@ fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
     }
 
     let runtime = generate_runtime_stub();
-    assert!(runtime.contains("SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2"));
+    assert!(runtime.contains("SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = 3"));
     assert!(!runtime.contains("__EZ_COMPONENT_SCHEMA_VERSION__"));
     for forbidden in [
         "resolveComponent",
@@ -583,12 +597,18 @@ fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
     assert!(runtime.contains("store.componentRegions = new Map"));
 
     let core = repo_root().join("crates/ezc_core/src");
-    for (needle, authority) in [
-        ("ComponentInstanceId::for_", "component_instance.rs"),
-        ("ComponentStructuralRegionId::for_", "component_instance.rs"),
-        ("SlotBindingId::for_instance", "slot_binding.rs"),
-        ("ProviderInstanceId::new", "instance_context.rs"),
-        ("ConsumerInstanceId::new", "instance_context.rs"),
+    for (needle, authorities) in [
+        (
+            "ComponentInstanceId::for_",
+            &["component_instance.rs", "resume_identity.rs"][..],
+        ),
+        (
+            "ComponentStructuralRegionId::for_",
+            &["component_instance.rs"][..],
+        ),
+        ("SlotBindingId::for_instance", &["slot_binding.rs"][..]),
+        ("ProviderInstanceId::new", &["instance_context.rs"][..]),
+        ("ConsumerInstanceId::new", &["instance_context.rs"][..]),
     ] {
         let owners = fs::read_dir(&core)
             .unwrap()
@@ -602,7 +622,14 @@ fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
             .filter(|entry| fs::read_to_string(entry.path()).unwrap().contains(needle))
             .map(|entry| entry.file_name().to_string_lossy().into_owned())
             .collect::<BTreeSet<_>>();
-        assert_eq!(owners, BTreeSet::from([authority.to_string()]), "{needle}");
+        assert_eq!(
+            owners,
+            authorities
+                .iter()
+                .map(|authority| (*authority).to_string())
+                .collect(),
+            "{needle}"
+        );
     }
 
     for file in [

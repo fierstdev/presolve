@@ -1,7 +1,8 @@
 {
-  "schema_version": 1,
+  "schema_version": 4,
   "components": [
     {
+      "component_id": "module:fixtures/0009-decrement-counter/input/DecrementCounter.tsx/component:x-decrement-counter",
       "name": "DecrementCounter",
       "template": {
         "nodes": [
@@ -29,9 +30,30 @@
         {
           "method": "decrement",
           "operation": "decrement",
-          "field": "count"
+          "field": "count",
+          "storage_id": "storage:module:fixtures/0009-decrement-counter/input/DecrementCounter.tsx/component:x-decrement-counter/state:count"
         }
       ]
+    }
+  ],
+  "ordinary_targets": [
+    {
+      "id": "root:module:fixtures/0009-decrement-counter/input/DecrementCounter.tsx/component:x-decrement-counter/template-target:module%3Afixtures%2F0009-decrement-counter%2Finput%2FDecrementCounter.tsx%2Fcomponent%3Ax-decrement-counter%2Ftemplate%3Arender%2Fbinding%3Aroot.1",
+      "component_instance_id": "root:module:fixtures/0009-decrement-counter/input/DecrementCounter.tsx/component:x-decrement-counter",
+      "template_entity_id": "module:fixtures/0009-decrement-counter/input/DecrementCounter.tsx/component:x-decrement-counter/template:render/binding:root.1",
+      "kind": "element"
+    }
+  ],
+  "ordinary_bindings": [
+    {
+      "instance_binding_id": "root:module:fixtures/0009-decrement-counter/input/DecrementCounter.tsx/component:x-decrement-counter/template-binding:module%3Afixtures%2F0009-decrement-counter%2Finput%2FDecrementCounter.tsx%2Fcomponent%3Ax-decrement-counter%2Ftemplate%3Arender%2Fbinding%3Aroot.1",
+      "component_instance_id": "root:module:fixtures/0009-decrement-counter/input/DecrementCounter.tsx/component:x-decrement-counter",
+      "instance_target_id": "root:module:fixtures/0009-decrement-counter/input/DecrementCounter.tsx/component:x-decrement-counter/template-target:module%3Afixtures%2F0009-decrement-counter%2Finput%2FDecrementCounter.tsx%2Fcomponent%3Ax-decrement-counter%2Ftemplate%3Arender%2Fbinding%3Aroot.1",
+      "declaration_binding_id": "module:fixtures/0009-decrement-counter/input/DecrementCounter.tsx/component:x-decrement-counter/template:render/binding:root.1",
+      "kind": "text",
+      "program_id": "module:fixtures/0009-decrement-counter/input/DecrementCounter.tsx/component:x-decrement-counter/template:render/binding:root.1",
+      "expression": "this.count",
+      "attribute_name": null
     }
   ]
 }

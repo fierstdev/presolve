@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::path::Path;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::instance_context::{ConsumerInstanceId, ProviderInstanceId};
 use crate::semantic_id::{
@@ -975,7 +975,7 @@ pub enum DeclaredStateTypeKind {
     Null,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SerializableValue {
     Null,

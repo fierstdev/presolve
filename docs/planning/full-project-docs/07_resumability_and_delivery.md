@@ -28,6 +28,22 @@ J1-A then uses the same execution context to qualify State storage. J2 alone
 classifies the already-existing State, computed-cache, and computed-dirty
 addresses for resumability.
 
+## Phase J prerequisite: instance-qualified State storage
+
+J1-A projects every executable `(ComponentInstanceId, IrStorageId)` pair into
+one typed `StateInstanceSlotId` and immutable registry record. Component
+artifact v3 serializes the complete slot, value, type, serialization, and
+ownership facts; the browser builds its closed lookup index only from those
+records. `storageValues` uses exact instance-slot keys in the Phase J path,
+while programs retain definition-level storage operands selected under the
+J1-P execution context.
+
+Cold boot initializes each exact slot once. Repeated instances do not share
+State, binding updates, or computed invalidation. Component artifact v2 remains
+accepted only with the legacy manifest-v3 cold path and no Phase J resume
+product. J1-A adds no liveness, retention, snapshot, restore, activation, or
+chunk policy; J2 classifies these now-canonical runtime addresses.
+
 ## Definition
 
 In EdgeZero, resumability means:

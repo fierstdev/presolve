@@ -97,6 +97,7 @@ pub mod semantic_type;
 pub mod slot;
 pub mod slot_binding;
 pub mod slot_content;
+pub mod state_instance_storage;
 pub mod summarize;
 pub mod symbol_table;
 pub mod template_graph;
@@ -374,6 +375,7 @@ pub use ordinary_template_instance::{
 };
 pub use ordinary_template_integrity::{
     ComputedInstanceSlotIntegrityCode, OrdinaryTemplateIntegrityCode,
+    StateInstanceStorageIntegrityCode,
 };
 pub use page_codegen::{
     generate_standalone_page, generate_standalone_page_with_component_runtime,
@@ -391,7 +393,8 @@ pub use resume_identity::{
     ResumeActivationRootKind, ResumeAnchorId, ResumeBoundaryId, ResumeBoundaryKind, ResumeBuildId,
     ResumeCaptureProgramId, ResumeChunkGroupId, ResumeChunkId, ResumeEventId,
     ResumeIdentityParseError, ResumeRestoreProgramId, ResumeSchemaId, ResumeSlotId,
-    ResumeSnapshotId, ResumeValueRecordId, TemplateInstanceBindingId, TemplateInstanceTargetId,
+    ResumeSnapshotId, ResumeValueRecordId, StateInstanceSlotId, TemplateInstanceBindingId,
+    TemplateInstanceTargetId,
 };
 pub use resume_manifest::{
     build_resume_manifest, resume_manifest_json, validate_resume_manifest, ResumeManifest,
@@ -506,6 +509,11 @@ pub use slot_content::{
     collect_slot_composition, SlotCompositionRegistry, SlotContentFragment,
     SlotContentFragmentStatus, SlotContentFragmentViolation, SlotOutlet, SlotOutletStatus,
     SlotOutletViolation,
+};
+pub use state_instance_storage::{
+    build_state_instance_storage_registry, validate_state_instance_storage_registry,
+    StateInstanceStorageRecord, StateInstanceStorageRegistry,
+    STATE_INSTANCE_STORAGE_REGISTRY_VERSION,
 };
 pub use summarize::summarize_source;
 pub use symbol_table::{
@@ -2914,6 +2922,7 @@ class Beta extends Component {
                 action_batch_id: None,
                 operation: ManifestOperation::Increment,
                 field: "count".to_string(),
+                storage_id: None,
                 operand: None,
             }]
         );
@@ -2947,6 +2956,7 @@ class Beta extends Component {
                 action_batch_id: None,
                 operation: ManifestOperation::Decrement,
                 field: "count".to_string(),
+                storage_id: None,
                 operand: None,
             }]
         );
@@ -2984,6 +2994,7 @@ class Beta extends Component {
                     action_batch_id: None,
                     operation: ManifestOperation::AddAssign,
                     field: "count".to_string(),
+                    storage_id: None,
                     operand: Some(SerializableValue::Number("2".to_string())),
                 },
                 ManifestAction {
@@ -2992,6 +3003,7 @@ class Beta extends Component {
                     action_batch_id: None,
                     operation: ManifestOperation::SubtractAssign,
                     field: "count".to_string(),
+                    storage_id: None,
                     operand: Some(SerializableValue::Number("3".to_string())),
                 }
             ]
@@ -3041,6 +3053,7 @@ class Beta extends Component {
                 action_batch_id: None,
                 operation: ManifestOperation::Assign,
                 field: "count".to_string(),
+                storage_id: None,
                 operand: Some(SerializableValue::Number("0".to_string())),
             }]
         );
@@ -3078,6 +3091,7 @@ class Beta extends Component {
                 action_batch_id: None,
                 operation: ManifestOperation::Toggle,
                 field: "enabled".to_string(),
+                storage_id: None,
                 operand: None,
             }]
         );
@@ -3118,6 +3132,7 @@ class Beta extends Component {
                     action_batch_id: None,
                     operation: ManifestOperation::AddAssign,
                     field: "count".to_string(),
+                    storage_id: None,
                     operand: Some(SerializableValue::Number("2".to_string())),
                 },
                 ManifestAction {
@@ -3126,6 +3141,7 @@ class Beta extends Component {
                     action_batch_id: None,
                     operation: ManifestOperation::Decrement,
                     field: "count".to_string(),
+                    storage_id: None,
                     operand: None,
                 },
                 ManifestAction {
@@ -3134,6 +3150,7 @@ class Beta extends Component {
                     action_batch_id: None,
                     operation: ManifestOperation::Assign,
                     field: "count".to_string(),
+                    storage_id: None,
                     operand: Some(SerializableValue::Number("8".to_string())),
                 },
                 ManifestAction {
@@ -3142,6 +3159,7 @@ class Beta extends Component {
                     action_batch_id: None,
                     operation: ManifestOperation::Increment,
                     field: "count".to_string(),
+                    storage_id: None,
                     operand: None,
                 },
                 ManifestAction {
@@ -3150,6 +3168,7 @@ class Beta extends Component {
                     action_batch_id: None,
                     operation: ManifestOperation::Toggle,
                     field: "enabled".to_string(),
+                    storage_id: None,
                     operand: None,
                 }
             ]

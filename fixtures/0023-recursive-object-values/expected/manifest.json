@@ -1,7 +1,8 @@
 {
-  "schema_version": 1,
+  "schema_version": 4,
   "components": [
     {
+      "component_id": "module:fixtures/0023-recursive-object-values/input/RecursiveObjectValues.tsx/component:x-recursive-object-values",
       "name": "RecursiveObjectValues",
       "template": {
         "nodes": [
@@ -52,6 +53,7 @@
           "method": "replace",
           "operation": "assign",
           "field": "profile",
+          "storage_id": "storage:module:fixtures/0023-recursive-object-values/input/RecursiveObjectValues.tsx/component:x-recursive-object-values/state:profile",
           "operand": {
             "name": "South",
             "settings": {
@@ -63,6 +65,26 @@
           }
         }
       ]
+    }
+  ],
+  "ordinary_targets": [
+    {
+      "id": "root:module:fixtures/0023-recursive-object-values/input/RecursiveObjectValues.tsx/component:x-recursive-object-values/template-target:module%3Afixtures%2F0023-recursive-object-values%2Finput%2FRecursiveObjectValues.tsx%2Fcomponent%3Ax-recursive-object-values%2Ftemplate%3Arender%2Fbinding%3Aroot.1.0",
+      "component_instance_id": "root:module:fixtures/0023-recursive-object-values/input/RecursiveObjectValues.tsx/component:x-recursive-object-values",
+      "template_entity_id": "module:fixtures/0023-recursive-object-values/input/RecursiveObjectValues.tsx/component:x-recursive-object-values/template:render/binding:root.1.0",
+      "kind": "element"
+    }
+  ],
+  "ordinary_bindings": [
+    {
+      "instance_binding_id": "root:module:fixtures/0023-recursive-object-values/input/RecursiveObjectValues.tsx/component:x-recursive-object-values/template-binding:module%3Afixtures%2F0023-recursive-object-values%2Finput%2FRecursiveObjectValues.tsx%2Fcomponent%3Ax-recursive-object-values%2Ftemplate%3Arender%2Fbinding%3Aroot.1.0",
+      "component_instance_id": "root:module:fixtures/0023-recursive-object-values/input/RecursiveObjectValues.tsx/component:x-recursive-object-values",
+      "instance_target_id": "root:module:fixtures/0023-recursive-object-values/input/RecursiveObjectValues.tsx/component:x-recursive-object-values/template-target:module%3Afixtures%2F0023-recursive-object-values%2Finput%2FRecursiveObjectValues.tsx%2Fcomponent%3Ax-recursive-object-values%2Ftemplate%3Arender%2Fbinding%3Aroot.1.0",
+      "declaration_binding_id": "module:fixtures/0023-recursive-object-values/input/RecursiveObjectValues.tsx/component:x-recursive-object-values/template:render/binding:root.1.0",
+      "kind": "text",
+      "program_id": "module:fixtures/0023-recursive-object-values/input/RecursiveObjectValues.tsx/component:x-recursive-object-values/template:render/binding:root.1.0",
+      "expression": "this.profile",
+      "attribute_name": null
     }
   ]
 }

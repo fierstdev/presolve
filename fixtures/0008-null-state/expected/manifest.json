@@ -1,7 +1,8 @@
 {
-  "schema_version": 1,
+  "schema_version": 4,
   "components": [
     {
+      "component_id": "module:fixtures/0008-null-state/input/NullSelection.tsx/component:x-null-selection",
       "name": "NullSelection",
       "template": {
         "nodes": [
@@ -20,6 +21,26 @@
         "events": []
       },
       "actions": []
+    }
+  ],
+  "ordinary_targets": [
+    {
+      "id": "root:module:fixtures/0008-null-state/input/NullSelection.tsx/component:x-null-selection/template-target:module%3Afixtures%2F0008-null-state%2Finput%2FNullSelection.tsx%2Fcomponent%3Ax-null-selection%2Ftemplate%3Arender%2Fbinding%3Aroot.1",
+      "component_instance_id": "root:module:fixtures/0008-null-state/input/NullSelection.tsx/component:x-null-selection",
+      "template_entity_id": "module:fixtures/0008-null-state/input/NullSelection.tsx/component:x-null-selection/template:render/binding:root.1",
+      "kind": "element"
+    }
+  ],
+  "ordinary_bindings": [
+    {
+      "instance_binding_id": "root:module:fixtures/0008-null-state/input/NullSelection.tsx/component:x-null-selection/template-binding:module%3Afixtures%2F0008-null-state%2Finput%2FNullSelection.tsx%2Fcomponent%3Ax-null-selection%2Ftemplate%3Arender%2Fbinding%3Aroot.1",
+      "component_instance_id": "root:module:fixtures/0008-null-state/input/NullSelection.tsx/component:x-null-selection",
+      "instance_target_id": "root:module:fixtures/0008-null-state/input/NullSelection.tsx/component:x-null-selection/template-target:module%3Afixtures%2F0008-null-state%2Finput%2FNullSelection.tsx%2Fcomponent%3Ax-null-selection%2Ftemplate%3Arender%2Fbinding%3Aroot.1",
+      "declaration_binding_id": "module:fixtures/0008-null-state/input/NullSelection.tsx/component:x-null-selection/template:render/binding:root.1",
+      "kind": "text",
+      "program_id": "module:fixtures/0008-null-state/input/NullSelection.tsx/component:x-null-selection/template:render/binding:root.1",
+      "expression": "this.selection",
+      "attribute_name": null
     }
   ]
 }

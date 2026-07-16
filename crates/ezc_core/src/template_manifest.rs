@@ -8,7 +8,9 @@ use crate::template_graph::{
     AttributeValue, ConditionalNode, ElementNode, FragmentNode, ListNode, TemplateChild,
     TemplateGraph, TemplateNode,
 };
-use crate::{ApplicationSemanticModel, OrdinaryTemplateBindingKind, OrdinaryTemplateTargetKind};
+use crate::{
+    ApplicationSemanticModel, IrStorageId, OrdinaryTemplateBindingKind, OrdinaryTemplateTargetKind,
+};
 
 pub const TEMPLATE_MANIFEST_SCHEMA_VERSION: u32 = 4;
 const LEGACY_TEMPLATE_MANIFEST_SCHEMA_VERSION: u32 = 1;
@@ -206,6 +208,8 @@ pub struct ManifestAction {
     pub operation: ManifestOperation,
     pub field: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub storage_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub operand: Option<SerializableValue>,
 }
 
@@ -278,6 +282,7 @@ pub fn build_template_manifest_from_asm(model: &ApplicationSemanticModel) -> Tem
                     .find(|component| component.class_name == template.component_name)?;
                 let mut manifest = manifest_component_for(component, template);
                 apply_action_bindings(&mut manifest, &action_bindings(model, component));
+                apply_action_storage_ids(&mut manifest, component);
                 Some(manifest)
             })
             .collect(),
@@ -671,6 +676,16 @@ fn apply_action_bindings(
     }
 }
 
+fn apply_action_storage_ids(manifest: &mut ManifestComponent, component: &ComponentNode) {
+    for action in &mut manifest.actions {
+        action.storage_id = component
+            .state_fields
+            .iter()
+            .find(|state| state.name == action.field)
+            .map(|state| IrStorageId::for_semantic_origin(&state.id).to_string());
+    }
+}
+
 fn collect_fragment(
     fragment: &FragmentNode,
     nodes: &mut Vec<ManifestNode>,
@@ -691,6 +706,7 @@ fn manifest_actions(component: &ComponentNode) -> Vec<ManifestAction> {
             action_batch_id: None,
             operation: manifest_operation(&action.operation),
             field: action.field.clone(),
+            storage_id: None,
             operand: manifest_operand(&action.operation),
         })
         .collect()
@@ -863,9 +879,12 @@ class TemplateActionBatch extends Component {
         assert_eq!(event.method_id.as_deref(), Some(method.as_str()));
         assert_eq!(event.action_batch_id.as_deref(), Some(batch.id.as_str()));
         assert_eq!(component_manifest.actions.len(), 2);
+        let storage_id =
+            crate::IrStorageId::for_semantic_origin(&component.id.state_field("count")).to_string();
         assert!(component_manifest.actions.iter().all(|action| {
             action.method_id.as_deref() == Some(method.as_str())
                 && action.action_batch_id.as_deref() == Some(batch.id.as_str())
+                && action.storage_id.as_deref() == Some(storage_id.as_str())
         }));
     }
 

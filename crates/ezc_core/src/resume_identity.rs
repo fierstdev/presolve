@@ -8,7 +8,7 @@ use std::str::FromStr;
 
 use crate::{
     ComponentInstanceId, ComponentRootId, ComponentStructuralRegionId, ComputedCacheSlotId,
-    ComputedDirtyFlagId, FormInstanceId, SemanticId,
+    ComputedDirtyFlagId, FormInstanceId, IrStorageId, SemanticId,
 };
 
 macro_rules! resume_id {
@@ -275,6 +275,48 @@ impl fmt::Display for ComputedInstanceDirtySlotId {
     }
 }
 
+/// Exact runtime State address for one declaration-level IR storage in one
+/// compiler-planned component instance.
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct StateInstanceSlotId {
+    component_instance_id: ComponentInstanceId,
+    storage_id: IrStorageId,
+}
+
+impl StateInstanceSlotId {
+    #[must_use]
+    pub fn for_component_instance_storage(
+        component_instance_id: ComponentInstanceId,
+        storage_id: IrStorageId,
+    ) -> Self {
+        Self {
+            component_instance_id,
+            storage_id,
+        }
+    }
+
+    #[must_use]
+    pub const fn component_instance_id(&self) -> &ComponentInstanceId {
+        &self.component_instance_id
+    }
+
+    #[must_use]
+    pub const fn storage_id(&self) -> &IrStorageId {
+        &self.storage_id
+    }
+}
+
+impl fmt::Display for StateInstanceSlotId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "{}/state-slot:{}",
+            self.component_instance_id,
+            percent_encode(self.storage_id.as_str())
+        )
+    }
+}
+
 impl ResumeBoundaryId {
     #[must_use]
     pub fn application_root(root: &ComponentRootId) -> Self {
@@ -417,7 +459,6 @@ fn canonical_hash(value: &str) -> u64 {
             (hash ^ u64::from(*byte)).wrapping_mul(0x0000_0100_0000_01b3)
         })
 }
-
 fn percent_encode(value: &str) -> String {
     value.bytes().fold(String::new(), |mut encoded, byte| {
         if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
@@ -489,5 +530,20 @@ mod tests {
             ResumeChunkGroupId::for_ordered_chunks(&[chunk])
         );
         assert!("".parse::<ResumeBuildId>().is_err());
+    }
+
+    #[test]
+    fn j1a_state_slot_identity_preserves_the_exact_typed_pair() {
+        let component = SemanticId::component(Some("x-state"), "State");
+        let instance = ComponentInstanceId::for_root(&ComponentRootId::for_component(&component));
+        let storage = IrStorageId::for_semantic_origin(&component.state_field("count/value"));
+        let slot =
+            StateInstanceSlotId::for_component_instance_storage(instance.clone(), storage.clone());
+        assert_eq!(slot.component_instance_id(), &instance);
+        assert_eq!(slot.storage_id(), &storage);
+        assert_eq!(
+            slot.to_string(),
+            format!("{instance}/state-slot:storage%3Acomponent%3Ax-state%2Fstate%3Acount%2Fvalue")
+        );
     }
 }

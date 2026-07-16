@@ -4029,7 +4029,8 @@ fn build_command_writes_page_manifest_and_runtime_artifacts() {
     assert!(actual_html.contains("<title>NestedCounter</title>"));
     assert!(actual_html.contains("<section data-ez-node=\"n0\">"));
     assert!(actual_html.contains("<button data-ez-node=\"n1\""));
-    assert!(actual_html.contains("<!-- ez-binding:n2:this.count -->"));
+    assert!(actual_html.contains("<!--ez-ti-binding-start:"));
+    assert!(actual_html.contains("<!--ez-ti-binding-end:"));
     assert!(actual_html.contains("id=\"ez-template-manifest\""));
     assert!(actual_html.contains("\"name\": \"NestedCounter\""));
     assert!(actual_html.contains("<script src=\"./runtime.js\" defer></script>"));
@@ -4046,7 +4047,7 @@ fn build_command_writes_page_manifest_and_runtime_artifacts() {
         std::fs::read_to_string(out_dir.join("runtime.js")).expect("failed to read built runtime");
 
     assert!(actual_runtime.contains("ez-template-manifest"));
-    assert!(actual_runtime.contains("SUPPORTED_SCHEMA_VERSION = 3"));
+    assert!(actual_runtime.contains("SUPPORTED_SCHEMA_VERSION = 4"));
     assert!(actual_runtime.contains("RUNTIME_VERSION = \"0.0.0\""));
     assert!(actual_runtime.contains("validateManifestSchema"));
     assert!(actual_runtime.contains("EZR_UNSUPPORTED_SCHEMA"));
@@ -4178,7 +4179,7 @@ class FormArtifact {
     let manifest = std::fs::read_to_string(out_dir.join("template.manifest.json"))
         .expect("failed to read template manifest");
     let manifest: serde_json::Value = serde_json::from_str(&manifest).expect("manifest JSON");
-    assert_eq!(manifest["schema_version"], 3);
+    assert_eq!(manifest["schema_version"], 4);
     assert_eq!(manifest["form_bindings"].as_array().map(Vec::len), Some(1));
     assert_eq!(manifest["form_hosts"].as_array().map(Vec::len), Some(1));
 
@@ -4317,7 +4318,7 @@ fn build_command_writes_compiler_generated_effect_runtime_metadata() {
     let manifest = std::fs::read_to_string(out_dir.join("template.manifest.json"))
         .expect("failed to read generated template manifest");
     let manifest: serde_json::Value = serde_json::from_str(&manifest).expect("manifest JSON");
-    assert_eq!(manifest["schema_version"], 2);
+    assert_eq!(manifest["schema_version"], 4);
     assert_eq!(
         manifest["components"][0]["template"]["events"][0]["kind"],
         "action"

@@ -37,7 +37,6 @@ pub struct RuntimeComponentInstanceRecord {
     pub parent: Option<ComponentInstanceId>,
     pub depth: usize,
     pub initialization_batch: usize,
-    pub instance_storage_prefix: String,
     pub instance_cache_prefix: String,
     pub instance_context_prefix: String,
     pub optimized_instruction_indices: Vec<usize>,
@@ -199,7 +198,6 @@ fn instance_record(
         parent: instance.parent_instance.clone(),
         depth: instance.depth,
         initialization_batch,
-        instance_storage_prefix: format!("component-storage:{}", instance.id),
         instance_cache_prefix: format!("component-cache:{}", instance.id),
         instance_context_prefix: format!("component-context:{}", instance.id),
         optimized_instruction_indices: optimized

@@ -76,9 +76,41 @@ impl ComputedInstanceSlotIntegrityCode {
     }
 }
 
+/// J1-A consumes the next reserved integrity codes before J2 liveness.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StateInstanceStorageIntegrityCode {
+    MissingProjection,
+    DuplicateSlot,
+    ConstructorMismatch,
+    OwnershipMismatch,
+    StaleRegistry,
+    ArtifactProjectionDrift,
+    DeclarationRuntimeKey,
+    UnknownResumeSlot,
+}
+
+impl StateInstanceStorageIntegrityCode {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::MissingProjection => "EZASM1312",
+            Self::DuplicateSlot => "EZASM1313",
+            Self::ConstructorMismatch => "EZASM1314",
+            Self::OwnershipMismatch => "EZASM1315",
+            Self::StaleRegistry => "EZASM1316",
+            Self::ArtifactProjectionDrift => "EZASM1317",
+            Self::DeclarationRuntimeKey => "EZASM1318",
+            Self::UnknownResumeSlot => "EZASM1319",
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{ComputedInstanceSlotIntegrityCode, OrdinaryTemplateIntegrityCode};
+    use super::{
+        ComputedInstanceSlotIntegrityCode, OrdinaryTemplateIntegrityCode,
+        StateInstanceStorageIntegrityCode,
+    };
 
     #[test]
     fn reserves_j1p_codes_before_j2_in_amendment_order() {
@@ -117,5 +149,21 @@ mod tests {
         ];
         assert_eq!(codes.first().map(|code| code.as_str()), Some("EZASM1305"));
         assert_eq!(codes.last().map(|code| code.as_str()), Some("EZASM1311"));
+    }
+
+    #[test]
+    fn reserves_j1a_codes_before_j2_in_amendment_order() {
+        let codes = [
+            StateInstanceStorageIntegrityCode::MissingProjection,
+            StateInstanceStorageIntegrityCode::DuplicateSlot,
+            StateInstanceStorageIntegrityCode::ConstructorMismatch,
+            StateInstanceStorageIntegrityCode::OwnershipMismatch,
+            StateInstanceStorageIntegrityCode::StaleRegistry,
+            StateInstanceStorageIntegrityCode::ArtifactProjectionDrift,
+            StateInstanceStorageIntegrityCode::DeclarationRuntimeKey,
+            StateInstanceStorageIntegrityCode::UnknownResumeSlot,
+        ];
+        assert_eq!(codes.first().map(|code| code.as_str()), Some("EZASM1312"));
+        assert_eq!(codes.last().map(|code| code.as_str()), Some("EZASM1319"));
     }
 }

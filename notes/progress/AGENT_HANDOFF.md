@@ -3,25 +3,28 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: J1-C - Instance-Qualified Computed Runtime Slots
-* Working tree: clean after J1-C commit `d2e9534`; J1-A is blocked pending its complete authored State-slot contract.
+* Latest completed slice: J1-A - Instance-Qualified State Storage
+* Working tree: ready for the atomic J1-A commit; the next authored slice is J2 resumability liveness.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: J1-C - Instance-Qualified Computed Runtime Slots
-* Summary: E12 declaration cache/dirty records now project into exact per-instance runtime slots in component artifact v3 and the v4/v3 cold runtime selects them only through `RuntimeExecutionContext`.
-* Key files: `computed_instance_slots.rs`, `resume_identity.rs`, `runtime_component_artifact.rs`, `runtime_codegen.rs`, `runtime_browser.rs`
-* Boundary: no State slots, retention, snapshots, restoration, liveness, lazy activation, or J10 markers.
+* Slice: J1-A - Instance-Qualified State Storage
+* Summary: every executable `(ComponentInstanceId, IrStorageId)` pair now owns one canonical `StateInstanceSlotId`; component artifact v3 serializes the exact slots and the v4/v3 runtime uses only those keys for cold initialization, action writes, bindings, and computed invalidation.
+* Key files: `state_instance_storage.rs`, `resume_identity.rs`, `runtime_component_artifact.rs`, `runtime_codegen.rs`, `template_manifest.rs`, `runtime_browser.rs`
+* Boundary: no retention classification, snapshot, restoration, liveness, lazy activation, chunking, or J10 markers.
 
 Current in-progress slice
 
-* Slice: J1-A - State-instance storage
-* Status: Blocked pending a complete authored contract. The available roadmap prose authorizes qualifying State storage through J1-P's `RuntimeExecutionContext`, but omits the exact State slot constructor, artifact fields, runtime map rules, and required action-isolation proof. Those details cannot be inferred.
+* Slice: J2 - Resumability Liveness and Retained Slots
+* Status: Ready. The authoritative Phase J roadmap now has canonical instance-qualified State, computed-cache, and computed-dirty addresses to classify.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase I: none. Next after supplying the J1-A contract: State-instance storage using the J1-P `RuntimeExecutionContext` and J1-C computed slots.
+* Remaining in Phase I: none. Next: J2 `ResumeLivenessPlan`, retained/recomputable/excluded/blocked classification, integrity validation, focused proofs, progress update, and atomic commit.
 
 Verification
+
+* J1-A verification: `just check` passes formatting, strict workspace clippy, 2 CLI units, 7 Component fixtures, 12 Context fixtures, 128 CLI inspection/build tests, 29 sequential real-browser probes, 364 core tests, 13 parser units, and 26 parser integrations. Focused browser proofs cover repeated State cold initialization, A-only action/binding updates, computed invalidation isolation, exact State-slot-only runtime keys, malformed/missing projection failure, Phase J component-v2 rejection, and retained legacy v2 cold compatibility.
+* J1-A fixture repair: all template-manifest goldens now match the already-authorized v4 ordinary-instance contract, including canonical action `storage_id` operands; stale Phase G/H schema assertions now acknowledge template v4/component artifact v3.
 
 * J1-C verification: `cargo test -p ezc_core --lib` (359), `cargo clippy -p ezc_core --all-targets -- -D warnings`, `cargo fmt --all --check`, `git diff --check`, and `cargo test -p ezc_cli --test runtime_browser` (27 real-browser probes) all pass. The component-runtime watchdog was a harness pipe backpressure failure, not a runtime-readiness regression: Chrome filled the piped DOM output while the runner waited to read it. The harness now drains both streams concurrently; the probe keeps its 20-second watchdog, removes parsed JSON metadata before DOM dumping, and reports terminal runtime errors immediately.
 
@@ -144,10 +147,9 @@ Architecture decisions made
 * Reason: Later Phase J validators and the J19 projector need monotonic, non-overlapping diagnostic space without prematurely creating identities, schemas, manifests, snapshots, chunks, or runtime behavior.
 * Tradeoff: The reservations are inert metadata and a freeze test only; diagnostics remain unprojected until J19.
 
-* Resolved prior blocker: the supplied State-storage amendment authorizes `StateInstanceSlotId`, its registry, and component artifact v3. It does not, however, define an exact bridge from ordinary DOM event/binding targets to `ComponentInstanceId`.
-* Blocker: J1-A mandatory action isolation requires execution context A/B, but normal `ManifestEvent`/binding products are declaration-level. The only existing instance-qualified template bridge is Forms-specific.
-* Why alternatives are invalid: attaching an event to an instance by DOM ancestry, component name, node order, or runtime ordinal is forbidden discovery; selecting a component instance by map order is invented semantics; broadening the Forms bridge is unrelated language/runtime behavior; starting J10 anchor work early would merge slices and change the frozen template-manifest v3 contract.
-* Required authority: an authored normal-template event/binding-to-`ComponentInstanceId` mapping, including exact compiler product, artifact/template projection, DOM marker policy, and runtime execution-context contract. J1-A and all later Phase J execution products remain unstarted.
+* Decision: J1-A owns the sole `StateInstanceSlotId` constructor from the exact typed pair `(ComponentInstanceId, IrStorageId)` and the immutable registry ordered by canonical instance then storage.
+* Reason: declaration-level IR storage remains the correct program operand, but repeated component executions require exact mutable addresses before J2 can classify retained values.
+* Tradeoff: component artifact v3 removes `instance_storage_prefix`; manifest v4 actions carry a canonical storage operand; the browser builds the closed pair-to-slot index only from serialized records. Manifest v3/component artifact v2 remains a cold-only legacy pair and cannot participate in Phase J resume products.
 
 * Decision: I7 creates one declaration-level `ValidationPlanId::for_form(FormId)` for every valid Form, including empty Forms, and one `FieldDependencyId::for_rule_and_source(ValidationRuleId, FieldId)` for each eligible I6 direct dependency edge.
 * Reason: Form plans and dependency records need stable typed names independent of Rule counts, source order, Component instances, runtime registration, or DOM identity; future runtime planning can refer to a complete Form plan without using absence as policy.
