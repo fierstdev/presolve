@@ -32,7 +32,7 @@ use ezc_parser::{
 use serde::Serialize;
 
 const ASM_INSPECTION_SCHEMA_VERSION: u32 = 9;
-const CHECK_JSON_SCHEMA_VERSION: u32 = 4;
+const CHECK_JSON_SCHEMA_VERSION: u32 = 5;
 
 fn main() {
     let mut args = env::args().skip(1).collect::<Vec<_>>();

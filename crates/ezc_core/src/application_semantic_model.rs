@@ -1755,6 +1755,9 @@ pub fn build_application_semantic_model_from_component_graph(
     model
         .diagnostics
         .extend(crate::collect_context_diagnostics(&model));
+    model
+        .diagnostics
+        .extend(crate::collect_form_diagnostics(&model));
     model.component_ir = lower_component_ir(&model);
     model.component_ir_optimization = optimize_component_ir(&model.component_ir);
     model
@@ -2232,6 +2235,9 @@ fn build_application_semantic_model_from_files_with_bindings(
     model
         .diagnostics
         .extend(crate::collect_context_diagnostics(&model));
+    model
+        .diagnostics
+        .extend(crate::collect_form_diagnostics(&model));
     model.component_ir = lower_component_ir(&model);
     model.component_ir_optimization = optimize_component_ir(&model.component_ir);
     model

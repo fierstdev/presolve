@@ -258,7 +258,9 @@ pub use form_binding::{
     FormFieldBindingEvidence, FormFieldBindingEvidenceKind, FormFieldBindingExpressionFact,
     FormFieldBindingProducts, FormFieldBindingViolation, FormInputKind,
 };
-pub use form_diagnostics::{FormDiagnosticReservation, FORM_DIAGNOSTIC_RESERVATIONS};
+pub use form_diagnostics::{
+    collect_form_diagnostics, FormDiagnosticReservation, FORM_DIAGNOSTIC_RESERVATIONS,
+};
 pub use form_field::{collect_form_field_products, FormFieldEntity, FormFieldProducts};
 pub use form_inspection::{build_form_inspection_registry, FormInspection, FormInspectionRegistry};
 pub use form_ir::{

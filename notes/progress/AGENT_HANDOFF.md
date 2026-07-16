@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: I17 - Forms Inspection
-* Working tree: I17 is verified; commit pending.
+* Latest completed slice: I18 - Forms Diagnostics
+* Working tree: I18 is verified; commit pending.
 * Date: 2026-07-15
 
 Last completed slice
 
-* Slice: I17 - Forms Inspection
-* Summary: A single core-owned Forms inspection registry now projects Form, Field, FieldBinding, and ValidationRule records into full ASM, selected ASM, entity-mode explain, and the semantic graph. Form records include declaration ownership/order, binding channels, validation dependencies, tracking/submission/serialization/reset products, instance-qualified slots/programs, runtime/artifact/resume membership, and blocked reasons; Field records add canonical type, initial value, per-field tracking, and dependencies.
-* Key files: crates/ezc_core/src/form_inspection.rs, crates/ezc_core/src/semantic_graph.rs, crates/ezc_cli/src/main.rs, crates/ezc_cli/tests/explain.rs
-* Schema decision: semantic graph v6 adds first-class Forms nodes plus typed ownership/reference edges; ASM inspection v9 adds the shared `form` projection. Check JSON remains v4; template manifest remains v3; Forms artifact remains v1; resume manifest remains v5.
+* Slice: I18 - Forms Diagnostics
+* Summary: The reserved EZC1084–EZC1095 families now project exclusively from retained Forms candidates, validation graphs, submission/serialization/reset products, bindings, and host-demand facts. The projector neither reparses source nor uses runtime evidence, and preserves candidate identities where no valid semantic identity exists.
+* Key files: crates/ezc_core/src/form_diagnostics.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_cli/src/main.rs
+* Schema decision: check JSON v5 carries the shared diagnostic envelope. Semantic graph remains v6; ASM inspection remains v9; template manifest remains v3; Forms artifact remains v1; resume manifest remains v5.
 
 Current in-progress slice
 
-* Slice: I17 - Forms Inspection
-* Status: complete through I17. Proceed to I18 only under its authoritative contract.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I17
-* Remaining in Phase I: I18 through I20.
+* Slice: I18 - Forms Diagnostics
+* Status: complete through I18. Proceed to I19 only under its authoritative contract.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I18
+* Remaining in Phase I: I19 through I20.
 
 Verification
 

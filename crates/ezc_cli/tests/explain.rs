@@ -1542,7 +1542,7 @@ fn check_command_emits_json_diagnostics() {
         .output().expect("failed to run ezc_cli check");
     assert!(!output.status.success());
     let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("check JSON");
-    assert_eq!(document["schema_version"], 4);
+    assert_eq!(document["schema_version"], 5);
     assert_eq!(
         document["compiler_diagnostics"].as_array().map(Vec::len),
         Some(7)
@@ -1674,7 +1674,7 @@ fn context_diagnostics_share_check_full_asm_selected_asm_and_explain_projection(
     let check_output = run(&["check", path, "--format", "json"]);
     assert!(!check_output.status.success());
     let check = parse(&check_output);
-    assert_eq!(check["schema_version"], 4);
+    assert_eq!(check["schema_version"], 5);
     let expected = normalize(&check["compiler_diagnostics"]);
     assert_eq!(
         expected
@@ -1755,7 +1755,7 @@ fn component_diagnostics_share_check_full_asm_selected_asm_and_explain_projectio
     let check_output = run(&["check", relative, "--format", "json"]);
     assert!(!check_output.status.success());
     let check = parse(&check_output);
-    assert_eq!(check["schema_version"], 4);
+    assert_eq!(check["schema_version"], 5);
     let expected = normalize(&check["compiler_diagnostics"]);
     assert_eq!(
         expected
