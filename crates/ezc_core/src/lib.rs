@@ -70,6 +70,7 @@ pub mod ordinary_template_instance;
 pub mod ordinary_template_integrity;
 pub mod page_codegen;
 pub mod provider;
+pub mod resume_activation;
 pub mod resume_boot;
 pub mod resume_boundary;
 pub mod resume_diagnostics;
@@ -386,6 +387,12 @@ pub use page_codegen::{
     generate_standalone_page_with_effect_runtime,
 };
 pub use provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
+pub use resume_activation::{
+    build_resume_activation_plan, validate_resume_activation_plan, ResumeActivationBlock,
+    ResumeActivationBlockReason, ResumeActivationIntegrityCode,
+    ResumeActivationIntegrityDiagnostic, ResumeActivationPlan, ResumeActivationPolicy,
+    ResumeActivationPolicyDecision, ResumeActivationPrerequisite, RESUME_ACTIVATION_PLAN_VERSION,
+};
 pub use resume_boundary::{
     build_resume_boundary_graph, validate_resume_boundary_graph, ResumeBoundary,
     ResumeBoundaryActivationIdentity, ResumeBoundaryActivationProgram,

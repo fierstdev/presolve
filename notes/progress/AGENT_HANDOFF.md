@@ -3,25 +3,27 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: J3 - Resume Boundary Graph
-* Working tree: ready for the atomic J3 commit; the next authored slice is J4 activation policy planning.
+* Latest completed slice: J4 - Activation Policy Planning
+* Working tree: ready for the atomic J4 commit; the next authored slice is J5 deterministic interaction chunk graph.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: J3 - Resume Boundary Graph
-* Summary: `ResumeBoundaryGraph` creates distinct application-root, planned/structural-template Component, structural-region, Form, ordinary-event Interaction, and enhanced Form-submit Interaction boundaries from exact Phase H/I/J2 products. Ownership parentage and activation references remain separate.
-* Key files: `resume_boundary.rs`, `lib.rs`, `07_resumability_and_delivery.md`
-* Boundary: no activation policy, anchor, event serialization, snapshot, capture/restore program, lazy loader, chunk, or runtime resume behavior.
+* Slice: J4 - Activation Policy Planning
+* Summary: every J3 boundary receives exactly one Eager/Interaction/None decision or explicit block from canonical prerequisites; Visible and Manual remain empty because no earlier frozen authority exists.
+* Key files: `resume_activation.rs`, `lib.rs`, `07_resumability_and_delivery.md`
+* Boundary: no chunk, anchor, event serialization, snapshot, capture/restore program, loader, or runtime resume behavior.
 
 Current in-progress slice
 
-* Slice: J4 - Activation Policy Planning
-* Status: Ready after the atomic J3 commit. The authoritative roadmap supplies the closed precedence and forbids heuristic Visible/Manual policy.
+* Slice: J5 - Deterministic Interaction Chunk Graph
+* Status: Ready after the atomic J4 commit.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase I: none. Next: J4 policy decisions/prerequisites/blocks, deterministic validation, focused proofs, progress update, and atomic commit.
+* Remaining in Phase I: none. Next: J5 exact eager/interaction chunk roots and canonical program closures.
 
 Verification
+
+* J4 verification: `cargo test -p ezc_core --lib` passes all 376 core tests; strict all-target core clippy, formatting, and `git diff --check` pass. Focused proofs cover Eager/Interaction/None assignment, eager Forms runtime with interaction-scoped submit, zero Visible/Manual output, fixed precedence, and `EZASM1337`-`EZASM1342`.
 
 * J3 verification: `cargo test -p ezc_core --lib` passes all 372 core tests; `cargo clippy -p ezc_core --all-targets -- -D warnings`, `cargo fmt --all --check`, and `git diff --check` pass. Focused proofs cover parent-before-child application/Component/structural/Form ownership, structural-template event ownership, ordinary and Form-submit activation references, upstream Component/liveness block preservation, reverse-input determinism, invalid parent reciprocity, and the complete `EZASM1328`-`EZASM1336` range.
 
@@ -162,6 +164,10 @@ Architecture decisions made
 * Decision: J3 retains structural-template Component instances as distinct Component boundaries parented by their exact structural-region boundary, while Interaction boundaries carry activation references and no ownership parent.
 * Reason: Phase H ordinary events can belong to a structural-template instance, and the graph must give that event an exact owner without collapsing the Component into its region or discovering a parent from DOM ancestry. Form submits likewise need both their Component host and Form boundary references.
 * Tradeoff: Structural-template boundaries currently own no J1-A/J1-C storage because those registries project executable planned instances only. J3 records the identity/parentage without inventing dynamic instance storage; later policy/program slices must preserve this boundary.
+
+* Decision: J4 emits Eager for application infrastructure, immediate Forms runtime, and post-restore recomputation; Interaction only for exact event/submit activation roots; and None only where no independent executable work is present.
+* Reason: This applies the frozen correctness precedence without cost heuristics and preserves earlier immediate browser behavior.
+* Tradeoff: no earlier product authorizes Visible or Manual, so both sets are empty. Structural work is reached through exact interaction program closure rather than receiving a fabricated activation root.
 
 * Decision: I7 creates one declaration-level `ValidationPlanId::for_form(FormId)` for every valid Form, including empty Forms, and one `FieldDependencyId::for_rule_and_source(ValidationRuleId, FieldId)` for each eligible I6 direct dependency edge.
 * Reason: Form plans and dependency records need stable typed names independent of Rule counts, source order, Component instances, runtime registration, or DOM identity; future runtime planning can refer to a complete Form plan without using absence as policy.
@@ -1153,12 +1159,10 @@ Known limitations
 
 Exact next step
 
-Commit J3 atomically as `compiler: build canonical resume boundary graph`,
-verify the worktree is clean, then implement J4 exactly from the authoritative
-Phase J roadmap. J4 may assign only the closed Eager/Interaction/Visible/Manual/
-None policy with the frozen precedence; it must emit zero heuristic Visible or
-Manual policies and must not create anchors, snapshots, programs, chunks,
-loaders, or runtime resume behavior from later slices.
+Commit J4 atomically as `compiler: plan resume activation policies`, verify the
+worktree is clean, then implement J5 from the authoritative chunk contract.
+J5 must create exact roots and canonical program closures without size-based
+splitting, shared lazy chunks, source call-graph inference, or runtime behavior.
 
 Useful commands
 
@@ -1190,7 +1194,7 @@ Useful commands
 Changed but uncommitted files
 
 * `crates/ezc_core/src/lib.rs`
-* `crates/ezc_core/src/resume_boundary.rs`
+* `crates/ezc_core/src/resume_activation.rs`
 * `docs/planning/full-project-docs/07_resumability_and_delivery.md`
 * `notes/progress/2026-W28.md`
 * `notes/progress/AGENT_HANDOFF.md`

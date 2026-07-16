@@ -95,6 +95,25 @@ correspondence drift, provenance drift, and ordering/index drift. J3 changes
 no public schema and emits no policy, marker, snapshot, capture/restore
 program, chunk, loader, or runtime resume behavior.
 
+## Phase J canonical activation policy
+
+J4 assigns exactly one compiler-only activation decision or explicit block to
+every J3 boundary. Application bootstrap/registries/event delegation, immediate
+Phase I Form runtime behavior, and required post-restore Computed recomputation
+are `Eager`. Exact ordinary-event and enhanced Form-submit roots are
+`Interaction` when their required boundaries and J2 retained values are
+available. Boundaries with no independent executable work are `None`.
+
+The fixed correctness precedence is `Eager > Visible > Interaction > Manual >
+None`. No earlier frozen product authorizes visibility- or manual-driven
+activation, so J4 emits zero `Visible` and zero `Manual` policies. Unsupported
+lazy event payloads use an explicit eager fallback only when the existing
+program remains valid; missing references or blocked prerequisites remain
+`ResumeActivationBlock` records. `EZASM1337` through `EZASM1342` validate one
+decision per boundary, exact prerequisites, known events/boundaries, source
+authority, lazy-payload handling, and deterministic order/indexes. No public
+schema or runtime behavior changes.
+
 ## Definition
 
 In EdgeZero, resumability means:
