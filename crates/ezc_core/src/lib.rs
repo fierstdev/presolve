@@ -82,6 +82,7 @@ pub mod resume_instance;
 pub mod resume_liveness;
 pub mod resume_manifest;
 pub mod resume_plan;
+pub mod resume_restore;
 pub mod resume_schema;
 pub mod route_graph;
 pub mod runtime_codegen;
@@ -448,6 +449,13 @@ pub use resume_plan::{
     build_resume_plan, ComponentInstanceResumePlan, FormFieldResumePlan, FormInstanceResumePlan,
     ResumeComponentPlan, ResumeComputedPlan, ResumePlan, SlotBindingResumePlan,
     StructuralRegionResumePlan,
+};
+pub use resume_restore::{
+    build_resume_restore_plan, validate_resume_restore_plan, ResumeRestoreApplicationSchedule,
+    ResumeRestoreBlock, ResumeRestoreBlockReason, ResumeRestoreInstruction,
+    ResumeRestoreInstructionRecord, ResumeRestoreIntegrityCode, ResumeRestoreIntegrityDiagnostic,
+    ResumeRestorePhase, ResumeRestorePlan, ResumeRestoreProgram, ResumeRestoreSchedulePhase,
+    ResumeRestoreSlotAssignment, RESUME_RESTORE_PLAN_VERSION,
 };
 pub use resume_schema::{
     build_resume_schema_registry, resume_value_codec, validate_resume_schema_registry,

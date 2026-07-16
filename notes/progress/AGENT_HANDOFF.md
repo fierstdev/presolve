@@ -3,25 +3,27 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: J7 - Generated Capture Programs and Snapshot Model v1
-* Working tree: ready for the atomic J7 commit; the next authored slice is J8 generated restore programs.
+* Latest completed slice: J8 - Generated Restore Programs and Fixed R0-R20 Schedule
+* Working tree: ready for the atomic J8 commit; the next authored slice is J9 executable resume manifest v6.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: J7 - Generated Capture Programs and Snapshot Model v1
-* Summary: one exact-slot capture program per boundary, closed canonical encoders, strict quiescence/stable-state checks, and an internal deterministic snapshot envelope.
-* Key files: `resume_capture.rs`, `lib.rs`, `07_resumability_and_delivery.md`
-* Boundary: no restore program, public manifest/build output, emitted JS, anchor, loader, or browser runtime behavior.
+* Slice: J8 - Generated Restore Programs and Fixed R0-R20 Schedule
+* Summary: one closed restore program per boundary, exact phase assignment for every retained/recomputable slot, and the complete parent-before-child R0-R20 schedule.
+* Key files: `resume_restore.rs`, `lib.rs`, `07_resumability_and_delivery.md`
+* Boundary: no public manifest/build output, emitted JS, anchor, loader, or browser runtime behavior.
 
 Current in-progress slice
 
-* Slice: J8 - Generated Restore Programs
-* Status: Ready after the atomic J7 commit.
+* Slice: J9 - Executable Resume Manifest v6
+* Status: Ready after the atomic J8 commit.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase I: none. Next: J8 closed restore instructions and fixed R0-R20 schedule.
+* Remaining in Phase I: none. Next: J9 sole-authority executable resume manifest v6 and public snapshot/runtime protocol declarations.
 
 Verification
+
+* J8 verification: `cargo test -p ezc_core --lib` passes all 400 core tests; strict all-target core clippy, formatting, and `git diff --check` pass. Five focused proofs cover all R0-R20 phases, retained/recomputable assignment, exact Form phase classes, dangling program references, wrong phases, duplicate writes, missing completion, parent-order rejection, reverse-input determinism, and `EZASM1359`-`EZASM1362`.
 
 * J7 verification: `cargo test -p ezc_core --lib` passes all 395 core tests; strict all-target core clippy, formatting, and `git diff --check` pass. Nine focused proofs cover every value variant, canonical object/number encoding, negative zero/non-finite rejection, unsupported runtime shape rejection, retained-only program generation, equal-state byte equality, no mutation/timestamp, full quiescence, stable Form submission, malformed product rejection, reverse-input determinism, and `EZASM1355`-`EZASM1358`.
 
@@ -186,6 +188,10 @@ Architecture decisions made
 * Decision: J7 emits one closed read/encode/append triple per retained slot and omits recomputable slots from snapshot values.
 * Reason: Snapshot capture must consume J2 liveness and J6 schemas exactly without replaying computation, walking arbitrary runtime objects, or serializing values that J8 will regenerate.
 * Tradeoff: Snapshot model v1 is internal until J9. Form submission uses the existing runtime string states with an explicit stable-state allowlist; pending/unknown states and any non-quiescent runtime are rejected immediately.
+
+* Decision: J8 assigns every retained/recomputable slot to the fixed R0-R20 sequence, decodes only retained values, and emits one recompute instruction per exact Computed cache pair.
+* Reason: Resume boot must restore storage without replaying authored initialization and must establish deterministic readiness parent-before-child before any interaction can execute.
+* Tradeoff: R16 DOM-binding and R17 Effect-subscription phases are present but carry no instructions until their later slices provide canonical anchors and runtime establishment authority; J8 does not fabricate those references.
 
 * Decision: I7 creates one declaration-level `ValidationPlanId::for_form(FormId)` for every valid Form, including empty Forms, and one `FieldDependencyId::for_rule_and_source(ValidationRuleId, FieldId)` for each eligible I6 direct dependency edge.
 * Reason: Form plans and dependency records need stable typed names independent of Rule counts, source order, Component instances, runtime registration, or DOM identity; future runtime planning can refer to a complete Form plan without using absence as policy.
@@ -1177,9 +1183,9 @@ Known limitations
 
 Exact next step
 
-Commit J7 atomically as `compiler: generate resume capture programs`, verify
-the worktree is clean, then implement J8 one closed restore program per
-boundary and the fixed application R0-R20 restore schedule.
+Commit J8 atomically as `compiler: generate resume restore programs`, verify
+the worktree is clean, then implement J9 resume manifest v6, public snapshot
+schema v1/runtime protocol v1, canonical JSON, and fixed build identity.
 
 Useful commands
 
@@ -1211,7 +1217,7 @@ Useful commands
 Changed but uncommitted files
 
 * `crates/ezc_core/src/lib.rs`
-* `crates/ezc_core/src/resume_capture.rs`
+* `crates/ezc_core/src/resume_restore.rs`
 * `docs/planning/full-project-docs/07_resumability_and_delivery.md`
 * `notes/progress/2026-W28.md`
 * `notes/progress/AGENT_HANDOFF.md`

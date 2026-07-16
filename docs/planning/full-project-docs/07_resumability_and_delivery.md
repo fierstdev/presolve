@@ -175,6 +175,31 @@ clear. Pending or unknown Form submission state is rejected; stable states are
 shape, capture-envelope policy, and ordering/output drift. J7 does not expose
 snapshot build output or add browser runtime behavior.
 
+## Phase J generated restore programs
+
+J8 creates one `ResumeRestoreProgram` per J3 boundary and the complete fixed
+R0-R20 application schedule. Boundary allocation and program order preserve
+J3 parent-before-child order. Every J2 retained or recomputable slot receives
+one explicit phase assignment; retained values decode through their J6 codec,
+while recomputable Computed cache/dirty pairs are omitted from snapshot decode
+and regenerated once by the exact compiler-planned evaluator at R5.
+
+Mutable State restores at R3, retained Computed cache state at R4, Context
+Provider values at R6, exact Context Consumer bindings at R7, Form Field values
+at R11, dirty/touched state at R12, rule/aggregate validation at R13, and stable
+submission state at R14. Each program allocates its boundary record at R2 and
+ends with `MarkBoundaryRestored` at R19. The closed instruction vocabulary has
+no authored callback, constructor, initializer replay, render call, validator,
+submit handler, or Effect-body execution.
+
+J8 deliberately emits no DOM-binding install instruction before J10 supplies
+canonical anchor identities and no Effect-subscription instruction before the
+later runtime-establishment slice. Those fixed schedule phases remain present
+and empty rather than fabricating references. Internal integrity codes
+`EZASM1359` through `EZASM1362` cover dangling program references, wrong
+phases/duplicate writes, missing completion, and ordering/output drift. No
+public schema or runtime behavior changes.
+
 ## Definition
 
 In EdgeZero, resumability means:
