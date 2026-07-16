@@ -476,4 +476,31 @@ mod tests {
         assert!(super::validate_runtime_forms_artifact(&artifact).is_valid);
         assert!(super::runtime_forms_artifact_json(&artifact).contains("field-binding"));
     }
+
+    #[test]
+    fn forms_products_are_byte_deterministic_when_input_files_are_reversed() {
+        let a = r#"@component("a") class A { @form() @serialize("json") profile!: Form; @field(this.profile) name = ""; @action() @submit(this.profile) save(): void {} render() { return <form form={this.profile}><input field={this.name}/></form>; } }"#;
+        let b = r#"@component("b") class B { @form() @serialize("url-encoded") search!: Form; @field(this.search) query = ""; @action() @submit(this.search) save(): void {} render() { return <form form={this.search}><input field={this.query}/></form>; } }"#;
+        let first = crate::CompilationUnit::parse_sources([("src/A.tsx", a), ("src/B.tsx", b)]);
+        let second = crate::CompilationUnit::parse_sources([("src/B.tsx", b), ("src/A.tsx", a)]);
+        let first = crate::build_application_semantic_model_for_unit(&first);
+        let second = crate::build_application_semantic_model_for_unit(&second);
+
+        assert_eq!(
+            super::runtime_forms_artifact_json(&super::build_runtime_forms_artifact(&first)),
+            super::runtime_forms_artifact_json(&super::build_runtime_forms_artifact(&second)),
+        );
+        assert_eq!(
+            crate::template_manifest_json(&crate::build_template_manifest_from_asm(&first)),
+            crate::template_manifest_json(&crate::build_template_manifest_from_asm(&second)),
+        );
+        assert_eq!(
+            crate::resume_manifest_json(&crate::build_resume_manifest(&crate::build_resume_plan(
+                &first
+            ))),
+            crate::resume_manifest_json(&crate::build_resume_manifest(&crate::build_resume_plan(
+                &second
+            ))),
+        );
+    }
 }
