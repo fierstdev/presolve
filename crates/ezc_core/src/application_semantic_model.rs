@@ -51,6 +51,7 @@ use crate::form_validation::{
     collect_validation_graph, collect_validation_products, ValidationGraph, ValidationRule,
     ValidationRuleCandidate,
 };
+use crate::form_validation_plan::{collect_validation_dependency_plans, ValidationDependencyPlans};
 use crate::instance_context::{collect_instance_context_registry, InstanceContextRegistry};
 use crate::intermediate_representation::{
     IrComputedEvaluationPlan, IrReactiveCycleAnalysis, IrReactiveGraph,
@@ -97,6 +98,7 @@ pub struct ApplicationSemanticModel {
     pub validation_rule_candidates: Vec<ValidationRuleCandidate>,
     pub validation_rules: BTreeMap<ValidationRuleId, ValidationRule>,
     pub validation_graph: ValidationGraph,
+    pub validation_dependency_plans: ValidationDependencyPlans,
     pub slots: BTreeMap<SlotId, SlotEntity>,
     pub component_invocations: BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
     pub component_instance_plan: ComponentInstancePlan,
@@ -509,6 +511,11 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub const fn validation_graph(&self) -> &ValidationGraph {
         &self.validation_graph
+    }
+
+    #[must_use]
+    pub const fn validation_dependency_plans(&self) -> &ValidationDependencyPlans {
+        &self.validation_dependency_plans
     }
 
     #[must_use]
@@ -1451,6 +1458,13 @@ pub fn build_application_semantic_model_from_component_graph(
         &ownership,
         &references,
     );
+    let validation_dependency_plans = collect_validation_dependency_plans(
+        &forms,
+        &form_fields,
+        &validation_rules,
+        &form_ownership,
+        &validation_graph,
+    );
     let semantic_types = finalize_semantic_types(
         base_semantic_types,
         &component_graph.components,
@@ -1605,6 +1619,7 @@ pub fn build_application_semantic_model_from_component_graph(
         validation_rule_candidates,
         validation_rules,
         validation_graph,
+        validation_dependency_plans,
         slots,
         component_invocations,
         component_instance_plan,
@@ -1884,6 +1899,13 @@ fn build_application_semantic_model_from_files_with_bindings(
         &ownership,
         &references,
     );
+    let validation_dependency_plans = collect_validation_dependency_plans(
+        &forms,
+        &form_fields,
+        &validation_rules,
+        &form_ownership,
+        &validation_graph,
+    );
     let semantic_types = finalize_semantic_types(
         base_semantic_types,
         &components,
@@ -2031,6 +2053,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         validation_rule_candidates,
         validation_rules,
         validation_graph,
+        validation_dependency_plans,
         slots,
         component_invocations,
         component_instance_plan,

@@ -48,6 +48,7 @@ pub mod form_diagnostics;
 pub mod form_field;
 pub mod form_ownership;
 pub mod form_validation;
+pub mod form_validation_plan;
 pub mod html_codegen;
 pub mod instance_context;
 pub mod intermediate_representation;
@@ -262,6 +263,14 @@ pub use form_validation::{
     ValidationGraphNodeKey, ValidationGraphValidation, ValidationProducts, ValidationRule,
     ValidationRuleArgument, ValidationRuleCandidate, ValidationRuleKind, ValidationRuleViolation,
 };
+pub use form_validation_plan::{
+    collect_validation_dependency_plans, validate_validation_dependency_plans,
+    BlockedFieldValidationDependency, FieldChangeSet, FieldChangeValidationSchedule,
+    FieldDependencyBlockReason, FieldValidationChangePlan, FieldValidationDependency,
+    FieldValidationSourceEntry, FieldValidationTargetEntry, FormValidationDependencyPlan,
+    ValidationDependencyPlanIntegrityDiagnostic, ValidationDependencyPlanIntegrityKind,
+    ValidationDependencyPlanValidation, ValidationDependencyPlans, ValidationPlanningStatus,
+};
 pub use html_codegen::generate_static_html;
 pub use instance_context::{
     collect_instance_context_registry, ConsumerInstanceId, ConsumerInstanceRecord,
@@ -373,11 +382,12 @@ pub use semantic_graph::{
 pub use semantic_id::{
     ComponentInstanceId, ComponentInvocationId, ComponentRootId, ComponentStructuralRegionId,
     ConsumerId, ContextDeclarationCandidateId, ContextId, EffectId, EffectStatementId,
-    FieldBindingId, FieldId, FormDeclarationCandidateId, FormFieldBindingCandidateId,
-    FormFieldDeclarationCandidateId, FormId, FormInstanceId, FormOwnershipGraphId, ProviderId,
-    SemanticId, SemanticOwner, SlotBindingId, SlotContentFragmentId, SlotDeclarationCandidateId,
-    SlotId, SlotOutletId, TemplatePositionId, ValidationDependencyCycleId, ValidationGraphId,
-    ValidationRuleCandidateId, ValidationRuleId,
+    FieldBindingId, FieldDependencyId, FieldId, FormDeclarationCandidateId,
+    FormFieldBindingCandidateId, FormFieldDeclarationCandidateId, FormId, FormInstanceId,
+    FormOwnershipGraphId, ProviderId, SemanticId, SemanticOwner, SlotBindingId,
+    SlotContentFragmentId, SlotDeclarationCandidateId, SlotId, SlotOutletId, TemplatePositionId,
+    ValidationDependencyCycleId, ValidationGraphId, ValidationPlanId, ValidationRuleCandidateId,
+    ValidationRuleId,
 };
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};

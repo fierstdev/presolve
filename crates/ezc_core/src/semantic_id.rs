@@ -113,6 +113,18 @@ pub struct ValidationRuleId(SemanticId);
 #[serde(transparent)]
 pub struct ValidationGraphId(SemanticId);
 
+/// Stable identity for the declaration-level validation dependency plan of one
+/// canonical Form. This is deliberately distinct from both Form declarations
+/// and future Form-instance-qualified execution plans.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ValidationPlanId(SemanticId);
+
+/// Stable identity for one direct I6 validation-rule read dependency.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct FieldDependencyId(SemanticId);
+
 /// Stable identity for one canonical dependency-cycle field set.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -344,6 +356,16 @@ impl SemanticId {
     #[must_use]
     pub fn validation_rule(&self, ordinal: usize) -> Self {
         self.child("validation-rule", &ordinal.to_string())
+    }
+
+    #[must_use]
+    pub fn validation_plan(&self) -> Self {
+        Self(format!("{}/validation-plan", self.as_str()))
+    }
+
+    #[must_use]
+    pub fn field_dependency(&self, source_field: &Self) -> Self {
+        self.child("field-dependency", source_field.as_str())
     }
 
     #[must_use]
@@ -793,6 +815,43 @@ impl ValidationGraphId {
     }
 }
 
+impl ValidationPlanId {
+    #[must_use]
+    pub fn for_form(form: &FormId) -> Self {
+        Self(form.as_semantic_id().validation_plan())
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl FieldDependencyId {
+    #[must_use]
+    pub fn for_rule_and_source(rule: &ValidationRuleId, source_field: &FieldId) -> Self {
+        Self(
+            rule.as_semantic_id()
+                .field_dependency(source_field.as_semantic_id()),
+        )
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 impl ValidationDependencyCycleId {
     #[must_use]
     pub fn for_fields(form: &FormId, fields: &[FieldId]) -> Self {
@@ -1141,6 +1200,18 @@ impl fmt::Display for ValidationGraphId {
     }
 }
 
+impl fmt::Display for ValidationPlanId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl fmt::Display for FieldDependencyId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
 impl fmt::Display for ValidationDependencyCycleId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(formatter)
@@ -1216,8 +1287,9 @@ impl fmt::Display for ContextDeclarationCandidateId {
 #[cfg(test)]
 mod tests {
     use super::{
-        ComponentInstanceId, ComponentInvocationId, ConsumerId, ContextId, FieldId, FormId,
-        FormInstanceId, ProviderId, SemanticId, SemanticOwner, SlotId, TemplatePositionId,
+        ComponentInstanceId, ComponentInvocationId, ConsumerId, ContextId, FieldDependencyId,
+        FieldId, FormId, FormInstanceId, ProviderId, SemanticId, SemanticOwner, SlotId,
+        TemplatePositionId, ValidationPlanId, ValidationRuleId,
     };
 
     #[test]
@@ -1323,6 +1395,9 @@ mod tests {
         let nested_instance =
             FormInstanceId::for_component_instance(&nested_component_instance, &form);
         let field = FieldId::for_form(&form, "email");
+        let rule = ValidationRuleId::for_field(&field, 2);
+        let plan = ValidationPlanId::for_form(&form);
+        let dependency = FieldDependencyId::for_rule_and_source(&rule, &field);
 
         assert_eq!(
             form.as_str(),
@@ -1340,6 +1415,14 @@ mod tests {
         assert_ne!(form.as_semantic_id(), instance.as_semantic_id());
         assert_ne!(field.as_semantic_id(), instance.as_semantic_id());
         assert_ne!(instance, nested_instance);
+        assert_eq!(
+            plan.as_str(),
+            "module:src/Profile.tsx/component:x-profile/form:profile/validation-plan"
+        );
+        assert_eq!(
+            dependency.as_str(),
+            "module:src/Profile.tsx/component:x-profile/form:profile/field:email/validation-rule:2/field-dependency:module:src/Profile.tsx/component:x-profile/form:profile/field:email"
+        );
     }
 
     #[test]

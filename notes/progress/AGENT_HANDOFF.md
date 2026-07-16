@@ -3,25 +3,32 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: I6 - Canonical Form Validation Graph
-* Working tree: clean after the I6 implementation commit.
+* Latest completed slice: I7 - Canonical Cross-Field Validation Dependency Planning
+* Working tree: I7 is verified; commit pending.
 * Date: 2026-07-15
 
 Last completed slice
 
-* Slice: I6 - Canonical Form Validation Graph
-* Summary: I6 retains every `@validate(<rule-expression>)` placement under a source-qualified `ValidationRuleCandidateId`, resolves only exact valid I3 target Fields and same-Form direct `this.<field>` dependencies, classifies and normalizes the closed nine-rule catalog through existing constant/type authorities, invalidates complete duplicate/contradiction/cycle groups without a winner, and lowers only violation-free candidates to client-boundary `ValidationRule` entities. The immutable build-root-qualified `ValidationGraph` projects I5 Form/Field ownership plus canonical ASM Field-owned rules and dependency references, validates deterministic integrity without repair, and exposes read-only rule/dependency/cycle queries.
-* Key files: crates/ezc_core/src/form_validation.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_parser/src/model.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/asm_validation.rs, crates/ezc_core/src/semantic_id.rs
-* Schema decision: I6 is an in-memory ASM product only. Semantic graph v5, CLI ASM inspection v8, check JSON v4, template manifest v2, runtime artifacts, and resume manifest v4 remain unchanged and explicitly filter Validation Rules and their references. No `forms.runtime.json`, `validation.runtime.json`, Form instance, validation execution/state, registry, IR, browser behavior, public diagnostic, or resumability product is introduced.
+* Slice: I7 - Canonical Cross-Field Validation Dependency Planning
+* Summary: I7 consumes only valid I3/I5/I6 canonical Form, Field, Rule, ownership, and direct `RuleDependsOnField` products. Every valid Form receives one immutable `ValidationPlanId`, including empty Forms. Every eligible direct cross-Field read receives one `FieldDependencyId` derived from its `ValidationRuleId` and source `FieldId`; source entries retain reverse invalidation evidence, target entries retain declaration-side dependency evidence, and unary Rules remain absent. Pure one-Field and change-set queries normalize changed Fields, retain every triggering dependency, schedule each direct Rule once by target-Field authored order then rule order then Rule ID, and never compute a transitive closure or treat validation as a Field write.
+* Key files: crates/ezc_core/src/form_validation_plan.rs, crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/asm_validation.rs, crates/ezc_core/src/lib.rs
+* Schema decision: I7 remains an in-memory declaration-planning product only. Semantic graph v5, CLI ASM inspection v8, check JSON v4, template manifest v2, resume manifest v4, all runtime artifacts, and browser output remain unchanged. No Form instance, validation state/execution, tracking, submission/reset/serialization plan, IR, runtime registry/artifact, public diagnostic, or resumability product is introduced.
 
 Current in-progress slice
 
-* Slice: I7 - Cross-Field Dependency Planning (blocked before implementation)
-* Status: Phase I is complete through I6. I6 freezes and records only direct same-Form validation dependencies and deterministic cycle exclusion. No complete authoritative I7 contract is present for invalidation propagation, dependency scheduling, update triggers, derived plans, execution, or runtime state, so I7 has not begun.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I6
-* Remaining in Phase I: I7 through I20.
+* Slice: I8 - Dirty and Touched Tracking (blocked before implementation)
+* Status: Phase I is complete through I7. I7 freezes only declaration-level direct validation dependency planning and pure scheduling. No complete authoritative I8 contract is present for dirty/touched identities, transitions, focus/blur/change mapping, reset interaction, state, runtime, or schema policy, so I8 has not begun.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I7
+* Remaining in Phase I: I8 through I20.
 
 Verification
+
+* I7 `just check`: pass (formatting, strict workspace clippy, 331 core tests, 12 parser unit tests, 26 parser integration tests, 2 CLI unit tests, 7 Component fixture/freeze tests, 12 Context fixture/freeze tests, all 126 CLI inspection/build tests, and all 26 real-browser tests)
+* `cargo test -p ezc_core form_validation_plan --lib`: pass (5 focused I7 planning tests)
+* `cargo test -p ezc_core semantic_id::tests::derives_distinct_form_definition_instance_and_field_identities --lib`: pass (I7 identity extension)
+* `cargo clippy -p ezc_core --all-targets --all-features -- -D warnings`: pass
+* `cargo fmt --all --check`: pass
+* git diff --check: pass
 
 * I6 `just check`: pass (formatting, strict workspace clippy, 326 core tests, 12 parser unit tests, 26 parser integration tests, 2 CLI unit tests, 7 Component fixture/freeze tests, 12 Context fixture/freeze tests, all 126 CLI inspection/build tests, and all 26 real-browser tests)
 * `cargo test -p ezc_core form_validation`: pass (7 focused I6 tests)
@@ -63,6 +70,18 @@ Verification
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: I7 creates one declaration-level `ValidationPlanId::for_form(FormId)` for every valid Form, including empty Forms, and one `FieldDependencyId::for_rule_and_source(ValidationRuleId, FieldId)` for each eligible I6 direct dependency edge.
+* Reason: Form plans and dependency records need stable typed names independent of Rule counts, source order, Component instances, runtime registration, or DOM identity; future runtime planning can refer to a complete Form plan without using absence as policy.
+* Tradeoff: Plans and dependencies are internal immutable products, not semantic owners or public schema entities. I7 creates no instance-qualified plan, runtime state, or artifact.
+
+* Decision: I7 retains both Rule-to-source read facts and source-Field-to-Rule invalidation indexes, but schedules only direct dependencies after a committed abstract Field write. Change sets normalize changed Fields in Field-authored order, schedule Rules by target Field then rule order then Rule ID, deduplicate Rules/targets, and retain every triggering dependency ID.
+* Reason: Validation reads Field values; a validation result is not a Field write. Direct-only scheduling prevents a cross-Field chain from becoming an invented Rule-to-Rule execution graph or transitive invalidation engine.
+* Tradeoff: Unary Rules, target-Field writes, initial validation, submission, reset, dirty/touched transitions, values, browser events, and execution remain outside I7.
+
+* Decision: I7 integrity validation derives internal `EZASM1242` through `EZASM1270` findings for plan/dependency identity, I5/I6 reciprocity, Form/Component/boundary/provenance/order/index consistency, duplicate/missing projections, direct-only leakage, and instance identity leakage. `EZASM1271` and `EZASM1272` detect stale retained validation and stale whole planning products in ASM validation.
+* Reason: Later consumers must be able to reject malformed staged products deterministically without re-resolving validation syntax or repairing graph drift.
+* Tradeoff: Blocked downstream records retain only malformed/stale canonical I6 evidence and receive no fabricated dependency identity; ordinary invalid authored rules remain solely in I6 candidate registries.
 
 * Decision: The parser retains the outer `@validate` invocation shape and one normalized nested rule-expression fact, including direct call identity, ordered arguments, exact `this.<identifier>` designators, compiler constant expressions, literal strings, spans, and unsupported shapes. Canonical I6 lowering alone resolves target Fields, dependencies, rule kinds, normalized arguments, compatibility, duplicates, contradictions, cycles, and validity.
 * Reason: Later diagnostics and planning must consume immutable normalized evidence without reparsing TypeScript, while the parser must not become a semantic validation authority.

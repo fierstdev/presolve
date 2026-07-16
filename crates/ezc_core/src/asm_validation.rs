@@ -158,6 +158,42 @@ fn validate_form_validation(
             message: "validation graph retained stale validation facts".to_string(),
         });
     }
+    let expected_plans = crate::collect_validation_dependency_plans(
+        &model.forms,
+        &model.form_fields,
+        &model.validation_rules,
+        &model.form_ownership,
+        &model.validation_graph,
+    );
+    if model.validation_dependency_plans != expected_plans {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1272".to_string(),
+            message: "validation dependency plans do not match canonical I7 planning".to_string(),
+        });
+    }
+    let planning = crate::validate_validation_dependency_plans(
+        &model.validation_dependency_plans,
+        &model.forms,
+        &model.form_fields,
+        &model.validation_rules,
+        &model.form_ownership,
+        &model.validation_graph,
+    );
+    diagnostics.extend(
+        planning
+            .diagnostics
+            .iter()
+            .map(|diagnostic| AsmValidationDiagnostic {
+                code: diagnostic.code.clone(),
+                message: diagnostic.message.clone(),
+            }),
+    );
+    if model.validation_dependency_plans.validation != planning {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1271".to_string(),
+            message: "validation dependency plans retained stale validation facts".to_string(),
+        });
+    }
 }
 
 fn validate_form_ownership(
