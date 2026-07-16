@@ -46,6 +46,7 @@ use crate::form_binding::{
     collect_form_field_binding_products, FormFieldBinding, FormFieldBindingCandidate,
 };
 use crate::form_field::{collect_form_field_products, FormFieldEntity};
+use crate::form_ir::{lower_form_ir, FormIrReport};
 use crate::form_ownership::{collect_form_ownership_graph, FormOwnershipGraph};
 use crate::form_reset::{collect_reset_products, ResetProducts};
 use crate::form_serialization::{collect_serialization_products, SerializationProducts};
@@ -107,6 +108,7 @@ pub struct ApplicationSemanticModel {
     pub submissions: SubmissionProducts,
     pub serialization: SerializationProducts,
     pub reset: ResetProducts,
+    pub form_ir: FormIrReport,
     pub slots: BTreeMap<SlotId, SlotEntity>,
     pub component_invocations: BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
     pub component_instance_plan: ComponentInstancePlan,
@@ -1599,6 +1601,7 @@ pub fn build_application_semantic_model_from_component_graph(
         &submissions.plans,
     );
     let reset = collect_reset_products(&forms, &form_fields, &form_field_bindings, &form_tracking);
+    let form_ir = lower_form_ir(&component_instance_plan, &forms, &form_fields);
     let effect_execution_plan = plan_effect_execution(
         &computed_values,
         &effects,
@@ -1668,6 +1671,7 @@ pub fn build_application_semantic_model_from_component_graph(
         submissions,
         serialization,
         reset,
+        form_ir,
         slots,
         component_invocations,
         component_instance_plan,
@@ -2051,6 +2055,7 @@ fn build_application_semantic_model_from_files_with_bindings(
     let serialization =
         collect_serialization_products(&components, &forms, &form_fields, &submissions.plans);
     let reset = collect_reset_products(&forms, &form_fields, &form_field_bindings, &form_tracking);
+    let form_ir = lower_form_ir(&component_instance_plan, &forms, &form_fields);
     let effect_execution_plan = plan_effect_execution(
         &computed_values,
         &effects,
@@ -2118,6 +2123,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         submissions,
         serialization,
         reset,
+        form_ir,
         slots,
         component_invocations,
         component_instance_plan,

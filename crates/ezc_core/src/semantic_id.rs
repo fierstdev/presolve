@@ -169,6 +169,25 @@ pub struct ResetPlanId(SemanticId);
 #[serde(transparent)]
 pub struct FieldResetOperationId(SemanticId);
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct FormFieldValueSlotId(SemanticId);
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct FormFieldDirtySlotId(SemanticId);
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct FormFieldTouchedSlotId(SemanticId);
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct FormFieldValidationSlotId(SemanticId);
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct FormValidationAggregateSlotId(SemanticId);
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct FormSubmissionStateSlotId(SemanticId);
+
 /// Stable identity for one compiler-owned component Slot semantic entity.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -1074,6 +1093,27 @@ impl FieldResetOperationId {
         self.0.as_str()
     }
 }
+
+macro_rules! impl_form_slot_id {
+    ($name:ident) => {
+        impl $name {
+            #[must_use]
+            pub fn for_instance(instance: &FormInstanceId, name: &str) -> Self {
+                Self(
+                    instance
+                        .as_semantic_id()
+                        .child("form-slot", &format!("{}:{name}", stringify!($name))),
+                )
+            }
+        }
+    };
+}
+impl_form_slot_id!(FormFieldValueSlotId);
+impl_form_slot_id!(FormFieldDirtySlotId);
+impl_form_slot_id!(FormFieldTouchedSlotId);
+impl_form_slot_id!(FormFieldValidationSlotId);
+impl_form_slot_id!(FormValidationAggregateSlotId);
+impl_form_slot_id!(FormSubmissionStateSlotId);
 
 impl ValidationDependencyCycleId {
     #[must_use]

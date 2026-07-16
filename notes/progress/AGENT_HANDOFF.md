@@ -3,25 +3,30 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: I11 - Reset Planning
-* Working tree: I11 is verified; commit pending.
+* Latest completed slice: I12 - Canonical Form IR
+* Working tree: I12 is verified; commit pending.
 * Date: 2026-07-15
 
 Last completed slice
 
-* Slice: I11 - Reset Planning
-* Summary: I11 creates one `ResetPlanId` per valid Form and one exact `FieldResetOperationId` per Field. Each operation follows I3 order, restores the canonical initial value, writes every I4-bound control, clears I8 dirty/touched and I6 Field validation, then the Form plan clears aggregate validity and submission state with validation scheduling frozen false.
-* Key files: crates/ezc_core/src/form_reset.rs, crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/asm_validation.rs, crates/ezc_core/src/lib.rs
-* Schema decision: I11 remains an internal reset program only. Existing public schemas and runtime artifacts remain unchanged; reset is not executed and no runtime state or DOM behavior is introduced.
+* Slice: I12 - Canonical Form IR
+* Summary: I12 projects each valid Form through every existing Phase H Component instance into a distinct `FormInstanceId`, with all mutable value/dirty/touched/validation/aggregate/submission slots derived from that exact instance. It emits compiler-owned typed initialize/input/blur/reset operation sequences; no declaration ID is a mutable storage key.
+* Key files: crates/ezc_core/src/form_ir.rs, crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/lib.rs
+* Schema decision: I12 is internal IR only. Existing public schemas and runtime artifacts remain unchanged; no Form execution occurs.
 
 Current in-progress slice
 
-* Slice: I12 - Canonical Form IR
-* Status: I11 is complete and ready to commit. I12 is the first slice allowed to project declaration Forms onto frozen Phase H Component instances and instance-qualified storage; do not create instances outside that authority.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I11
-* Remaining in Phase I: I12 through I20.
+* Slice: I13 - Form IR Optimization
+* Status: I12 is complete and ready to commit. I13 may optimize only compiler-owned Form IR without changing identity, observable order, or plans.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I12
+* Remaining in Phase I: I13 through I20.
 
 Verification
+
+* I12 `cargo test -p ezc_core`: pass (341 core tests, including instance-qualified Form IR coverage)
+* `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass
+* `cargo fmt --check`: pass
+* git diff --check: pass
 
 * I11 `cargo test -p ezc_core`: pass (340 core tests, including focused I11 reset planning)
 * `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass

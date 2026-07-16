@@ -46,6 +46,7 @@ pub mod form;
 pub mod form_binding;
 pub mod form_diagnostics;
 pub mod form_field;
+pub mod form_ir;
 pub mod form_ownership;
 pub mod form_reset;
 pub mod form_serialization;
@@ -254,6 +255,9 @@ pub use form_binding::{
 };
 pub use form_diagnostics::{FormDiagnosticReservation, FORM_DIAGNOSTIC_RESERVATIONS};
 pub use form_field::{collect_form_field_products, FormFieldEntity, FormFieldProducts};
+pub use form_ir::{
+    lower_form_ir, FormInstanceIr, FormIrOperation, FormIrReport, FormRuntimeStorage,
+};
 pub use form_ownership::{
     collect_form_ownership_graph, validate_form_ownership_graph, FormOwnershipEdge,
     FormOwnershipEdgeKind, FormOwnershipGraph, FormOwnershipIntegrityDiagnostic,
@@ -409,12 +413,13 @@ pub use semantic_id::{
     ConsumerId, ContextDeclarationCandidateId, ContextId, DirtyTrackingPlanId, EffectId,
     EffectStatementId, FieldBindingId, FieldDependencyId, FieldId, FieldResetOperationId,
     FieldTrackingId, FormDeclarationCandidateId, FormFieldBindingCandidateId,
-    FormFieldDeclarationCandidateId, FormId, FormInstanceId, FormOwnershipGraphId, ProviderId,
-    ResetPlanId, SemanticId, SemanticOwner, SerializationPlanId, SlotBindingId,
-    SlotContentFragmentId, SlotDeclarationCandidateId, SlotId, SlotOutletId,
-    SubmissionDeclarationCandidateId, SubmissionPlanId, TemplatePositionId, TouchedTrackingPlanId,
-    ValidationDependencyCycleId, ValidationGraphId, ValidationPlanId, ValidationRuleCandidateId,
-    ValidationRuleId,
+    FormFieldDeclarationCandidateId, FormFieldDirtySlotId, FormFieldTouchedSlotId,
+    FormFieldValidationSlotId, FormFieldValueSlotId, FormId, FormInstanceId, FormOwnershipGraphId,
+    FormSubmissionStateSlotId, FormValidationAggregateSlotId, ProviderId, ResetPlanId, SemanticId,
+    SemanticOwner, SerializationPlanId, SlotBindingId, SlotContentFragmentId,
+    SlotDeclarationCandidateId, SlotId, SlotOutletId, SubmissionDeclarationCandidateId,
+    SubmissionPlanId, TemplatePositionId, TouchedTrackingPlanId, ValidationDependencyCycleId,
+    ValidationGraphId, ValidationPlanId, ValidationRuleCandidateId, ValidationRuleId,
 };
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
