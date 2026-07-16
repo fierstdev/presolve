@@ -388,7 +388,7 @@ pub use page_codegen::{
     generate_standalone_page, generate_standalone_page_with_component_runtime,
     generate_standalone_page_with_component_runtime_and_forms,
     generate_standalone_page_with_computed_runtime, generate_standalone_page_with_context_runtime,
-    generate_standalone_page_with_effect_runtime,
+    generate_standalone_page_with_effect_runtime, generate_standalone_page_with_resume_runtime,
 };
 pub use provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
 pub use resume_activation::{
@@ -441,9 +441,16 @@ pub use resume_liveness::{
     RESUME_LIVENESS_PLAN_VERSION,
 };
 pub use resume_manifest::{
-    build_resume_manifest, resume_manifest_json, validate_resume_manifest, ResumeManifest,
-    ResumeManifestContextSlotRecord, ResumeManifestEffectRecord,
+    build_resume_manifest, compute_resume_build_id, parse_resume_manifest_v6, resume_manifest_json,
+    validate_resume_manifest, ResumeManifest, ResumeManifestActivationPolicy,
+    ResumeManifestActivationRecord, ResumeManifestAnchorRecord, ResumeManifestBoundaryKind,
+    ResumeManifestBoundaryRecord, ResumeManifestCaptureInstruction, ResumeManifestCaptureProgram,
+    ResumeManifestChunkRecord, ResumeManifestContextSlotRecord, ResumeManifestEffectRecord,
+    ResumeManifestEventRecord, ResumeManifestPhaseIComponentResumeRecord,
+    ResumeManifestRestoreInstruction, ResumeManifestRestoreInstructionRecord,
+    ResumeManifestRestoreProgram, ResumeManifestSlotSchemaRecord,
     ResumeManifestValidationDiagnostic, RESUME_MANIFEST_SCHEMA_VERSION,
+    RESUME_RUNTIME_PROTOCOL_VERSION,
 };
 pub use resume_plan::{
     build_resume_plan, ComponentInstanceResumePlan, FormFieldResumePlan, FormInstanceResumePlan,

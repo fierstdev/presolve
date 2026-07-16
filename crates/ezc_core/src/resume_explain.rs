@@ -8,7 +8,16 @@ pub fn explain_resume(model: &ApplicationSemanticModel) -> String {
     let chunks = plan_lazy_action_chunks(model);
     format!(
         "components={}\ninstances={}\nchunks={}\nzero_replay={}\ndiagnostics={}\n",
-        boot.manifest.components.len(),
+        boot.manifest
+            .phase_i_component_resume_records
+            .iter()
+            .filter(|record| {
+                matches!(
+                    record,
+                    crate::ResumeManifestPhaseIComponentResumeRecord::Component { .. }
+                )
+            })
+            .count(),
         boot.instances.len(),
         chunks.len(),
         boot.zero_replay,

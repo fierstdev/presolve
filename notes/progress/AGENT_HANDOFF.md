@@ -3,25 +3,27 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: J8 - Generated Restore Programs and Fixed R0-R20 Schedule
-* Working tree: ready for the atomic J8 commit; the next authored slice is J9 executable resume manifest v6.
+* Latest completed slice: J9 - Executable Resume Manifest v6
+* Working tree: ready for the atomic J9 commit; the next authored slice is J10 resume anchors and event markers.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: J8 - Generated Restore Programs and Fixed R0-R20 Schedule
-* Summary: one closed restore program per boundary, exact phase assignment for every retained/recomputable slot, and the complete parent-before-child R0-R20 schedule.
-* Key files: `resume_restore.rs`, `lib.rs`, `07_resumability_and_delivery.md`
-* Boundary: no public manifest/build output, emitted JS, anchor, loader, or browser runtime behavior.
+* Slice: J9 - Executable Resume Manifest v6
+* Summary: sole-authority manifest v6, public snapshot/runtime versions, fixed SHA-256 build identity, canonical build artifact, and exact embedded bytes.
+* Key files: `resume_manifest.rs`, `resume_identity.rs`, `page_codegen.rs`, `ezc_cli/src/main.rs`, `07_resumability_and_delivery.md`
+* Boundary: anchors/events remain empty; J10 alone adds resume HTML markers.
 
 Current in-progress slice
 
-* Slice: J9 - Executable Resume Manifest v6
-* Status: Ready after the atomic J8 commit.
+* Slice: J10 - Resume Anchors and Event Markers
+* Status: Ready after the atomic J9 commit.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase I: none. Next: J9 sole-authority executable resume manifest v6 and public snapshot/runtime protocol declarations.
+* Remaining in Phase I: none. Next: J10 exact `data-ez-r`/`data-ez-e` records and HTML markers without rendered-semantic changes.
 
 Verification
+
+* J9 verification: 8 focused manifest tests, all 405 core tests, 2 CLI units, 7 Component fixtures, 12 Context fixtures, all 128 CLI inspection/build tests, all 29 sequential real-browser probes, strict all-target core/CLI clippy, formatting, and `git diff --check` pass. Coverage includes v5/unknown-field rejection, every endpoint family, canonical snapshot/manifest examples, executable sensitivity, provenance and absolute-source-root independence, reverse-order determinism, `resume.runtime.json` emission, and exact page-embedded byte equality.
 
 * J8 verification: `cargo test -p ezc_core --lib` passes all 400 core tests; strict all-target core clippy, formatting, and `git diff --check` pass. Five focused proofs cover all R0-R20 phases, retained/recomputable assignment, exact Form phase classes, dangling program references, wrong phases, duplicate writes, missing completion, parent-order rejection, reverse-input determinism, and `EZASM1359`-`EZASM1362`.
 
@@ -156,6 +158,14 @@ Verification
 * git diff --check: pass
 
 Architecture decisions made
+
+* Decision: J9 is the sole executable resume authority at schema v6 and preserves Phase I semantic meaning only through normalized records inside that manifest.
+* Reason: Runtime validation and later marker/loader slices need one closed cross-referenced product rather than competing v5 planning and v6 execution structures.
+* Tradeoff: v5 is rejected with no adapter. Anchor/event arrays are intentionally empty until J10, and no J11 runtime consumption begins early.
+
+* Decision: `ResumeBuildId` uses SHA-256 lowercase hexadecimal over framed canonical executable inputs, with a fixed zero-sentinel manifest ID and canonical absolute-source-root normalization.
+* Reason: The fingerprint must change for executable behavior while remaining independent of provenance, absolute paths, time, output directory, and build machine.
+* Tradeoff: Build identity performs a second deterministic projection of existing artifacts during manifest construction; it does not make provenance or paths part of runtime authority.
 
 * Decision: J0 reserves `EZC1096` through `EZC1111` in exact roadmap order and internal `EZASM1289` through `EZASM1384` inclusive (96 codes).
 * Reason: Later Phase J validators and the J19 projector need monotonic, non-overlapping diagnostic space without prematurely creating identities, schemas, manifests, snapshots, chunks, or runtime behavior.
@@ -1183,9 +1193,9 @@ Known limitations
 
 Exact next step
 
-Commit J8 atomically as `compiler: generate resume restore programs`, verify
-the worktree is clean, then implement J9 resume manifest v6, public snapshot
-schema v1/runtime protocol v1, canonical JSON, and fixed build identity.
+Commit J9 atomically as `compiler: emit executable resume manifest v6`, verify
+the worktree is clean, then implement J10 exact resume anchors/event markers
+and freeze one structural-anchor representation.
 
 Useful commands
 

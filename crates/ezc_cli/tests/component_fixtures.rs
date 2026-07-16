@@ -7,19 +7,19 @@ use std::process::Command;
 
 use ezc_core::{
     build_application_semantic_model, build_application_semantic_model_for_unit,
-    build_resume_manifest, build_resume_plan, build_runtime_component_artifact,
-    build_runtime_component_registry, build_runtime_context_artifact, build_semantic_graph,
-    build_template_manifest_from_asm, collect_component_diagnostics, generate_runtime_stub,
-    lower_components_to_ir, optimize_context_ir, resume_manifest_json,
-    runtime_component_artifact_json, runtime_context_artifact_json, semantic_graph_json,
-    template_manifest_json, validate_application_semantic_model, validate_resume_manifest,
+    build_resume_manifest, build_runtime_component_artifact, build_runtime_component_registry,
+    build_runtime_context_artifact, build_semantic_graph, build_template_manifest_from_asm,
+    collect_component_diagnostics, generate_runtime_stub, lower_components_to_ir,
+    optimize_context_ir, resume_manifest_json, runtime_component_artifact_json,
+    runtime_context_artifact_json, semantic_graph_json, template_manifest_json,
+    validate_application_semantic_model, validate_resume_manifest,
     validate_runtime_component_artifact, BlockedComponentInstancePlan,
     BlockedComponentInstanceReason, CompilationUnit, ComponentInstanceStatus,
     ComponentInvocationResolutionStatus, CompositionCompatibility, InstanceContextResolutionStatus,
-    SlotBindingStatus, COMPONENT_DIAGNOSTIC_CONTRACTS, RESUME_MANIFEST_SCHEMA_VERSION,
-    RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION, RUNTIME_COMPONENT_REGISTRY_SCHEMA_CONTRACT_VERSION,
-    RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, SEMANTIC_GRAPH_SCHEMA_VERSION,
-    TEMPLATE_MANIFEST_SCHEMA_VERSION,
+    ResumeManifestPhaseIComponentResumeRecord, SlotBindingStatus, COMPONENT_DIAGNOSTIC_CONTRACTS,
+    RESUME_MANIFEST_SCHEMA_VERSION, RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION,
+    RUNTIME_COMPONENT_REGISTRY_SCHEMA_CONTRACT_VERSION, RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION,
+    SEMANTIC_GRAPH_SCHEMA_VERSION, TEMPLATE_MANIFEST_SCHEMA_VERSION,
 };
 
 fn repo_root() -> PathBuf {
@@ -352,28 +352,33 @@ fn component_runtime_and_resume_fixtures_preserve_order_isolation_structure_and_
         .iter()
         .all(|binding| binding.content_owner_instance == binding.caller_instance));
 
-    let resume = build_resume_manifest(&build_resume_plan(&model));
+    let resume = build_resume_manifest(&model);
     assert_eq!(resume.schema_version, RESUME_MANIFEST_SCHEMA_VERSION);
     assert!(validate_resume_manifest(&resume).is_empty());
-    let resume_ids = resume
-        .component_instances
+    let component_instances = resume
+        .phase_i_component_resume_records
+        .iter()
+        .filter_map(|record| match record {
+            ResumeManifestPhaseIComponentResumeRecord::ComponentInstance { component_instance } => {
+                Some(component_instance)
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let resume_ids = component_instances
         .iter()
         .map(|instance| instance.resume_id.as_str())
         .collect::<BTreeSet<_>>();
-    assert_eq!(resume_ids.len(), resume.component_instances.len());
+    assert_eq!(resume_ids.len(), component_instances.len());
     assert_eq!(
         resume_manifest_json(&resume),
-        resume_manifest_json(&build_resume_manifest(&build_resume_plan(&fixture_model(
-            path
-        ))))
+        resume_manifest_json(&build_resume_manifest(&fixture_model(path)))
     );
-    assert!(resume
-        .component_instances
+    assert!(component_instances
         .iter()
         .all(|instance| instance.active_status == "active"));
     assert!(
-        resume
-            .component_instances
+        component_instances
             .iter()
             .filter(|instance| instance.component.ends_with("/component:x-runtime-card"))
             .map(|instance| instance.resume_id.as_str())
@@ -382,7 +387,14 @@ fn component_runtime_and_resume_fixtures_preserve_order_isolation_structure_and_
             >= 2
     );
     assert_eq!(
-        resume.slot_bindings.len(),
+        resume
+            .phase_i_component_resume_records
+            .iter()
+            .filter(|record| matches!(
+                record,
+                ResumeManifestPhaseIComponentResumeRecord::SlotBinding { .. }
+            ))
+            .count(),
         artifact.slot_binding_programs.len()
     );
 
@@ -402,21 +414,38 @@ fn component_runtime_and_resume_fixtures_preserve_order_isolation_structure_and_
                     .rev()
                     .eq(program.template_instances.iter())
         }));
-    let structural_resume = build_resume_manifest(&build_resume_plan(&structural));
-    assert!(!structural_resume.structural_regions.is_empty());
+    let structural_resume = build_resume_manifest(&structural);
     assert!(structural_resume
-        .component_instances
+        .phase_i_component_resume_records
         .iter()
+        .any(|record| matches!(
+            record,
+            ResumeManifestPhaseIComponentResumeRecord::StructuralRegion { .. }
+        )));
+    assert!(structural_resume
+        .phase_i_component_resume_records
+        .iter()
+        .filter_map(|record| match record {
+            ResumeManifestPhaseIComponentResumeRecord::ComponentInstance { component_instance } =>
+                Some(component_instance),
+            _ => None,
+        })
         .any(|instance| instance.active_status == "inactive"));
     assert!(structural_resume
-        .structural_regions
+        .phase_i_component_resume_records
         .iter()
+        .filter_map(|record| match record {
+            ResumeManifestPhaseIComponentResumeRecord::StructuralRegion { structural_region } => {
+                Some(structural_region)
+            }
+            _ => None,
+        })
         .all(|region| region.active_status == "inactive"));
     assert_eq!(
         resume_manifest_json(&structural_resume),
-        resume_manifest_json(&build_resume_manifest(&build_resume_plan(&fixture_model(
+        resume_manifest_json(&build_resume_manifest(&fixture_model(
             "fixtures/0065-component-runtime/input/StructuralComponents.tsx"
-        ))))
+        )))
     );
 
     let failure = fixture_model("fixtures/0065-component-runtime/input/FailureIsolation.tsx");
@@ -438,10 +467,15 @@ fn component_runtime_and_resume_fixtures_preserve_order_isolation_structure_and_
         .instances
         .iter()
         .any(|instance| instance.component.ends_with("/component:x-safe-leaf")));
-    let failure_resume = build_resume_manifest(&build_resume_plan(&failure));
+    let failure_resume = build_resume_manifest(&failure);
     assert!(failure_resume
-        .component_instances
+        .phase_i_component_resume_records
         .iter()
+        .filter_map(|record| match record {
+            ResumeManifestPhaseIComponentResumeRecord::ComponentInstance { component_instance } =>
+                Some(component_instance),
+            _ => None,
+        })
         .all(|instance| !instance.component.contains("Missing")));
 }
 
@@ -546,15 +580,12 @@ fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
     assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 6);
     assert_eq!(RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION, 3);
     assert_eq!(RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, 2);
-    assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 5);
+    assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 6);
     assert_eq!(TEMPLATE_MANIFEST_SCHEMA_VERSION, 4);
     assert_eq!(component_artifact.schema_version, 3);
     assert!(validate_runtime_component_artifact(&component_artifact).is_ok());
     assert_eq!(build_semantic_graph(&model).schema_version, 6);
-    assert_eq!(
-        build_resume_manifest(&build_resume_plan(&model)).schema_version,
-        5
-    );
+    assert_eq!(build_resume_manifest(&model).schema_version, 6);
     assert_eq!(build_template_manifest_from_asm(&model).schema_version, 4);
 
     for (args, expected_status, expected_schema) in [
@@ -600,7 +631,11 @@ fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
     for (needle, authorities) in [
         (
             "ComponentInstanceId::for_",
-            &["component_instance.rs", "resume_identity.rs"][..],
+            &[
+                "component_instance.rs",
+                "resume_identity.rs",
+                "resume_liveness.rs",
+            ][..],
         ),
         (
             "ComponentStructuralRegionId::for_",

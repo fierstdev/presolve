@@ -495,12 +495,8 @@ mod tests {
             crate::template_manifest_json(&crate::build_template_manifest_from_asm(&second)),
         );
         assert_eq!(
-            crate::resume_manifest_json(&crate::build_resume_manifest(&crate::build_resume_plan(
-                &first
-            ))),
-            crate::resume_manifest_json(&crate::build_resume_manifest(&crate::build_resume_plan(
-                &second
-            ))),
+            crate::resume_manifest_json(&crate::build_resume_manifest(&first)),
+            crate::resume_manifest_json(&crate::build_resume_manifest(&second)),
         );
     }
 }

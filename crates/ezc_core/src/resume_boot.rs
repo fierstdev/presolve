@@ -18,7 +18,7 @@ pub fn build_resume_boot_plan(model: &ApplicationSemanticModel) -> ResumeBootPla
     let instances = build_serializable_instances(model);
     let diagnostics = validate_resume_instances(&plan, &instances);
     ResumeBootPlan {
-        manifest: build_resume_manifest(&plan),
+        manifest: build_resume_manifest(model),
         instances,
         zero_replay: diagnostics.is_empty(),
         diagnostics,

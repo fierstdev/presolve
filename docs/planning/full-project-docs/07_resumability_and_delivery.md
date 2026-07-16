@@ -200,6 +200,31 @@ and empty rather than fabricating references. Internal integrity codes
 phases/duplicate writes, missing completion, and ordering/output drift. No
 public schema or runtime behavior changes.
 
+## Phase J executable resume manifest
+
+J9 advances the sole resume manifest authority from v5 to v6 and publishes the
+J1-J8 boundary, liveness, schema, capture, restore, chunk, activation, and
+normalized Phase I resume records. Snapshot schema v1 and runtime protocol v1
+are now public version fields. V5 is rejected at the v6 runtime boundary; no
+compatibility adapter or second planning authority remains.
+
+The standalone `resume.runtime.json` artifact uses compact canonical JSON with
+one trailing newline. The generated page embeds those exact bytes in
+`#ez-resume-runtime`, without reformatting or reserializing them. The parser
+rejects unknown fields, version drift, malformed shapes, duplicate identities,
+and every unresolved cross-reference before runtime consumption.
+
+`ResumeBuildId` is SHA-256 lowercase hexadecimal over framed canonical bytes
+for every executable runtime artifact, the v6 manifest with its build ID set to
+the fixed zero sentinel, normalized eager/lazy chunk bytes, the anchor/event
+marker plan, runtime protocol v1, and snapshot schema v1. Absolute source-root
+prefixes, provenance/spans, wall-clock time, diagnostics, output directory,
+and machine information do not influence the fingerprint. Executable changes
+do. Repeated and reversed builds remain byte-identical.
+
+J9 emits empty anchor and event arrays intentionally. J10 alone adds exact
+`data-ez-r`/`data-ez-e` marker records and HTML markers.
+
 ## Definition
 
 In EdgeZero, resumability means:

@@ -1,7 +1,7 @@
 use crate::{
     runtime_component_artifact_json, runtime_computed_artifact_json, runtime_context_artifact_json,
     runtime_effect_artifact_json, runtime_forms_artifact_json, template_manifest_json,
-    RuntimeComponentArtifact, RuntimeComputedArtifact, RuntimeContextArtifact,
+    ResumeManifest, RuntimeComponentArtifact, RuntimeComputedArtifact, RuntimeContextArtifact,
     RuntimeEffectArtifact, RuntimeFormsArtifact, TemplateManifest,
 };
 
@@ -11,7 +11,9 @@ pub fn generate_standalone_page(
     body_html: &str,
     manifest: &TemplateManifest,
 ) -> String {
-    generate_page(title, body_html, manifest, None, None, None, None, None)
+    generate_page(
+        title, body_html, manifest, None, None, None, None, None, None,
+    )
 }
 
 /// Generate a standalone page with compiler-generated computed runtime data.
@@ -27,6 +29,7 @@ pub fn generate_standalone_page_with_computed_runtime(
         body_html,
         manifest,
         Some(computed),
+        None,
         None,
         None,
         None,
@@ -52,6 +55,7 @@ pub fn generate_standalone_page_with_effect_runtime(
         Some(effects),
         None,
         None,
+        None,
     )
 }
 
@@ -72,6 +76,7 @@ pub fn generate_standalone_page_with_context_runtime(
         Some(computed),
         Some(context),
         Some(effects),
+        None,
         None,
         None,
     )
@@ -96,6 +101,7 @@ pub fn generate_standalone_page_with_component_runtime(
         Some(context),
         Some(effects),
         Some(components),
+        None,
         None,
     )
 }
@@ -123,6 +129,35 @@ pub fn generate_standalone_page_with_component_runtime_and_forms(
         Some(effects),
         Some(components),
         Some(forms),
+        None,
+    )
+}
+
+/// Generate a standalone page with every runtime artifact and the exact J9
+/// resume-manifest bytes embedded for runtime consumption.
+#[must_use]
+#[allow(clippy::too_many_arguments)]
+pub fn generate_standalone_page_with_resume_runtime(
+    title: &str,
+    body_html: &str,
+    manifest: &TemplateManifest,
+    computed: &RuntimeComputedArtifact,
+    context: &RuntimeContextArtifact,
+    effects: &RuntimeEffectArtifact,
+    components: &RuntimeComponentArtifact,
+    forms: &RuntimeFormsArtifact,
+    resume: &ResumeManifest,
+) -> String {
+    generate_page(
+        title,
+        body_html,
+        manifest,
+        Some(computed),
+        Some(context),
+        Some(effects),
+        Some(components),
+        Some(forms),
+        Some(resume),
     )
 }
 
@@ -136,6 +171,7 @@ fn generate_page(
     effects: Option<&RuntimeEffectArtifact>,
     components: Option<&RuntimeComponentArtifact>,
     forms: Option<&RuntimeFormsArtifact>,
+    resume: Option<&ResumeManifest>,
 ) -> String {
     let manifest_json = template_manifest_json(manifest);
 
@@ -209,6 +245,11 @@ fn generate_page(
             output.push_str(&escape_script_json_line(line));
             output.push('\n');
         }
+        output.push_str("    </script>\n");
+    }
+    if let Some(resume) = resume {
+        output.push_str("    <script type=\"application/json\" id=\"ez-resume-runtime\">");
+        output.push_str(&crate::resume_manifest_json(resume));
         output.push_str("    </script>\n");
     }
     output.push_str("    <script src=\"./runtime.js\" defer></script>\n");

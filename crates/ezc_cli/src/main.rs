@@ -9,22 +9,21 @@ use std::process;
 use ezc_core::{
     build_application_semantic_model_for_unit, build_component_graph,
     build_context_inspection_registry, build_effect_inspection_registry,
-    build_form_inspection_registry, build_runtime_component_artifact,
+    build_form_inspection_registry, build_resume_manifest, build_runtime_component_artifact,
     build_runtime_computed_artifact, build_runtime_context_artifact, build_runtime_effect_artifact,
     build_runtime_forms_artifact, build_semantic_graph, build_template_graph,
     build_template_manifest_from_asm, explain_json, explain_text, fold_component_graph,
     generate_ordinary_instance_html, generate_runtime_stub,
-    generate_standalone_page_with_component_runtime_and_forms, generate_static_html,
-    lower_components_to_ir, optimize_context_ir, optimize_effect_ir,
-    runtime_component_artifact_json, runtime_computed_artifact_json, runtime_context_artifact_json,
-    runtime_effect_artifact_json, runtime_forms_artifact_json, semantic_graph_json,
-    semantic_type_text, summarize_source, template_manifest_json,
-    validate_application_semantic_model, ApplicationSemanticModel, AsmValidationDiagnostic,
-    AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
-    EffectInspection, EffectInspectionRegistry, ImmutableAsmPass, RenderAttribute,
-    RenderAttributeValue, SemanticEntity, SemanticEntityKind, SemanticId, SemanticOwner,
-    SemanticReferenceKind, SerializableValue, SourceProvenance, StateOperation, TemplateChild,
-    TemplateGraph, TemplateSemanticKind,
+    generate_standalone_page_with_resume_runtime, generate_static_html, lower_components_to_ir,
+    optimize_context_ir, optimize_effect_ir, resume_manifest_json, runtime_component_artifact_json,
+    runtime_computed_artifact_json, runtime_context_artifact_json, runtime_effect_artifact_json,
+    runtime_forms_artifact_json, semantic_graph_json, semantic_type_text, summarize_source,
+    template_manifest_json, validate_application_semantic_model, ApplicationSemanticModel,
+    AsmValidationDiagnostic, AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass,
+    DeclaredStateTypeKind, EffectInspection, EffectInspectionRegistry, ImmutableAsmPass,
+    RenderAttribute, RenderAttributeValue, SemanticEntity, SemanticEntityKind, SemanticId,
+    SemanticOwner, SemanticReferenceKind, SerializableValue, SourceProvenance, StateOperation,
+    TemplateChild, TemplateGraph, TemplateSemanticKind,
 };
 use ezc_parser::{
     parse_file, ParseDiagnostic, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
@@ -1887,13 +1886,15 @@ fn run_build(mut args: Vec<String>) {
     let component_runtime_json = runtime_component_artifact_json(&component_runtime_artifact);
     let forms_runtime_artifact = build_runtime_forms_artifact(&asm);
     let forms_runtime_json = runtime_forms_artifact_json(&forms_runtime_artifact);
+    let resume_runtime_artifact = build_resume_manifest(&asm);
+    let resume_runtime_json = resume_manifest_json(&resume_runtime_artifact);
     let component_graph = fold_component_graph(&build_component_graph(&parsed));
     let template_graph = build_template_graph(&component_graph);
     let html_fragment = generate_ordinary_instance_html(&asm);
     let manifest = build_template_manifest_from_asm(&asm);
     let manifest_json = template_manifest_json(&manifest);
     let page_title = page_title_from_graph(&template_graph);
-    let page_html = generate_standalone_page_with_component_runtime_and_forms(
+    let page_html = generate_standalone_page_with_resume_runtime(
         &page_title,
         &html_fragment,
         &manifest,
@@ -1902,6 +1903,7 @@ fn run_build(mut args: Vec<String>) {
         &effect_runtime_artifact,
         &component_runtime_artifact,
         &forms_runtime_artifact,
+        &resume_runtime_artifact,
     );
     let runtime_js = generate_runtime_stub();
 
@@ -1914,6 +1916,7 @@ fn run_build(mut args: Vec<String>) {
         &effect_runtime_json,
         &component_runtime_json,
         &forms_runtime_json,
+        &resume_runtime_json,
         &runtime_js,
     )
     .unwrap_or_else(|error| {
@@ -1932,6 +1935,7 @@ fn run_build(mut args: Vec<String>) {
     println!("Wrote {}", out_dir.join("effect.runtime.json").display());
     println!("Wrote {}", out_dir.join("component.runtime.json").display());
     println!("Wrote {}", out_dir.join("forms.runtime.json").display());
+    println!("Wrote {}", out_dir.join("resume.runtime.json").display());
     println!("Wrote {}", out_dir.join("runtime.js").display());
 }
 
@@ -2731,6 +2735,7 @@ fn write_build_artifacts(
     effect_runtime_json: &str,
     component_runtime_json: &str,
     forms_runtime_json: &str,
+    resume_runtime_json: &str,
     runtime_js: &str,
 ) -> io::Result<()> {
     fs::create_dir_all(out_dir)?;
@@ -2749,6 +2754,7 @@ fn write_build_artifacts(
         component_runtime_json,
     )?;
     fs::write(out_dir.join("forms.runtime.json"), forms_runtime_json)?;
+    fs::write(out_dir.join("resume.runtime.json"), resume_runtime_json)?;
 
     fs::write(out_dir.join("runtime.js"), runtime_js)?;
 

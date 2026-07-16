@@ -5,20 +5,19 @@ use std::process::{Command, Output};
 
 use ezc_core::{
     build_application_semantic_model, build_application_semantic_model_for_unit,
-    build_resume_manifest, build_resume_plan, build_runtime_context_artifact,
-    build_runtime_context_registry, build_semantic_graph, build_template_manifest_from_asm,
-    collect_context_diagnostics, collect_context_resolutions, generate_runtime_stub,
-    lower_components_to_ir, optimize_context_ir, resume_manifest_json,
-    runtime_context_artifact_json, semantic_graph_json, validate_application_semantic_model,
-    validate_context_ir, validate_optimized_context_ir, validate_resume_manifest,
-    validate_runtime_context_registry, CompatibilityStatus, CompilationUnit, ComponentScopeGraph,
-    ConsumerId, ContextBindingCompatibility, ContextBindingLifetimeStatus,
-    ContextDeclarationStatus, ContextDependencyNodeId, ContextResolutionResult,
-    ContextSerializationCompatibility, ContextSlotResumeStatus, ContextSourceBlockReason,
-    ContextSourcePlanStatus, ContextValueSourceId, IrInstructionKind, ProviderId,
-    RuntimeContextSourceKind, RESUME_MANIFEST_SCHEMA_VERSION,
-    RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, SEMANTIC_GRAPH_SCHEMA_VERSION,
-    TEMPLATE_MANIFEST_SCHEMA_VERSION,
+    build_resume_manifest, build_runtime_context_artifact, build_runtime_context_registry,
+    build_semantic_graph, build_template_manifest_from_asm, collect_context_diagnostics,
+    collect_context_resolutions, generate_runtime_stub, lower_components_to_ir,
+    optimize_context_ir, resume_manifest_json, runtime_context_artifact_json, semantic_graph_json,
+    validate_application_semantic_model, validate_context_ir, validate_optimized_context_ir,
+    validate_resume_manifest, validate_runtime_context_registry, CompatibilityStatus,
+    CompilationUnit, ComponentScopeGraph, ConsumerId, ContextBindingCompatibility,
+    ContextBindingLifetimeStatus, ContextDeclarationStatus, ContextDependencyNodeId,
+    ContextResolutionResult, ContextSerializationCompatibility, ContextSlotResumeStatus,
+    ContextSourceBlockReason, ContextSourcePlanStatus, ContextValueSourceId, IrInstructionKind,
+    ProviderId, ResumeManifestPhaseIComponentResumeRecord, RuntimeContextSourceKind,
+    RESUME_MANIFEST_SCHEMA_VERSION, RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION,
+    SEMANTIC_GRAPH_SCHEMA_VERSION, TEMPLATE_MANIFEST_SCHEMA_VERSION,
 };
 
 fn repo_root() -> PathBuf {
@@ -271,16 +270,23 @@ fn context_compiler_fixture_covers_resume_and_candidate_exclusion() {
     let model = fixture_model(path);
     let component = &model.components[0].id;
     let total_provider = ProviderId::for_component(component, "providedTotal");
-    let resume = build_resume_plan(&model);
-    let manifest = build_resume_manifest(&resume);
-    assert_eq!(manifest.schema_version, 5);
-    assert_eq!(manifest.context_slots.len(), 3);
-    assert!(manifest
-        .context_slots
+    let manifest = build_resume_manifest(&model);
+    assert_eq!(manifest.schema_version, 6);
+    let context_slots = manifest
+        .phase_i_component_resume_records
+        .iter()
+        .filter_map(|record| match record {
+            ResumeManifestPhaseIComponentResumeRecord::ContextSlot { context_slot } => {
+                Some(context_slot)
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(context_slots.len(), 3);
+    assert!(context_slots
         .iter()
         .all(|record| record.initial_status == ContextSlotResumeStatus::Uninitialized));
-    let total_resume = manifest
-        .context_slots
+    let total_resume = context_slots
         .iter()
         .find(|record| record.source == total_provider.as_str())
         .unwrap();
@@ -582,9 +588,16 @@ fn blocked_context_fixture_products_are_excluded_from_ir_runtime_and_resume() {
         assert!(build_runtime_context_artifact(&model, &ir)
             .sources
             .is_empty());
-        assert!(build_resume_manifest(&build_resume_plan(&model))
-            .context_slots
-            .is_empty());
+        assert!(build_resume_manifest(&model)
+            .phase_i_component_resume_records
+            .iter()
+            .find_map(|record| match record {
+                ResumeManifestPhaseIComponentResumeRecord::ContextSlot { context_slot } => {
+                    Some(context_slot)
+                }
+                _ => None,
+            })
+            .is_none());
     }
 }
 
@@ -679,8 +692,8 @@ fn context_fixture_outputs_are_byte_deterministic_across_all_serialized_surfaces
         runtime_context_artifact_json(&build_runtime_context_artifact(&model, &second_ir))
     );
     assert_eq!(
-        resume_manifest_json(&build_resume_manifest(&build_resume_plan(&model))),
-        resume_manifest_json(&build_resume_manifest(&build_resume_plan(&model)))
+        resume_manifest_json(&build_resume_manifest(&model)),
+        resume_manifest_json(&build_resume_manifest(&model))
     );
 
     let out_a = repo_root().join("target/ezc-test-output/context-fixture-determinism-a");
@@ -692,7 +705,11 @@ fn context_fixture_outputs_are_byte_deterministic_across_all_serialized_surfaces
         let output = run_cli(&["build", path, "--out", out.to_str().unwrap()]);
         assert!(output.status.success());
     }
-    for artifact in ["context.runtime.json", "template.manifest.json"] {
+    for artifact in [
+        "context.runtime.json",
+        "resume.runtime.json",
+        "template.manifest.json",
+    ] {
         assert_eq!(
             fs::read(out_a.join(artifact)).unwrap(),
             fs::read(out_b.join(artifact)).unwrap()
@@ -718,7 +735,7 @@ fn phase_g_freezes_schema_versions_runtime_order_and_no_discovery_contract() {
     assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 6);
     assert_eq!(RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, 2);
     assert_eq!(TEMPLATE_MANIFEST_SCHEMA_VERSION, 4);
-    assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 5);
+    assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 6);
 
     let path = "fixtures/0059-context-runtime-matrix/input/ContextRuntimeMatrix.tsx";
     let model = fixture_model(path);
@@ -733,8 +750,8 @@ fn phase_g_freezes_schema_versions_runtime_order_and_no_discovery_contract() {
         build_runtime_context_artifact(&model, &optimized).schema_version,
         2
     );
-    let resume = build_resume_manifest(&build_resume_plan(&model));
-    assert_eq!(resume.schema_version, 5);
+    let resume = build_resume_manifest(&model);
+    assert_eq!(resume.schema_version, 6);
     assert!(validate_resume_manifest(&resume).is_empty());
     assert_eq!(build_template_manifest_from_asm(&model).schema_version, 4);
 

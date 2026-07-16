@@ -6,6 +6,9 @@
 use std::fmt;
 use std::str::FromStr;
 
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+
 use crate::{
     ComponentInstanceId, ComponentRootId, ComponentStructuralRegionId, ComputedCacheSlotId,
     ComputedDirtyFlagId, FormInstanceId, IrStorageId, SemanticId,
@@ -13,7 +16,8 @@ use crate::{
 
 macro_rules! resume_id {
     ($name:ident) => {
-        #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+        #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+        #[serde(transparent)]
         pub struct $name(String);
 
         impl $name {
@@ -445,9 +449,18 @@ impl ResumeAnchorId {
     }
 }
 impl ResumeBuildId {
+    pub const ZERO_SENTINEL: &'static str =
+        "resume-build:0000000000000000000000000000000000000000000000000000000000000000";
+
     #[must_use]
     pub fn for_public_inputs(inputs: &str) -> Self {
-        Self(format!("resume-build:{:016x}", canonical_hash(inputs)))
+        let digest = Sha256::digest(inputs.as_bytes());
+        Self(format!("resume-build:{digest:x}"))
+    }
+
+    #[must_use]
+    pub fn zero_sentinel() -> Self {
+        Self(Self::ZERO_SENTINEL.to_string())
     }
 }
 

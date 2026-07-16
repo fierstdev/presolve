@@ -123,8 +123,18 @@ class App extends Component {
             ContextSlotResumeStatus::Uninitialized
         );
         assert_ne!(record.resume_slot.as_str(), record.runtime_slot.as_str());
-        let manifest = build_resume_manifest(&plan);
-        assert_eq!(manifest.schema_version, 5);
-        assert_eq!(manifest.context_slots.len(), 1);
+        let manifest = build_resume_manifest(&model);
+        assert_eq!(manifest.schema_version, 6);
+        assert_eq!(
+            manifest
+                .phase_i_component_resume_records
+                .iter()
+                .filter(|record| matches!(
+                    record,
+                    crate::ResumeManifestPhaseIComponentResumeRecord::ContextSlot { .. }
+                ))
+                .count(),
+            1
+        );
     }
 }

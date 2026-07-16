@@ -142,7 +142,7 @@ mod tests {
             RESUME_INTEGRITY_RESERVATION_END - RESUME_INTEGRITY_RESERVATION_START + 1,
             96
         );
-        assert_eq!(crate::RESUME_MANIFEST_SCHEMA_VERSION, 5);
+        assert_eq!(crate::RESUME_MANIFEST_SCHEMA_VERSION, 6);
         assert_eq!(crate::SEMANTIC_GRAPH_SCHEMA_VERSION, 6);
         assert_eq!(crate::TEMPLATE_MANIFEST_SCHEMA_VERSION, 4);
     }

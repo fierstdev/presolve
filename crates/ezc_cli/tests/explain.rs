@@ -4020,6 +4020,7 @@ fn build_command_writes_page_manifest_and_runtime_artifacts() {
     let stdout = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
     assert!(stdout.contains("index.html"));
     assert!(stdout.contains("template.manifest.json"));
+    assert!(stdout.contains("resume.runtime.json"));
     assert!(stdout.contains("runtime.js"));
 
     let actual_html =
@@ -4032,6 +4033,7 @@ fn build_command_writes_page_manifest_and_runtime_artifacts() {
     assert!(actual_html.contains("<!--ez-ti-binding-start:"));
     assert!(actual_html.contains("<!--ez-ti-binding-end:"));
     assert!(actual_html.contains("id=\"ez-template-manifest\""));
+    assert!(actual_html.contains("id=\"ez-resume-runtime\""));
     assert!(actual_html.contains("\"name\": \"NestedCounter\""));
     assert!(actual_html.contains("<script src=\"./runtime.js\" defer></script>"));
 
@@ -4042,6 +4044,27 @@ fn build_command_writes_page_manifest_and_runtime_artifacts() {
             .expect("failed to read expected nested manifest");
 
     assert_json_eq(&actual_manifest, &expected_manifest);
+
+    let actual_resume = std::fs::read_to_string(out_dir.join("resume.runtime.json"))
+        .expect("failed to read built resume manifest");
+    let parsed_resume: serde_json::Value =
+        serde_json::from_str(&actual_resume).expect("resume manifest JSON");
+    assert_eq!(parsed_resume["schema_version"], 6);
+    assert_eq!(parsed_resume["snapshot_schema_version"], 1);
+    assert_eq!(parsed_resume["runtime_protocol_version"], 1);
+    assert!(parsed_resume["build_id"]
+        .as_str()
+        .is_some_and(|build_id| build_id.starts_with("resume-build:")));
+    let resume_script_prefix = "<script type=\"application/json\" id=\"ez-resume-runtime\">";
+    let embedded_start = actual_html
+        .find(resume_script_prefix)
+        .expect("embedded resume manifest")
+        + resume_script_prefix.len();
+    let embedded_end = actual_html[embedded_start..]
+        .find("    </script>\n")
+        .map(|offset| embedded_start + offset)
+        .expect("embedded resume manifest close");
+    assert_eq!(&actual_html[embedded_start..embedded_end], actual_resume);
 
     let actual_runtime =
         std::fs::read_to_string(out_dir.join("runtime.js")).expect("failed to read built runtime");

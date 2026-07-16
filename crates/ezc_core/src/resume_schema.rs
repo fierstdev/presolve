@@ -2,6 +2,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
     build_computed_instance_slot_registry, build_resume_boundary_graph, build_resume_liveness_plan,
     build_runtime_component_registry, build_state_instance_storage_registry,
@@ -11,13 +13,14 @@ use crate::{
 
 pub const RESUME_SCHEMA_REGISTRY_VERSION: u32 = 1;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ResumeObjectPropertyCodec {
     pub name: String,
     pub codec: ResumeValueCodec,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum ResumeValueCodec {
     NullCodec,
     BooleanCodec,
