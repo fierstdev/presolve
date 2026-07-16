@@ -69,6 +69,7 @@ pub mod provider;
 pub mod resume_boot;
 pub mod resume_diagnostics;
 pub mod resume_explain;
+pub mod resume_identity;
 pub mod resume_instance;
 pub mod resume_manifest;
 pub mod resume_plan;
@@ -364,6 +365,12 @@ pub use provider::{collect_provider_entities, DuplicateProviderDeclaration, Prov
 pub use resume_diagnostics::{
     ResumeDiagnosticReservation, RESUME_DIAGNOSTIC_RESERVATIONS, RESUME_INTEGRITY_RESERVATION_END,
     RESUME_INTEGRITY_RESERVATION_START,
+};
+pub use resume_identity::{
+    ResumeActivationId, ResumeActivationRootKind, ResumeAnchorId, ResumeBoundaryId,
+    ResumeBoundaryKind, ResumeBuildId, ResumeCaptureProgramId, ResumeChunkGroupId, ResumeChunkId,
+    ResumeEventId, ResumeIdentityParseError, ResumeRestoreProgramId, ResumeSchemaId, ResumeSlotId,
+    ResumeSnapshotId, ResumeValueRecordId,
 };
 pub use resume_manifest::{
     build_resume_manifest, resume_manifest_json, validate_resume_manifest, ResumeManifest,

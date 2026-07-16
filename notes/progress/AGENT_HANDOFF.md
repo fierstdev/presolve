@@ -3,8 +3,8 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: J0 - Phase J Entry Audit and Reservations
-* Working tree: J0 verified; commit pending. No executable Phase J product exists.
+* Latest completed slice: J1 - Canonical Resume Identities
+* Working tree: J1 verified; commit pending. No public resume product exists.
 * Date: 2026-07-15
 
 Last completed slice
@@ -16,12 +16,17 @@ Last completed slice
 
 Current in-progress slice
 
-* Slice: J0 - Phase J Entry Audit and Reservations
-* Status: Phase I is committed and its repaired full gate passed. J0 reserves only public and internal diagnostic ranges; J1 has not started.
+* Slice: J1 - Canonical Resume Identities
+* Status: Typed compiler-only Phase J identities are complete. No public serialization or schema change occurred.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase I: none. Next slice: J1 - Canonical Resume Identities.
+* Remaining in Phase I: none. Next slice: J2 - Resumability Liveness and Retained Slots.
 
 Verification
+
+* J1 `cargo test -p ezc_core resume_identity::tests::j1_resume_identities_are_typed_deterministic_and_instance_qualified`: pass
+* J1 `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass
+* J1 `cargo fmt --all --check`: pass
+* J1 `git diff --check`: pass
 
 * J0 `cargo test -p ezc_core j0_reserves_the_public_and_internal_resumability_ranges_without_products`: pass (1 focused entry-freeze test)
 * J0 `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass
