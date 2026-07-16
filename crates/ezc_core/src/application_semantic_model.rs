@@ -47,6 +47,7 @@ use crate::form_binding::{
 };
 use crate::form_field::{collect_form_field_products, FormFieldEntity};
 use crate::form_ownership::{collect_form_ownership_graph, FormOwnershipGraph};
+use crate::form_reset::{collect_reset_products, ResetProducts};
 use crate::form_serialization::{collect_serialization_products, SerializationProducts};
 use crate::form_submission::{collect_submission_products, SubmissionProducts};
 use crate::form_tracking::{collect_form_tracking_products, FormTrackingProducts};
@@ -105,6 +106,7 @@ pub struct ApplicationSemanticModel {
     pub form_tracking: FormTrackingProducts,
     pub submissions: SubmissionProducts,
     pub serialization: SerializationProducts,
+    pub reset: ResetProducts,
     pub slots: BTreeMap<SlotId, SlotEntity>,
     pub component_invocations: BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
     pub component_instance_plan: ComponentInstancePlan,
@@ -537,6 +539,11 @@ impl ApplicationSemanticModel {
     #[must_use]
     pub const fn serialization(&self) -> &SerializationProducts {
         &self.serialization
+    }
+
+    #[must_use]
+    pub const fn reset(&self) -> &ResetProducts {
+        &self.reset
     }
 
     #[must_use]
@@ -1591,6 +1598,7 @@ pub fn build_application_semantic_model_from_component_graph(
         &form_fields,
         &submissions.plans,
     );
+    let reset = collect_reset_products(&forms, &form_fields, &form_field_bindings, &form_tracking);
     let effect_execution_plan = plan_effect_execution(
         &computed_values,
         &effects,
@@ -1659,6 +1667,7 @@ pub fn build_application_semantic_model_from_component_graph(
         form_tracking,
         submissions,
         serialization,
+        reset,
         slots,
         component_invocations,
         component_instance_plan,
@@ -2041,6 +2050,7 @@ fn build_application_semantic_model_from_files_with_bindings(
     );
     let serialization =
         collect_serialization_products(&components, &forms, &form_fields, &submissions.plans);
+    let reset = collect_reset_products(&forms, &form_fields, &form_field_bindings, &form_tracking);
     let effect_execution_plan = plan_effect_execution(
         &computed_values,
         &effects,
@@ -2107,6 +2117,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         form_tracking,
         submissions,
         serialization,
+        reset,
         slots,
         component_invocations,
         component_instance_plan,

@@ -13,6 +13,7 @@ pub struct AsmValidationDiagnostic {
 }
 
 #[must_use]
+#[allow(clippy::too_many_lines)]
 pub fn validate_application_semantic_model(
     model: &ApplicationSemanticModel,
 ) -> Vec<AsmValidationDiagnostic> {
@@ -98,6 +99,7 @@ pub fn validate_application_semantic_model(
     validate_form_tracking(model, &mut diagnostics);
     validate_form_submissions(model, &mut diagnostics);
     validate_form_serialization(model, &mut diagnostics);
+    validate_form_reset(model, &mut diagnostics);
     validate_contexts(model, &mut diagnostics);
     validate_providers(model, &mut diagnostics);
     validate_consumers(model, &mut diagnostics);
@@ -277,6 +279,24 @@ fn validate_form_serialization(
             code: "EZASM1287".to_string(),
             message: "I10 serialization products do not match canonical declaration planning"
                 .to_string(),
+        });
+    }
+}
+
+fn validate_form_reset(
+    model: &ApplicationSemanticModel,
+    diagnostics: &mut Vec<AsmValidationDiagnostic>,
+) {
+    let expected = crate::collect_reset_products(
+        &model.forms,
+        &model.form_fields,
+        &model.form_field_bindings,
+        &model.form_tracking,
+    );
+    if model.reset != expected {
+        diagnostics.push(AsmValidationDiagnostic {
+            code: "EZASM1288".to_string(),
+            message: "I11 reset products do not match canonical declaration planning".to_string(),
         });
     }
 }

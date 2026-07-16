@@ -161,6 +161,14 @@ pub struct SubmissionPlanId(SemanticId);
 #[serde(transparent)]
 pub struct SerializationPlanId(SemanticId);
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ResetPlanId(SemanticId);
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct FieldResetOperationId(SemanticId);
+
 /// Stable identity for one compiler-owned component Slot semantic entity.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -433,6 +441,16 @@ impl SemanticId {
     #[must_use]
     pub fn serialization_plan(&self) -> Self {
         Self(format!("{}/serialization-plan", self.as_str()))
+    }
+
+    #[must_use]
+    pub fn reset_plan(&self) -> Self {
+        Self(format!("{}/reset-plan", self.as_str()))
+    }
+
+    #[must_use]
+    pub fn field_reset_operation(&self, field: &Self) -> Self {
+        self.child("field-reset", field.as_str())
     }
 
     #[must_use]
@@ -1018,6 +1036,39 @@ impl SerializationPlanId {
         &self.0
     }
 
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl ResetPlanId {
+    #[must_use]
+    pub fn for_form(form: &FormId) -> Self {
+        Self(form.as_semantic_id().reset_plan())
+    }
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl FieldResetOperationId {
+    #[must_use]
+    pub fn for_plan_and_field(plan: &ResetPlanId, field: &FieldId) -> Self {
+        Self(
+            plan.as_semantic_id()
+                .field_reset_operation(field.as_semantic_id()),
+        )
+    }
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
     #[must_use]
     pub fn as_str(&self) -> &str {
         self.0.as_str()

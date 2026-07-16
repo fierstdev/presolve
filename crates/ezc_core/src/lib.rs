@@ -47,6 +47,7 @@ pub mod form_binding;
 pub mod form_diagnostics;
 pub mod form_field;
 pub mod form_ownership;
+pub mod form_reset;
 pub mod form_serialization;
 pub mod form_submission;
 pub mod form_tracking;
@@ -259,6 +260,9 @@ pub use form_ownership::{
     FormOwnershipIntegrityKind, FormOwnershipNode, FormOwnershipNodeKey, FormOwnershipValidation,
     FormReferenceEdge, FormReferenceKind,
 };
+pub use form_reset::{
+    collect_reset_products, FieldResetOperation, FieldResetStep, FormResetPlan, ResetProducts,
+};
 pub use form_serialization::{
     collect_serialization_products, FormFieldSerializationConversion, FormSerializationFormat,
     FormSerializationPlan, SerializationDeclarationFact, SerializationPlanStatus,
@@ -403,13 +407,14 @@ pub use semantic_graph::{
 pub use semantic_id::{
     ComponentInstanceId, ComponentInvocationId, ComponentRootId, ComponentStructuralRegionId,
     ConsumerId, ContextDeclarationCandidateId, ContextId, DirtyTrackingPlanId, EffectId,
-    EffectStatementId, FieldBindingId, FieldDependencyId, FieldId, FieldTrackingId,
-    FormDeclarationCandidateId, FormFieldBindingCandidateId, FormFieldDeclarationCandidateId,
-    FormId, FormInstanceId, FormOwnershipGraphId, ProviderId, SemanticId, SemanticOwner,
-    SerializationPlanId, SlotBindingId, SlotContentFragmentId, SlotDeclarationCandidateId, SlotId,
-    SlotOutletId, SubmissionDeclarationCandidateId, SubmissionPlanId, TemplatePositionId,
-    TouchedTrackingPlanId, ValidationDependencyCycleId, ValidationGraphId, ValidationPlanId,
-    ValidationRuleCandidateId, ValidationRuleId,
+    EffectStatementId, FieldBindingId, FieldDependencyId, FieldId, FieldResetOperationId,
+    FieldTrackingId, FormDeclarationCandidateId, FormFieldBindingCandidateId,
+    FormFieldDeclarationCandidateId, FormId, FormInstanceId, FormOwnershipGraphId, ProviderId,
+    ResetPlanId, SemanticId, SemanticOwner, SerializationPlanId, SlotBindingId,
+    SlotContentFragmentId, SlotDeclarationCandidateId, SlotId, SlotOutletId,
+    SubmissionDeclarationCandidateId, SubmissionPlanId, TemplatePositionId, TouchedTrackingPlanId,
+    ValidationDependencyCycleId, ValidationGraphId, ValidationPlanId, ValidationRuleCandidateId,
+    ValidationRuleId,
 };
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};

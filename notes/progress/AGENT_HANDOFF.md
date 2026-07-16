@@ -3,25 +3,30 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: I10 - Serialization Planning
-* Working tree: I10 is verified; commit pending.
+* Latest completed slice: I11 - Reset Planning
+* Working tree: I11 is verified; commit pending.
 * Date: 2026-07-15
 
 Last completed slice
 
-* Slice: I10 - Serialization Planning
-* Summary: I10 retains `@serialize(...)` facts on canonical Form declarations and lowers one `SerializationPlanId::for_form` plan for every valid Form. It selects JSON by default or a static `json`, `form-data`, or `url-encoded` format, preserves I3 Field/key order, records compiler-owned conversion kinds, rejects invalid decorator groups and nonserializable Fields from executable membership, and links valid I9 submission plans by exact identity.
-* Key files: crates/ezc_core/src/form_serialization.rs, crates/ezc_parser/src/oxc_adapter.rs, crates/ezc_core/src/component_graph.rs, crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/application_semantic_model.rs
-* Schema decision: I10 remains an internal plan only. Existing public schemas and runtime artifacts remain unchanged; no serializer execution, submission execution, reset execution, Form instance, runtime artifact, or browser behavior is introduced.
+* Slice: I11 - Reset Planning
+* Summary: I11 creates one `ResetPlanId` per valid Form and one exact `FieldResetOperationId` per Field. Each operation follows I3 order, restores the canonical initial value, writes every I4-bound control, clears I8 dirty/touched and I6 Field validation, then the Form plan clears aggregate validity and submission state with validation scheduling frozen false.
+* Key files: crates/ezc_core/src/form_reset.rs, crates/ezc_core/src/semantic_id.rs, crates/ezc_core/src/application_semantic_model.rs, crates/ezc_core/src/asm_validation.rs, crates/ezc_core/src/lib.rs
+* Schema decision: I11 remains an internal reset program only. Existing public schemas and runtime artifacts remain unchanged; reset is not executed and no runtime state or DOM behavior is introduced.
 
 Current in-progress slice
 
-* Slice: I11 - Reset Planning
-* Status: I10 is complete and ready to commit. I11 may only define deterministic reset operations over I3/I4/I6/I8 canonical products; do not execute reset or introduce runtime state.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I10
-* Remaining in Phase I: I11 through I20.
+* Slice: I12 - Canonical Form IR
+* Status: I11 is complete and ready to commit. I12 is the first slice allowed to project declaration Forms onto frozen Phase H Component instances and instance-qualified storage; do not create instances outside that authority.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I11
+* Remaining in Phase I: I12 through I20.
 
 Verification
+
+* I11 `cargo test -p ezc_core`: pass (340 core tests, including focused I11 reset planning)
+* `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass
+* `cargo fmt --check`: pass
+* git diff --check: pass
 
 * I10 `cargo test -p ezc_parser -p ezc_core`: pass (13 parser unit, 26 parser integration, 339 core tests including 2 focused I10 tests)
 * `cargo clippy -p ezc_parser -p ezc_core --all-targets -- -D warnings`: pass
