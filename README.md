@@ -141,6 +141,12 @@ in [`docs/component-contract.md`](docs/component-contract.md). The runtime
 consumes closed compiler-ID tables and performs no component or Slot discovery,
 Provider or parent search, authored-name lookup, or virtual-DOM diffing.
 
+## Resumability contract
+
+Phase J same-build continuation, snapshot/manifest versions, restore order,
+exact lazy activation, diagnostics, and runtime no-discovery invariants are
+frozen in [`docs/resumability-contract.md`](docs/resumability-contract.md).
+
 ## Computed values: supported contract and limits
 
 `@computed()` currently applies only to synchronous getters with one supported

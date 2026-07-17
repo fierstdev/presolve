@@ -57,7 +57,11 @@ definition, instance, State/computed slot, initialization-batch, Slot-binding,
 instance-Context, ordinary-template, and structural-region identities. It
 performs no tag lookup, Slot-name matching, parent or Provider search,
 component discovery, or virtual-DOM diffing. The complete frozen component
-boundary is documented in [Component contract](component-contract.md).
+boundary is documented in [Component contract](component-contract.md). Phase J
+resume uses the exact manifest-v6/snapshot-v1 registry protocol and closed
+anchor/event indexes; its same-build, no-discovery, failure, schema, and
+diagnostic rules are frozen in the
+[Resumability contract](resumability-contract.md).
 
 ## Diagnostics
 

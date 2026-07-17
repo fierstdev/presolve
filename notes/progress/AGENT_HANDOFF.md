@@ -1201,8 +1201,14 @@ Known limitations
 
 Exact next step
 
-Commit J20 atomically as `test: expand phase J resumability fixtures`, verify
-the worktree is clean, then perform the J21 stability audit and Phase J freeze.
+Phase J is complete and frozen at J21. The current versions are semantic graph
+v6, template manifest v4, component artifact v3, Context artifact v2,
+Forms/Effect artifacts v1, resume manifest v6, snapshot v1, runtime
+protocol/registry v1, ASM inspection v11, and check JSON v6. J21 added
+`docs/resumability-contract.md`, linked it from runtime/README documentation,
+and ran the sequential format, all-feature clippy, `just check`, diff, and
+real-browser gates. The worktree must remain clean; do not enter Phase K
+without its authoritative roadmap contract.
 
 Useful commands
 
