@@ -317,6 +317,238 @@ fn explicit_form_hosts_submit_only_through_compiler_emitted_records() {
 }
 
 #[test]
+fn resume_bootstrap_registry_accepts_and_atomically_falls_back_in_a_real_browser() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/resume-bootstrap");
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean resume bootstrap output");
+    }
+    fs::create_dir_all(&out_dir).expect("failed to create resume bootstrap output");
+    let input = out_dir.join("ResumeCounter.tsx");
+    fs::write(
+        &input,
+        r#"
+@component("resume-counter") class ResumeCounter {
+  count = state(1);
+  @action() increment() { this.count += 1; }
+  render() { return <button onClick={() => this.increment()}>{this.count}</button>; }
+}"#,
+    )
+    .expect("failed to write resume bootstrap source");
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            input.to_str().expect("input UTF-8"),
+            "--out",
+            out_dir.to_str().expect("output UTF-8"),
+        ])
+        .output()
+        .expect("failed to build resume bootstrap source");
+    assert!(
+        output.status.success(),
+        "resume bootstrap build failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    write_resume_bootstrap_probe_pages(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    for (index, (page, marker)) in [
+        ("cold.html", "EDGEZERO_RESUME_COLD_PASS"),
+        ("accepted.html", "EDGEZERO_RESUME_ACCEPTED_PASS"),
+        ("build-mismatch.html", "EDGEZERO_RESUME_BUILD_FALLBACK_PASS"),
+        (
+            "protocol-mismatch.html",
+            "EDGEZERO_RESUME_ARTIFACT_FALLBACK_PASS",
+        ),
+        (
+            "malformed-snapshot.html",
+            "EDGEZERO_RESUME_SNAPSHOT_FALLBACK_PASS",
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let profile_dir = out_dir.join(format!("chrome-profile-{index}"));
+        fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile");
+        let output = run_chrome_probe(
+            chrome.clone(),
+            &format!("--user-data-dir={}", profile_dir.display()),
+            &format!("http://127.0.0.1:{}/{page}", server.port),
+        );
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            stdout.contains(marker),
+            "resume bootstrap probe failed for {page}\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+            output.status,
+            stdout,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    server.stop();
+}
+
+fn write_resume_bootstrap_probe_pages(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("built page");
+    let resume_json =
+        fs::read_to_string(out_dir.join("resume.runtime.json")).expect("resume manifest");
+    let manifest: serde_json::Value =
+        serde_json::from_str(&resume_json).expect("resume manifest JSON");
+    let snapshot = resume_bootstrap_snapshot(&manifest);
+
+    let cold = resume_bootstrap_probe_page(
+        &index,
+        "",
+        r#"
+if (runtime.resume === undefined) fail("runtime boot failed: " + JSON.stringify(runtime.diagnostics));
+if (runtime.resume.mode !== "cold" || runtime.resume.failure !== null) fail("no-snapshot boot was not cold");
+if (!(runtime.store?.components instanceof Map) || runtime.components[0].state.count !== 1) fail("cold runtime did not initialize");
+if (runtime.resume_registry !== null) fail("cold boot retained a resume registry");
+document.querySelector("button").click();
+await waitFor(() => runtime.components[0].state.count === 2, "cold action");"#,
+        "EDGEZERO_RESUME_COLD_PASS",
+    );
+    fs::write(out_dir.join("cold.html"), cold).expect("cold probe");
+
+    let accepted = resume_bootstrap_probe_page(
+        &index,
+        &format!(
+            "window.__EDGEZERO_RESUME_SNAPSHOT__ = {};",
+            serde_json::to_string(&snapshot).expect("snapshot JSON")
+        ),
+        r#"
+if (runtime.resume.mode !== "resume" || runtime.resume.failure !== null) fail("valid snapshot was not accepted");
+if (!(runtime.resume_registry?.boundary_records instanceof Map)) fail("closed registry was not allocated");
+if (runtime.resume_registry.boundary_records.size !== 0 || runtime.resume_registry.slot_values.size !== 0) fail("registry retained partial runtime state");
+if (runtime.store !== null || runtime.components.length !== 0) fail("resume path executed cold authored initialization");
+const eventId = runtime.resume_registry.definitions.events.keys().next().value;
+const activation = await window.__EDGEZERO_RESUME__.activateByEvent(eventId);
+if (activation.status !== "registered") fail("event activation API did not resolve the exact boundary");
+if (window.__EDGEZERO_RESUME__.captureSnapshot().failure !== "NotQuiescent") fail("capture API contract was absent");
+let doubleFailure = null;
+try { await window.__EDGEZERO_RESUME__.bootstrapResume(); } catch (error) { doubleFailure = error.failure; }
+if (doubleFailure !== "DoubleBootstrap") fail("double bootstrap was not rejected");"#,
+        "EDGEZERO_RESUME_ACCEPTED_PASS",
+    );
+    fs::write(out_dir.join("accepted.html"), accepted).expect("accepted probe");
+
+    let mut wrong_build = snapshot.clone();
+    wrong_build["buildId"] = serde_json::Value::String(
+        "resume-build:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_string(),
+    );
+    let rejected = resume_bootstrap_probe_page(
+        &index,
+        &format!(
+            "window.__EDGEZERO_RESUME_SNAPSHOT__ = {};",
+            serde_json::to_string(&wrong_build).expect("wrong build snapshot JSON")
+        ),
+        &fallback_assertions("BuildIdMismatch"),
+        "EDGEZERO_RESUME_BUILD_FALLBACK_PASS",
+    );
+    fs::write(out_dir.join("build-mismatch.html"), rejected).expect("build fallback probe");
+
+    let protocol_page = replace_json_script(&index, "ez-resume-runtime", |value| {
+        value["runtime_protocol_version"] = serde_json::Value::from(2);
+    });
+    let protocol_page = resume_bootstrap_probe_page(
+        &protocol_page,
+        "",
+        &fallback_assertions("RuntimeProtocolMismatch"),
+        "EDGEZERO_RESUME_ARTIFACT_FALLBACK_PASS",
+    );
+    fs::write(out_dir.join("protocol-mismatch.html"), protocol_page)
+        .expect("artifact fallback probe");
+
+    let mut malformed = snapshot;
+    malformed["unknown"] = serde_json::Value::Bool(true);
+    let malformed_page = resume_bootstrap_probe_page(
+        &index,
+        &format!(
+            "window.__EDGEZERO_RESUME_SNAPSHOT__ = {};",
+            serde_json::to_string(&malformed).expect("malformed snapshot JSON")
+        ),
+        &fallback_assertions("SnapshotSchemaMismatch"),
+        "EDGEZERO_RESUME_SNAPSHOT_FALLBACK_PASS",
+    );
+    fs::write(out_dir.join("malformed-snapshot.html"), malformed_page)
+        .expect("snapshot fallback probe");
+}
+
+fn resume_bootstrap_snapshot(manifest: &serde_json::Value) -> serde_json::Value {
+    let boundaries = manifest["boundaries"]
+        .as_array()
+        .expect("resume boundaries")
+        .iter()
+        .map(|boundary| {
+            serde_json::json!({
+                "boundaryId": boundary["boundary_id"],
+                "schemaId": boundary["schema_id"],
+                "values": []
+            })
+        })
+        .collect::<Vec<_>>();
+    serde_json::json!({
+        "schemaVersion": 1,
+        "buildId": manifest["build_id"],
+        "snapshotId": format!("resume-snapshot:{}", manifest["build_id"].as_str().expect("build ID")),
+        "manifestVersion": 6,
+        "capturedAt": null,
+        "boundaries": boundaries
+    })
+}
+
+fn fallback_assertions(failure: &str) -> String {
+    format!(
+        r#"
+if (runtime.resume.mode !== "cold" || runtime.resume.failure !== "{failure}") fail("resume failure did not select one cold boot");
+if (!(runtime.store?.components instanceof Map) || runtime.components[0].state.count !== 1) fail("cold fallback did not initialize exactly once");
+if (runtime.resume_registry !== null) fail("failed resume retained a partial registry");
+const evidence = window.__EDGEZERO_RESUME__.debugEvidence()[0];
+if (evidence.failure !== "{failure}" || (evidence.boundary_ids ?? []).length !== 0) fail("fallback debug evidence retained partial state");"#
+    )
+}
+
+fn resume_bootstrap_probe_page(
+    index: &str,
+    prelude: &str,
+    assertions: &str,
+    marker: &str,
+) -> String {
+    let runtime_tag = r#"<script src="./runtime.js" defer></script>"#;
+    let page = index.replace(
+        runtime_tag,
+        &format!("<script>{prelude}</script>\n{runtime_tag}"),
+    );
+    let split = marker.len() / 2;
+    let marker_start = &marker[..split];
+    let marker_end = &marker[split..];
+    let probe = format!(
+        r#"<script>
+const fail = (message) => {{ throw new Error(message); }};
+const waitFor = async (predicate, label) => {{
+  for (let attempt = 0; attempt < 200; attempt += 1) {{
+    if (predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }}
+  fail(`Timed out waiting for ${{label}}`);
+}};
+(async () => {{
+  await waitFor(() => window.__EDGEZERO__ !== undefined, "runtime");
+  const runtime = window.__EDGEZERO__;
+  {assertions}
+  document.body.insertAdjacentHTML("beforeend", "<div>" + "{marker_start}" + "{marker_end}" + "</div>");
+}})().catch((error) => {{
+  document.body.insertAdjacentHTML("beforeend", `<pre>EDGEZERO_RESUME_BOOTSTRAP_FAIL: ${{error.message}}</pre>`);
+}});
+</script>
+</body>"#
+    );
+    page.replace("</body>", &probe)
+}
+
+#[test]
 fn component_structural_programs_preserve_host_dom_identity_in_a_real_browser() {
     let _guard = browser_test_guard();
     let repo_root = repo_root();

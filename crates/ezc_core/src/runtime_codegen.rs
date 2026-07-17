@@ -7,6 +7,8 @@ const RUNTIME_STUB: &str = r#"(() => {
   const CONTEXT_ARTIFACT_ELEMENT_ID = "ez-context-runtime";
   const COMPONENT_ARTIFACT_ELEMENT_ID = "ez-component-runtime";
   const FORMS_ARTIFACT_ELEMENT_ID = "ez-forms-runtime";
+  const RESUME_MANIFEST_ELEMENT_ID = "ez-resume-runtime";
+  const RESUME_SNAPSHOT_ELEMENT_ID = "ez-resume-snapshot";
   const RUNTIME_VERSION = "0.0.0";
   const SUPPORTED_SCHEMA_VERSION = 4;
   const ACTION_MANIFEST_SCHEMA_VERSION = 2;
@@ -18,6 +20,10 @@ const RUNTIME_STUB: &str = r#"(() => {
   const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = __EZ_COMPONENT_SCHEMA_VERSION__;
   const LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 1;
+  const SUPPORTED_RESUME_MANIFEST_SCHEMA_VERSION = 6;
+  const SUPPORTED_RESUME_SNAPSHOT_SCHEMA_VERSION = 1;
+  const SUPPORTED_RESUME_RUNTIME_PROTOCOL_VERSION = 1;
+  const RESUME_REGISTRY_CONTRACT_VERSION = 1;
 
   class EdgeZeroBootError extends Error {
     constructor(code) {
@@ -41,6 +47,292 @@ const RUNTIME_STUB: &str = r#"(() => {
     diagnostics.push(diagnostic);
     console.error(`[EdgeZero] ${code}`, diagnostic);
     return diagnostic;
+  }
+
+  class ResumeBootError extends Error {
+    constructor(failure, detail = {}) {
+      super(failure);
+      this.name = "ResumeBootError";
+      this.failure = failure;
+      this.detail = detail;
+    }
+  }
+
+  const resumeBootstrapState = {
+    phase: "idle",
+    manifest: null,
+    registry: null,
+    result: null,
+    debug: []
+  };
+
+  function exactObjectKeys(value, expected) {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+    const actual = Object.keys(value).sort();
+    const canonical = [...expected].sort();
+    return actual.length === canonical.length
+      && actual.every((key, index) => key === canonical[index]);
+  }
+
+  function readResumeManifest(diagnostics) {
+    const element = document.getElementById(RESUME_MANIFEST_ELEMENT_ID);
+    if (!(element instanceof HTMLScriptElement)) {
+      reportDiagnostic(diagnostics, "EZR_RESUME_MANIFEST_MISSING", "Resume manifest v6 is missing", { artifactElementId: RESUME_MANIFEST_ELEMENT_ID });
+      throw new ResumeBootError("ManifestVersionMismatch");
+    }
+    try {
+      return JSON.parse(element.textContent ?? "");
+    } catch (error) {
+      reportDiagnostic(diagnostics, "EZR_RESUME_MANIFEST_PARSE", "Resume manifest v6 could not be parsed", { message: error instanceof Error ? error.message : String(error) });
+      throw new ResumeBootError("ManifestVersionMismatch");
+    }
+  }
+
+  function readOptionalResumeSnapshot(diagnostics, explicitSnapshot) {
+    if (explicitSnapshot !== undefined) return explicitSnapshot;
+    if (window.__EDGEZERO_RESUME_SNAPSHOT__ !== undefined) {
+      return window.__EDGEZERO_RESUME_SNAPSHOT__;
+    }
+    const element = document.getElementById(RESUME_SNAPSHOT_ELEMENT_ID);
+    if (element === null) return null;
+    if (!(element instanceof HTMLScriptElement)) {
+      reportDiagnostic(diagnostics, "EZR_RESUME_SNAPSHOT_PARSE", "Resume snapshot was not stored in a JSON script element", { artifactElementId: RESUME_SNAPSHOT_ELEMENT_ID });
+      throw new ResumeBootError("SnapshotParseFailure");
+    }
+    try {
+      return JSON.parse(element.textContent ?? "");
+    } catch (error) {
+      reportDiagnostic(diagnostics, "EZR_RESUME_SNAPSHOT_PARSE", "Resume snapshot v1 could not be parsed", { message: error instanceof Error ? error.message : String(error) });
+      throw new ResumeBootError("SnapshotParseFailure");
+    }
+  }
+
+  function uniqueRecordIndex(records, key, failure = "DuplicateIdentity") {
+    if (!Array.isArray(records)) throw new ResumeBootError("ResumeArtifactMismatch");
+    const index = new Map();
+    for (const record of records) {
+      const id = record?.[key];
+      if (typeof id !== "string" || index.has(id)) throw new ResumeBootError(failure, { id });
+      index.set(id, record);
+    }
+    return index;
+  }
+
+  function validateResumeManifest(manifest) {
+    const topLevelKeys = [
+      "schema_version", "build_id", "snapshot_schema_version", "runtime_protocol_version",
+      "application_root_boundary_id", "boundaries", "slot_schemas", "capture_programs",
+      "restore_programs", "chunks", "activations", "anchors", "events",
+      "phase_i_component_resume_records", "phase_i_form_resume_records"
+    ];
+    if (!exactObjectKeys(manifest, topLevelKeys)) throw new ResumeBootError("ResumeArtifactMismatch");
+    if (manifest.schema_version !== SUPPORTED_RESUME_MANIFEST_SCHEMA_VERSION) {
+      throw new ResumeBootError("ManifestVersionMismatch");
+    }
+    if (manifest.snapshot_schema_version !== SUPPORTED_RESUME_SNAPSHOT_SCHEMA_VERSION) {
+      throw new ResumeBootError("SnapshotSchemaMismatch");
+    }
+    if (manifest.runtime_protocol_version !== SUPPORTED_RESUME_RUNTIME_PROTOCOL_VERSION) {
+      throw new ResumeBootError("RuntimeProtocolMismatch");
+    }
+    if (typeof manifest.build_id !== "string" || !/^resume-build:[0-9a-f]{64}$/.test(manifest.build_id)) {
+      throw new ResumeBootError("ResumeArtifactMismatch");
+    }
+    const boundaries = uniqueRecordIndex(manifest.boundaries, "boundary_id");
+    const slots = uniqueRecordIndex(manifest.slot_schemas, "slot_id");
+    const capturePrograms = uniqueRecordIndex(manifest.capture_programs, "program_id");
+    const restorePrograms = uniqueRecordIndex(manifest.restore_programs, "program_id");
+    const chunks = uniqueRecordIndex(manifest.chunks, "chunk_id");
+    const activations = uniqueRecordIndex(manifest.activations, "activation_id");
+    const anchors = uniqueRecordIndex(manifest.anchors, "anchor_id");
+    const events = uniqueRecordIndex(manifest.events, "resume_event_id");
+    if (!boundaries.has(manifest.application_root_boundary_id)) {
+      throw new ResumeBootError("UnknownBoundary");
+    }
+    for (const boundary of boundaries.values()) {
+      if (!capturePrograms.has(boundary.capture_program_id)
+        || !restorePrograms.has(boundary.restore_program_id)
+        || (boundary.parent_boundary_id !== undefined && !boundaries.has(boundary.parent_boundary_id))
+        || !boundary.child_boundary_ids.every((id) => boundaries.has(id))
+        || !boundary.anchor_ids.every((id) => anchors.has(id))
+        || !boundary.event_ids.every((id) => events.has(id))) {
+        throw new ResumeBootError("ResumeArtifactMismatch", { boundary: boundary.boundary_id });
+      }
+    }
+    for (const slot of slots.values()) {
+      if (!boundaries.has(slot.owner_boundary_id)) throw new ResumeBootError("UnknownBoundary");
+    }
+    for (const activation of activations.values()) {
+      if (!boundaries.has(activation.boundary_id)
+        || !chunks.has(activation.chunk_id)
+        || !activation.prerequisite_boundary_ids.every((id) => boundaries.has(id))
+        || (activation.event_id !== undefined && !events.has(activation.event_id))) {
+        throw new ResumeBootError("ResumeArtifactMismatch", { activation: activation.activation_id });
+      }
+    }
+    for (const anchor of anchors.values()) {
+      if (!boundaries.has(anchor.boundary_id)) throw new ResumeBootError("UnknownBoundary");
+    }
+    for (const event of events.values()) {
+      if (!anchors.has(event.exact_target_anchor_id)
+        || !boundaries.has(event.owner_boundary_id)
+        || !chunks.has(event.chunk_id)) {
+        throw new ResumeBootError("ResumeArtifactMismatch", { event: event.resume_event_id });
+      }
+    }
+    return { boundaries, slots, capturePrograms, restorePrograms, chunks, activations, anchors, events };
+  }
+
+  function validateResumeSnapshot(snapshot, manifest, definitions) {
+    if (!exactObjectKeys(snapshot, ["schemaVersion", "buildId", "snapshotId", "manifestVersion", "capturedAt", "boundaries"])) {
+      throw new ResumeBootError("SnapshotSchemaMismatch");
+    }
+    if (snapshot.schemaVersion !== SUPPORTED_RESUME_SNAPSHOT_SCHEMA_VERSION
+      || snapshot.manifestVersion !== SUPPORTED_RESUME_MANIFEST_SCHEMA_VERSION
+      || snapshot.capturedAt !== null
+      || typeof snapshot.snapshotId !== "string") {
+      throw new ResumeBootError("SnapshotSchemaMismatch");
+    }
+    if (snapshot.buildId !== manifest.build_id) throw new ResumeBootError("BuildIdMismatch");
+    const seenBoundaries = new Set();
+    const seenSlots = new Set();
+    if (!Array.isArray(snapshot.boundaries)) throw new ResumeBootError("SnapshotSchemaMismatch");
+    for (const boundary of snapshot.boundaries) {
+      if (!exactObjectKeys(boundary, ["boundaryId", "schemaId", "values"])) {
+        throw new ResumeBootError("SnapshotSchemaMismatch");
+      }
+      const definition = definitions.boundaries.get(boundary.boundaryId);
+      if (definition === undefined) throw new ResumeBootError("UnknownBoundary");
+      if (seenBoundaries.has(boundary.boundaryId)) throw new ResumeBootError("DuplicateIdentity");
+      if (boundary.schemaId !== definition.schema_id || !Array.isArray(boundary.values)) {
+        throw new ResumeBootError("ResumeArtifactMismatch");
+      }
+      seenBoundaries.add(boundary.boundaryId);
+      for (const value of boundary.values) {
+        if (!exactObjectKeys(value, ["valueRecordId", "slotId", "value"])) {
+          throw new ResumeBootError("SnapshotSchemaMismatch");
+        }
+        const slot = definitions.slots.get(value.slotId);
+        if (slot === undefined) throw new ResumeBootError("UnknownSlot");
+        if (slot.owner_boundary_id !== boundary.boundaryId || seenSlots.has(value.slotId)) {
+          throw new ResumeBootError("DuplicateIdentity");
+        }
+        seenSlots.add(value.slotId);
+      }
+    }
+    return { seenBoundaries, seenSlots };
+  }
+
+  function allocateResumeRegistry(manifest, definitions) {
+    return {
+      contract_version: RESUME_REGISTRY_CONTRACT_VERSION,
+      build_id: manifest.build_id,
+      definitions,
+      boundary_records: new Map(),
+      slot_values: new Map(),
+      context_bindings: new Map(),
+      component_records: new Map(),
+      form_records: new Map(),
+      structural_records: new Map(),
+      effect_subscriptions: new Map(),
+      activation_states: new Map(),
+      debug: []
+    };
+  }
+
+  function resumeDebugEvidence(result) {
+    return {
+      contract_version: RESUME_REGISTRY_CONTRACT_VERSION,
+      mode: result.mode,
+      failure: result.failure ?? null,
+      build_id: resumeBootstrapState.manifest?.build_id ?? null,
+      boundary_ids: resumeBootstrapState.registry === null
+        ? []
+        : [...resumeBootstrapState.registry.definitions.boundaries.keys()],
+      slot_ids: resumeBootstrapState.registry === null
+        ? []
+        : [...resumeBootstrapState.registry.definitions.slots.keys()]
+    };
+  }
+
+  async function bootstrapResume(input = {}) {
+    if (resumeBootstrapState.phase !== "idle") {
+      throw new ResumeBootError("DoubleBootstrap");
+    }
+    resumeBootstrapState.phase = "booting";
+    const diagnostics = input.diagnostics ?? [];
+    let snapshot = null;
+    let coldAttempted = false;
+    try {
+      const manifest = input.resumeManifest ?? readResumeManifest(diagnostics);
+      const definitions = validateResumeManifest(manifest);
+      snapshot = readOptionalResumeSnapshot(diagnostics, input.snapshot);
+      resumeBootstrapState.manifest = manifest;
+      if (snapshot === null) {
+        coldAttempted = true;
+        const cold = await input.coldBoot?.("NoSnapshot");
+        const result = { mode: "cold", failure: null, cold };
+        resumeBootstrapState.phase = "ready";
+        resumeBootstrapState.result = result;
+        resumeBootstrapState.debug = [resumeDebugEvidence(result)];
+        return result;
+      }
+      validateResumeSnapshot(snapshot, manifest, definitions);
+      resumeBootstrapState.registry = allocateResumeRegistry(manifest, definitions);
+      const result = { mode: "resume", failure: null, registry: resumeBootstrapState.registry };
+      resumeBootstrapState.phase = "ready";
+      resumeBootstrapState.result = result;
+      resumeBootstrapState.debug = [resumeDebugEvidence(result)];
+      return result;
+    } catch (error) {
+      if (coldAttempted) {
+        resumeBootstrapState.phase = "failed";
+        throw error;
+      }
+      const failure = error instanceof ResumeBootError ? error.failure : "RestoreInstructionFailure";
+      resumeBootstrapState.registry = null;
+      resumeBootstrapState.debug = [{ contract_version: RESUME_REGISTRY_CONTRACT_VERSION, mode: "cold", failure }];
+      try {
+        coldAttempted = true;
+        const cold = await input.coldBoot?.(failure);
+        const result = { mode: "cold", failure, cold };
+        resumeBootstrapState.phase = "ready";
+        resumeBootstrapState.result = result;
+        return result;
+      } catch (coldError) {
+        resumeBootstrapState.phase = "failed";
+        throw coldError;
+      }
+    }
+  }
+
+  function captureSnapshot() {
+    if (resumeBootstrapState.phase !== "ready" || resumeBootstrapState.manifest === null) {
+      return { ok: false, failure: "NotQuiescent" };
+    }
+    return { ok: false, failure: "NotQuiescent" };
+  }
+
+  async function activateBoundary(boundaryId) {
+    const registry = resumeBootstrapState.registry;
+    if (registry === null || !registry.definitions.boundaries.has(boundaryId)) {
+      throw new ResumeBootError("UnknownBoundary", { boundaryId });
+    }
+    const activation = [...registry.definitions.activations.values()]
+      .find((record) => record.boundary_id === boundaryId);
+    if (activation === undefined) throw new ResumeBootError("ActivationFailure", { boundaryId });
+    return { boundary_id: boundaryId, activation_id: activation.activation_id, status: "registered" };
+  }
+
+  async function activateByEvent(resumeEventId) {
+    const registry = resumeBootstrapState.registry;
+    if (registry === null || !registry.definitions.events.has(resumeEventId)) {
+      throw new ResumeBootError("ActivationFailure", { resumeEventId });
+    }
+    const activation = [...registry.definitions.activations.values()]
+      .find((record) => record.event_id === resumeEventId);
+    if (activation === undefined) throw new ResumeBootError("ActivationFailure", { resumeEventId });
+    return activateBoundary(activation.boundary_id);
   }
 
   function readManifest(diagnostics) {
@@ -1310,7 +1602,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
   function dispatchEffectCapability(store, effect, instruction, values, evidence) {
     const runtimeLowering = instruction.runtime_lowering;
-    const arguments = (instruction.arguments ?? []).map((operand) =>
+    const capabilityArguments = (instruction.arguments ?? []).map((operand) =>
       computedOperandValue(store, values, operand)
     );
     const value = computedOperandValue(store, values, instruction.value);
@@ -1320,28 +1612,28 @@ const RUNTIME_STUB: &str = r#"(() => {
         document.title = value;
         break;
       case "builtin.browser.console.log":
-        console.log(...arguments);
+        console.log(...capabilityArguments);
         break;
       case "builtin.browser.console.info":
-        console.info(...arguments);
+        console.info(...capabilityArguments);
         break;
       case "builtin.browser.console.warn":
-        console.warn(...arguments);
+        console.warn(...capabilityArguments);
         break;
       case "builtin.browser.console.error":
-        console.error(...arguments);
+        console.error(...capabilityArguments);
         break;
       case "builtin.browser.local_storage.set_item":
-        localStorage.setItem(...arguments);
+        localStorage.setItem(...capabilityArguments);
         break;
       case "builtin.browser.local_storage.remove_item":
-        localStorage.removeItem(...arguments);
+        localStorage.removeItem(...capabilityArguments);
         break;
       case "builtin.browser.session_storage.set_item":
-        sessionStorage.setItem(...arguments);
+        sessionStorage.setItem(...capabilityArguments);
         break;
       case "builtin.browser.session_storage.remove_item":
-        sessionStorage.removeItem(...arguments);
+        sessionStorage.removeItem(...capabilityArguments);
         break;
       default:
         reportDiagnostic(
@@ -2066,6 +2358,11 @@ const RUNTIME_STUB: &str = r#"(() => {
   function initializeOrdinaryInstanceRuntime(store, manifest, componentArtifact) {
     if (manifest.schema_version !== SUPPORTED_SCHEMA_VERSION) return;
     const anchors = collectOrdinaryTargetAnchors();
+    for (const binding of manifest.ordinary_bindings ?? []) {
+      if (binding.kind !== "text" || anchors.targets.has(binding.instance_target_id)) continue;
+      const text = ordinaryTextBindingNode(binding.instance_binding_id);
+      if (text !== null) anchors.targets.set(binding.instance_target_id, text);
+    }
     const artifactTargets = new Map((componentArtifact.ordinary_template_targets ?? []).map((target) => [target.id, target]));
     const artifactBindings = new Map((componentArtifact.ordinary_template_bindings ?? []).map((binding) => [binding.id, binding]));
     const artifactEvents = new Map((componentArtifact.ordinary_template_events ?? []).map((event) => [ordinaryEventKey(event.target_id, event.event_type), event]));
@@ -2355,6 +2652,13 @@ const RUNTIME_STUB: &str = r#"(() => {
     window.__EDGEZERO__.computed_update_runs = store.computedUpdateRuns;
   }
 
+  function initialStateSlotValue(slot) {
+    if (slot.semantic_type !== "number") return slot.initial_value;
+    const value = Number(slot.initial_value);
+    if (!Number.isFinite(value)) throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+    return value;
+  }
+
   function runtimeState({
     manifest = null,
     missingAnchors = [],
@@ -2439,7 +2743,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         const definition = definitions.get(instance.component);
         if (definition === undefined) throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_COMPONENT");
         const definitionStates = (computedArtifact?.state ?? []).filter(
-          (state) => state.component === instance.component
+          (state) => state.component === definition.name
         );
         if ((instance.state_slots ?? []).length !== definitionStates.length) {
           throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
@@ -2453,7 +2757,7 @@ const RUNTIME_STUB: &str = r#"(() => {
             throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
           }
           store.stateSlotsByInstanceStorage.set(pair, slot);
-          store.storageValues.set(slot.slot_id, slot.initial_value);
+          store.storageValues.set(slot.slot_id, initialStateSlotValue(slot));
         }
         for (const state of definitionStates) {
           if (!store.stateSlotsByInstanceStorage.has(`${instance.instance}|${state.storage}`)) {
@@ -2473,7 +2777,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         }
         const component = { instance_id: instance.instance, name: instance.component, manifest: definition, state: {} };
         for (const state of computedArtifact?.state ?? []) {
-          if (state.component !== instance.component) continue;
+          if (state.component !== definition.name) continue;
           const slot = store.stateSlotsByInstanceStorage.get(`${instance.instance}|${state.storage}`);
           if (slot !== undefined) component.state[state.field] = store.storageValues.get(slot.slot_id);
         }
@@ -2542,7 +2846,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     });
   }
 
-  function boot() {
+  async function boot() {
     const diagnostics = [];
 
     try {
@@ -2559,7 +2863,28 @@ const RUNTIME_STUB: &str = r#"(() => {
       const formsArtifact = readFormsArtifact(diagnostics);
       validateFormsArtifact(formsArtifact, manifest, diagnostics);
 
-      const state = initializeRuntime(manifest, computedArtifact, contextArtifact, effectArtifact, componentArtifact, formsArtifact, diagnostics);
+      const result = await bootstrapResume({
+        diagnostics,
+        coldBoot: () => initializeRuntime(
+          manifest,
+          computedArtifact,
+          contextArtifact,
+          effectArtifact,
+          componentArtifact,
+          formsArtifact,
+          diagnostics
+        )
+      });
+      const state = result.mode === "cold"
+        ? result.cold
+        : runtimeState({ manifest, diagnostics });
+      state.resume = {
+        mode: result.mode,
+        failure: result.failure,
+        contract_version: RESUME_REGISTRY_CONTRACT_VERSION
+      };
+      state.resume_registry = result.mode === "resume" ? result.registry : null;
+      state.resume_debug = [...resumeBootstrapState.debug];
       const status = state.diagnostics.some((diagnostic) => diagnostic.fatal)
         || state.missingAnchors.length > 0
         ? "error"
@@ -2585,7 +2910,15 @@ const RUNTIME_STUB: &str = r#"(() => {
         })
       );
 
-      if (!(error instanceof EdgeZeroBootError)) {
+      if (error instanceof EdgeZeroBootError) {
+        reportDiagnostic(
+          diagnostics,
+          error.code,
+          "Runtime boot failed at a closed compiler contract boundary",
+          { code: error.code },
+          true
+        );
+      } else {
         reportDiagnostic(
           diagnostics,
           "EZR_RUNTIME_BOOT_FAILED",
@@ -2596,6 +2929,14 @@ const RUNTIME_STUB: &str = r#"(() => {
       }
     }
   }
+
+  window.__EDGEZERO_RESUME__ = Object.freeze({
+    bootstrapResume,
+    captureSnapshot,
+    activateByEvent,
+    activateBoundary,
+    debugEvidence: () => [...resumeBootstrapState.debug]
+  });
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot, {
@@ -2648,6 +2989,15 @@ mod tests {
         assert!(runtime.contains("/computed-cache:"));
         assert!(runtime.contains("/computed-dirty:"));
         assert!(runtime.contains("LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2"));
+        assert!(runtime.contains("RESUME_REGISTRY_CONTRACT_VERSION = 1"));
+        assert!(runtime.contains("function validateResumeManifest"));
+        assert!(runtime.contains("function validateResumeSnapshot"));
+        assert!(runtime.contains("async function bootstrapResume"));
+        assert!(runtime.contains("function captureSnapshot"));
+        assert!(runtime.contains("async function activateByEvent"));
+        assert!(runtime.contains("async function activateBoundary"));
+        assert!(runtime.contains("window.__EDGEZERO_RESUME__ = Object.freeze"));
+        assert!(runtime.contains("throw new ResumeBootError(\"DoubleBootstrap\")"));
         assert!(runtime.contains("ez-binding:"));
         assert!(runtime.contains("reportDiagnostic"));
         assert!(runtime.contains("validateManifestSchema"));
@@ -2668,6 +3018,7 @@ mod tests {
         assert!(runtime.contains("activeActionBatch"));
         assert!(runtime.contains("executeInitialEffects"));
         assert!(runtime.contains("dispatchEffectCapability"));
+        assert!(!runtime.contains("const arguments ="));
         assert!(runtime.contains("formatBindingValue"));
         assert!(runtime.contains("value === null ? \"\" : String(value)"));
         assert!(runtime.contains("listItemMemberPath"));

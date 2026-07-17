@@ -238,6 +238,35 @@ targets, duplicate anchors, wrong kinds, structural-pair mismatch, and
 noncanonical ordering/output. The template manifest remains unchanged; resume
 manifest v6 is the sole Phase J marker authority.
 
+## Phase J resume runtime registry and bootstrap
+
+J11 adds runtime Resume registry contract v1. The eager bootstrap validates
+the existing runtime artifacts plus resume manifest v6 before selecting a
+path. An absent snapshot is a normal cold boot. A structurally valid,
+same-build snapshot allocates closed, ID-keyed definition and runtime
+registries without running State initializers, Component initialization,
+Context sources, Forms, or Effects.
+
+Snapshot parse/schema/build/protocol and artifact failures discard the entire
+candidate registry before invoking the existing cold path exactly once. No
+partially allocated boundary, slot, Context, Component, Form, structural,
+Effect, or activation state survives. A second bootstrap is rejected.
+Development evidence exposes only deterministic version, mode, failure,
+build-ID, boundary-ID, and slot-ID facts.
+
+The internal runtime API now provides `bootstrapResume`, `captureSnapshot`,
+`activateByEvent`, and `activateBoundary`. J11 freezes their registry and
+identity boundary; later slices execute restore/capture and lazy activation
+programs through those APIs.
+
+The J11 readiness audit also repaired the preexisting ordinary cold path:
+generated strict-mode JavaScript no longer binds the reserved `arguments`
+identifier, instance State correlates compiler records through the manifest
+definition name, text-binding targets join the exact ordinary target index,
+and numeric instance-slot initial values enter storage as numbers. The focused
+probe constructs its success marker only after runtime assertions, so source
+text cannot produce a false pass.
+
 ## Definition
 
 In EdgeZero, resumability means:

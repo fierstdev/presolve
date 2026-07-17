@@ -3,25 +3,27 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: J10 - Resume Anchors and Event Markers
-* Working tree: ready for the atomic J10 commit; the next authored slice is J11 resume runtime registry and bootstrap loader.
+* Latest completed slice: J11 - Resume Runtime Registry and Bootstrap Loader
+* Working tree: ready for the atomic J11 commit; the next authored slice is J12 State, Resource, and Computed restoration.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: J10 - Resume Anchors and Event Markers
-* Summary: canonical instance-qualified marker plan, exact manifest/page anchor and event agreement, and frozen attribute/text/structural representations.
-* Key files: `resume_anchor.rs`, `ordinary_html_codegen.rs`, `resume_manifest.rs`, `resume_identity.rs`, `07_resumability_and_delivery.md`
-* Boundary: markers do not activate or restore runtime state; J11 alone adds the resume registry/bootstrap substrate.
+* Slice: J11 - Resume Runtime Registry and Bootstrap Loader
+* Summary: contract-v1 closed registries, exact artifact/snapshot validation, cold/resume selection, atomic cold fallback, deterministic debug evidence, and double-bootstrap rejection.
+* Key files: `runtime_codegen.rs`, `runtime_browser.rs`, `07_resumability_and_delivery.md`
+* Boundary: J11 accepts and allocates but does not decode/write State or Computed values; J12 alone executes R3-R5.
 
 Current in-progress slice
 
-* Slice: J11 - Resume Runtime Registry and Bootstrap Loader
-* Status: Ready after the atomic J10 commit.
+* Slice: J12 - State, Resource, and Computed Restoration
+* Status: Ready after the atomic J11 commit.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase I: none. Next: J11 artifact validation, cold/resume selection, closed registries, atomic cold fallback, and double-bootstrap rejection.
+* Remaining in Phase I: none. Next: J12 exact R3-R5 State/authorized Resource/retained Computed writes and approved Computed recomputation.
 
 Verification
+
+* J11 verification: hardened five-page real-browser matrix covers no-snapshot cold plus numeric action execution, accepted resume, build mismatch, runtime-protocol artifact rejection, malformed snapshot, empty rollback registries, exact activation lookup, double-bootstrap rejection, and suppression of authored cold initialization. The pass token does not occur literally in probe source. All 410 core tests, 2 CLI units, 7 Component fixtures, 12 Context fixtures, 128 CLI inspection/build tests, all 30 sequential real-browser probes, strict all-target core/CLI clippy, formatting, and `git diff --check` pass.
 
 * J10 verification: 5 focused marker-plan/HTML tests, all 410 core tests, 2 CLI units, 7 Component fixtures, 12 Context fixtures, all 128 CLI inspection/build tests, all 29 sequential real-browser probes, strict all-target core/CLI clippy, formatting, and `git diff --check` pass. Coverage includes every marker kind, Form and ordinary events, static-only omission, missing/unstable/duplicate/wrong-kind/structural-pair failures, exact page/manifest agreement, source-reversal/path-independent build identity, and byte determinism.
 
@@ -1195,9 +1197,9 @@ Known limitations
 
 Exact next step
 
-Commit J10 atomically as `compiler: emit exact resume anchors`, verify the
-worktree is clean, then implement J11 runtime resume registry/bootstrap
-contract v1 while preserving the existing cold path.
+Commit J11 atomically as `runtime: add resume bootstrap registry`, verify the
+worktree is clean, then implement J12 State, authorized Resource, retained
+Computed, and approved Computed recomputation for exact R3-R5.
 
 Useful commands
 
@@ -1228,12 +1230,8 @@ Useful commands
 
 Changed but uncommitted files
 
-* `crates/ezc_core/src/lib.rs`
-* `crates/ezc_core/src/ordinary_html_codegen.rs`
-* `crates/ezc_core/src/resume_anchor.rs`
-* `crates/ezc_core/src/resume_identity.rs`
-* `crates/ezc_core/src/resume_manifest.rs`
-* `crates/ezc_cli/tests/explain.rs`
+* `crates/ezc_core/src/runtime_codegen.rs`
+* `crates/ezc_cli/tests/runtime_browser.rs`
 * `docs/planning/full-project-docs/07_resumability_and_delivery.md`
 * `notes/progress/2026-W28.md`
 * `notes/progress/AGENT_HANDOFF.md`
