@@ -552,6 +552,121 @@ class ResumeContextFallback extends Component {
     );
 }
 
+#[test]
+fn resume_restores_components_and_structural_state_without_dom_reconstruction() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/resume-structure");
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean resume structure output");
+    }
+    fs::create_dir_all(&out_dir).expect("failed to create resume structure output");
+    let input = out_dir.join("ResumeStructure.tsx");
+    let source = fs::read_to_string(
+        repo_root.join("fixtures/0065-component-runtime/input/StructuralComponents.tsx"),
+    )
+    .expect("failed to read structural fixture")
+    .replace("  toggle()", "  @action() toggle()")
+    .replace("  reconcile()", "  @action() reconcile()")
+    .replace("  trim()", "  @action() trim()");
+    fs::write(&input, source).expect("failed to write resume structure source");
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            input.to_str().expect("input UTF-8"),
+            "--out",
+            out_dir.to_str().expect("output UTF-8"),
+        ])
+        .output()
+        .expect("failed to build resume structure fixture");
+    assert!(output.status.success(), "resume structure fixture failed");
+    write_resume_structure_probe_pages(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    for (index, (page, marker)) in [
+        ("probe.html", "EDGEZERO_RESUME_STRUCTURE_PASS"),
+        (
+            "state-mismatch.html",
+            "EDGEZERO_RESUME_STRUCTURE_FALLBACK_PASS",
+        ),
+        (
+            "missing-anchor.html",
+            "EDGEZERO_RESUME_ANCHOR_FALLBACK_PASS",
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let profile_dir = out_dir.join(format!("chrome-profile-{index}"));
+        fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile");
+        let output = run_chrome_probe(
+            chrome.clone(),
+            &format!("--user-data-dir={}", profile_dir.display()),
+            &format!("http://127.0.0.1:{}/{page}", server.port),
+        );
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            stdout.contains(marker),
+            "resume structure probe failed for {page}\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+            output.status,
+            stdout,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    server.stop();
+}
+
+#[test]
+fn resume_restores_exact_slot_bindings_without_component_initialization() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/resume-slots");
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean resume Slot output");
+    }
+    fs::create_dir_all(&out_dir).expect("failed to create resume Slot output");
+    let input = out_dir.join("ResumeSlots.tsx");
+    let source = fs::read_to_string(
+        repo_root.join("fixtures/0065-component-runtime/input/RuntimeComponents.tsx"),
+    )
+    .expect("failed to read Slot fixture")
+    .replace("  increment()", "  @action() increment()");
+    fs::write(&input, source).expect("failed to write resume Slot source");
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            input.to_str().expect("input UTF-8"),
+            "--out",
+            out_dir.to_str().expect("output UTF-8"),
+        ])
+        .output()
+        .expect("failed to build resume Slot fixture");
+    assert!(output.status.success(), "resume Slot fixture failed");
+    write_resume_slot_probe_page(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile");
+    let output = run_chrome_probe(
+        chrome,
+        &format!("--user-data-dir={}", profile_dir.display()),
+        &format!("http://127.0.0.1:{}/probe.html", server.port),
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("EDGEZERO_RESUME_SLOT_PASS"),
+        "resume Slot probe failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 fn write_resume_state_computed_probe_page(out_dir: &Path) {
     let index = fs::read_to_string(out_dir.join("index.html")).expect("built page");
     let resume_json =
@@ -600,6 +715,50 @@ if (runtime.diagnostics.some((diagnostic) => diagnostic.fatal)) fail("resume rep
         "EDGEZERO_RESUME_STATE_COMPUTED_PASS",
     );
     fs::write(out_dir.join("probe.html"), probe).expect("resume State probe");
+}
+
+fn write_resume_slot_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("built page");
+    let resume_json =
+        fs::read_to_string(out_dir.join("resume.runtime.json")).expect("resume manifest");
+    let manifest: serde_json::Value =
+        serde_json::from_str(&resume_json).expect("resume manifest JSON");
+    let component_json =
+        fs::read_to_string(out_dir.join("component.runtime.json")).expect("component artifact");
+    let component: serde_json::Value =
+        serde_json::from_str(&component_json).expect("component artifact JSON");
+    let mut snapshot = resume_bootstrap_snapshot(&manifest);
+    set_snapshot_state_to_compiled_initials(&manifest, &component, &mut snapshot);
+    let probe = resume_bootstrap_probe_page(
+        &index,
+        &format!(
+            "window.__EDGEZERO_RESUME_SNAPSHOT__ = {};",
+            serde_json::to_string(&snapshot).expect("snapshot JSON")
+        ),
+        r#"
+if (runtime.resume?.mode !== "resume") fail("Slot snapshot was not resumed: " + JSON.stringify(runtime.diagnostics));
+const artifact = runtime.store.componentArtifact;
+const expected = new Map(artifact.slot_binding_programs.map((binding) => [binding.binding, binding]));
+if (runtime.store.slotBindings.size !== expected.size || expected.size !== 2) fail("exact Slot bindings were not installed");
+for (const [bindingId, binding] of expected) {
+  const installed = runtime.store.slotBindings.get(bindingId);
+  if (installed?.caller_instance !== binding.caller_instance
+    || installed?.callee_instance !== binding.callee_instance
+    || installed?.content_owner_instance !== binding.content_owner_instance) {
+    fail("Slot caller, callee, or content owner was reselected");
+  }
+}
+if (runtime.resume_registry.component_records.size !== runtime.component_instance_tree.length) fail("component runtime records were incomplete");
+if (runtime.component_initialization_runs.length !== 0 || runtime.slot_binding_runs.length !== 0) fail("resume executed component or Slot initialization");
+if (runtime.initial_effect_runs.length !== 0) fail("resume executed cold effects");
+if (document.querySelector("main").innerHTML !== window.__edgezeroInitialHtml) fail("resume reconstructed component DOM");"#,
+        "EDGEZERO_RESUME_SLOT_PASS",
+    )
+    .replace(
+        "window.__EDGEZERO_RESUME_SNAPSHOT__",
+        "window.__edgezeroInitialHtml = document.querySelector(\"main\").innerHTML;\nwindow.__EDGEZERO_RESUME_SNAPSHOT__",
+    );
+    fs::write(out_dir.join("probe.html"), probe).expect("resume Slot probe");
 }
 
 fn write_resume_context_probe_pages(out_dir: &Path) {
@@ -710,6 +869,158 @@ if (runtime.context_consumer_bindings.length !== 1) fail("cold fallback reselect
         "EDGEZERO_RESUME_CONTEXT_FALLBACK_PASS",
     );
     fs::write(out_dir.join("probe.html"), probe).expect("Context fallback probe");
+}
+
+fn write_resume_structure_probe_pages(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("built page");
+    let manifest: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(out_dir.join("resume.runtime.json")).expect("resume manifest"),
+    )
+    .expect("resume manifest JSON");
+    let component: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(out_dir.join("component.runtime.json")).expect("component artifact"),
+    )
+    .expect("component artifact JSON");
+    let mut snapshot = resume_bootstrap_snapshot(&manifest);
+    set_snapshot_state_to_compiled_initials(&manifest, &component, &mut snapshot);
+    let snapshot_json = serde_json::to_string(&snapshot).expect("snapshot JSON");
+
+    let probe = resume_bootstrap_probe_page(
+        &index,
+        &format!(
+            "window.__EDGEZERO_RESUME_SNAPSHOT__ = {snapshot_json}; window.__J14_DOM__ = document.querySelector('main').innerHTML;"
+        ),
+        r#"
+if (runtime.resume === undefined) fail("structural boot failed: " + JSON.stringify({ diagnostics: runtime.diagnostics, resume: window.__EDGEZERO_RESUME__.debugEvidence() }));
+if (runtime.resume.mode !== "resume") fail("structural snapshot was not resumed");
+if (runtime.resume_registry.component_records.size !== 5) fail("Component runtime records were incomplete");
+if (runtime.resume_registry.structural_records.size !== 2) fail("structural runtime records were incomplete");
+if ([...runtime.resume_registry.structural_records.values()].some((record) => record.selection_value === undefined)) fail("structural selection was not restored");
+if (runtime.store.resumeAnchors.size !== runtime.resume_registry.definitions.anchors.size) fail("exact resume anchors were not verified");
+if (runtime.component_initialization_runs.length !== 0) fail("Component initialization ran during R8");
+if (runtime.initial_effect_runs.length !== 0) fail("Effect ran during R8-R10");
+if (document.querySelector("main").innerHTML !== window.__J14_DOM__) fail("resume reconstructed the DOM");"#,
+        "EDGEZERO_RESUME_STRUCTURE_PASS",
+    );
+    fs::write(out_dir.join("probe.html"), probe).expect("resume structure probe");
+
+    let mut mismatch = snapshot.clone();
+    let record = mismatch["boundaries"]
+        .as_array_mut()
+        .expect("boundaries")
+        .iter_mut()
+        .flat_map(|boundary| {
+            boundary["values"]
+                .as_array_mut()
+                .expect("values")
+                .iter_mut()
+        })
+        .find(|record| {
+            manifest["slot_schemas"]
+                .as_array()
+                .expect("slot schemas")
+                .iter()
+                .find(|slot| slot["slot_id"] == record["slotId"])
+                .is_some_and(|slot| slot["semantic_type"] == "boolean")
+        })
+        .expect("boolean structural State");
+    record["value"] = serde_json::Value::Bool(false);
+    let mismatch_page = resume_bootstrap_probe_page(
+        &index,
+        &format!(
+            "window.__EDGEZERO_RESUME_SNAPSHOT__ = {};",
+            serde_json::to_string(&mismatch).expect("mismatch snapshot")
+        ),
+        &structural_fallback_assertions("StructuralStateMismatch"),
+        "EDGEZERO_RESUME_STRUCTURE_FALLBACK_PASS",
+    );
+    fs::write(out_dir.join("state-mismatch.html"), mismatch_page)
+        .expect("structural mismatch probe");
+
+    let first_anchor = manifest["anchors"]
+        .as_array()
+        .expect("anchors")
+        .iter()
+        .find(|anchor| {
+            matches!(
+                anchor["kind"].as_str(),
+                Some("structural_start" | "structural_end")
+            )
+        })
+        .and_then(|anchor| anchor["anchor_id"].as_str())
+        .expect("structural anchor ID");
+    let missing = index.replace(&format!("<!--ez-r-end:{first_anchor}-->"), "");
+    let missing = missing.replace(&format!("<!--ez-r-start:{first_anchor}-->"), "");
+    assert_ne!(missing, index, "resume anchor comment was not emitted");
+    let missing_page = resume_bootstrap_probe_page(
+        &missing,
+        &format!("window.__EDGEZERO_RESUME_SNAPSHOT__ = {snapshot_json};"),
+        &structural_fallback_assertions("MissingAnchor"),
+        "EDGEZERO_RESUME_ANCHOR_FALLBACK_PASS",
+    );
+    fs::write(out_dir.join("missing-anchor.html"), missing_page).expect("missing anchor probe");
+}
+
+fn set_snapshot_state_to_compiled_initials(
+    manifest: &serde_json::Value,
+    component: &serde_json::Value,
+    snapshot: &mut serde_json::Value,
+) {
+    let initial_by_slot = component["instances"]
+        .as_array()
+        .expect("component instances")
+        .iter()
+        .flat_map(|instance| {
+            instance["state_slots"]
+                .as_array()
+                .expect("State slots")
+                .iter()
+        })
+        .map(|slot| {
+            (
+                slot["slot_id"].as_str().expect("State slot"),
+                slot["initial_value"].clone(),
+            )
+        })
+        .collect::<std::collections::BTreeMap<_, _>>();
+    for record in snapshot["boundaries"]
+        .as_array_mut()
+        .expect("snapshot boundaries")
+        .iter_mut()
+        .flat_map(|boundary| {
+            boundary["values"]
+                .as_array_mut()
+                .expect("snapshot values")
+                .iter_mut()
+        })
+    {
+        let slot_id = record["slotId"].as_str().expect("snapshot slot");
+        let schema = manifest["slot_schemas"]
+            .as_array()
+            .expect("slot schemas")
+            .iter()
+            .find(|schema| schema["slot_id"] == slot_id)
+            .expect("slot schema");
+        if schema["restore_phase"] != "R3" {
+            continue;
+        }
+        let existing = schema["existing_storage_slot_id"]
+            .as_str()
+            .expect("existing slot");
+        record["value"] = initial_by_slot
+            .get(existing)
+            .expect("compiled State initial")
+            .clone();
+    }
+}
+
+fn structural_fallback_assertions(failure: &str) -> String {
+    format!(
+        r#"
+if (runtime.resume.mode !== "cold" || runtime.resume.failure !== "{failure}") fail("structural rejection did not select one cold boot");
+if (runtime.resume_registry !== null) fail("structural rejection retained a partial registry");
+if (runtime.component_initialization_runs.length === 0) fail("cold fallback did not initialize Components");"#
+    )
 }
 
 fn write_resume_bootstrap_probe_pages(out_dir: &Path) {

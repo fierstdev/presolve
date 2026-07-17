@@ -1201,9 +1201,8 @@ Known limitations
 
 Exact next step
 
-Commit J13 atomically as `runtime: restore context bindings`, verify the
-worktree is clean, then implement J14 exact R8-R10 Component, Slot, structure,
-and DOM-anchor restore.
+Commit J14 atomically as `runtime: restore component structure`, verify the
+worktree is clean, then implement J15 exact R11-R15 Form restoration.
 
 Useful commands
 

@@ -3,12 +3,15 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    build_computed_instance_slot_registry, build_resume_boundary_graph, build_resume_liveness_plan,
-    build_resume_schema_registry, build_runtime_component_registry, lower_components_to_ir,
-    ApplicationSemanticModel, ComponentInstanceId, ConsumerInstanceId, ContextSourceInstanceId,
-    FieldId, FormInstanceId, InstanceContextValueSlotId, ProviderInstanceId, ResumeAnchorId,
-    ResumeBoundaryId, ResumeExistingSlot, ResumeLivenessClassificationRef, ResumeRestoreProgramId,
-    ResumeSlotId, ResumeValueCodec, SemanticId, SourceProvenance, TemplateInstanceBindingId,
+    build_computed_instance_slot_registry, build_ordinary_template_instance_registry,
+    build_resume_boundary_graph, build_resume_liveness_plan, build_resume_schema_registry,
+    build_runtime_component_registry, build_state_instance_storage_registry,
+    lower_components_to_ir, ApplicationSemanticModel, ComponentInstanceId,
+    ComponentStructuralRegionId, ConsumerInstanceId, ContextSourceInstanceId, FieldId,
+    FormInstanceId, InstanceContextValueSlotId, OrdinaryTemplateBindingKind, ProviderInstanceId,
+    ResumeAnchorId, ResumeBoundaryId, ResumeBoundaryOwner, ResumeExistingSlot,
+    ResumeLivenessClassificationRef, ResumeRestoreProgramId, ResumeSlotId, ResumeValueCodec,
+    SemanticId, SourceProvenance, TemplateInstanceBindingId,
 };
 
 pub const RESUME_RESTORE_PLAN_VERSION: u32 = 1;
@@ -204,6 +207,7 @@ struct RestoreAuthorities {
     form: BTreeMap<ResumeExistingSlot, (FormInstanceId, Option<FieldId>)>,
     context_bindings:
         BTreeMap<ResumeExistingSlot, Vec<crate::RuntimeComponentContextBindingRecord>>,
+    structural: BTreeMap<ComponentStructuralRegionId, ResumeExistingSlot>,
 }
 
 impl RestoreAuthorities {
@@ -272,10 +276,37 @@ impl RestoreAuthorities {
         for bindings in context_bindings.values_mut() {
             bindings.sort_by(|left, right| left.consumer_instance.cmp(&right.consumer_instance));
         }
+        let state_slots = build_state_instance_storage_registry(model, &ir);
+        let structural = build_ordinary_template_instance_registry(model)
+            .bindings
+            .iter()
+            .filter_map(|binding| {
+                let region_kind = match binding.binding_kind {
+                    OrdinaryTemplateBindingKind::Conditional => "conditional",
+                    OrdinaryTemplateBindingKind::List => "keyed-list",
+                    _ => return None,
+                };
+                let [storage] = binding.state_storage_ids.as_slice() else {
+                    return None;
+                };
+                let state_slot = state_slots.records.iter().find(|record| {
+                    record.component_instance_id == binding.component_instance_id
+                        && record.storage_id == *storage
+                })?;
+                Some((
+                    ComponentStructuralRegionId::for_template_entity(
+                        &binding.declaration_binding_id,
+                        region_kind,
+                    ),
+                    ResumeExistingSlot::State(state_slot.slot_id.clone()),
+                ))
+            })
+            .collect();
         Self {
             computed,
             form,
             context_bindings,
+            structural,
         }
     }
 }
@@ -414,6 +445,17 @@ pub fn build_resume_restore_plan(model: &ApplicationSemanticModel) -> ResumeRest
                             value_slot_id: binding.runtime_slot.clone(),
                         });
                 }
+            }
+        }
+        if let ResumeBoundaryOwner::StructuralRegion { region, .. } = &boundary.owner {
+            if let Some(slot) = authorities.structural.get(region) {
+                by_phase
+                    .entry(ResumeRestorePhase::R9RestoreStructuralSelection)
+                    .or_default()
+                    .push(ResumeRestoreInstruction::RestoreStructuralSelection {
+                        region_id: region.clone(),
+                        slot_id: slot.resume_slot_id(),
+                    });
             }
         }
         by_phase
@@ -773,6 +815,47 @@ mod tests {
                 ResumeRestorePhase::R14RestoreStableFormSubmission
             )
         )));
+    }
+
+    #[test]
+    fn structural_regions_restore_from_their_exact_retained_state_slots() {
+        let model = model(
+            r#"@component("x-leaf") class Leaf extends Component { render() { return <span />; } }
+@component("x-page") @route("/") class Page extends Component {
+  visible = state(true);
+  items = state([{ id: "a" }, { id: "b" }]);
+  render() {
+    return <main>{this.visible ? <div><Leaf /></div> : <aside>Hidden</aside>}<ul>{this.items.map(item => <li key={item.id}><Leaf /></li>)}</ul></main>;
+  }
+  hide() { this.visible = false; }
+  trim() { this.items = [{ id: "b" }]; }
+}"#,
+        );
+        let plan = build_resume_restore_plan(&model);
+        let structural = plan
+            .programs
+            .iter()
+            .flat_map(|program| &program.instructions)
+            .filter_map(|record| match &record.instruction {
+                ResumeRestoreInstruction::RestoreStructuralSelection { region_id, slot_id } => {
+                    Some((record.phase, region_id.to_string(), slot_id.to_string()))
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(structural.len(), 2);
+        assert!(structural
+            .iter()
+            .all(|(phase, _, _)| { *phase == ResumeRestorePhase::R9RestoreStructuralSelection }));
+        assert!(structural
+            .iter()
+            .any(|(_, region, slot)| region.ends_with(":conditional")
+                && slot.contains("state%3Avisible")));
+        assert!(structural
+            .iter()
+            .any(|(_, region, slot)| region.ends_with(":keyed-list")
+                && slot.contains("state%3Aitems")));
+        assert_eq!(validate_resume_restore_plan(&model, &plan), Ok(()));
     }
 
     #[test]

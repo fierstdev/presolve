@@ -309,6 +309,23 @@ its compiler-selected exact slot, while Context initial evaluators and Effects
 remain suppressed. The existing Phase G action-update batches remain the sole
 future propagation order; J17 owns delivery of the first resumed interaction.
 
+## Phase J Component, Slot, and structural restoration
+
+J14 executes R8-R10 from closed Phase I records. It installs Component runtime
+records and caller-owned Slot bindings directly by their compiler-emitted
+instance and binding IDs, without constructors, render methods, tag matching,
+Slot matching, parent traversal, or index-derived identity. Structural regions
+restore their selected conditional/keyed-list State from the exact retained
+State slot selected by the compiler; a value divergent from the already
+rendered structural DOM rejects the candidate rather than reconstructing it.
+
+Anchor validation resolves only emitted `data-ez-r` attributes and exact
+`ez-r-start`/`ez-r-end` comment pairs. Resume never mutates the DOM for this
+phase. A mismatch or missing anchor discards the entire registry and performs
+one ordinary cold boot. The cold ordinary-runtime target index now recognizes
+the existing compiler-emitted structural comment ranges, so that fallback
+remains a valid Phase H continuation path.
+
 ## Definition
 
 In EdgeZero, resumability means:

@@ -672,9 +672,18 @@ const RUNTIME_STUB: &str = r#"(() => {
       throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
     }
     const instances = new Set(artifact.instances.map((instance) => instance.instance));
+    const structuralTemplates = new Set(
+      (artifact.structural_programs ?? [])
+        .flatMap((program) => program.template_instances ?? [])
+    );
     const stateSlots = new Set();
     const statePairs = new Set();
-    for (const instance of artifact.instances) if (instance.parent !== null && instance.parent !== undefined && !instances.has(instance.parent)) {
+    for (const instance of artifact.instances) if (
+      instance.parent !== null
+      && instance.parent !== undefined
+      && !instances.has(instance.parent)
+      && !structuralTemplates.has(instance.parent)
+    ) {
       reportDiagnostic(diagnostics, "EZR_INVALID_COMPONENT_ARTIFACT", "Component runtime metadata referenced an unknown parent instance", { instance: instance.instance, parent: instance.parent }, true);
       throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
     }
@@ -2316,11 +2325,48 @@ const RUNTIME_STUB: &str = r#"(() => {
   function collectOrdinaryTargetAnchors() {
     const targets = new Map();
     const duplicates = new Set();
+    const register = (id, target) => {
+      if (targets.has(id)) duplicates.add(id);
+      targets.set(id, target);
+    };
     for (const element of document.querySelectorAll("[data-ez-ti]")) {
       const id = element.getAttribute("data-ez-ti");
       if (id === null) continue;
-      if (targets.has(id)) duplicates.add(id);
-      targets.set(id, element);
+      register(id, element);
+    }
+    const conditionalStarts = new Map();
+    const listStarts = new Map();
+    const walker = document.createTreeWalker(document, NodeFilter.SHOW_COMMENT);
+    while (walker.nextNode()) {
+      const marker = walker.currentNode;
+      const value = String(marker.nodeValue ?? "");
+      const conditionalStart = /^ez-conditional-start:[^:]+:ti:(.+)$/.exec(value);
+      if (conditionalStart !== null) {
+        conditionalStarts.set(conditionalStart[1], marker);
+        continue;
+      }
+      const conditionalEnd = /^ez-conditional-end:[^:]+:ti:(.+)$/.exec(value);
+      if (conditionalEnd !== null) {
+        const start = conditionalStarts.get(conditionalEnd[1]);
+        if (start !== undefined) {
+          register(conditionalEnd[1], { kind: "conditional", start, end: marker });
+          conditionalStarts.delete(conditionalEnd[1]);
+        }
+        continue;
+      }
+      const listStart = /^ez-ti-target-start:(.+)$/.exec(value);
+      if (listStart !== null) {
+        listStarts.set(listStart[1], marker);
+        continue;
+      }
+      const listEnd = /^ez-ti-target-end:(.+)$/.exec(value);
+      if (listEnd !== null) {
+        const start = listStarts.get(listEnd[1]);
+        if (start !== undefined) {
+          register(listEnd[1], { kind: "list", start, end: marker });
+          listStarts.delete(listEnd[1]);
+        }
+      }
     }
     return { targets, duplicates };
   }
@@ -2359,6 +2405,47 @@ const RUNTIME_STUB: &str = r#"(() => {
       if (text !== null) update = (value) => { text.data = formatBindingValue(value); };
     } else if ((binding.kind === "attribute" || binding.kind === "property") && target instanceof Element && typeof binding.attribute_name === "string") {
       update = (value) => { updateAttributeBinding(target, binding.attribute_name, value); };
+    } else if (binding.kind === "conditional" && target?.kind === "conditional") {
+      const nodes = (component.manifest.template?.nodes ?? []).filter(
+        (node) => node.kind === "conditional" && node.condition === binding.expression
+      );
+      if (nodes.length === 1) {
+        const node = nodes[0];
+        update = (value) => {
+          replaceConditionalBranch(
+            store,
+            target.start,
+            target.end,
+            value === true ? node.when_true_html : node.when_false_html
+          );
+        };
+      }
+    } else if (binding.kind === "list" && target?.kind === "list") {
+      const nodes = (component.manifest.template?.nodes ?? []).filter(
+        (node) => node.kind === "list" && node.iterable === binding.expression
+      );
+      if (nodes.length === 1) {
+        const node = nodes[0];
+        let instances = initialListInstances(
+          store,
+          node,
+          listItems(store.storageValues.get(slot.slot_id))
+        );
+        for (const instance of instances.values()) {
+          registerListItemEvents(store, component, instance);
+        }
+        update = (value) => {
+          instances = reconcileKeyedList(
+            store,
+            component,
+            node,
+            target.start,
+            target.end,
+            instances,
+            value
+          );
+        };
+      }
     }
     if (update === null) throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_BINDING");
     update(store.storageValues.get(slot.slot_id));
@@ -2744,6 +2831,9 @@ const RUNTIME_STUB: &str = r#"(() => {
       componentArtifact
     );
     store.componentArtifact = componentArtifact;
+    store.componentInstances = new Map();
+    store.slotBindings = new Map();
+    store.componentRegions = new Map();
     store.instanceContextBindings = new Map(
       (componentArtifact?.instance_context_bindings ?? [])
         .map((binding) => [binding.consumer_instance, binding])
@@ -2951,7 +3041,157 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
-  function restoreResumeStateComputedAndContext(
+  function collectExactResumeAnchors(manifest) {
+    const elements = new Map();
+    for (const element of document.querySelectorAll("[data-ez-r]")) {
+      const id = element.getAttribute("data-ez-r");
+      if (elements.has(id)) throw new ResumeBootError("DuplicateIdentity");
+      elements.set(id, element);
+    }
+    const comments = new Map();
+    const walker = document.createTreeWalker(document, NodeFilter.SHOW_COMMENT);
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      const value = node.nodeValue ?? "";
+      if (!value.startsWith("ez-r-start:") && !value.startsWith("ez-r-end:")) continue;
+      const id = value.slice(value.indexOf(":") + 1);
+      if (comments.has(id)) throw new ResumeBootError("DuplicateIdentity");
+      comments.set(id, node);
+    }
+    const anchors = new Map();
+    for (const anchor of manifest.anchors) {
+      const node = anchor.kind === "structural_start" || anchor.kind === "structural_end"
+        ? comments.get(anchor.anchor_id)
+        : elements.get(anchor.anchor_id);
+      if (anchor.required && node === undefined) throw new ResumeBootError("MissingAnchor");
+      if (node !== undefined) anchors.set(anchor.anchor_id, node);
+    }
+    return anchors;
+  }
+
+  function canonicalResumeValueEqual(left, right) {
+    return JSON.stringify(left) === JSON.stringify(right);
+  }
+
+  function restoreResumeComponentsSlotsAndStructure(
+    manifest,
+    registry,
+    store,
+    componentArtifact
+  ) {
+    const componentRecords = new Map();
+    const slotRecords = new Map();
+    const structuralRecords = new Map();
+    for (const item of manifest.phase_i_component_resume_records ?? []) {
+      if (item.record_kind === "component_instance") {
+        const record = item.component_instance;
+        if (componentRecords.has(record.instance)) throw new ResumeBootError("DuplicateIdentity");
+        componentRecords.set(record.instance, record);
+      } else if (item.record_kind === "slot_binding") {
+        const record = item.slot_binding;
+        if (slotRecords.has(record.binding)) throw new ResumeBootError("DuplicateIdentity");
+        slotRecords.set(record.binding, record);
+      } else if (item.record_kind === "structural_region") {
+        const record = item.structural_region;
+        if (structuralRecords.has(record.region)) throw new ResumeBootError("DuplicateIdentity");
+        structuralRecords.set(record.region, record);
+      }
+    }
+
+    const planned = new Map(
+      (componentArtifact.instances ?? []).map((instance) => [instance.instance, instance])
+    );
+    const templateInstances = new Set(
+      (componentArtifact.structural_programs ?? [])
+        .flatMap((program) => program.template_instances ?? [])
+    );
+    if (componentRecords.size !== planned.size + templateInstances.size) {
+      throw new ResumeBootError("ResumeArtifactMismatch");
+    }
+    for (const record of componentRecords.values()) {
+      const instance = planned.get(record.instance);
+      if (instance !== undefined) {
+        if (
+          record.component !== instance.component
+          || (record.parent_instance ?? null) !== (instance.parent ?? null)
+          || (record.structural_region ?? null) !== (instance.structural_region ?? null)
+          || record.active_status !== "active"
+        ) {
+          throw new ResumeBootError("ResumeArtifactMismatch");
+        }
+      } else if (!templateInstances.has(record.instance) || record.active_status !== "inactive") {
+        throw new ResumeBootError("ResumeArtifactMismatch");
+      }
+      const runtimeRecord = { ...record, status: record.active_status };
+      registry.component_records.set(record.instance, runtimeRecord);
+      store.componentInstances.set(record.instance, runtimeRecord);
+    }
+
+    const expectedSlots = new Map(
+      (componentArtifact.slot_binding_programs ?? []).map((binding) => [binding.binding, binding])
+    );
+    if (slotRecords.size !== expectedSlots.size) throw new ResumeBootError("ResumeArtifactMismatch");
+    for (const record of slotRecords.values()) {
+      const binding = expectedSlots.get(record.binding);
+      if (
+        binding === undefined
+        || record.caller_instance !== binding.caller_instance
+        || record.callee_instance !== binding.callee_instance
+      ) {
+        throw new ResumeBootError("ResumeArtifactMismatch");
+      }
+      store.slotBindings.set(record.binding, binding);
+    }
+
+    const expectedRegions = new Map(
+      (componentArtifact.structural_programs ?? []).map((program) => [program.region, program])
+    );
+    if (structuralRecords.size !== expectedRegions.size) {
+      throw new ResumeBootError("ResumeArtifactMismatch");
+    }
+    for (const record of structuralRecords.values()) {
+      const program = expectedRegions.get(record.region);
+      if (program === undefined || record.active_status !== "inactive") {
+        throw new ResumeBootError("ResumeArtifactMismatch");
+      }
+      const runtimeRecord = { ...record, program, selection_value: undefined };
+      registry.structural_records.set(record.region, runtimeRecord);
+      store.componentRegions.set(record.region, runtimeRecord);
+    }
+
+    const restoredRegions = new Set();
+    for (const program of registry.definitions.restorePrograms.values()) {
+      for (const record of program.instructions ?? []) {
+        if (record.phase !== "R9") continue;
+        const instruction = record.instruction;
+        if (
+          instruction.kind !== "restore_structural_selection"
+          || restoredRegions.has(instruction.region_id)
+        ) {
+          throw new ResumeBootError("RestoreInstructionFailure");
+        }
+        const runtimeRecord = registry.structural_records.get(instruction.region_id);
+        const schema = registry.definitions.slots.get(instruction.slot_id);
+        const value = registry.slot_values.get(instruction.slot_id);
+        if (runtimeRecord === undefined || schema === undefined || value === undefined) {
+          throw new ResumeBootError("ResumeArtifactMismatch");
+        }
+        const stateSlot = (componentArtifact.instances ?? [])
+          .flatMap((instance) => instance.state_slots ?? [])
+          .find((slot) => slot.slot_id === schema.existing_storage_slot_id);
+        if (stateSlot === undefined || !canonicalResumeValueEqual(value, stateSlot.initial_value)) {
+          throw new ResumeBootError("StructuralStateMismatch");
+        }
+        runtimeRecord.selection_value = value;
+        restoredRegions.add(instruction.region_id);
+      }
+    }
+    if (restoredRegions.size !== expectedRegions.size) {
+      throw new ResumeBootError("ResumeArtifactMismatch");
+    }
+    store.resumeAnchors = collectExactResumeAnchors(manifest);
+  }
+
+  function restoreResumeRuntimeThroughStructure(
     manifest,
     snapshot,
     registry,
@@ -2977,6 +3217,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     const recomputationRuns = executeResumeComputedRecomputation(store, registry);
     executeResumeDecodeAndWrites(store, registry, snapshot, new Set(["R6"]));
     executeResumeContextBindings(store, registry, componentArtifact);
+    restoreResumeComponentsSlotsAndStructure(manifest, registry, store, componentArtifact);
     const state = runtimeState({
       manifest: templateManifest,
       diagnostics,
@@ -2988,7 +3229,11 @@ const RUNTIME_STUB: &str = r#"(() => {
       context_slots: [...store.contextSlots.entries()],
       context_consumer_bindings: [...store.contextConsumerBindings.entries()],
       context_failures: store.contextFailures,
-      context_update_source_runs: store.contextUpdateSourceRuns
+      context_update_source_runs: store.contextUpdateSourceRuns,
+      component_initialization_runs: [],
+      component_instance_tree: [...store.componentInstances.values()],
+      slot_binding_runs: [...store.slotBindings.keys()],
+      component_failures: []
     });
     state.resume_recomputation_runs = recomputationRuns;
     return state;
@@ -3049,13 +3294,15 @@ const RUNTIME_STUB: &str = r#"(() => {
     store.slotBindings = new Map((componentArtifact?.slot_binding_programs ?? []).map((binding) => [binding.binding, binding]));
     store.instanceContextBindings = new Map((componentArtifact?.instance_context_bindings ?? []).map((binding) => [binding.consumer_instance, binding]));
     store.componentRegions = new Map((componentArtifact?.structural_programs ?? []).map((program) => [program.region, program]));
-    const missingAnchors = collectMissingAnchors(
-      manifest,
-      bindingAnchors,
-      conditionalAnchors,
-      listAnchors,
-      elementsByNode
-    );
+    const missingAnchors = manifest.schema_version === SUPPORTED_SCHEMA_VERSION
+      ? []
+      : collectMissingAnchors(
+          manifest,
+          bindingAnchors,
+          conditionalAnchors,
+          listAnchors,
+          elementsByNode
+        );
 
     for (const anchor of missingAnchors) {
       reportDiagnostic(
@@ -3200,7 +3447,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
       const result = await bootstrapResume({
         diagnostics,
-        resumeBoot: ({ manifest: resumeManifest, snapshot, registry }) => restoreResumeStateComputedAndContext(
+        resumeBoot: ({ manifest: resumeManifest, snapshot, registry }) => restoreResumeRuntimeThroughStructure(
           resumeManifest,
           snapshot,
           registry,
@@ -3246,16 +3493,6 @@ const RUNTIME_STUB: &str = r#"(() => {
       );
     } catch (error) {
       document.documentElement.dataset.ezRuntime = "error";
-      window.__EDGEZERO__ = runtimeState({
-        diagnostics
-      });
-
-      document.dispatchEvent(
-        new CustomEvent("edgezero:ready", {
-          detail: window.__EDGEZERO__
-        })
-      );
-
       if (error instanceof EdgeZeroBootError) {
         reportDiagnostic(
           diagnostics,
@@ -3273,6 +3510,16 @@ const RUNTIME_STUB: &str = r#"(() => {
           true
         );
       }
+
+      window.__EDGEZERO__ = runtimeState({
+        diagnostics
+      });
+
+      document.dispatchEvent(
+        new CustomEvent("edgezero:ready", {
+          detail: window.__EDGEZERO__
+        })
+      );
     }
   }
 
@@ -3343,9 +3590,11 @@ mod tests {
         assert!(runtime.contains("async function activateByEvent"));
         assert!(runtime.contains("async function activateBoundary"));
         assert!(runtime.contains("function decodeResumeValue"));
-        assert!(runtime.contains("function restoreResumeStateComputedAndContext"));
+        assert!(runtime.contains("function restoreResumeRuntimeThroughStructure"));
         assert!(runtime.contains("executeResumeComputedRecomputation"));
         assert!(runtime.contains("function executeResumeContextBindings"));
+        assert!(runtime.contains("function restoreResumeComponentsSlotsAndStructure"));
+        assert!(runtime.contains("function collectExactResumeAnchors"));
         assert!(runtime.contains("window.__EDGEZERO_RESUME__ = Object.freeze"));
         assert!(runtime.contains("throw new ResumeBootError(\"DoubleBootstrap\")"));
         assert!(runtime.contains("ez-binding:"));
