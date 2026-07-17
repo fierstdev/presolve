@@ -1201,9 +1201,9 @@ Known limitations
 
 Exact next step
 
-Commit J15 atomically as `runtime: restore compiler-owned forms`, verify the
-worktree is clean, then implement J16 exact R16-R17 DOM-binding and Effect
-establishment.
+Commit J16 atomically as `runtime: establish resumed bindings and effects`,
+verify the worktree is clean, then implement J17 lazy event and boundary
+activation.
 
 Useful commands
 

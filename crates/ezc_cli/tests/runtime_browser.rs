@@ -1203,6 +1203,7 @@ if (!(runtime.resume_registry?.boundary_records instanceof Map)) fail("closed re
 if (runtime.resume_registry.boundary_records.size !== runtime.resume_registry.definitions.boundaries.size) fail("boundary records were incomplete");
 if (runtime.resume_registry.slot_values.size !== 1) fail("restored State registry was incomplete");
 if (!(runtime.store?.components instanceof Map) || runtime.components[0].state.count !== 7) fail("snapshot State was not restored");
+if (document.querySelector("button").textContent !== "7") fail("R16 did not patch the exact text binding before Ready");
 if (runtime.initial_effect_runs.length !== 0) fail("resume path executed cold authored initialization");
 const eventId = runtime.resume_registry.definitions.events.keys().next().value;
 const activation = await window.__EDGEZERO_RESUME__.activateByEvent(eventId);

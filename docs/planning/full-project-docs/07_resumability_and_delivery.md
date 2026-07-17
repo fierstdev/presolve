@@ -340,6 +340,19 @@ restored. Reset continues to use the frozen artifact initial values and reset
 plan, not a snapshot value. Any bad Form slot, active submission, or absent
 required control anchor rejects the entire candidate before Ready.
 
+## Phase J DOM binding and Effect establishment
+
+J16 installs ordinary text, attribute, and property bindings from exact
+instance-qualified targets and patches them from restored storage before
+Ready. Structural bindings are deliberately excluded: their ranges were
+validated at R10 and are never reconstructed as a side effect of DOM binding
+installation.
+
+Effect establishment records are installed in frozen artifact order with
+`active_after_restore` true and `run_on_restore` false. No Effect body runs
+during resume; future completed action scheduling continues to use the frozen
+Phase F action batches.
+
 ## Definition
 
 In EdgeZero, resumability means:

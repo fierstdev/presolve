@@ -1427,6 +1427,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       computedUpdateRuns: 0,
       initialEffectRuns: [],
       completedActionEffectRuns: [],
+      effectSubscriptions: new Map(),
       activeActionBatch: null
     };
   }
@@ -2493,6 +2494,29 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
+  function installResumeDomBindings(store, manifest, componentArtifact) {
+    const bindings = (manifest.ordinary_bindings ?? []).filter((binding) =>
+      binding.kind === "text" || binding.kind === "attribute" || binding.kind === "property"
+    );
+    initializeOrdinaryInstanceRuntime(store, { ...manifest, ordinary_bindings: bindings }, componentArtifact);
+  }
+
+  function establishResumeEffects(registry, store, effectArtifact) {
+    for (const effect of effectArtifact?.effects ?? []) {
+      if (store.effectSubscriptions.has(effect.effect) || registry.effect_subscriptions.has(effect.effect)) {
+        throw new ResumeBootError("DuplicateIdentity");
+      }
+      const subscription = {
+        effect_instance_id: effect.effect,
+        scheduler_order: effect.initial_trigger?.effect_batch_index ?? null,
+        active_after_restore: true,
+        run_on_restore: false
+      };
+      store.effectSubscriptions.set(effect.effect, subscription);
+      registry.effect_subscriptions.set(effect.effect, subscription);
+    }
+  }
+
   function ordinaryTargetFromEvent(target) {
     let current = target instanceof Element ? target : target?.parentElement;
     while (current !== null && current !== undefined) {
@@ -3325,6 +3349,8 @@ const RUNTIME_STUB: &str = r#"(() => {
     executeResumeContextBindings(store, registry, componentArtifact);
     restoreResumeComponentsSlotsAndStructure(manifest, registry, store, componentArtifact);
     restoreResumeForms(manifest, snapshot, registry, store, formsArtifact);
+    installResumeDomBindings(store, templateManifest, componentArtifact);
+    establishResumeEffects(registry, store, effectArtifact);
     const state = runtimeState({
       manifest: templateManifest,
       diagnostics,
@@ -3711,6 +3737,8 @@ mod tests {
         assert!(runtime.contains("function executeResumeContextBindings"));
         assert!(runtime.contains("function restoreResumeComponentsSlotsAndStructure"));
         assert!(runtime.contains("function restoreResumeForms"));
+        assert!(runtime.contains("function installResumeDomBindings"));
+        assert!(runtime.contains("function establishResumeEffects"));
         assert!(runtime.contains("function collectExactResumeAnchors"));
         assert!(runtime.contains("window.__EDGEZERO_RESUME__ = Object.freeze"));
         assert!(runtime.contains("throw new ResumeBootError(\"DoubleBootstrap\")"));
