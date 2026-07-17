@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: K0 - Phase K Entry Audit, Reservations, and Baselines
-* Working tree: K0 is committed and the worktree is clean; begin K1 only.
+* Latest completed slice: K1 - Canonical Optimization Identities and Policy Product
+* Working tree: K1 is committed and the worktree is clean; begin K2 only.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: K0 - Phase K Entry Audit, Reservations, and Baselines
-* Summary: confirmed the committed J21 freeze and schema set; reserved `EZC1112`-`EZC1127` and `EZASM1385`-`EZASM1512`; added inert `ProductionOptimizationPolicyV1` constants; and recorded deterministic artifact/product baselines without changing executable output.
-* Key files: `production_optimization.rs`, `production_baseline.rs`, `phase-k-production-baseline.json`, `production-optimization-baseline.md`
-* Boundary: K0 adds no optimization identities, product elimination, chunk changes, runtime behavior, production artifacts/reports, or schema increment.
+* Slice: K1 - Canonical Optimization Identities and Policy Product
+* Summary: added one compiler-owned authority for the eleven Phase K typed identity domains and the immutable `ProductionOptimizationPolicy` v1 product; canonical constructors hash only compiler inputs, normalize unordered root/program inputs, reject invalid labels/paths, and retain strict domain separation.
+* Key files: `production_optimization.rs`, `lib.rs`
+* Boundary: K1 serializes no public production artifact, executes no optimizer, changes no chunk/runtime behavior, and increments no schema.
 
 Current in-progress slice
 
-* Slice: K1 - Canonical Optimization Identities and Policy Product
-* Status: Ready after the K0 commit and clean-worktree check.
+* Slice: K2 - Whole-Application Executable Reachability
+* Status: Ready after the K1 commit and clean-worktree check.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase K: K1-K21. Next: introduce only the roadmap Section 7 typed optimization IDs and immutable policy product; do not serialize or execute optimization yet.
+* Remaining in Phase K: K2-K21. Next: build the immutable executable-reachability graph from existing canonical products only; do not eliminate any product until K3.
 
 Verification
 
@@ -1201,14 +1201,14 @@ Known limitations
 
 Exact next step
 
-K0 is complete. The J21 schemas remain frozen: semantic graph v6, template
+K1 is complete. The J21 schemas remain frozen: semantic graph v6, template
 manifest v4, component artifact v3, Context artifact v2, Forms/Effect
 artifacts v1, resume manifest v6, snapshot v1, runtime protocol/registry v1,
-ASM inspection v11, and check JSON v6. K0 reserves `EZC1112`-`EZC1127` and
-`EZASM1385`-`EZASM1512`, adds only inert policy constants, and records the
-deterministic test-only baseline in `fixtures/phase-k-production-baseline.json`.
-K1 may add only the typed IDs and policy product required by the authoritative
-Phase K roadmap; it must not serialize an artifact or execute an optimization.
+ASM inspection v11, and check JSON v6. K1 adds typed compiler-only
+optimization identities and `ProductionOptimizationPolicy` v1 without public
+serialization or an optimizer/runtime consumer. K2 must construct reachability
+only from immutable existing Phase A-J products; no product elimination begins
+before K3.
 
 Useful commands
 
@@ -1239,4 +1239,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the K0 commit.
+* None after the K1 commit.

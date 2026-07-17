@@ -393,7 +393,11 @@ pub use page_codegen::{
     generate_standalone_page_with_effect_runtime, generate_standalone_page_with_resume_runtime,
 };
 pub use production_optimization::{
-    ProductionOptimizationDiagnosticReservation, ProductionOptimizationPolicyV1,
+    BenchmarkFixtureId, ConstantPoolEntryId, ExecutableProgramFingerprint, OptimizationDecisionId,
+    OptimizationPolicyId, OptimizationReportId, PerformanceBudgetId, ProductionArtifactId,
+    ProductionChunkId, ProductionOptimizationDiagnosticReservation,
+    ProductionOptimizationIdentityParseError, ProductionOptimizationPolicy,
+    ProductionOptimizationPolicyV1, RuntimeTableId, SharedChunkCandidateId,
     PRODUCTION_OPTIMIZATION_DIAGNOSTIC_RESERVATIONS,
     PRODUCTION_OPTIMIZATION_INTEGRITY_RESERVATION_END,
     PRODUCTION_OPTIMIZATION_INTEGRITY_RESERVATION_START,
