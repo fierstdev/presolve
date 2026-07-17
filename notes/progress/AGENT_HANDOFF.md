@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: K10 - Production Bootstrap and Event Index
-* Working tree: K10 is implemented and awaiting its atomic commit; do not begin K11 until the worktree is clean.
+* Latest completed slice: K11 - Scheduler and DOM Patch Refinement
+* Working tree: K11 is implemented and awaiting its atomic commit; do not begin K12 until the worktree is clean.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: K10 - Production Bootstrap and Event Index
-* Summary: expanded the packed artifact with exact anchor/event/activation tables, builds validated canonical-ID-to-ordinal indexes, and embeds/validates the artifact at the production runtime boot boundary before initialization.
-* Key files: `production_bootstrap.rs`, `production_runtime_artifact.rs`, `runtime_codegen.rs`, `main.rs`
-* Boundary: K10 preserves the frozen development boot/event path while its production boundary validates closed tables; K11 alone refines scheduler and DOM-patch execution.
+* Slice: K11 - Scheduler and DOM Patch Refinement
+* Summary: added dense compiler ordinal schedules and proof-gated binding write coalescing that retains the last canonical write only when every structural/capability/Effect/read/observation boundary is absent.
+* Key files: `production_scheduler.rs`, `lib.rs`
+* Boundary: K11 is compiler-side scheduling evidence only; K12 alone owns structural component cleanup and detached activation state.
 
 Current in-progress slice
 
-* Slice: K11 - Scheduler and DOM Patch Refinement
-* Status: Ready after the K10 atomic commit and clean-worktree check.
+* Slice: K12 - Component and Structural Runtime Cleanup
+* Status: Ready after the K11 atomic commit and clean-worktree check.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase K: K11-K21. Next: refine compiler-scheduled patches and binding execution without reordering observable operations.
+* Remaining in Phase K: K12-K21. Next: build exact component/structural destroy closure and stale-dispatch protection.
 
 Verification
 

@@ -78,6 +78,7 @@ pub mod production_module_emitter;
 pub mod production_optimization;
 pub mod production_reachability;
 pub mod production_runtime_artifact;
+pub mod production_scheduler;
 pub mod provider;
 pub mod resume_activation;
 pub mod resume_anchor;
@@ -453,6 +454,11 @@ pub use production_runtime_artifact::{
     ProductionArtifactIntegrityViolation, ProductionOrdinalMapping, ProductionOrdinalWidth,
     ProductionRuntimeArtifactV1, ProductionRuntimeTable, ProductionRuntimeTableRegistry,
     PRODUCTION_RUNTIME_ARTIFACT_SCHEMA_VERSION, PRODUCTION_RUNTIME_TABLE_SCHEMA_VERSION,
+};
+pub use production_scheduler::{
+    build_production_patch_schedule, coalesce_production_binding_writes,
+    BindingWriteCoalescingDecision, BindingWriteCoalescingReport, ProductionPatchBatchKind,
+    ProductionPatchOperation, ProductionPatchSchedule,
 };
 pub use provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
 pub use resume_activation::{
