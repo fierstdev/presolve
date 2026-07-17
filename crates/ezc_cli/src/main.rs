@@ -9,22 +9,24 @@ use std::process;
 use ezc_core::{
     build_application_semantic_model_for_unit, build_component_graph,
     build_context_inspection_registry, build_effect_inspection_registry,
-    build_form_inspection_registry, build_resume_chunk_graph, build_resume_manifest,
-    build_runtime_component_artifact, build_runtime_computed_artifact,
+    build_form_inspection_registry, build_production_runtime_artifact, build_resume_chunk_graph,
+    build_resume_manifest, build_runtime_component_artifact, build_runtime_computed_artifact,
     build_runtime_context_artifact, build_runtime_effect_artifact, build_runtime_forms_artifact,
     build_semantic_graph, build_template_graph, build_template_manifest_from_asm, explain_json,
-    explain_text, fold_component_graph, generate_ordinary_instance_html, generate_runtime_stub,
+    explain_text, extract_production_chunk_graph, fold_component_graph,
+    generate_ordinary_instance_html, generate_runtime_stub,
     generate_standalone_page_with_resume_runtime, generate_static_html, lower_components_to_ir,
-    optimize_context_ir, optimize_effect_ir, project_resume_diagnostics, resume_manifest_json,
-    runtime_component_artifact_json, runtime_computed_artifact_json, runtime_context_artifact_json,
-    runtime_effect_artifact_json, runtime_forms_artifact_json, semantic_graph_json,
-    semantic_type_text, summarize_source, template_manifest_json,
-    validate_application_semantic_model, ApplicationSemanticModel, AsmValidationDiagnostic,
-    AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
-    EffectInspection, EffectInspectionRegistry, ImmutableAsmPass, RenderAttribute,
+    optimize_context_ir, optimize_effect_ir, production_runtime_artifact_json,
+    project_resume_diagnostics, resume_manifest_json, runtime_component_artifact_json,
+    runtime_computed_artifact_json, runtime_context_artifact_json, runtime_effect_artifact_json,
+    runtime_forms_artifact_json, semantic_graph_json, semantic_type_text, summarize_source,
+    template_manifest_json, validate_application_semantic_model, ApplicationSemanticModel,
+    AsmValidationDiagnostic, AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass,
+    DeclaredStateTypeKind, EffectInspection, EffectInspectionRegistry,
+    ExecutableProgramFingerprint, ImmutableAsmPass, ProductionRootChunkInput, RenderAttribute,
     RenderAttributeValue, SemanticEntity, SemanticEntityKind, SemanticId, SemanticOwner,
-    SemanticReferenceKind, SerializableValue, SourceProvenance, StateOperation, TemplateChild,
-    TemplateGraph, TemplateSemanticKind,
+    SemanticReferenceKind, SerializableValue, SharedChunkCandidatePlan, SourceProvenance,
+    StateOperation, TemplateChild, TemplateGraph, TemplateSemanticKind,
 };
 use ezc_parser::{
     parse_file, ParseDiagnostic, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
@@ -2021,6 +2023,18 @@ fn run_build(mut args: Vec<String>) {
     let forms_runtime_json = runtime_forms_artifact_json(&forms_runtime_artifact);
     let resume_runtime_artifact = build_resume_manifest(&asm);
     let resume_runtime_json = resume_manifest_json(&resume_runtime_artifact);
+    let (production_chunk_graph, _) = extract_production_chunk_graph(
+        &SharedChunkCandidatePlan {
+            candidates: Vec::new(),
+            rejections: Vec::new(),
+        },
+        &production_root_chunk_inputs(&resume_runtime_artifact),
+    )
+    .expect("frozen resume manifest should form a production root graph");
+    let production_runtime_artifact =
+        build_production_runtime_artifact(&resume_runtime_artifact, &production_chunk_graph)
+            .expect("validated production root graph should pack");
+    let production_runtime_json = production_runtime_artifact_json(&production_runtime_artifact);
     let resume_chunks = build_resume_chunk_graph(&asm);
     let component_graph = fold_component_graph(&build_component_graph(&parsed));
     let template_graph = build_template_graph(&component_graph);
@@ -2051,6 +2065,7 @@ fn run_build(mut args: Vec<String>) {
         &component_runtime_json,
         &forms_runtime_json,
         &resume_runtime_json,
+        &production_runtime_json,
         &runtime_js,
         &resume_chunks,
     )
@@ -2071,6 +2086,10 @@ fn run_build(mut args: Vec<String>) {
     println!("Wrote {}", out_dir.join("component.runtime.json").display());
     println!("Wrote {}", out_dir.join("forms.runtime.json").display());
     println!("Wrote {}", out_dir.join("resume.runtime.json").display());
+    println!(
+        "Wrote {}",
+        out_dir.join("production.runtime.json").display()
+    );
     println!("Wrote {}", out_dir.join("runtime.js").display());
     for chunk in &resume_chunks.chunks {
         println!(
@@ -2078,6 +2097,40 @@ fn run_build(mut args: Vec<String>) {
             out_dir.join(&chunk.module.module_path).display()
         );
     }
+}
+
+fn production_root_chunk_inputs(
+    resume: &ezc_core::ResumeManifest,
+) -> Vec<ProductionRootChunkInput> {
+    let mut roots = resume
+        .chunks
+        .iter()
+        .filter_map(|chunk| {
+            let root_kind = match chunk.root_kind {
+                ezc_core::resume_manifest::ResumeManifestChunkRootKind::Eager => return None,
+                ezc_core::resume_manifest::ResumeManifestChunkRootKind::Interaction => {
+                    "interaction"
+                }
+                ezc_core::resume_manifest::ResumeManifestChunkRootKind::Visible => "visible",
+                ezc_core::resume_manifest::ResumeManifestChunkRootKind::Manual => "manual",
+            };
+            Some(ProductionRootChunkInput {
+                activation_root_id: chunk.root_id.clone(),
+                root_kind: root_kind.to_string(),
+                programs: chunk
+                    .provided_program_ids
+                    .iter()
+                    .map(|program| {
+                        ExecutableProgramFingerprint::for_canonical_opcode_stream(
+                            program.as_bytes(),
+                        )
+                    })
+                    .collect(),
+            })
+        })
+        .collect::<Vec<_>>();
+    roots.sort_by(|left, right| left.activation_root_id.cmp(&right.activation_root_id));
+    roots
 }
 
 fn run_parse(mut args: Vec<String>) {
@@ -2877,6 +2930,7 @@ fn write_build_artifacts(
     component_runtime_json: &str,
     forms_runtime_json: &str,
     resume_runtime_json: &str,
+    production_runtime_json: &str,
     runtime_js: &str,
     resume_chunks: &ezc_core::ResumeChunkGraph,
 ) -> io::Result<()> {
@@ -2897,6 +2951,10 @@ fn write_build_artifacts(
     )?;
     fs::write(out_dir.join("forms.runtime.json"), forms_runtime_json)?;
     fs::write(out_dir.join("resume.runtime.json"), resume_runtime_json)?;
+    fs::write(
+        out_dir.join("production.runtime.json"),
+        production_runtime_json,
+    )?;
 
     fs::write(out_dir.join("runtime.js"), runtime_js)?;
     for chunk in &resume_chunks.chunks {

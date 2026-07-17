@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: K7 - Production Chunk Graph and Shared Extraction
-* Working tree: K7 is implemented and awaiting its atomic commit; do not begin K8 until the worktree is clean.
+* Latest completed slice: K8 - Compact Runtime Tables and Production Artifact v1
+* Working tree: K8 is implemented and awaiting its atomic commit; do not begin K9 until the worktree is clean.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: K7 - Production Chunk Graph and Shared Extraction
-* Summary: applied only accepted K6 candidates to one eager/root/shared depth-one topology, with canonical activation plans, registration-only shared records, provisional content-hash filenames, and preserved Phase J no-retry failure behavior.
-* Key files: `production_chunk_graph.rs`, `production_optimization.rs`, `lib.rs`
-* Boundary: K7 emits no modules or production artifact and does not alter runtime activation/dispatch; K8 alone adds compact runtime tables and production artifact v1.
+* Slice: K8 - Compact Runtime Tables and Production Artifact v1
+* Summary: added a closed `production.runtime.json` v1 derived from the frozen resume manifest and validated K7 graph, with canonical dense ordinal tables, checksums, build/protocol agreement, and reference validation.
+* Key files: `production_runtime_artifact.rs`, `main.rs`, `production_baseline.rs`, `lib.rs`
+* Boundary: K8 leaves all frozen development artifacts unchanged and emits no final production JavaScript modules; K9 alone owns production module emission and content-addressed filenames.
 
 Current in-progress slice
 
-* Slice: K8 - Compact Runtime Tables and Production Artifact v1
-* Status: Ready after the K7 atomic commit and clean-worktree check.
+* Slice: K9 - Deterministic Production JavaScript Emission
+* Status: Ready after the K8 atomic commit and clean-worktree check.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase K: K8-K21. Next: derive canonical production runtime tables and packed artifact v1 only from frozen canonical artifacts plus K projections.
+* Remaining in Phase K: K9-K21. Next: emit final deterministic eager, shared, and root production modules with canonical imports and two-stage content hashes.
 
 Verification
 

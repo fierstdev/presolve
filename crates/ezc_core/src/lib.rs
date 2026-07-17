@@ -75,6 +75,7 @@ pub mod production_deduplication;
 pub mod production_elimination;
 pub mod production_optimization;
 pub mod production_reachability;
+pub mod production_runtime_artifact;
 pub mod provider;
 pub mod resume_activation;
 pub mod resume_anchor;
@@ -433,6 +434,15 @@ pub use production_reachability::{
     build_production_reachability_graph, ProductionExecutableRoot, ProductionProgramEdge,
     ProductionReachabilityBlock, ProductionReachabilityGraph, ProductionReachabilityReason,
     ProductionUnreachableRecord,
+};
+pub use production_runtime_artifact::{
+    build_production_runtime_artifact, build_production_runtime_table,
+    parse_production_runtime_artifact_v1, production_runtime_artifact_json,
+    validate_production_runtime_artifact, ProductionArtifactActivationEntry,
+    ProductionArtifactChunkRecord, ProductionArtifactEntry, ProductionArtifactIntegrity,
+    ProductionArtifactIntegrityViolation, ProductionOrdinalMapping, ProductionOrdinalWidth,
+    ProductionRuntimeArtifactV1, ProductionRuntimeTable, ProductionRuntimeTableRegistry,
+    PRODUCTION_RUNTIME_ARTIFACT_SCHEMA_VERSION, PRODUCTION_RUNTIME_TABLE_SCHEMA_VERSION,
 };
 pub use provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
 pub use resume_activation::{
