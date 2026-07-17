@@ -1201,8 +1201,8 @@ Known limitations
 
 Exact next step
 
-Commit J17 atomically as `runtime: activate resumable interactions lazily`,
-verify the worktree is clean, then implement J18 Phase J inspection.
+Commit J18 atomically as `cli: inspect executable resumability`, verify the
+worktree is clean, then implement J19 Phase J diagnostics.
 
 Useful commands
 

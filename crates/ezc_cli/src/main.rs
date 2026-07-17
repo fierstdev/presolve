@@ -31,7 +31,7 @@ use ezc_parser::{
 };
 use serde::Serialize;
 
-const ASM_INSPECTION_SCHEMA_VERSION: u32 = 9;
+const ASM_INSPECTION_SCHEMA_VERSION: u32 = 10;
 const CHECK_JSON_SCHEMA_VERSION: u32 = 5;
 
 fn main() {
@@ -530,6 +530,14 @@ fn asm_inspection_json(
     let effect_inspections = build_effect_inspection_registry(asm);
     let context_inspections = build_context_inspection_registry(asm);
     let form_inspections = build_form_inspection_registry(asm);
+    let resume = if asm.diagnostics.is_empty() {
+        serde_json::from_str(&resume_manifest_json(&build_resume_manifest(asm)))
+            .expect("resume manifest inspection JSON should parse")
+    } else {
+        serde_json::json!({
+            "resumeFailures": asm.diagnostics.iter().map(|diagnostic| &diagnostic.code).collect::<Vec<_>>()
+        })
+    };
     let mut references = asm
         .references
         .iter()
@@ -603,6 +611,7 @@ fn asm_inspection_json(
         references,
         diagnostics,
         validation,
+        resume,
     };
 
     serde_json::to_string_pretty(&document).expect("ASM inspection document should serialize")
@@ -1540,6 +1549,7 @@ struct AsmInspectionDocument<'a> {
     references: Vec<AsmInspectionReference<'a>>,
     diagnostics: Vec<AsmInspectionDiagnostic<'a>>,
     validation: Vec<AsmInspectionDiagnostic<'a>>,
+    resume: serde_json::Value,
 }
 
 #[derive(Serialize)]
@@ -2845,7 +2855,7 @@ class Profile {
         let document = asm_inspection_json(&[path], &asm, &[]);
         let json: serde_json::Value = serde_json::from_str(&document).unwrap();
         assert_eq!(json["schema_version"], ASM_INSPECTION_SCHEMA_VERSION);
-        assert_eq!(json["schema_version"], 9);
+        assert_eq!(json["schema_version"], 10);
         assert!(document.contains("validation-rule"));
         assert!(document.contains("validation_rule"));
     }

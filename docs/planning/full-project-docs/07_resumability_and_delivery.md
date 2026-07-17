@@ -366,6 +366,15 @@ looks it up in the closed event index, activates its exact chunk, then invokes
 the existing compiler-owned ordinary event program. It does not synthesize a
 DOM event or derive an action from DOM shape.
 
+## Phase J inspection
+
+ASM inspection v10 publishes the canonical resume manifest projection beside
+the frozen semantic inspection products. It exposes the same build, boundary,
+slot, capture/restore, chunk, activation, anchor, and event authorities used
+by runtime delivery, without exposing generated module source or snapshot
+values. Invalid compiler models expose deterministic resumability failures
+instead of attempting to fabricate an executable manifest.
+
 ## Definition
 
 In EdgeZero, resumability means:
