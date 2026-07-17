@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: K5 - Canonical Constant Pooling
-* Working tree: K5 is committed and the worktree is clean; begin K6 only.
+* Latest completed slice: K6 - Shared Lazy-Chunk Candidate Planning
+* Working tree: K6 is committed and the worktree is clean; begin K7 only.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: K5 - Canonical Constant Pooling
-* Summary: added deterministic production-only pooling over immutable exact-type canonical bytes, with fixed threshold/savings rules and ordinal-ready entries.
-* Key files: `production_constant_pool.rs`, `lib.rs`
-* Boundary: K5 excludes mutable/identity/snapshot/public values and changes no public artifact/runtime/schema behavior.
+* Slice: K6 - Shared Lazy-Chunk Candidate Planning
+* Summary: added exact consuming-root grouping, fixed deterministic savings arithmetic, and rejection evidence without changing chunk topology.
+* Key files: `shared_chunk_candidate.rs`, `lib.rs`
+* Boundary: K6 emits no modules and permits no subset search, runtime behavior, or schema change.
 
 Current in-progress slice
 
-* Slice: K6 - Shared Lazy-Chunk Candidate Planning
-* Status: Ready after the K5 commit and clean-worktree check.
+* Slice: K7 - Production Chunk Graph and Shared Extraction
+* Status: Ready after the K6 commit and clean-worktree check.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase K: K6-K21. Next: identify deterministic candidate groups under the fixed policy only; do not change chunk topology until K7.
+* Remaining in Phase K: K7-K21. Next: construct the depth-one shared/root/eager graph from accepted K6 candidates only.
 
 Verification
 

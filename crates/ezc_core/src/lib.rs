@@ -107,6 +107,7 @@ pub mod semantic_id;
 pub mod semantic_provenance;
 pub mod semantic_reference;
 pub mod semantic_type;
+pub mod shared_chunk_candidate;
 pub mod slot;
 pub mod slot_binding;
 pub mod slot_content;
@@ -608,6 +609,11 @@ pub use semantic_type::{
     ResourceType, SemanticOperator, SemanticType, SemanticTypeAlias, SemanticTypeAssignment,
     SemanticTypeId, SemanticTypeModel, SemanticTypeStatus, SerializationCompatibility,
     TypeDiagnosticCode, TypeDiagnosticFamily,
+};
+pub use shared_chunk_candidate::{
+    plan_shared_lazy_chunk_candidates, SharedChunkCandidate, SharedChunkCandidatePlan,
+    SharedChunkConsumerRoot, SharedChunkProgramOccurrence, SharedChunkRejectionReason,
+    SharedChunkSavingsCalculation,
 };
 pub use slot::{collect_slot_entities, SlotEntity};
 pub use slot_binding::{
