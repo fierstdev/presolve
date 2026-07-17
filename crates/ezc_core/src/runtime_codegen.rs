@@ -9,6 +9,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const FORMS_ARTIFACT_ELEMENT_ID = "ez-forms-runtime";
   const RESUME_MANIFEST_ELEMENT_ID = "ez-resume-runtime";
   const RESUME_SNAPSHOT_ELEMENT_ID = "ez-resume-snapshot";
+  const PRODUCTION_RUNTIME_ELEMENT_ID = "ez-production-runtime";
   const RUNTIME_VERSION = "0.0.0";
   const SUPPORTED_SCHEMA_VERSION = 4;
   const ACTION_MANIFEST_SCHEMA_VERSION = 2;
@@ -86,6 +87,43 @@ const RUNTIME_STUB: &str = r#"(() => {
       reportDiagnostic(diagnostics, "EZR_RESUME_MANIFEST_PARSE", "Resume manifest v6 could not be parsed", { message: error instanceof Error ? error.message : String(error) });
       throw new ResumeBootError("ManifestVersionMismatch");
     }
+  }
+
+  function readProductionRuntimeArtifact() {
+    const element = document.getElementById(PRODUCTION_RUNTIME_ELEMENT_ID);
+    if (element === null) return null;
+    if (!(element instanceof HTMLScriptElement)) throw new ResumeBootError("ProductionArtifactMismatch");
+    let artifact;
+    try { artifact = JSON.parse(element.textContent ?? ""); } catch (_) { throw new ResumeBootError("ProductionArtifactMismatch"); }
+    if (artifact === null || typeof artifact !== "object"
+      || artifact.schemaVersion !== 1 || artifact.runtimeProtocolVersion !== 1
+      || !Array.isArray(artifact.tables?.tables) || !Array.isArray(artifact.chunks)) {
+      throw new ResumeBootError("ProductionArtifactMismatch");
+    }
+    return artifact;
+  }
+
+  function productionOrdinalIndexes(artifact) {
+    if (artifact === null) return null;
+    const indexes = new Map();
+    for (const table of artifact.tables.tables) {
+      if (typeof table.table_kind !== "string" || !Array.isArray(table.mappings)) {
+        throw new ResumeBootError("ProductionArtifactMismatch");
+      }
+      const values = new Map();
+      for (const mapping of table.mappings) {
+        if (typeof mapping.canonical_id !== "string" || !Number.isInteger(mapping.ordinal)
+          || mapping.ordinal < 0 || values.has(mapping.canonical_id)) {
+          throw new ResumeBootError("ProductionArtifactMismatch");
+        }
+        values.set(mapping.canonical_id, mapping.ordinal);
+      }
+      indexes.set(table.table_kind, values);
+    }
+    for (const required of ["anchors", "events", "activations", "activation_roots"]) {
+      if (!indexes.has(required)) throw new ResumeBootError("ProductionArtifactMismatch");
+    }
+    return indexes;
   }
 
   function readOptionalResumeSnapshot(diagnostics, explicitSnapshot) {
@@ -3622,6 +3660,8 @@ const RUNTIME_STUB: &str = r#"(() => {
     const diagnostics = [];
 
     try {
+      const productionArtifact = readProductionRuntimeArtifact();
+      const productionIndexes = productionOrdinalIndexes(productionArtifact);
       const manifest = readManifest(diagnostics);
       const computedArtifact = readComputedArtifact(diagnostics);
       validateComputedArtifactSchema(computedArtifact, diagnostics);
@@ -3669,6 +3709,10 @@ const RUNTIME_STUB: &str = r#"(() => {
       };
       state.resume_registry = result.mode === "resume" ? result.registry : null;
       state.resume_debug = [...resumeBootstrapState.debug];
+      state.production = productionIndexes === null ? null : {
+        artifact_checksum: productionArtifact.integrity?.artifact_checksum ?? null,
+        table_kinds: [...productionIndexes.keys()]
+      };
       const status = state.diagnostics.some((diagnostic) => diagnostic.fatal)
         || state.missingAnchors.length > 0
         ? "error"

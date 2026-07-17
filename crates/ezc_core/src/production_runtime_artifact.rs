@@ -156,6 +156,7 @@ pub fn build_production_runtime_table(
 ///
 /// Panics only if compiler-derived canonical IDs cannot form one of the fixed
 /// K8 tables, which indicates an earlier compiler invariant failure.
+#[allow(clippy::too_many_lines)]
 pub fn build_production_runtime_artifact(
     resume: &ResumeManifest,
     chunk_graph: &ProductionChunkGraph,
@@ -170,6 +171,21 @@ pub fn build_production_runtime_artifact(
         .activation_plans
         .iter()
         .map(|plan| plan.activation_root_id.clone())
+        .collect::<Vec<_>>();
+    let anchor_ids = resume
+        .anchors
+        .iter()
+        .map(|anchor| anchor.anchor_id.to_string())
+        .collect::<Vec<_>>();
+    let event_ids = resume
+        .events
+        .iter()
+        .map(|event| event.resume_event_id.to_string())
+        .collect::<Vec<_>>();
+    let activation_ids = resume
+        .activations
+        .iter()
+        .map(|activation| activation.activation_id.to_string())
         .collect::<Vec<_>>();
     let chunk_ids = chunk_graph
         .chunks
@@ -186,8 +202,29 @@ pub fn build_production_runtime_artifact(
         std::slice::from_ref(&chunk_table.table_id),
     )
     .expect("graph activation roots are canonical and unique");
+    let anchor_table = build_production_runtime_table("anchors", &anchor_ids, &[])
+        .expect("manifest anchor IDs are canonical and unique");
+    let event_table = build_production_runtime_table(
+        "events",
+        &event_ids,
+        std::slice::from_ref(&anchor_table.table_id),
+    )
+    .expect("manifest event IDs are canonical and unique");
+    let activation_id_table = build_production_runtime_table(
+        "activations",
+        &activation_ids,
+        std::slice::from_ref(&chunk_table.table_id),
+    )
+    .expect("manifest activation IDs are canonical and unique");
     let tables = ProductionRuntimeTableRegistry {
-        tables: vec![activation_table, chunk_table, program_table],
+        tables: vec![
+            activation_id_table,
+            activation_table,
+            anchor_table,
+            chunk_table,
+            event_table,
+            program_table,
+        ],
     };
     let dependencies = chunk_graph.dependencies.iter().fold(
         BTreeMap::<ProductionChunkId, Vec<ProductionChunkId>>::new(),

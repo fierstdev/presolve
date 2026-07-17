@@ -2053,6 +2053,11 @@ fn run_build(mut args: Vec<String>) {
         &forms_runtime_artifact,
         &resume_runtime_artifact,
     );
+    let page_html = production_mode_page_html(
+        page_html,
+        args.iter().any(|argument| argument == "--production"),
+        &production_runtime_json,
+    );
     write_build_artifacts(
         &out_dir,
         &page_html,
@@ -2173,6 +2178,24 @@ fn maybe_write_production_modules(
         process::exit(1);
     });
     println!("Wrote {}", out_dir.join("production").display());
+}
+
+fn production_mode_page_html(
+    page_html: String,
+    production_mode: bool,
+    artifact_json: &str,
+) -> String {
+    if !production_mode {
+        return page_html;
+    }
+    let artifact = artifact_json.replace("</script", "<\\/script");
+    page_html.replacen(
+        "    <script src=\"./runtime.js\" defer></script>",
+        &format!(
+            "    <script type=\"application/json\" id=\"ez-production-runtime\">{artifact}    </script>\n    <script src=\"./runtime.js\" defer></script>"
+        ),
+        1,
+    )
 }
 
 fn run_parse(mut args: Vec<String>) {
