@@ -1201,9 +1201,8 @@ Known limitations
 
 Exact next step
 
-Commit J16 atomically as `runtime: establish resumed bindings and effects`,
-verify the worktree is clean, then implement J17 lazy event and boundary
-activation.
+Commit J17 atomically as `runtime: activate resumable interactions lazily`,
+verify the worktree is clean, then implement J18 Phase J inspection.
 
 Useful commands
 

@@ -1207,7 +1207,9 @@ if (document.querySelector("button").textContent !== "7") fail("R16 did not patc
 if (runtime.initial_effect_runs.length !== 0) fail("resume path executed cold authored initialization");
 const eventId = runtime.resume_registry.definitions.events.keys().next().value;
 const activation = await window.__EDGEZERO_RESUME__.activateByEvent(eventId);
-if (activation.status !== "registered") fail("event activation API did not resolve the exact boundary");
+if (activation.status !== "active") fail("event activation API did not load the exact chunk");
+document.querySelector("button").click();
+await waitFor(() => runtime.components[0].state.count === 8, "activated action");
 if (window.__EDGEZERO_RESUME__.captureSnapshot().failure !== "NotQuiescent") fail("capture API contract was absent");
 let doubleFailure = null;
 try { await window.__EDGEZERO_RESUME__.bootstrapResume(); } catch (error) { doubleFailure = error.failure; }

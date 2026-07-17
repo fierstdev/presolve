@@ -343,7 +343,7 @@ fn chunk(
             .map_or("application", ResumeBoundaryId::as_str),
     );
     let canonical_module_bytes = format!(
-        "chunk={id}\nkind={root_kind:?}\nroot={}\nboundaries={}\nprograms={}\n",
+        "// chunk={id}\n// kind={root_kind:?}\n// root={}\n// boundaries={}\n// programs={}\nexport {{}};\n",
         root_boundary.as_ref().map_or("", ResumeBoundaryId::as_str),
         required_boundaries
             .iter()

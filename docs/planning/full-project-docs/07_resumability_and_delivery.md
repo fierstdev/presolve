@@ -353,6 +353,19 @@ Effect establishment records are installed in frozen artifact order with
 during resume; future completed action scheduling continues to use the frozen
 Phase F action batches.
 
+## Phase J lazy interaction activation
+
+J17 materializes each compiler-planned chunk as a deterministic ES module and
+loads it by the manifest's exact module path. Activation is keyed by the
+compiler-emitted activation and event IDs; concurrent requests share one load,
+successful chunks activate once, and a failed chunk remains failed without a
+retry or action dispatch.
+
+The eager resume listener resolves only the nearest emitted `data-ez-e` marker,
+looks it up in the closed event index, activates its exact chunk, then invokes
+the existing compiler-owned ordinary event program. It does not synthesize a
+DOM event or derive an action from DOM shape.
+
 ## Definition
 
 In EdgeZero, resumability means:

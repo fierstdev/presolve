@@ -331,7 +331,26 @@ const RUNTIME_STUB: &str = r#"(() => {
     const activation = [...registry.definitions.activations.values()]
       .find((record) => record.boundary_id === boundaryId);
     if (activation === undefined) throw new ResumeBootError("ActivationFailure", { boundaryId });
-    return { boundary_id: boundaryId, activation_id: activation.activation_id, status: "registered" };
+    const prior = registry.activation_states.get(activation.activation_id);
+    if (prior?.status === "active") return prior.result;
+    if (prior?.status === "failed") throw new ResumeBootError("ActivationFailure", { boundaryId });
+    if (prior?.promise !== undefined) return prior.promise;
+    const chunk = registry.definitions.chunks.get(activation.chunk_id);
+    if (chunk === undefined || typeof chunk.module_path !== "string") {
+      throw new ResumeBootError("ActivationFailure", { boundaryId });
+    }
+    const promise = import(new URL(chunk.module_path, document.baseURI).href)
+      .then(() => {
+        const result = { boundary_id: boundaryId, activation_id: activation.activation_id, chunk_id: activation.chunk_id, status: "active" };
+        registry.activation_states.set(activation.activation_id, { status: "active", result });
+        return result;
+      })
+      .catch(() => {
+        registry.activation_states.set(activation.activation_id, { status: "failed" });
+        throw new ResumeBootError("ActivationFailure", { boundaryId });
+      });
+    registry.activation_states.set(activation.activation_id, { status: "loading", promise });
+    return promise;
   }
 
   async function activateByEvent(resumeEventId) {
@@ -343,6 +362,35 @@ const RUNTIME_STUB: &str = r#"(() => {
       .find((record) => record.event_id === resumeEventId);
     if (activation === undefined) throw new ResumeBootError("ActivationFailure", { resumeEventId });
     return activateBoundary(activation.boundary_id);
+  }
+
+  function resumeEventMarker(event) {
+    let current = event.target instanceof Element ? event.target : event.target?.parentElement;
+    while (current !== null && current !== undefined) {
+      const marker = current.getAttribute("data-ez-e");
+      if (marker !== null) return marker;
+      current = current.parentElement;
+    }
+    return null;
+  }
+
+  function installResumeActivationListeners(registry, store) {
+    const events = new Map([...registry.definitions.events.values()].map((event) => [event.resume_event_id, event]));
+    const eventTypes = new Set([...events.values()].map((event) => event.event_type));
+    for (const eventType of eventTypes) {
+      document.addEventListener(eventType, async (event) => {
+        const marker = resumeEventMarker(event);
+        if (marker === null) return;
+        const record = events.get(marker);
+        if (record === undefined || record.event_type !== event.type) return;
+        try {
+          await activateByEvent(marker);
+          dispatchOrdinaryInstanceEvent(store, event);
+        } catch (error) {
+          registry.debug.push({ event_id: marker, failure: error instanceof ResumeBootError ? error.failure : "ActivationFailure" });
+        }
+      });
+    }
   }
 
   function readManifest(diagnostics) {
@@ -3351,6 +3399,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     restoreResumeForms(manifest, snapshot, registry, store, formsArtifact);
     installResumeDomBindings(store, templateManifest, componentArtifact);
     establishResumeEffects(registry, store, effectArtifact);
+    installResumeActivationListeners(registry, store);
     const state = runtimeState({
       manifest: templateManifest,
       diagnostics,
