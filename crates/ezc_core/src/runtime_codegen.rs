@@ -505,7 +505,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
   function validateFormsArtifact(formsArtifact, manifest, diagnostics) {
     if (formsArtifact === null) {
-      if (manifest.schema_version === 3) {
+      if (manifest.schema_version >= 3) {
         reportDiagnostic(diagnostics, "EZR_MISSING_FORMS_ARTIFACT", "A schema-v3 template manifest requires Forms runtime metadata", {}, true);
         throw new EdgeZeroBootError("EZR_MISSING_FORMS_ARTIFACT");
       }
@@ -516,7 +516,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       throw new EdgeZeroBootError("EZR_UNSUPPORTED_FORMS_ARTIFACT_SCHEMA");
     }
     const hasForms = formsArtifact.forms.length > 0 || formsArtifact.instances.length > 0;
-    if (hasForms && manifest.schema_version !== 3) {
+    if (hasForms && manifest.schema_version < 3) {
       reportDiagnostic(diagnostics, "EZR_FORMS_MANIFEST_MISMATCH", "Forms runtime metadata requires a schema-v3 template manifest", { schema_version: manifest.schema_version }, true);
       throw new EdgeZeroBootError("EZR_FORMS_MANIFEST_MISMATCH");
     }
@@ -3191,7 +3191,112 @@ const RUNTIME_STUB: &str = r#"(() => {
     store.resumeAnchors = collectExactResumeAnchors(manifest);
   }
 
-  function restoreResumeRuntimeThroughStructure(
+  function restoreResumeForms(manifest, snapshot, registry, store, formsArtifact) {
+    const restoreRecords = [...registry.definitions.restorePrograms.values()]
+      .flatMap((program) => program.instructions ?? [])
+      .filter((record) => ["R11", "R12", "R13", "R14", "R15"].includes(record.phase));
+    if (formsArtifact === null) {
+      if (restoreRecords.length !== 0) throw new ResumeBootError("ResumeArtifactMismatch");
+      return;
+    }
+    const targets = collectOrdinaryTargetAnchors();
+    const definitions = new Map((formsArtifact.forms ?? []).map((form) => [form.id, form]));
+    const instances = new Map((formsArtifact.instances ?? []).map((instance) => [instance.id, instance]));
+    if (definitions.size !== (formsArtifact.forms ?? []).length || instances.size !== (formsArtifact.instances ?? []).length) {
+      throw new ResumeBootError("DuplicateIdentity");
+    }
+    store.forms = new Map();
+    store.formInstances = new Map();
+    store.formBindingsByAnchor = new Map();
+    store.formBindingsByField = new Map();
+    store.formHostsByAnchor = new Map();
+    const slotOwners = new Map();
+    for (const instance of instances.values()) {
+      const definition = definitions.get(instance.form);
+      if (definition === undefined || store.formInstances.has(instance.id)) {
+        throw new ResumeBootError("ResumeArtifactMismatch");
+      }
+      const fields = new Map((definition.fields ?? []).map((field) => [field.id, {
+        value: field.initial_value,
+        initial: field.initial_value,
+        dirty: false,
+        touched: false,
+        validation: []
+      }]));
+      if (fields.size !== (definition.fields ?? []).length) throw new ResumeBootError("DuplicateIdentity");
+      const runtime = { definition, instance, fields, aggregate_valid: true, submission: "Idle" };
+      store.forms.set(definition.id, definition);
+      store.formInstances.set(instance.id, runtime);
+      registry.form_records.set(instance.id, runtime);
+      for (const slots of instance.field_slots ?? []) {
+        if (!fields.has(slots.field)) throw new ResumeBootError("ResumeArtifactMismatch");
+        for (const [kind, slot] of [["value", slots.value], ["dirty", slots.dirty], ["touched", slots.touched], ["validation", slots.validation]]) {
+          if (slotOwners.has(slot)) throw new ResumeBootError("DuplicateIdentity");
+          slotOwners.set(slot, { instance: runtime, field: slots.field, kind });
+        }
+      }
+      if (slotOwners.has(instance.aggregate_validation_slot) || slotOwners.has(instance.submission_slot)) {
+        throw new ResumeBootError("DuplicateIdentity");
+      }
+      slotOwners.set(instance.aggregate_validation_slot, { instance: runtime, field: null, kind: "aggregate" });
+      slotOwners.set(instance.submission_slot, { instance: runtime, field: null, kind: "submission" });
+    }
+
+    const snapshotValues = snapshotValuesBySlot(snapshot);
+    const restored = new Set();
+    for (const record of restoreRecords) {
+      if (record.phase === "R15") continue;
+      const instruction = record.instruction;
+      if (instruction.kind !== "decode_value") continue;
+      const schema = registry.definitions.slots.get(instruction.slot_id);
+      if (schema === undefined || schema.restore_phase !== record.phase || !snapshotValues.has(instruction.slot_id)) {
+        throw new ResumeBootError("RestoreInstructionFailure");
+      }
+      const owner = slotOwners.get(schema.existing_storage_slot_id);
+      if (owner === undefined || restored.has(instruction.slot_id)) throw new ResumeBootError("ResumeArtifactMismatch");
+      const value = decodeResumeValue(snapshotValues.get(instruction.slot_id), instruction.codec);
+      const field = owner.field === null ? undefined : owner.instance.fields.get(owner.field);
+      if (owner.kind === "value" && field !== undefined) field.value = value;
+      else if (owner.kind === "dirty" && field !== undefined && typeof value === "boolean") field.dirty = value;
+      else if (owner.kind === "touched" && field !== undefined && typeof value === "boolean") field.touched = value;
+      else if (owner.kind === "validation" && field !== undefined && Array.isArray(value) && value.every((item) => typeof item === "string")) field.validation = value;
+      else if (owner.kind === "aggregate" && typeof value === "boolean") owner.instance.aggregate_valid = value;
+      else if (owner.kind === "submission" && ["Idle", "Completed", "Failed", "Invalid"].includes(value)) owner.instance.submission = value;
+      else throw new ResumeBootError(owner.kind === "submission" ? "UnstableFormSubmission" : "ValueTypeMismatch");
+      registry.slot_values.set(instruction.slot_id, value);
+      restored.add(instruction.slot_id);
+    }
+    const expectedSlots = [...registry.definitions.slots.values()]
+      .filter((schema) => ["R11", "R12", "R13", "R14"].includes(schema.restore_phase));
+    if (restored.size !== expectedSlots.length) throw new ResumeBootError("RestoreInstructionFailure");
+
+    for (const bridge of manifest.form_bindings ?? []) {
+      const target = targets.targets.get(bridge.instance_target_id);
+      const formInstance = store.formInstances.get(bridge.form_instance_id);
+      if (!(target instanceof Element) || targets.duplicates.has(bridge.instance_target_id) || formInstance === undefined) {
+        throw new ResumeBootError("MissingAnchor");
+      }
+      const binding = formInstance.definition.bindings.find((item) => item.id === bridge.field_binding_id);
+      if (binding === undefined || binding.field === undefined || binding.channel !== bridge.channel || store.formBindingsByAnchor.has(bridge.instance_target_id)) {
+        throw new ResumeBootError("ResumeArtifactMismatch");
+      }
+      const runtimeBinding = { bridge, binding, element: target, formInstance };
+      store.formBindingsByAnchor.set(bridge.instance_target_id, runtimeBinding);
+      const key = `${bridge.form_instance_id}|${binding.field}`;
+      const bindings = store.formBindingsByField.get(key) ?? [];
+      bindings.push(runtimeBinding);
+      store.formBindingsByField.set(key, bindings);
+      writeFormControl(runtimeBinding, formInstance.fields.get(binding.field)?.value);
+    }
+    const expectedBindings = [...instances.values()].reduce((count, instance) => count + (definitions.get(instance.form)?.bindings?.length ?? 0), 0);
+    if (store.formBindingsByAnchor.size !== expectedBindings) throw new ResumeBootError("ResumeArtifactMismatch");
+    window.__EDGEZERO_FORMS__ = {
+      resetForm: (instanceId) => resetForm(store, instanceId),
+      resetField: (instanceId, fieldId) => resetField(store, instanceId, fieldId)
+    };
+  }
+
+  function restoreResumeRuntimeThroughForms(
     manifest,
     snapshot,
     registry,
@@ -3200,6 +3305,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     contextArtifact,
     effectArtifact,
     componentArtifact,
+    formsArtifact,
     diagnostics
   ) {
     const store = allocateResumeStateComputedStore(
@@ -3218,6 +3324,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     executeResumeDecodeAndWrites(store, registry, snapshot, new Set(["R6"]));
     executeResumeContextBindings(store, registry, componentArtifact);
     restoreResumeComponentsSlotsAndStructure(manifest, registry, store, componentArtifact);
+    restoreResumeForms(manifest, snapshot, registry, store, formsArtifact);
     const state = runtimeState({
       manifest: templateManifest,
       diagnostics,
@@ -3232,6 +3339,12 @@ const RUNTIME_STUB: &str = r#"(() => {
       context_update_source_runs: store.contextUpdateSourceRuns,
       component_initialization_runs: [],
       component_instance_tree: [...store.componentInstances.values()],
+      forms: [...store.formInstances.values()].map((instance) => ({
+        id: instance.instance.id,
+        form: instance.definition.id,
+        aggregate_valid: instance.aggregate_valid,
+        submission: instance.submission
+      })),
       slot_binding_runs: [...store.slotBindings.keys()],
       component_failures: []
     });
@@ -3255,6 +3368,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     context_update_source_runs = [],
     component_initialization_runs = [],
     component_instance_tree = [],
+    forms = [],
     slot_binding_runs = [],
     component_failures = [],
     diagnostics
@@ -3278,6 +3392,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       context_update_source_runs,
       component_initialization_runs,
       component_instance_tree,
+      forms,
       slot_binding_runs,
       component_failures
     };
@@ -3447,7 +3562,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
       const result = await bootstrapResume({
         diagnostics,
-        resumeBoot: ({ manifest: resumeManifest, snapshot, registry }) => restoreResumeRuntimeThroughStructure(
+        resumeBoot: ({ manifest: resumeManifest, snapshot, registry }) => restoreResumeRuntimeThroughForms(
           resumeManifest,
           snapshot,
           registry,
@@ -3456,6 +3571,7 @@ const RUNTIME_STUB: &str = r#"(() => {
           contextArtifact,
           effectArtifact,
           componentArtifact,
+          formsArtifact,
           diagnostics
         ),
         coldBoot: () => initializeRuntime(
@@ -3590,10 +3706,11 @@ mod tests {
         assert!(runtime.contains("async function activateByEvent"));
         assert!(runtime.contains("async function activateBoundary"));
         assert!(runtime.contains("function decodeResumeValue"));
-        assert!(runtime.contains("function restoreResumeRuntimeThroughStructure"));
+        assert!(runtime.contains("function restoreResumeRuntimeThroughForms"));
         assert!(runtime.contains("executeResumeComputedRecomputation"));
         assert!(runtime.contains("function executeResumeContextBindings"));
         assert!(runtime.contains("function restoreResumeComponentsSlotsAndStructure"));
+        assert!(runtime.contains("function restoreResumeForms"));
         assert!(runtime.contains("function collectExactResumeAnchors"));
         assert!(runtime.contains("window.__EDGEZERO_RESUME__ = Object.freeze"));
         assert!(runtime.contains("throw new ResumeBootError(\"DoubleBootstrap\")"));

@@ -1201,8 +1201,9 @@ Known limitations
 
 Exact next step
 
-Commit J14 atomically as `runtime: restore component structure`, verify the
-worktree is clean, then implement J15 exact R11-R15 Form restoration.
+Commit J15 atomically as `runtime: restore compiler-owned forms`, verify the
+worktree is clean, then implement J16 exact R16-R17 DOM-binding and Effect
+establishment.
 
 Useful commands
 

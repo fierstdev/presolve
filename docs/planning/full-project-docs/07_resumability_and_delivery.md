@@ -326,6 +326,20 @@ one ordinary cold boot. The cold ordinary-runtime target index now recognizes
 the existing compiler-emitted structural comment ranges, so that fallback
 remains a valid Phase H continuation path.
 
+## Phase J Form restoration
+
+J15 executes R11-R15 against the emitted Forms artifact and exact
+instance-qualified control bridges. It restores Field values, dirty/touched
+tracking, Rule results, aggregate validity, and only stable submission states.
+`Submitting` is rejected; the current frozen Forms runtime represents its
+other stable completed state as `Completed`.
+
+No validator, submit action, or control discovery runs on resume. Controls are
+written through their exact compiler-emitted bridge after the Form slots are
+restored. Reset continues to use the frozen artifact initial values and reset
+plan, not a snapshot value. Any bad Form slot, active submission, or absent
+required control anchor rejects the entire candidate before Ready.
+
 ## Definition
 
 In EdgeZero, resumability means:

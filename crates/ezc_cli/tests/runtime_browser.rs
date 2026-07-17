@@ -667,6 +667,65 @@ fn resume_restores_exact_slot_bindings_without_component_initialization() {
     );
 }
 
+#[test]
+fn resume_restores_compiler_owned_form_state_and_rejects_active_submission() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/resume-forms");
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean resume Forms output");
+    }
+    fs::create_dir_all(&out_dir).expect("failed to create resume Forms output");
+    let input = out_dir.join("ResumeForms.tsx");
+    fs::write(&input, r#"
+@component("resume-forms") class ResumeForms {
+  @form() @serialize("json") profile!: Form;
+  @validate(required()) @field(this.profile) name = "";
+  submitted = 0;
+  @action() @submit(this.profile) save(): void { this.submitted += 1; }
+  render() { return <form form={this.profile}><input field={this.name}/><span>{this.submitted}</span></form>; }
+}"#).expect("failed to write resume Forms source");
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            input.to_str().expect("input UTF-8"),
+            "--out",
+            out_dir.to_str().expect("output UTF-8"),
+        ])
+        .output()
+        .expect("failed to build resume Forms fixture");
+    assert!(output.status.success(), "resume Forms fixture failed");
+    write_resume_form_probe_pages(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    for (index, (page, marker)) in [
+        ("probe.html", "EDGEZERO_RESUME_FORMS_PASS"),
+        ("submitting.html", "EDGEZERO_RESUME_FORMS_FALLBACK_PASS"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let profile_dir = out_dir.join(format!("chrome-profile-{index}"));
+        fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile");
+        let output = run_chrome_probe(
+            chrome.clone(),
+            &format!("--user-data-dir={}", profile_dir.display()),
+            &format!("http://127.0.0.1:{}/{page}", server.port),
+        );
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            stdout.contains(marker),
+            "resume Forms probe failed for {page}\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+            output.status,
+            stdout,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    server.stop();
+}
+
 fn write_resume_state_computed_probe_page(out_dir: &Path) {
     let index = fs::read_to_string(out_dir.join("index.html")).expect("built page");
     let resume_json =
@@ -759,6 +818,93 @@ if (document.querySelector("main").innerHTML !== window.__edgezeroInitialHtml) f
         "window.__edgezeroInitialHtml = document.querySelector(\"main\").innerHTML;\nwindow.__EDGEZERO_RESUME_SNAPSHOT__",
     );
     fs::write(out_dir.join("probe.html"), probe).expect("resume Slot probe");
+}
+
+fn write_resume_form_probe_pages(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("built page");
+    let resume_json =
+        fs::read_to_string(out_dir.join("resume.runtime.json")).expect("resume manifest");
+    let manifest: serde_json::Value =
+        serde_json::from_str(&resume_json).expect("resume manifest JSON");
+    let mut snapshot = resume_bootstrap_snapshot(&manifest);
+    for record in snapshot["boundaries"]
+        .as_array_mut()
+        .expect("boundaries")
+        .iter_mut()
+        .flat_map(|boundary| {
+            boundary["values"]
+                .as_array_mut()
+                .expect("values")
+                .iter_mut()
+        })
+    {
+        let schema = manifest["slot_schemas"]
+            .as_array()
+            .expect("slot schemas")
+            .iter()
+            .find(|schema| schema["slot_id"] == record["slotId"])
+            .expect("slot schema");
+        record["value"] = match schema["restore_phase"].as_str() {
+            Some("R11") => serde_json::Value::String("resumed-name".to_string()),
+            Some("R12") => serde_json::Value::Bool(true),
+            Some("R13") => match schema["semantic_type"].as_str() {
+                Some("boolean") => serde_json::Value::Bool(true),
+                _ => serde_json::Value::Array(Vec::new()),
+            },
+            Some("R14") => serde_json::Value::String("Completed".to_string()),
+            _ => record["value"].clone(),
+        };
+    }
+    let snapshot_json = serde_json::to_string(&snapshot).expect("snapshot JSON");
+    let probe = resume_bootstrap_probe_page(
+        &index,
+        &format!("window.__EDGEZERO_RESUME_SNAPSHOT__ = {snapshot_json};"),
+        r#"
+if (runtime.resume.mode !== "resume") fail("Form snapshot was not resumed");
+if (runtime.forms.length !== 1 || runtime.forms[0].submission !== "Completed" || runtime.forms[0].aggregate_valid !== true) fail("stable Form state was not restored");
+const instance = runtime.store.formInstances.values().next().value;
+const field = instance.fields.values().next().value;
+if (field.value !== "resumed-name" || field.dirty !== true || field.touched !== true || field.validation.length !== 0) fail("Field slots were not restored exactly");
+if (document.querySelector("input").value !== "resumed-name") fail("exact Form control was not synchronized");
+if (!window.__EDGEZERO_FORMS__.resetForm(instance.instance.id)) fail("reset plan was not installed");
+if (field.value !== "" || field.dirty || field.touched || field.validation.length !== 0 || document.querySelector("input").value !== "") fail("reset did not use compiled initial Form values");"#,
+        "EDGEZERO_RESUME_FORMS_PASS",
+    );
+    fs::write(out_dir.join("probe.html"), probe).expect("resume Forms probe");
+
+    let mut submitting = snapshot;
+    let record = submitting["boundaries"]
+        .as_array_mut()
+        .expect("boundaries")
+        .iter_mut()
+        .flat_map(|boundary| {
+            boundary["values"]
+                .as_array_mut()
+                .expect("values")
+                .iter_mut()
+        })
+        .find(|record| {
+            manifest["slot_schemas"]
+                .as_array()
+                .expect("slot schemas")
+                .iter()
+                .find(|schema| schema["slot_id"] == record["slotId"])
+                .is_some_and(|schema| schema["restore_phase"] == "R14")
+        })
+        .expect("submission slot");
+    record["value"] = serde_json::Value::String("Submitting".to_string());
+    let submitting_page = resume_bootstrap_probe_page(
+        &index,
+        &format!(
+            "window.__EDGEZERO_RESUME_SNAPSHOT__ = {};",
+            serde_json::to_string(&submitting).expect("submitting snapshot")
+        ),
+        r#"
+if (runtime.resume.mode !== "cold" || runtime.resume.failure !== "UnstableFormSubmission") fail("active Form submission did not cold fall back");
+if (runtime.resume_registry !== null || runtime.forms[0].submission !== "Idle") fail("active Form submission retained resume state");"#,
+        "EDGEZERO_RESUME_FORMS_FALLBACK_PASS",
+    );
+    fs::write(out_dir.join("submitting.html"), submitting_page).expect("submitting Forms probe");
 }
 
 fn write_resume_context_probe_pages(out_dir: &Path) {
