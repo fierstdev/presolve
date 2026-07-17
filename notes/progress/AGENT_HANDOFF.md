@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: K6 - Shared Lazy-Chunk Candidate Planning
-* Working tree: K6 is committed and the worktree is clean; begin K7 only.
+* Latest completed slice: K7 - Production Chunk Graph and Shared Extraction
+* Working tree: K7 is implemented and awaiting its atomic commit; do not begin K8 until the worktree is clean.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: K6 - Shared Lazy-Chunk Candidate Planning
-* Summary: added exact consuming-root grouping, fixed deterministic savings arithmetic, and rejection evidence without changing chunk topology.
-* Key files: `shared_chunk_candidate.rs`, `lib.rs`
-* Boundary: K6 emits no modules and permits no subset search, runtime behavior, or schema change.
+* Slice: K7 - Production Chunk Graph and Shared Extraction
+* Summary: applied only accepted K6 candidates to one eager/root/shared depth-one topology, with canonical activation plans, registration-only shared records, provisional content-hash filenames, and preserved Phase J no-retry failure behavior.
+* Key files: `production_chunk_graph.rs`, `production_optimization.rs`, `lib.rs`
+* Boundary: K7 emits no modules or production artifact and does not alter runtime activation/dispatch; K8 alone adds compact runtime tables and production artifact v1.
 
 Current in-progress slice
 
-* Slice: K7 - Production Chunk Graph and Shared Extraction
-* Status: Ready after the K6 commit and clean-worktree check.
+* Slice: K8 - Compact Runtime Tables and Production Artifact v1
+* Status: Ready after the K7 atomic commit and clean-worktree check.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase K: K7-K21. Next: construct the depth-one shared/root/eager graph from accepted K6 candidates only.
+* Remaining in Phase K: K8-K21. Next: derive canonical production runtime tables and packed artifact v1 only from frozen canonical artifacts plus K projections.
 
 Verification
 

@@ -234,6 +234,12 @@ impl SharedChunkCandidateId {
 }
 
 impl ProductionChunkId {
+    /// The stable identity of the single compiler-owned eager runtime module.
+    #[must_use]
+    pub fn eager_runtime_v1() -> Self {
+        Self("production-chunk:eager:runtime-v1".to_string())
+    }
+
     #[must_use]
     pub fn for_activation_roots_and_programs(
         chunk_kind: &str,
@@ -241,8 +247,9 @@ impl ProductionChunkId {
         programs: &[ExecutableProgramFingerprint],
     ) -> Option<Self> {
         let roots = canonical_sorted(activation_roots)?;
-        let programs =
-            canonical_sorted(&programs.iter().map(ToString::to_string).collect::<Vec<_>>())?;
+        let programs = canonical_sorted_or_empty(
+            &programs.iter().map(ToString::to_string).collect::<Vec<_>>(),
+        )?;
         canonical_label(chunk_kind).then(|| {
             Self(format!(
                 "production-chunk:{chunk_kind}:{}",
@@ -374,6 +381,15 @@ fn canonical_sorted(values: &[String]) -> Option<Vec<String>> {
             sorted
         })
         .filter(|values| !values.is_empty())
+}
+
+fn canonical_sorted_or_empty(values: &[String]) -> Option<Vec<String>> {
+    if !values.iter().all(|value| canonical_subject(value)) {
+        return None;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort();
+    (!sorted.windows(2).any(|pair| pair[0] == pair[1])).then_some(sorted)
 }
 
 #[cfg(test)]
