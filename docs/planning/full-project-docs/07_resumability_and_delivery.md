@@ -289,6 +289,26 @@ caches are clean and isolated before Ready. Later J16-J17 slices own resumed
 DOM subscription establishment and future action delivery; J12 does not enter
 those authorities early.
 
+## Phase J Context restoration
+
+J13 executes R6-R7 without evaluating an initial Context source. R6 decodes
+each retained Provider or Context-default value through its J6 codec and
+writes the exact instance-qualified Context slot named by the restore program.
+R7 installs the emitted `ConsumerInstanceId` to exact selected source,
+optional `ProviderInstanceId`, and value-slot relation.
+
+The runtime cross-checks every installed relation against the frozen Component
+runtime artifact. It does not select a Provider, traverse component ancestry,
+look up a Context name, or derive an identity. Missing, duplicate, or divergent
+relations reject the complete resume attempt; no partial Context registry
+survives the cold fallback.
+
+The browser proof restores distinct default, outer Provider, and nearest
+override values for nested component instances. Each Consumer observes only
+its compiler-selected exact slot, while Context initial evaluators and Effects
+remain suppressed. The existing Phase G action-update batches remain the sole
+future propagation order; J17 owns delivery of the first resumed interaction.
+
 ## Definition
 
 In EdgeZero, resumability means:

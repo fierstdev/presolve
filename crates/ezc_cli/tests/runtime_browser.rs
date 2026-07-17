@@ -452,6 +452,106 @@ fn resume_restores_repeated_state_and_recomputes_computed_in_a_real_browser() {
     );
 }
 
+#[test]
+fn resume_restores_exact_nested_context_bindings_in_a_real_browser() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/resume-context");
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean resume Context output");
+    }
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0064-component-instance-context/input/InstanceContext.tsx",
+            "--out",
+            out_dir.to_str().expect("output UTF-8"),
+        ])
+        .output()
+        .expect("failed to build resume Context fixture");
+    assert!(
+        output.status.success(),
+        "resume Context build failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    write_resume_context_probe_pages(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile");
+    let output = run_chrome_probe(
+        chrome,
+        &format!("--user-data-dir={}", profile_dir.display()),
+        &format!("http://127.0.0.1:{}/probe.html", server.port),
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("EDGEZERO_RESUME_CONTEXT_PASS"),
+        "resume Context probe failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn resume_context_binding_mismatch_falls_back_without_reselection() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/resume-context-mismatch");
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean Context mismatch output");
+    }
+    fs::create_dir_all(&out_dir).expect("failed to create Context mismatch output");
+    let input = out_dir.join("ResumeContextFallback.tsx");
+    fs::write(
+        &input,
+        r#"
+@component("resume-context-fallback")
+class ResumeContextFallback extends Component {
+  @context() shared!: string;
+  @provide(ResumeContextFallback.shared) provided: string = "cold";
+  @consume(ResumeContextFallback.shared) selected!: string;
+  render() { return <main />; }
+}"#,
+    )
+    .expect("failed to write Context mismatch source");
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            input.to_str().expect("input UTF-8"),
+            "--out",
+            out_dir.to_str().expect("output UTF-8"),
+        ])
+        .output()
+        .expect("failed to build Context mismatch fixture");
+    assert!(output.status.success(), "Context mismatch fixture failed");
+    write_resume_context_mismatch_probe(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile");
+    let output = run_chrome_probe(
+        chrome,
+        &format!("--user-data-dir={}", profile_dir.display()),
+        &format!("http://127.0.0.1:{}/probe.html", server.port),
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("EDGEZERO_RESUME_CONTEXT_FALLBACK_PASS"),
+        "resume Context fallback probe failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 fn write_resume_state_computed_probe_page(out_dir: &Path) {
     let index = fs::read_to_string(out_dir.join("index.html")).expect("built page");
     let resume_json =
@@ -500,6 +600,116 @@ if (runtime.diagnostics.some((diagnostic) => diagnostic.fatal)) fail("resume rep
         "EDGEZERO_RESUME_STATE_COMPUTED_PASS",
     );
     fs::write(out_dir.join("probe.html"), probe).expect("resume State probe");
+}
+
+fn write_resume_context_probe_pages(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("built page");
+    let resume_json =
+        fs::read_to_string(out_dir.join("resume.runtime.json")).expect("resume manifest");
+    let manifest: serde_json::Value =
+        serde_json::from_str(&resume_json).expect("resume manifest JSON");
+    let mut snapshot = resume_bootstrap_snapshot(&manifest);
+    let values = ["restored-default", "restored-light", "restored-nearest"];
+    let mut expected = serde_json::Map::new();
+    let mut next = values.into_iter();
+    for boundary in snapshot["boundaries"]
+        .as_array_mut()
+        .expect("snapshot boundaries")
+    {
+        for record in boundary["values"].as_array_mut().expect("snapshot values") {
+            let slot_id = record["slotId"].as_str().expect("snapshot slot");
+            let schema = manifest["slot_schemas"]
+                .as_array()
+                .expect("slot schemas")
+                .iter()
+                .find(|schema| schema["slot_id"] == slot_id)
+                .expect("slot schema");
+            if schema["restore_phase"] != "R6" {
+                continue;
+            }
+            let value = next.next().expect("Context restore value");
+            record["value"] = serde_json::Value::String(value.to_string());
+            expected.insert(
+                schema["existing_storage_slot_id"]
+                    .as_str()
+                    .expect("runtime slot")
+                    .to_string(),
+                serde_json::Value::String(value.to_string()),
+            );
+        }
+    }
+    assert!(next.next().is_none(), "expected three Context value slots");
+    let prelude = format!(
+        "window.__EDGEZERO_RESUME_SNAPSHOT__ = {}; window.__J13_EXPECTED__ = {};",
+        serde_json::to_string(&snapshot).expect("snapshot JSON"),
+        serde_json::to_string(&expected).expect("expected Context JSON")
+    );
+    let probe = resume_bootstrap_probe_page(
+        &index,
+        &prelude,
+        r#"
+if (runtime.resume.mode !== "resume") fail("Context snapshot was not resumed");
+if (runtime.context_initial_source_runs.length !== 0) fail("Context evaluator ran during R6-R7");
+if (runtime.context_slots.length !== 3) fail("restored Context slots were incomplete");
+if (runtime.context_consumer_bindings.length !== 3) fail("exact Consumer bindings were incomplete");
+if (runtime.resume_registry.context_bindings.size !== 3) fail("Context registry was incomplete");
+const expected = new Map(Object.entries(window.__J13_EXPECTED__));
+for (const [slot, value] of runtime.context_slots) {
+  if (expected.get(slot) !== value) fail("Context value did not use its exact instance slot");
+}
+const componentArtifact = JSON.parse(document.getElementById("ez-component-runtime").textContent);
+for (const binding of componentArtifact.instance_context_bindings) {
+  const installedSlot = runtime.store.contextConsumerBindings.get(binding.consumer_instance);
+  const installed = runtime.resume_registry.context_bindings.get(binding.consumer_instance);
+  if (installedSlot !== binding.runtime_slot || installed.value_slot_id !== binding.runtime_slot) fail("Consumer slot was reselected");
+  if (installed.selected_source !== binding.selected_source) fail("Provider source was reselected");
+  if (installed.provider_instance_id !== binding.provider_source) fail("Provider instance was reselected");
+  if (runtime.store.contextSlots.get(installedSlot) !== expected.get(installedSlot)) fail("Consumer did not observe the exact restored Provider slot");
+}
+if (runtime.context_failures.length !== 0) fail("Context restore reported failures");
+if (runtime.initial_effect_runs.length !== 0) fail("Effect ran during Context restore");"#,
+        "EDGEZERO_RESUME_CONTEXT_PASS",
+    );
+    fs::write(out_dir.join("probe.html"), probe).expect("resume Context probe");
+}
+
+fn write_resume_context_mismatch_probe(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("built page");
+    let manifest: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(out_dir.join("resume.runtime.json")).expect("resume manifest"),
+    )
+    .expect("resume manifest JSON");
+    let snapshot = resume_bootstrap_snapshot(&manifest);
+    let mismatch = replace_json_script(&index, "ez-resume-runtime", |value| {
+        let instruction = value["restore_programs"]
+            .as_array_mut()
+            .expect("restore programs")
+            .iter_mut()
+            .flat_map(|program| {
+                program["instructions"]
+                    .as_array_mut()
+                    .expect("restore instructions")
+                    .iter_mut()
+            })
+            .find(|record| record["phase"] == "R7")
+            .expect("R7 instruction");
+        instruction["instruction"]["selected_source"] =
+            serde_json::Value::String("context-source:invalid".to_string());
+    });
+    let probe = resume_bootstrap_probe_page(
+        &mismatch,
+        &format!(
+            "window.__EDGEZERO_RESUME_SNAPSHOT__ = {};",
+            serde_json::to_string(&snapshot).expect("snapshot JSON")
+        ),
+        r#"
+if (runtime.resume.mode !== "cold" || runtime.resume.failure !== "ResumeArtifactMismatch") fail("Context mismatch did not fall back atomically");
+if (runtime.resume_registry !== null) fail("Context mismatch retained a partial registry");
+if (runtime.context_initial_source_runs.length !== 1 || runtime.context_slots.length !== 1) fail("cold fallback did not initialize Context once");
+if (runtime.context_consumer_bindings.length !== 1) fail("cold fallback reselected or lost Consumer binding");"#,
+        "EDGEZERO_RESUME_CONTEXT_FALLBACK_PASS",
+    );
+    fs::write(out_dir.join("probe.html"), probe).expect("Context fallback probe");
 }
 
 fn write_resume_bootstrap_probe_pages(out_dir: &Path) {
@@ -714,7 +924,7 @@ fn resume_bootstrap_probe_page(
         r#"<script>
 const fail = (message) => {{ throw new Error(message); }};
 const waitFor = async (predicate, label) => {{
-  for (let attempt = 0; attempt < 200; attempt += 1) {{
+  for (let attempt = 0; attempt < 1000; attempt += 1) {{
     if (predicate()) return;
     await new Promise((resolve) => setTimeout(resolve, 10));
   }}

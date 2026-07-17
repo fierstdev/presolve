@@ -2744,6 +2744,10 @@ const RUNTIME_STUB: &str = r#"(() => {
       componentArtifact
     );
     store.componentArtifact = componentArtifact;
+    store.instanceContextBindings = new Map(
+      (componentArtifact?.instance_context_bindings ?? [])
+        .map((binding) => [binding.consumer_instance, binding])
+    );
     const definitions = new Map(
       (templateManifest.components ?? []).map((component) => [component.component_id, component])
     );
@@ -2797,6 +2801,10 @@ const RUNTIME_STUB: &str = r#"(() => {
       if (computedSlot === undefined) throw new ResumeBootError("UnknownSlot");
       if (computedSlot.cache_slot_id === existing) store.computedCaches.set(existing, value);
       else store.computedDirtySlots.set(existing, value);
+      return;
+    }
+    if (slotSchema.restore_phase === "R6") {
+      store.contextSlots.set(existing, value);
       return;
     }
     throw new ResumeBootError("RestoreInstructionFailure");
@@ -2902,7 +2910,48 @@ const RUNTIME_STUB: &str = r#"(() => {
     return [...recomputed];
   }
 
-  function restoreResumeStateAndComputed(
+  function executeResumeContextBindings(store, registry, componentArtifact) {
+    const expected = new Map(
+      (componentArtifact?.instance_context_bindings ?? [])
+        .map((binding) => [binding.consumer_instance, binding])
+    );
+    for (const program of registry.definitions.restorePrograms.values()) {
+      for (const record of program.instructions ?? []) {
+        if (record.phase !== "R7") continue;
+        const instruction = record.instruction;
+        if (instruction.kind !== "bind_context_consumer") {
+          throw new ResumeBootError("RestoreInstructionFailure");
+        }
+        const binding = expected.get(instruction.consumer_instance_id);
+        if (
+          binding === undefined
+          || binding.selected_source !== instruction.selected_source
+          || (binding.provider_source ?? null) !== (instruction.provider_instance_id ?? null)
+          || binding.runtime_slot !== instruction.value_slot_id
+          || !store.contextSlots.has(instruction.value_slot_id)
+          || store.contextConsumerBindings.has(instruction.consumer_instance_id)
+        ) {
+          throw new ResumeBootError("ResumeArtifactMismatch");
+        }
+        const installed = {
+          consumer_instance_id: instruction.consumer_instance_id,
+          selected_source: instruction.selected_source,
+          provider_instance_id: instruction.provider_instance_id ?? null,
+          value_slot_id: instruction.value_slot_id
+        };
+        store.contextConsumerBindings.set(
+          instruction.consumer_instance_id,
+          instruction.value_slot_id
+        );
+        registry.context_bindings.set(instruction.consumer_instance_id, installed);
+      }
+    }
+    if (store.contextConsumerBindings.size !== expected.size) {
+      throw new ResumeBootError("ResumeArtifactMismatch");
+    }
+  }
+
+  function restoreResumeStateComputedAndContext(
     manifest,
     snapshot,
     registry,
@@ -2926,13 +2975,20 @@ const RUNTIME_STUB: &str = r#"(() => {
     executeResumeDecodeAndWrites(store, registry, snapshot, new Set(["R3", "R4"]));
     synchronizeRestoredComponentState(store, computedArtifact, componentArtifact);
     const recomputationRuns = executeResumeComputedRecomputation(store, registry);
+    executeResumeDecodeAndWrites(store, registry, snapshot, new Set(["R6"]));
+    executeResumeContextBindings(store, registry, componentArtifact);
     const state = runtimeState({
       manifest: templateManifest,
       diagnostics,
       store,
       components: debugComponents(store),
       computed: debugComputed(store),
-      computed_update_runs: 0
+      computed_update_runs: 0,
+      context_initial_source_runs: store.contextInitialSourceRuns,
+      context_slots: [...store.contextSlots.entries()],
+      context_consumer_bindings: [...store.contextConsumerBindings.entries()],
+      context_failures: store.contextFailures,
+      context_update_source_runs: store.contextUpdateSourceRuns
     });
     state.resume_recomputation_runs = recomputationRuns;
     return state;
@@ -3144,7 +3200,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
       const result = await bootstrapResume({
         diagnostics,
-        resumeBoot: ({ manifest: resumeManifest, snapshot, registry }) => restoreResumeStateAndComputed(
+        resumeBoot: ({ manifest: resumeManifest, snapshot, registry }) => restoreResumeStateComputedAndContext(
           resumeManifest,
           snapshot,
           registry,
@@ -3287,8 +3343,9 @@ mod tests {
         assert!(runtime.contains("async function activateByEvent"));
         assert!(runtime.contains("async function activateBoundary"));
         assert!(runtime.contains("function decodeResumeValue"));
-        assert!(runtime.contains("function restoreResumeStateAndComputed"));
+        assert!(runtime.contains("function restoreResumeStateComputedAndContext"));
         assert!(runtime.contains("executeResumeComputedRecomputation"));
+        assert!(runtime.contains("function executeResumeContextBindings"));
         assert!(runtime.contains("window.__EDGEZERO_RESUME__ = Object.freeze"));
         assert!(runtime.contains("throw new ResumeBootError(\"DoubleBootstrap\")"));
         assert!(runtime.contains("ez-binding:"));
