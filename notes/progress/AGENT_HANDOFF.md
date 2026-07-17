@@ -1201,8 +1201,8 @@ Known limitations
 
 Exact next step
 
-Commit J18 atomically as `cli: inspect executable resumability`, verify the
-worktree is clean, then implement J19 Phase J diagnostics.
+Commit J19 atomically as `compiler: project resumability diagnostics`, verify
+the worktree is clean, then implement J20 comprehensive Phase J fixtures only.
 
 Useful commands
 

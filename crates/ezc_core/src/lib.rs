@@ -428,8 +428,10 @@ pub use resume_chunk::{
     ResumeChunkProgramInclusion, ResumeChunkRootKind, RESUME_CHUNK_GRAPH_VERSION,
 };
 pub use resume_diagnostics::{
-    ResumeDiagnosticReservation, RESUME_DIAGNOSTIC_RESERVATIONS, RESUME_INTEGRITY_RESERVATION_END,
-    RESUME_INTEGRITY_RESERVATION_START,
+    build_resume_diagnostic_products, project_resume_diagnostics,
+    project_resume_diagnostics_from_products, ResumeDiagnosticProducts,
+    ResumeDiagnosticReservation, ResumeProjectedDiagnostic, RESUME_DIAGNOSTIC_RESERVATIONS,
+    RESUME_INTEGRITY_RESERVATION_END, RESUME_INTEGRITY_RESERVATION_START,
 };
 pub use resume_identity::{
     ComputedInstanceCacheSlotId, ComputedInstanceDirtySlotId, ResumeActivationId,

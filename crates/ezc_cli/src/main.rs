@@ -15,15 +15,16 @@ use ezc_core::{
     build_semantic_graph, build_template_graph, build_template_manifest_from_asm, explain_json,
     explain_text, fold_component_graph, generate_ordinary_instance_html, generate_runtime_stub,
     generate_standalone_page_with_resume_runtime, generate_static_html, lower_components_to_ir,
-    optimize_context_ir, optimize_effect_ir, resume_manifest_json, runtime_component_artifact_json,
-    runtime_computed_artifact_json, runtime_context_artifact_json, runtime_effect_artifact_json,
-    runtime_forms_artifact_json, semantic_graph_json, semantic_type_text, summarize_source,
-    template_manifest_json, validate_application_semantic_model, ApplicationSemanticModel,
-    AsmValidationDiagnostic, AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass,
-    DeclaredStateTypeKind, EffectInspection, EffectInspectionRegistry, ImmutableAsmPass,
-    RenderAttribute, RenderAttributeValue, SemanticEntity, SemanticEntityKind, SemanticId,
-    SemanticOwner, SemanticReferenceKind, SerializableValue, SourceProvenance, StateOperation,
-    TemplateChild, TemplateGraph, TemplateSemanticKind,
+    optimize_context_ir, optimize_effect_ir, project_resume_diagnostics, resume_manifest_json,
+    runtime_component_artifact_json, runtime_computed_artifact_json, runtime_context_artifact_json,
+    runtime_effect_artifact_json, runtime_forms_artifact_json, semantic_graph_json,
+    semantic_type_text, summarize_source, template_manifest_json,
+    validate_application_semantic_model, ApplicationSemanticModel, AsmValidationDiagnostic,
+    AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
+    EffectInspection, EffectInspectionRegistry, ImmutableAsmPass, RenderAttribute,
+    RenderAttributeValue, SemanticEntity, SemanticEntityKind, SemanticId, SemanticOwner,
+    SemanticReferenceKind, SerializableValue, SourceProvenance, StateOperation, TemplateChild,
+    TemplateGraph, TemplateSemanticKind,
 };
 use ezc_parser::{
     parse_file, ParseDiagnostic, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
@@ -31,8 +32,8 @@ use ezc_parser::{
 };
 use serde::Serialize;
 
-const ASM_INSPECTION_SCHEMA_VERSION: u32 = 10;
-const CHECK_JSON_SCHEMA_VERSION: u32 = 5;
+const ASM_INSPECTION_SCHEMA_VERSION: u32 = 11;
+const CHECK_JSON_SCHEMA_VERSION: u32 = 6;
 
 fn main() {
     let mut args = env::args().skip(1).collect::<Vec<_>>();
@@ -138,7 +139,18 @@ fn run_asm_inspection(inputs: AsmInputs) {
         .collect::<Vec<_>>();
     let asm = build_application_semantic_model_for_unit(&unit);
     let asm = ConstantFoldingPass.transform(&asm);
-    let validation = validate_application_semantic_model(&asm);
+    let resume_diagnostics = if unit.files().iter().any(|file| !file.diagnostics.is_empty()) {
+        Vec::new()
+    } else {
+        project_resume_diagnostics(&asm)
+    };
+    let mut validation = validate_application_semantic_model(&asm);
+    validation.extend(resume_diagnostics.iter().cloned().map(|diagnostic| {
+        AsmValidationDiagnostic {
+            code: diagnostic.code.to_string(),
+            message: diagnostic.message,
+        }
+    }));
 
     if inputs.format == "graph" {
         if inputs.entity_id.is_some()
@@ -165,14 +177,29 @@ fn run_asm_inspection(inputs: AsmInputs) {
 
     match (inputs.format.as_str(), entity) {
         ("text", Some(entity)) => {
-            print_asm_entity_text(&asm, entity, &asm.diagnostics, inputs.filters);
+            print_asm_entity_text(
+                &asm,
+                entity,
+                &asm.diagnostics,
+                &resume_diagnostics,
+                inputs.filters,
+            );
         }
         ("json", Some(entity)) => print!(
             "{}",
-            asm_entity_inspection_json(&asm, entity, &asm.diagnostics, inputs.filters)
+            asm_entity_inspection_json(
+                &asm,
+                entity,
+                &asm.diagnostics,
+                &resume_diagnostics,
+                inputs.filters,
+            )
         ),
         ("text", None) => print_asm_text(&paths, &asm, &validation),
-        ("json", None) => print!("{}", asm_inspection_json(&paths, &asm, &validation)),
+        ("json", None) => print!(
+            "{}",
+            asm_inspection_json(&paths, &asm, &validation, &resume_diagnostics)
+        ),
         _ => {
             eprintln!("unsupported format: {}", inputs.format);
             process::exit(1);
@@ -202,7 +229,18 @@ fn run_check(args: &[String]) {
     let unit = CompilationUnit::parse_sources(sources);
     let asm = build_application_semantic_model_for_unit(&unit);
     let asm = ConstantFoldingPass.transform(&asm);
-    let validation = validate_application_semantic_model(&asm);
+    let resume_diagnostics = if unit.files().iter().any(|file| !file.diagnostics.is_empty()) {
+        Vec::new()
+    } else {
+        project_resume_diagnostics(&asm)
+    };
+    let mut validation = validate_application_semantic_model(&asm);
+    validation.extend(resume_diagnostics.iter().cloned().map(|diagnostic| {
+        AsmValidationDiagnostic {
+            code: diagnostic.code.to_string(),
+            message: diagnostic.message,
+        }
+    }));
     let parser_diagnostic_count = unit
         .files()
         .iter()
@@ -220,7 +258,14 @@ fn run_check(args: &[String]) {
         ),
         "json" => print!(
             "{}",
-            check_json(&unit, &asm, &validation, &categories, &fail_on)
+            check_json(
+                &unit,
+                &asm,
+                &validation,
+                &resume_diagnostics,
+                &categories,
+                &fail_on,
+            )
         ),
         _ => {
             eprintln!("unsupported format: {format}");
@@ -285,6 +330,7 @@ fn check_json(
     unit: &CompilationUnit,
     asm: &ApplicationSemanticModel,
     validation: &[AsmValidationDiagnostic],
+    resume_diagnostics: &[ezc_core::ResumeProjectedDiagnostic],
     categories: &[String],
     fail_on: &ParseSeverity,
 ) -> String {
@@ -318,7 +364,12 @@ fn check_json(
     } else {
         Vec::new()
     };
-    serde_json::to_string_pretty(&serde_json::json!({"schema_version": CHECK_JSON_SCHEMA_VERSION, "files": unit.files().iter().map(|file| file.path.display().to_string()).collect::<Vec<_>>(), "summary": {"parser_diagnostics": parser_count, "compiler_diagnostics": asm.diagnostics.len(), "validation": validation.len()}, "categories": categories, "fail_on": diagnostic_severity_label(fail_on), "parser_diagnostics": parser_diagnostics, "compiler_diagnostics": compiler_diagnostics, "validation": validation_diagnostics})).expect("check document should serialize") + "\n"
+    let resume_diagnostics = if check_category_enabled(categories, "validation") {
+        asm_resume_diagnostics(resume_diagnostics)
+    } else {
+        Vec::new()
+    };
+    serde_json::to_string_pretty(&serde_json::json!({"schema_version": CHECK_JSON_SCHEMA_VERSION, "files": unit.files().iter().map(|file| file.path.display().to_string()).collect::<Vec<_>>(), "summary": {"parser_diagnostics": parser_count, "compiler_diagnostics": asm.diagnostics.len(), "validation": validation.len()}, "categories": categories, "fail_on": diagnostic_severity_label(fail_on), "parser_diagnostics": parser_diagnostics, "compiler_diagnostics": compiler_diagnostics, "validation": validation_diagnostics, "resume_diagnostics": resume_diagnostics})).expect("check document should serialize") + "\n"
 }
 
 fn parser_diagnostic_json(path: &Path, diagnostic: &ParseDiagnostic) -> serde_json::Value {
@@ -525,6 +576,7 @@ fn asm_inspection_json(
     paths: &[PathBuf],
     asm: &ApplicationSemanticModel,
     validation: &[AsmValidationDiagnostic],
+    resume_diagnostics: &[ezc_core::ResumeProjectedDiagnostic],
 ) -> String {
     let computed_functions = computed_evaluation_functions(asm);
     let effect_inspections = build_effect_inspection_registry(asm);
@@ -611,6 +663,7 @@ fn asm_inspection_json(
         references,
         diagnostics,
         validation,
+        resume_diagnostics: asm_resume_diagnostics(resume_diagnostics),
         resume,
     };
 
@@ -679,6 +732,7 @@ fn print_asm_entity_text(
     asm: &ApplicationSemanticModel,
     id: &SemanticId,
     diagnostics: &[ezc_core::ComponentDiagnostic],
+    resume_diagnostics: &[ezc_core::ResumeProjectedDiagnostic],
     filters: AsmEntityFilters,
 ) {
     let computed_functions = computed_evaluation_functions(asm);
@@ -757,6 +811,7 @@ fn print_asm_entity_text(
         filtered_entity_references(asm.references_to(id), filters),
     );
     print_entity_diagnostics(diagnostics, id, provenance);
+    print_resume_diagnostics_text(&related_resume_diagnostics(resume_diagnostics, provenance));
 }
 
 fn print_entity_references(label: &str, references: Vec<&ezc_core::SemanticReference>) {
@@ -808,10 +863,63 @@ fn print_entity_diagnostics(
     }
 }
 
+fn related_resume_diagnostics<'a>(
+    diagnostics: &'a [ezc_core::ResumeProjectedDiagnostic],
+    provenance: &SourceProvenance,
+) -> Vec<&'a ezc_core::ResumeProjectedDiagnostic> {
+    diagnostics
+        .iter()
+        .filter(|diagnostic| {
+            diagnostic.primary_provenance.path == provenance.path
+                && diagnostic.primary_provenance.span.start < provenance.span.end
+                && provenance.span.start < diagnostic.primary_provenance.span.end
+        })
+        .collect()
+}
+
+fn print_resume_diagnostics_text(diagnostics: &[&ezc_core::ResumeProjectedDiagnostic]) {
+    if diagnostics.is_empty() {
+        return;
+    }
+    println!("  resumability diagnostics: {}", diagnostics.len());
+    for diagnostic in diagnostics {
+        println!("    {}: {}", diagnostic.code, diagnostic.message);
+    }
+}
+
+fn asm_resume_diagnostics(
+    diagnostics: &[ezc_core::ResumeProjectedDiagnostic],
+) -> Vec<AsmResumeDiagnostic<'_>> {
+    diagnostics
+        .iter()
+        .map(|diagnostic| AsmResumeDiagnostic {
+            code: diagnostic.code,
+            message: &diagnostic.message,
+            primary_identity: diagnostic.primary_identity.as_deref(),
+            primary_provenance: (&diagnostic.primary_provenance).into(),
+        })
+        .collect()
+}
+
+fn asm_resume_diagnostics_from_refs<'a>(
+    diagnostics: &[&'a ezc_core::ResumeProjectedDiagnostic],
+) -> Vec<AsmResumeDiagnostic<'a>> {
+    diagnostics
+        .iter()
+        .map(|diagnostic| AsmResumeDiagnostic {
+            code: diagnostic.code,
+            message: &diagnostic.message,
+            primary_identity: diagnostic.primary_identity.as_deref(),
+            primary_provenance: (&diagnostic.primary_provenance).into(),
+        })
+        .collect()
+}
+
 fn asm_entity_inspection_json(
     asm: &ApplicationSemanticModel,
     id: &SemanticId,
     diagnostics: &[ezc_core::ComponentDiagnostic],
+    resume_diagnostics: &[ezc_core::ResumeProjectedDiagnostic],
     filters: AsmEntityFilters,
 ) -> String {
     let computed_functions = computed_evaluation_functions(asm);
@@ -851,6 +959,10 @@ fn asm_entity_inspection_json(
             .into_iter()
             .map(AsmInspectionDiagnostic::from)
             .collect(),
+        resume_diagnostics: asm_resume_diagnostics_from_refs(&related_resume_diagnostics(
+            resume_diagnostics,
+            provenance,
+        )),
     };
 
     serde_json::to_string_pretty(&document).expect("ASM entity inspection should serialize") + "\n"
@@ -1549,6 +1661,7 @@ struct AsmInspectionDocument<'a> {
     references: Vec<AsmInspectionReference<'a>>,
     diagnostics: Vec<AsmInspectionDiagnostic<'a>>,
     validation: Vec<AsmInspectionDiagnostic<'a>>,
+    resume_diagnostics: Vec<AsmResumeDiagnostic<'a>>,
     resume: serde_json::Value,
 }
 
@@ -1562,6 +1675,16 @@ struct AsmEntityInspectionDocument<'a> {
     outgoing_references: Vec<AsmInspectionReference<'a>>,
     incoming_references: Vec<AsmInspectionReference<'a>>,
     diagnostics: Vec<AsmInspectionDiagnostic<'a>>,
+    resume_diagnostics: Vec<AsmResumeDiagnostic<'a>>,
+}
+
+#[derive(Serialize)]
+struct AsmResumeDiagnostic<'a> {
+    code: &'static str,
+    message: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    primary_identity: Option<&'a str>,
+    primary_provenance: AsmInspectionProvenance,
 }
 
 #[derive(Serialize)]
@@ -2832,7 +2955,7 @@ mod tests {
     }
 
     #[test]
-    fn i17_forms_inspection_projects_validation_rules_in_schema_v9() {
+    fn j19_resume_diagnostics_extend_inspection_to_schema_v11() {
         let path = PathBuf::from("src/Profile.tsx");
         let parsed = ezc_parser::parse_file(
             &path,
@@ -2852,11 +2975,87 @@ class Profile {
                 parsed,
             ]));
         assert_eq!(asm.validation_rules.len(), 1);
-        let document = asm_inspection_json(&[path], &asm, &[]);
+        let document = asm_inspection_json(&[path], &asm, &[], &[]);
         let json: serde_json::Value = serde_json::from_str(&document).unwrap();
         assert_eq!(json["schema_version"], ASM_INSPECTION_SCHEMA_VERSION);
-        assert_eq!(json["schema_version"], 10);
+        assert_eq!(json["schema_version"], 11);
         assert!(document.contains("validation-rule"));
         assert!(document.contains("validation_rule"));
+    }
+
+    #[test]
+    fn j19_resume_diagnostics_share_full_selected_and_check_json_evidence() {
+        let path = PathBuf::from("src/ResumeDiagnostic.tsx");
+        let parsed = ezc_parser::parse_file(
+            &path,
+            r#"@component("x-resume-diagnostic") class ResumeDiagnostic {
+  value = state(1);
+  render() { return <main>{this.value}</main>; }
+}"#,
+        );
+        let unit = CompilationUnit::from_parsed_files(vec![parsed]);
+        let mut asm = build_application_semantic_model_for_unit(&unit);
+        let state = asm.components[0].state_fields[0].id.clone();
+        asm.semantic_types
+            .assignments
+            .get_mut(&state)
+            .expect("state type")
+            .semantic_type = ezc_core::SemanticType::Unknown;
+        let resume_diagnostics = project_resume_diagnostics(&asm);
+        assert!(resume_diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "EZC1096"));
+
+        let full: serde_json::Value = serde_json::from_str(&asm_inspection_json(
+            std::slice::from_ref(&path),
+            &asm,
+            &[],
+            &resume_diagnostics,
+        ))
+        .expect("full ASM JSON");
+        assert_eq!(full["schema_version"], 11);
+        let full_diagnostic = full["resume_diagnostics"]
+            .as_array()
+            .expect("resume diagnostics")
+            .iter()
+            .find(|diagnostic| diagnostic["code"] == "EZC1096")
+            .expect("EZC1096");
+        assert!(full_diagnostic["primary_identity"].as_str().is_some());
+
+        let entity = asm
+            .ownership
+            .keys()
+            .find(|id| id.as_str() == state.as_str())
+            .expect("state entity");
+        let selected: serde_json::Value = serde_json::from_str(&asm_entity_inspection_json(
+            &asm,
+            entity,
+            &asm.diagnostics,
+            &resume_diagnostics,
+            AsmEntityFilters::default(),
+        ))
+        .expect("selected ASM JSON");
+        assert_eq!(selected["schema_version"], 11);
+        assert!(selected["resume_diagnostics"]
+            .as_array()
+            .expect("selected resume diagnostics")
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "EZC1096"));
+
+        let check: serde_json::Value = serde_json::from_str(&check_json(
+            &unit,
+            &asm,
+            &[],
+            &resume_diagnostics,
+            &["validation".to_string()],
+            &ParseSeverity::Error,
+        ))
+        .expect("check JSON");
+        assert_eq!(check["schema_version"], 6);
+        assert!(check["resume_diagnostics"]
+            .as_array()
+            .expect("check resume diagnostics")
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "EZC1096"));
     }
 }

@@ -375,6 +375,23 @@ by runtime delivery, without exposing generated module source or snapshot
 values. Invalid compiler models expose deterministic resumability failures
 instead of attempting to fabricate an executable manifest.
 
+## Phase J diagnostics
+
+J19 projects the complete reserved resumability diagnostic catalog from
+immutable Phase J products only. Each
+public record retains its reserved `EZC1096`–`EZC1111` code, exact established
+resume identity when one exists, and primary source provenance. Candidates
+without an established identity remain unresolved rather than acquiring a
+fabricated Phase J ID.
+
+Those source-backed fields require ASM inspection v11 and check JSON v6. Full
+ASM, selected ASM, text inspection, and check JSON expose the same ordered,
+deduplicated resume diagnostic records. The public mapping covers both direct
+block reasons and malformed-product integrity results, including boundary/chunk
+cycles, anchors, schema collisions, snapshot stable-state violations, and
+ordering drift. Earlier parser/compiler failures suppress Phase J projection
+because their canonical resume products do not exist.
+
 ## Definition
 
 In EdgeZero, resumability means:
