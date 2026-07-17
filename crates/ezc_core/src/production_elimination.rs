@@ -8,6 +8,7 @@ use crate::{OptimizationDecisionId, ProductionReachabilityGraph, ProductionUnrea
 /// projection. The record is supplied by an existing canonical product; K3
 /// never derives it from source, DOM, or runtime registration order.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct ProductionExecutionRecord {
     pub subject_id: String,
     pub program_id: String,
@@ -46,6 +47,10 @@ pub struct DeadProductEliminationReport {
 
 /// Projects immutable canonical execution records for production only.
 /// Development products are borrowed as input and are not mutated.
+///
+/// # Panics
+///
+/// Panics only when a caller supplies an empty canonical execution subject.
 #[must_use]
 pub fn eliminate_unreachable_production_records(
     records: &[ProductionExecutionRecord],
@@ -107,13 +112,12 @@ pub fn eliminate_unreachable_production_records(
             record
                 .referenced_program_ids
                 .iter()
-                .filter_map(|reference| {
-                    (!retained_programs.contains(reference.as_str())).then(|| {
-                        format!(
-                            "{} references removed program {reference}",
-                            record.subject_id
-                        )
-                    })
+                .filter(|reference| !retained_programs.contains(reference.as_str()))
+                .map(|reference| {
+                    format!(
+                        "{} references removed program {reference}",
+                        record.subject_id
+                    )
                 })
         })
         .collect::<Vec<_>>();

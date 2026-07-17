@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: K3 - Dead Runtime Product Elimination
-* Working tree: K3 is committed and the worktree is clean; begin K4 only.
+* Latest completed slice: K4 - Canonical Program Fingerprinting and Deduplication
+* Working tree: K4 is committed and the worktree is clean; begin K5 only.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: K3 - Dead Runtime Product Elimination
-* Summary: added immutable production-only execution-record projections, exact elimination decisions, and dangling-reference blocks using K2 reachability as the only removal authority.
-* Key files: `production_elimination.rs`, `lib.rs`
-* Boundary: K3 preserves canonical development products, validation/inspection/failure/destruction records, runtime behavior, and schemas; it does not pool constants or deduplicate programs.
+* Slice: K4 - Canonical Program Fingerprinting and Deduplication
+* Summary: added canonical generated-program streams, SHA-256 fingerprint registry, byte-equality-gated aliases, and deterministic deduplication reporting.
+* Key files: `production_deduplication.rs`, `lib.rs`
+* Boundary: K4 keeps exact semantic program IDs as runtime aliases, rejects captured identity/schedule/default/failure merges, and changes no chunk/runtime/schema behavior.
 
 Current in-progress slice
 
-* Slice: K4 - Canonical Program Fingerprinting and Deduplication
-* Status: Ready after the K3 commit and clean-worktree check.
+* Slice: K5 - Canonical Constant Pooling
+* Status: Ready after the K4 commit and clean-worktree check.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase K: K4-K21. Next: derive canonical opcode streams and deduplication aliases with byte-equality and frozen-boundary checks; do not extract chunks yet.
+* Remaining in Phase K: K5-K21. Next: pool only immutable canonical constants under the fixed thresholds; preserve public schemas and snapshot bytes.
 
 Verification
 

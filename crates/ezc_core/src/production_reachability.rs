@@ -51,6 +51,7 @@ pub struct ProductionReachabilityGraph {
 /// a record or reads source syntax.
 #[must_use]
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_lines)]
 pub fn build_production_reachability_graph(
     resume: &ResumeManifest,
     component: &RuntimeComponentArtifact,

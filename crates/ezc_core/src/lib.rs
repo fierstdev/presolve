@@ -69,6 +69,7 @@ pub mod ordinary_html_codegen;
 pub mod ordinary_template_instance;
 pub mod ordinary_template_integrity;
 pub mod page_codegen;
+pub mod production_deduplication;
 pub mod production_elimination;
 pub mod production_optimization;
 pub mod production_reachability;
@@ -393,6 +394,11 @@ pub use page_codegen::{
     generate_standalone_page_with_component_runtime_and_forms,
     generate_standalone_page_with_computed_runtime, generate_standalone_page_with_context_runtime,
     generate_standalone_page_with_effect_runtime, generate_standalone_page_with_resume_runtime,
+};
+pub use production_deduplication::{
+    deduplicate_generated_programs, DeduplicatedProgramRegistry, ExecutableProgramCandidate,
+    ExecutableProgramCanonicalStream, ExecutableProgramFingerprintRegistry, ProgramAliasRecord,
+    ProgramDeduplicationReport,
 };
 pub use production_elimination::{
     eliminate_unreachable_production_records, DeadProductEliminationReason,
