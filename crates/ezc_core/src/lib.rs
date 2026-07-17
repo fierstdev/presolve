@@ -71,6 +71,7 @@ pub mod ordinary_template_integrity;
 pub mod page_codegen;
 pub mod production_bootstrap;
 pub mod production_chunk_graph;
+pub mod production_cleanup;
 pub mod production_constant_pool;
 pub mod production_deduplication;
 pub mod production_elimination;
@@ -411,6 +412,10 @@ pub use production_chunk_graph::{
     ProductionChunkDependency, ProductionChunkExtractionError, ProductionChunkExtractionReport,
     ProductionChunkGraph, ProductionChunkGraphValidationError, ProductionChunkKind,
     ProductionChunkRecord, ProductionRootChunkInput, ProductionSharedChunkFailurePolicy,
+};
+pub use production_cleanup::{
+    build_production_destroy_plan, ProductionCleanupKind, ProductionDestroyPlan,
+    ProductionOwnedRuntimeRecord,
 };
 pub use production_constant_pool::{
     pool_production_constants, ConstantPoolConsumer, ConstantPoolingDecision,

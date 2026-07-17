@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: K11 - Scheduler and DOM Patch Refinement
-* Working tree: K11 is implemented and awaiting its atomic commit; do not begin K12 until the worktree is clean.
+* Latest completed slice: K12 - Component and Structural Runtime Cleanup
+* Working tree: K12 is implemented and awaiting its atomic commit; do not begin K13 until the worktree is clean.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: K11 - Scheduler and DOM Patch Refinement
-* Summary: added dense compiler ordinal schedules and proof-gated binding write coalescing that retains the last canonical write only when every structural/capability/Effect/read/observation boundary is absent.
-* Key files: `production_scheduler.rs`, `lib.rs`
-* Boundary: K11 is compiler-side scheduling evidence only; K12 alone owns structural component cleanup and detached activation state.
+* Slice: K12 - Component and Structural Runtime Cleanup
+* Summary: added compiler-owned destroy closures that filter exact destroyed owners, reverse canonical initialization order, and mark pending activation identities detached without altering global module caches.
+* Key files: `production_cleanup.rs`, `lib.rs`
+* Boundary: K12 covers component/structural records only; K13 alone completes Forms, Context, Effect, and resume registry cleanup.
 
 Current in-progress slice
 
-* Slice: K12 - Component and Structural Runtime Cleanup
-* Status: Ready after the K11 atomic commit and clean-worktree check.
+* Slice: K13 - Form, Context, Effect, and Resume Registry Cleanup
+* Status: Ready after the K12 atomic commit and clean-worktree check.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase K: K12-K21. Next: build exact component/structural destroy closure and stale-dispatch protection.
+* Remaining in Phase K: K13-K21. Next: extend the cleanup closure across Forms, Context, Effect, and resume-owned records.
 
 Verification
 
