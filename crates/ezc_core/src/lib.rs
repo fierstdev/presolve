@@ -70,6 +70,7 @@ pub mod ordinary_template_instance;
 pub mod ordinary_template_integrity;
 pub mod page_codegen;
 pub mod production_optimization;
+pub mod production_reachability;
 pub mod provider;
 pub mod resume_activation;
 pub mod resume_anchor;
@@ -401,6 +402,11 @@ pub use production_optimization::{
     PRODUCTION_OPTIMIZATION_DIAGNOSTIC_RESERVATIONS,
     PRODUCTION_OPTIMIZATION_INTEGRITY_RESERVATION_END,
     PRODUCTION_OPTIMIZATION_INTEGRITY_RESERVATION_START,
+};
+pub use production_reachability::{
+    build_production_reachability_graph, ProductionExecutableRoot, ProductionProgramEdge,
+    ProductionReachabilityBlock, ProductionReachabilityGraph, ProductionReachabilityReason,
+    ProductionUnreachableRecord,
 };
 pub use provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
 pub use resume_activation::{

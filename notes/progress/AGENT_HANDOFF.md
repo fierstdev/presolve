@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: K1 - Canonical Optimization Identities and Policy Product
-* Working tree: K1 is committed and the worktree is clean; begin K2 only.
+* Latest completed slice: K2 - Whole-Application Executable Reachability
+* Working tree: K2 is committed and the worktree is clean; begin K3 only.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: K1 - Canonical Optimization Identities and Policy Product
-* Summary: added one compiler-owned authority for the eleven Phase K typed identity domains and the immutable `ProductionOptimizationPolicy` v1 product; canonical constructors hash only compiler inputs, normalize unordered root/program inputs, reject invalid labels/paths, and retain strict domain separation.
-* Key files: `production_optimization.rs`, `lib.rs`
-* Boundary: K1 serializes no public production artifact, executes no optimizer, changes no chunk/runtime behavior, and increments no schema.
+* Slice: K2 - Whole-Application Executable Reachability
+* Summary: added an immutable descriptive graph over frozen resume and runtime artifacts; it records roots/edges/blocks and does not eliminate executable records.
+* Key files: `production_reachability.rs`, `lib.rs`
+* Boundary: K2 consumes no source syntax, fabricates no program ID, changes no runtime/schema, and performs no elimination.
 
 Current in-progress slice
 
-* Slice: K2 - Whole-Application Executable Reachability
-* Status: Ready after the K1 commit and clean-worktree check.
+* Slice: K3 - Dead Runtime Product Elimination
+* Status: Ready after the K2 commit and clean-worktree check.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase K: K2-K21. Next: build the immutable executable-reachability graph from existing canonical products only; do not eliminate any product until K3.
+* Remaining in Phase K: K3-K21. Next: produce immutable K3 projections from K2 reachability only; preserve development artifacts and validation closure.
 
 Verification
 
