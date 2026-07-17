@@ -7,12 +7,15 @@ use std::process::Command;
 
 use ezc_core::{
     build_application_semantic_model, build_application_semantic_model_for_unit,
-    build_resume_manifest, build_runtime_component_artifact, build_runtime_component_registry,
+    build_resume_activation_plan, build_resume_anchor_plan, build_resume_boundary_graph,
+    build_resume_capture_plan, build_resume_chunk_graph, build_resume_liveness_plan,
+    build_resume_manifest, build_resume_restore_plan, build_resume_schema_registry,
+    build_runtime_component_artifact, build_runtime_component_registry,
     build_runtime_context_artifact, build_semantic_graph, build_template_manifest_from_asm,
     collect_component_diagnostics, generate_runtime_stub, lower_components_to_ir,
-    optimize_context_ir, resume_manifest_json, runtime_component_artifact_json,
-    runtime_context_artifact_json, semantic_graph_json, template_manifest_json,
-    validate_application_semantic_model, validate_resume_manifest,
+    optimize_context_ir, project_resume_diagnostics, resume_manifest_json,
+    runtime_component_artifact_json, runtime_context_artifact_json, semantic_graph_json,
+    template_manifest_json, validate_application_semantic_model, validate_resume_manifest,
     validate_runtime_component_artifact, BlockedComponentInstancePlan,
     BlockedComponentInstanceReason, CompilationUnit, ComponentInstanceStatus,
     ComponentInvocationResolutionStatus, CompositionCompatibility, InstanceContextResolutionStatus,
@@ -287,6 +290,65 @@ fn instance_context_fixture_selects_exact_nearest_sources_without_leakage() {
             .filter(|diagnostic| diagnostic.code == "EZC1056")
             .count(),
         1
+    );
+}
+
+#[test]
+fn phase_j_fixture_products_remain_byte_identical_under_multifile_reversal() {
+    let forward = fixture_unit(&[
+        "fixtures/0062-component-declarations/input/ImportedPage.tsx",
+        "fixtures/0062-component-declarations/input/ValidComponents.tsx",
+    ]);
+    let reversed = fixture_unit(&[
+        "fixtures/0062-component-declarations/input/ValidComponents.tsx",
+        "fixtures/0062-component-declarations/input/ImportedPage.tsx",
+    ]);
+    assert!(forward.diagnostics.is_empty(), "{:#?}", forward.diagnostics);
+    assert!(
+        reversed.diagnostics.is_empty(),
+        "{:#?}",
+        reversed.diagnostics
+    );
+
+    assert_eq!(
+        resume_manifest_json(&build_resume_manifest(&forward)),
+        resume_manifest_json(&build_resume_manifest(&reversed))
+    );
+    assert_eq!(
+        build_resume_liveness_plan(&forward),
+        build_resume_liveness_plan(&reversed)
+    );
+    assert_eq!(
+        build_resume_boundary_graph(&forward),
+        build_resume_boundary_graph(&reversed)
+    );
+    assert_eq!(
+        build_resume_activation_plan(&forward),
+        build_resume_activation_plan(&reversed)
+    );
+    assert_eq!(
+        build_resume_chunk_graph(&forward),
+        build_resume_chunk_graph(&reversed)
+    );
+    assert_eq!(
+        build_resume_schema_registry(&forward),
+        build_resume_schema_registry(&reversed)
+    );
+    assert_eq!(
+        build_resume_capture_plan(&forward),
+        build_resume_capture_plan(&reversed)
+    );
+    assert_eq!(
+        build_resume_restore_plan(&forward),
+        build_resume_restore_plan(&reversed)
+    );
+    assert_eq!(
+        build_resume_anchor_plan(&forward),
+        build_resume_anchor_plan(&reversed)
+    );
+    assert_eq!(
+        project_resume_diagnostics(&forward),
+        project_resume_diagnostics(&reversed)
     );
 }
 
@@ -589,8 +651,8 @@ fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
     assert_eq!(build_template_manifest_from_asm(&model).schema_version, 4);
 
     for (args, expected_status, expected_schema) in [
-        (vec!["check", path, "--format", "json"], Some(1), 5),
-        (vec!["asm", path, "--format", "json"], Some(0), 9),
+        (vec!["check", path, "--format", "json"], Some(1), 6),
+        (vec!["asm", path, "--format", "json"], Some(0), 11),
     ] {
         let (status, stdout, stderr) = cli_result(&args);
         assert_eq!(
@@ -639,7 +701,7 @@ fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
         ),
         (
             "ComponentStructuralRegionId::for_",
-            &["component_instance.rs"][..],
+            &["component_instance.rs", "resume_restore.rs"][..],
         ),
         ("SlotBindingId::for_instance", &["slot_binding.rs"][..]),
         ("ProviderInstanceId::new", &["instance_context.rs"][..]),

@@ -1201,8 +1201,8 @@ Known limitations
 
 Exact next step
 
-Commit J19 atomically as `compiler: project resumability diagnostics`, verify
-the worktree is clean, then implement J20 comprehensive Phase J fixtures only.
+Commit J20 atomically as `test: expand phase J resumability fixtures`, verify
+the worktree is clean, then perform the J21 stability audit and Phase J freeze.
 
 Useful commands
 
