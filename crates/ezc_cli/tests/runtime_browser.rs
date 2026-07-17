@@ -367,6 +367,7 @@ fn resume_bootstrap_registry_accepts_and_atomically_falls_back_in_a_real_browser
             "malformed-snapshot.html",
             "EDGEZERO_RESUME_SNAPSHOT_FALLBACK_PASS",
         ),
+        ("value-mismatch.html", "EDGEZERO_RESUME_VALUE_FALLBACK_PASS"),
     ]
     .into_iter()
     .enumerate()
@@ -388,6 +389,117 @@ fn resume_bootstrap_registry_accepts_and_atomically_falls_back_in_a_real_browser
         );
     }
     server.stop();
+}
+
+#[test]
+fn resume_restores_repeated_state_and_recomputes_computed_in_a_real_browser() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/resume-state-computed");
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean resume State output");
+    }
+    fs::create_dir_all(&out_dir).expect("failed to create resume State output");
+    let input = out_dir.join("RepeatedComputed.tsx");
+    fs::write(
+        &input,
+        r#"
+@component("resume-child") class ResumeChild {
+  count = state(1);
+  @computed() get doubled() { return this.count * 2; }
+  @action() increment() { this.count += 1; }
+  render() { return <button onClick={() => this.increment()}>{this.count}</button>; }
+}
+@component("resume-parent") @route("/") class ResumeParent {
+  render() { return <main><ResumeChild /><ResumeChild /></main>; }
+}"#,
+    )
+    .expect("failed to write repeated resume source");
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            input.to_str().expect("input UTF-8"),
+            "--out",
+            out_dir.to_str().expect("output UTF-8"),
+        ])
+        .output()
+        .expect("failed to build repeated resume source");
+    assert!(
+        output.status.success(),
+        "repeated resume build failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    write_resume_state_computed_probe_page(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile");
+    let output = run_chrome_probe(
+        chrome,
+        &format!("--user-data-dir={}", profile_dir.display()),
+        &format!("http://127.0.0.1:{}/probe.html", server.port),
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("EDGEZERO_RESUME_STATE_COMPUTED_PASS"),
+        "resume State/Computed probe failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+fn write_resume_state_computed_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("built page");
+    let resume_json =
+        fs::read_to_string(out_dir.join("resume.runtime.json")).expect("resume manifest");
+    let manifest: serde_json::Value =
+        serde_json::from_str(&resume_json).expect("resume manifest JSON");
+    let mut snapshot = resume_bootstrap_snapshot(&manifest);
+    let state_slots = manifest["slot_schemas"]
+        .as_array()
+        .expect("slot schemas")
+        .iter()
+        .filter(|slot| slot["restore_phase"] == "R3")
+        .map(|slot| slot["slot_id"].as_str().expect("State slot").to_string())
+        .collect::<std::collections::BTreeSet<_>>();
+    let mut next = [7, 11].into_iter();
+    for boundary in snapshot["boundaries"]
+        .as_array_mut()
+        .expect("snapshot boundaries")
+    {
+        for record in boundary["values"].as_array_mut().expect("snapshot values") {
+            if state_slots.contains(record["slotId"].as_str().expect("snapshot slot")) {
+                record["value"] = serde_json::Value::from(next.next().expect("State value"));
+            }
+        }
+    }
+    assert!(
+        next.next().is_none(),
+        "expected exactly two repeated State slots"
+    );
+    let probe = resume_bootstrap_probe_page(
+        &index,
+        &format!(
+            "window.__EDGEZERO_RESUME_SNAPSHOT__ = {};",
+            serde_json::to_string(&snapshot).expect("snapshot JSON")
+        ),
+        r#"
+if (runtime.resume.mode !== "resume") fail("snapshot was not resumed");
+const states = runtime.components.filter((component) => component.state.count !== undefined).map((component) => component.state.count).sort((a, b) => a - b);
+if (JSON.stringify(states) !== "[7,11]") fail("repeated State slots were not restored distinctly");
+const computed = runtime.computed.map((entry) => entry.value).sort((a, b) => a - b);
+if (JSON.stringify(computed) !== "[14,22]") fail("Computed slots did not recompute from exact repeated State");
+if (runtime.computed.some((entry) => entry.dirty)) fail("Computed slots remained dirty");
+if (runtime.resume_recomputation_runs.length !== 2 || new Set(runtime.resume_recomputation_runs).size !== 2) fail("Computed recomputation did not execute exactly once per instance");
+if (runtime.initial_effect_runs.length !== 0) fail("Effects ran during R3-R5");
+if (runtime.diagnostics.some((diagnostic) => diagnostic.fatal)) fail("resume reported a fatal diagnostic");"#,
+        "EDGEZERO_RESUME_STATE_COMPUTED_PASS",
+    );
+    fs::write(out_dir.join("probe.html"), probe).expect("resume State probe");
 }
 
 fn write_resume_bootstrap_probe_pages(out_dir: &Path) {
@@ -421,8 +533,10 @@ await waitFor(() => runtime.components[0].state.count === 2, "cold action");"#,
         r#"
 if (runtime.resume.mode !== "resume" || runtime.resume.failure !== null) fail("valid snapshot was not accepted");
 if (!(runtime.resume_registry?.boundary_records instanceof Map)) fail("closed registry was not allocated");
-if (runtime.resume_registry.boundary_records.size !== 0 || runtime.resume_registry.slot_values.size !== 0) fail("registry retained partial runtime state");
-if (runtime.store !== null || runtime.components.length !== 0) fail("resume path executed cold authored initialization");
+if (runtime.resume_registry.boundary_records.size !== runtime.resume_registry.definitions.boundaries.size) fail("boundary records were incomplete");
+if (runtime.resume_registry.slot_values.size !== 1) fail("restored State registry was incomplete");
+if (!(runtime.store?.components instanceof Map) || runtime.components[0].state.count !== 7) fail("snapshot State was not restored");
+if (runtime.initial_effect_runs.length !== 0) fail("resume path executed cold authored initialization");
 const eventId = runtime.resume_registry.definitions.events.keys().next().value;
 const activation = await window.__EDGEZERO_RESUME__.activateByEvent(eventId);
 if (activation.status !== "registered") fail("event activation API did not resolve the exact boundary");
@@ -461,6 +575,8 @@ if (doubleFailure !== "DoubleBootstrap") fail("double bootstrap was not rejected
     fs::write(out_dir.join("protocol-mismatch.html"), protocol_page)
         .expect("artifact fallback probe");
 
+    write_resume_value_mismatch_probe(out_dir, &index, &snapshot);
+
     let mut malformed = snapshot;
     malformed["unknown"] = serde_json::Value::Bool(true);
     let malformed_page = resume_bootstrap_probe_page(
@@ -476,16 +592,59 @@ if (doubleFailure !== "DoubleBootstrap") fail("double bootstrap was not rejected
         .expect("snapshot fallback probe");
 }
 
+fn write_resume_value_mismatch_probe(out_dir: &Path, index: &str, snapshot: &serde_json::Value) {
+    let mut mismatch = snapshot.clone();
+    let value = mismatch["boundaries"]
+        .as_array_mut()
+        .expect("boundaries")
+        .iter_mut()
+        .flat_map(|boundary| {
+            boundary["values"]
+                .as_array_mut()
+                .expect("values")
+                .iter_mut()
+        })
+        .next()
+        .expect("retained value");
+    value["value"] = serde_json::Value::String("not-a-number".to_string());
+    let page = resume_bootstrap_probe_page(
+        index,
+        &format!(
+            "window.__EDGEZERO_RESUME_SNAPSHOT__ = {};",
+            serde_json::to_string(&mismatch).expect("mismatch snapshot JSON")
+        ),
+        &fallback_assertions("ValueTypeMismatch"),
+        "EDGEZERO_RESUME_VALUE_FALLBACK_PASS",
+    );
+    fs::write(out_dir.join("value-mismatch.html"), page).expect("value fallback probe");
+}
+
 fn resume_bootstrap_snapshot(manifest: &serde_json::Value) -> serde_json::Value {
+    let slots = manifest["slot_schemas"].as_array().expect("slot schemas");
     let boundaries = manifest["boundaries"]
         .as_array()
         .expect("resume boundaries")
         .iter()
         .map(|boundary| {
+            let boundary_id = boundary["boundary_id"].as_str().expect("boundary ID");
+            let values = slots
+                .iter()
+                .filter(|slot| {
+                    slot["owner_boundary_id"] == boundary_id && slot["restore_phase"] != "R5"
+                })
+                .map(|slot| {
+                    let slot_id = slot["slot_id"].as_str().expect("slot ID");
+                    serde_json::json!({
+                        "valueRecordId": format!("resume-value:{slot_id}"),
+                        "slotId": slot_id,
+                        "value": resume_bootstrap_value(&slot["value_codec"])
+                    })
+                })
+                .collect::<Vec<_>>();
             serde_json::json!({
                 "boundaryId": boundary["boundary_id"],
                 "schemaId": boundary["schema_id"],
-                "values": []
+                "values": values
             })
         })
         .collect::<Vec<_>>();
@@ -497,6 +656,33 @@ fn resume_bootstrap_snapshot(manifest: &serde_json::Value) -> serde_json::Value 
         "capturedAt": null,
         "boundaries": boundaries
     })
+}
+
+fn resume_bootstrap_value(codec: &serde_json::Value) -> serde_json::Value {
+    match codec["kind"].as_str().expect("codec kind") {
+        "null_codec" | "nullable_codec" => serde_json::Value::Null,
+        "boolean_codec" => serde_json::Value::Bool(false),
+        "number_codec" => serde_json::Value::from(7),
+        "string_codec" => serde_json::Value::String(String::new()),
+        "array_codec" => serde_json::Value::Array(Vec::new()),
+        "object_codec" => serde_json::Value::Object(
+            codec["value"]
+                .as_array()
+                .expect("object properties")
+                .iter()
+                .map(|property| {
+                    (
+                        property["name"]
+                            .as_str()
+                            .expect("property name")
+                            .to_string(),
+                        resume_bootstrap_value(&property["codec"]),
+                    )
+                })
+                .collect(),
+        ),
+        kind => panic!("unsupported resume codec {kind}"),
+    }
 }
 
 fn fallback_assertions(failure: &str) -> String {

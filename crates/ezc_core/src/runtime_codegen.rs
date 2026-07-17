@@ -279,7 +279,17 @@ const RUNTIME_STUB: &str = r#"(() => {
       }
       validateResumeSnapshot(snapshot, manifest, definitions);
       resumeBootstrapState.registry = allocateResumeRegistry(manifest, definitions);
-      const result = { mode: "resume", failure: null, registry: resumeBootstrapState.registry };
+      const resume = await input.resumeBoot?.({
+        manifest,
+        snapshot,
+        registry: resumeBootstrapState.registry
+      });
+      const result = {
+        mode: "resume",
+        failure: null,
+        registry: resumeBootstrapState.registry,
+        resume
+      };
       resumeBootstrapState.phase = "ready";
       resumeBootstrapState.result = result;
       resumeBootstrapState.debug = [resumeDebugEvidence(result)];
@@ -2635,6 +2645,15 @@ const RUNTIME_STUB: &str = r#"(() => {
   }
 
   function debugComputed(store) {
+    if (store.instanceQualifiedState) {
+      return [...store.computedSlotsByInstanceComputed.entries()].map(([key, slot]) => ({
+        component_instance_id: key.slice(0, key.lastIndexOf("|")),
+        computed: slot.computed_id,
+        cache_slot: slot.cache_slot_id,
+        dirty: store.computedDirtySlots.get(slot.dirty_slot_id) === true,
+        value: store.computedCaches.get(slot.cache_slot_id)
+      }));
+    }
     return [...store.computedEvaluations.values()].map((evaluation) => ({
       computed: evaluation.computed,
       cache_slot: evaluation.cache_slot,
@@ -2657,6 +2676,266 @@ const RUNTIME_STUB: &str = r#"(() => {
     const value = Number(slot.initial_value);
     if (!Number.isFinite(value)) throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
     return value;
+  }
+
+  function decodeResumeValue(value, codec) {
+    switch (codec?.kind) {
+      case "null_codec":
+        if (value !== null) throw new ResumeBootError("ValueTypeMismatch");
+        return null;
+      case "boolean_codec":
+        if (typeof value !== "boolean") throw new ResumeBootError("ValueTypeMismatch");
+        return value;
+      case "number_codec":
+        if (typeof value !== "number" || !Number.isFinite(value) || Object.is(value, -0)) {
+          throw new ResumeBootError("ValueTypeMismatch");
+        }
+        return value;
+      case "string_codec":
+        if (typeof value !== "string") throw new ResumeBootError("ValueTypeMismatch");
+        return value;
+      case "array_codec":
+        if (!Array.isArray(value)) throw new ResumeBootError("ValueTypeMismatch");
+        return value.map((entry) => decodeResumeValue(entry, codec.value));
+      case "object_codec": {
+        if (value === null || typeof value !== "object" || Array.isArray(value)) {
+          throw new ResumeBootError("ValueTypeMismatch");
+        }
+        const properties = codec.value ?? [];
+        if (!exactObjectKeys(value, properties.map((property) => property.name))) {
+          throw new ResumeBootError("ValueTypeMismatch");
+        }
+        return Object.fromEntries(properties.map((property) => [
+          property.name,
+          decodeResumeValue(value[property.name], property.codec)
+        ]));
+      }
+      case "nullable_codec":
+        return value === null ? null : decodeResumeValue(value, codec.value);
+      default:
+        throw new ResumeBootError("ValueCodecFailure");
+    }
+  }
+
+  function snapshotValuesBySlot(snapshot) {
+    const values = new Map();
+    for (const boundary of snapshot.boundaries) {
+      for (const record of boundary.values) values.set(record.slotId, record.value);
+    }
+    return values;
+  }
+
+  function allocateResumeStateComputedStore(
+    registry,
+    manifest,
+    templateManifest,
+    computedArtifact,
+    contextArtifact,
+    effectArtifact,
+    componentArtifact,
+    diagnostics
+  ) {
+    const store = createRuntimeStore(
+      collectElementAnchors(),
+      diagnostics,
+      computedArtifact,
+      contextArtifact,
+      effectArtifact,
+      componentArtifact
+    );
+    store.componentArtifact = componentArtifact;
+    const definitions = new Map(
+      (templateManifest.components ?? []).map((component) => [component.component_id, component])
+    );
+    for (const boundary of manifest.boundaries) {
+      registry.boundary_records.set(boundary.boundary_id, {
+        boundary_id: boundary.boundary_id,
+        kind: boundary.kind,
+        status: "allocated"
+      });
+    }
+    for (const instance of componentArtifact.instances ?? []) {
+      const definition = definitions.get(instance.component);
+      if (definition === undefined) throw new ResumeBootError("ResumeArtifactMismatch");
+      for (const slot of instance.state_slots ?? []) {
+        const key = `${instance.instance}|${slot.storage_id}`;
+        if (store.stateSlotsByInstanceStorage.has(key)) {
+          throw new ResumeBootError("DuplicateIdentity");
+        }
+        store.stateSlotsByInstanceStorage.set(key, slot);
+      }
+      for (const slot of instance.computed_slots ?? []) {
+        const key = `${instance.instance}|${slot.computed_id}`;
+        if (store.computedSlotsByInstanceComputed.has(key)) {
+          throw new ResumeBootError("DuplicateIdentity");
+        }
+        store.computedSlotsByInstanceComputed.set(key, slot);
+        store.computedDirtySlots.set(slot.dirty_slot_id, false);
+      }
+      const component = {
+        instance_id: instance.instance,
+        name: instance.component,
+        manifest: definition,
+        state: {}
+      };
+      store.components.set(instance.instance, component);
+      registerActions(store, component, definition);
+    }
+    return store;
+  }
+
+  function writeResumeSlot(store, registry, slotSchema, value) {
+    registry.slot_values.set(slotSchema.slot_id, value);
+    const existing = slotSchema.existing_storage_slot_id;
+    if (slotSchema.restore_phase === "R3") {
+      store.storageValues.set(existing, value);
+      return;
+    }
+    if (slotSchema.restore_phase === "R4") {
+      const computedSlot = [...store.computedSlotsByInstanceComputed.values()]
+        .find((slot) => slot.cache_slot_id === existing || slot.dirty_slot_id === existing);
+      if (computedSlot === undefined) throw new ResumeBootError("UnknownSlot");
+      if (computedSlot.cache_slot_id === existing) store.computedCaches.set(existing, value);
+      else store.computedDirtySlots.set(existing, value);
+      return;
+    }
+    throw new ResumeBootError("RestoreInstructionFailure");
+  }
+
+  function executeResumeDecodeAndWrites(store, registry, snapshot, phases) {
+    const snapshotValues = snapshotValuesBySlot(snapshot);
+    const decoded = new Map();
+    for (const program of registry.definitions.restorePrograms.values()) {
+      for (const record of program.instructions ?? []) {
+        if (!phases.has(record.phase)) continue;
+        const instruction = record.instruction;
+        if (instruction.kind === "decode_value") {
+          const schema = registry.definitions.slots.get(instruction.slot_id);
+          if (schema === undefined || schema.restore_phase !== record.phase) {
+            throw new ResumeBootError("RestoreInstructionFailure");
+          }
+          if (!snapshotValues.has(instruction.slot_id)) throw new ResumeBootError("UnknownSlot");
+          decoded.set(
+            instruction.slot_id,
+            decodeResumeValue(snapshotValues.get(instruction.slot_id), instruction.codec)
+          );
+        } else if (instruction.kind === "write_slot") {
+          const schema = registry.definitions.slots.get(instruction.slot_id);
+          if (schema === undefined || !decoded.has(instruction.slot_id)) {
+            throw new ResumeBootError("RestoreInstructionFailure");
+          }
+          writeResumeSlot(store, registry, schema, decoded.get(instruction.slot_id));
+        } else {
+          throw new ResumeBootError("RestoreInstructionFailure");
+        }
+      }
+    }
+  }
+
+  function synchronizeRestoredComponentState(store, computedArtifact, componentArtifact) {
+    const fieldsByStorage = new Map(
+      (computedArtifact?.state ?? []).map((state) => [state.storage, state.field])
+    );
+    for (const instance of componentArtifact.instances ?? []) {
+      const component = store.components.get(instance.instance);
+      if (component === undefined) throw new ResumeBootError("ResumeArtifactMismatch");
+      for (const slot of instance.state_slots ?? []) {
+        const field = fieldsByStorage.get(slot.storage_id);
+        if (field === undefined || !store.storageValues.has(slot.slot_id)) {
+          throw new ResumeBootError("UnknownSlot");
+        }
+        component.state[field] = store.storageValues.get(slot.slot_id);
+      }
+    }
+  }
+
+  function executeResumeComputedRecomputation(store, registry) {
+    for (const schema of registry.definitions.slots.values()) {
+      if (schema.restore_phase !== "R5") continue;
+      const computedSlot = [...store.computedSlotsByInstanceComputed.values()]
+        .find((slot) =>
+          slot.cache_slot_id === schema.existing_storage_slot_id
+          || slot.dirty_slot_id === schema.existing_storage_slot_id
+        );
+      if (computedSlot === undefined) throw new ResumeBootError("UnknownSlot");
+      if (computedSlot.dirty_slot_id === schema.existing_storage_slot_id) {
+        store.computedDirtySlots.set(computedSlot.dirty_slot_id, true);
+      }
+    }
+    const recomputed = new Set();
+    for (const program of registry.definitions.restorePrograms.values()) {
+      for (const record of program.instructions ?? []) {
+        if (record.phase !== "R5") continue;
+        const instruction = record.instruction;
+        if (instruction.kind !== "recompute_computed") {
+          throw new ResumeBootError("RestoreInstructionFailure");
+        }
+        const key = `${instruction.component_instance_id}|${instruction.computed_id}`;
+        const slot = store.computedSlotsByInstanceComputed.get(key);
+        const evaluation = store.computedEvaluations.get(instruction.computed_id);
+        if (slot === undefined || evaluation === undefined || recomputed.has(key)) {
+          throw new ResumeBootError("RestoreInstructionFailure");
+        }
+        const prior = store.activeExecutionContext;
+        store.activeExecutionContext = {
+          component_instance_id: instruction.component_instance_id
+        };
+        try {
+          const value = executeComputedProgram(store, evaluation);
+          storeComputedValue(store, evaluation, value);
+          setComputedDirty(store, instruction.computed_id, false);
+          const cacheSchema = [...registry.definitions.slots.values()]
+            .find((schema) => schema.existing_storage_slot_id === slot.cache_slot_id);
+          const dirtySchema = [...registry.definitions.slots.values()]
+            .find((schema) => schema.existing_storage_slot_id === slot.dirty_slot_id);
+          if (cacheSchema === undefined || dirtySchema === undefined) {
+            throw new ResumeBootError("UnknownSlot");
+          }
+          registry.slot_values.set(cacheSchema.slot_id, value);
+          registry.slot_values.set(dirtySchema.slot_id, false);
+          recomputed.add(key);
+        } finally {
+          store.activeExecutionContext = prior;
+        }
+      }
+    }
+    return [...recomputed];
+  }
+
+  function restoreResumeStateAndComputed(
+    manifest,
+    snapshot,
+    registry,
+    templateManifest,
+    computedArtifact,
+    contextArtifact,
+    effectArtifact,
+    componentArtifact,
+    diagnostics
+  ) {
+    const store = allocateResumeStateComputedStore(
+      registry,
+      manifest,
+      templateManifest,
+      computedArtifact,
+      contextArtifact,
+      effectArtifact,
+      componentArtifact,
+      diagnostics
+    );
+    executeResumeDecodeAndWrites(store, registry, snapshot, new Set(["R3", "R4"]));
+    synchronizeRestoredComponentState(store, computedArtifact, componentArtifact);
+    const recomputationRuns = executeResumeComputedRecomputation(store, registry);
+    const state = runtimeState({
+      manifest: templateManifest,
+      diagnostics,
+      store,
+      components: debugComponents(store),
+      computed: debugComputed(store),
+      computed_update_runs: 0
+    });
+    state.resume_recomputation_runs = recomputationRuns;
+    return state;
   }
 
   function runtimeState({
@@ -2865,6 +3144,17 @@ const RUNTIME_STUB: &str = r#"(() => {
 
       const result = await bootstrapResume({
         diagnostics,
+        resumeBoot: ({ manifest: resumeManifest, snapshot, registry }) => restoreResumeStateAndComputed(
+          resumeManifest,
+          snapshot,
+          registry,
+          manifest,
+          computedArtifact,
+          contextArtifact,
+          effectArtifact,
+          componentArtifact,
+          diagnostics
+        ),
         coldBoot: () => initializeRuntime(
           manifest,
           computedArtifact,
@@ -2877,7 +3167,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       });
       const state = result.mode === "cold"
         ? result.cold
-        : runtimeState({ manifest, diagnostics });
+        : result.resume;
       state.resume = {
         mode: result.mode,
         failure: result.failure,
@@ -2996,6 +3286,9 @@ mod tests {
         assert!(runtime.contains("function captureSnapshot"));
         assert!(runtime.contains("async function activateByEvent"));
         assert!(runtime.contains("async function activateBoundary"));
+        assert!(runtime.contains("function decodeResumeValue"));
+        assert!(runtime.contains("function restoreResumeStateAndComputed"));
+        assert!(runtime.contains("executeResumeComputedRecomputation"));
         assert!(runtime.contains("window.__EDGEZERO_RESUME__ = Object.freeze"));
         assert!(runtime.contains("throw new ResumeBootError(\"DoubleBootstrap\")"));
         assert!(runtime.contains("ez-binding:"));

@@ -267,6 +267,28 @@ and numeric instance-slot initial values enter storage as numbers. The focused
 probe constructs its success marker only after runtime assertions, so source
 text cannot produce a false pass.
 
+## Phase J State, Resource, and Computed restoration
+
+J12 executes only the compiler-authored R3-R5 restore instructions. R3 decodes
+and writes mutable State plus canonically retained Resource slots through their
+J6 codecs. R4 installs retained Computed cache/dirty pairs. R5 invokes only
+J2-approved recomputable Computed programs, once per exact instance-qualified
+slot and in manifest topological order.
+
+The resume path allocates boundary, component, State, and Computed runtime
+records directly from closed manifest identities. Restored slots never execute
+their authored initializer or evaluator, and no Effect body runs. A missing,
+duplicate, malformed, or codec-incompatible snapshot value rejects the whole
+candidate registry and selects one clean cold boot; partial writes cannot
+escape.
+
+Repeated component instances retain distinct State and Computed addresses.
+The browser proof restores different State values into two instances,
+recomputes their dependent Computed values exactly once, and confirms the
+caches are clean and isolated before Ready. Later J16-J17 slices own resumed
+DOM subscription establishment and future action delivery; J12 does not enter
+those authorities early.
+
 ## Definition
 
 In EdgeZero, resumability means:

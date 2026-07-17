@@ -3,25 +3,27 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: J11 - Resume Runtime Registry and Bootstrap Loader
-* Working tree: ready for the atomic J11 commit; the next authored slice is J12 State, Resource, and Computed restoration.
+* Latest completed slice: J12 - State, Resource, and Computed Restoration
+* Working tree: J12 implementation and the full relevant gate are complete; commit atomically, then begin J13 Context restoration.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: J11 - Resume Runtime Registry and Bootstrap Loader
-* Summary: contract-v1 closed registries, exact artifact/snapshot validation, cold/resume selection, atomic cold fallback, deterministic debug evidence, and double-bootstrap rejection.
+* Slice: J12 - State, Resource, and Computed Restoration
+* Summary: exact R3-R5 State/authorized Resource writes, retained Computed cache installation, approved topological Computed recomputation, and atomic codec failure.
 * Key files: `runtime_codegen.rs`, `runtime_browser.rs`, `07_resumability_and_delivery.md`
-* Boundary: J11 accepts and allocates but does not decode/write State or Computed values; J12 alone executes R3-R5.
+* Boundary: J12 restores value/runtime records but does not establish Context, structure, Forms, DOM subscriptions, Effects, or lazy action delivery.
 
 Current in-progress slice
 
-* Slice: J12 - State, Resource, and Computed Restoration
-* Status: Ready after the atomic J11 commit.
+* Slice: J13 - Context Restoration
+* Status: Ready after the atomic J12 commit and clean-worktree check.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase I: none. Next: J12 exact R3-R5 State/authorized Resource/retained Computed writes and approved Computed recomputation.
+* Remaining in Phase I: none. Next: J13 exact R6-R7 Provider value and frozen Consumer-binding restoration without runtime selection.
 
 Verification
+
+* J12 verification: hardened repeated-instance browser proof restores State 7/11, recomputes exact Computed values 14/22 once each in canonical order, retains clean isolated caches, and runs zero initial Effects. The six-page fallback matrix adds invalid-codec atomic rejection. All 410 core tests, 2 CLI units, 7 Component fixtures, 12 Context fixtures, 128 CLI inspection/build tests, all 31 sequential browser probes, strict all-target core/CLI clippy, generated-JavaScript syntax, formatting, and `git diff --check` pass.
 
 * J11 verification: hardened five-page real-browser matrix covers no-snapshot cold plus numeric action execution, accepted resume, build mismatch, runtime-protocol artifact rejection, malformed snapshot, empty rollback registries, exact activation lookup, double-bootstrap rejection, and suppression of authored cold initialization. The pass token does not occur literally in probe source. All 410 core tests, 2 CLI units, 7 Component fixtures, 12 Context fixtures, 128 CLI inspection/build tests, all 30 sequential real-browser probes, strict all-target core/CLI clippy, formatting, and `git diff --check` pass.
 
@@ -1197,9 +1199,9 @@ Known limitations
 
 Exact next step
 
-Commit J11 atomically as `runtime: add resume bootstrap registry`, verify the
-worktree is clean, then implement J12 State, authorized Resource, retained
-Computed, and approved Computed recomputation for exact R3-R5.
+Commit J12 atomically as `runtime: restore state and computed slots`, verify
+the worktree is clean, then implement J13 exact R6-R7 Context Provider values
+and Consumer bindings.
 
 Useful commands
 
