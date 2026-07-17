@@ -402,7 +402,7 @@ impl ResumeActivationId {
 }
 impl ResumeEventId {
     #[must_use]
-    pub fn for_existing_event(event: &SemanticId) -> Self {
+    pub fn for_existing_event(event: &str) -> Self {
         Self(format!("resume-event:{event}"))
     }
 }
@@ -528,7 +528,7 @@ mod tests {
         );
         let event = SemanticId::component(Some("x-one-event"), "Event");
         assert_eq!(
-            ResumeEventId::for_existing_event(&event).to_string(),
+            ResumeEventId::for_existing_event(event.as_str()).to_string(),
             format!("resume-event:{event}")
         );
         let slot = ResumeSlotId::for_existing_storage("runtime-slot:one");

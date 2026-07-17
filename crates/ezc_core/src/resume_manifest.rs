@@ -10,15 +10,16 @@ use crate::effect::{EffectExecutionPolicy, EffectRenderBoundary};
 use crate::effect_resume::{EffectActivationSlotId, EffectActivationStatus};
 use crate::semantic_type::ExecutionBoundary;
 use crate::{
-    build_resume_activation_plan, build_resume_boundary_graph, build_resume_capture_plan,
-    build_resume_chunk_graph, build_resume_liveness_plan, build_resume_plan,
-    build_resume_restore_plan, build_resume_schema_registry, build_runtime_component_artifact,
-    build_runtime_computed_artifact, build_runtime_context_artifact, build_runtime_effect_artifact,
-    build_runtime_forms_artifact, build_template_manifest_from_asm, generate_runtime_stub,
-    lower_components_to_ir, optimize_context_ir, optimize_effect_ir,
-    runtime_component_artifact_json, runtime_computed_artifact_json, runtime_context_artifact_json,
-    runtime_effect_artifact_json, runtime_forms_artifact_json, semantic_type_text,
-    template_manifest_json, ApplicationSemanticModel, ResumeActivationId, ResumeActivationPolicy,
+    build_resume_activation_plan, build_resume_anchor_plan, build_resume_boundary_graph,
+    build_resume_capture_plan, build_resume_chunk_graph, build_resume_liveness_plan,
+    build_resume_plan, build_resume_restore_plan, build_resume_schema_registry,
+    build_runtime_component_artifact, build_runtime_computed_artifact,
+    build_runtime_context_artifact, build_runtime_effect_artifact, build_runtime_forms_artifact,
+    build_template_manifest_from_asm, generate_runtime_stub, lower_components_to_ir,
+    optimize_context_ir, optimize_effect_ir, runtime_component_artifact_json,
+    runtime_computed_artifact_json, runtime_context_artifact_json, runtime_effect_artifact_json,
+    runtime_forms_artifact_json, semantic_type_text, template_manifest_json,
+    ApplicationSemanticModel, ResumeActivationId, ResumeActivationPolicy,
     ResumeActivationPrerequisite, ResumeAnchorId, ResumeBoundaryId, ResumeBoundaryKind,
     ResumeBoundaryOwner, ResumeBuildId, ResumeCaptureInstruction, ResumeCaptureProgramId,
     ResumeChunkId, ResumeChunkProgram, ResumeChunkRootKind, ResumeEventId, ResumeExistingSlot,
@@ -370,6 +371,7 @@ pub struct ResumeManifestValidationDiagnostic {
 pub fn build_resume_manifest(model: &ApplicationSemanticModel) -> ResumeManifest {
     let boundaries = build_resume_boundary_graph(model);
     let activation = build_resume_activation_plan(model);
+    let anchor_plan = build_resume_anchor_plan(model);
     let schemas = build_resume_schema_registry(model);
     let liveness = build_resume_liveness_plan(model);
     let capture = build_resume_capture_plan(model);
@@ -392,6 +394,38 @@ pub fn build_resume_manifest(model: &ApplicationSemanticModel) -> ResumeManifest
                 .map(|assignment| (assignment.slot.clone(), assignment))
         })
         .collect::<BTreeMap<_, _>>();
+    let anchor_ids_by_boundary =
+        anchor_plan
+            .anchors
+            .iter()
+            .fold(BTreeMap::<_, Vec<_>>::new(), |mut index, anchor| {
+                index
+                    .entry(anchor.boundary_id.clone())
+                    .or_default()
+                    .push(anchor.anchor_id.clone());
+                index
+            });
+    let event_ids_by_boundary =
+        anchor_plan
+            .events
+            .iter()
+            .fold(BTreeMap::<_, Vec<_>>::new(), |mut index, event| {
+                index
+                    .entry(event.interaction_boundary_id.clone())
+                    .or_default()
+                    .push(event.resume_event_id.clone());
+                index
+            });
+    let event_by_interaction = anchor_plan
+        .events
+        .iter()
+        .map(|event| {
+            (
+                event.interaction_boundary_id.clone(),
+                event.resume_event_id.clone(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
     let boundary_records = boundaries
         .boundaries
         .iter()
@@ -409,8 +443,14 @@ pub fn build_resume_manifest(model: &ApplicationSemanticModel) -> ResumeManifest
             schema_id: ResumeSchemaId::for_boundary(&boundary.id),
             capture_program_id: ResumeCaptureProgramId::for_boundary(&boundary.id),
             restore_program_id: ResumeRestoreProgramId::for_boundary(&boundary.id),
-            anchor_ids: Vec::new(),
-            event_ids: Vec::new(),
+            anchor_ids: anchor_ids_by_boundary
+                .get(&boundary.id)
+                .cloned()
+                .unwrap_or_default(),
+            event_ids: event_ids_by_boundary
+                .get(&boundary.id)
+                .cloned()
+                .unwrap_or_default(),
             provenance: manifest_provenance(&boundary.provenance),
         })
         .collect();
@@ -509,7 +549,7 @@ pub fn build_resume_manifest(model: &ApplicationSemanticModel) -> ResumeManifest
                 activation_id: ResumeActivationId::for_boundary(&decision.boundary),
                 boundary_id: decision.boundary.clone(),
                 policy: manifest_activation_policy(decision.policy),
-                event_id: None,
+                event_id: event_by_interaction.get(&decision.boundary).cloned(),
                 chunk_id,
                 prerequisite_boundary_ids: decision
                     .prerequisites
@@ -526,6 +566,33 @@ pub fn build_resume_manifest(model: &ApplicationSemanticModel) -> ResumeManifest
         })
         .collect();
     let phase_i_component_resume_records = phase_i_component_records(&phase_i);
+    let anchor_records = anchor_plan
+        .anchors
+        .iter()
+        .map(|anchor| ResumeManifestAnchorRecord {
+            anchor_id: anchor.anchor_id.clone(),
+            kind: anchor.kind.label().to_string(),
+            boundary_id: anchor.boundary_id.clone(),
+            exact_target_id: anchor.exact_target_id.clone(),
+            required: anchor.required,
+        })
+        .collect();
+    let event_records = anchor_plan
+        .events
+        .iter()
+        .map(|event| ResumeManifestEventRecord {
+            resume_event_id: event.resume_event_id.clone(),
+            existing_dom_event_id: event.existing_dom_event_id.clone(),
+            event_type: event.event_type.clone(),
+            event_phase: event.event_phase.clone(),
+            exact_target_anchor_id: event.exact_target_anchor_id.clone(),
+            owner_boundary_id: event.owner_boundary_id.clone(),
+            action_or_submit_program_id: event.action_or_submit_program_id.clone(),
+            chunk_id: event.chunk_id.clone(),
+            native_default_policy: event.native_default_policy.clone(),
+            propagation_policy: event.propagation_policy.clone(),
+        })
+        .collect();
     let mut manifest = ResumeManifest {
         schema_version: RESUME_MANIFEST_SCHEMA_VERSION,
         build_id: ResumeBuildId::zero_sentinel(),
@@ -538,8 +605,8 @@ pub fn build_resume_manifest(model: &ApplicationSemanticModel) -> ResumeManifest
         restore_programs,
         chunks: chunk_records,
         activations: activation_records,
-        anchors: Vec::new(),
-        events: Vec::new(),
+        anchors: anchor_records,
+        events: event_records,
         phase_i_component_resume_records,
         phase_i_form_resume_records: phase_i.form_instances,
     };
@@ -601,8 +668,11 @@ fn resume_build_fingerprint(model: &ApplicationSemanticModel, manifest: &ResumeM
         record.content_hash.clone_from(&normalized_hash);
         record.module_path = normalized_chunk_module_path(model, record, &normalized_hash);
     }
+    normalize_marker_identities(&mut fingerprint);
     let runtime = generate_runtime_stub();
     let manifest_bytes = canonical_manifest_json(&fingerprint);
+    let marker_plan = serde_json::to_string(&(&fingerprint.anchors, &fingerprint.events))
+        .expect("resume marker plan should serialize");
     let mut input = String::new();
     for (label, bytes) in [
         ("template", template.as_str()),
@@ -613,7 +683,7 @@ fn resume_build_fingerprint(model: &ApplicationSemanticModel, manifest: &ResumeM
         ("forms", forms.as_str()),
         ("runtime", runtime.as_str()),
         ("manifest", manifest_bytes.as_str()),
-        ("markers", "anchors=[]\nevents=[]"),
+        ("markers", marker_plan.as_str()),
         ("runtime_protocol", "1"),
         ("snapshot_schema", "1"),
     ] {
@@ -632,6 +702,55 @@ fn resume_build_fingerprint(model: &ApplicationSemanticModel, manifest: &ResumeM
         );
     }
     input
+}
+
+fn normalize_marker_identities(manifest: &mut ResumeManifest) {
+    let anchor_ids = manifest
+        .anchors
+        .iter()
+        .enumerate()
+        .map(|(index, anchor)| {
+            (
+                anchor.anchor_id.clone(),
+                format!("ez-r:canonical-{index}")
+                    .parse::<ResumeAnchorId>()
+                    .expect("canonical anchor placeholder"),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let event_ids = manifest
+        .events
+        .iter()
+        .enumerate()
+        .map(|(index, event)| {
+            (
+                event.resume_event_id.clone(),
+                format!("resume-event:canonical-{index}")
+                    .parse::<ResumeEventId>()
+                    .expect("canonical event placeholder"),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    for anchor in &mut manifest.anchors {
+        anchor.anchor_id = anchor_ids[&anchor.anchor_id].clone();
+    }
+    for event in &mut manifest.events {
+        event.resume_event_id = event_ids[&event.resume_event_id].clone();
+        event.exact_target_anchor_id = anchor_ids[&event.exact_target_anchor_id].clone();
+    }
+    for boundary in &mut manifest.boundaries {
+        for anchor in &mut boundary.anchor_ids {
+            *anchor = anchor_ids[anchor].clone();
+        }
+        for event in &mut boundary.event_ids {
+            *event = event_ids[event].clone();
+        }
+    }
+    for activation in &mut manifest.activations {
+        if let Some(event) = &mut activation.event_id {
+            *event = event_ids[event].clone();
+        }
+    }
 }
 
 fn normalized_chunk_module_path(
@@ -1375,8 +1494,8 @@ mod tests {
         assert!(!manifest.restore_programs.is_empty());
         assert!(!manifest.chunks.is_empty());
         assert!(!manifest.activations.is_empty());
-        assert!(manifest.anchors.is_empty());
-        assert!(manifest.events.is_empty());
+        assert!(!manifest.anchors.is_empty());
+        assert!(!manifest.events.is_empty());
         assert!(validate_resume_manifest(&manifest).is_empty());
         assert_eq!(parse_resume_manifest_v6(&json), Ok(manifest));
         assert!(json.ends_with('\n'));

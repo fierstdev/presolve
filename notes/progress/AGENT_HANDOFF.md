@@ -3,25 +3,27 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: J9 - Executable Resume Manifest v6
-* Working tree: ready for the atomic J9 commit; the next authored slice is J10 resume anchors and event markers.
+* Latest completed slice: J10 - Resume Anchors and Event Markers
+* Working tree: ready for the atomic J10 commit; the next authored slice is J11 resume runtime registry and bootstrap loader.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: J9 - Executable Resume Manifest v6
-* Summary: sole-authority manifest v6, public snapshot/runtime versions, fixed SHA-256 build identity, canonical build artifact, and exact embedded bytes.
-* Key files: `resume_manifest.rs`, `resume_identity.rs`, `page_codegen.rs`, `ezc_cli/src/main.rs`, `07_resumability_and_delivery.md`
-* Boundary: anchors/events remain empty; J10 alone adds resume HTML markers.
+* Slice: J10 - Resume Anchors and Event Markers
+* Summary: canonical instance-qualified marker plan, exact manifest/page anchor and event agreement, and frozen attribute/text/structural representations.
+* Key files: `resume_anchor.rs`, `ordinary_html_codegen.rs`, `resume_manifest.rs`, `resume_identity.rs`, `07_resumability_and_delivery.md`
+* Boundary: markers do not activate or restore runtime state; J11 alone adds the resume registry/bootstrap substrate.
 
 Current in-progress slice
 
-* Slice: J10 - Resume Anchors and Event Markers
-* Status: Ready after the atomic J9 commit.
+* Slice: J11 - Resume Runtime Registry and Bootstrap Loader
+* Status: Ready after the atomic J10 commit.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase I: none. Next: J10 exact `data-ez-r`/`data-ez-e` records and HTML markers without rendered-semantic changes.
+* Remaining in Phase I: none. Next: J11 artifact validation, cold/resume selection, closed registries, atomic cold fallback, and double-bootstrap rejection.
 
 Verification
+
+* J10 verification: 5 focused marker-plan/HTML tests, all 410 core tests, 2 CLI units, 7 Component fixtures, 12 Context fixtures, all 128 CLI inspection/build tests, all 29 sequential real-browser probes, strict all-target core/CLI clippy, formatting, and `git diff --check` pass. Coverage includes every marker kind, Form and ordinary events, static-only omission, missing/unstable/duplicate/wrong-kind/structural-pair failures, exact page/manifest agreement, source-reversal/path-independent build identity, and byte determinism.
 
 * J9 verification: 8 focused manifest tests, all 405 core tests, 2 CLI units, 7 Component fixtures, 12 Context fixtures, all 128 CLI inspection/build tests, all 29 sequential real-browser probes, strict all-target core/CLI clippy, formatting, and `git diff --check` pass. Coverage includes v5/unknown-field rejection, every endpoint family, canonical snapshot/manifest examples, executable sensitivity, provenance and absolute-source-root independence, reverse-order determinism, `resume.runtime.json` emission, and exact page-embedded byte equality.
 
@@ -1193,9 +1195,9 @@ Known limitations
 
 Exact next step
 
-Commit J9 atomically as `compiler: emit executable resume manifest v6`, verify
-the worktree is clean, then implement J10 exact resume anchors/event markers
-and freeze one structural-anchor representation.
+Commit J10 atomically as `compiler: emit exact resume anchors`, verify the
+worktree is clean, then implement J11 runtime resume registry/bootstrap
+contract v1 while preserving the existing cold path.
 
 Useful commands
 
@@ -1227,7 +1229,11 @@ Useful commands
 Changed but uncommitted files
 
 * `crates/ezc_core/src/lib.rs`
-* `crates/ezc_core/src/resume_restore.rs`
+* `crates/ezc_core/src/ordinary_html_codegen.rs`
+* `crates/ezc_core/src/resume_anchor.rs`
+* `crates/ezc_core/src/resume_identity.rs`
+* `crates/ezc_core/src/resume_manifest.rs`
+* `crates/ezc_cli/tests/explain.rs`
 * `docs/planning/full-project-docs/07_resumability_and_delivery.md`
 * `notes/progress/2026-W28.md`
 * `notes/progress/AGENT_HANDOFF.md`

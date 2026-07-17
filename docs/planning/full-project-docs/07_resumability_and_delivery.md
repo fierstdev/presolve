@@ -222,8 +222,21 @@ prefixes, provenance/spans, wall-clock time, diagnostics, output directory,
 and machine information do not influence the fingerprint. Executable changes
 do. Repeated and reversed builds remain byte-identical.
 
-J9 emits empty anchor and event arrays intentionally. J10 alone adds exact
-`data-ez-r`/`data-ez-e` marker records and HTML markers.
+## Phase J exact resume anchors and event markers
+
+J10 freezes one compiler-owned marker plan derived from ordinary
+instance-qualified template targets plus the J3/J5 boundary and chunk
+authorities. Element, Form-control, and event targets use exact ID-only
+`data-ez-r` and `data-ez-e` attributes. Dynamic text uses a zero-layout
+`<template data-ez-r>` marker. Existing conditional and keyed-list comment
+ranges receive exact `ez-r-start`/`ez-r-end` pairs; no second structural
+representation exists.
+
+Every public manifest anchor and event has exactly one emitted page marker.
+Static-only output emits none. Marker validation rejects missing or unstable
+targets, duplicate anchors, wrong kinds, structural-pair mismatch, and
+noncanonical ordering/output. The template manifest remains unchanged; resume
+manifest v6 is the sole Phase J marker authority.
 
 ## Definition
 

@@ -4055,6 +4055,7 @@ fn build_command_writes_page_manifest_and_runtime_artifacts() {
     assert!(parsed_resume["build_id"]
         .as_str()
         .is_some_and(|build_id| build_id.starts_with("resume-build:")));
+    assert_resume_markers_match_manifest(&actual_html, &parsed_resume);
     let resume_script_prefix = "<script type=\"application/json\" id=\"ez-resume-runtime\">";
     let embedded_start = actual_html
         .find(resume_script_prefix)
@@ -4089,6 +4090,30 @@ fn build_command_writes_page_manifest_and_runtime_artifacts() {
     assert!(actual_runtime.contains("dataset.ezRuntime"));
     assert!(actual_runtime.contains("edgezero:ready"));
     assert!(actual_runtime.contains("window.__EDGEZERO__"));
+}
+
+fn assert_resume_markers_match_manifest(actual_html: &str, parsed_resume: &serde_json::Value) {
+    for anchor in parsed_resume["anchors"].as_array().expect("resume anchors") {
+        let id = anchor["anchor_id"].as_str().expect("resume anchor ID");
+        let marker = match anchor["kind"].as_str().expect("resume anchor kind") {
+            "structural_start" => format!("<!--ez-r-start:{id}-->"),
+            "structural_end" => format!("<!--ez-r-end:{id}-->"),
+            _ => format!("data-ez-r=\"{id}\""),
+        };
+        assert_eq!(
+            actual_html.matches(&marker).count(),
+            1,
+            "resume anchor marker {id}"
+        );
+    }
+    for event in parsed_resume["events"].as_array().expect("resume events") {
+        let id = event["resume_event_id"].as_str().expect("resume event ID");
+        assert_eq!(
+            actual_html.matches(&format!("data-ez-e=\"{id}\"")).count(),
+            1,
+            "resume event marker {id}"
+        );
+    }
 }
 
 #[test]

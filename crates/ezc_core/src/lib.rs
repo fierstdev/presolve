@@ -71,6 +71,7 @@ pub mod ordinary_template_integrity;
 pub mod page_codegen;
 pub mod provider;
 pub mod resume_activation;
+pub mod resume_anchor;
 pub mod resume_boot;
 pub mod resume_boundary;
 pub mod resume_capture;
@@ -396,6 +397,12 @@ pub use resume_activation::{
     ResumeActivationBlockReason, ResumeActivationIntegrityCode,
     ResumeActivationIntegrityDiagnostic, ResumeActivationPlan, ResumeActivationPolicy,
     ResumeActivationPolicyDecision, ResumeActivationPrerequisite, RESUME_ACTIVATION_PLAN_VERSION,
+};
+pub use resume_anchor::{
+    build_resume_anchor_plan, validate_resume_anchor_plan, validate_resume_marker_html,
+    ResumeAnchorIntegrityCode, ResumeAnchorIntegrityDiagnostic, ResumeAnchorKind,
+    ResumeAnchorPlacement, ResumeAnchorPlan, ResumeAnchorPlanRecord, ResumeEventMarkerRecord,
+    RESUME_ANCHOR_PLAN_VERSION,
 };
 pub use resume_boundary::{
     build_resume_boundary_graph, validate_resume_boundary_graph, ResumeBoundary,
