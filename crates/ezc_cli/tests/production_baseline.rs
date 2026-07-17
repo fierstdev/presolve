@@ -62,21 +62,30 @@ fn logical_artifact_name(path: &Path) -> String {
     }
 }
 
-fn build_fixture(repo_root: &Path, fixture: &FixtureBaseline, suffix: &str) -> PathBuf {
+fn build_fixture(
+    repo_root: &Path,
+    fixture: &FixtureBaseline,
+    suffix: &str,
+    production: bool,
+) -> PathBuf {
     let output = repo_root
         .join("target/ezc-test-output")
         .join(format!("phase-k-{}-{suffix}", fixture.name));
     if output.exists() {
         std::fs::remove_dir_all(&output).expect("failed to clean prior Phase K output");
     }
+    let mut arguments = vec![
+        "build".to_string(),
+        fixture.input.clone(),
+        "--out".to_string(),
+        output.to_string_lossy().into_owned(),
+    ];
+    if production {
+        arguments.push("--production".to_string());
+    }
     let result = Command::new(env!("CARGO_BIN_EXE_ezc_cli"))
         .current_dir(repo_root)
-        .args([
-            "build",
-            &fixture.input,
-            "--out",
-            output.to_str().expect("output path should be UTF-8"),
-        ])
+        .args(arguments)
         .output()
         .expect("failed to run Phase K baseline build");
     assert!(
@@ -166,8 +175,8 @@ fn k8_production_artifact_is_deterministic_and_preserves_the_k0_baseline() {
     let baseline = baseline();
     assert_eq!(baseline.phase, "K0");
     for fixture in &baseline.fixtures {
-        let first = build_fixture(&repo_root, fixture, "first");
-        let second = build_fixture(&repo_root, fixture, "second");
+        let first = build_fixture(&repo_root, fixture, "first", false);
+        let second = build_fixture(&repo_root, fixture, "second", false);
         let mut first_artifacts = artifact_sizes(&first);
         let production_size = first_artifacts
             .remove("production.runtime.json")
@@ -219,4 +228,42 @@ fn k8_production_artifact_is_deterministic_and_preserves_the_k0_baseline() {
         );
         assert_resume_matches_baseline(&resume, fixture);
     }
+}
+
+#[test]
+fn k9_cli_production_layout_is_syntax_safe_and_deterministic() {
+    let repo_root = repo_root();
+    let fixture = &baseline().fixtures[0];
+    let first = build_fixture(&repo_root, fixture, "production-first", true);
+    let second = build_fixture(&repo_root, fixture, "production-second", true);
+    let read_layout = |output: &Path| {
+        let mut modules = std::fs::read_dir(output.join("production"))
+            .expect("production module directory")
+            .map(|entry| entry.expect("module entry").path())
+            .collect::<Vec<_>>();
+        modules.sort();
+        modules
+            .into_iter()
+            .map(|path| {
+                let source = std::fs::read_to_string(&path).expect("module source");
+                assert!(!source.contains("eval("));
+                assert!(!source.contains("Function("));
+                assert!(!source.contains("import("));
+                assert!(Command::new("node")
+                    .arg("--check")
+                    .arg(&path)
+                    .status()
+                    .expect("node syntax check")
+                    .success());
+                (
+                    path.file_name()
+                        .expect("module filename")
+                        .to_string_lossy()
+                        .into_owned(),
+                    source,
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(read_layout(&first), read_layout(&second));
 }

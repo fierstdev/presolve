@@ -12,9 +12,9 @@ use ezc_core::{
     build_form_inspection_registry, build_production_runtime_artifact, build_resume_chunk_graph,
     build_resume_manifest, build_runtime_component_artifact, build_runtime_computed_artifact,
     build_runtime_context_artifact, build_runtime_effect_artifact, build_runtime_forms_artifact,
-    build_semantic_graph, build_template_graph, build_template_manifest_from_asm, explain_json,
-    explain_text, extract_production_chunk_graph, fold_component_graph,
-    generate_ordinary_instance_html, generate_runtime_stub,
+    build_semantic_graph, build_template_graph, build_template_manifest_from_asm,
+    emit_production_modules, explain_json, explain_text, extract_production_chunk_graph,
+    fold_component_graph, generate_ordinary_instance_html, generate_runtime_stub,
     generate_standalone_page_with_resume_runtime, generate_static_html, lower_components_to_ir,
     optimize_context_ir, optimize_effect_ir, production_runtime_artifact_json,
     project_resume_diagnostics, resume_manifest_json, runtime_component_artifact_json,
@@ -2053,8 +2053,6 @@ fn run_build(mut args: Vec<String>) {
         &forms_runtime_artifact,
         &resume_runtime_artifact,
     );
-    let runtime_js = generate_runtime_stub();
-
     write_build_artifacts(
         &out_dir,
         &page_html,
@@ -2066,7 +2064,7 @@ fn run_build(mut args: Vec<String>) {
         &forms_runtime_json,
         &resume_runtime_json,
         &production_runtime_json,
-        &runtime_js,
+        &generate_runtime_stub(),
         &resume_chunks,
     )
     .unwrap_or_else(|error| {
@@ -2077,20 +2075,30 @@ fn run_build(mut args: Vec<String>) {
 
         process::exit(1);
     });
-
-    println!("Wrote {}", out_dir.join("index.html").display());
-    println!("Wrote {}", out_dir.join("template.manifest.json").display());
-    println!("Wrote {}", out_dir.join("computed.runtime.json").display());
-    println!("Wrote {}", out_dir.join("context.runtime.json").display());
-    println!("Wrote {}", out_dir.join("effect.runtime.json").display());
-    println!("Wrote {}", out_dir.join("component.runtime.json").display());
-    println!("Wrote {}", out_dir.join("forms.runtime.json").display());
-    println!("Wrote {}", out_dir.join("resume.runtime.json").display());
-    println!(
-        "Wrote {}",
-        out_dir.join("production.runtime.json").display()
+    maybe_write_production_modules(
+        args.iter().any(|argument| argument == "--production"),
+        &out_dir,
+        &production_chunk_graph,
     );
-    println!("Wrote {}", out_dir.join("runtime.js").display());
+
+    print_build_artifact_paths(&out_dir, &resume_chunks);
+}
+
+fn print_build_artifact_paths(out_dir: &Path, resume_chunks: &ezc_core::ResumeChunkGraph) {
+    for artifact in [
+        "index.html",
+        "template.manifest.json",
+        "computed.runtime.json",
+        "context.runtime.json",
+        "effect.runtime.json",
+        "component.runtime.json",
+        "forms.runtime.json",
+        "resume.runtime.json",
+        "production.runtime.json",
+        "runtime.js",
+    ] {
+        println!("Wrote {}", out_dir.join(artifact).display());
+    }
     for chunk in &resume_chunks.chunks {
         println!(
             "Wrote {}",
@@ -2131,6 +2139,40 @@ fn production_root_chunk_inputs(
         .collect::<Vec<_>>();
     roots.sort_by(|left, right| left.activation_root_id.cmp(&right.activation_root_id));
     roots
+}
+
+fn write_production_module_layout(
+    out_dir: &Path,
+    layout: &ezc_core::ProductionModuleLayout,
+) -> io::Result<()> {
+    let production_dir = out_dir.join("production");
+    fs::create_dir_all(&production_dir)?;
+    for module in std::iter::once(&layout.eager)
+        .chain(layout.shared.iter())
+        .chain(layout.roots.iter())
+    {
+        fs::write(production_dir.join(&module.filename), &module.source)?;
+    }
+    Ok(())
+}
+
+fn maybe_write_production_modules(
+    production_mode: bool,
+    out_dir: &Path,
+    graph: &ezc_core::ProductionChunkGraph,
+) {
+    if !production_mode {
+        return;
+    }
+    let layout = emit_production_modules(graph);
+    write_production_module_layout(out_dir, &layout).unwrap_or_else(|error| {
+        eprintln!(
+            "failed to write production modules to {}: {error}",
+            out_dir.display()
+        );
+        process::exit(1);
+    });
+    println!("Wrote {}", out_dir.join("production").display());
 }
 
 fn run_parse(mut args: Vec<String>) {
@@ -2197,6 +2239,9 @@ fn parse_out_dir(args: &[String]) -> PathBuf {
 
                 out_dir = Some(PathBuf::from(value));
                 index += 2;
+            }
+            "--production" => {
+                index += 1;
             }
             unknown => {
                 eprintln!("unknown option: {unknown}");
@@ -2980,7 +3025,7 @@ fn print_usage_and_exit() -> ! {
     eprintln!("  ezc_cli template <file>");
     eprintln!("  ezc_cli html <file>");
     eprintln!("  ezc_cli manifest <file>");
-    eprintln!("  ezc_cli build <file> [--out dir]");
+    eprintln!("  ezc_cli build <file> [--out dir] [--production]");
     process::exit(1);
 }
 

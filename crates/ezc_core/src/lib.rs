@@ -73,6 +73,7 @@ pub mod production_chunk_graph;
 pub mod production_constant_pool;
 pub mod production_deduplication;
 pub mod production_elimination;
+pub mod production_module_emitter;
 pub mod production_optimization;
 pub mod production_reachability;
 pub mod production_runtime_artifact;
@@ -419,6 +420,10 @@ pub use production_elimination::{
     eliminate_unreachable_production_records, DeadProductEliminationReason,
     DeadProductEliminationReport, OptimizationDecision, ProductionArtifactProjection,
     ProductionExecutionRecord,
+};
+pub use production_module_emitter::{
+    emit_production_modules, validate_production_module, ProductionModuleLayout,
+    ProductionModuleRecord, ProductionModuleValidationError,
 };
 pub use production_optimization::{
     BenchmarkFixtureId, ConstantPoolEntryId, ExecutableProgramFingerprint, OptimizationDecisionId,

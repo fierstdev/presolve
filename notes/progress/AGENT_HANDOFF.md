@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: K8 - Compact Runtime Tables and Production Artifact v1
-* Working tree: K8 is implemented and awaiting its atomic commit; do not begin K9 until the worktree is clean.
+* Latest completed slice: K9 - Deterministic Production JavaScript Emission
+* Working tree: K9 is implemented and awaiting its atomic commit; do not begin K10 until the worktree is clean.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: K8 - Compact Runtime Tables and Production Artifact v1
-* Summary: added a closed `production.runtime.json` v1 derived from the frozen resume manifest and validated K7 graph, with canonical dense ordinal tables, checksums, build/protocol agreement, and reference validation.
-* Key files: `production_runtime_artifact.rs`, `main.rs`, `production_baseline.rs`, `lib.rs`
-* Boundary: K8 leaves all frozen development artifacts unchanged and emits no final production JavaScript modules; K9 alone owns production module emission and content-addressed filenames.
+* Slice: K9 - Deterministic Production JavaScript Emission
+* Summary: added a compiler-owned content-addressed eager/shared/root module emitter and `ezc_cli build --production` layout, with canonical static imports, exact exports, no comments/provenance/dynamic source, and syntax validation.
+* Key files: `production_module_emitter.rs`, `main.rs`, `production_baseline.rs`, `lib.rs`
+* Boundary: K9 adds a parallel production layout only; K10 alone executes the compact artifact through production bootstrap and event indexes.
 
 Current in-progress slice
 
-* Slice: K9 - Deterministic Production JavaScript Emission
-* Status: Ready after the K8 atomic commit and clean-worktree check.
+* Slice: K10 - Production Bootstrap and Event Index
+* Status: Ready after the K9 atomic commit and clean-worktree check.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase K: K9-K21. Next: emit final deterministic eager, shared, and root production modules with canonical imports and two-stage content hashes.
+* Remaining in Phase K: K10-K21. Next: execute validated compact artifact tables through the production bootstrap/event index without altering the development path.
 
 Verification
 
