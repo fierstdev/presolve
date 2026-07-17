@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: J13 - Context Restoration
-* Working tree: J13 implementation and the full relevant gate are complete; commit atomically, then begin J14.
+* Latest completed slice: K0 - Phase K Entry Audit, Reservations, and Baselines
+* Working tree: K0 is committed and the worktree is clean; begin K1 only.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: J13 - Context Restoration
-* Summary: exact R6 Provider/default value restoration, R7 Consumer-instance binding installation, artifact cross-checking, and atomic mismatch fallback.
-* Key files: `runtime_codegen.rs`, `runtime_browser.rs`, `07_resumability_and_delivery.md`
-* Boundary: J13 restores Context values/bindings but does not restore Component/Slot/structure, Forms, DOM subscriptions, Effects, or lazy action delivery.
+* Slice: K0 - Phase K Entry Audit, Reservations, and Baselines
+* Summary: confirmed the committed J21 freeze and schema set; reserved `EZC1112`-`EZC1127` and `EZASM1385`-`EZASM1512`; added inert `ProductionOptimizationPolicyV1` constants; and recorded deterministic artifact/product baselines without changing executable output.
+* Key files: `production_optimization.rs`, `production_baseline.rs`, `phase-k-production-baseline.json`, `production-optimization-baseline.md`
+* Boundary: K0 adds no optimization identities, product elimination, chunk changes, runtime behavior, production artifacts/reports, or schema increment.
 
 Current in-progress slice
 
-* Slice: J14 - Component, Slot, and Structural Restoration
-* Status: Ready after the atomic J13 commit and clean-worktree check.
+* Slice: K1 - Canonical Optimization Identities and Policy Product
+* Status: Ready after the K0 commit and clean-worktree check.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase I: none. Next: J14 exact R8-R10 Component runtime, Slot binding, structural selection, and DOM-anchor verification.
+* Remaining in Phase K: K1-K21. Next: introduce only the roadmap Section 7 typed optimization IDs and immutable policy product; do not serialize or execute optimization yet.
 
 Verification
 
@@ -1201,14 +1201,14 @@ Known limitations
 
 Exact next step
 
-Phase J is complete and frozen at J21. The current versions are semantic graph
-v6, template manifest v4, component artifact v3, Context artifact v2,
-Forms/Effect artifacts v1, resume manifest v6, snapshot v1, runtime
-protocol/registry v1, ASM inspection v11, and check JSON v6. J21 added
-`docs/resumability-contract.md`, linked it from runtime/README documentation,
-and ran the sequential format, all-feature clippy, `just check`, diff, and
-real-browser gates. The worktree must remain clean; do not enter Phase K
-without its authoritative roadmap contract.
+K0 is complete. The J21 schemas remain frozen: semantic graph v6, template
+manifest v4, component artifact v3, Context artifact v2, Forms/Effect
+artifacts v1, resume manifest v6, snapshot v1, runtime protocol/registry v1,
+ASM inspection v11, and check JSON v6. K0 reserves `EZC1112`-`EZC1127` and
+`EZASM1385`-`EZASM1512`, adds only inert policy constants, and records the
+deterministic test-only baseline in `fixtures/phase-k-production-baseline.json`.
+K1 may add only the typed IDs and policy product required by the authoritative
+Phase K roadmap; it must not serialize an artifact or execute an optimization.
 
 Useful commands
 
@@ -1239,8 +1239,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* `crates/ezc_core/src/runtime_codegen.rs`
-* `crates/ezc_cli/tests/runtime_browser.rs`
-* `docs/planning/full-project-docs/07_resumability_and_delivery.md`
-* `notes/progress/2026-W28.md`
-* `notes/progress/AGENT_HANDOFF.md`
+* None after the K0 commit.
