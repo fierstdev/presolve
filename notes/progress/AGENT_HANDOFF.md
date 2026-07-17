@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: K2 - Whole-Application Executable Reachability
-* Working tree: K2 is committed and the worktree is clean; begin K3 only.
+* Latest completed slice: K3 - Dead Runtime Product Elimination
+* Working tree: K3 is committed and the worktree is clean; begin K4 only.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: K2 - Whole-Application Executable Reachability
-* Summary: added an immutable descriptive graph over frozen resume and runtime artifacts; it records roots/edges/blocks and does not eliminate executable records.
-* Key files: `production_reachability.rs`, `lib.rs`
-* Boundary: K2 consumes no source syntax, fabricates no program ID, changes no runtime/schema, and performs no elimination.
+* Slice: K3 - Dead Runtime Product Elimination
+* Summary: added immutable production-only execution-record projections, exact elimination decisions, and dangling-reference blocks using K2 reachability as the only removal authority.
+* Key files: `production_elimination.rs`, `lib.rs`
+* Boundary: K3 preserves canonical development products, validation/inspection/failure/destruction records, runtime behavior, and schemas; it does not pool constants or deduplicate programs.
 
 Current in-progress slice
 
-* Slice: K3 - Dead Runtime Product Elimination
-* Status: Ready after the K2 commit and clean-worktree check.
+* Slice: K4 - Canonical Program Fingerprinting and Deduplication
+* Status: Ready after the K3 commit and clean-worktree check.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase K: K3-K21. Next: produce immutable K3 projections from K2 reachability only; preserve development artifacts and validation closure.
+* Remaining in Phase K: K4-K21. Next: derive canonical opcode streams and deduplication aliases with byte-equality and frozen-boundary checks; do not extract chunks yet.
 
 Verification
 
