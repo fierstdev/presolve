@@ -6,9 +6,15 @@ use std::collections::BTreeSet;
 pub enum ProductionCleanupKind {
     ActivationDispatch,
     EventAndBindingIndex,
+    FormControlAndBindingIndex,
+    EffectSubscription,
+    ContextConsumerBinding,
     SlotAndStructuralRegistry,
     ComputedCache,
     StateStorage,
+    FormInstanceStorage,
+    ContextProviderSlot,
+    ResumeBoundaryAndAnchor,
     ComponentInstance,
     DomAnchor,
 }
@@ -25,6 +31,14 @@ pub struct ProductionOwnedRuntimeRecord {
 pub struct ProductionDestroyPlan {
     pub detached_activation_ids: Vec<String>,
     pub cleanup_records: Vec<ProductionOwnedRuntimeRecord>,
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum ProductionCleanupClosureViolation {
+    DuplicateRecord(String),
+    ForeignOwner(String),
+    MissingRecord(String),
+    OrderingMismatch,
 }
 
 /// Builds a reverse-initialization cleanup plan without authored callbacks.
@@ -54,6 +68,57 @@ pub fn build_production_destroy_plan(
         detached_activation_ids,
         cleanup_records,
     }
+}
+
+/// Validates complete exact-owner coverage and reverse initialization order.
+#[must_use]
+pub fn validate_production_cleanup_closure(
+    destroyed_owner_ids: &[String],
+    required_records: &[ProductionOwnedRuntimeRecord],
+    plan: &ProductionDestroyPlan,
+) -> Vec<ProductionCleanupClosureViolation> {
+    let owners = destroyed_owner_ids.iter().collect::<BTreeSet<_>>();
+    let required = required_records
+        .iter()
+        .filter(|record| owners.contains(&record.owner_id))
+        .map(|record| record.record_id.clone())
+        .collect::<BTreeSet<_>>();
+    let mut actual = BTreeSet::new();
+    let mut violations = Vec::new();
+    for record in &plan.cleanup_records {
+        if !owners.contains(&record.owner_id) {
+            violations.push(ProductionCleanupClosureViolation::ForeignOwner(
+                record.record_id.clone(),
+            ));
+        }
+        if !actual.insert(record.record_id.clone()) {
+            violations.push(ProductionCleanupClosureViolation::DuplicateRecord(
+                record.record_id.clone(),
+            ));
+        }
+    }
+    violations.extend(
+        required
+            .difference(&actual)
+            .cloned()
+            .map(ProductionCleanupClosureViolation::MissingRecord),
+    );
+    if plan.cleanup_records.windows(2).any(|pair| {
+        (
+            pair[0].initialization_ordinal,
+            pair[0].kind,
+            &pair[0].record_id,
+        ) < (
+            pair[1].initialization_ordinal,
+            pair[1].kind,
+            &pair[1].record_id,
+        )
+    }) {
+        violations.push(ProductionCleanupClosureViolation::OrderingMismatch);
+    }
+    violations.sort();
+    violations.dedup();
+    violations
 }
 
 #[cfg(test)]
@@ -94,5 +159,44 @@ mod tests {
             vec!["anchor", "state"]
         );
         assert_eq!(plan.detached_activation_ids, vec!["activation:a"]);
+    }
+
+    #[test]
+    fn k13_covers_forms_context_effect_and_resume_without_authored_cleanup() {
+        let records = [
+            (
+                ProductionCleanupKind::FormControlAndBindingIndex,
+                "form-control",
+            ),
+            (ProductionCleanupKind::EffectSubscription, "effect"),
+            (ProductionCleanupKind::ContextConsumerBinding, "consumer"),
+            (ProductionCleanupKind::FormInstanceStorage, "form-state"),
+            (ProductionCleanupKind::ContextProviderSlot, "provider"),
+            (ProductionCleanupKind::ResumeBoundaryAndAnchor, "resume"),
+        ]
+        .into_iter()
+        .enumerate()
+        .map(
+            |(ordinal, (kind, record_id))| ProductionOwnedRuntimeRecord {
+                owner_id: "destroyed".to_string(),
+                initialization_ordinal: u32::try_from(ordinal).expect("fixture ordinal"),
+                kind,
+                record_id: record_id.to_string(),
+            },
+        )
+        .collect::<Vec<_>>();
+        let plan = build_production_destroy_plan(
+            &["destroyed".to_string()],
+            &records,
+            &["activation:destroyed".to_string()],
+        );
+        assert!(
+            validate_production_cleanup_closure(&["destroyed".to_string()], &records, &plan)
+                .is_empty()
+        );
+        assert_eq!(
+            plan.cleanup_records.first().expect("record").record_id,
+            "resume"
+        );
     }
 }

@@ -414,7 +414,8 @@ pub use production_chunk_graph::{
     ProductionChunkRecord, ProductionRootChunkInput, ProductionSharedChunkFailurePolicy,
 };
 pub use production_cleanup::{
-    build_production_destroy_plan, ProductionCleanupKind, ProductionDestroyPlan,
+    build_production_destroy_plan, validate_production_cleanup_closure,
+    ProductionCleanupClosureViolation, ProductionCleanupKind, ProductionDestroyPlan,
     ProductionOwnedRuntimeRecord,
 };
 pub use production_constant_pool::{

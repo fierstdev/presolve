@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: K12 - Component and Structural Runtime Cleanup
-* Working tree: K12 is implemented and awaiting its atomic commit; do not begin K13 until the worktree is clean.
+* Latest completed slice: K13 - Form, Context, Effect, and Resume Registry Cleanup
+* Working tree: K13 is implemented and awaiting its atomic commit; do not begin K14 until the worktree is clean.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: K12 - Component and Structural Runtime Cleanup
-* Summary: added compiler-owned destroy closures that filter exact destroyed owners, reverse canonical initialization order, and mark pending activation identities detached without altering global module caches.
+* Slice: K13 - Form, Context, Effect, and Resume Registry Cleanup
+* Summary: completed exact-owner cleanup kinds for Forms, Context, Effect, and resume records and added closure validation for missing, duplicate, foreign-owner, and order failures.
 * Key files: `production_cleanup.rs`, `lib.rs`
-* Boundary: K12 covers component/structural records only; K13 alone completes Forms, Context, Effect, and resume registry cleanup.
+* Boundary: K13 executes no authored cleanup and leaves shared immutable caches global; K14 alone owns the production validation pipeline and failure records.
 
 Current in-progress slice
 
-* Slice: K13 - Form, Context, Effect, and Resume Registry Cleanup
-* Status: Ready after the K12 atomic commit and clean-worktree check.
+* Slice: K14 - Runtime Validation and Production Failure Records
+* Status: Ready after the K13 atomic commit and clean-worktree check.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase K: K13-K21. Next: extend the cleanup closure across Forms, Context, Effect, and resume-owned records.
+* Remaining in Phase K: K14-K21. Next: implement the ordered V0-V10 production validation pipeline and compact safe failure records.
 
 Verification
 
