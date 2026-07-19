@@ -134,6 +134,127 @@ fn component_runtime_consumes_only_compiler_plans_in_a_real_browser() {
 }
 
 #[test]
+fn phase_k_production_artifact_runs_under_csp_and_rejects_malformed_boot_in_a_real_browser() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/ezc-browser-test/phase-k-production");
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean Phase K browser output");
+    }
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0047-computed-diamond/input/ComputedDiamond.tsx",
+            "--out",
+            out_dir.to_str().expect("Phase K browser output UTF-8"),
+            "--production",
+        ])
+        .output()
+        .expect("failed to build Phase K production browser fixture");
+    assert!(
+        output.status.success(),
+        "Phase K production build failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    write_phase_k_production_probe_pages(&out_dir);
+
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let run = |page: &str, profile: &str| {
+        let profile_dir = out_dir.join(profile);
+        fs::create_dir_all(&profile_dir).expect("failed to create Phase K Chrome profile");
+        run_chrome_probe(
+            chrome.clone(),
+            &format!("--user-data-dir={}", profile_dir.to_string_lossy()),
+            &format!("http://127.0.0.1:{}/{page}", server.port),
+        )
+    };
+    let production = run("production-csp.html", "chrome-production");
+    let malformed = run("production-malformed.html", "chrome-malformed");
+    server.stop();
+
+    assert!(
+        String::from_utf8_lossy(&production.stdout)
+            .contains("EDGEZERO_PHASE_K_PRODUCTION_BROWSER_PASS"),
+        "production CSP probe failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        production.status,
+        String::from_utf8_lossy(&production.stdout),
+        String::from_utf8_lossy(&production.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&malformed.stdout)
+            .contains("EDGEZERO_PHASE_K_MALFORMED_BROWSER_PASS"),
+        "malformed production probe failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        malformed.status,
+        String::from_utf8_lossy(&malformed.stdout),
+        String::from_utf8_lossy(&malformed.stderr)
+    );
+}
+
+fn write_phase_k_production_probe_pages(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("Phase K production page");
+    let csp = index
+        .replace(
+            "<head>",
+            "<head>\n    <meta http-equiv=\"Content-Security-Policy\" content=\"script-src 'self'; object-src 'none'; base-uri 'none'\">",
+        )
+        .replace(
+            "</body>",
+            "    <script src=\"./phase-k-production-probe.js\" defer></script>\n  </body>",
+        );
+    fs::write(out_dir.join("production-csp.html"), csp).expect("write Phase K production CSP page");
+
+    let module_names = fs::read_dir(out_dir.join("production"))
+        .expect("Phase K production module directory")
+        .map(|entry| {
+            entry
+                .expect("Phase K module entry")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .collect::<Vec<_>>();
+    let module_names = serde_json::to_string(&module_names).expect("module filename JSON");
+    let probe = format!(
+        r#"const fail=(message)=>{{throw new Error(message)}};
+const waitFor=(predicate,label)=>new Promise((resolve,reject)=>{{const deadline=Date.now()+3000;const tick=()=>{{if(predicate()){{resolve();return}}if(Date.now()>deadline){{reject(new Error(`Timed out waiting for ${{label}}`));return}}setTimeout(tick,20)}};tick()}});
+(async()=>{{
+  await waitFor(()=>["ready","error"].includes(document.documentElement.dataset.ezRuntime),"production runtime");
+  const runtime=window.__EDGEZERO__;
+  if(document.documentElement.dataset.ezRuntime==="error")fail(`production runtime failed: ${{JSON.stringify(runtime.diagnostics)}}`);
+  if(runtime.production===null||runtime.production.table_kinds.length!==6)fail("packed ordinal tables were not installed exactly");
+  if(new Set(runtime.production.table_kinds).size!==runtime.production.table_kinds.length)fail("duplicate production table installation");
+  const before=Object.values(runtime.store).filter(value=>value instanceof Map||value instanceof Set).map(value=>value.size).join(",");
+  const host=document.querySelector("main")??document.body;
+  for(let cycle=0;cycle<100;cycle+=1){{const clone=host.cloneNode(true);document.body.appendChild(clone);clone.remove();await Promise.resolve()}}
+  const after=Object.values(runtime.store).filter(value=>value instanceof Map||value instanceof Set).map(value=>value.size).join(",");
+  if(after!==before)fail("compiler-owned registry counts grew across 100 create/remove cycles");
+  const sources=await Promise.all(["runtime.js",...{module_names}.map(name=>`production/${{name}}`)].map(path=>fetch(path).then(response=>response.text())));
+  if(sources.some(source=>source.includes("eval(")||source.includes("Function(")))fail("CSP-unsafe dynamic code was emitted");
+  document.body.insertAdjacentHTML("beforeend","<div>EDGEZERO_PHASE_K_PRODUCTION_BROWSER_PASS</div>");
+}})().catch(error=>{{document.body.insertAdjacentHTML("beforeend",`<div>EDGEZERO_PHASE_K_PRODUCTION_BROWSER_FAIL: ${{error.message}}</div>`);console.error(error)}});
+"#
+    );
+    fs::write(out_dir.join("phase-k-production-probe.js"), probe)
+        .expect("write Phase K production probe");
+
+    let malformed = index
+        .replacen("\"schemaVersion\":1", "\"schemaVersion\":2", 1)
+        .replace(
+            "</body>",
+            "    <script src=\"./phase-k-malformed-probe.js\" defer></script>\n  </body>",
+        );
+    fs::write(out_dir.join("production-malformed.html"), malformed)
+        .expect("write malformed production page");
+    fs::write(
+        out_dir.join("phase-k-malformed-probe.js"),
+        r#"const wait=setInterval(()=>{if(document.documentElement.dataset.ezRuntime!=="error")return;clearInterval(wait);const runtime=window.__EDGEZERO__;if(runtime.production!==undefined&&runtime.production!==null){document.body.insertAdjacentHTML("beforeend","<div>EDGEZERO_PHASE_K_MALFORMED_BROWSER_FAIL</div>");return}document.body.insertAdjacentHTML("beforeend","<div>EDGEZERO_PHASE_K_MALFORMED_BROWSER_PASS</div>")},20);"#,
+    )
+    .expect("write malformed production probe");
+}
+
+#[test]
 fn repeated_component_state_and_computed_updates_stay_instance_qualified_in_a_real_browser() {
     let _guard = browser_test_guard();
     let repo_root = repo_root();

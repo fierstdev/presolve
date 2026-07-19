@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: K18 - Phase K Diagnostics and Check Projection
-* Working tree: K18 is implemented and awaiting its atomic commit; do not begin K19 until the worktree is clean.
+* Latest completed slice: K19 - Comprehensive Production and Browser Fixtures
+* Working tree: K19 is implemented and awaiting its atomic commit; do not begin K20 until the worktree is clean.
 * Date: 2026-07-19
 
 Last completed slice
 
-* Slice: K18 - Phase K Diagnostics and Check Projection
-* Summary: activates one ordered `EZC1112`-`EZC1127` catalog and a deterministic projector with exact-identity/span deduplication, optional established provenance, and sorted secondary evidence.
-* Key files: `production_diagnostics.rs`, `main.rs`, `explain.rs`, `production-optimization-baseline.md`
-* Boundary: diagnostics consume explicit immutable failure facts; missing or malformed identities/provenance remain absent. Check JSON retains v6 because its existing diagnostic identity/provenance envelope suffices.
+* Slice: K19 - Comprehensive Production and Browser Fixtures
+* Summary: proves development/production observable parity, repeated byte identity, dense packed tables, malformed-artifact rejection, reversed multi-file identity, generated-module syntax/no-dynamic-source rules, CSP-safe production boot, and 100-cycle browser registry stability.
+* Key files: `production_runtime_fixtures.rs`, `runtime_browser.rs`, `explain.rs`
+* Boundary: K19 adds proof only. Production modules remain source-free inspection products, malformed packed input fails before authored execution, and existing cold/resume/shared/failure/cleanup/coalescing semantics are unchanged.
 
 Current in-progress slice
 
-* Slice: K19 - Comprehensive Production and Browser Fixtures
-* Status: Ready after the K18 atomic commit and clean-worktree check.
+* Slice: K20 - Production Runtime Refinement Audit
+* Status: Ready after the K19 atomic commit and clean-worktree check.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase K: K19-K21. Next: expand full-system production/browser coverage across the K16 corpus, parity, failure, cleanup, determinism, and CSP-safe execution matrix.
+* Remaining in Phase K: K20-K21. Next: audit every production authority/hot-path/cache/leakage invariant with static assertions and preserve all K16 budgets and prior schema versions.
 
 Verification
 

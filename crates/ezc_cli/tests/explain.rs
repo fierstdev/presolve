@@ -376,6 +376,35 @@ fn k18_production_diagnostics_have_full_selected_text_and_check_json_parity() {
 }
 
 #[test]
+fn k19_production_inspection_is_identical_under_reversed_multi_file_input() {
+    let root = repo_root();
+    let first_path = "fixtures/0001-source-summary/input/Counter.tsx";
+    let second_path = "fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx";
+    let inspect = |paths: [&str; 2]| {
+        let output = Command::new(ezc_cli_bin())
+            .current_dir(&root)
+            .arg("asm")
+            .args(paths)
+            .args(["--format", "json"])
+            .output()
+            .expect("K19 reversed ASM");
+        assert!(output.status.success());
+        serde_json::from_slice::<serde_json::Value>(&output.stdout).expect("K19 reversed JSON")
+    };
+    let first = inspect([first_path, second_path]);
+    let reversed = inspect([second_path, first_path]);
+    assert_eq!(first["production"], reversed["production"]);
+    assert_eq!(
+        first["production_diagnostics"],
+        reversed["production_diagnostics"]
+    );
+    assert_eq!(
+        first["production"]["artifact_identity"]["build_id"],
+        reversed["production"]["artifact_identity"]["build_id"]
+    );
+}
+
+#[test]
 fn asm_command_exports_a_deterministic_semantic_graph() {
     let repo_root = repo_root();
     let path = "fixtures/0001-source-summary/input/Counter.tsx";
