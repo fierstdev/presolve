@@ -652,7 +652,7 @@ fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
 
     for (args, expected_status, expected_schema) in [
         (vec!["check", path, "--format", "json"], Some(1), 6),
-        (vec!["asm", path, "--format", "json"], Some(0), 11),
+        (vec!["asm", path, "--format", "json"], Some(0), 12),
     ] {
         let (status, stdout, stderr) = cli_result(&args);
         assert_eq!(

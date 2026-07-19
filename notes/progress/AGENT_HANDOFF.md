@@ -3,25 +3,27 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: K20 - Production Runtime Refinement Audit
-* Working tree: K20 is implemented and awaiting its atomic commit; do not begin K21 until the worktree is clean.
+* Latest completed slice: K21 - Phase K Stability Audit and Freeze
+* Working tree: Phase K is complete and committed at handoff; no Phase L work has started.
 * Date: 2026-07-19
 
 Last completed slice
 
-* Slice: K20 - Production Runtime Refinement Audit
-* Summary: freezes eight unique named authorities and thirteen audited refinement invariants covering ordinal hot paths, listener/registry installation, leakage, generated helpers, cache growth, specialization, deterministic modules, validation, cleanup, budgets, schema stability, and parity.
-* Key files: `production_audit.rs`, `production-runtime-refinement-audit.md`, `lib.rs`
-* Boundary: K20 changes no public product or behavior. All earlier schema versions and the K16 budget ceilings remain exact.
-
-Current in-progress slice
-
 * Slice: K21 - Phase K Stability Audit and Freeze
-* Status: Ready after the K20 atomic commit and clean-worktree check.
-* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase K: K21 only. Next: write the frozen production contract and cross-references, run the exact sequential final gate plus dedicated production/browser suites, record exact counts/bytes/ranges/exclusions, and commit the Phase K freeze without entering Phase L.
+* Summary: freezes the production optimization contract, schema/version cross-references, exact benchmark identities and representative budgets, diagnostic ranges, lifecycle counts, and the complete sequential verification matrix.
+* Key files: `production-optimization-contract.md`, `runtime-contract.md`, `resumability-contract.md`, `README.md`, `2026-W28.md`
+* Boundary: Phase K is frozen through K21. Do not infer or begin Phase L without an authoritative roadmap.
+
+Current phase boundary
+
+* Slice: Phase L is not started.
+* Status: Await an authoritative Phase L roadmap; the Phase K contract is frozen.
+* Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
+* Remaining in Phase K: none.
 
 Verification
+
+* K21 verification: the exact sequential gate passes `cargo fmt --all --check`, strict all-feature workspace clippy, `RUST_TEST_THREADS=1 cargo test --workspace --all-features` (686 tests: 4 CLI units, 8 Component fixtures, 12 Context fixtures, 132 inspection/build tests, 2 production baselines, 2 production budgets, 2 production runtime fixtures, 37 serialized browser probes, 448 core tests, 13 parser units, and 26 parser integrations), `just check`, and `git diff --check`. K21 also repairs exact resume Forms/Context/Slot execution exposed by the final browser gate, freezes the corrected K0 byte baseline, and records corpus/budget identities plus the 552-byte positive shared-candidate proof and 100-cycle 0/2 lifecycle registry result.
 
 * J13 verification: hardened nested browser proof restores three distinct Context slots and exact default/outer/nearest Consumer selections without initial evaluator or Effect execution. A separate malformed R7 proof selects one clean cold fallback with no retained registry or reselection. All 410 core tests, 2 CLI units, 7 Component fixtures, 12 Context fixtures, 128 CLI inspection/build tests, all 33 sequential browser probes, strict all-target core/CLI clippy, formatting, generated-runtime syntax, and `git diff --check` pass.
 
@@ -1201,14 +1203,13 @@ Known limitations
 
 Exact next step
 
-K1 is complete. The J21 schemas remain frozen: semantic graph v6, template
-manifest v4, component artifact v3, Context artifact v2, Forms/Effect
-artifacts v1, resume manifest v6, snapshot v1, runtime protocol/registry v1,
-ASM inspection v11, and check JSON v6. K1 adds typed compiler-only
-optimization identities and `ProductionOptimizationPolicy` v1 without public
-serialization or an optimizer/runtime consumer. K2 must construct reachability
-only from immutable existing Phase A-J products; no product elimination begins
-before K3.
+Phase K is complete and frozen through K21. The final versions are semantic
+graph v6, template manifest v4, component artifact v3, Context artifact v2,
+Forms/Effect artifacts v1, resume manifest v6, snapshot v1,
+runtime protocol/registry v1, production artifact/table v1,
+optimization/cost reports v1, production policy v1, ASM inspection v12, and
+check JSON v6. Do not begin Phase L until its authoritative roadmap is
+available.
 
 Useful commands
 
@@ -1239,4 +1240,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the K1 commit.
+* None after the K21 freeze commit.

@@ -21,7 +21,7 @@ shapes are excluded and fail closed.
 - Resume manifest: v6, emitted as `resume.runtime.json` and embedded unchanged.
 - Resume snapshot: v1, canonical schema-driven JSON.
 - Resume runtime protocol and registry contract: v1.
-- ASM inspection: v11; check JSON: v6.
+- ASM inspection: v12; check JSON: v6.
 - Semantic graph: v6; template manifest: v4; component runtime artifact: v3;
   Context artifact: v2; Forms and Effect artifacts: v1.
 
@@ -41,6 +41,13 @@ Anchors (`data-ez-r`) and events (`data-ez-e`) contain exact compiler IDs.
 The listener finds only the nearest emitted event marker, looks up its closed
 manifest entry, and loads the exact deterministic chunk. Failed chunks never
 dispatch the action; successful chunks activate once.
+
+Phase K may project an interaction root through a deterministic shared
+registration chunk before its root chunk. Shared extraction never merges root
+identity, state, or scheduling; shared chunks depend only on eager code, and a
+shared import failure retains the same isolated, non-retried activation failure
+contract. The packed production artifact preserves the exact Phase J build,
+anchor, event, activation, and resume-manifest authority.
 
 ## No-discovery and security boundary
 

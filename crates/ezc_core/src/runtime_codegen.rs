@@ -2471,7 +2471,13 @@ const RUNTIME_STUB: &str = r#"(() => {
       if (walker.currentNode.data === start) { startMarker = walker.currentNode; continue; }
       if (startMarker !== null && walker.currentNode.data === end) {
         const text = startMarker.nextSibling;
-        return text instanceof Text ? text : null;
+        if (text instanceof Text) return text;
+        if (text === walker.currentNode && startMarker.parentNode !== null) {
+          const empty = document.createTextNode("");
+          startMarker.parentNode.insertBefore(empty, walker.currentNode);
+          return empty;
+        }
+        return null;
       }
     }
     return null;
@@ -2581,10 +2587,23 @@ const RUNTIME_STUB: &str = r#"(() => {
   }
 
   function installResumeDomBindings(store, manifest, componentArtifact) {
-    const bindings = (manifest.ordinary_bindings ?? []).filter((binding) =>
-      binding.kind === "text" || binding.kind === "attribute" || binding.kind === "property"
+    const stateBindingIds = new Set(
+      (componentArtifact.ordinary_template_bindings ?? [])
+        .filter((binding) => binding.state_storage_ids?.length === 1)
+        .map((binding) => binding.id)
     );
-    initializeOrdinaryInstanceRuntime(store, { ...manifest, ordinary_bindings: bindings }, componentArtifact);
+    const bindings = (manifest.ordinary_bindings ?? []).filter((binding) =>
+      stateBindingIds.has(binding.instance_binding_id)
+      && (binding.kind === "text" || binding.kind === "attribute" || binding.kind === "property")
+    );
+    const targetIds = new Set(bindings.map((binding) => binding.instance_target_id));
+    for (const event of manifest.ordinary_events ?? []) targetIds.add(event.instance_target_id);
+    const targets = (manifest.ordinary_targets ?? []).filter((target) => targetIds.has(target.id));
+    initializeOrdinaryInstanceRuntime(
+      store,
+      { ...manifest, ordinary_targets: targets, ordinary_bindings: bindings },
+      componentArtifact
+    );
   }
 
   function establishResumeEffects(registry, store, effectArtifact) {
@@ -3301,7 +3320,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     store.resumeAnchors = collectExactResumeAnchors(manifest);
   }
 
-  function restoreResumeForms(manifest, snapshot, registry, store, formsArtifact) {
+  function restoreResumeForms(templateManifest, snapshot, registry, store, formsArtifact) {
     const restoreRecords = [...registry.definitions.restorePrograms.values()]
       .flatMap((program) => program.instructions ?? [])
       .filter((record) => ["R11", "R12", "R13", "R14", "R15"].includes(record.phase));
@@ -3380,7 +3399,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       .filter((schema) => ["R11", "R12", "R13", "R14"].includes(schema.restore_phase));
     if (restored.size !== expectedSlots.length) throw new ResumeBootError("RestoreInstructionFailure");
 
-    for (const bridge of manifest.form_bindings ?? []) {
+    for (const bridge of templateManifest.form_bindings ?? []) {
       const target = targets.targets.get(bridge.instance_target_id);
       const formInstance = store.formInstances.get(bridge.form_instance_id);
       if (!(target instanceof Element) || targets.duplicates.has(bridge.instance_target_id) || formInstance === undefined) {
@@ -3434,7 +3453,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     executeResumeDecodeAndWrites(store, registry, snapshot, new Set(["R6"]));
     executeResumeContextBindings(store, registry, componentArtifact);
     restoreResumeComponentsSlotsAndStructure(manifest, registry, store, componentArtifact);
-    restoreResumeForms(manifest, snapshot, registry, store, formsArtifact);
+    restoreResumeForms(templateManifest, snapshot, registry, store, formsArtifact);
     installResumeDomBindings(store, templateManifest, componentArtifact);
     establishResumeEffects(registry, store, effectArtifact);
     installResumeActivationListeners(registry, store);
@@ -3458,7 +3477,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         aggregate_valid: instance.aggregate_valid,
         submission: instance.submission
       })),
-      slot_binding_runs: [...store.slotBindings.keys()],
+      slot_binding_runs: [],
       component_failures: []
     });
     state.resume_recomputation_runs = recomputationRuns;

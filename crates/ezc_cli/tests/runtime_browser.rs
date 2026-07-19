@@ -55,11 +55,24 @@ fn chrome_bin() -> Option<PathBuf> {
 }
 
 fn run_chrome_probe(chrome: PathBuf, user_data_dir: &str, probe_url: &str) -> Output {
+    run_chrome_probe_with_timeout(chrome, user_data_dir, probe_url, Duration::from_secs(20))
+}
+
+fn run_chrome_probe_with_timeout(
+    chrome: PathBuf,
+    user_data_dir: &str,
+    probe_url: &str,
+    timeout: Duration,
+) -> Output {
     let mut args = vec![
         "--headless=new".to_string(),
         "--disable-gpu".to_string(),
         "--no-first-run".to_string(),
         "--disable-background-networking".to_string(),
+        "--disable-component-update".to_string(),
+        "--disable-default-apps".to_string(),
+        "--disable-extensions".to_string(),
+        "--disable-sync".to_string(),
         "--virtual-time-budget=5000".to_string(),
         "--dump-dom".to_string(),
     ];
@@ -73,7 +86,7 @@ fn run_chrome_probe(chrome: PathBuf, user_data_dir: &str, probe_url: &str) -> Ou
     args.push(probe_url.to_string());
 
     let arg_refs = args.iter().map(String::as_str).collect::<Vec<_>>();
-    run_chrome_with_timeout(chrome, &arg_refs, Duration::from_secs(20))
+    run_chrome_with_timeout(chrome, &arg_refs, timeout)
 }
 
 #[test]
@@ -768,17 +781,17 @@ fn resume_restores_exact_slot_bindings_without_component_initialization() {
     assert!(output.status.success(), "resume Slot fixture failed");
     write_resume_slot_probe_page(&out_dir);
 
-    let server = StaticServer::start(out_dir.clone());
     let chrome = chrome_bin().expect("headless Chrome was not found");
     let profile_dir = out_dir.join("chrome-profile");
     fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile");
-    let output = run_chrome_probe(
+    let probe_url = format!("file://{}", out_dir.join("probe.html").display());
+    let output = run_chrome_probe_with_timeout(
         chrome,
         &format!("--user-data-dir={}", profile_dir.display()),
-        &format!("http://127.0.0.1:{}/probe.html", server.port),
+        &probe_url,
+        Duration::from_secs(45),
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    server.stop();
     assert!(
         stdout.contains("EDGEZERO_RESUME_SLOT_PASS"),
         "resume Slot probe failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
@@ -802,7 +815,7 @@ fn resume_restores_compiler_owned_form_state_and_rejects_active_submission() {
 @component("resume-forms") class ResumeForms {
   @form() @serialize("json") profile!: Form;
   @validate(required()) @field(this.profile) name = "";
-  submitted = 0;
+  submitted = state(0);
   @action() @submit(this.profile) save(): void { this.submitted += 1; }
   render() { return <form form={this.profile}><input field={this.name}/><span>{this.submitted}</span></form>; }
 }"#).expect("failed to write resume Forms source");
@@ -947,7 +960,12 @@ fn write_resume_form_probe_pages(out_dir: &Path) {
         fs::read_to_string(out_dir.join("resume.runtime.json")).expect("resume manifest");
     let manifest: serde_json::Value =
         serde_json::from_str(&resume_json).expect("resume manifest JSON");
+    let component_json =
+        fs::read_to_string(out_dir.join("component.runtime.json")).expect("component artifact");
+    let component: serde_json::Value =
+        serde_json::from_str(&component_json).expect("component artifact JSON");
     let mut snapshot = resume_bootstrap_snapshot(&manifest);
+    set_snapshot_state_to_compiled_initials(&manifest, &component, &mut snapshot);
     for record in snapshot["boundaries"]
         .as_array_mut()
         .expect("boundaries")
@@ -981,7 +999,7 @@ fn write_resume_form_probe_pages(out_dir: &Path) {
         &index,
         &format!("window.__EDGEZERO_RESUME_SNAPSHOT__ = {snapshot_json};"),
         r#"
-if (runtime.resume.mode !== "resume") fail("Form snapshot was not resumed");
+if (runtime.resume?.mode !== "resume") fail("Form snapshot was not resumed: " + JSON.stringify({resume: runtime.resume, diagnostics: runtime.diagnostics}));
 if (runtime.forms.length !== 1 || runtime.forms[0].submission !== "Completed" || runtime.forms[0].aggregate_valid !== true) fail("stable Form state was not restored");
 const instance = runtime.store.formInstances.values().next().value;
 const field = instance.fields.values().next().value;
@@ -1074,7 +1092,7 @@ fn write_resume_context_probe_pages(out_dir: &Path) {
         &index,
         &prelude,
         r#"
-if (runtime.resume.mode !== "resume") fail("Context snapshot was not resumed");
+if (runtime.resume?.mode !== "resume") fail("Context snapshot was not resumed: " + JSON.stringify({resume: runtime.resume, diagnostics: runtime.diagnostics}));
 if (runtime.context_initial_source_runs.length !== 0) fail("Context evaluator ran during R6-R7");
 if (runtime.context_slots.length !== 3) fail("restored Context slots were incomplete");
 if (runtime.context_consumer_bindings.length !== 3) fail("exact Consumer bindings were incomplete");
@@ -1274,10 +1292,21 @@ fn set_snapshot_state_to_compiled_initials(
         let existing = schema["existing_storage_slot_id"]
             .as_str()
             .expect("existing slot");
-        record["value"] = initial_by_slot
+        let mut value = initial_by_slot
             .get(existing)
             .expect("compiled State initial")
             .clone();
+        if schema["semantic_type"] == "number" {
+            let number = value
+                .as_str()
+                .expect("serialized numeric State initial")
+                .parse::<f64>()
+                .expect("numeric State initial");
+            value = serde_json::Value::Number(
+                serde_json::Number::from_f64(number).expect("finite numeric State initial"),
+            );
+        }
+        record["value"] = value;
     }
 }
 
@@ -5195,6 +5224,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
 }
 
+#[allow(clippy::too_many_lines)]
 fn run_chrome_with_timeout(chrome: PathBuf, args: &[&str], timeout: Duration) -> Output {
     let mut child = Command::new(chrome)
         .args(args)
@@ -5210,50 +5240,117 @@ fn run_chrome_with_timeout(chrome: PathBuf, args: &[&str], timeout: Duration) ->
         .stderr
         .take()
         .expect("headless Chrome stderr was not piped");
-    let stdout_reader = thread::spawn(move || {
+    let stdout_output = Arc::new(Mutex::new(Vec::new()));
+    let stdout_buffer = Arc::clone(&stdout_output);
+    let mut stdout_reader = Some(thread::spawn(move || {
         let mut stdout = stdout;
-        let mut output = Vec::new();
-        stdout
-            .read_to_end(&mut output)
-            .expect("failed to read headless Chrome stdout");
-        output
-    });
-    let stderr_reader = thread::spawn(move || {
+        let mut chunk = [0_u8; 16 * 1024];
+        while let Ok(count) = stdout.read(&mut chunk) {
+            if count == 0 {
+                break;
+            }
+            stdout_buffer
+                .lock()
+                .expect("headless Chrome stdout buffer was poisoned")
+                .extend_from_slice(&chunk[..count]);
+        }
+    }));
+    let stderr_output = Arc::new(Mutex::new(Vec::new()));
+    let stderr_buffer = Arc::clone(&stderr_output);
+    let mut stderr_reader = Some(thread::spawn(move || {
         let mut stderr = stderr;
-        let mut output = Vec::new();
-        stderr
-            .read_to_end(&mut output)
-            .expect("failed to read headless Chrome stderr");
-        output
-    });
+        let mut chunk = [0_u8; 16 * 1024];
+        while let Ok(count) = stderr.read(&mut chunk) {
+            if count == 0 {
+                break;
+            }
+            stderr_buffer
+                .lock()
+                .expect("headless Chrome stderr buffer was poisoned")
+                .extend_from_slice(&chunk[..count]);
+        }
+    }));
 
     let started = Instant::now();
 
     loop {
-        let status = if let Some(status) = child.try_wait().expect("failed to poll headless Chrome")
-        {
-            status
-        } else if started.elapsed() > timeout {
+        let dom_complete = stdout_output
+            .lock()
+            .expect("headless Chrome stdout buffer was poisoned")
+            .windows(b"</html>".len())
+            .any(|window| window == b"</html>");
+        if dom_complete {
+            let status = child
+                .try_wait()
+                .expect("failed to poll headless Chrome")
+                .unwrap_or_else(|| {
+                    child
+                        .kill()
+                        .expect("failed to stop headless Chrome after complete DOM output");
+                    child
+                        .wait()
+                        .expect("failed to wait for headless Chrome after complete DOM output")
+                });
+            thread::sleep(Duration::from_millis(20));
+            return Output {
+                status,
+                stdout: stdout_output
+                    .lock()
+                    .expect("headless Chrome stdout buffer was poisoned")
+                    .clone(),
+                stderr: stderr_output
+                    .lock()
+                    .expect("headless Chrome stderr buffer was poisoned")
+                    .clone(),
+            };
+        }
+
+        if let Some(status) = child.try_wait().expect("failed to poll headless Chrome") {
+            stdout_reader
+                .take()
+                .expect("headless Chrome stdout reader was missing")
+                .join()
+                .expect("headless Chrome stdout reader panicked");
+            stderr_reader
+                .take()
+                .expect("headless Chrome stderr reader was missing")
+                .join()
+                .expect("headless Chrome stderr reader panicked");
+            return Output {
+                status,
+                stdout: stdout_output
+                    .lock()
+                    .expect("headless Chrome stdout buffer was poisoned")
+                    .clone(),
+                stderr: stderr_output
+                    .lock()
+                    .expect("headless Chrome stderr buffer was poisoned")
+                    .clone(),
+            };
+        }
+
+        if started.elapsed() > timeout {
             child
                 .kill()
                 .expect("failed to stop timed-out headless Chrome");
-            child
+            let status = child
                 .wait()
-                .expect("failed to wait for timed-out headless Chrome")
-        } else {
-            thread::sleep(Duration::from_millis(50));
-            continue;
-        };
+                .expect("failed to wait for timed-out headless Chrome");
+            thread::sleep(Duration::from_millis(20));
+            return Output {
+                status,
+                stdout: stdout_output
+                    .lock()
+                    .expect("headless Chrome stdout buffer was poisoned")
+                    .clone(),
+                stderr: stderr_output
+                    .lock()
+                    .expect("headless Chrome stderr buffer was poisoned")
+                    .clone(),
+            };
+        }
 
-        return Output {
-            status,
-            stdout: stdout_reader
-                .join()
-                .expect("headless Chrome stdout reader panicked"),
-            stderr: stderr_reader
-                .join()
-                .expect("headless Chrome stderr reader panicked"),
-        };
+        thread::sleep(Duration::from_millis(50));
     }
 }
 

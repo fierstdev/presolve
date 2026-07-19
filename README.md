@@ -21,6 +21,7 @@ cargo test --workspace
 cargo run -p ezc_cli -- explain fixtures/0001-source-summary/input/Counter.tsx
 cargo run -p ezc_cli -- explain fixtures/0001-source-summary/input/Counter.tsx --format json
 cargo run -p ezc_cli -- check fixtures/0001-source-summary/input/Counter.tsx
+cargo run -p ezc_cli -- build fixtures/0047-computed-diamond/input/ComputedDiamond.tsx --out target/ezc-production --production
 ```
 
 ## Check policy
@@ -146,6 +147,22 @@ Provider or parent search, authored-name lookup, or virtual-DOM diffing.
 Phase J same-build continuation, snapshot/manifest versions, restore order,
 exact lazy activation, diagnostics, and runtime no-discovery invariants are
 frozen in [`docs/resumability-contract.md`](docs/resumability-contract.md).
+
+## Production optimization contract
+
+`ezc_cli build <file> --out <directory> --production` enables the frozen Phase
+K production path. The build retains the normal development artifacts, embeds
+the validated compact production runtime artifact, and writes deterministic
+content-addressed runtime modules under `production/`. Normal builds keep the
+development runtime path while still emitting the production artifact and the
+two non-authoritative optimization/cost reports for inspection and budget
+tracking.
+
+Production optimization policy v1, reachability and deduplication boundaries,
+generated-module constraints, packed artifact validation, report schemas,
+budget maintenance rules, diagnostics, frozen versions, and deliberate
+exclusions are documented in
+[`docs/production-optimization-contract.md`](docs/production-optimization-contract.md).
 
 ## Computed values: supported contract and limits
 

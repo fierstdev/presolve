@@ -44,6 +44,9 @@ snapshot record, retained-slot classification, or lazy activation behavior.
 - `schema_version` is required at the manifest root.
 - The current template manifest schema is `4`.
 - The current component runtime artifact schema is `3`.
+- The current production runtime artifact and packed-table schemas are `1`.
+- The current production optimization policy is
+  `optimization-policy:production-v1`.
 - The exact Phase J cold runtime pair is template manifest v4/component
   artifact v3.
 - Template manifest v3/component artifact v2 remains accepted only as the
@@ -62,6 +65,24 @@ resume uses the exact manifest-v6/snapshot-v1 registry protocol and closed
 anchor/event indexes; its same-build, no-discovery, failure, schema, and
 diagnostic rules are frozen in the
 [Resumability contract](resumability-contract.md).
+
+## Phase K production runtime
+
+Production HTML embeds `production.runtime.json` as
+`#ez-production-runtime` before `runtime.js`. The browser validates the exact
+build/protocol pair, every packed table and checksum, identity/ordinal
+bijections, references, fingerprints, chunks, eager closure, resume agreement,
+and lifecycle closure before installing production state or executing authored
+work. After validation, closed bootstrap and scheduling paths use only
+compiler-emitted dense ordinals; malformed products fail closed without
+fallback discovery.
+
+Generated production modules are deterministic, content-addressed,
+registration-only compiler products. Exact-owner cleanup reverses installation
+and releases all component-scoped registries and caches. The complete policy,
+artifact/report schemas, validation order, budgets, diagnostics, and exclusions
+are frozen in the
+[Production optimization contract](production-optimization-contract.md).
 
 ## Diagnostics
 
