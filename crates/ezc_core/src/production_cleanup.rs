@@ -199,4 +199,58 @@ mod tests {
             "resume"
         );
     }
+
+    #[test]
+    fn k16_one_hundred_cleanup_cycles_return_every_owned_registry_to_baseline() {
+        let kinds = [
+            ProductionCleanupKind::ActivationDispatch,
+            ProductionCleanupKind::EventAndBindingIndex,
+            ProductionCleanupKind::FormControlAndBindingIndex,
+            ProductionCleanupKind::EffectSubscription,
+            ProductionCleanupKind::ContextConsumerBinding,
+            ProductionCleanupKind::SlotAndStructuralRegistry,
+            ProductionCleanupKind::ComputedCache,
+            ProductionCleanupKind::StateStorage,
+            ProductionCleanupKind::FormInstanceStorage,
+            ProductionCleanupKind::ContextProviderSlot,
+            ProductionCleanupKind::ResumeBoundaryAndAnchor,
+            ProductionCleanupKind::ComponentInstance,
+            ProductionCleanupKind::DomAnchor,
+        ];
+        let mut instance_registry = BTreeSet::new();
+        let global_program_cache = BTreeSet::from(["runtime-bootstrap", "runtime-registries"]);
+        let baseline_instance_count = instance_registry.len();
+        let baseline_global_count = global_program_cache.len();
+
+        for cycle in 0_u32..100 {
+            let owner = format!("component:{cycle}");
+            let records = kinds
+                .iter()
+                .enumerate()
+                .map(|(ordinal, kind)| ProductionOwnedRuntimeRecord {
+                    owner_id: owner.clone(),
+                    initialization_ordinal: u32::try_from(ordinal).expect("fixture ordinal"),
+                    kind: *kind,
+                    record_id: format!("{owner}:{kind:?}"),
+                })
+                .collect::<Vec<_>>();
+            instance_registry.extend(records.iter().map(|record| record.record_id.clone()));
+            let plan = build_production_destroy_plan(
+                std::slice::from_ref(&owner),
+                &records,
+                &[format!("activation:{owner}")],
+            );
+            assert!(validate_production_cleanup_closure(
+                std::slice::from_ref(&owner),
+                &records,
+                &plan
+            )
+            .is_empty());
+            for record in plan.cleanup_records {
+                assert!(instance_registry.remove(&record.record_id));
+            }
+            assert_eq!(instance_registry.len(), baseline_instance_count);
+            assert_eq!(global_program_cache.len(), baseline_global_count);
+        }
+    }
 }
