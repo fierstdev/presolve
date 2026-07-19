@@ -181,6 +181,12 @@ fn k8_production_artifact_is_deterministic_and_preserves_the_k0_baseline() {
         let production_size = first_artifacts
             .remove("production.runtime.json")
             .expect("K8 production artifact should be emitted");
+        let optimization_size = first_artifacts
+            .remove("optimization-report.json")
+            .expect("K15 optimization report should be emitted");
+        let cost_size = first_artifacts
+            .remove("runtime-cost-report.json")
+            .expect("K15 runtime cost report should be emitted");
         assert!(production_size > 0, "production artifact must not be empty");
         assert_eq!(
             first_artifacts, fixture.artifacts,
@@ -195,16 +201,19 @@ fn k8_production_artifact_is_deterministic_and_preserves_the_k0_baseline() {
             fixture.name
         );
         assert_eq!(
+            second_artifacts.remove("optimization-report.json"),
+            Some(optimization_size)
+        );
+        assert_eq!(
+            second_artifacts.remove("runtime-cost-report.json"),
+            Some(cost_size)
+        );
+        assert_eq!(
             first_artifacts, second_artifacts,
             "{} repeated build",
             fixture.name
         );
-        for forbidden in ["optimization-report.json", "runtime-cost-report.json"] {
-            assert!(
-                !first.join(forbidden).exists(),
-                "K0 must not emit {forbidden}"
-            );
-        }
+        assert!(optimization_size > 0 && cost_size > 0);
         let resume: serde_json::Value = serde_json::from_slice(
             &std::fs::read(first.join("resume.runtime.json"))
                 .expect("resume manifest should be emitted"),

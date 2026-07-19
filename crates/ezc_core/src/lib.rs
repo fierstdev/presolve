@@ -78,6 +78,7 @@ pub mod production_elimination;
 pub mod production_module_emitter;
 pub mod production_optimization;
 pub mod production_reachability;
+pub mod production_reports;
 pub mod production_runtime_artifact;
 pub mod production_scheduler;
 pub mod production_validation;
@@ -452,6 +453,12 @@ pub use production_reachability::{
     build_production_reachability_graph, ProductionExecutableRoot, ProductionProgramEdge,
     ProductionReachabilityBlock, ProductionReachabilityGraph, ProductionReachabilityReason,
     ProductionUnreachableRecord,
+};
+pub use production_reports::{
+    build_production_reports, optimization_report_json, runtime_cost_report_json,
+    OptimizationInspectionQuery, OptimizationReportV1, ProductionReportInputs,
+    RuntimeCostInspectionQuery, RuntimeCostReportV1, OPTIMIZATION_REPORT_SCHEMA_VERSION,
+    RUNTIME_COST_REPORT_SCHEMA_VERSION,
 };
 pub use production_runtime_artifact::{
     build_production_runtime_artifact, build_production_runtime_table,

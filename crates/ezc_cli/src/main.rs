@@ -9,24 +9,25 @@ use std::process;
 use ezc_core::{
     build_application_semantic_model_for_unit, build_component_graph,
     build_context_inspection_registry, build_effect_inspection_registry,
-    build_form_inspection_registry, build_production_runtime_artifact, build_resume_chunk_graph,
-    build_resume_manifest, build_runtime_component_artifact, build_runtime_computed_artifact,
-    build_runtime_context_artifact, build_runtime_effect_artifact, build_runtime_forms_artifact,
-    build_semantic_graph, build_template_graph, build_template_manifest_from_asm,
-    emit_production_modules, explain_json, explain_text, extract_production_chunk_graph,
-    fold_component_graph, generate_ordinary_instance_html, generate_runtime_stub,
-    generate_standalone_page_with_resume_runtime, generate_static_html, lower_components_to_ir,
-    optimize_context_ir, optimize_effect_ir, production_runtime_artifact_json,
-    project_resume_diagnostics, resume_manifest_json, runtime_component_artifact_json,
-    runtime_computed_artifact_json, runtime_context_artifact_json, runtime_effect_artifact_json,
-    runtime_forms_artifact_json, semantic_graph_json, semantic_type_text, summarize_source,
-    template_manifest_json, validate_application_semantic_model, ApplicationSemanticModel,
-    AsmValidationDiagnostic, AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass,
-    DeclaredStateTypeKind, EffectInspection, EffectInspectionRegistry,
-    ExecutableProgramFingerprint, ImmutableAsmPass, ProductionRootChunkInput, RenderAttribute,
-    RenderAttributeValue, SemanticEntity, SemanticEntityKind, SemanticId, SemanticOwner,
-    SemanticReferenceKind, SerializableValue, SharedChunkCandidatePlan, SourceProvenance,
-    StateOperation, TemplateChild, TemplateGraph, TemplateSemanticKind,
+    build_form_inspection_registry, build_production_reports, build_production_runtime_artifact,
+    build_resume_chunk_graph, build_resume_manifest, build_runtime_component_artifact,
+    build_runtime_computed_artifact, build_runtime_context_artifact, build_runtime_effect_artifact,
+    build_runtime_forms_artifact, build_semantic_graph, build_template_graph,
+    build_template_manifest_from_asm, emit_production_modules, explain_json, explain_text,
+    extract_production_chunk_graph, fold_component_graph, generate_ordinary_instance_html,
+    generate_runtime_stub, generate_standalone_page_with_resume_runtime, generate_static_html,
+    lower_components_to_ir, optimization_report_json, optimize_context_ir, optimize_effect_ir,
+    production_runtime_artifact_json, project_resume_diagnostics, resume_manifest_json,
+    runtime_component_artifact_json, runtime_computed_artifact_json, runtime_context_artifact_json,
+    runtime_cost_report_json, runtime_effect_artifact_json, runtime_forms_artifact_json,
+    semantic_graph_json, semantic_type_text, summarize_source, template_manifest_json,
+    validate_application_semantic_model, ApplicationSemanticModel, AsmValidationDiagnostic,
+    AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
+    EffectInspection, EffectInspectionRegistry, ExecutableProgramFingerprint, ImmutableAsmPass,
+    ProductionReportInputs, ProductionRootChunkInput, RenderAttribute, RenderAttributeValue,
+    SemanticEntity, SemanticEntityKind, SemanticId, SemanticOwner, SemanticReferenceKind,
+    SerializableValue, SharedChunkCandidatePlan, SourceProvenance, StateOperation, TemplateChild,
+    TemplateGraph, TemplateSemanticKind,
 };
 use ezc_parser::{
     parse_file, ParseDiagnostic, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
@@ -1990,6 +1991,7 @@ fn run_manifest(mut args: Vec<String>) {
     println!("{}", template_manifest_json(&manifest));
 }
 
+#[allow(clippy::too_many_lines)]
 fn run_build(mut args: Vec<String>) {
     if args.is_empty() {
         eprintln!("missing file path");
@@ -2058,6 +2060,61 @@ fn run_build(mut args: Vec<String>) {
         args.iter().any(|argument| argument == "--production"),
         &production_runtime_json,
     );
+    let runtime_js = generate_runtime_stub();
+    let production_layout = emit_production_modules(&production_chunk_graph);
+    let development_bytes = byte_count([
+        &page_html,
+        &manifest_json,
+        &computed_runtime_json,
+        &context_runtime_json,
+        &effect_runtime_json,
+        &component_runtime_json,
+        &forms_runtime_json,
+        &resume_runtime_json,
+        &runtime_js,
+    ]);
+    let production_bytes = byte_count(
+        std::iter::once(&production_runtime_json).chain(
+            std::iter::once(&production_layout.eager)
+                .chain(production_layout.shared.iter())
+                .chain(production_layout.roots.iter())
+                .map(|module| &module.source),
+        ),
+    );
+    let report_inputs = ProductionReportInputs {
+        dead_products_removed: 0,
+        constants_pooled: 0,
+        programs_deduplicated: 0,
+        shared_candidates_rejected: 0,
+        binding_writes_coalesced: 0,
+        development_bytes,
+        production_bytes,
+        cold_init_operation_count: report_count(
+            resume_runtime_artifact
+                .capture_programs
+                .iter()
+                .map(|program| program.instructions.len())
+                .sum(),
+        ),
+        resume_restore_operation_count: report_count(
+            resume_runtime_artifact
+                .restore_programs
+                .iter()
+                .map(|program| program.instructions.len())
+                .sum(),
+        ),
+        max_action_batch_operation_count: 0,
+        max_scheduler_batch_width: 0,
+        max_dom_patch_count_per_action: 0,
+        retained_slot_count: report_count(resume_runtime_artifact.slot_schemas.len()),
+    };
+    let (optimization_report, runtime_cost_report) = build_production_reports(
+        &production_runtime_artifact,
+        &production_chunk_graph,
+        &report_inputs,
+    );
+    let optimization_report_json = optimization_report_json(&optimization_report);
+    let runtime_cost_report_json = runtime_cost_report_json(&runtime_cost_report);
     write_build_artifacts(
         &out_dir,
         &page_html,
@@ -2069,7 +2126,9 @@ fn run_build(mut args: Vec<String>) {
         &forms_runtime_json,
         &resume_runtime_json,
         &production_runtime_json,
-        &generate_runtime_stub(),
+        &optimization_report_json,
+        &runtime_cost_report_json,
+        &runtime_js,
         &resume_chunks,
     )
     .unwrap_or_else(|error| {
@@ -2100,6 +2159,8 @@ fn print_build_artifact_paths(out_dir: &Path, resume_chunks: &ezc_core::ResumeCh
         "forms.runtime.json",
         "resume.runtime.json",
         "production.runtime.json",
+        "optimization-report.json",
+        "runtime-cost-report.json",
         "runtime.js",
     ] {
         println!("Wrote {}", out_dir.join(artifact).display());
@@ -2110,6 +2171,15 @@ fn print_build_artifact_paths(out_dir: &Path, resume_chunks: &ezc_core::ResumeCh
             out_dir.join(&chunk.module.module_path).display()
         );
     }
+}
+
+fn byte_count<'a>(values: impl IntoIterator<Item = &'a String>) -> u64 {
+    u64::try_from(values.into_iter().map(String::len).sum::<usize>())
+        .expect("build byte count exceeds u64")
+}
+
+fn report_count(value: usize) -> u32 {
+    u32::try_from(value).expect("build report count exceeds u32")
 }
 
 fn production_root_chunk_inputs(
@@ -2999,6 +3069,8 @@ fn write_build_artifacts(
     forms_runtime_json: &str,
     resume_runtime_json: &str,
     production_runtime_json: &str,
+    optimization_report_json: &str,
+    runtime_cost_report_json: &str,
     runtime_js: &str,
     resume_chunks: &ezc_core::ResumeChunkGraph,
 ) -> io::Result<()> {
@@ -3016,6 +3088,14 @@ fn write_build_artifacts(
     fs::write(
         out_dir.join("component.runtime.json"),
         component_runtime_json,
+    )?;
+    fs::write(
+        out_dir.join("optimization-report.json"),
+        optimization_report_json,
+    )?;
+    fs::write(
+        out_dir.join("runtime-cost-report.json"),
+        runtime_cost_report_json,
     )?;
     fs::write(out_dir.join("forms.runtime.json"), forms_runtime_json)?;
     fs::write(out_dir.join("resume.runtime.json"), resume_runtime_json)?;
