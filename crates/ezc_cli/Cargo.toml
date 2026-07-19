@@ -1,15 +1,19 @@
 [package]
-name = "ezc_cli"
-version = "0.0.0"
+name = "presolve-cli"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
 [dependencies]
-ezc_core = { path = "../ezc_core" }
-ezc_parser = { path = "../ezc_parser" }
+ezc_core = { package = "presolve-compiler", path = "../ezc_core" }
+ezc_parser = { package = "presolve-parser", path = "../ezc_parser" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+[[bin]]
+name = "presolve"
+path = "src/main.rs"
 
 [lints]
 workspace = true

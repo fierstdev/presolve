@@ -1,8 +1,11 @@
 [package]
-name = "ezc_parser"
-version = "0.0.0"
-edition = "2021"
+name = "presolve-parser"
+version.workspace = true
+edition.workspace = true
 publish = false
+
+[lib]
+name = "ezc_parser"
 
 [dependencies]
 oxc_allocator = "0.87"

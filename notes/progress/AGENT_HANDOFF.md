@@ -1,27 +1,29 @@
-EdgeZero Agent Handoff
+Presolve Agent Handoff
 
 Repository state
 
 * Branch: main
-* Latest completed slice: K21 - Phase K Stability Audit and Freeze
-* Working tree: Phase K is complete and committed at handoff; no Phase L work has started.
+* Latest completed slice: L1 - Presolve Identity Transition
+* Working tree: L1 is complete and ready to commit; the public identity is Presolve.
 * Date: 2026-07-19
 
 Last completed slice
 
-* Slice: K21 - Phase K Stability Audit and Freeze
-* Summary: freezes the production optimization contract, schema/version cross-references, exact benchmark identities and representative budgets, diagnostic ranges, lifecycle counts, and the complete sequential verification matrix.
-* Key files: `production-optimization-contract.md`, `runtime-contract.md`, `resumability-contract.md`, `README.md`, `2026-W28.md`
-* Boundary: Phase K is frozen through K21. Do not infer or begin Phase L without an authoritative roadmap.
+* Slice: L1 - Presolve Identity Transition
+* Summary: establishes Presolve as the public product, compiler, canonical `presolve` executable, package namespace, repository destination, website, package/version metadata, workflow configuration, and public schema identity without changing compiler or runtime semantics.
+* Key files: `Cargo.toml`, `crates/ezc_cli/Cargo.toml`, `README.md`, `package.json`, `packages/runtime/package.json`, `scripts/verify-public-identity.sh`, `docs/presolve-identity-transition.md`, `2026-W28.md`
+* Boundary: L1 is identity-only. Frozen generated runtime globals, authored fixture strings, private Rust aliases/paths, and Phase A-K historical records remain intentionally retained and are classified in `docs/presolve-identity-transition.md`. Next: L2 - Repository Constitution.
 
 Current phase boundary
 
-* Slice: Phase L is not started.
-* Status: Await an authoritative Phase L roadmap; the Phase K contract is frozen.
+* Slice: L2 - Repository Constitution.
+* Status: L1 is complete. The Phase L authoritative specification set is available; begin only the L2 repository-layout and public-development slice next.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
 * Remaining in Phase K: none.
 
 Verification
+
+* L1 verification: `cargo check --workspace`, `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, `RUST_TEST_THREADS=1 cargo test --workspace --all-features`, independent `just check`, `./scripts/verify-public-identity.sh`, `cargo run -q -p presolve-cli -- explain fixtures/0001-source-summary/input/Counter.tsx --format json`, and `git diff --check` pass. The serialized workspace run passes 4 CLI units, 8 Component fixtures, 12 Context fixtures, 132 inspection/build tests, 2 production baseline tests, 2 production budget tests, 2 production runtime fixtures, 37 real-browser probes, 448 core tests, 13 parser units, and 26 parser integrations. The compiler builds and tests exclusively through the renamed `presolve-cli` package and `presolve` binary; frozen generated artifacts remain covered by the existing baseline and fixture assertions.
 
 * K21 verification: the exact sequential gate passes `cargo fmt --all --check`, strict all-feature workspace clippy, `RUST_TEST_THREADS=1 cargo test --workspace --all-features` (686 tests: 4 CLI units, 8 Component fixtures, 12 Context fixtures, 132 inspection/build tests, 2 production baselines, 2 production budgets, 2 production runtime fixtures, 37 serialized browser probes, 448 core tests, 13 parser units, and 26 parser integrations), `just check`, and `git diff --check`. K21 also repairs exact resume Forms/Context/Slot execution exposed by the final browser gate, freezes the corrected K0 byte baseline, and records corpus/budget identities plus the 552-byte positive shared-candidate proof and 100-cycle 0/2 lifecycle registry result.
 

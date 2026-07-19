@@ -1,6 +1,8 @@
-# EdgeZero Starter Repository
+# Presolve Compiler
 
-EdgeZero is a compiler-centered web authoring system. This repository starts with the smallest useful vertical slice:
+Presolve is a compiler-centered web authoring system. The compiler is the sole
+semantic authority: tooling, the runtime, and future platform services consume
+immutable compiler products rather than reconstructing source knowledge.
 
 ```txt
 source file
@@ -18,20 +20,20 @@ This is not the real TSX compiler yet. It is the first learning and infrastructu
 ```sh
 # after installing Rust and pnpm
 cargo test --workspace
-cargo run -p ezc_cli -- explain fixtures/0001-source-summary/input/Counter.tsx
-cargo run -p ezc_cli -- explain fixtures/0001-source-summary/input/Counter.tsx --format json
-cargo run -p ezc_cli -- check fixtures/0001-source-summary/input/Counter.tsx
-cargo run -p ezc_cli -- build fixtures/0047-computed-diamond/input/ComputedDiamond.tsx --out target/ezc-production --production
+cargo run -p presolve-cli -- explain fixtures/0001-source-summary/input/Counter.tsx
+cargo run -p presolve-cli -- explain fixtures/0001-source-summary/input/Counter.tsx --format json
+cargo run -p presolve-cli -- check fixtures/0001-source-summary/input/Counter.tsx
+cargo run -p presolve-cli -- build fixtures/0047-computed-diamond/input/ComputedDiamond.tsx --out target/presolve-production --production
 ```
 
 ## Check policy
 
-Use `ezc_cli check` to compile one or more source files, assemble the canonical
+Use `presolve check` to compile one or more source files, assemble the canonical
 Application Semantic Model (ASM), and report parser, compiler, and ASM
 validation diagnostics.
 
 ```sh
-ezc_cli check <file> [file...] \
+presolve check <file> [file...] \
   [--format text|json] \
   [--category parser|compiler|validation] \
   [--fail-on error|warning|info]
@@ -66,13 +68,13 @@ Inspect one canonical semantic entity with its ownership, provenance,
 containment, relations, and overlap-based compiler diagnostics:
 
 ```sh
-ezc_cli asm <file> --entity <semantic-id> [--format text|json]
-ezc_cli asm <file> --source <path> --offset <byte> [--format text|json]
-ezc_cli explain <file> --entity <semantic-id> [--format text|json]
-ezc_cli explain <file> --source <path> --offset <byte> [--format text|json]
+presolve asm <file> --entity <semantic-id> [--format text|json]
+presolve asm <file> --source <path> --offset <byte> [--format text|json]
+presolve explain <file> --entity <semantic-id> [--format text|json]
+presolve explain <file> --source <path> --offset <byte> [--format text|json]
 ```
 
-Use `ezc_cli asm <file> --format json` to discover the available semantic IDs.
+Use `presolve asm <file> --format json` to discover the available semantic IDs.
 The selected-entity document includes the entity itself, direct child IDs,
 nearest-first parent IDs through the application root, descendant count, incoming and outgoing references,
 and related compiler diagnostics. This is the canonical semantic-navigation
@@ -84,9 +86,9 @@ Source selection chooses the uniquely narrowest semantic span covering the
 given byte offset. No match or tied narrowest spans fail explicitly; `--entity`
 cannot be combined with `--source` or `--offset`.
 
-`ezc_cli explain <file>` retains its legacy source-summary output. Supplying
+`presolve explain <file>` retains its legacy source-summary output. Supplying
 an entity selector (or an entity filter) activates the same read-only,
-canonical ASM inspection path as `ezc_cli asm`, including its text/JSON
+canonical ASM inspection path as `presolve asm`, including its text/JSON
 document, source selection, deterministic filtering, and explicit failures.
 
 For a computed entity, the inspection record additionally contains the
@@ -105,8 +107,8 @@ version.
 Selected entity inspection supports optional filters:
 
 ```sh
-ezc_cli asm <file> --entity <semantic-id> --child-kind method
-ezc_cli asm <file> --entity <semantic-id> --reference-kind action-state
+presolve asm <file> --entity <semantic-id> --child-kind method
+presolve asm <file> --entity <semantic-id> --reference-kind action-state
 ```
 
 `--child-kind` accepts `component`, `state-field`, `method`, `action`,
@@ -150,7 +152,7 @@ frozen in [`docs/resumability-contract.md`](docs/resumability-contract.md).
 
 ## Production optimization contract
 
-`ezc_cli build <file> --out <directory> --production` enables the frozen Phase
+`presolve build <file> --out <directory> --production` enables the frozen Phase
 K production path. The build retains the normal development artifacts, embeds
 the validated compact production runtime artifact, and writes deterministic
 content-addressed runtime modules under `production/`. Normal builds keep the
@@ -188,7 +190,7 @@ restored, and unsupported getter syntax does not receive partial execution.
 Export the canonical ASM as a stable JSON graph:
 
 ```sh
-ezc_cli asm <file> [file...] --format graph
+presolve asm <file> [file...] --format graph
 ```
 
 The graph schema has a version, ordered application roots, typed semantic nodes

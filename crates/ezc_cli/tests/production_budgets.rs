@@ -82,7 +82,7 @@ fn assert_fixture_budget(root: &Path, fixture: &CorpusFixture, budget: &Budget) 
     if output.exists() {
         std::fs::remove_dir_all(&output).expect("clean prior budget output");
     }
-    let result = Command::new(env!("CARGO_BIN_EXE_ezc_cli"))
+    let result = Command::new(env!("CARGO_BIN_EXE_presolve"))
         .current_dir(root)
         .args([
             "build",

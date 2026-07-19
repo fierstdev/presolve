@@ -205,52 +205,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91622ff5e7162018101f2fea40d6ebf4a78bbe5a49736a2020649edf9693679e"
 
 [[package]]
-name = "ezc_cli"
-version = "0.0.0"
-dependencies = [
- "ezc_core",
- "ezc_parser",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "ezc_core"
-version = "0.0.0"
-dependencies = [
- "ezc_parser",
- "serde",
- "serde_json",
- "sha2",
-]
-
-[[package]]
-name = "ezc_parser"
-version = "0.0.0"
-dependencies = [
- "oxc_allocator",
- "oxc_ast",
- "oxc_diagnostics",
- "oxc_parser",
- "oxc_regular_expression",
- "oxc_span",
-]
-
-[[package]]
-name = "ezc_parser_spike"
-version = "0.0.0"
-dependencies = [
- "oxc_allocator",
- "oxc_ast",
- "oxc_diagnostics",
- "oxc_parser",
- "oxc_span",
- "swc_common",
- "swc_ecma_ast",
- "swc_ecma_parser",
-]
-
-[[package]]
 name = "fastrand"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -819,6 +773,52 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0103b1cef7ec0cf76490e969665504990193874ea05c85ff9bab8b911d0a0564"
 dependencies = [
  "zerovec",
+]
+
+[[package]]
+name = "presolve-cli"
+version = "0.1.0-alpha"
+dependencies = [
+ "presolve-compiler",
+ "presolve-parser",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "presolve-compiler"
+version = "0.1.0-alpha"
+dependencies = [
+ "presolve-parser",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
+name = "presolve-parser"
+version = "0.1.0-alpha"
+dependencies = [
+ "oxc_allocator",
+ "oxc_ast",
+ "oxc_diagnostics",
+ "oxc_parser",
+ "oxc_regular_expression",
+ "oxc_span",
+]
+
+[[package]]
+name = "presolve-parser-spike"
+version = "0.1.0-alpha"
+dependencies = [
+ "oxc_allocator",
+ "oxc_ast",
+ "oxc_diagnostics",
+ "oxc_parser",
+ "oxc_span",
+ "swc_common",
+ "swc_ecma_ast",
+ "swc_ecma_parser",
 ]
 
 [[package]]

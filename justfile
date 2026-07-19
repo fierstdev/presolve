@@ -6,13 +6,13 @@ check:
     cargo test --workspace
 
 e2e:
-    cargo test -p ezc_cli --test runtime_browser -- --nocapture --test-threads=1
+    cargo test -p presolve-cli --test runtime_browser -- --nocapture --test-threads=1
 
 e2e-headed:
-    cargo test -p ezc_cli --test runtime_browser -- --nocapture --test-threads=1
+    cargo test -p presolve-cli --test runtime_browser -- --nocapture --test-threads=1
 
 explain-counter:
-    cargo run -p ezc_cli -- explain fixtures/0001-source-summary/input/Counter.tsx
+    cargo run -p presolve-cli -- explain fixtures/0001-source-summary/input/Counter.tsx
 
 explain-counter-json:
-    cargo run -p ezc_cli -- explain fixtures/0001-source-summary/input/Counter.tsx --format json
+    cargo run -p presolve-cli -- explain fixtures/0001-source-summary/input/Counter.tsx --format json

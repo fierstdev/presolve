@@ -49,7 +49,7 @@ fn fixture_unit(paths: &[&str]) -> ezc_core::ApplicationSemanticModel {
 }
 
 fn cli_result(args: &[&str]) -> (Option<i32>, Vec<u8>, Vec<u8>) {
-    let output = Command::new(env!("CARGO_BIN_EXE_ezc_cli"))
+    let output = Command::new(env!("CARGO_BIN_EXE_presolve"))
         .current_dir(repo_root())
         .args(args)
         .output()

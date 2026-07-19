@@ -10,7 +10,8 @@ resolver = "2"
 [workspace.package]
 edition = "2021"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/edgezero/edgezero"
+repository = "https://github.com/fierstdev/presolve"
+version = "0.1.0-alpha"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

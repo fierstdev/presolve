@@ -14,7 +14,7 @@ fn repo_root() -> PathBuf {
 }
 
 fn ezc_cli_bin() -> &'static str {
-    env!("CARGO_BIN_EXE_ezc_cli")
+    env!("CARGO_BIN_EXE_presolve")
 }
 
 fn normalize_html_for_fixture(value: &str) -> String {

@@ -3384,18 +3384,18 @@ fn write_build_artifacts(
 
 fn print_usage_and_exit() -> ! {
     eprintln!("usage:");
-    eprintln!("  ezc_cli explain <file> [--format text|json]");
-    eprintln!("  ezc_cli explain <file> [--entity semantic-id | --source path --offset byte] [--child-kind kind] [--reference-kind kind] [--format text|json]");
-    eprintln!("  ezc_cli asm <file> [--entity semantic-id | --source path --offset byte] [--child-kind kind] [--reference-kind kind] [--format text|json|graph]");
+    eprintln!("  presolve explain <file> [--format text|json]");
+    eprintln!("  presolve explain <file> [--entity semantic-id | --source path --offset byte] [--child-kind kind] [--reference-kind kind] [--format text|json]");
+    eprintln!("  presolve asm <file> [--entity semantic-id | --source path --offset byte] [--child-kind kind] [--reference-kind kind] [--format text|json|graph]");
     eprintln!(
-        "  ezc_cli check <file> [file...] [--format text|json] [--category parser|compiler|validation] [--fail-on error|warning|info]"
+        "  presolve check <file> [file...] [--format text|json] [--category parser|compiler|validation] [--fail-on error|warning|info]"
     );
-    eprintln!("  ezc_cli parse <file>");
-    eprintln!("  ezc_cli graph <file>");
-    eprintln!("  ezc_cli template <file>");
-    eprintln!("  ezc_cli html <file>");
-    eprintln!("  ezc_cli manifest <file>");
-    eprintln!("  ezc_cli build <file> [--out dir] [--production]");
+    eprintln!("  presolve parse <file>");
+    eprintln!("  presolve graph <file>");
+    eprintln!("  presolve template <file>");
+    eprintln!("  presolve html <file>");
+    eprintln!("  presolve manifest <file>");
+    eprintln!("  presolve build <file> [--out dir] [--production]");
     process::exit(1);
 }
 

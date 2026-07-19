@@ -1,6 +1,6 @@
 {
-  "name": "@edgezero/runtime",
-  "version": "0.0.0",
+  "name": "@presolve/runtime",
+  "version": "0.1.0-alpha",
   "type": "module",
   "private": true,
   "exports": {

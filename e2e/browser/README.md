@@ -6,12 +6,12 @@ The permanent browser gate is the Rust integration harness in:
 crates/ezc_cli/tests/runtime_browser.rs
 ```
 
-It builds the double-binding counter fixture, serves the generated output with a tiny in-test static server, opens the page in real Chrome, and fails on unexpected EdgeZero runtime console errors.
+It builds the double-binding counter fixture, serves the generated output with a tiny in-test static server, opens the page in real Chrome, and fails on unexpected generated-runtime console errors.
 
 Run it directly:
 
 ```sh
-cargo test -p ezc_cli --test runtime_browser -- --nocapture
+cargo test -p presolve-cli --test runtime_browser -- --nocapture
 ```
 
 Or through the project aliases:
@@ -24,4 +24,4 @@ just e2e
 `pnpm test:e2e:headed` and `just e2e-headed` currently run the same deterministic
 Chrome dump-DOM harness.
 
-Set `EDGEZERO_CHROME=/path/to/chrome` when Chrome is not in a standard location.
+Set `PRESOLVE_CHROME=/path/to/chrome` when Chrome is not in a standard location.

@@ -1,5 +1,6 @@
 {
-  "name": "edgezero-counter-example",
+  "name": "presolve-counter-example",
+  "version": "0.1.0-alpha",
   "private": true,
   "type": "module",
   "scripts": {

@@ -28,7 +28,7 @@ fn build(root: &Path, input: &str, name: &str, production: bool) -> PathBuf {
     if production {
         arguments.push("--production".to_string());
     }
-    let result = Command::new(env!("CARGO_BIN_EXE_ezc_cli"))
+    let result = Command::new(env!("CARGO_BIN_EXE_presolve"))
         .current_dir(root)
         .args(arguments)
         .output()

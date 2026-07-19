@@ -83,7 +83,7 @@ fn build_fixture(
     if production {
         arguments.push("--production".to_string());
     }
-    let result = Command::new(env!("CARGO_BIN_EXE_ezc_cli"))
+    let result = Command::new(env!("CARGO_BIN_EXE_presolve"))
         .current_dir(repo_root)
         .args(arguments)
         .output()

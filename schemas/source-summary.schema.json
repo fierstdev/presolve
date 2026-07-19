@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://edgezero.dev/schemas/source-summary.schema.json",
-  "title": "EdgeZero Source Summary",
+  "$id": "https://presolve.dev/schemas/source-summary.schema.json",
+  "title": "Presolve Source Summary",
   "type": "object",
   "required": [
     "path",

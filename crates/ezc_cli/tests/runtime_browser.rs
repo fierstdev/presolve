@@ -27,11 +27,11 @@ fn repo_root() -> PathBuf {
 }
 
 fn ezc_cli_bin() -> PathBuf {
-    PathBuf::from(env!("CARGO_BIN_EXE_ezc_cli"))
+    PathBuf::from(env!("CARGO_BIN_EXE_presolve"))
 }
 
 fn chrome_bin() -> Option<PathBuf> {
-    if let Some(path) = std::env::var_os("EDGEZERO_CHROME") {
+    if let Some(path) = std::env::var_os("PRESOLVE_CHROME") {
         let path = PathBuf::from(path);
 
         if path.is_file() {
