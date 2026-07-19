@@ -14,4 +14,8 @@ Phase J's `ResumeChunkGraph` deliberately duplicates exact root program closures
 
 The generated runtime uses compiler-emitted string IDs in `Map` and `Set` indexes for template anchors, component/slot/structural records, resume slot values and definitions, Forms indexes, Context bindings, Effect state, and activation registrations. It uses delegated document listeners, explicit scheduler queues, and compiler-owned restore registries. Existing destruction and release paths remain frozen until K12/K13; K0 neither adds cleanup nor alters listener/queue registration.
 
-The K0 policy constants are inert compiler constants. `EZC1112` through `EZC1127` and `EZASM1385` through `EZASM1512` are reservations only; K18 owns the public diagnostic projection and later slices own integrity validators.
+The K0 policy constants remain compiler-owned. K18 activates the canonical
+ordered public projection for `EZC1112` through `EZC1127`; it emits only from
+immutable production failure facts and never invents missing identities or
+provenance. `EZASM1385` through `EZASM1512` remain the reserved internal
+integrity range.

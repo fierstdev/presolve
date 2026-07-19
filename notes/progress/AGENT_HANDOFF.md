@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: K17 - ASM Inspection v12
-* Working tree: K17 is implemented and awaiting its atomic commit; do not begin K18 until the worktree is clean.
+* Latest completed slice: K18 - Phase K Diagnostics and Check Projection
+* Working tree: K18 is implemented and awaiting its atomic commit; do not begin K19 until the worktree is clean.
 * Date: 2026-07-19
 
 Last completed slice
 
-* Slice: K17 - ASM Inspection v12
-* Summary: projects immutable production policy, reachability, fingerprints, pooling/shared facts, chunk graph, packed tables, artifact identity, cleanup closure, validation phases, static costs, blocks, and exclusions in full and selected ASM inspection.
-* Key files: `crates/ezc_cli/src/main.rs`, `crates/ezc_cli/tests/explain.rs`
-* Boundary: generated module source is never embedded, reports remain non-authoritative, invalid candidates expose blocks without fabricated production identities, and v11 is rejected.
+* Slice: K18 - Phase K Diagnostics and Check Projection
+* Summary: activates one ordered `EZC1112`-`EZC1127` catalog and a deterministic projector with exact-identity/span deduplication, optional established provenance, and sorted secondary evidence.
+* Key files: `production_diagnostics.rs`, `main.rs`, `explain.rs`, `production-optimization-baseline.md`
+* Boundary: diagnostics consume explicit immutable failure facts; missing or malformed identities/provenance remain absent. Check JSON retains v6 because its existing diagnostic identity/provenance envelope suffices.
 
 Current in-progress slice
 
-* Slice: K18 - Phase K Diagnostics and Check Projection
-* Status: Ready after the K17 atomic commit and clean-worktree check.
+* Slice: K19 - Comprehensive Production and Browser Fixtures
+* Status: Ready after the K18 atomic commit and clean-worktree check.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase K: K18-K21. Next: project the canonical ordered `EZC1112`-`EZC1127` catalog from immutable production blocks and validators into ASM/check surfaces.
+* Remaining in Phase K: K19-K21. Next: expand full-system production/browser coverage across the K16 corpus, parity, failure, cleanup, determinism, and CSP-safe execution matrix.
 
 Verification
 

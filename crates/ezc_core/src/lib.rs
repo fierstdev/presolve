@@ -74,6 +74,7 @@ pub mod production_chunk_graph;
 pub mod production_cleanup;
 pub mod production_constant_pool;
 pub mod production_deduplication;
+pub mod production_diagnostics;
 pub mod production_elimination;
 pub mod production_module_emitter;
 pub mod production_optimization;
@@ -429,6 +430,11 @@ pub use production_deduplication::{
     deduplicate_generated_programs, DeduplicatedProgramRegistry, ExecutableProgramCandidate,
     ExecutableProgramCanonicalStream, ExecutableProgramFingerprintRegistry, ProgramAliasRecord,
     ProgramDeduplicationReport,
+};
+pub use production_diagnostics::{
+    project_production_diagnostics, ProductionDiagnosticContract, ProductionDiagnosticFact,
+    ProductionDiagnosticKind, ProductionDiagnosticProvenance, ProductionProjectedDiagnostic,
+    PRODUCTION_DIAGNOSTIC_CATALOG,
 };
 pub use production_elimination::{
     eliminate_unreachable_production_records, DeadProductEliminationReason,

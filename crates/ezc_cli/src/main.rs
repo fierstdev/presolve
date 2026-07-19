@@ -18,17 +18,19 @@ use ezc_core::{
     fold_component_graph, generate_ordinary_instance_html, generate_runtime_stub,
     generate_standalone_page_with_resume_runtime, generate_static_html, lower_components_to_ir,
     optimization_report_json, optimize_context_ir, optimize_effect_ir,
-    production_runtime_artifact_json, project_resume_diagnostics, resume_manifest_json,
-    runtime_component_artifact_json, runtime_computed_artifact_json, runtime_context_artifact_json,
-    runtime_cost_report_json, runtime_effect_artifact_json, runtime_forms_artifact_json,
-    semantic_graph_json, semantic_type_text, summarize_source, template_manifest_json,
-    validate_application_semantic_model, ApplicationSemanticModel, AsmValidationDiagnostic,
-    AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
-    EffectInspection, EffectInspectionRegistry, ExecutableProgramFingerprint, ImmutableAsmPass,
-    ProductionReportInputs, ProductionRootChunkInput, RenderAttribute, RenderAttributeValue,
-    SemanticEntity, SemanticEntityKind, SemanticId, SemanticOwner, SemanticReferenceKind,
-    SerializableValue, SharedChunkCandidatePlan, SourceProvenance, StateOperation, TemplateChild,
-    TemplateGraph, TemplateSemanticKind,
+    production_runtime_artifact_json, project_production_diagnostics, project_resume_diagnostics,
+    resume_manifest_json, runtime_component_artifact_json, runtime_computed_artifact_json,
+    runtime_context_artifact_json, runtime_cost_report_json, runtime_effect_artifact_json,
+    runtime_forms_artifact_json, semantic_graph_json, semantic_type_text, summarize_source,
+    template_manifest_json, validate_application_semantic_model, ApplicationSemanticModel,
+    AsmValidationDiagnostic, AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass,
+    DeclaredStateTypeKind, EffectInspection, EffectInspectionRegistry,
+    ExecutableProgramFingerprint, ImmutableAsmPass, ProductionDiagnosticFact,
+    ProductionDiagnosticKind, ProductionProjectedDiagnostic, ProductionReportInputs,
+    ProductionRootChunkInput, RenderAttribute, RenderAttributeValue, SemanticEntity,
+    SemanticEntityKind, SemanticId, SemanticOwner, SemanticReferenceKind, SerializableValue,
+    SharedChunkCandidatePlan, SourceProvenance, StateOperation, TemplateChild, TemplateGraph,
+    TemplateSemanticKind,
 };
 use ezc_parser::{
     parse_file, ParseDiagnostic, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
@@ -331,6 +333,7 @@ fn print_check_text(
         if let Some(validation_text) = asm_validation_diagnostics_text(validation) {
             print!("{validation_text}");
         }
+        print_production_diagnostics_text(&asm_production_diagnostics(asm));
     }
 }
 
@@ -377,7 +380,12 @@ fn check_json(
     } else {
         Vec::new()
     };
-    serde_json::to_string_pretty(&serde_json::json!({"schema_version": CHECK_JSON_SCHEMA_VERSION, "files": unit.files().iter().map(|file| file.path.display().to_string()).collect::<Vec<_>>(), "summary": {"parser_diagnostics": parser_count, "compiler_diagnostics": asm.diagnostics.len(), "validation": validation.len()}, "categories": categories, "fail_on": diagnostic_severity_label(fail_on), "parser_diagnostics": parser_diagnostics, "compiler_diagnostics": compiler_diagnostics, "validation": validation_diagnostics, "resume_diagnostics": resume_diagnostics})).expect("check document should serialize") + "\n"
+    let production_diagnostics = if check_category_enabled(categories, "validation") {
+        asm_production_diagnostics(asm)
+    } else {
+        Vec::new()
+    };
+    serde_json::to_string_pretty(&serde_json::json!({"schema_version": CHECK_JSON_SCHEMA_VERSION, "files": unit.files().iter().map(|file| file.path.display().to_string()).collect::<Vec<_>>(), "summary": {"parser_diagnostics": parser_count, "compiler_diagnostics": asm.diagnostics.len(), "validation": validation.len()}, "categories": categories, "fail_on": diagnostic_severity_label(fail_on), "parser_diagnostics": parser_diagnostics, "compiler_diagnostics": compiler_diagnostics, "validation": validation_diagnostics, "resume_diagnostics": resume_diagnostics, "production_diagnostics": production_diagnostics})).expect("check document should serialize") + "\n"
 }
 
 fn parser_diagnostic_json(path: &Path, diagnostic: &ParseDiagnostic) -> serde_json::Value {
@@ -478,6 +486,7 @@ fn print_asm_text(
             "blocked"
         }
     );
+    print_production_diagnostics_text(&asm_production_diagnostics(asm));
 
     print_compiler_diagnostics(&asm.diagnostics);
 
@@ -684,6 +693,7 @@ fn asm_inspection_json(
         diagnostics,
         validation,
         resume_diagnostics: asm_resume_diagnostics(resume_diagnostics),
+        production_diagnostics: asm_production_diagnostics(asm),
         resume,
         production: asm_production_inspection(asm),
     };
@@ -831,6 +841,82 @@ fn asm_production_inspection(asm: &ApplicationSemanticModel) -> serde_json::Valu
     })
 }
 
+fn asm_production_diagnostics(
+    asm: &ApplicationSemanticModel,
+) -> Vec<ProductionProjectedDiagnostic> {
+    project_production_diagnostics(&asm_production_diagnostic_facts(asm))
+}
+
+fn asm_production_diagnostic_facts(
+    asm: &ApplicationSemanticModel,
+) -> Vec<ProductionDiagnosticFact> {
+    asm.diagnostics
+        .iter()
+        .map(|diagnostic| {
+            let primary_identity = diagnostic
+                .effect_id
+                .as_ref()
+                .map(ToString::to_string)
+                .or_else(|| diagnostic.statement_id.as_ref().map(ToString::to_string))
+                .or_else(|| {
+                    diagnostic
+                        .context_declaration_candidate_id
+                        .as_ref()
+                        .map(ToString::to_string)
+                })
+                .or_else(|| diagnostic.context_id.as_ref().map(ToString::to_string))
+                .or_else(|| diagnostic.provider_id.as_ref().map(ToString::to_string))
+                .or_else(|| diagnostic.consumer_id.as_ref().map(ToString::to_string))
+                .or_else(|| {
+                    diagnostic_component_identities(diagnostic)
+                        .into_iter()
+                        .next()
+                        .map(|(_, identity)| identity)
+                });
+            ProductionDiagnosticFact {
+                kind: ProductionDiagnosticKind::InvalidOptimizationRoot,
+                actionable: true,
+                primary_identity,
+                primary_provenance: diagnostic.provenance.clone(),
+                secondary_evidence: diagnostic
+                    .secondary_labels
+                    .iter()
+                    .map(|label| label.message.clone())
+                    .collect(),
+            }
+        })
+        .collect()
+}
+
+fn print_production_diagnostics_text(diagnostics: &[ProductionProjectedDiagnostic]) {
+    if diagnostics.is_empty() {
+        return;
+    }
+    println!("  production diagnostics: {}", diagnostics.len());
+    for diagnostic in diagnostics {
+        println!(
+            "    {} {}: {}",
+            diagnostic.code, diagnostic.name, diagnostic.message
+        );
+        if let Some(identity) = &diagnostic.primary_identity {
+            println!("      = subject: {identity}");
+        }
+        if let Some(provenance) = &diagnostic.primary_provenance {
+            println!(
+                "      at {}:{}:{} span={}..{}",
+                provenance.path,
+                provenance.line,
+                provenance.column,
+                provenance.start,
+                provenance.end
+            );
+        }
+        for evidence in &diagnostic.secondary_evidence {
+            println!("      = evidence: {evidence}");
+        }
+    }
+}
+
 fn find_asm_entity<'a>(asm: &'a ApplicationSemanticModel, entity_id: &str) -> &'a SemanticId {
     asm.ownership
         .keys()
@@ -972,6 +1058,21 @@ fn print_asm_entity_text(
     );
     print_entity_diagnostics(diagnostics, id, provenance);
     print_resume_diagnostics_text(&related_resume_diagnostics(resume_diagnostics, provenance));
+    let production = asm_production_diagnostics(asm)
+        .into_iter()
+        .filter(|diagnostic| {
+            diagnostic.primary_identity.as_deref() == Some(id.as_str())
+                || diagnostic
+                    .primary_provenance
+                    .as_ref()
+                    .is_some_and(|primary| {
+                        primary.path == provenance.path.to_string_lossy()
+                            && primary.start == provenance.span.start
+                            && primary.end == provenance.span.end
+                    })
+        })
+        .collect::<Vec<_>>();
+    print_production_diagnostics_text(&production);
 }
 
 fn print_entity_references(label: &str, references: Vec<&ezc_core::SemanticReference>) {
@@ -1126,6 +1227,7 @@ fn asm_entity_inspection_json(
             resume_diagnostics,
             provenance,
         )),
+        production_diagnostics: asm_production_diagnostics(asm),
         production: asm_production_inspection(asm),
     };
 
@@ -1826,6 +1928,7 @@ struct AsmInspectionDocument<'a> {
     diagnostics: Vec<AsmInspectionDiagnostic<'a>>,
     validation: Vec<AsmInspectionDiagnostic<'a>>,
     resume_diagnostics: Vec<AsmResumeDiagnostic<'a>>,
+    production_diagnostics: Vec<ProductionProjectedDiagnostic>,
     resume: serde_json::Value,
     production: serde_json::Value,
 }
@@ -1841,6 +1944,7 @@ struct AsmEntityInspectionDocument<'a> {
     incoming_references: Vec<AsmInspectionReference<'a>>,
     diagnostics: Vec<AsmInspectionDiagnostic<'a>>,
     resume_diagnostics: Vec<AsmResumeDiagnostic<'a>>,
+    production_diagnostics: Vec<ProductionProjectedDiagnostic>,
     production: serde_json::Value,
 }
 

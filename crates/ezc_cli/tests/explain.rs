@@ -323,6 +323,59 @@ fn k17_inspection_static_costs_match_the_emitted_reports() {
 }
 
 #[test]
+fn k18_production_diagnostics_have_full_selected_text_and_check_json_parity() {
+    let root = repo_root();
+    let input = "fixtures/0066-component-diagnostics/input/EZC1068.tsx";
+    let component = format!("module:{input}/component:x-diagnostic");
+    let full = Command::new(ezc_cli_bin())
+        .current_dir(&root)
+        .args(["asm", input, "--format", "json"])
+        .output()
+        .expect("full K18 ASM");
+    let selected = Command::new(ezc_cli_bin())
+        .current_dir(&root)
+        .args(["explain", input, "--entity", &component, "--format", "json"])
+        .output()
+        .expect("selected K18 ASM");
+    let text = Command::new(ezc_cli_bin())
+        .current_dir(&root)
+        .args(["asm", input])
+        .output()
+        .expect("text K18 ASM");
+    let check = Command::new(ezc_cli_bin())
+        .current_dir(&root)
+        .args(["check", input, "--format", "json"])
+        .output()
+        .expect("K18 check JSON");
+    assert!(full.status.success() && selected.status.success() && text.status.success());
+    assert!(
+        !check.status.success(),
+        "invalid source must still fail check"
+    );
+
+    let full: serde_json::Value = serde_json::from_slice(&full.stdout).expect("full K18 JSON");
+    let selected: serde_json::Value =
+        serde_json::from_slice(&selected.stdout).expect("selected K18 JSON");
+    let check: serde_json::Value = serde_json::from_slice(&check.stdout).expect("check K18 JSON");
+    assert_eq!(check["schema_version"], 6);
+    assert_eq!(
+        full["production_diagnostics"],
+        selected["production_diagnostics"]
+    );
+    assert_eq!(
+        full["production_diagnostics"],
+        check["production_diagnostics"]
+    );
+    let diagnostic = &full["production_diagnostics"][0];
+    assert_eq!(diagnostic["code"], "EZC1112");
+    assert_eq!(diagnostic["name"], "InvalidOptimizationRoot");
+    assert_eq!(diagnostic["primary_identity"], component);
+    let text = String::from_utf8(text.stdout).expect("K18 text UTF-8");
+    assert!(text.contains("EZC1112 InvalidOptimizationRoot"));
+    assert!(text.contains("span=66..82"));
+}
+
+#[test]
 fn asm_command_exports_a_deterministic_semantic_graph() {
     let repo_root = repo_root();
     let path = "fixtures/0001-source-summary/input/Counter.tsx";
