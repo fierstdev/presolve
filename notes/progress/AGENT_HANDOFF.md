@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: K16 - Benchmark Corpus and Production Budgets
-* Working tree: K16 is implemented and awaiting its atomic commit; do not begin K17 until the worktree is clean.
+* Latest completed slice: K17 - ASM Inspection v12
+* Working tree: K17 is implemented and awaiting its atomic commit; do not begin K18 until the worktree is clean.
 * Date: 2026-07-19
 
 Last completed slice
 
-* Slice: K16 - Benchmark Corpus and Production Budgets
-* Summary: commits the sixteen-case production corpus, exact K15 static ceilings, Phase J relative comparison, static no-lazy gate, and 100-cycle exact-owner cleanup stress proof.
-* Key files: `fixtures/phase-k-benchmarks/`, `production_budgets.rs`, `production_cleanup.rs`
-* Boundary: budgets are pinned-toolchain static gates; wall-clock timing is informational and cannot fail the build.
+* Slice: K17 - ASM Inspection v12
+* Summary: projects immutable production policy, reachability, fingerprints, pooling/shared facts, chunk graph, packed tables, artifact identity, cleanup closure, validation phases, static costs, blocks, and exclusions in full and selected ASM inspection.
+* Key files: `crates/ezc_cli/src/main.rs`, `crates/ezc_cli/tests/explain.rs`
+* Boundary: generated module source is never embedded, reports remain non-authoritative, invalid candidates expose blocks without fabricated production identities, and v11 is rejected.
 
 Current in-progress slice
 
-* Slice: K17 - ASM Inspection v12
-* Status: Ready after the K16 atomic commit and clean-worktree check.
+* Slice: K18 - Phase K Diagnostics and Check Projection
+* Status: Ready after the K17 atomic commit and clean-worktree check.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase K: K17-K21. Next: project immutable production optimization products into ASM inspection v12 without embedding generated module source or granting report authority.
+* Remaining in Phase K: K18-K21. Next: project the canonical ordered `EZC1112`-`EZC1127` catalog from immutable production blocks and validators into ASM/check surfaces.
 
 Verification
 

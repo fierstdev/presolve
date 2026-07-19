@@ -173,7 +173,7 @@ fn asm_command_reports_text_summary() {
 
     assert_eq!(
         String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8"),
-        "File: fixtures/0001-source-summary/input/Counter.tsx\nApplicationSemanticModel:\n  components: 1\n  templates: 1\n  ownership: 11\n  references: 4\n  provenance: 11\n  semantic types: 2\n  diagnostics: 0\n  validation: 0\n"
+        "File: fixtures/0001-source-summary/input/Counter.tsx\nApplicationSemanticModel:\n  components: 1\n  templates: 1\n  ownership: 11\n  references: 4\n  provenance: 11\n  semantic types: 2\n  diagnostics: 0\n  validation: 0\n  production optimization: available\n"
     );
 }
 
@@ -204,7 +204,7 @@ fn asm_command_emits_deterministic_json_inspection() {
 
     let document: serde_json::Value =
         serde_json::from_slice(&first.stdout).expect("ASM inspection output was not valid JSON");
-    assert_eq!(document["schema_version"], 11);
+    assert_eq!(document["schema_version"], 12);
     assert_eq!(
         document["file"],
         "fixtures/0001-source-summary/input/Counter.tsx"
@@ -212,6 +212,22 @@ fn asm_command_emits_deterministic_json_inspection() {
     assert_eq!(document["entities"].as_array().map(Vec::len), Some(11));
     assert_eq!(document["diagnostics"], serde_json::json!([]));
     assert_eq!(document["validation"], serde_json::json!([]));
+    assert_eq!(document["production"]["status"], "available");
+    assert_eq!(
+        document["production"]["validation_phases"]
+            .as_array()
+            .map(Vec::len),
+        Some(11)
+    );
+    assert_eq!(
+        document["production"]["runtime_tables"]["tables"]
+            .as_array()
+            .map(Vec::len),
+        Some(6)
+    );
+    assert!(document["production"]["modules"]
+        .as_array()
+        .is_some_and(|modules| modules.iter().all(|module| module.get("source").is_none())));
     assert!(document["references"].as_array().is_some_and(|references| {
         references.iter().any(|reference| {
             reference["kind"] == "event-method"
@@ -221,6 +237,89 @@ fn asm_command_emits_deterministic_json_inspection() {
                     == "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/method:increment"
         })
     }));
+}
+
+#[test]
+fn k17_invalid_candidates_expose_blocks_without_production_id_fabrication() {
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args([
+            "asm",
+            "fixtures/0066-component-diagnostics/input/EZC1068.tsx",
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("failed to inspect invalid production candidate");
+    assert!(output.status.success());
+    let document: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("invalid candidate ASM JSON");
+    assert_eq!(document["schema_version"], 12);
+    assert_eq!(document["production"]["status"], "blocked");
+    assert_eq!(
+        document["production"]["production_ids"],
+        serde_json::json!([])
+    );
+    assert!(document["production"]["blocks"]
+        .as_array()
+        .is_some_and(|blocks| blocks.iter().any(|block| block["code"] == "EZC1068")));
+    assert!(document["production"].get("artifact_identity").is_none());
+}
+
+#[test]
+fn k17_inspection_static_costs_match_the_emitted_reports() {
+    let root = repo_root();
+    let input = "fixtures/0059-context-runtime-matrix/input/ContextRuntimeMatrix.tsx";
+    let output_dir = root.join("target/ezc-test-output/k17-report-parity");
+    if output_dir.exists() {
+        std::fs::remove_dir_all(&output_dir).expect("clean K17 report output");
+    }
+    let build = Command::new(ezc_cli_bin())
+        .current_dir(&root)
+        .args([
+            "build",
+            input,
+            "--out",
+            output_dir.to_str().expect("output UTF-8"),
+            "--production",
+        ])
+        .output()
+        .expect("build K17 report fixture");
+    assert!(build.status.success());
+    let asm = Command::new(ezc_cli_bin())
+        .current_dir(&root)
+        .args(["asm", input, "--format", "json"])
+        .output()
+        .expect("inspect K17 report fixture");
+    assert!(asm.status.success());
+
+    let inspection: serde_json::Value =
+        serde_json::from_slice(&asm.stdout).expect("K17 inspection JSON");
+    let optimization: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(output_dir.join("optimization-report.json")).expect("optimization report"),
+    )
+    .expect("optimization report JSON");
+    let cost: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(output_dir.join("runtime-cost-report.json")).expect("cost report"),
+    )
+    .expect("cost report JSON");
+    let inspected_cost = &inspection["production"]["size_and_static_cost"];
+    let total_bytes = inspected_cost["production_artifact_bytes"]
+        .as_u64()
+        .expect("artifact bytes")
+        + inspected_cost["production_executable_bytes"]
+            .as_u64()
+            .expect("executable bytes");
+    assert_eq!(optimization["productionBytes"], total_bytes);
+    assert_eq!(cost["productionArtifactBytes"], total_bytes);
+    assert_eq!(
+        inspected_cost["runtime_table_count"],
+        cost["runtimeTableCount"]
+    );
+    assert_eq!(
+        inspected_cost["runtime_record_count"],
+        cost["runtimeRecordCount"]
+    );
 }
 
 #[test]
@@ -355,7 +454,7 @@ fn asm_command_inspects_one_semantic_entity() {
 
     assert!(output.status.success());
     let document: serde_json::Value = serde_json::from_slice(&output.stdout).expect("entity JSON");
-    assert_eq!(document["schema_version"], 11);
+    assert_eq!(document["schema_version"], 12);
     assert_eq!(document["entity"]["id"], entity_id);
     assert_eq!(document["entity"]["kind"], "state-field");
     assert_eq!(document["entity"]["semantic_type"]["type_text"], "number");
@@ -442,7 +541,7 @@ fn asm_and_explain_inspect_canonical_computed_metadata() {
 
     let document: serde_json::Value =
         serde_json::from_slice(&asm.stdout).expect("computed entity inspection JSON");
-    assert_eq!(document["schema_version"], 11);
+    assert_eq!(document["schema_version"], 12);
     assert_eq!(document["entity"]["computed"]["computed_type"], "number");
     assert_eq!(
         document["entity"]["computed"]["dependencies"],
@@ -463,6 +562,7 @@ fn asm_and_explain_inspect_canonical_computed_metadata() {
 
     let full_document: serde_json::Value =
         serde_json::from_slice(&full_asm.stdout).expect("full computed ASM inspection JSON");
+    assert_eq!(document["production"], full_document["production"]);
     let full_entity = full_document["entities"]
         .as_array()
         .expect("full ASM entities")
@@ -519,7 +619,7 @@ fn asm_and_explain_project_one_canonical_effect_inspection_record() {
 
     let selected: serde_json::Value = serde_json::from_slice(&asm.stdout).expect("effect JSON");
     let inspection = &selected["entity"]["effect"];
-    assert_eq!(selected["schema_version"], 11);
+    assert_eq!(selected["schema_version"], 12);
     assert_eq!(inspection["validation"]["status"], "valid");
     assert_eq!(
         inspection["direct_dependencies"]["state"],
@@ -1628,7 +1728,7 @@ fn effect_diagnostics_share_check_and_selected_explain_projection() {
     assert!(explain.status.success());
     let explain: serde_json::Value =
         serde_json::from_slice(&explain.stdout).expect("selected effect explain JSON");
-    assert_eq!(explain["schema_version"], 11);
+    assert_eq!(explain["schema_version"], 12);
     assert_eq!(explain["diagnostics"], serde_json::Value::Array(expected));
 }
 
@@ -1687,14 +1787,14 @@ fn context_diagnostics_share_check_full_asm_selected_asm_and_explain_projection(
     let full_asm_output = run(&["asm", path, "--format", "json"]);
     assert!(full_asm_output.status.success());
     let full_asm = parse(&full_asm_output);
-    assert_eq!(full_asm["schema_version"], 11);
+    assert_eq!(full_asm["schema_version"], 12);
     assert_eq!(normalize(&full_asm["diagnostics"]), expected);
 
     for command in ["asm", "explain"] {
         let output = run(&[command, "--entity", context_id, path, "--format", "json"]);
         assert!(output.status.success());
         let selected = parse(&output);
-        assert_eq!(selected["schema_version"], 11);
+        assert_eq!(selected["schema_version"], 12);
         assert_eq!(normalize(&selected["diagnostics"]), expected);
     }
 }
@@ -1773,7 +1873,7 @@ fn component_diagnostics_share_check_full_asm_selected_asm_and_explain_projectio
     assert!(full_output.status.success());
     assert_eq!(full_output.stdout, repeated.stdout);
     let full = parse(&full_output);
-    assert_eq!(full["schema_version"], 11);
+    assert_eq!(full["schema_version"], 12);
     assert_eq!(normalize(&full["diagnostics"]), expected);
 
     for command in ["asm", "explain"] {
@@ -1787,7 +1887,7 @@ fn component_diagnostics_share_check_full_asm_selected_asm_and_explain_projectio
         ]);
         assert!(output.status.success());
         let selected = parse(&output);
-        assert_eq!(selected["schema_version"], 11);
+        assert_eq!(selected["schema_version"], 12);
         assert_eq!(normalize(&selected["diagnostics"]), expected);
     }
 
@@ -4274,7 +4374,7 @@ class FormsInspection {
     );
     let document: serde_json::Value =
         serde_json::from_slice(&output.stdout).expect("Forms ASM JSON");
-    assert_eq!(document["schema_version"], 11);
+    assert_eq!(document["schema_version"], 12);
     let form_id = document["entities"]
         .as_array()
         .expect("Forms ASM entities")
@@ -4328,7 +4428,7 @@ class FormsInspection {
     );
     let selected: serde_json::Value =
         serde_json::from_slice(&output.stdout).expect("Forms explain JSON");
-    assert_eq!(selected["schema_version"], 11);
+    assert_eq!(selected["schema_version"], 12);
     assert_eq!(selected["entity"]["form"]["role"], "form");
     assert_eq!(selected["entity"]["form"]["form"], form_id);
 }

@@ -9,14 +9,15 @@ use std::process;
 use ezc_core::{
     build_application_semantic_model_for_unit, build_component_graph,
     build_context_inspection_registry, build_effect_inspection_registry,
-    build_form_inspection_registry, build_production_reports, build_production_runtime_artifact,
-    build_resume_chunk_graph, build_resume_manifest, build_runtime_component_artifact,
-    build_runtime_computed_artifact, build_runtime_context_artifact, build_runtime_effect_artifact,
-    build_runtime_forms_artifact, build_semantic_graph, build_template_graph,
-    build_template_manifest_from_asm, emit_production_modules, explain_json, explain_text,
-    extract_production_chunk_graph, fold_component_graph, generate_ordinary_instance_html,
-    generate_runtime_stub, generate_standalone_page_with_resume_runtime, generate_static_html,
-    lower_components_to_ir, optimization_report_json, optimize_context_ir, optimize_effect_ir,
+    build_form_inspection_registry, build_production_reachability_graph, build_production_reports,
+    build_production_runtime_artifact, build_resume_chunk_graph, build_resume_manifest,
+    build_runtime_component_artifact, build_runtime_computed_artifact,
+    build_runtime_context_artifact, build_runtime_effect_artifact, build_runtime_forms_artifact,
+    build_semantic_graph, build_template_graph, build_template_manifest_from_asm,
+    emit_production_modules, explain_json, explain_text, extract_production_chunk_graph,
+    fold_component_graph, generate_ordinary_instance_html, generate_runtime_stub,
+    generate_standalone_page_with_resume_runtime, generate_static_html, lower_components_to_ir,
+    optimization_report_json, optimize_context_ir, optimize_effect_ir,
     production_runtime_artifact_json, project_resume_diagnostics, resume_manifest_json,
     runtime_component_artifact_json, runtime_computed_artifact_json, runtime_context_artifact_json,
     runtime_cost_report_json, runtime_effect_artifact_json, runtime_forms_artifact_json,
@@ -35,8 +36,12 @@ use ezc_parser::{
 };
 use serde::Serialize;
 
-const ASM_INSPECTION_SCHEMA_VERSION: u32 = 11;
+const ASM_INSPECTION_SCHEMA_VERSION: u32 = 12;
 const CHECK_JSON_SCHEMA_VERSION: u32 = 6;
+
+fn supports_asm_inspection_schema(version: u32) -> bool {
+    version == ASM_INSPECTION_SCHEMA_VERSION
+}
 
 fn main() {
     let mut args = env::args().skip(1).collect::<Vec<_>>();
@@ -464,6 +469,15 @@ fn print_asm_text(
     );
     println!("  diagnostics: {}", asm.diagnostics.len());
     println!("  validation: {}", validation.len());
+    let production = asm_production_inspection(asm);
+    println!(
+        "  production optimization: {}",
+        if production["status"] == "available" {
+            "available"
+        } else {
+            "blocked"
+        }
+    );
 
     print_compiler_diagnostics(&asm.diagnostics);
 
@@ -581,6 +595,9 @@ fn asm_inspection_json(
     validation: &[AsmValidationDiagnostic],
     resume_diagnostics: &[ezc_core::ResumeProjectedDiagnostic],
 ) -> String {
+    debug_assert!(supports_asm_inspection_schema(
+        ASM_INSPECTION_SCHEMA_VERSION
+    ));
     let computed_functions = computed_evaluation_functions(asm);
     let effect_inspections = build_effect_inspection_registry(asm);
     let context_inspections = build_context_inspection_registry(asm);
@@ -668,10 +685,150 @@ fn asm_inspection_json(
         validation,
         resume_diagnostics: asm_resume_diagnostics(resume_diagnostics),
         resume,
+        production: asm_production_inspection(asm),
     };
 
     serde_json::to_string_pretty(&document).expect("ASM inspection document should serialize")
         + "\n"
+}
+
+#[allow(clippy::too_many_lines)]
+fn asm_production_inspection(asm: &ApplicationSemanticModel) -> serde_json::Value {
+    if !asm.diagnostics.is_empty() {
+        return serde_json::json!({
+            "status": "blocked",
+            "policy": {"id": "optimization-policy:production-v1", "version": 1},
+            "blocks": asm.diagnostics.iter().map(|diagnostic| serde_json::json!({
+                "code": diagnostic.code,
+                "reason": diagnostic.message,
+            })).collect::<Vec<_>>(),
+            "production_ids": [],
+        });
+    }
+
+    let ir = lower_components_to_ir(asm);
+    let component = build_runtime_component_artifact(asm, &asm.component_ir_optimization);
+    let computed = build_runtime_computed_artifact(asm, &ir);
+    let context = build_runtime_context_artifact(asm, &optimize_context_ir(&ir));
+    let effect = build_runtime_effect_artifact(asm, &optimize_effect_ir(&ir).output);
+    let forms = build_runtime_forms_artifact(asm);
+    let resume = build_resume_manifest(asm);
+    let reachability = build_production_reachability_graph(
+        &resume, &component, &computed, &context, &effect, &forms,
+    );
+    let candidates = SharedChunkCandidatePlan {
+        candidates: Vec::new(),
+        rejections: Vec::new(),
+    };
+    let (graph, extraction) =
+        extract_production_chunk_graph(&candidates, &production_root_chunk_inputs(&resume))
+            .expect("valid immutable resume products form a production graph");
+    let artifact = build_production_runtime_artifact(&resume, &graph)
+        .expect("valid immutable production graph packs");
+    let artifact_json = production_runtime_artifact_json(&artifact);
+    let layout = emit_production_modules(&graph);
+    let modules = std::iter::once(&layout.eager)
+        .chain(layout.shared.iter())
+        .chain(layout.roots.iter())
+        .map(|module| {
+            serde_json::json!({
+                "filename": module.filename,
+                "byte_count": module.source.len(),
+                "exports": module.exports,
+            })
+        })
+        .collect::<Vec<_>>();
+    let runtime_record_count = artifact
+        .tables
+        .tables
+        .iter()
+        .map(|table| table.mappings.len())
+        .sum::<usize>()
+        + graph.chunks.len();
+    let static_operation_count = resume
+        .capture_programs
+        .iter()
+        .map(|program| program.instructions.len())
+        .sum::<usize>()
+        + resume
+            .restore_programs
+            .iter()
+            .map(|program| program.instructions.len())
+            .sum::<usize>();
+
+    serde_json::json!({
+        "status": "available",
+        "policy": {"id": artifact.optimization_policy, "version": 1},
+        "reachability": {
+            "roots": reachability.roots.iter().map(|root| serde_json::json!({
+                "subject_id": root.subject_id,
+                "reason": format!("{:?}", root.reason),
+            })).collect::<Vec<_>>(),
+            "edges": reachability.edges.iter().map(|edge| serde_json::json!({
+                "from": edge.from,
+                "to": edge.to,
+                "reason": format!("{:?}", edge.reason),
+            })).collect::<Vec<_>>(),
+            "unreachable_records": reachability.unreachable.iter().map(|record| serde_json::json!({
+                "subject_id": record.subject_id,
+                "reason": record.reason,
+            })).collect::<Vec<_>>(),
+        },
+        "programs": {
+            "fingerprints": graph.chunks.iter().flat_map(|chunk| chunk.programs.iter()).map(ToString::to_string).collect::<Vec<_>>(),
+            "aliases": [],
+        },
+        "constant_pool": {"entries": [], "consumers": []},
+        "shared_candidates": {"calculations": [], "rejections": []},
+        "chunk_graph": {
+            "eager_chunk_id": graph.eager_chunk_id,
+            "chunks": graph.chunks.iter().map(|chunk| serde_json::json!({
+                "id": chunk.id,
+                "kind": format!("{:?}", chunk.kind),
+                "activation_roots": chunk.activation_roots,
+                "root_kind": chunk.root_kind,
+                "program_fingerprints": chunk.programs.iter().map(ToString::to_string).collect::<Vec<_>>(),
+                "registration_only": chunk.registration_only,
+                "module_filename": chunk.provisional_module_filename,
+            })).collect::<Vec<_>>(),
+            "dependencies": graph.dependencies.iter().map(|dependency| serde_json::json!({
+                "dependent_chunk_id": dependency.dependent_chunk_id,
+                "dependency_chunk_id": dependency.dependency_chunk_id,
+            })).collect::<Vec<_>>(),
+            "activation_plans": graph.activation_plans.iter().map(|plan| serde_json::json!({
+                "activation_root_id": plan.activation_root_id,
+                "root_chunk_id": plan.root_chunk_id,
+                "shared_chunk_ids": plan.shared_chunk_ids,
+            })).collect::<Vec<_>>(),
+        },
+        "runtime_tables": artifact.tables,
+        "artifact_identity": {
+            "build_id": artifact.build_id,
+            "runtime_protocol_version": artifact.runtime_protocol_version,
+            "artifact_checksum": artifact.integrity.artifact_checksum,
+        },
+        "cleanup_closures": {
+            "ordering": "reverse-initialization",
+            "owned_kinds": ["activation-dispatch", "event-binding-index", "form-index", "effect-subscription", "context-binding", "slot-structural-registry", "computed-cache", "state-storage", "form-storage", "context-provider", "resume-boundary-anchor", "component-instance", "dom-anchor"],
+        },
+        "validation_phases": ["V0","V1","V2","V3","V4","V5","V6","V7","V8","V9","V10"],
+        "size_and_static_cost": {
+            "production_artifact_bytes": artifact_json.len(),
+            "production_executable_bytes": modules.iter().map(|module| module["byte_count"].as_u64().unwrap_or(0)).sum::<u64>(),
+            "runtime_table_count": artifact.tables.tables.len(),
+            "runtime_record_count": runtime_record_count,
+            "static_operation_count": static_operation_count,
+            "extracted_program_count": extraction.extracted_program_count,
+            "root_chunk_count": extraction.root_chunk_count,
+            "shared_chunk_count": extraction.shared_chunk_count,
+        },
+        "modules": modules,
+        "blocks": reachability.blocks.iter().map(|block| serde_json::json!({
+            "subject_id": block.subject_id,
+            "reason": block.reason,
+        })).collect::<Vec<_>>(),
+        "exclusions": ["cryptographic-signing", "wall-clock-timing"],
+    })
 }
 
 fn find_asm_entity<'a>(asm: &'a ApplicationSemanticModel, entity_id: &str) -> &'a SemanticId {
@@ -925,6 +1082,9 @@ fn asm_entity_inspection_json(
     resume_diagnostics: &[ezc_core::ResumeProjectedDiagnostic],
     filters: AsmEntityFilters,
 ) -> String {
+    debug_assert!(supports_asm_inspection_schema(
+        ASM_INSPECTION_SCHEMA_VERSION
+    ));
     let computed_functions = computed_evaluation_functions(asm);
     let effect_inspections = build_effect_inspection_registry(asm);
     let context_inspections = build_context_inspection_registry(asm);
@@ -966,6 +1126,7 @@ fn asm_entity_inspection_json(
             resume_diagnostics,
             provenance,
         )),
+        production: asm_production_inspection(asm),
     };
 
     serde_json::to_string_pretty(&document).expect("ASM entity inspection should serialize") + "\n"
@@ -1666,6 +1827,7 @@ struct AsmInspectionDocument<'a> {
     validation: Vec<AsmInspectionDiagnostic<'a>>,
     resume_diagnostics: Vec<AsmResumeDiagnostic<'a>>,
     resume: serde_json::Value,
+    production: serde_json::Value,
 }
 
 #[derive(Serialize)]
@@ -1679,6 +1841,7 @@ struct AsmEntityInspectionDocument<'a> {
     incoming_references: Vec<AsmInspectionReference<'a>>,
     diagnostics: Vec<AsmInspectionDiagnostic<'a>>,
     resume_diagnostics: Vec<AsmResumeDiagnostic<'a>>,
+    production: serde_json::Value,
 }
 
 #[derive(Serialize)]
@@ -3137,6 +3300,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn k17_accepts_only_asm_inspection_schema_v12() {
+        assert!(supports_asm_inspection_schema(12));
+        assert!(!supports_asm_inspection_schema(11));
+        assert!(!supports_asm_inspection_schema(13));
+    }
+
+    #[test]
     fn formats_sorted_asm_validation_diagnostics_only_when_present() {
         assert!(asm_validation_diagnostics_text(&[]).is_none());
 
@@ -3184,7 +3354,7 @@ class Profile {
         let document = asm_inspection_json(&[path], &asm, &[], &[]);
         let json: serde_json::Value = serde_json::from_str(&document).unwrap();
         assert_eq!(json["schema_version"], ASM_INSPECTION_SCHEMA_VERSION);
-        assert_eq!(json["schema_version"], 11);
+        assert_eq!(json["schema_version"], 12);
         assert!(document.contains("validation-rule"));
         assert!(document.contains("validation_rule"));
     }
@@ -3219,7 +3389,7 @@ class Profile {
             &resume_diagnostics,
         ))
         .expect("full ASM JSON");
-        assert_eq!(full["schema_version"], 11);
+        assert_eq!(full["schema_version"], 12);
         let full_diagnostic = full["resume_diagnostics"]
             .as_array()
             .expect("resume diagnostics")
@@ -3241,7 +3411,7 @@ class Profile {
             AsmEntityFilters::default(),
         ))
         .expect("selected ASM JSON");
-        assert_eq!(selected["schema_version"], 11);
+        assert_eq!(selected["schema_version"], 12);
         assert!(selected["resume_diagnostics"]
             .as_array()
             .expect("selected resume diagnostics")
