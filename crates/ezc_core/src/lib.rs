@@ -69,6 +69,7 @@ pub mod ordinary_html_codegen;
 pub mod ordinary_template_instance;
 pub mod ordinary_template_integrity;
 pub mod page_codegen;
+pub mod production_audit;
 pub mod production_bootstrap;
 pub mod production_chunk_graph;
 pub mod production_cleanup;
@@ -405,6 +406,10 @@ pub use page_codegen::{
     generate_standalone_page_with_component_runtime_and_forms,
     generate_standalone_page_with_computed_runtime, generate_standalone_page_with_context_runtime,
     generate_standalone_page_with_effect_runtime, generate_standalone_page_with_resume_runtime,
+};
+pub use production_audit::{
+    ProductionRuntimeAuthority, PRODUCTION_RUNTIME_AUTHORITIES,
+    PRODUCTION_RUNTIME_REFINEMENT_INVARIANTS,
 };
 pub use production_bootstrap::{
     build_production_bootstrap_plan, ProductionBootstrapBlock, ProductionBootstrapPlan,

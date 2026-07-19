@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: K19 - Comprehensive Production and Browser Fixtures
-* Working tree: K19 is implemented and awaiting its atomic commit; do not begin K20 until the worktree is clean.
+* Latest completed slice: K20 - Production Runtime Refinement Audit
+* Working tree: K20 is implemented and awaiting its atomic commit; do not begin K21 until the worktree is clean.
 * Date: 2026-07-19
 
 Last completed slice
 
-* Slice: K19 - Comprehensive Production and Browser Fixtures
-* Summary: proves development/production observable parity, repeated byte identity, dense packed tables, malformed-artifact rejection, reversed multi-file identity, generated-module syntax/no-dynamic-source rules, CSP-safe production boot, and 100-cycle browser registry stability.
-* Key files: `production_runtime_fixtures.rs`, `runtime_browser.rs`, `explain.rs`
-* Boundary: K19 adds proof only. Production modules remain source-free inspection products, malformed packed input fails before authored execution, and existing cold/resume/shared/failure/cleanup/coalescing semantics are unchanged.
+* Slice: K20 - Production Runtime Refinement Audit
+* Summary: freezes eight unique named authorities and thirteen audited refinement invariants covering ordinal hot paths, listener/registry installation, leakage, generated helpers, cache growth, specialization, deterministic modules, validation, cleanup, budgets, schema stability, and parity.
+* Key files: `production_audit.rs`, `production-runtime-refinement-audit.md`, `lib.rs`
+* Boundary: K20 changes no public product or behavior. All earlier schema versions and the K16 budget ceilings remain exact.
 
 Current in-progress slice
 
-* Slice: K20 - Production Runtime Refinement Audit
-* Status: Ready after the K19 atomic commit and clean-worktree check.
+* Slice: K21 - Phase K Stability Audit and Freeze
+* Status: Ready after the K20 atomic commit and clean-worktree check.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase K: K20-K21. Next: audit every production authority/hot-path/cache/leakage invariant with static assertions and preserve all K16 budgets and prior schema versions.
+* Remaining in Phase K: K21 only. Next: write the frozen production contract and cross-references, run the exact sequential final gate plus dedicated production/browser suites, record exact counts/bytes/ranges/exclusions, and commit the Phase K freeze without entering Phase L.
 
 Verification
 
