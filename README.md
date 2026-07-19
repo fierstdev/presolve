@@ -4,6 +4,13 @@ Presolve is a compiler-centered web authoring system. The compiler is the sole
 semantic authority: tooling, the runtime, and future platform services consume
 immutable compiler products rather than reconstructing source knowledge.
 
+## Repository layout
+
+The current active repository boundaries and historical-archive policy are
+documented in [`docs/repository-layout.md`](docs/repository-layout.md). Phase L
+authority documents live in
+[`docs/specifications/phase-l/`](docs/specifications/phase-l/README.md).
+
 ```txt
 source file
   -> source summary

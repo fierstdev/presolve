@@ -4,6 +4,14 @@ check:
     cargo fmt --all --check
     cargo clippy --workspace --all-targets -- -D warnings
     cargo test --workspace
+    ./scripts/verify-repository-layout.sh
+    ./scripts/verify-public-identity.sh
+
+repository-layout:
+    ./scripts/verify-repository-layout.sh
+
+phase-l-specifications:
+    ./scripts/verify-phase-l-specifications.sh
 
 e2e:
     cargo test -p presolve-cli --test runtime_browser -- --nocapture --test-threads=1

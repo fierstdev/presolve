@@ -3,25 +3,27 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L1 - Presolve Identity Transition
-* Working tree: L1 is complete and ready to commit; the public identity is Presolve.
+* Latest completed slice: L2 - Repository Constitution
+* Working tree: L2 is complete and ready to commit; active implementation paths remain stable and historical material is archived under `docs/archive/engineering/`.
 * Date: 2026-07-19
 
 Last completed slice
 
-* Slice: L1 - Presolve Identity Transition
-* Summary: establishes Presolve as the public product, compiler, canonical `presolve` executable, package namespace, repository destination, website, package/version metadata, workflow configuration, and public schema identity without changing compiler or runtime semantics.
-* Key files: `Cargo.toml`, `crates/ezc_cli/Cargo.toml`, `README.md`, `package.json`, `packages/runtime/package.json`, `scripts/verify-public-identity.sh`, `docs/presolve-identity-transition.md`, `2026-W28.md`
-* Boundary: L1 is identity-only. Frozen generated runtime globals, authored fixture strings, private Rust aliases/paths, and Phase A-K historical records remain intentionally retained and are classified in `docs/presolve-identity-transition.md`. Next: L2 - Repository Constitution.
+* Slice: L2 - Repository Constitution
+* Summary: classifies all tracked root paths, archives only authorized planning/research history, tracks the complete Phase L authority set, and adds deterministic repository-layout and specification-index audits without repartitioning active implementation.
+* Key files: `docs/repository-layout.md`, `docs/archive/engineering/README.md`, `docs/specifications/phase-l/README.md`, `scripts/verify-repository-layout.sh`, `scripts/verify-phase-l-specifications.sh`, `justfile`, `2026-W28.md`
+* Boundary: `crates/`, `packages/`, `examples/`, `fixtures/`, and `schemas/` remain in place. `docs/planning/` moved byte-preserved to `docs/archive/engineering/planning/`; inactive resource notes and the ADR-accepted parser spike note moved to the archive. The live continuation records remain in `notes/progress/`. Next: L3 - Compiler Platform Products. Do not begin L3 without re-reading its active contract and the Phase L constitution.
 
 Current phase boundary
 
-* Slice: L2 - Repository Constitution.
-* Status: L1 is complete. The Phase L authoritative specification set is available; begin only the L2 repository-layout and public-development slice next.
+* Slice: L3 - Compiler Platform Products.
+* Status: L2 is complete. Stop at the L3 boundary; no L3 platform product, schema, service, or package work has started.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
 * Remaining in Phase K: none.
 
 Verification
+
+* L2 verification: `./scripts/verify-repository-layout.sh`, `./scripts/verify-phase-l-specifications.sh`, and `./scripts/verify-public-identity.sh` pass. The repository audit verifies the authoritative Phase L index, forbids speculative root `compiler/`, `runtime/`, and `cli/` directories, rejects archived schema/fixture directories and tracked generated or credential-like material, checks active control files, current root ownership, archive navigation, and no active automation path into the archive. Exact `cmp` checks prove all six supplied Phase L documents were tracked byte-for-byte. `pnpm -r check` and `pnpm -r test` pass; the existing JavaScript packages report their current placeholder checks/tests. `cargo test -p presolve-cli --test production_baseline` passes both generated-output baseline/determinism tests. `cargo fmt --all --check`, strict all-feature workspace clippy, `RUST_TEST_THREADS=1 cargo test --workspace --all-features`, independent `just check`, and `git diff --check` pass. No standalone schema validator or documentation-link framework exists; the repository audit is the established closest check for schema placement and archive/specification navigation.
 
 * L1 verification: `cargo check --workspace`, `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, `RUST_TEST_THREADS=1 cargo test --workspace --all-features`, independent `just check`, `./scripts/verify-public-identity.sh`, `cargo run -q -p presolve-cli -- explain fixtures/0001-source-summary/input/Counter.tsx --format json`, and `git diff --check` pass. The serialized workspace run passes 4 CLI units, 8 Component fixtures, 12 Context fixtures, 132 inspection/build tests, 2 production baseline tests, 2 production budget tests, 2 production runtime fixtures, 37 real-browser probes, 448 core tests, 13 parser units, and 26 parser integrations. The compiler builds and tests exclusively through the renamed `presolve-cli` package and `presolve` binary; frozen generated artifacts remain covered by the existing baseline and fixture assertions.
 

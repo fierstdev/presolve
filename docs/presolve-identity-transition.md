@@ -16,7 +16,7 @@ replacement incorrect. The retained occurrences are deliberately classified:
 
 | Location class | Reason | Rule |
 | --- | --- | --- |
-| `notes/progress/`, `docs/planning/`, ADRs, and RFCs | Historical engineering record | Preserve the record verbatim. |
+| `notes/progress/`, `docs/archive/engineering/planning/`, ADRs, and RFCs | Historical engineering record | Preserve the record verbatim. |
 | Frozen Phase A-K contracts | Frozen provenance and contract terminology | Preserve until the historical archive is established in L2. |
 | `crates/ezc_*` paths and Rust import aliases | Private implementation layout retained until L2 repository restructuring | Never present these as a public package or executable. |
 | Generated runtime globals and diagnostics | Frozen generated-artifact/runtime contract | Do not rename in L1; generated output must remain byte-equivalent. |

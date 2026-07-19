@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+readonly specification_dir='docs/specifications/phase-l'
+readonly -a specifications=(
+  PHASE_L_AUTHORITATIVE_PLATFORM_CONSTITUTION.md
+  PRESOLVE_PACKAGE_AND_CLI_SPECIFICATION.md
+  PHASE_L_SLICES_L1_L10.md
+  PHASE_L_SLICES_L11_L20.md
+  PHASE_L_VERIFICATION_AND_RELEASE.md
+  PHASE_L_L2_REPOSITORY_CONSTITUTION_AMENDMENT.md
+)
+
+for specification in "${specifications[@]}"; do
+  test -f "$specification_dir/$specification"
+  rg --quiet --fixed-strings "$specification" "$specification_dir/README.md"
+done
