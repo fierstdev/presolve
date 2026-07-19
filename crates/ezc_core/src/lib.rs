@@ -80,6 +80,7 @@ pub mod production_optimization;
 pub mod production_reachability;
 pub mod production_runtime_artifact;
 pub mod production_scheduler;
+pub mod production_validation;
 pub mod provider;
 pub mod resume_activation;
 pub mod resume_anchor;
@@ -465,6 +466,10 @@ pub use production_scheduler::{
     build_production_patch_schedule, coalesce_production_binding_writes,
     BindingWriteCoalescingDecision, BindingWriteCoalescingReport, ProductionPatchBatchKind,
     ProductionPatchOperation, ProductionPatchSchedule,
+};
+pub use production_validation::{
+    validate_production_runtime_pipeline, ProductionRuntimeFailure, ProductionValidationEvidence,
+    ProductionValidationPhase, ProductionValidationResult,
 };
 pub use provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
 pub use resume_activation::{

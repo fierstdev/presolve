@@ -3,23 +3,23 @@ EdgeZero Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: K13 - Form, Context, Effect, and Resume Registry Cleanup
-* Working tree: K13 is implemented and awaiting its atomic commit; do not begin K14 until the worktree is clean.
+* Latest completed slice: K14 - Runtime Validation and Production Failure Records
+* Working tree: K14 is implemented and awaiting its atomic commit; do not begin K15 until the worktree is clean.
 * Date: 2026-07-16
 
 Last completed slice
 
-* Slice: K13 - Form, Context, Effect, and Resume Registry Cleanup
-* Summary: completed exact-owner cleanup kinds for Forms, Context, Effect, and resume records and added closure validation for missing, duplicate, foreign-owner, and order failures.
-* Key files: `production_cleanup.rs`, `lib.rs`
-* Boundary: K13 executes no authored cleanup and leaves shared immutable caches global; K14 alone owns the production validation pipeline and failure records.
+* Slice: K14 - Runtime Validation and Production Failure Records
+* Summary: added the exact ordered V0-V10 validation pipeline, prototype-pollution hardening, first-failure termination, and compact source-free trusted/untrusted failure records.
+* Key files: `production_validation.rs`, `lib.rs`
+* Boundary: K14 validates before authored execution and adds no recovery UI; K15 alone owns optimization/runtime cost reports.
 
 Current in-progress slice
 
-* Slice: K14 - Runtime Validation and Production Failure Records
-* Status: Ready after the K13 atomic commit and clean-worktree check.
+* Slice: K15 - Optimization and Runtime Cost Reports
+* Status: Ready after the K14 atomic commit and clean-worktree check.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20
-* Remaining in Phase K: K14-K21. Next: implement the ordered V0-V10 production validation pipeline and compact safe failure records.
+* Remaining in Phase K: K15-K21. Next: derive immutable optimization and static runtime cost reports from committed K products.
 
 Verification
 
