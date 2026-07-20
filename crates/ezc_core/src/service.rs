@@ -19,6 +19,10 @@ use std::sync::Arc;
 
 use sha2::{Digest as _, Sha256};
 
+use crate::persistent_cache::{
+    CacheInspectionReportV1, CacheKeyInputV1, CacheOutcomeV1, CacheReportSelector,
+    CacheTelemetryV1, CachedCompileResultV1, PersistentArtifactCacheV1,
+};
 use crate::platform::{
     self, CacheLimits, CancellationToken, CanonicalReusableProductV1, CompilationOutcome,
     CompileWorkspaceRequest, CompilerSessionState, ContractVersion, IncrementalCompilationModeV1,
@@ -101,6 +105,8 @@ pub struct CompileRequest {
     pub incremental_report: IncrementalReportSelector,
     /// Explicit test-only proof mode. It never enables production semantics.
     pub verify_exact_equivalence: bool,
+    /// Optional L6 cache telemetry. `None` preserves the L4/L5 response surface.
+    pub cache_report: CacheReportSelector,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IncrementalReportSelector {
@@ -170,6 +176,7 @@ pub struct CompileResponse {
     pub graph: Arc<WorkspaceGraph>,
     pub mode: String,
     pub incremental_report: Option<IncrementalExecutionReportV1>,
+    pub cache_report: Option<CacheTelemetryV1>,
 }
 
 pub fn encode_frame(payload: &[u8]) -> Result<Vec<u8>, ServiceError> {
@@ -217,6 +224,7 @@ pub struct CompilerServiceHost {
     root: PathBuf,
     descriptor: CompilerServiceDescriptor,
     sessions: BTreeMap<String, DurableSession>,
+    cache: PersistentArtifactCacheV1,
 }
 struct DurableSession {
     workspace_id: WorkspaceId,
@@ -257,6 +265,13 @@ impl CompilerServiceHost {
         root: impl AsRef<Path>,
         compiler_contract: ContractVersion,
     ) -> Result<Self, ServiceError> {
+        Self::start_with_cache(root, None, compiler_contract)
+    }
+    pub fn start_with_cache(
+        root: impl AsRef<Path>,
+        cache_root: Option<&Path>,
+        compiler_contract: ContractVersion,
+    ) -> Result<Self, ServiceError> {
         let root = root.as_ref().join("service");
         fs::create_dir_all(root.join("sessions")).map_err(io_error)?;
         let service_id = format!(
@@ -282,6 +297,7 @@ impl CompilerServiceHost {
             root,
             descriptor,
             sessions: BTreeMap::new(),
+            cache: PersistentArtifactCacheV1::open(cache_root, &compiler_contract),
         };
         host.write_manifest()?;
         Ok(host)
@@ -356,6 +372,21 @@ impl CompilerServiceHost {
             None,
         )
     }
+    pub fn verify_cache(
+        &self,
+        _explicit_root: &Path,
+    ) -> Result<CacheInspectionReportV1, ServiceError> {
+        self.cache.verify().map_err(cache_operation_error)
+    }
+    pub fn inspect_cache(
+        &self,
+        _explicit_root: &Path,
+    ) -> Result<CacheInspectionReportV1, ServiceError> {
+        self.cache.inspect().map_err(cache_operation_error)
+    }
+    pub fn clean_cache(&self, _explicit_root: &Path) -> Result<Vec<String>, ServiceError> {
+        self.cache.clean().map_err(cache_operation_error)
+    }
     pub fn compile(
         &mut self,
         session_id: &str,
@@ -419,6 +450,17 @@ impl CompilerServiceHost {
                 IncrementalFallbackReasonV1::MalformedBaselineGraph,
             );
         }
+        let cache_input = CacheKeyInputV1 {
+            compiler_contract: session.compiler_contract.clone(),
+            configuration_fingerprint: derived.configuration_fingerprint.as_str().into(),
+            source_universe_fingerprint: platform::source_universe_fingerprint_v1(&derived)
+                .as_str()
+                .into(),
+            compile_mode: match request.mode {
+                RequestedCompilationMode::Automatic => "automatic",
+                RequestedCompilationMode::Full => "full",
+            },
+        };
         if plan.mode == IncrementalCompilationModeV1::NoChange {
             let Some(baseline) = baseline else {
                 return Err(ServiceError::new(
@@ -442,7 +484,80 @@ impl CompilerServiceHost {
                 graph: Arc::clone(&baseline.graph),
                 mode: plan.mode.as_str().into(),
                 incremental_report: report,
+                cache_report: selected_cache_report(
+                    request.cache_report,
+                    CacheTelemetryV1 {
+                        enabled: self.cache.enabled(),
+                        outcome: CacheOutcomeV1::NotChecked,
+                        reasons: Vec::new(),
+                        cache_key: cache_input.key(),
+                        payload_length: None,
+                        result_fingerprint: None,
+                        entry_published: false,
+                        entry_replaced: false,
+                    },
+                ),
             });
+        }
+        // A restored L6 baseline deliberately has no parser products. Do not
+        // pretend it can support L5 durable partial reuse.
+        if plan.mode == IncrementalCompilationModeV1::Incremental
+            && baseline.is_some_and(|value| value.reusable_products.is_empty())
+        {
+            platform::force_clean_fallback_v1(
+                &mut plan,
+                &derived,
+                IncrementalFallbackReasonV1::ReuseProductRejected,
+            );
+        }
+        let (cache_hit, mut cache_telemetry) = self.cache.lookup(&cache_input);
+        if let Some(hit) = cache_hit {
+            let previous_configuration = session.configuration.clone();
+            let previous_workspace_id = session.workspace_id.clone();
+            let previous_sequence = session.commit_sequence;
+            session.configuration = request.configuration.clone();
+            session.workspace_id = derived.workspace_id.clone();
+            session.commit_sequence += 1;
+            if publish_commit(
+                &root,
+                session_id,
+                session,
+                session.commit_sequence,
+                &hit.snapshot,
+                &hit.graph,
+            )
+            .is_ok()
+            {
+                session.incremental_baseline = Some(baseline_from_result(
+                    &session.configuration,
+                    Arc::new(hit.snapshot.clone()),
+                    Arc::new(hit.graph.clone()),
+                    Vec::new(),
+                    &session.compiler_contract,
+                ));
+                return Ok(CompileResponse {
+                    commit_sequence: session.commit_sequence,
+                    snapshot: Arc::new(hit.snapshot),
+                    graph: Arc::new(hit.graph),
+                    mode: hit.response_mode,
+                    incremental_report: selected_report(
+                        request.incremental_report,
+                        &plan,
+                        Vec::new(),
+                        Vec::new(),
+                        "published",
+                        None,
+                    ),
+                    cache_report: selected_cache_report(request.cache_report, cache_telemetry),
+                });
+            }
+            session.configuration = previous_configuration;
+            session.workspace_id = previous_workspace_id;
+            session.commit_sequence = previous_sequence;
+            cache_telemetry.outcome = CacheOutcomeV1::Miss;
+            cache_telemetry.reasons.push(
+                crate::persistent_cache::CacheReasonCodeV1::CanonicalProductValidationFailure,
+            );
         }
         let verification_workspace = request.verify_exact_equivalence.then(|| workspace.clone());
         let (outcome, reused, recomputed) =
@@ -540,20 +655,21 @@ impl CompilerServiceHost {
             session.commit_sequence = previous_sequence;
             return Err(error);
         }
-        session.incremental_baseline = Some(IncrementalBaseline {
-            publication_identity: committed.snapshot.snapshot_id.to_string(),
-            configuration: session.configuration.clone(),
-            source_fingerprints: committed
-                .snapshot
-                .units
-                .iter()
-                .map(|unit| (unit.source_unit_id.clone(), unit.source_revision_id.clone()))
-                .collect(),
-            snapshot: Arc::clone(&committed.snapshot),
-            graph: Arc::clone(&committed.graph),
-            reusable_products: committed.reusable_products,
-            compiler_contract: session.compiler_contract.clone(),
-        });
+        session.incremental_baseline = Some(baseline_from_result(
+            &session.configuration,
+            Arc::clone(&committed.snapshot),
+            Arc::clone(&committed.graph),
+            committed.reusable_products,
+            &session.compiler_contract,
+        ));
+        let cache_telemetry = self.cache.publish(
+            &cache_input,
+            &CachedCompileResultV1 {
+                snapshot: (*committed.snapshot).clone(),
+                graph: (*committed.graph).clone(),
+                response_mode: plan.mode.as_str().into(),
+            },
+        );
         Ok(CompileResponse {
             commit_sequence: session.commit_sequence,
             snapshot: committed.snapshot,
@@ -567,6 +683,7 @@ impl CompilerServiceHost {
                 "published",
                 equivalence,
             ),
+            cache_report: selected_cache_report(request.cache_report, cache_telemetry),
         })
     }
     fn write_manifest(&self) -> Result<(), ServiceError> {
@@ -618,6 +735,42 @@ fn selected_report(
         report.fallback_reasons.clear();
     }
     Some(report)
+}
+fn selected_cache_report(
+    selector: CacheReportSelector,
+    mut telemetry: CacheTelemetryV1,
+) -> Option<CacheTelemetryV1> {
+    if selector == CacheReportSelector::None {
+        return None;
+    }
+    if selector == CacheReportSelector::Summary {
+        telemetry.payload_length = None;
+        telemetry.result_fingerprint = None;
+        telemetry.entry_published = false;
+        telemetry.entry_replaced = false;
+    }
+    Some(telemetry)
+}
+fn baseline_from_result(
+    configuration: &WorkspaceConfiguration,
+    snapshot: Arc<WorkspaceSnapshot>,
+    graph: Arc<WorkspaceGraph>,
+    reusable_products: Vec<CanonicalReusableProductV1>,
+    compiler_contract: &ContractVersion,
+) -> IncrementalBaseline {
+    IncrementalBaseline {
+        publication_identity: snapshot.snapshot_id.to_string(),
+        configuration: configuration.clone(),
+        source_fingerprints: snapshot
+            .units
+            .iter()
+            .map(|unit| (unit.source_unit_id.clone(), unit.source_revision_id.clone()))
+            .collect(),
+        snapshot,
+        graph,
+        reusable_products,
+        compiler_contract: compiler_contract.clone(),
+    }
 }
 fn publish_commit(
     root: &Path,
@@ -736,6 +889,9 @@ fn platform_failure(error: platform::PlatformFailure) -> ServiceError {
 fn platform_serialization(error: platform::PlatformSerializationError) -> ServiceError {
     ServiceError::new("compiler_platform_failed", error.message)
 }
+fn cache_operation_error(reason: crate::persistent_cache::CacheReasonCodeV1) -> ServiceError {
+    ServiceError::new("cache_operation_failed", reason.code())
+}
 
 pub mod protocol {
     pub use super::{
@@ -801,13 +957,16 @@ mod tests {
             mode: RequestedCompilationMode::Automatic,
             incremental_report: report,
             verify_exact_equivalence: verify,
+            cache_report: CacheReportSelector::None,
         }
     }
     fn root(label: &str) -> std::path::PathBuf {
-        std::env::temp_dir().join(format!(
+        let root = std::env::temp_dir().join(format!(
             "presolve-service-l5-{label}-{}",
             NEXT_SERVICE.fetch_add(1, Ordering::Relaxed)
-        ))
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        root
     }
     fn opened_host(
         root: &std::path::Path,
@@ -876,6 +1035,7 @@ mod tests {
                     mode: RequestedCompilationMode::Full,
                     incremental_report: IncrementalReportSelector::None,
                     verify_exact_equivalence: false,
+                    cache_report: CacheReportSelector::None,
                 },
             )
             .unwrap();
@@ -1015,6 +1175,139 @@ mod tests {
             .unwrap()
             .reused_product_identities
             .is_empty());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn l6_persistent_complete_result_cache_hits_after_restart_without_source_text() {
+        let root = root("l6-service");
+        let cache_root = root.join("explicit-cache");
+        let configuration = WorkspaceConfiguration::default();
+        let workspace = platform::derive_workspace_id_v1(&configuration).unwrap();
+        let sentinel = "L6_SOURCE_SENTINEL_IDENTIFIER_COMMENT_STRING";
+        let source = format!("// {sentinel}\nexport class App {{ value = '{sentinel}'; }}");
+        let mut first =
+            CompilerServiceHost::start_with_cache(&root, Some(&cache_root), contract()).unwrap();
+        let session = first
+            .open_session(configuration.clone(), &workspace)
+            .unwrap();
+        let mut clean_request = request(
+            configuration.clone(),
+            vec![("src/App.ts", source.as_str())],
+            IncrementalReportSelector::None,
+            true,
+        );
+        clean_request.cache_report = CacheReportSelector::Full;
+        let clean = first.compile(&session, 0, clean_request).unwrap();
+        assert!(clean.cache_report.as_ref().unwrap().entry_published);
+        assert!(cache_root.join("manifest.json").is_file());
+        drop(first);
+
+        let mut restarted =
+            CompilerServiceHost::start_with_cache(&root, Some(&cache_root), contract()).unwrap();
+        let session = restarted
+            .open_session(configuration.clone(), &workspace)
+            .unwrap();
+        let mut hit_request = request(
+            configuration,
+            vec![("src/App.ts", source.as_str())],
+            IncrementalReportSelector::None,
+            false,
+        );
+        hit_request.cache_report = CacheReportSelector::Full;
+        let hit = restarted.compile(&session, 0, hit_request).unwrap();
+        assert_eq!(
+            hit.cache_report.as_ref().unwrap().outcome,
+            CacheOutcomeV1::Hit
+        );
+        assert_eq!(
+            clean.snapshot.to_canonical_json().unwrap(),
+            hit.snapshot.to_canonical_json().unwrap()
+        );
+        assert_eq!(
+            clean.graph.to_canonical_json().unwrap(),
+            hit.graph.to_canonical_json().unwrap()
+        );
+        let cache_bytes = read_tree(&cache_root);
+        assert!(!String::from_utf8_lossy(&cache_bytes).contains(sentinel));
+        let report = restarted.inspect_cache(&cache_root).unwrap();
+        assert_eq!(report.valid_keys.len(), 1);
+        assert_eq!(restarted.clean_cache(&cache_root).unwrap().len(), 1);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn l6_corruption_and_disabled_cache_fall_back_to_l5() {
+        let root = root("l6-corrupt");
+        let cache_root = root.join("explicit-cache");
+        let configuration = WorkspaceConfiguration::default();
+        let workspace = platform::derive_workspace_id_v1(&configuration).unwrap();
+        let sources = vec![("src/App.ts", "export class App {}")];
+        let mut host =
+            CompilerServiceHost::start_with_cache(&root, Some(&cache_root), contract()).unwrap();
+        let session = host
+            .open_session(configuration.clone(), &workspace)
+            .unwrap();
+        host.compile(
+            &session,
+            0,
+            request(
+                configuration.clone(),
+                sources.clone(),
+                IncrementalReportSelector::None,
+                false,
+            ),
+        )
+        .unwrap();
+        drop(host);
+        let payload = cache_root.join("entries");
+        let prefix = std::fs::read_dir(&payload)
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        let entry = std::fs::read_dir(prefix)
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path()
+            .join("payload.bin");
+        std::fs::write(&entry, b"corrupt").unwrap();
+        let mut restarted =
+            CompilerServiceHost::start_with_cache(&root, Some(&cache_root), contract()).unwrap();
+        let session = restarted
+            .open_session(configuration.clone(), &workspace)
+            .unwrap();
+        let mut corrupt_request = request(
+            configuration.clone(),
+            sources.clone(),
+            IncrementalReportSelector::None,
+            true,
+        );
+        corrupt_request.cache_report = CacheReportSelector::Full;
+        let result = restarted.compile(&session, 0, corrupt_request).unwrap();
+        assert_ne!(result.cache_report.unwrap().outcome, CacheOutcomeV1::Hit);
+        drop(restarted);
+        let mut disabled = CompilerServiceHost::start(&root, contract()).unwrap();
+        let session = disabled.open_session(configuration, &workspace).unwrap();
+        let mut request = request(
+            WorkspaceConfiguration::default(),
+            sources,
+            IncrementalReportSelector::None,
+            true,
+        );
+        request.cache_report = CacheReportSelector::Full;
+        assert_eq!(
+            disabled
+                .compile(&session, 0, request)
+                .unwrap()
+                .cache_report
+                .unwrap()
+                .outcome,
+            CacheOutcomeV1::Miss
+        );
         std::fs::remove_dir_all(root).unwrap();
     }
 
