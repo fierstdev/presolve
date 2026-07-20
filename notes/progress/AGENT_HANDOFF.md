@@ -3,21 +3,25 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L4 - Compiler Service and Durable Sessions
-* Working tree: L4 is complete and ready to commit; the local service host and L3 canonical-recovery compatibility live in `crates/ezc_core/src/service.rs` and `crates/ezc_core/src/platform.rs`.
+* Latest completed slice: L5 - Deterministic Incremental Compilation
+* Working tree: L5 is implemented as one atomic slice; no L6 persistent-cache work has begun.
 * Date: 2026-07-19
 
 Last completed slice
 
-* Slice: L4 - Compiler Service and Durable Sessions
-* Summary: adds the local compiler-service v1 boundary, exact frame codec, durable session/commit publication, complete request-owned source admission, and authorized L3 configuration/decode compatibility APIs.
-* Key files: `crates/ezc_core/src/service.rs`, `crates/ezc_core/src/platform.rs`, `crates/ezc_core/fixtures/service/`, `docs/compiler-service-contract.md`, `scripts/verify-l4-service-contracts.sh`, `justfile`, `2026-W28.md`
-* Boundary: the service delegates source parsing and compiler semantics exclusively to L3. It persists canonical L3 snapshot/graph products and canonical configuration only; source contents and L3 cache values remain memory-only. Next: L5 only with an explicit authorized contract.
+* Slice: L5 - Deterministic Incremental Compilation
+* Summary: adds `IncrementalCompilationPlanV1`, the L3 `compile_workspace_incremental_v1` entry point, session-local parse-product reuse, optional reports, clean-equivalence verification, and deterministic clean fallback.
+* Key files: `crates/ezc_core/src/platform.rs`, `crates/ezc_core/src/service.rs`, `crates/ezc_core/fixtures/incremental/`, `docs/incremental-compilation-contract.md`, `scripts/verify-l5-incremental-contracts.sh`, `justfile`, `2026-W28.md`
+* Reuse authority: only unchanged L3 parser products are eligible. A content edit invalidates its typed `SourceUnitId` plus the transitive reverse closure of canonical `WorkspaceGraph` compile edges. L3 validates every offered product's source unit, source revision, product key, and normalized path before use; parser/binder/semantic/artifact work remains L3-owned.
+* Fallback authority: L3 v1 does not expose product-granular source-universe membership dependency edges, so additions/deletions/rename representation clean-fallback with `L5F009_SOURCE_UNIVERSE_MEMBERSHIP_UNMODELED`; configuration changes clean-fallback with `L5F002_CONFIGURATION_CHANGED`; malformed retained baselines clean-fallback with `L5F006_MALFORMED_BASELINE_GRAPH`.
+* Persistence/lifecycle: the one L5 baseline is held only in `DurableSession` memory after L4 atomic publication and stores configuration/source fingerprints, snapshot/graph, and immutable normalized parser products—not authored source text. Service restart or a new session starts cold. Failed candidates and failed publication do not install a baseline.
+* Equivalence: explicit test-only verification uses an isolated clean L3 `RequestedCompilationMode::Full` compile and compares canonical snapshot and graph bytes before publication. The focused deterministic sequence runs 20 fresh sessions and returns byte-identical plan/report output; no source text appears in the durable tree.
+* Verification: `./scripts/verify-l5-incremental-contracts.sh` passes independently; it is in `just check`. It runs focused service tests, 20-run determinism, equivalence, source-persistence/no-discovery audits, formatter, strict compiler clippy, frozen L3/L4 audits, and diff check. L5 ends before L6 persistent-cache work.
 
 Current phase boundary
 
-* Slice: L5 and later Phase L work.
-* Status: L4 is complete. Stop at the L5 boundary until its implementation-ready contract is supplied; L3/L4 v1 meanings remain compatible.
+* Slice: L6 and later Phase L work.
+* Status: L5 is complete under `PHASE_L_L5_INCREMENTAL_COMPILATION_IMPLEMENTATION_CONTRACT.md`. Stop at the L6 boundary until its implementation-ready contract is supplied; L3/L4/L5 v1 meanings remain compatible.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
 * Remaining in Phase K: none.
 

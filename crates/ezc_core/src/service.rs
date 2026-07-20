@@ -20,9 +20,11 @@ use std::sync::Arc;
 use sha2::{Digest as _, Sha256};
 
 use crate::platform::{
-    self, CacheLimits, CancellationToken, CompilationOutcome, CompileWorkspaceRequest,
-    CompilerSessionState, ContractVersion, RequestedCompilationMode, WorkspaceConfiguration,
-    WorkspaceGraph, WorkspaceId, WorkspaceInput, WorkspaceSnapshot, WorkspaceSource,
+    self, CacheLimits, CancellationToken, CanonicalReusableProductV1, CompilationOutcome,
+    CompileWorkspaceRequest, CompilerSessionState, ContractVersion, IncrementalCompilationModeV1,
+    IncrementalCompileWorkspaceRequestV1, IncrementalFallbackReasonV1, RequestedCompilationMode,
+    SourceRevisionId, SourceUnitId, WorkspaceConfiguration, WorkspaceGraph, WorkspaceId,
+    WorkspaceInput, WorkspaceSnapshot, WorkspaceSource,
 };
 
 pub const COMPILER_SERVICE_PROTOCOL_VERSION: u32 = 1;
@@ -95,6 +97,71 @@ pub struct CompileRequest {
     pub candidate_snapshot: WorkspaceSnapshot,
     pub sources: Vec<CompleteSource>,
     pub mode: RequestedCompilationMode,
+    /// Optional L5 inspection data. `None` preserves the L4 response surface.
+    pub incremental_report: IncrementalReportSelector,
+    /// Explicit test-only proof mode. It never enables production semantics.
+    pub verify_exact_equivalence: bool,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IncrementalReportSelector {
+    None,
+    Summary,
+    Full,
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IncrementalExecutionReportV1 {
+    pub schema: &'static str,
+    pub plan_fingerprint: platform::Digest,
+    pub mode: IncrementalCompilationModeV1,
+    pub changed_inputs: Vec<platform::IncrementalInputChangeV1>,
+    pub invalidated_identities: Vec<SourceUnitId>,
+    pub reused_product_identities: Vec<platform::ProductKey>,
+    pub recomputed_work_unit_identities: Vec<SourceUnitId>,
+    pub fallback_reasons: Vec<IncrementalFallbackReasonV1>,
+    pub publication_outcome: &'static str,
+    pub exact_equivalence_verified: Option<bool>,
+}
+impl IncrementalExecutionReportV1 {
+    /// # Panics
+    ///
+    /// Panics only if serializing an owned Rust string fails, which `serde_json`
+    /// guarantees for strings.
+    #[must_use]
+    pub fn to_canonical_json(&self) -> Vec<u8> {
+        let quote = |value: &str| serde_json::to_string(value).expect("strings serialize");
+        let changes = self
+            .changed_inputs
+            .iter()
+            .map(|change| {
+                format!(
+                    "{{\"kind\":{},\"identity\":{}}}",
+                    quote(change.kind.as_str()),
+                    quote(&change.identity)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+        let ids = |values: &[SourceUnitId]| {
+            values
+                .iter()
+                .map(|value| quote(value.as_str()))
+                .collect::<Vec<_>>()
+                .join(",")
+        };
+        let reused = self
+            .reused_product_identities
+            .iter()
+            .map(|value| quote(value.as_str()))
+            .collect::<Vec<_>>()
+            .join(",");
+        let fallback = self
+            .fallback_reasons
+            .iter()
+            .map(|reason| quote(reason.code()))
+            .collect::<Vec<_>>()
+            .join(",");
+        format!("{{\"schema\":{},\"plan_fingerprint\":{},\"mode\":{},\"changed_inputs\":[{}],\"invalidated_identities\":[{}],\"reused_product_identities\":[{}],\"recomputed_work_unit_identities\":[{}],\"fallback_reasons\":[{}],\"publication_outcome\":{},\"exact_equivalence_verified\":{}}}\n",quote(self.schema),quote(self.plan_fingerprint.as_str()),quote(self.mode.as_str()),changes,ids(&self.invalidated_identities),reused,ids(&self.recomputed_work_unit_identities),fallback,quote(self.publication_outcome),self.exact_equivalence_verified.map_or_else(|| "null".into(), |value| value.to_string())).into_bytes()
+    }
 }
 #[derive(Debug, Clone)]
 pub struct CompileResponse {
@@ -102,6 +169,7 @@ pub struct CompileResponse {
     pub snapshot: Arc<WorkspaceSnapshot>,
     pub graph: Arc<WorkspaceGraph>,
     pub mode: String,
+    pub incremental_report: Option<IncrementalExecutionReportV1>,
 }
 
 pub fn encode_frame(payload: &[u8]) -> Result<Vec<u8>, ServiceError> {
@@ -157,6 +225,32 @@ struct DurableSession {
     commit_sequence: u64,
     closed: bool,
     l3: CompilerSessionState,
+    incremental_baseline: Option<IncrementalBaseline>,
+}
+#[derive(Clone)]
+struct IncrementalBaseline {
+    publication_identity: String,
+    configuration: WorkspaceConfiguration,
+    source_fingerprints: BTreeMap<SourceUnitId, SourceRevisionId>,
+    snapshot: Arc<WorkspaceSnapshot>,
+    graph: Arc<WorkspaceGraph>,
+    reusable_products: Vec<CanonicalReusableProductV1>,
+    compiler_contract: ContractVersion,
+}
+impl IncrementalBaseline {
+    fn is_consistent(&self) -> bool {
+        self.publication_identity == self.snapshot.snapshot_id.as_str()
+            && self.compiler_contract == self.snapshot.compiler_contract
+            && platform::workspace_configuration_fingerprint_v1(&self.configuration)
+                .is_ok_and(|fingerprint| fingerprint == self.snapshot.configuration_fingerprint)
+            && self.source_fingerprints
+                == self
+                    .snapshot
+                    .units
+                    .iter()
+                    .map(|unit| (unit.source_unit_id.clone(), unit.source_revision_id.clone()))
+                    .collect()
+    }
 }
 impl CompilerServiceHost {
     pub fn start(
@@ -231,11 +325,36 @@ impl CompilerServiceHost {
             commit_sequence: 0,
             closed: false,
             l3,
+            incremental_baseline: None,
         };
         self.write_session(&id, &session)?;
         append_journal(&self.root, &id, 1, "session_created", 0, None)?;
         self.sessions.insert(id.clone(), session);
         Ok(id)
+    }
+    /// Closes a live session and releases its non-durable L5 baseline before
+    /// recording the existing L4 durable closed-state marker.
+    pub fn close_session(&mut self, session_id: &str) -> Result<(), ServiceError> {
+        let root = self.root.clone();
+        let session = self
+            .sessions
+            .get_mut(session_id)
+            .ok_or_else(|| ServiceError::new("session_not_found", "session not loaded"))?;
+        if session.closed {
+            return Ok(());
+        }
+        session.incremental_baseline = None;
+        session.l3.close();
+        session.closed = true;
+        write_session_at(&root, session_id, session)?;
+        append_journal(
+            &root,
+            session_id,
+            session.commit_sequence.saturating_mul(2).saturating_add(2),
+            "session_closed",
+            session.commit_sequence,
+            None,
+        )
     }
     pub fn compile(
         &mut self,
@@ -257,17 +376,9 @@ impl CompilerServiceHost {
                 "commit sequence is stale",
             ));
         }
-        let config = platform::canonical_workspace_configuration_json_v1(&request.configuration)
+        platform::canonical_workspace_configuration_json_v1(&request.configuration)
             .map_err(|error| ServiceError::new("invalid_request", error.message))?;
-        let retained = platform::canonical_workspace_configuration_json_v1(&session.configuration)
-            .map_err(|error| ServiceError::new("internal_invariant_failed", error.message))?;
-        if config != retained {
-            return Err(ServiceError::new(
-                "workspace_mismatch",
-                "request configuration differs from durable session",
-            ));
-        }
-        let derived = WorkspaceSnapshot::from_input(&WorkspaceInput {
+        let workspace = WorkspaceInput {
             configuration: request.configuration.clone(),
             sources: request
                 .sources
@@ -279,8 +390,8 @@ impl CompilerServiceHost {
                 })
                 .collect(),
             compiler_contract: session.compiler_contract.clone(),
-        })
-        .map_err(platform_failure)?;
+        };
+        let derived = WorkspaceSnapshot::from_input(&workspace).map_err(platform_failure)?;
         if derived
             .to_canonical_json()
             .map_err(|error| ServiceError::new("invalid_request", error.message))?
@@ -294,48 +405,168 @@ impl CompilerServiceHost {
                 "complete source input does not match candidate snapshot",
             ));
         }
-        let outcome = session.l3.compile_workspace(CompileWorkspaceRequest {
-            workspace: WorkspaceInput {
-                configuration: request.configuration,
-                sources: request
-                    .sources
-                    .into_iter()
-                    .map(|source| WorkspaceSource {
-                        path: source.path,
-                        source: source.source,
-                        language: source.language,
-                    })
-                    .collect(),
-                compiler_contract: session.compiler_contract.clone(),
-            },
-            mode: request.mode,
-            cancellation: CancellationToken::new(),
-        });
+        let raw_baseline = session.incremental_baseline.as_ref();
+        let baseline_is_malformed = raw_baseline.is_some_and(|baseline| !baseline.is_consistent());
+        let baseline = raw_baseline.filter(|_| !baseline_is_malformed);
+        let mut plan = platform::plan_incremental_compilation_v1(
+            baseline.map(|value| (value.snapshot.as_ref(), value.graph.as_ref())),
+            &derived,
+        );
+        if baseline_is_malformed {
+            platform::force_clean_fallback_v1(
+                &mut plan,
+                &derived,
+                IncrementalFallbackReasonV1::MalformedBaselineGraph,
+            );
+        }
+        if plan.mode == IncrementalCompilationModeV1::NoChange {
+            let Some(baseline) = baseline else {
+                return Err(ServiceError::new(
+                    "internal_invariant_failed",
+                    "L5 no-change plan has no baseline",
+                ));
+            };
+            baseline.snapshot.validate().map_err(platform_failure)?;
+            baseline.graph.validate().map_err(platform_failure)?;
+            let report = selected_report(
+                request.incremental_report,
+                &plan,
+                Vec::new(),
+                Vec::new(),
+                "published",
+                Some(true),
+            );
+            return Ok(CompileResponse {
+                commit_sequence: session.commit_sequence,
+                snapshot: Arc::clone(&baseline.snapshot),
+                graph: Arc::clone(&baseline.graph),
+                mode: plan.mode.as_str().into(),
+                incremental_report: report,
+            });
+        }
+        let verification_workspace = request.verify_exact_equivalence.then(|| workspace.clone());
+        let (outcome, reused, recomputed) =
+            if plan.mode == IncrementalCompilationModeV1::Incremental {
+                let reusable_products = baseline
+                    .map(|value| value.reusable_products.clone())
+                    .unwrap_or_default();
+                let execution = session.l3.compile_workspace_incremental_v1(
+                    IncrementalCompileWorkspaceRequestV1 {
+                        workspace,
+                        cancellation: CancellationToken::new(),
+                        plan: plan.clone(),
+                        reusable_products,
+                    },
+                );
+                (
+                    execution.outcome,
+                    execution.reused_product_identities,
+                    execution.recomputed_work_units,
+                )
+            } else {
+                let outcome = session.l3.compile_workspace(CompileWorkspaceRequest {
+                    workspace,
+                    // A fallback is intentionally a clean canonical L3 compile.
+                    mode: RequestedCompilationMode::Full,
+                    cancellation: CancellationToken::new(),
+                });
+                (outcome, Vec::new(), plan.recompute_work_units.clone())
+            };
         let CompilationOutcome::Committed(committed) = outcome else {
             return Err(ServiceError::new(
                 "compiler_platform_failed",
                 "compiler did not commit",
             ));
         };
+        let equivalence = if let Some(clean_workspace) = verification_workspace {
+            let mut clean = CompilerSessionState::new(
+                derived.workspace_id.clone(),
+                session.compiler_contract.clone(),
+                CacheLimits::default(),
+            );
+            let clean = clean.compile_workspace(CompileWorkspaceRequest {
+                workspace: clean_workspace,
+                mode: RequestedCompilationMode::Full,
+                cancellation: CancellationToken::new(),
+            });
+            let CompilationOutcome::Committed(clean) = clean else {
+                return Err(ServiceError::new(
+                    "incremental_equivalence_failed",
+                    "isolated clean L3 compilation failed",
+                ));
+            };
+            if clean
+                .snapshot
+                .to_canonical_json()
+                .map_err(platform_serialization)?
+                != committed
+                    .snapshot
+                    .to_canonical_json()
+                    .map_err(platform_serialization)?
+                || clean
+                    .graph
+                    .to_canonical_json()
+                    .map_err(platform_serialization)?
+                    != committed
+                        .graph
+                        .to_canonical_json()
+                        .map_err(platform_serialization)?
+            {
+                return Err(ServiceError::new(
+                    "incremental_equivalence_failed",
+                    "first canonical mismatch is workspace snapshot or graph",
+                ));
+            }
+            Some(true)
+        } else {
+            None
+        };
+        let previous_configuration = session.configuration.clone();
+        let previous_workspace_id = session.workspace_id.clone();
+        let previous_sequence = session.commit_sequence;
+        session.configuration = request.configuration;
+        session.workspace_id = derived.workspace_id.clone();
         session.commit_sequence += 1;
-        publish_commit(
+        if let Err(error) = publish_commit(
             &root,
             session_id,
             session,
             session.commit_sequence,
             &committed.snapshot,
             &committed.graph,
-        )?;
+        ) {
+            session.configuration = previous_configuration;
+            session.workspace_id = previous_workspace_id;
+            session.commit_sequence = previous_sequence;
+            return Err(error);
+        }
+        session.incremental_baseline = Some(IncrementalBaseline {
+            publication_identity: committed.snapshot.snapshot_id.to_string(),
+            configuration: session.configuration.clone(),
+            source_fingerprints: committed
+                .snapshot
+                .units
+                .iter()
+                .map(|unit| (unit.source_unit_id.clone(), unit.source_revision_id.clone()))
+                .collect(),
+            snapshot: Arc::clone(&committed.snapshot),
+            graph: Arc::clone(&committed.graph),
+            reusable_products: committed.reusable_products,
+            compiler_contract: session.compiler_contract.clone(),
+        });
         Ok(CompileResponse {
             commit_sequence: session.commit_sequence,
             snapshot: committed.snapshot,
             graph: committed.graph,
-            mode: match committed.plan.mode {
-                platform::IncrementalMode::NoOp => "no_op",
-                platform::IncrementalMode::Incremental => "incremental",
-                platform::IncrementalMode::Full => "full",
-            }
-            .into(),
+            mode: plan.mode.as_str().into(),
+            incremental_report: selected_report(
+                request.incremental_report,
+                &plan,
+                reused,
+                recomputed,
+                "published",
+                equivalence,
+            ),
         })
     }
     fn write_manifest(&self) -> Result<(), ServiceError> {
@@ -355,6 +586,38 @@ impl CompilerServiceHost {
         fs::create_dir_all(dir.join("commits")).map_err(io_error)?;
         atomic_write(&dir.join("session.json"),format!("{{\"schema_version\":1,\"session_id\":{},\"workspace_id\":{},\"workspace_configuration\":{},\"compiler_contract\":{},\"state\":{},\"current_commit_sequence\":{}}}\n",json(id),json(session.workspace_id.as_str()),config,json(session.compiler_contract.as_str()),json(if session.closed{"closed"}else{"open"}),session.commit_sequence).as_bytes())
     }
+}
+fn selected_report(
+    selector: IncrementalReportSelector,
+    plan: &platform::IncrementalCompilationPlanV1,
+    reused_product_identities: Vec<platform::ProductKey>,
+    recomputed_work_unit_identities: Vec<SourceUnitId>,
+    publication_outcome: &'static str,
+    exact_equivalence_verified: Option<bool>,
+) -> Option<IncrementalExecutionReportV1> {
+    if selector == IncrementalReportSelector::None {
+        return None;
+    }
+    let mut report = IncrementalExecutionReportV1 {
+        schema: platform::INCREMENTAL_EXECUTION_REPORT_V1_SCHEMA,
+        plan_fingerprint: plan.plan_fingerprint.clone(),
+        mode: plan.mode,
+        changed_inputs: plan.input_changes.clone(),
+        invalidated_identities: plan.invalidation_closure.clone(),
+        reused_product_identities,
+        recomputed_work_unit_identities,
+        fallback_reasons: plan.fallback_reasons.clone(),
+        publication_outcome,
+        exact_equivalence_verified,
+    };
+    if selector == IncrementalReportSelector::Summary {
+        report.changed_inputs.clear();
+        report.invalidated_identities.clear();
+        report.reused_product_identities.clear();
+        report.recomputed_work_unit_identities.clear();
+        report.fallback_reasons.clear();
+    }
+    Some(report)
 }
 fn publish_commit(
     root: &Path,
@@ -470,6 +733,9 @@ fn platform_error(error: platform::PlatformValidationError) -> ServiceError {
 fn platform_failure(error: platform::PlatformFailure) -> ServiceError {
     ServiceError::new("compiler_platform_failed", error.message)
 }
+fn platform_serialization(error: platform::PlatformSerializationError) -> ServiceError {
+    ServiceError::new("compiler_platform_failed", error.message)
+}
 
 pub mod protocol {
     pub use super::{
@@ -478,7 +744,10 @@ pub mod protocol {
     };
 }
 pub mod host {
-    pub use super::{CompileRequest, CompileResponse, CompilerServiceHost, CompleteSource};
+    pub use super::{
+        CompileRequest, CompileResponse, CompilerServiceHost, CompleteSource,
+        IncrementalExecutionReportV1, IncrementalReportSelector,
+    };
 }
 pub mod session_store {
     pub use super::CompilerServiceHost;
@@ -496,6 +765,70 @@ pub mod inspection {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn contract() -> ContractVersion {
+        ContractVersion::new("presolve-compiler:0.1.0-alpha")
+    }
+    fn request(
+        configuration: WorkspaceConfiguration,
+        sources: Vec<(&str, &str)>,
+        report: IncrementalReportSelector,
+        verify: bool,
+    ) -> CompileRequest {
+        let input = WorkspaceInput {
+            configuration: configuration.clone(),
+            sources: sources
+                .iter()
+                .map(|(path, source)| WorkspaceSource {
+                    path: (*path).into(),
+                    source: (*source).into(),
+                    language: None,
+                })
+                .collect(),
+            compiler_contract: contract(),
+        };
+        CompileRequest {
+            configuration,
+            candidate_snapshot: WorkspaceSnapshot::from_input(&input).unwrap(),
+            sources: sources
+                .into_iter()
+                .map(|(path, source)| CompleteSource {
+                    path: path.into(),
+                    source: source.into(),
+                    language: None,
+                })
+                .collect(),
+            mode: RequestedCompilationMode::Automatic,
+            incremental_report: report,
+            verify_exact_equivalence: verify,
+        }
+    }
+    fn root(label: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "presolve-service-l5-{label}-{}",
+            NEXT_SERVICE.fetch_add(1, Ordering::Relaxed)
+        ))
+    }
+    fn opened_host(
+        root: &std::path::Path,
+        configuration: &WorkspaceConfiguration,
+    ) -> (CompilerServiceHost, String) {
+        let workspace = platform::derive_workspace_id_v1(configuration).unwrap();
+        let mut host = CompilerServiceHost::start(root, contract()).unwrap();
+        let session = host
+            .open_session(configuration.clone(), &workspace)
+            .unwrap();
+        (host, session)
+    }
+    fn read_tree(path: &Path) -> Vec<u8> {
+        if path.is_file() {
+            return std::fs::read(path).unwrap();
+        }
+        std::fs::read_dir(path)
+            .unwrap()
+            .flat_map(|entry| read_tree(&entry.unwrap().path()))
+            .collect()
+    }
 
     #[test]
     fn frames_are_exactly_length_delimited() {
@@ -541,6 +874,8 @@ mod tests {
                         language: None,
                     }],
                     mode: RequestedCompilationMode::Full,
+                    incremental_report: IncrementalReportSelector::None,
+                    verify_exact_equivalence: false,
                 },
             )
             .unwrap();
@@ -557,6 +892,293 @@ mod tests {
                 .len()
                 > 0
         );
+        assert!(!String::from_utf8_lossy(&read_tree(&persisted)).contains("export class App {}"));
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn l5_content_edit_reuses_validated_parse_products_and_equals_clean() {
+        let root = root("content");
+        let configuration = WorkspaceConfiguration::default();
+        let (mut host, session) = opened_host(&root, &configuration);
+        let baseline = vec![
+            ("src/Dependency.ts", "export class Dependency {}"),
+            (
+                "src/App.ts",
+                "import { Dependency } from './Dependency'; export class App {}",
+            ),
+            ("src/Stable.ts", "export class Stable {}"),
+        ];
+        let first = host
+            .compile(
+                &session,
+                0,
+                request(
+                    configuration.clone(),
+                    baseline.clone(),
+                    IncrementalReportSelector::Full,
+                    true,
+                ),
+            )
+            .unwrap();
+        assert_eq!(first.mode, "cold");
+        let report = first.incremental_report.unwrap();
+        assert_eq!(report.mode, IncrementalCompilationModeV1::Cold);
+        assert_eq!(report.exact_equivalence_verified, Some(true));
+        let candidate = vec![
+            (
+                "src/Dependency.ts",
+                "export class Dependency { value = 1; }",
+            ),
+            (
+                "src/App.ts",
+                "import { Dependency } from './Dependency'; export class App {}",
+            ),
+            ("src/Stable.ts", "export class Stable {}"),
+        ];
+        let second = host
+            .compile(
+                &session,
+                1,
+                request(
+                    configuration.clone(),
+                    candidate.clone(),
+                    IncrementalReportSelector::Full,
+                    true,
+                ),
+            )
+            .unwrap();
+        let report = second.incremental_report.unwrap();
+        assert_eq!(second.mode, "incremental");
+        assert!(!report.reused_product_identities.is_empty());
+        assert_eq!(report.exact_equivalence_verified, Some(true));
+        let no_change = host
+            .compile(
+                &session,
+                2,
+                request(
+                    configuration,
+                    candidate,
+                    IncrementalReportSelector::Full,
+                    true,
+                ),
+            )
+            .unwrap();
+        assert_eq!(no_change.commit_sequence, 2);
+        assert_eq!(no_change.mode, "no_change");
+        assert_eq!(
+            no_change.snapshot.to_canonical_json().unwrap(),
+            second.snapshot.to_canonical_json().unwrap()
+        );
+        host.close_session(&session).unwrap();
+        let closed = host.sessions.get(&session).unwrap();
+        assert!(closed.closed);
+        assert!(closed.incremental_baseline.is_none());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn l5_service_restart_has_no_durable_baseline() {
+        let root = root("restart");
+        let configuration = WorkspaceConfiguration::default();
+        let baseline = vec![("src/App.ts", "export class App {}")];
+        let (mut first, first_session) = opened_host(&root, &configuration);
+        first
+            .compile(
+                &first_session,
+                0,
+                request(
+                    configuration.clone(),
+                    baseline.clone(),
+                    IncrementalReportSelector::None,
+                    false,
+                ),
+            )
+            .unwrap();
+        drop(first);
+        let (mut restarted, session) = opened_host(&root, &configuration);
+        let response = restarted
+            .compile(
+                &session,
+                0,
+                request(
+                    configuration,
+                    baseline,
+                    IncrementalReportSelector::Full,
+                    true,
+                ),
+            )
+            .unwrap();
+        assert_eq!(response.mode, "cold");
+        assert!(response
+            .incremental_report
+            .unwrap()
+            .reused_product_identities
+            .is_empty());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn l5_add_delete_configuration_and_malformed_baselines_clean_fallback() {
+        let root = root("fallback");
+        let configuration = WorkspaceConfiguration::default();
+        let (mut host, session) = opened_host(&root, &configuration);
+        let baseline = vec![("src/App.ts", "export class App {}")];
+        host.compile(
+            &session,
+            0,
+            request(
+                configuration.clone(),
+                baseline.clone(),
+                IncrementalReportSelector::None,
+                false,
+            ),
+        )
+        .unwrap();
+        let added = host
+            .compile(
+                &session,
+                1,
+                request(
+                    configuration.clone(),
+                    vec![
+                        ("src/App.ts", "export class App {}"),
+                        ("src/Added.ts", "export class Added {}"),
+                    ],
+                    IncrementalReportSelector::Full,
+                    true,
+                ),
+            )
+            .unwrap();
+        let report = added.incremental_report.unwrap();
+        assert_eq!(added.mode, "clean_fallback");
+        assert!(report
+            .fallback_reasons
+            .contains(&IncrementalFallbackReasonV1::SourceUniverseMembershipUnmodeled));
+        let mut changed_configuration = configuration.clone();
+        changed_configuration.feature_flags.push("strict".into());
+        let config_changed = host
+            .compile(
+                &session,
+                2,
+                request(
+                    changed_configuration,
+                    vec![
+                        ("src/App.ts", "export class App {}"),
+                        ("src/Added.ts", "export class Added {}"),
+                    ],
+                    IncrementalReportSelector::Full,
+                    true,
+                ),
+            )
+            .unwrap();
+        assert!(config_changed
+            .incremental_report
+            .unwrap()
+            .fallback_reasons
+            .contains(&IncrementalFallbackReasonV1::ConfigurationChanged));
+        host.sessions
+            .get_mut(&session)
+            .unwrap()
+            .incremental_baseline
+            .as_mut()
+            .unwrap()
+            .publication_identity = "malformed".into();
+        let malformed = host
+            .compile(
+                &session,
+                3,
+                request(
+                    configuration,
+                    baseline,
+                    IncrementalReportSelector::Full,
+                    true,
+                ),
+            )
+            .unwrap();
+        assert!(malformed
+            .incremental_report
+            .unwrap()
+            .fallback_reasons
+            .contains(&IncrementalFallbackReasonV1::MalformedBaselineGraph));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn l5_failure_isolation_no_persistence_and_twenty_run_determinism() {
+        let configuration = WorkspaceConfiguration::default();
+        let baseline = vec![
+            ("src/Dependency.ts", "export class Dependency {}"),
+            (
+                "src/App.ts",
+                "import { Dependency } from './Dependency'; export class App {}",
+            ),
+        ];
+        let candidate = vec![
+            (
+                "src/Dependency.ts",
+                "export class Dependency { value = 1; }",
+            ),
+            (
+                "src/App.ts",
+                "import { Dependency } from './Dependency'; export class App {}",
+            ),
+        ];
+        let mut expected_report = None;
+        for run in 0..20 {
+            let root = root("determinism");
+            let (mut host, session) = opened_host(&root, &configuration);
+            host.compile(
+                &session,
+                0,
+                request(
+                    configuration.clone(),
+                    baseline.clone(),
+                    IncrementalReportSelector::None,
+                    false,
+                ),
+            )
+            .unwrap();
+            let mut invalid = request(
+                configuration.clone(),
+                baseline.clone(),
+                IncrementalReportSelector::None,
+                false,
+            );
+            invalid.sources = vec![
+                CompleteSource {
+                    path: "src/App.ts".into(),
+                    source: "export class App {}".into(),
+                    language: None,
+                },
+                CompleteSource {
+                    path: "src/App.ts".into(),
+                    source: "export class Duplicate {}".into(),
+                    language: None,
+                },
+            ];
+            assert!(host.compile(&session, 1, invalid).is_err());
+            let response = host
+                .compile(
+                    &session,
+                    1,
+                    request(
+                        configuration.clone(),
+                        candidate.clone(),
+                        IncrementalReportSelector::Full,
+                        true,
+                    ),
+                )
+                .unwrap();
+            let report = response.incremental_report.unwrap().to_canonical_json();
+            if let Some(expected) = &expected_report {
+                assert_eq!(&report, expected, "determinism run {run}");
+            } else {
+                expected_report = Some(report);
+            }
+            let persisted = read_tree(&root.join("service/sessions"));
+            assert!(!String::from_utf8_lossy(&persisted).contains("value = 1"));
+            std::fs::remove_dir_all(root).unwrap();
+        }
     }
 }

@@ -8,6 +8,7 @@ check:
     ./scripts/verify-public-identity.sh
     ./scripts/verify-l3-platform-contracts.sh
     ./scripts/verify-l4-service-contracts.sh
+    ./scripts/verify-l5-incremental-contracts.sh
 
 repository-layout:
     ./scripts/verify-repository-layout.sh
@@ -20,6 +21,9 @@ l3-platform-contracts:
 
 l4-service-contracts:
     ./scripts/verify-l4-service-contracts.sh
+
+l5-incremental-contracts:
+    ./scripts/verify-l5-incremental-contracts.sh
 
 e2e:
     cargo test -p presolve-cli --test runtime_browser -- --nocapture --test-threads=1

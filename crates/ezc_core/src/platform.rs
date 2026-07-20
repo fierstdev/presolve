@@ -29,6 +29,10 @@ pub const INCREMENTAL_PLAN_SCHEMA_VERSION: u32 = 1;
 pub const PRODUCT_CACHE_INSPECTION_SCHEMA_VERSION: u32 = 1;
 /// The public canonical workspace-configuration input schema authorized by L4.
 pub const WORKSPACE_CONFIGURATION_SCHEMA_VERSION: u32 = 1;
+/// L5's session-local incremental planning product discriminator.
+pub const INCREMENTAL_COMPILATION_PLAN_V1_SCHEMA: &str = "presolve.incremental-compilation-plan.v1";
+/// L5's service execution-report product discriminator.
+pub const INCREMENTAL_EXECUTION_REPORT_V1_SCHEMA: &str = "presolve.incremental-execution-report.v1";
 
 static NEXT_SESSION_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -1359,6 +1363,156 @@ impl IncrementalPlan {
         Ok(json_document(incremental_plan_json(self)))
     }
 }
+
+/// The only L5 execution modes. They describe orchestration, never language
+/// semantics or generated output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IncrementalCompilationModeV1 {
+    Cold,
+    NoChange,
+    Incremental,
+    CleanFallback,
+}
+impl IncrementalCompilationModeV1 {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Cold => "cold",
+            Self::NoChange => "no_change",
+            Self::Incremental => "incremental",
+            Self::CleanFallback => "clean_fallback",
+        }
+    }
+}
+
+/// Canonical order is declaration order, which is also the L5 contract order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum IncrementalInputChangeKindV1 {
+    ConfigurationChanged,
+    SourceDeleted,
+    SourceAdded,
+    SourceContentChanged,
+}
+impl IncrementalInputChangeKindV1 {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ConfigurationChanged => "configuration_changed",
+            Self::SourceDeleted => "source_deleted",
+            Self::SourceAdded => "source_added",
+            Self::SourceContentChanged => "source_content_changed",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IncrementalInputChangeV1 {
+    pub kind: IncrementalInputChangeKindV1,
+    /// `configuration` or a canonical L3 source-unit identity.
+    pub identity: String,
+}
+
+/// Stable, non-diagnostic L5 fallback facts in the exact contract order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum IncrementalFallbackReasonV1 {
+    NoBaseline,
+    ServiceRestart,
+    ConfigurationChanged,
+    CompilerVersionMismatch,
+    BuildProtocolMismatch,
+    ProductSchemaMismatch,
+    MalformedBaselineGraph,
+    IncompleteDependencyAuthority,
+    UnresolvedCanonicalIdentity,
+    SourceUniverseMembershipUnmodeled,
+    ReuseProductRejected,
+    IncrementalInvariantFailure,
+}
+impl IncrementalFallbackReasonV1 {
+    #[must_use]
+    pub const fn code(self) -> &'static str {
+        match self {
+            Self::NoBaseline => "L5F000_NO_BASELINE",
+            Self::ServiceRestart => "L5F001_SERVICE_RESTART",
+            Self::ConfigurationChanged => "L5F002_CONFIGURATION_CHANGED",
+            Self::CompilerVersionMismatch => "L5F003_COMPILER_VERSION_MISMATCH",
+            Self::BuildProtocolMismatch => "L5F004_BUILD_PROTOCOL_MISMATCH",
+            Self::ProductSchemaMismatch => "L5F005_PRODUCT_SCHEMA_MISMATCH",
+            Self::MalformedBaselineGraph => "L5F006_MALFORMED_BASELINE_GRAPH",
+            Self::IncompleteDependencyAuthority => "L5F007_INCOMPLETE_DEPENDENCY_AUTHORITY",
+            Self::UnresolvedCanonicalIdentity => "L5F008_UNRESOLVED_CANONICAL_IDENTITY",
+            Self::SourceUniverseMembershipUnmodeled => {
+                "L5F009_SOURCE_UNIVERSE_MEMBERSHIP_UNMODELED"
+            }
+            Self::ReuseProductRejected => "L5F010_REUSE_PRODUCT_REJECTED",
+            Self::IncrementalInvariantFailure => "L5F011_INCREMENTAL_INVARIANT_FAILURE",
+        }
+    }
+}
+
+/// Immutable, canonical L5 planning product. It carries no source text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IncrementalCompilationPlanV1 {
+    pub schema: &'static str,
+    pub baseline_publication_identity: Option<String>,
+    pub candidate_configuration_fingerprint: Digest,
+    pub candidate_source_universe_fingerprint: Digest,
+    pub input_changes: Vec<IncrementalInputChangeV1>,
+    pub directly_invalidated: Vec<SourceUnitId>,
+    pub invalidation_closure: Vec<SourceUnitId>,
+    pub reusable_product_identities: Vec<ProductKey>,
+    pub recompute_work_units: Vec<SourceUnitId>,
+    pub fallback_reasons: Vec<IncrementalFallbackReasonV1>,
+    pub mode: IncrementalCompilationModeV1,
+    pub plan_fingerprint: Digest,
+}
+impl IncrementalCompilationPlanV1 {
+    pub fn to_canonical_json(&self) -> Result<Vec<u8>, PlatformSerializationError> {
+        if self.schema != INCREMENTAL_COMPILATION_PLAN_V1_SCHEMA {
+            return Err(PlatformSerializationError {
+                message: "unsupported L5 incremental compilation plan schema".into(),
+            });
+        }
+        let expected = Digest::sha256(l5_plan_bytes_without_fingerprint(self));
+        if expected != self.plan_fingerprint {
+            return Err(PlatformSerializationError {
+                message: "L5 incremental compilation plan fingerprint mismatch".into(),
+            });
+        }
+        Ok(json_document(l5_plan_json(self)))
+    }
+}
+
+/// An L3 parse product explicitly authorized for L5 session-local reuse.
+/// `ParsedFile` is a normalized parser result, not authored source text.
+#[derive(Debug, Clone)]
+pub struct CanonicalReusableProductV1 {
+    pub source_unit_id: SourceUnitId,
+    pub source_revision_id: SourceRevisionId,
+    pub product_key: ProductKey,
+    parsed: Arc<ezc_parser::ParsedFile>,
+}
+impl CanonicalReusableProductV1 {
+    fn parsed(&self) -> &ezc_parser::ParsedFile {
+        self.parsed.as_ref()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct IncrementalCompileWorkspaceRequestV1 {
+    pub workspace: WorkspaceInput,
+    pub cancellation: CancellationToken,
+    pub plan: IncrementalCompilationPlanV1,
+    pub reusable_products: Vec<CanonicalReusableProductV1>,
+}
+
+#[derive(Debug, Clone)]
+pub struct IncrementalCompilationOutcomeV1 {
+    pub outcome: CompilationOutcome,
+    pub reused_product_identities: Vec<ProductKey>,
+    pub recomputed_work_units: Vec<SourceUnitId>,
+    pub rejected_reuse_product_identities: Vec<ProductKey>,
+}
 #[must_use]
 pub fn plan_incremental(
     baseline: Option<(&WorkspaceSnapshot, &WorkspaceGraph)>,
@@ -1475,6 +1629,211 @@ pub fn plan_incremental(
         impacted,
         discarded,
     )
+}
+
+/// Fingerprints the complete normalized source universe using only canonical
+/// L3 snapshot facts. The source revision already binds identity, language,
+/// and exact authored bytes; no text is retained by this product.
+#[must_use]
+pub fn source_universe_fingerprint_v1(snapshot: &WorkspaceSnapshot) -> Digest {
+    let mut bytes = Vec::new();
+    for unit in &snapshot.units {
+        for value in [
+            unit.source_unit_id.as_str(),
+            unit.language.as_str(),
+            unit.source_revision_id.as_str(),
+        ] {
+            bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(value.as_bytes());
+        }
+    }
+    Digest::sha256(bytes)
+}
+
+/// Builds an L5 plan solely from canonical L3 snapshots, graph edges, and
+/// product identities. Source membership lacks product-granular authority in
+/// L3 v1, so additions and deletions deliberately clean-fallback.
+#[must_use]
+pub fn plan_incremental_compilation_v1(
+    baseline: Option<(&WorkspaceSnapshot, &WorkspaceGraph)>,
+    candidate: &WorkspaceSnapshot,
+) -> IncrementalCompilationPlanV1 {
+    let mut changes = Vec::new();
+    let mut direct = Vec::new();
+    let mut closure = Vec::new();
+    let mut reusable = Vec::new();
+    let mut work = Vec::new();
+    let mut fallback = Vec::new();
+    let mut mode = IncrementalCompilationModeV1::Cold;
+    let baseline_publication_identity =
+        baseline.map(|(snapshot, _)| snapshot.snapshot_id.to_string());
+
+    if let Some((before, graph)) = baseline {
+        let old = before
+            .units
+            .iter()
+            .map(|unit| (unit.source_unit_id.clone(), unit))
+            .collect::<BTreeMap<_, _>>();
+        let current = candidate
+            .units
+            .iter()
+            .map(|unit| (unit.source_unit_id.clone(), unit))
+            .collect::<BTreeMap<_, _>>();
+        if before.configuration_fingerprint != candidate.configuration_fingerprint {
+            changes.push(IncrementalInputChangeV1 {
+                kind: IncrementalInputChangeKindV1::ConfigurationChanged,
+                identity: "configuration".into(),
+            });
+            fallback.push(IncrementalFallbackReasonV1::ConfigurationChanged);
+        }
+        for unit in &before.units {
+            if !current.contains_key(&unit.source_unit_id) {
+                changes.push(IncrementalInputChangeV1 {
+                    kind: IncrementalInputChangeKindV1::SourceDeleted,
+                    identity: unit.source_unit_id.to_string(),
+                });
+            }
+        }
+        for unit in &candidate.units {
+            match old.get(&unit.source_unit_id) {
+                None => changes.push(IncrementalInputChangeV1 {
+                    kind: IncrementalInputChangeKindV1::SourceAdded,
+                    identity: unit.source_unit_id.to_string(),
+                }),
+                Some(previous) if previous.source_revision_id != unit.source_revision_id => {
+                    changes.push(IncrementalInputChangeV1 {
+                        kind: IncrementalInputChangeKindV1::SourceContentChanged,
+                        identity: unit.source_unit_id.to_string(),
+                    });
+                    direct.push(unit.source_unit_id.clone());
+                }
+                Some(_) => {}
+            }
+        }
+        changes.sort_by(|left, right| {
+            left.kind
+                .cmp(&right.kind)
+                .then_with(|| left.identity.as_bytes().cmp(right.identity.as_bytes()))
+        });
+        if graph.validate().is_err() || graph.snapshot_id != before.snapshot_id {
+            fallback.push(IncrementalFallbackReasonV1::MalformedBaselineGraph);
+        }
+        if changes.iter().any(|change| {
+            matches!(
+                change.kind,
+                IncrementalInputChangeKindV1::SourceAdded
+                    | IncrementalInputChangeKindV1::SourceDeleted
+            )
+        }) {
+            fallback.push(IncrementalFallbackReasonV1::SourceUniverseMembershipUnmodeled);
+        }
+        if before.compiler_contract != candidate.compiler_contract {
+            fallback.push(IncrementalFallbackReasonV1::CompilerVersionMismatch);
+        }
+        if fallback.is_empty() {
+            let mut invalidated = direct.iter().cloned().collect::<BTreeSet<_>>();
+            let mut frontier = direct.clone();
+            while let Some(current_id) = frontier.pop() {
+                for edge in graph.direct_dependents(&current_id) {
+                    if invalidated.insert(edge.source.clone()) {
+                        frontier.push(edge.source.clone());
+                    }
+                }
+            }
+            closure = invalidated.into_iter().collect();
+            work.clone_from(&closure);
+            let candidate_by_id = candidate
+                .units
+                .iter()
+                .map(|unit| (unit.source_unit_id.clone(), unit))
+                .collect::<BTreeMap<_, _>>();
+            for unit in &graph.units {
+                let Some(candidate_unit) = candidate_by_id.get(&unit.source_unit_id) else {
+                    continue;
+                };
+                if closure.contains(&unit.source_unit_id)
+                    || candidate_unit.source_revision_id != unit.source_revision_id
+                {
+                    continue;
+                }
+                for product in &unit.products {
+                    if product.product_kind == ProductKind::Parse {
+                        reusable.push(product.product_key.clone());
+                    }
+                }
+            }
+            mode = if changes.is_empty() {
+                IncrementalCompilationModeV1::NoChange
+            } else if reusable.is_empty() {
+                // There is no separately reusable L3 product. A clean compile
+                // is safer than pretending the plan has incremental benefit.
+                fallback.push(IncrementalFallbackReasonV1::IncompleteDependencyAuthority);
+                IncrementalCompilationModeV1::CleanFallback
+            } else {
+                IncrementalCompilationModeV1::Incremental
+            };
+        }
+        if !fallback.is_empty() {
+            mode = IncrementalCompilationModeV1::CleanFallback;
+            direct.clear();
+            closure.clear();
+            reusable.clear();
+            work = candidate
+                .units
+                .iter()
+                .map(|unit| unit.source_unit_id.clone())
+                .collect();
+        }
+    }
+    fallback.sort();
+    fallback.dedup();
+    direct.sort();
+    direct.dedup();
+    closure.sort();
+    closure.dedup();
+    reusable.sort();
+    reusable.dedup();
+    work.sort();
+    work.dedup();
+    let mut plan = IncrementalCompilationPlanV1 {
+        schema: INCREMENTAL_COMPILATION_PLAN_V1_SCHEMA,
+        baseline_publication_identity,
+        candidate_configuration_fingerprint: candidate.configuration_fingerprint.clone(),
+        candidate_source_universe_fingerprint: source_universe_fingerprint_v1(candidate),
+        input_changes: changes,
+        directly_invalidated: direct,
+        invalidation_closure: closure,
+        reusable_product_identities: reusable,
+        recompute_work_units: work,
+        fallback_reasons: fallback,
+        mode,
+        plan_fingerprint: Digest::sha256([]),
+    };
+    plan.plan_fingerprint = Digest::sha256(l5_plan_bytes_without_fingerprint(&plan));
+    plan
+}
+
+/// Converts a candidate plan to the conservative L5 clean path without
+/// deriving any dependency information. Used when the service detects that a
+/// retained baseline product no longer validates.
+pub fn force_clean_fallback_v1(
+    plan: &mut IncrementalCompilationPlanV1,
+    candidate: &WorkspaceSnapshot,
+    reason: IncrementalFallbackReasonV1,
+) {
+    plan.mode = IncrementalCompilationModeV1::CleanFallback;
+    plan.directly_invalidated.clear();
+    plan.invalidation_closure.clear();
+    plan.reusable_product_identities.clear();
+    plan.recompute_work_units = candidate
+        .units
+        .iter()
+        .map(|unit| unit.source_unit_id.clone())
+        .collect();
+    plan.fallback_reasons.push(reason);
+    plan.fallback_reasons.sort();
+    plan.fallback_reasons.dedup();
+    plan.plan_fingerprint = Digest::sha256(l5_plan_bytes_without_fingerprint(plan));
 }
 fn build_full_plan(
     baseline: WorkspaceSnapshotId,
@@ -1785,6 +2144,9 @@ pub struct CommittedCompilation {
     pub snapshot: Arc<WorkspaceSnapshot>,
     pub graph: Arc<WorkspaceGraph>,
     pub plan: Arc<IncrementalPlan>,
+    /// Session-local L3 products that the L5 API explicitly permits a later
+    /// request to offer back for validation and reuse.
+    pub reusable_products: Vec<CanonicalReusableProductV1>,
 }
 #[derive(Debug, Clone)]
 pub struct RejectedCompilation {
@@ -1882,10 +2244,11 @@ impl CompilerSessionState {
             plan: Arc::clone(&plan),
             phase: AttemptPhase::Executing,
         });
-        let graph = match build_graph(&request.workspace, &snapshot) {
-            Ok(graph) => graph,
-            Err(error) => return self.fail(error),
-        };
+        let (graph, reusable_products, _, _) =
+            match build_graph_with_reuse(&request.workspace, &snapshot, &[], &BTreeSet::new()) {
+                Ok(result) => result,
+                Err(error) => return self.fail(error),
+            };
         if request.cancellation.is_cancelled() {
             return self.cancel();
         }
@@ -1916,7 +2279,135 @@ impl CompilerSessionState {
             snapshot: committed.snapshot,
             graph: committed.graph,
             plan,
+            reusable_products,
         })
+    }
+
+    /// L5's narrow canonical incremental entry point. It validates every
+    /// offered parse product itself and falls back to recomputation for any
+    /// product it cannot prove safe; the service plan is never semantic
+    /// authority.
+    pub fn compile_workspace_incremental_v1(
+        &mut self,
+        request: IncrementalCompileWorkspaceRequestV1,
+    ) -> IncrementalCompilationOutcomeV1 {
+        if self.status == CompilerSessionStatus::Closed {
+            return IncrementalCompilationOutcomeV1 {
+                outcome: CompilationOutcome::PlatformFailure(PlatformFailure::new(
+                    PlatformFailureCode::SessionClosed,
+                    "compiler session is closed",
+                )),
+                reused_product_identities: Vec::new(),
+                recomputed_work_units: Vec::new(),
+                rejected_reuse_product_identities: Vec::new(),
+            };
+        }
+        let snapshot = match WorkspaceSnapshot::from_input(&request.workspace) {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                return IncrementalCompilationOutcomeV1 {
+                    outcome: self.fail(error),
+                    reused_product_identities: Vec::new(),
+                    recomputed_work_units: Vec::new(),
+                    rejected_reuse_product_identities: Vec::new(),
+                };
+            }
+        };
+        if request.cancellation.is_cancelled() {
+            return IncrementalCompilationOutcomeV1 {
+                outcome: self.cancel(),
+                reused_product_identities: Vec::new(),
+                recomputed_work_units: Vec::new(),
+                rejected_reuse_product_identities: Vec::new(),
+            };
+        }
+        if request.plan.to_canonical_json().is_err()
+            || request.plan.candidate_configuration_fingerprint
+                != snapshot.configuration_fingerprint
+            || request.plan.candidate_source_universe_fingerprint
+                != source_universe_fingerprint_v1(&snapshot)
+        {
+            return IncrementalCompilationOutcomeV1 {
+                outcome: self.fail(PlatformFailure::new(
+                    PlatformFailureCode::InvalidIncrementalPlan,
+                    "L5 incremental plan does not match the canonical candidate",
+                )),
+                reused_product_identities: Vec::new(),
+                recomputed_work_units: Vec::new(),
+                rejected_reuse_product_identities: Vec::new(),
+            };
+        }
+        let attempt_id = CompilationAttemptId(format!(
+            "attempt:{}:{}",
+            self.session_id.as_str().trim_start_matches("session:"),
+            self.next_attempt
+        ));
+        self.next_attempt += 1;
+        self.status = CompilerSessionStatus::Compiling;
+        let legacy_plan = Arc::new(plan_incremental(None, &snapshot, true));
+        self.active_attempt = Some(CompilationAttemptState {
+            attempt_id,
+            baseline_snapshot_id: request
+                .plan
+                .baseline_publication_identity
+                .as_ref()
+                .map(|value| WorkspaceSnapshotId(value.clone())),
+            candidate_snapshot: Arc::new(snapshot.clone()),
+            plan: Arc::clone(&legacy_plan),
+            phase: AttemptPhase::Executing,
+        });
+        let invalidated = request
+            .plan
+            .invalidation_closure
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let (graph, reusable_products, reused, rejected) = match build_graph_with_reuse(
+            &request.workspace,
+            &snapshot,
+            &request.reusable_products,
+            &invalidated,
+        ) {
+            Ok(result) => result,
+            Err(error) => {
+                return IncrementalCompilationOutcomeV1 {
+                    outcome: self.fail(error),
+                    reused_product_identities: Vec::new(),
+                    recomputed_work_units: Vec::new(),
+                    rejected_reuse_product_identities: Vec::new(),
+                };
+            }
+        };
+        if let Err(error) = snapshot.validate().and_then(|()| graph.validate()) {
+            return IncrementalCompilationOutcomeV1 {
+                outcome: self.fail(error),
+                reused_product_identities: Vec::new(),
+                recomputed_work_units: Vec::new(),
+                rejected_reuse_product_identities: rejected,
+            };
+        }
+        let committed = CommittedWorkspaceState {
+            snapshot: Arc::new(snapshot),
+            graph: Arc::new(graph),
+            committed_product_keys: Vec::new(),
+            committed_workspace_product_keys: Vec::new(),
+        };
+        self.workspace_id = committed.snapshot.workspace_id.clone();
+        self.compiler_contract = committed.snapshot.compiler_contract.clone();
+        self.committed = Some(committed.clone());
+        self.active_attempt = None;
+        self.status = CompilerSessionStatus::Ready;
+        IncrementalCompilationOutcomeV1 {
+            outcome: CompilationOutcome::Committed(CommittedCompilation {
+                snapshot: committed.snapshot,
+                graph: committed.graph,
+                plan: legacy_plan,
+                reusable_products,
+            }),
+            reused_product_identities: reused,
+            recomputed_work_units: request.plan.recompute_work_units,
+            rejected_reuse_product_identities: rejected,
+        }
     }
     fn fail(&mut self, error: PlatformFailure) -> CompilationOutcome {
         self.active_attempt = None;
@@ -1957,15 +2448,68 @@ impl CompilerSessionState {
         }
     }
 }
-fn build_graph(
+type GraphBuildResult = (
+    WorkspaceGraph,
+    Vec<CanonicalReusableProductV1>,
+    Vec<ProductKey>,
+    Vec<ProductKey>,
+);
+
+fn build_graph_with_reuse(
     input: &WorkspaceInput,
     snapshot: &WorkspaceSnapshot,
-) -> Result<WorkspaceGraph, PlatformFailure> {
+    offered: &[CanonicalReusableProductV1],
+    invalidated: &BTreeSet<SourceUnitId>,
+) -> Result<GraphBuildResult, PlatformFailure> {
     let (_, fingerprint, inputs) = normalize(input)?;
-    let parsed = inputs
+    let parser_contract = ContractVersion::new("parser:1");
+    let offered_by_unit = offered
         .iter()
-        .map(|source| ezc_parser::parse_file(source.path.as_str(), &source.source))
-        .collect::<Vec<_>>();
+        .map(|product| (product.source_unit_id.clone(), product))
+        .collect::<BTreeMap<_, _>>();
+    let mut reused = Vec::new();
+    let mut rejected = Vec::new();
+    let mut parsed = Vec::new();
+    let mut reusable_products = Vec::new();
+    for source in &inputs {
+        let expected_key = product_key(
+            &source.source_unit_id,
+            &source.source_revision_id,
+            ProductKind::Parse,
+            &parser_contract,
+            &fingerprint,
+        );
+        let reusable = offered_by_unit
+            .get(&source.source_unit_id)
+            .and_then(|product| {
+                let product = *product;
+                let valid = !invalidated.contains(&source.source_unit_id)
+                    && product.source_revision_id == source.source_revision_id
+                    && product.product_key == expected_key
+                    && WorkspacePath::new(product.parsed().path.to_string_lossy())
+                        .is_ok_and(|path| path == source.path);
+                if valid {
+                    Some(product)
+                } else {
+                    rejected.push(product.product_key.clone());
+                    None
+                }
+            });
+        let file = reusable.map_or_else(
+            || ezc_parser::parse_file(source.path.as_str(), &source.source),
+            |product| {
+                reused.push(product.product_key.clone());
+                product.parsed().clone()
+            },
+        );
+        reusable_products.push(CanonicalReusableProductV1 {
+            source_unit_id: source.source_unit_id.clone(),
+            source_revision_id: source.source_revision_id.clone(),
+            product_key: expected_key,
+            parsed: Arc::new(file.clone()),
+        });
+        parsed.push(file);
+    }
     let unit = CompilationUnit::from_parsed_files(parsed.clone());
     let model = build_application_semantic_model_for_unit(&unit);
     let model_digest = Digest::sha256(format!(
@@ -1973,7 +2517,6 @@ fn build_graph(
         model.components.len(),
         model.diagnostics.len()
     ));
-    let parser_contract = ContractVersion::new("parser:1");
     let units = inputs
         .iter()
         .map(|source| {
@@ -2031,7 +2574,7 @@ fn build_graph(
         producer_contract: asm_contract,
         content_digest: model_digest,
     }];
-    Ok(WorkspaceGraph {
+    let graph = WorkspaceGraph {
         schema_version: WORKSPACE_GRAPH_SCHEMA_VERSION,
         workspace_id: snapshot.workspace_id.clone(),
         snapshot_id: snapshot.snapshot_id.clone(),
@@ -2039,7 +2582,12 @@ fn build_graph(
         units,
         dependency_edges: edges,
         application_products,
-    })
+    };
+    reused.sort();
+    reused.dedup();
+    rejected.sort();
+    rejected.dedup();
+    Ok((graph, reusable_products, reused, rejected))
 }
 fn resolve_import(
     source: &WorkspacePath,
@@ -2216,6 +2764,67 @@ fn incremental_plan_json(plan: &IncrementalPlan) -> String {
         .join(",");
     format!("{{\"schema_version\":{},\"plan_id\":{},\"baseline_snapshot_id\":{},\"candidate_snapshot_id\":{},\"mode\":{},\"changes\":{},\"invalidated_units\":[{}],\"stages\":[{}],\"retained_products\":[{}],\"discarded_products\":[{}],\"expected_commit\":{{\"snapshot_id\":{},\"workspace_graph_schema_version\":{}}}}}", plan.schema_version, quote(plan.plan_id.as_str()), quote(plan.baseline_snapshot_id.as_str()), quote(plan.candidate_snapshot_id.as_str()), quote(plan.mode.as_str()), changes, invalidated, stages, plan.retained_products.iter().map(|key|quote(key.as_str())).collect::<Vec<_>>().join(","), plan.discarded_products.iter().map(|key|quote(key.as_str())).collect::<Vec<_>>().join(","), quote(plan.expected_commit.snapshot_id.as_str()), plan.expected_commit.workspace_graph_schema_version)
 }
+fn l5_plan_bytes_without_fingerprint(plan: &IncrementalCompilationPlanV1) -> Vec<u8> {
+    l5_plan_json_without_fingerprint(plan).into_bytes()
+}
+fn l5_plan_json_without_fingerprint(plan: &IncrementalCompilationPlanV1) -> String {
+    let ids = |values: &[SourceUnitId]| {
+        values
+            .iter()
+            .map(|value| quote(value.as_str()))
+            .collect::<Vec<_>>()
+            .join(",")
+    };
+    let products = plan
+        .reusable_product_identities
+        .iter()
+        .map(|value| quote(value.as_str()))
+        .collect::<Vec<_>>()
+        .join(",");
+    let changes = plan
+        .input_changes
+        .iter()
+        .map(|change| {
+            format!(
+                "{{\"kind\":{},\"identity\":{}}}",
+                quote(change.kind.as_str()),
+                quote(&change.identity)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    let fallback = plan
+        .fallback_reasons
+        .iter()
+        .map(|reason| quote(reason.code()))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        "{{\"schema\":{},\"baseline_publication_identity\":{},\"candidate_configuration_fingerprint\":{},\"candidate_source_universe_fingerprint\":{},\"input_changes\":[{}],\"directly_invalidated\":[{}],\"invalidation_closure\":[{}],\"reusable_product_identities\":[{}],\"recompute_work_units\":[{}],\"fallback_reasons\":[{}],\"mode\":{}}}",
+        quote(plan.schema),
+        plan.baseline_publication_identity.as_ref().map_or_else(|| "null".into(), |value| quote(value)),
+        quote(plan.candidate_configuration_fingerprint.as_str()),
+        quote(plan.candidate_source_universe_fingerprint.as_str()),
+        changes,
+        ids(&plan.directly_invalidated),
+        ids(&plan.invalidation_closure),
+        products,
+        ids(&plan.recompute_work_units),
+        fallback,
+        quote(plan.mode.as_str()),
+    )
+}
+fn l5_plan_json(plan: &IncrementalCompilationPlanV1) -> String {
+    let without = l5_plan_json_without_fingerprint(plan);
+    without
+        .strip_suffix('}')
+        .expect("canonical L5 plan is an object")
+        .to_owned()
+        + &format!(
+            ",\"plan_fingerprint\":{}}}",
+            quote(plan.plan_fingerprint.as_str())
+        )
+}
 fn cache_json(cache: &ProductCacheInspection) -> String {
     let entries = cache.entries.iter().map(|entry| format!("{{\"product_key\":{},\"product_kind\":{},\"content_digest\":{},\"state\":{},\"weight\":{}}}", quote(entry.product_key.as_str()), quote(entry.product_kind.as_str()), quote(entry.content_digest.as_str()), quote(match entry.state { CacheEntryState::AttemptLocal => "attempt_local", CacheEntryState::Committed => "committed" }), entry.weight)).collect::<Vec<_>>().join(",");
     format!("{{\"schema_version\":{},\"entry_count\":{},\"total_weight\":{},\"limits\":{{\"maximum_entries\":{},\"maximum_weight\":{}}},\"entries\":[{}]}}", cache.schema_version, cache.entry_count, cache.total_weight, cache.limits.maximum_entries, cache.limits.maximum_weight, entries)
@@ -2242,8 +2851,13 @@ pub mod snapshot {
 }
 pub mod incremental {
     pub use super::{
-        plan_incremental, ExpectedCommit, IncrementalMode, IncrementalPlan, IncrementalPlanId,
-        IncrementalStage, IncrementalStageKind, InvalidatedUnit, InvalidationReason,
+        force_clean_fallback_v1, plan_incremental, plan_incremental_compilation_v1,
+        source_universe_fingerprint_v1, CanonicalReusableProductV1, ExpectedCommit,
+        IncrementalCompilationModeV1, IncrementalCompilationOutcomeV1,
+        IncrementalCompilationPlanV1, IncrementalCompileWorkspaceRequestV1,
+        IncrementalFallbackReasonV1, IncrementalInputChangeKindV1, IncrementalInputChangeV1,
+        IncrementalMode, IncrementalPlan, IncrementalPlanId, IncrementalStage,
+        IncrementalStageKind, InvalidatedUnit, InvalidationReason,
     };
 }
 pub mod cache {
@@ -2256,7 +2870,8 @@ pub mod session {
     pub use super::{
         CancellationToken, CommittedCompilation, CompilationAttemptId, CompilationOutcome,
         CompileWorkspaceRequest, CompilerSessionId, CompilerSessionInspection,
-        CompilerSessionState, CompilerSessionStatus, RequestedCompilationMode,
+        CompilerSessionState, CompilerSessionStatus, IncrementalCompilationOutcomeV1,
+        IncrementalCompileWorkspaceRequestV1, RequestedCompilationMode,
     };
 }
 pub mod inspection {
