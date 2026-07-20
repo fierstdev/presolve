@@ -1,0 +1,1 @@
+{"schema":"presolve.workspace-manifest","version":1,"packages":["foundation","feature","app"],"dependencies":["foundation>feature","feature>app"]}

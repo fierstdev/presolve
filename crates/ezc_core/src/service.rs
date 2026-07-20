@@ -6,11 +6,13 @@
 
 #![allow(
     clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
     clippy::needless_pass_by_value,
+    clippy::single_match_else,
     clippy::too_many_lines
 )]
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -30,6 +32,7 @@ use crate::platform::{
     SourceRevisionId, SourceUnitId, WorkspaceConfiguration, WorkspaceGraph, WorkspaceId,
     WorkspaceInput, WorkspaceSnapshot, WorkspaceSource,
 };
+use crate::workspace::{self, WorkspaceBuildPlanV1, WorkspaceManifestV1, WorkspacePackageGraphV1};
 
 pub const COMPILER_SERVICE_PROTOCOL_VERSION: u32 = 1;
 pub const COMPILER_SERVICE_DESCRIPTOR_SCHEMA_VERSION: u32 = 1;
@@ -178,6 +181,40 @@ pub struct CompileResponse {
     pub incremental_report: Option<IncrementalExecutionReportV1>,
     pub cache_report: Option<CacheTelemetryV1>,
 }
+#[derive(Debug, Clone)]
+pub struct WorkspacePackageCompileRequestV1 {
+    pub package_id: String,
+    pub expected_commit_sequence: u64,
+    pub request: CompileRequest,
+}
+#[derive(Debug, Clone)]
+pub struct WorkspaceCompileRequestV1 {
+    pub manifest: WorkspaceManifestV1,
+    pub packages: Vec<WorkspacePackageCompileRequestV1>,
+    pub operation_id: String,
+}
+#[derive(Debug, Clone)]
+pub struct WorkspacePackageResultV1 {
+    pub package_id: String,
+    pub status: String,
+    pub snapshot_id: Option<String>,
+}
+#[derive(Debug, Clone)]
+pub struct WorkspaceBuildResultV1 {
+    pub workspace_id: String,
+    pub status: String,
+    pub manifest_identity: String,
+    pub graph_identity: String,
+    pub plan_identity: String,
+    pub package_results: Vec<WorkspacePackageResultV1>,
+}
+#[derive(Debug, Clone)]
+struct DurableWorkspaceStateV1 {
+    manifest: WorkspaceManifestV1,
+    graph: WorkspacePackageGraphV1,
+    plan: WorkspaceBuildPlanV1,
+    result: WorkspaceBuildResultV1,
+}
 
 pub fn encode_frame(payload: &[u8]) -> Result<Vec<u8>, ServiceError> {
     if payload.is_empty() {
@@ -225,6 +262,7 @@ pub struct CompilerServiceHost {
     descriptor: CompilerServiceDescriptor,
     sessions: BTreeMap<String, DurableSession>,
     cache: PersistentArtifactCacheV1,
+    workspaces: BTreeMap<String, DurableWorkspaceStateV1>,
 }
 struct DurableSession {
     workspace_id: WorkspaceId,
@@ -298,6 +336,7 @@ impl CompilerServiceHost {
             descriptor,
             sessions: BTreeMap::new(),
             cache: PersistentArtifactCacheV1::open(cache_root, &compiler_contract),
+            workspaces: BTreeMap::new(),
         };
         host.write_manifest()?;
         Ok(host)
@@ -386,6 +425,167 @@ impl CompilerServiceHost {
     }
     pub fn clean_cache(&self, _explicit_root: &Path) -> Result<Vec<String>, ServiceError> {
         self.cache.clean().map_err(cache_operation_error)
+    }
+    pub fn compile_workspace_v1(
+        &mut self,
+        request: WorkspaceCompileRequestV1,
+    ) -> Result<WorkspaceBuildResultV1, ServiceError> {
+        let manifest = request
+            .manifest
+            .normalize_validate()
+            .map_err(workspace_error)?;
+        let graph = workspace::graph(&manifest).map_err(workspace_error)?;
+        let expected = manifest
+            .packages
+            .iter()
+            .map(|p| p.package_id.clone())
+            .collect::<BTreeSet<_>>();
+        let supplied = request
+            .packages
+            .iter()
+            .map(|p| p.package_id.clone())
+            .collect::<BTreeSet<_>>();
+        if expected != supplied || supplied.len() != request.packages.len() {
+            return Err(ServiceError::new(
+                "L7W007_PACKAGE_REQUEST_SET_MISMATCH",
+                "workspace request keys do not match manifest",
+            ));
+        }
+        let mut requests = request
+            .packages
+            .into_iter()
+            .map(|p| (p.package_id.clone(), p))
+            .collect::<BTreeMap<_, _>>();
+        for package in &manifest.packages {
+            let item = requests
+                .get(&package.package_id)
+                .expect("validated request");
+            if package.session_id != item.request.candidate_snapshot.workspace_id.as_str()
+                && !self.sessions.contains_key(&package.session_id)
+            {
+                return Err(ServiceError::new(
+                    "L7W011_WORKSPACE_SESSION_OWNERSHIP_CONFLICT",
+                    "package session does not exist",
+                ));
+            }
+            if let Some(hint) = &package.configuration_identity_hint {
+                let actual =
+                    platform::workspace_configuration_fingerprint_v1(&item.request.configuration)
+                        .map_err(platform_error)?;
+                if hint != actual.as_str() {
+                    return Err(ServiceError::new(
+                        "L7W008_CONFIGURATION_IDENTITY_HINT_MISMATCH",
+                        "configuration identity hint mismatch",
+                    ));
+                }
+            }
+        }
+        let fingerprints = requests
+            .iter()
+            .map(|(id, item)| {
+                (
+                    id.clone(),
+                    item.request
+                        .candidate_snapshot
+                        .snapshot_id
+                        .as_str()
+                        .to_owned(),
+                )
+            })
+            .collect();
+        let plan = workspace::plan(&graph, fingerprints);
+        let mut results = Vec::new();
+        let mut failed = false;
+        for stage in &plan.stages {
+            for package_id in &stage.packages {
+                let item = requests.remove(package_id).expect("plan package");
+                let session_id = manifest
+                    .packages
+                    .iter()
+                    .find(|p| p.package_id == *package_id)
+                    .expect("descriptor")
+                    .session_id
+                    .clone();
+                if failed {
+                    results.push(WorkspacePackageResultV1 {
+                        package_id: package_id.clone(),
+                        status: "skipped_fail_fast".into(),
+                        snapshot_id: None,
+                    });
+                    continue;
+                }
+                match self.compile(&session_id, item.expected_commit_sequence, item.request) {
+                    Ok(response) => results.push(WorkspacePackageResultV1 {
+                        package_id: package_id.clone(),
+                        status: "succeeded".into(),
+                        snapshot_id: Some(response.snapshot.snapshot_id.to_string()),
+                    }),
+                    Err(_) => {
+                        failed = true;
+                        results.push(WorkspacePackageResultV1 {
+                            package_id: package_id.clone(),
+                            status: "failed".into(),
+                            snapshot_id: None,
+                        });
+                    }
+                }
+            }
+        }
+        let status = if failed { "failed" } else { "succeeded" }.to_owned();
+        let result = WorkspaceBuildResultV1 {
+            workspace_id: manifest.workspace_id.clone(),
+            status,
+            manifest_identity: graph.manifest_identity.clone(),
+            graph_identity: graph.graph_identity.clone(),
+            plan_identity: plan.plan_identity.clone(),
+            package_results: results,
+        };
+        if !failed {
+            let state = DurableWorkspaceStateV1 {
+                manifest: manifest.clone(),
+                graph: graph.clone(),
+                plan: plan.clone(),
+                result: result.clone(),
+            };
+            self.publish_workspace_state(&state)?;
+            self.workspaces.insert(manifest.workspace_id.clone(), state);
+        }
+        Ok(result)
+    }
+    pub fn inspect_workspace(
+        &self,
+        workspace_id: &str,
+    ) -> Result<WorkspaceBuildResultV1, ServiceError> {
+        self.workspaces
+            .get(workspace_id)
+            .map(|state| state.result.clone())
+            .ok_or_else(|| ServiceError::new("workspace_not_found", "workspace state not found"))
+    }
+    pub fn verify_workspace(&self, workspace_id: &str) -> Result<(), ServiceError> {
+        let state = self
+            .workspaces
+            .get(workspace_id)
+            .ok_or_else(|| ServiceError::new("workspace_not_found", "workspace state not found"))?;
+        if state.graph.manifest_identity != state.manifest.identity()
+            || state.plan.manifest_identity != state.graph.manifest_identity
+        {
+            return Err(ServiceError::new(
+                "workspace_state_invalid",
+                "workspace state integrity mismatch",
+            ));
+        }
+        Ok(())
+    }
+    pub fn remove_workspace_state(&mut self, workspace_id: &str) -> Result<(), ServiceError> {
+        self.workspaces.remove(workspace_id);
+        let path = self
+            .root
+            .join("workspaces")
+            .join(format!("{workspace_id}.json"));
+        if path.exists() {
+            fs::remove_file(path).map_err(io_error)?;
+        }
+        Ok(())
     }
     pub fn compile(
         &mut self,
@@ -703,6 +903,31 @@ impl CompilerServiceHost {
         fs::create_dir_all(dir.join("commits")).map_err(io_error)?;
         atomic_write(&dir.join("session.json"),format!("{{\"schema_version\":1,\"session_id\":{},\"workspace_id\":{},\"workspace_configuration\":{},\"compiler_contract\":{},\"state\":{},\"current_commit_sequence\":{}}}\n",json(id),json(session.workspace_id.as_str()),config,json(session.compiler_contract.as_str()),json(if session.closed{"closed"}else{"open"}),session.commit_sequence).as_bytes())
     }
+    fn publish_workspace_state(&self, state: &DurableWorkspaceStateV1) -> Result<(), ServiceError> {
+        let directory = self.root.join("workspaces");
+        fs::create_dir_all(&directory).map_err(io_error)?;
+        let packages = state
+            .result
+            .package_results
+            .iter()
+            .map(|p| {
+                format!(
+                    "{{\"package_id\":{},\"status\":{},\"snapshot_id\":{}}}",
+                    json(&p.package_id),
+                    json(&p.status),
+                    p.snapshot_id
+                        .as_ref()
+                        .map_or_else(|| "null".into(), |v| json(v))
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+        let bytes=format!("{{\"schema\":\"presolve.durable-workspace-state\",\"version\":1,\"workspace_id\":{},\"manifest_identity\":{},\"graph_identity\":{},\"plan_identity\":{},\"package_results\":[{}]}}\n",json(&state.result.workspace_id),json(&state.result.manifest_identity),json(&state.result.graph_identity),json(&state.result.plan_identity),packages);
+        atomic_write(
+            &directory.join(format!("{}.json", state.result.workspace_id)),
+            bytes.as_bytes(),
+        )
+    }
 }
 fn selected_report(
     selector: IncrementalReportSelector,
@@ -891,6 +1116,9 @@ fn platform_serialization(error: platform::PlatformSerializationError) -> Servic
 }
 fn cache_operation_error(reason: crate::persistent_cache::CacheReasonCodeV1) -> ServiceError {
     ServiceError::new("cache_operation_failed", reason.code())
+}
+fn workspace_error(error: workspace::WorkspaceErrorV1) -> ServiceError {
+    ServiceError::new(error.code(), "workspace manifest validation failed")
 }
 
 pub mod protocol {

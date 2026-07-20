@@ -130,6 +130,7 @@ pub mod symbol_table;
 pub mod template_graph;
 pub mod template_manifest;
 pub mod template_semantics;
+pub mod workspace;
 
 pub use application_semantic_model::{
     build_application_semantic_model, build_application_semantic_model_for_unit,

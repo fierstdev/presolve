@@ -10,6 +10,7 @@ check:
     ./scripts/verify-l4-service-contracts.sh
     ./scripts/verify-l5-incremental-contracts.sh
     ./scripts/verify-l6-persistent-cache-contracts.sh
+    ./scripts/verify-l7-workspace-contracts.sh
 
 repository-layout:
     ./scripts/verify-repository-layout.sh

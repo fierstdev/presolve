@@ -3,15 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L6 - Persistent Cache
-* Working tree: L6 is implemented as one atomic slice; no L7 workspace work has begun.
+* Latest completed slice: L7 - Workspace Architecture
+* Working tree: L7 is implemented as one atomic slice; no L8 watch work has begun.
 * Date: 2026-07-19
 
 Last completed slice
 
-* Slice: L6 - Persistent Cache
-* Summary: adds the explicit-root, source-free complete-result persistent cache, atomic post-publication writes, exact-key lookup/fallback, cache telemetry, and internal inspect/verify/clean operations.
-* Key files: `crates/ezc_core/src/persistent_cache.rs`, `crates/ezc_core/src/service.rs`, `crates/ezc_core/fixtures/persistent-cache/`, `docs/persistent-cache-contract.md`, `scripts/verify-l6-persistent-cache-contracts.sh`, `justfile`, `2026-W28.md`
+* Slice: L7 - Workspace Architecture
+* Summary: adds caller-owned manifest validation, deterministic serial topological package orchestration, source-free durable workspace state, and internal workspace inspection/verification/removal APIs.
+* Key files: `crates/ezc_core/src/workspace.rs`, `crates/ezc_core/src/service.rs`, `crates/ezc_core/fixtures/workspace/`, `docs/workspace-architecture-contract.md`, `scripts/verify-l7-workspace-contracts.sh`, `justfile`, `2026-W28.md`
+* Workspace boundary: manifests and complete package requests are caller-owned. Explicit edges schedule serial package order only; they do not create cross-package semantics, discovery, artifact linking, or package-cache key changes. Package publication is atomic per package; workspace state publishes only after all packages succeed.
 * Cache boundary: only canonical snapshot/graph/response metadata is persisted after L4/L5 publication. Cache payloads contain no authored source text, parser products, ASTs, request frames, or durable L5 baselines. A restart can hit a complete result but restores no parser reuse products.
 * Cache authority: exact SHA-256 length-delimited keying binds compiler/service/schema/feature/platform/configuration/source-universe/mode/artifact/diagnostic/codec identities. Absent, disabled, corrupt, incompatible, or write-failed cache state falls through to L5 without changing compiler semantics.
 * Verification: `./scripts/verify-l6-persistent-cache-contracts.sh` passes independently and is in `just check`; focused cases cover initialization, restart hit, corruption fallback, disabled cache, source sentinel exclusion, inspection, and owned cleanup. Stop at L7; no workspace discovery, watch mode, public cache CLI, or remote cache work has started.
@@ -23,8 +24,8 @@ Last completed slice
 
 Current phase boundary
 
-* Slice: L7 and later Phase L work.
-* Status: L6 is complete under `PHASE_L_L6_PERSISTENT_CACHE_IMPLEMENTATION_CONTRACT.md`. Stop at the L7 boundary until its implementation-ready contract is supplied; L3–L6 v1 meanings remain compatible.
+* Slice: L8 and later Phase L work.
+* Status: L7 is complete under `PHASE_L_L7_WORKSPACE_ARCHITECTURE_IMPLEMENTATION_CONTRACT.md`. Stop at the L8 boundary until its implementation-ready contract is supplied; L3–L7 v1 meanings remain compatible.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
 * Remaining in Phase K: none.
 
