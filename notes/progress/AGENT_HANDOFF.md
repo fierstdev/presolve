@@ -3,15 +3,19 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L7 - Workspace Architecture
-* Working tree: L7 is implemented as one atomic slice; no L8 watch work has begun.
+* Latest completed slice: L8 - Watch Mode
+* Working tree: L8 is implemented as one atomic slice; verify and commit evidence recorded below.
 * Date: 2026-07-19
 
 Last completed slice
 
-* Slice: L7 - Workspace Architecture
-* Summary: adds caller-owned manifest validation, deterministic serial topological package orchestration, source-free durable workspace state, and internal workspace inspection/verification/removal APIs.
-* Key files: `crates/ezc_core/src/workspace.rs`, `crates/ezc_core/src/service.rs`, `crates/ezc_core/fixtures/workspace/`, `docs/workspace-architecture-contract.md`, `scripts/verify-l7-workspace-contracts.sh`, `justfile`, `2026-W28.md`
+* Slice: L8 - Watch Mode
+* Summary: adds explicit process-local, caller-driven watch sessions over complete L7 candidates. The state machine has source-free snapshots/events, bounded journals, canonical change evidence, injected monotonic-time debounce, latest-candidate coalescing, obsolete-attempt discard semantics, and one active operation maximum.
+* Key files: `crates/ezc_core/src/watch.rs`, `crates/ezc_core/src/service.rs`, `crates/ezc_core/fixtures/watch/`, `docs/watch-mode-contract.md`, `scripts/verify-l8-watch-contracts.sh`, `justfile`, `2026-W28.md`
+* Observer boundary: callers observe and read inputs, then submit complete exact replacement L7 workspace requests. The service does no filesystem watch/read/scan/poll/glob/manifest discovery and exposes no public watch CLI, dev server, HMR, browser refresh, or streaming transport.
+* Scheduler: test and internal execution use explicit monotonic scheduler turns. Quiet and maximum deadlines are caller-clock values; zero debounce coalesces before the next turn. Pending input is one transient complete candidate only, replaced at highest accepted sequence; the source-free evidence union is retained for reporting.
+* Publication/lifecycle: every execution delegates unchanged to `compile_workspace_v1`; L7 serial scheduling/publication, L5 ephemeral package reuse, and L6 complete-result cache behavior remain authoritative. Obsolete active success is discarded at the watch layer without rollback. Sessions are process-local and never restored; stop releases pending input.
+* Verification: `cargo test -p presolve-compiler watch --lib`, `cargo test -p presolve-compiler l8_explicit --lib -- --nocapture`, `./scripts/verify-l8-watch-contracts.sh`, and inherited `just check` pass. The L8 script runs fake-clock/debounce/coalescing/supersession/journal/determinism (20 fresh runs), direct L7 delegation, L3-L7 audits, formatter, strict clippy, fixture/source-exclusion audit, and `git diff --check`.
 * Workspace boundary: manifests and complete package requests are caller-owned. Explicit edges schedule serial package order only; they do not create cross-package semantics, discovery, artifact linking, or package-cache key changes. Package publication is atomic per package; workspace state publishes only after all packages succeed.
 * Cache boundary: only canonical snapshot/graph/response metadata is persisted after L4/L5 publication. Cache payloads contain no authored source text, parser products, ASTs, request frames, or durable L5 baselines. A restart can hit a complete result but restores no parser reuse products.
 * Cache authority: exact SHA-256 length-delimited keying binds compiler/service/schema/feature/platform/configuration/source-universe/mode/artifact/diagnostic/codec identities. Absent, disabled, corrupt, incompatible, or write-failed cache state falls through to L5 without changing compiler semantics.
@@ -24,8 +28,8 @@ Last completed slice
 
 Current phase boundary
 
-* Slice: L8 and later Phase L work.
-* Status: L7 is complete under `PHASE_L_L7_WORKSPACE_ARCHITECTURE_IMPLEMENTATION_CONTRACT.md`. Stop at the L8 boundary until its implementation-ready contract is supplied; L3–L7 v1 meanings remain compatible.
+* Slice: L9 and later Phase L work.
+* Status: L8 is complete under `PHASE_L_L8_WATCH_MODE_IMPLEMENTATION_CONTRACT.md`. Stop at the L9 boundary until its implementation-ready contract is supplied; L3–L8 v1 meanings remain compatible. Do not begin public CLI watch behavior or any L9 work.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
 * Remaining in Phase K: none.
 

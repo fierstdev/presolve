@@ -11,6 +11,7 @@ check:
     ./scripts/verify-l5-incremental-contracts.sh
     ./scripts/verify-l6-persistent-cache-contracts.sh
     ./scripts/verify-l7-workspace-contracts.sh
+    ./scripts/verify-l8-watch-contracts.sh
 
 repository-layout:
     ./scripts/verify-repository-layout.sh
@@ -29,6 +30,9 @@ l5-incremental-contracts:
 
 l6-persistent-cache-contracts:
     ./scripts/verify-l6-persistent-cache-contracts.sh
+
+l8-watch-contracts:
+    ./scripts/verify-l8-watch-contracts.sh
 
 e2e:
     cargo test -p presolve-cli --test runtime_browser -- --nocapture --test-threads=1

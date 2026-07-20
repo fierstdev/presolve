@@ -13,6 +13,7 @@
 )]
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Write as _;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -32,6 +33,7 @@ use crate::platform::{
     SourceRevisionId, SourceUnitId, WorkspaceConfiguration, WorkspaceGraph, WorkspaceId,
     WorkspaceInput, WorkspaceSnapshot, WorkspaceSource,
 };
+use crate::watch::{self, WatchChangeBatchMetadataV1, WatchSessionV1};
 use crate::workspace::{self, WorkspaceBuildPlanV1, WorkspaceManifestV1, WorkspacePackageGraphV1};
 
 pub const COMPILER_SERVICE_PROTOCOL_VERSION: u32 = 1;
@@ -208,6 +210,30 @@ pub struct WorkspaceBuildResultV1 {
     pub plan_identity: String,
     pub package_results: Vec<WorkspacePackageResultV1>,
 }
+/// Transient L8 input.  The complete workspace request is never placed in a
+/// snapshot, event journal, or durable service state.
+#[derive(Debug, Clone)]
+pub struct WatchCandidateV1 {
+    pub candidate_id: String,
+    pub fingerprint_hint: Option<String>,
+    pub verify_exact_equivalence: bool,
+    pub workspace_request: WorkspaceCompileRequestV1,
+}
+#[derive(Debug, Clone)]
+pub struct WatchChangeBatchV1 {
+    pub schema: String,
+    pub version: u32,
+    pub watch_session_id: String,
+    pub sequence: u64,
+    pub observed_changes: Vec<watch::ObservedChangeV1>,
+    pub candidate: WatchCandidateV1,
+}
+struct WatchHostSession {
+    state: WatchSessionV1,
+    /// At most one unexecuted complete replacement request.  This is strictly
+    /// process-local and is released on coalesce, completion, or stop.
+    pending: Option<WatchCandidateV1>,
+}
 #[derive(Debug, Clone)]
 struct DurableWorkspaceStateV1 {
     manifest: WorkspaceManifestV1,
@@ -263,6 +289,7 @@ pub struct CompilerServiceHost {
     sessions: BTreeMap<String, DurableSession>,
     cache: PersistentArtifactCacheV1,
     workspaces: BTreeMap<String, DurableWorkspaceStateV1>,
+    watch_sessions: BTreeMap<String, WatchHostSession>,
 }
 struct DurableSession {
     workspace_id: WorkspaceId,
@@ -329,6 +356,7 @@ impl CompilerServiceHost {
                 "incremental_compile".into(),
                 "request_cancellation".into(),
                 "session_recovery".into(),
+                "explicit_watch_sessions".into(),
             ],
         };
         let host = Self {
@@ -337,6 +365,7 @@ impl CompilerServiceHost {
             sessions: BTreeMap::new(),
             cache: PersistentArtifactCacheV1::open(cache_root, &compiler_contract),
             workspaces: BTreeMap::new(),
+            watch_sessions: BTreeMap::new(),
         };
         host.write_manifest()?;
         Ok(host)
@@ -425,6 +454,199 @@ impl CompilerServiceHost {
     }
     pub fn clean_cache(&self, _explicit_root: &Path) -> Result<Vec<String>, ServiceError> {
         self.cache.clean().map_err(cache_operation_error)
+    }
+    /// Creates a process-local L8 watch session.  This has no persistence and
+    /// intentionally performs no compilation or input discovery.
+    pub fn create_watch_session(
+        &mut self,
+        configuration: watch::WatchSessionConfigurationV1,
+    ) -> Result<watch::WatchSessionSnapshotV1, ServiceError> {
+        let id = configuration.watch_session_id.clone();
+        if self.watch_sessions.contains_key(&id) {
+            return Err(ServiceError::new(
+                "L8W001_WATCH_SESSION_ALREADY_EXISTS",
+                "watch session already exists",
+            ));
+        }
+        if self.watch_sessions.len() >= watch::MAX_WATCH_SESSIONS {
+            return Err(ServiceError::new(
+                "L8W010_WATCH_RESOURCE_LIMIT_EXCEEDED",
+                "maximum process-local watch sessions reached",
+            ));
+        }
+        let state = WatchSessionV1::new(configuration).map_err(watch_error)?;
+        let snapshot = state.snapshot();
+        self.watch_sessions.insert(
+            id,
+            WatchHostSession {
+                state,
+                pending: None,
+            },
+        );
+        Ok(snapshot)
+    }
+    /// Accepts an exact complete replacement candidate. The caller, not the
+    /// compiler service, owns all observation and source acquisition.
+    pub fn submit_watch_change_batch(
+        &mut self,
+        batch: WatchChangeBatchV1,
+        monotonic_milliseconds: u64,
+    ) -> Result<watch::WatchAcceptanceV1, ServiceError> {
+        let workspace_id = batch
+            .candidate
+            .workspace_request
+            .manifest
+            .normalize_validate()
+            .map_err(workspace_error)?
+            .workspace_id;
+        let session = self
+            .watch_sessions
+            .get_mut(&batch.watch_session_id)
+            .ok_or_else(|| {
+                ServiceError::new("L8W002_WATCH_SESSION_NOT_FOUND", "watch session not found")
+            })?;
+        if session.state.configuration().workspace_id != workspace_id {
+            return Err(ServiceError::new(
+                "L8W003_WATCH_WORKSPACE_MISMATCH",
+                "candidate workspace does not match watch session",
+            ));
+        }
+        let fingerprint = watch_candidate_fingerprint(&batch.candidate.workspace_request)?;
+        if batch
+            .candidate
+            .fingerprint_hint
+            .as_ref()
+            .is_some_and(|hint| hint != &fingerprint)
+        {
+            return Err(ServiceError::new(
+                "L8W008_CANDIDATE_IDENTITY_HINT_MISMATCH",
+                "candidate fingerprint hint does not match the derived identity",
+            ));
+        }
+        let metadata = WatchChangeBatchMetadataV1 {
+            schema: batch.schema,
+            version: batch.version,
+            watch_session_id: batch.watch_session_id,
+            sequence: batch.sequence,
+            observed_changes: batch.observed_changes,
+            candidate: watch::WatchCandidateMetadataV1 {
+                candidate_id: batch.candidate.candidate_id.clone(),
+                fingerprint,
+            },
+        };
+        let acceptance = session
+            .state
+            .accept(metadata, monotonic_milliseconds)
+            .map_err(watch_error)?;
+        if acceptance.retained_pending {
+            // Replacing this drops the prior complete candidate and its authored
+            // source text immediately; the state machine itself is source-free.
+            session.pending = Some(batch.candidate);
+        }
+        Ok(acceptance)
+    }
+    pub fn flush_watch_session(&mut self, watch_session_id: &str) -> Result<(), ServiceError> {
+        self.watch_sessions
+            .get_mut(watch_session_id)
+            .ok_or_else(|| {
+                ServiceError::new("L8W002_WATCH_SESSION_NOT_FOUND", "watch session not found")
+            })?
+            .state
+            .flush()
+            .map_err(watch_error)
+    }
+    /// Runs one caller-controlled deterministic scheduler turn. This is an
+    /// internal service executor hook, not a wall-clock timer or public API.
+    pub fn run_watch_scheduler_turn(
+        &mut self,
+        watch_session_id: &str,
+        monotonic_milliseconds: u64,
+    ) -> Result<Option<watch::WatchExecutionReportV1>, ServiceError> {
+        let (plan, candidate) = {
+            let session = self
+                .watch_sessions
+                .get_mut(watch_session_id)
+                .ok_or_else(|| {
+                    ServiceError::new("L8W002_WATCH_SESSION_NOT_FOUND", "watch session not found")
+                })?;
+            let Some(plan) = session.state.scheduler_turn(monotonic_milliseconds) else {
+                return Ok(None);
+            };
+            let candidate = session.pending.take().ok_or_else(|| {
+                ServiceError::new(
+                    "L8W007_INVALID_CHANGE_BATCH",
+                    "missing transient pending candidate",
+                )
+            })?;
+            (plan, candidate)
+        };
+        // The sole active request is owned on this stack only; it is released as
+        // soon as L7 returns. L7 remains the only compiler/workspace executor.
+        let outcome = self.compile_workspace_v1(candidate.workspace_request);
+        let (success, identity) = match &outcome {
+            Ok(result) if result.status == "succeeded" => {
+                (true, Some(workspace_result_identity(result)))
+            }
+            _ => (false, None),
+        };
+        let report = self
+            .watch_sessions
+            .get_mut(watch_session_id)
+            .expect("session cannot be removed during serialized turn")
+            .state
+            .finish(success, identity);
+        debug_assert!(report.as_ref().is_some_and(|report| report.plan == plan));
+        match outcome {
+            Ok(_) => Ok(report),
+            // L7 failure is represented in the watch event/report while prior
+            // watch success remains untouched; callers can inspect the session.
+            Err(error) => {
+                if report.is_some() {
+                    Ok(report)
+                } else {
+                    Err(error)
+                }
+            }
+        }
+    }
+    pub fn poll_watch_events(
+        &self,
+        watch_session_id: &str,
+        after_event_sequence: u64,
+    ) -> Result<Vec<watch::WatchEventV1>, ServiceError> {
+        self.watch_sessions
+            .get(watch_session_id)
+            .ok_or_else(|| {
+                ServiceError::new("L8W002_WATCH_SESSION_NOT_FOUND", "watch session not found")
+            })?
+            .state
+            .poll(after_event_sequence)
+            .map_err(watch_error)
+    }
+    pub fn inspect_watch_session(
+        &self,
+        watch_session_id: &str,
+    ) -> Result<watch::WatchSessionSnapshotV1, ServiceError> {
+        self.watch_sessions
+            .get(watch_session_id)
+            .map(|session| session.state.snapshot())
+            .ok_or_else(|| {
+                ServiceError::new("L8W002_WATCH_SESSION_NOT_FOUND", "watch session not found")
+            })
+    }
+    pub fn stop_watch_session(
+        &mut self,
+        watch_session_id: &str,
+    ) -> Result<watch::WatchSessionSnapshotV1, ServiceError> {
+        let session = self
+            .watch_sessions
+            .get_mut(watch_session_id)
+            .ok_or_else(|| {
+                ServiceError::new("L8W002_WATCH_SESSION_NOT_FOUND", "watch session not found")
+            })?;
+        session.pending = None;
+        session.state.stop();
+        Ok(session.state.snapshot())
     }
     pub fn compile_workspace_v1(
         &mut self,
@@ -1120,6 +1342,80 @@ fn cache_operation_error(reason: crate::persistent_cache::CacheReasonCodeV1) -> 
 fn workspace_error(error: workspace::WorkspaceErrorV1) -> ServiceError {
     ServiceError::new(error.code(), "workspace manifest validation failed")
 }
+fn watch_error(error: watch::WatchErrorV1) -> ServiceError {
+    ServiceError::new(error.code(), "watch-session validation failed")
+}
+/// Candidate identity is derived from the complete normalized L7 request. It
+/// binds all package snapshot identities (which bind exact source universes),
+/// configuration identities, request modes, and expected publication state.
+fn watch_candidate_fingerprint(
+    request: &WorkspaceCompileRequestV1,
+) -> Result<String, ServiceError> {
+    let manifest = request
+        .manifest
+        .normalize_validate()
+        .map_err(workspace_error)?;
+    let mut packages = request.packages.iter().collect::<Vec<_>>();
+    packages.sort_by(|a, b| a.package_id.cmp(&b.package_id));
+    let mut encoded = format!("{}|{}|", manifest.identity(), request.operation_id);
+    for package in packages {
+        let config =
+            platform::canonical_workspace_configuration_json_v1(&package.request.configuration)
+                .map_err(platform_serialization)?;
+        write!(
+            encoded,
+            "{}|{}|{}|{}|{:?}|{}|{:?}|{:?}|",
+            package.package_id,
+            package.expected_commit_sequence,
+            package.request.candidate_snapshot.snapshot_id.as_str(),
+            String::from_utf8_lossy(&config),
+            package.request.mode,
+            package.request.verify_exact_equivalence,
+            package.request.incremental_report,
+            package.request.cache_report,
+        )
+        .expect("write to string");
+        let mut sources = package.request.sources.iter().collect::<Vec<_>>();
+        sources.sort_by(|a, b| a.path.cmp(&b.path));
+        for source in sources {
+            write!(
+                encoded,
+                "{}\0{}\0{:?}|",
+                source.path, source.source, source.language
+            )
+            .expect("write to string");
+        }
+    }
+    Ok(format!("sha256:{:x}", Sha256::digest(encoded.as_bytes())))
+}
+fn workspace_result_identity(result: &WorkspaceBuildResultV1) -> String {
+    let packages = result
+        .package_results
+        .iter()
+        .map(|package| {
+            format!(
+                "{}:{}:{:?}",
+                package.package_id, package.status, package.snapshot_id
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("|");
+    format!(
+        "sha256:{:x}",
+        Sha256::digest(
+            format!(
+                "{}|{}|{}|{}|{}|{}",
+                result.workspace_id,
+                result.status,
+                result.manifest_identity,
+                result.graph_identity,
+                result.plan_identity,
+                packages
+            )
+            .as_bytes()
+        )
+    )
+}
 
 pub mod protocol {
     pub use super::{
@@ -1206,6 +1502,89 @@ mod tests {
             .open_session(configuration.clone(), &workspace)
             .unwrap();
         (host, session)
+    }
+    #[test]
+    fn l8_explicit_watch_session_delegates_one_complete_l7_candidate() {
+        let root = root("l8-watch");
+        let configuration = WorkspaceConfiguration::default();
+        let (mut host, session) = opened_host(&root, &configuration);
+        host.create_watch_session(watch::WatchSessionConfigurationV1 {
+            schema: watch::WATCH_SESSION_CONFIGURATION_V1_SCHEMA.into(),
+            version: 1,
+            watch_session_id: "watch-test".into(),
+            workspace_id: "watch-space".into(),
+            debounce: watch::WatchDebounceV1 {
+                quiet_period_milliseconds: 0,
+                maximum_delay_milliseconds: 0,
+            },
+            supersession_policy: "cancel_obsolete".into(),
+            event_detail: "summary".into(),
+            event_journal_capacity: 16,
+        })
+        .unwrap();
+        let package_request = request(
+            configuration,
+            vec![("src/App.ts", "export class App {}")],
+            IncrementalReportSelector::Full,
+            true,
+        );
+        let workspace_request = WorkspaceCompileRequestV1 {
+            manifest: WorkspaceManifestV1 {
+                schema: workspace::WORKSPACE_MANIFEST_V1_SCHEMA.into(),
+                version: 1,
+                workspace_id: "watch-space".into(),
+                packages: vec![workspace::WorkspacePackageDescriptorV1 {
+                    package_id: "app".into(),
+                    session_id: session,
+                    display_name: None,
+                    configuration_identity_hint: None,
+                    metadata: BTreeMap::new(),
+                }],
+                dependencies: vec![],
+                policy: workspace::WorkspacePolicyV1 {
+                    failure_mode: "fail_fast".into(),
+                    execution_mode: "deterministic_serial".into(),
+                    result_detail: "summary".into(),
+                },
+            },
+            packages: vec![WorkspacePackageCompileRequestV1 {
+                package_id: "app".into(),
+                expected_commit_sequence: 0,
+                request: package_request,
+            }],
+            operation_id: "watch-operation".into(),
+        };
+        host.submit_watch_change_batch(
+            WatchChangeBatchV1 {
+                schema: watch::WATCH_CHANGE_BATCH_V1_SCHEMA.into(),
+                version: 1,
+                watch_session_id: "watch-test".into(),
+                sequence: 1,
+                observed_changes: vec![watch::ObservedChangeV1 {
+                    kind: "modified".into(),
+                    logical_path: "src/App.ts".into(),
+                    previous_logical_path: None,
+                }],
+                candidate: WatchCandidateV1 {
+                    candidate_id: "candidate".into(),
+                    fingerprint_hint: None,
+                    verify_exact_equivalence: true,
+                    workspace_request,
+                },
+            },
+            0,
+        )
+        .unwrap();
+        let report = host
+            .run_watch_scheduler_turn("watch-test", 0)
+            .unwrap()
+            .unwrap();
+        assert_eq!(report.outcome, "succeeded");
+        let snapshot = host.inspect_watch_session("watch-test").unwrap();
+        assert_eq!(snapshot.pending_count, 0);
+        assert!(snapshot.last_successful_workspace_result_identity.is_some());
+        assert!(!String::from_utf8_lossy(&read_tree(&root)).contains("export class App"));
+        std::fs::remove_dir_all(root).unwrap();
     }
     fn read_tree(path: &Path) -> Vec<u8> {
         if path.is_file() {
