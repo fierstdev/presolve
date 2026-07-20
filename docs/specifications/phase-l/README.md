@@ -24,3 +24,7 @@ authority set is present and indexed.
 L3 — Compiler Platform Products is implementation-ready. Its frozen public
 product and compatibility contract is [the compiler platform contract](../../compiler-platform-contract.md).
 The implementation and exact schema fixtures are owned by `presolve-compiler`.
+
+L4 — Compiler Service and Durable Sessions is implementation-ready under its
+authoritative service contract. The public implementation contract is
+[the compiler service contract](../../compiler-service-contract.md).

@@ -3,25 +3,27 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L3 - Compiler Platform Products
-* Working tree: L3 is complete and ready to commit; the process-local platform layer lives in `crates/ezc_core/src/platform.rs` and no active repository path was moved.
+* Latest completed slice: L4 - Compiler Service and Durable Sessions
+* Working tree: L4 is complete and ready to commit; the local service host and L3 canonical-recovery compatibility live in `crates/ezc_core/src/service.rs` and `crates/ezc_core/src/platform.rs`.
 * Date: 2026-07-19
 
 Last completed slice
 
-* Slice: L3 - Compiler Platform Products
-* Summary: adds deterministic WorkspaceSnapshot/WorkspaceGraph/IncrementalPlan v1 products, a process-local CompilerSessionState and memory-only ProductCache inspection, canonical fixture documents, and the L3 contract audit.
-* Key files: `crates/ezc_core/src/platform.rs`, `crates/ezc_core/fixtures/platform/`, `docs/compiler-platform-contract.md`, `scripts/verify-l3-platform-contracts.sh`, `docs/specifications/phase-l/README.md`, `justfile`, `2026-W28.md`
-* Boundary: L3 consumes the existing `ezc_parser::parse_file` and `build_application_semantic_model_for_unit` authorities. It introduces no alternate parser, semantic ownership model, daemon, watcher, IPC protocol, persistent cache, or parallel scheduler. Next: the next explicitly authorized Phase L slice; do not infer a new schema or service protocol from L3.
+* Slice: L4 - Compiler Service and Durable Sessions
+* Summary: adds the local compiler-service v1 boundary, exact frame codec, durable session/commit publication, complete request-owned source admission, and authorized L3 configuration/decode compatibility APIs.
+* Key files: `crates/ezc_core/src/service.rs`, `crates/ezc_core/src/platform.rs`, `crates/ezc_core/fixtures/service/`, `docs/compiler-service-contract.md`, `scripts/verify-l4-service-contracts.sh`, `justfile`, `2026-W28.md`
+* Boundary: the service delegates source parsing and compiler semantics exclusively to L3. It persists canonical L3 snapshot/graph products and canonical configuration only; source contents and L3 cache values remain memory-only. Next: L5 only with an explicit authorized contract.
 
 Current phase boundary
 
-* Slice: L4 and later Phase L work.
-* Status: L3 is complete. Stop at the next explicitly authorized slice boundary; L3 v1 meanings and canonical serialization must remain compatible.
+* Slice: L5 and later Phase L work.
+* Status: L4 is complete. Stop at the L5 boundary until its implementation-ready contract is supplied; L3/L4 v1 meanings remain compatible.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
 * Remaining in Phase K: none.
 
 Verification
+
+* L4 verification: `./scripts/verify-l4-service-contracts.sh` checks service schema constants, canonical fixtures, framing, L3 decode boundary, temporary-write/atomic-rename publication, and the absence of network transport or source persistence. Focused service tests prove exact framing plus complete-candidate L3 compilation and durable canonical snapshot/graph publication without source text in durable commit metadata.
 
 * L3 verification: `./scripts/verify-phase-l-specifications.sh` and `./scripts/verify-l3-platform-contracts.sh` pass. The L3 audit checks all five schema constants, canonical fixture presence and newline termination, no absolute-path/timestamp/cache-persistence/socket surface, and the existing parser/application-model authority boundary. Focused platform tests cover path normalization, identity stability, reversed source discovery, snapshot change classification, and cancellation rollback. `cargo fmt --all --check`, strict all-feature workspace clippy, `RUST_TEST_THREADS=1 cargo test --workspace --all-features`, independent `just check`, and `git diff --check` are the required final gate.
 

@@ -7,6 +7,7 @@ check:
     ./scripts/verify-repository-layout.sh
     ./scripts/verify-public-identity.sh
     ./scripts/verify-l3-platform-contracts.sh
+    ./scripts/verify-l4-service-contracts.sh
 
 repository-layout:
     ./scripts/verify-repository-layout.sh
@@ -16,6 +17,9 @@ phase-l-specifications:
 
 l3-platform-contracts:
     ./scripts/verify-l3-platform-contracts.sh
+
+l4-service-contracts:
+    ./scripts/verify-l4-service-contracts.sh
 
 e2e:
     cargo test -p presolve-cli --test runtime_browser -- --nocapture --test-threads=1

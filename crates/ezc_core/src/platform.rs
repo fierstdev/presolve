@@ -27,6 +27,8 @@ pub const WORKSPACE_SNAPSHOT_SCHEMA_VERSION: u32 = 1;
 pub const COMPILER_SESSION_SCHEMA_VERSION: u32 = 1;
 pub const INCREMENTAL_PLAN_SCHEMA_VERSION: u32 = 1;
 pub const PRODUCT_CACHE_INSPECTION_SCHEMA_VERSION: u32 = 1;
+/// The public canonical workspace-configuration input schema authorized by L4.
+pub const WORKSPACE_CONFIGURATION_SCHEMA_VERSION: u32 = 1;
 
 static NEXT_SESSION_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -304,6 +306,99 @@ impl WorkspaceConfiguration {
         )
     }
 }
+
+/// Validation error for the public L3 platform input surface.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlatformValidationError {
+    pub code: &'static str,
+    pub message: String,
+}
+
+/// Deterministic canonical-decode failure. `pointer` is a JSON pointer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlatformDecodeError {
+    pub code: &'static str,
+    pub pointer: String,
+    pub message: String,
+}
+
+/// Public L3 v1 configuration validation authorized by the L4 service contract.
+pub fn validate_workspace_configuration_v1(
+    configuration: &WorkspaceConfiguration,
+) -> Result<(), PlatformValidationError> {
+    if configuration.target_profile.is_empty() || configuration.target_profile.contains('\0') {
+        return Err(PlatformValidationError {
+            code: "invalid_workspace_configuration",
+            message: "target profile must be non-empty".into(),
+        });
+    }
+    if configuration.source_roots.is_empty() {
+        return Err(PlatformValidationError {
+            code: "invalid_workspace_configuration",
+            message: "at least one source root is required".into(),
+        });
+    }
+    let mut roots = BTreeSet::new();
+    for root in &configuration.source_roots {
+        WorkspacePath::new(root.as_str()).map_err(|error| PlatformValidationError {
+            code: "invalid_workspace_configuration",
+            message: error.message,
+        })?;
+        if !roots.insert(root.clone()) {
+            return Err(PlatformValidationError {
+                code: "invalid_workspace_configuration",
+                message: "source roots must be unique".into(),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Returns exact canonical JSON for the L3 v1 workspace configuration.
+pub fn canonical_workspace_configuration_json_v1(
+    configuration: &WorkspaceConfiguration,
+) -> Result<Vec<u8>, PlatformSerializationError> {
+    validate_workspace_configuration_v1(configuration).map_err(|error| {
+        PlatformSerializationError {
+            message: error.message,
+        }
+    })?;
+    let flags = configuration
+        .feature_flags
+        .iter()
+        .map(|value| quote(value))
+        .collect::<Vec<_>>()
+        .join(",");
+    let roots = configuration
+        .source_roots
+        .iter()
+        .map(|value| quote(value.as_str()))
+        .collect::<Vec<_>>()
+        .join(",");
+    let options = configuration
+        .platform_options
+        .iter()
+        .map(|(key, value)| format!("{{\"key\":{},\"value\":{}}}", quote(key), quote(value)))
+        .collect::<Vec<_>>()
+        .join(",");
+    Ok(json_document(format!("{{\"schema_version\":{},\"source_roots\":[{}],\"compiler_flags\":[{}],\"target_profile\":{},\"platform_options\":[{}]}}", WORKSPACE_CONFIGURATION_SCHEMA_VERSION, roots, flags, quote(&configuration.target_profile), options)))
+}
+
+/// Returns the configuration fingerprint used by L3 workspace products.
+pub fn workspace_configuration_fingerprint_v1(
+    configuration: &WorkspaceConfiguration,
+) -> Result<Digest, PlatformValidationError> {
+    validate_workspace_configuration_v1(configuration)?;
+    Ok(Digest::sha256(configuration.canonical()))
+}
+
+/// Derives the L3 workspace identity from a fully validated configuration.
+pub fn derive_workspace_id_v1(
+    configuration: &WorkspaceConfiguration,
+) -> Result<WorkspaceId, PlatformValidationError> {
+    validate_workspace_configuration_v1(configuration)?;
+    Ok(workspace_id(configuration))
+}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkspaceSource {
     pub path: String,
@@ -513,6 +608,396 @@ impl WorkspaceSnapshot {
         self.validate()
             .map_err(PlatformSerializationError::validation)?;
         Ok(json_document(snapshot_json(self)))
+    }
+}
+
+/// Decodes one exact canonical L3 v1 workspace snapshot document without
+/// loading source, invoking the parser, or mutating a compiler session.
+pub fn decode_workspace_snapshot_json_v1(
+    bytes: &[u8],
+) -> Result<WorkspaceSnapshot, PlatformDecodeError> {
+    let value = decode_json(bytes)?;
+    let object = object_fields(
+        value,
+        &[
+            "schema_version",
+            "workspace_id",
+            "snapshot_id",
+            "compiler_contract",
+            "configuration_fingerprint",
+            "units",
+        ],
+        "",
+    )?;
+    let schema = number(object.get("schema_version"), "/schema_version")?;
+    if schema != u64::from(WORKSPACE_SNAPSHOT_SCHEMA_VERSION) {
+        return Err(decode_error(
+            "unsupported_schema_version",
+            "/schema_version",
+            "unsupported workspace snapshot schema version",
+        ));
+    }
+    let units = array(object.get("units"), "/units")?
+        .iter()
+        .enumerate()
+        .map(|(index, value)| {
+            let item = object_fields(
+                value.clone(),
+                &[
+                    "source_unit_id",
+                    "path",
+                    "source_revision_id",
+                    "source_digest",
+                    "source_length",
+                    "language",
+                ],
+                &format!("/units/{index}"),
+            )?;
+            Ok(SnapshotUnit {
+                source_unit_id: SourceUnitId(
+                    string(
+                        item.get("source_unit_id"),
+                        &format!("/units/{index}/source_unit_id"),
+                    )?
+                    .into(),
+                ),
+                path: WorkspacePath::new(string(
+                    item.get("path"),
+                    &format!("/units/{index}/path"),
+                )?)
+                .map_err(|_| {
+                    decode_error(
+                        "invalid_workspace_path",
+                        &format!("/units/{index}/path"),
+                        "invalid workspace path",
+                    )
+                })?,
+                source_revision_id: SourceRevisionId(
+                    string(
+                        item.get("source_revision_id"),
+                        &format!("/units/{index}/source_revision_id"),
+                    )?
+                    .into(),
+                ),
+                source_digest: Digest(
+                    string(
+                        item.get("source_digest"),
+                        &format!("/units/{index}/source_digest"),
+                    )?
+                    .into(),
+                ),
+                source_length: number(
+                    item.get("source_length"),
+                    &format!("/units/{index}/source_length"),
+                )?,
+                language: decode_language(string(
+                    item.get("language"),
+                    &format!("/units/{index}/language"),
+                )?)?,
+            })
+        })
+        .collect::<Result<Vec<_>, PlatformDecodeError>>()?;
+    let snapshot = WorkspaceSnapshot {
+        schema_version: WORKSPACE_SNAPSHOT_SCHEMA_VERSION,
+        workspace_id: WorkspaceId(string(object.get("workspace_id"), "/workspace_id")?.into()),
+        snapshot_id: WorkspaceSnapshotId(string(object.get("snapshot_id"), "/snapshot_id")?.into()),
+        compiler_contract: ContractVersion::new(string(
+            object.get("compiler_contract"),
+            "/compiler_contract",
+        )?),
+        configuration_fingerprint: Digest(
+            string(
+                object.get("configuration_fingerprint"),
+                "/configuration_fingerprint",
+            )?
+            .into(),
+        ),
+        units,
+    };
+    snapshot
+        .validate()
+        .map_err(|error| decode_error("invalid_workspace_snapshot", "", error.message))?;
+    if snapshot
+        .to_canonical_json()
+        .map_err(|error| decode_error("invalid_workspace_snapshot", "", error.message))?
+        != bytes
+    {
+        return Err(decode_error(
+            "noncanonical_json",
+            "",
+            "workspace snapshot is not canonical",
+        ));
+    }
+    Ok(snapshot)
+}
+
+/// Decodes one exact canonical L3 v1 workspace graph document without source
+/// loading or compiler execution.
+pub fn decode_workspace_graph_json_v1(bytes: &[u8]) -> Result<WorkspaceGraph, PlatformDecodeError> {
+    let value = decode_json(bytes)?;
+    let object = object_fields(
+        value,
+        &[
+            "schema_version",
+            "workspace_id",
+            "snapshot_id",
+            "compiler_contract",
+            "units",
+            "dependency_edges",
+            "application_products",
+        ],
+        "",
+    )?;
+    if number(object.get("schema_version"), "/schema_version")?
+        != u64::from(WORKSPACE_GRAPH_SCHEMA_VERSION)
+    {
+        return Err(decode_error(
+            "unsupported_schema_version",
+            "/schema_version",
+            "unsupported workspace graph schema version",
+        ));
+    }
+    let units = array(object.get("units"), "/units")?
+        .iter()
+        .enumerate()
+        .map(|(index, value)| {
+            let item = object_fields(
+                value.clone(),
+                &[
+                    "source_unit_id",
+                    "path",
+                    "source_revision_id",
+                    "source_digest",
+                    "source_length",
+                    "language",
+                    "products",
+                ],
+                &format!("/units/{index}"),
+            )?;
+            let products = array(item.get("products"), &format!("/units/{index}/products"))?
+                .iter()
+                .enumerate()
+                .map(|(product_index, value)| {
+                    let p = object_fields(
+                        value.clone(),
+                        &[
+                            "product_kind",
+                            "product_key",
+                            "producer_contract",
+                            "content_digest",
+                        ],
+                        &format!("/units/{index}/products/{product_index}"),
+                    )?;
+                    Ok(UnitProductRef {
+                        product_kind: decode_product_kind(string(p.get("product_kind"), "")?)?,
+                        product_key: ProductKey(string(p.get("product_key"), "")?.into()),
+                        producer_contract: ContractVersion::new(string(
+                            p.get("producer_contract"),
+                            "",
+                        )?),
+                        content_digest: Digest(string(p.get("content_digest"), "")?.into()),
+                    })
+                })
+                .collect::<Result<Vec<_>, PlatformDecodeError>>()?;
+            Ok(WorkspaceUnit {
+                source_unit_id: SourceUnitId(string(item.get("source_unit_id"), "")?.into()),
+                path: WorkspacePath::new(string(item.get("path"), "")?).map_err(|_| {
+                    decode_error("invalid_workspace_path", "", "invalid workspace path")
+                })?,
+                source_revision_id: SourceRevisionId(
+                    string(item.get("source_revision_id"), "")?.into(),
+                ),
+                source_digest: Digest(string(item.get("source_digest"), "")?.into()),
+                source_length: number(item.get("source_length"), "")?,
+                language: decode_language(string(item.get("language"), "")?)?,
+                products,
+            })
+        })
+        .collect::<Result<Vec<_>, PlatformDecodeError>>()?;
+    let edges = array(object.get("dependency_edges"), "/dependency_edges")?
+        .iter()
+        .map(|value| {
+            let edge = object_fields(
+                value.clone(),
+                &["source", "kind", "target"],
+                "/dependency_edges",
+            )?;
+            Ok(WorkspaceDependencyEdge {
+                source: SourceUnitId(string(edge.get("source"), "")?.into()),
+                kind: decode_dependency_kind(string(edge.get("kind"), "")?)?,
+                target: SourceUnitId(string(edge.get("target"), "")?.into()),
+            })
+        })
+        .collect::<Result<Vec<_>, PlatformDecodeError>>()?;
+    let applications = array(object.get("application_products"), "/application_products")?
+        .iter()
+        .map(|value| {
+            let product = object_fields(
+                value.clone(),
+                &[
+                    "product_kind",
+                    "product_key",
+                    "producer_contract",
+                    "content_digest",
+                ],
+                "/application_products",
+            )?;
+            Ok(ApplicationProductRef {
+                product_kind: decode_application_product_kind(string(
+                    product.get("product_kind"),
+                    "",
+                )?)?,
+                product_key: WorkspaceProductKey(string(product.get("product_key"), "")?.into()),
+                producer_contract: ContractVersion::new(string(
+                    product.get("producer_contract"),
+                    "",
+                )?),
+                content_digest: Digest(string(product.get("content_digest"), "")?.into()),
+            })
+        })
+        .collect::<Result<Vec<_>, PlatformDecodeError>>()?;
+    let graph = WorkspaceGraph {
+        schema_version: WORKSPACE_GRAPH_SCHEMA_VERSION,
+        workspace_id: WorkspaceId(string(object.get("workspace_id"), "/workspace_id")?.into()),
+        snapshot_id: WorkspaceSnapshotId(string(object.get("snapshot_id"), "/snapshot_id")?.into()),
+        compiler_contract: ContractVersion::new(string(
+            object.get("compiler_contract"),
+            "/compiler_contract",
+        )?),
+        units,
+        dependency_edges: edges,
+        application_products: applications,
+    };
+    graph
+        .validate()
+        .map_err(|error| decode_error("invalid_workspace_graph", "", error.message))?;
+    if graph
+        .to_canonical_json()
+        .map_err(|error| decode_error("invalid_workspace_graph", "", error.message))?
+        != bytes
+    {
+        return Err(decode_error(
+            "noncanonical_json",
+            "",
+            "workspace graph is not canonical",
+        ));
+    }
+    Ok(graph)
+}
+fn decode_product_kind(value: &str) -> Result<ProductKind, PlatformDecodeError> {
+    match value {
+        "parse" => Ok(ProductKind::Parse),
+        "source_semantic" => Ok(ProductKind::SourceSemantic),
+        "component_graph" => Ok(ProductKind::ComponentGraph),
+        "application_semantic_model" => Ok(ProductKind::ApplicationSemanticModel),
+        "lowered_program" => Ok(ProductKind::LoweredProgram),
+        "html_artifact" => Ok(ProductKind::HtmlArtifact),
+        "runtime_artifact" => Ok(ProductKind::RuntimeArtifact),
+        "template_manifest" => Ok(ProductKind::TemplateManifest),
+        "resume_manifest" => Ok(ProductKind::ResumeManifest),
+        "inspection_artifact" => Ok(ProductKind::InspectionArtifact),
+        "diagnostic_set" => Ok(ProductKind::DiagnosticSet),
+        _ => Err(decode_error("invalid_enum", "", "unsupported product kind")),
+    }
+}
+fn decode_application_product_kind(
+    value: &str,
+) -> Result<ApplicationProductKind, PlatformDecodeError> {
+    match value {
+        "application_semantic_model" => Ok(ApplicationProductKind::ApplicationSemanticModel),
+        "application_diagnostics" => Ok(ApplicationProductKind::ApplicationDiagnostics),
+        "build_manifest" => Ok(ApplicationProductKind::BuildManifest),
+        _ => Err(decode_error(
+            "invalid_enum",
+            "",
+            "unsupported application product kind",
+        )),
+    }
+}
+fn decode_dependency_kind(value: &str) -> Result<WorkspaceDependencyKind, PlatformDecodeError> {
+    match value {
+        "compile" => Ok(WorkspaceDependencyKind::Compile),
+        "semantic" => Ok(WorkspaceDependencyKind::Semantic),
+        "artifact" => Ok(WorkspaceDependencyKind::Artifact),
+        _ => Err(decode_error(
+            "invalid_enum",
+            "",
+            "unsupported dependency kind",
+        )),
+    }
+}
+
+fn decode_json(bytes: &[u8]) -> Result<serde_json::Value, PlatformDecodeError> {
+    if !bytes.ends_with(b"\n") || bytes.ends_with(b"\n\n") {
+        return Err(decode_error(
+            "noncanonical_json",
+            "",
+            "document must end with exactly one newline",
+        ));
+    }
+    serde_json::from_slice(bytes)
+        .map_err(|_| decode_error("invalid_json", "", "invalid canonical JSON"))
+}
+fn object_fields(
+    value: serde_json::Value,
+    expected: &[&str],
+    pointer: &str,
+) -> Result<serde_json::Map<String, serde_json::Value>, PlatformDecodeError> {
+    let serde_json::Value::Object(object) = value else {
+        return Err(decode_error("invalid_type", pointer, "expected object"));
+    };
+    if object.len() != expected.len() || expected.iter().any(|field| !object.contains_key(*field)) {
+        return Err(decode_error(
+            "invalid_schema",
+            pointer,
+            "missing or unknown object field",
+        ));
+    }
+    Ok(object)
+}
+fn string<'a>(
+    value: Option<&'a serde_json::Value>,
+    pointer: &str,
+) -> Result<&'a str, PlatformDecodeError> {
+    value
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| decode_error("invalid_type", pointer, "expected string"))
+}
+fn number(value: Option<&serde_json::Value>, pointer: &str) -> Result<u64, PlatformDecodeError> {
+    value
+        .and_then(serde_json::Value::as_u64)
+        .ok_or_else(|| decode_error("invalid_type", pointer, "expected unsigned integer"))
+}
+fn array<'a>(
+    value: Option<&'a serde_json::Value>,
+    pointer: &str,
+) -> Result<&'a Vec<serde_json::Value>, PlatformDecodeError> {
+    value
+        .and_then(serde_json::Value::as_array)
+        .ok_or_else(|| decode_error("invalid_type", pointer, "expected array"))
+}
+fn decode_language(value: &str) -> Result<SourceLanguage, PlatformDecodeError> {
+    match value {
+        "typescript" => Ok(SourceLanguage::TypeScript),
+        "typescript_jsx" => Ok(SourceLanguage::TypeScriptJsx),
+        "javascript" => Ok(SourceLanguage::JavaScript),
+        "javascript_jsx" => Ok(SourceLanguage::JavaScriptJsx),
+        _ => Err(decode_error(
+            "invalid_enum",
+            "/language",
+            "unsupported source language",
+        )),
+    }
+}
+fn decode_error(
+    code: &'static str,
+    pointer: &str,
+    message: impl Into<String>,
+) -> PlatformDecodeError {
+    PlatformDecodeError {
+        code,
+        pointer: pointer.into(),
+        message: message.into(),
     }
 }
 fn canonical_snapshot_identity(
