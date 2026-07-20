@@ -6,12 +6,16 @@ check:
     cargo test --workspace
     ./scripts/verify-repository-layout.sh
     ./scripts/verify-public-identity.sh
+    ./scripts/verify-l3-platform-contracts.sh
 
 repository-layout:
     ./scripts/verify-repository-layout.sh
 
 phase-l-specifications:
     ./scripts/verify-phase-l-specifications.sh
+
+l3-platform-contracts:
+    ./scripts/verify-l3-platform-contracts.sh
 
 e2e:
     cargo test -p presolve-cli --test runtime_browser -- --nocapture --test-threads=1

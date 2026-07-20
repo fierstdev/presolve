@@ -3,25 +3,27 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L2 - Repository Constitution
-* Working tree: L2 is complete and ready to commit; active implementation paths remain stable and historical material is archived under `docs/archive/engineering/`.
+* Latest completed slice: L3 - Compiler Platform Products
+* Working tree: L3 is complete and ready to commit; the process-local platform layer lives in `crates/ezc_core/src/platform.rs` and no active repository path was moved.
 * Date: 2026-07-19
 
 Last completed slice
 
-* Slice: L2 - Repository Constitution
-* Summary: classifies all tracked root paths, archives only authorized planning/research history, tracks the complete Phase L authority set, and adds deterministic repository-layout and specification-index audits without repartitioning active implementation.
-* Key files: `docs/repository-layout.md`, `docs/archive/engineering/README.md`, `docs/specifications/phase-l/README.md`, `scripts/verify-repository-layout.sh`, `scripts/verify-phase-l-specifications.sh`, `justfile`, `2026-W28.md`
-* Boundary: `crates/`, `packages/`, `examples/`, `fixtures/`, and `schemas/` remain in place. `docs/planning/` moved byte-preserved to `docs/archive/engineering/planning/`; inactive resource notes and the ADR-accepted parser spike note moved to the archive. The live continuation records remain in `notes/progress/`. Next: L3 - Compiler Platform Products. Do not begin L3 without re-reading its active contract and the Phase L constitution.
+* Slice: L3 - Compiler Platform Products
+* Summary: adds deterministic WorkspaceSnapshot/WorkspaceGraph/IncrementalPlan v1 products, a process-local CompilerSessionState and memory-only ProductCache inspection, canonical fixture documents, and the L3 contract audit.
+* Key files: `crates/ezc_core/src/platform.rs`, `crates/ezc_core/fixtures/platform/`, `docs/compiler-platform-contract.md`, `scripts/verify-l3-platform-contracts.sh`, `docs/specifications/phase-l/README.md`, `justfile`, `2026-W28.md`
+* Boundary: L3 consumes the existing `ezc_parser::parse_file` and `build_application_semantic_model_for_unit` authorities. It introduces no alternate parser, semantic ownership model, daemon, watcher, IPC protocol, persistent cache, or parallel scheduler. Next: the next explicitly authorized Phase L slice; do not infer a new schema or service protocol from L3.
 
 Current phase boundary
 
-* Slice: L3 - Compiler Platform Products.
-* Status: L2 is complete. Stop at the L3 boundary; no L3 platform product, schema, service, or package work has started.
+* Slice: L4 and later Phase L work.
+* Status: L3 is complete. Stop at the next explicitly authorized slice boundary; L3 v1 meanings and canonical serialization must remain compatible.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
 * Remaining in Phase K: none.
 
 Verification
+
+* L3 verification: `./scripts/verify-phase-l-specifications.sh` and `./scripts/verify-l3-platform-contracts.sh` pass. The L3 audit checks all five schema constants, canonical fixture presence and newline termination, no absolute-path/timestamp/cache-persistence/socket surface, and the existing parser/application-model authority boundary. Focused platform tests cover path normalization, identity stability, reversed source discovery, snapshot change classification, and cancellation rollback. `cargo fmt --all --check`, strict all-feature workspace clippy, `RUST_TEST_THREADS=1 cargo test --workspace --all-features`, independent `just check`, and `git diff --check` are the required final gate.
 
 * L2 verification: `./scripts/verify-repository-layout.sh`, `./scripts/verify-phase-l-specifications.sh`, and `./scripts/verify-public-identity.sh` pass. The repository audit verifies the authoritative Phase L index, forbids speculative root `compiler/`, `runtime/`, and `cli/` directories, rejects archived schema/fixture directories and tracked generated or credential-like material, checks active control files, current root ownership, archive navigation, and no active automation path into the archive. Exact `cmp` checks prove all six supplied Phase L documents were tracked byte-for-byte. `pnpm -r check` and `pnpm -r test` pass; the existing JavaScript packages report their current placeholder checks/tests. `cargo test -p presolve-cli --test production_baseline` passes both generated-output baseline/determinism tests. `cargo fmt --all --check`, strict all-feature workspace clippy, `RUST_TEST_THREADS=1 cargo test --workspace --all-features`, independent `just check`, and `git diff --check` pass. No standalone schema validator or documentation-link framework exists; the repository audit is the established closest check for schema placement and archive/specification navigation.
 

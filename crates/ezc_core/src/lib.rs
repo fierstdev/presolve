@@ -69,6 +69,7 @@ pub mod ordinary_html_codegen;
 pub mod ordinary_template_instance;
 pub mod ordinary_template_integrity;
 pub mod page_codegen;
+pub mod platform;
 pub mod production_audit;
 pub mod production_bootstrap;
 pub mod production_chunk_graph;

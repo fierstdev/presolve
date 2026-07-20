@@ -20,3 +20,7 @@ archival, and hygiene work.
 
 `./scripts/verify-phase-l-specifications.sh` verifies that this complete
 authority set is present and indexed.
+
+L3 — Compiler Platform Products is implementation-ready. Its frozen public
+product and compatibility contract is [the compiler platform contract](../../compiler-platform-contract.md).
+The implementation and exact schema fixtures are owned by `presolve-compiler`.
