@@ -8,7 +8,9 @@ use ezc_core::platform::{
     WorkspaceSource,
 };
 use ezc_core::{
-    build_tooling_build_trace_v1, tooling_build_trace_json_v1, ToolingBuildTraceStageV1,
+    build_tooling_build_trace_v1, build_tooling_compile_cost_report_v1,
+    tooling_build_trace_json_v1, tooling_compile_cost_report_json_v1, OptimizationPolicyId,
+    OptimizationReportV1, ResumeBuildId, RuntimeCostReportV1, ToolingBuildTraceStageV1,
     ToolingTraceIdentityV1, ToolingTraceOutcomeV1, ToolingTraceStageKindV1,
 };
 
@@ -322,5 +324,70 @@ fn l11g_trace_projects_only_a_validated_explicit_product() {
         .unwrap();
     assert_eq!(mismatch.status.code(), Some(6));
     assert!(String::from_utf8_lossy(&mismatch.stderr).contains("L11T003"));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn l11g_profile_projects_only_a_validated_explicit_product() {
+    let (root, _) = project();
+    let binary = env!("CARGO_BIN_EXE_presolve");
+    let build_id = ResumeBuildId::zero_sentinel();
+    let optimization = OptimizationReportV1 {
+        schema_version: 1,
+        build_id: build_id.clone(),
+        optimization_policy: OptimizationPolicyId::production_v1(),
+        dead_products_removed: 0,
+        constants_pooled: 0,
+        programs_deduplicated: 0,
+        shared_chunks_extracted: 0,
+        shared_candidates_rejected: 0,
+        binding_writes_coalesced: 0,
+        runtime_table_count: 0,
+        development_bytes: 100,
+        production_bytes: 80,
+        retained_exclusions: vec!["wall-clock-timing".into()],
+        validation_status: "valid".into(),
+    };
+    let cost = RuntimeCostReportV1 {
+        schema_version: 1,
+        build_id,
+        bootstrap_module_bytes: 0,
+        production_artifact_bytes: 80,
+        eager_program_count: 0,
+        lazy_root_chunk_count: 0,
+        shared_chunk_count: 0,
+        max_lazy_dependency_depth: 0,
+        runtime_table_count: 0,
+        runtime_record_count: 0,
+        estimated_boot_decode_units: 0,
+        estimated_boot_validation_units: 0,
+        estimated_cold_init_operation_count: 0,
+        estimated_resume_restore_operation_count: 0,
+        max_action_batch_operation_count: 0,
+        max_scheduler_batch_width: 0,
+        max_dom_patch_count_per_action: 0,
+        retained_slot_count: 0,
+    };
+    let report = build_tooling_compile_cost_report_v1(optimization, cost).unwrap();
+    let product = root.join("compile-cost-report.json");
+    fs::write(&product, tooling_compile_cost_report_json_v1(&report)).unwrap();
+    let output = Command::new(binary)
+        .args([
+            "profile",
+            "--schema",
+            "presolve.compile-cost-report",
+            "--product",
+            product.to_str().unwrap(),
+            "--format",
+            "json",
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap()["reportId"],
+        report.report_id
+    );
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("timestamp"));
     fs::remove_dir_all(root).unwrap();
 }

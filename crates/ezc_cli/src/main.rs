@@ -63,7 +63,7 @@ fn main() {
     match command.as_str() {
         "version" => run_l9_version(&args),
         "help" | "--help" | "-h" => print_l9_usage(),
-        "create" | "dev" | "profile" | "benchmark" | "doctor" => l9_reserved_command(&command),
+        "create" | "dev" | "benchmark" | "doctor" => l9_reserved_command(&command),
         "explain" => run_explain(args),
         "parse" => run_parse(args),
         "graph" => {
@@ -97,6 +97,7 @@ fn main() {
         "watch" => run_l9_watch(&args),
         "inspect" => run_l11_inspect(&args),
         "trace" => run_l11_trace(&args),
+        "profile" => run_l11_profile(&args),
         _ => {
             eprintln!("unknown command: {command}");
             print_usage_and_exit();
@@ -400,6 +401,30 @@ fn run_l11_trace(args: &[String]) {
             trace.workspace_id,
             trace.outcome,
             trace.stages.len()
+        );
+    }
+}
+
+fn run_l11_profile(args: &[String]) {
+    let input = parse_l11_product_input("profile", args, false);
+    let ToolingProductV1::CompileCostReport(report) = read_l11_product("profile", &input) else {
+        l11_error(
+            "profile",
+            "L11T006",
+            "profile requires a validated compile-cost-report product",
+        );
+    };
+    if input.format == "json" {
+        print!("{}", ezc_core::tooling_compile_cost_report_json_v1(&report));
+    } else {
+        println!(
+            "structural profile: report={} build={} production_bytes={} artifact_bytes={} static_operations={}",
+            report.report_id,
+            report.build_id,
+            report.optimization_report.production_bytes,
+            report.runtime_cost_report.production_artifact_bytes,
+            report.runtime_cost_report.estimated_cold_init_operation_count
+                + report.runtime_cost_report.estimated_resume_restore_operation_count
         );
     }
 }

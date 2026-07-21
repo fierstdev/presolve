@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L11-G-A - Build-Trace Command Projection
-* Working tree: L11-G-A is implemented as one explicit-product command projection; no compiler, discovery, build-directory, or persistence path has been activated.
+* Latest completed slice: L11-G-B - Structural-Profile Command Projection
+* Working tree: L11-G-B is implemented as one explicit-product command projection; no compiler, discovery, build-directory, telemetry, or persistence path has been activated.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L11-G-B - Structural-Profile Command Projection
+* Summary: activates `presolve profile --schema presolve.compile-cost-report --product <file> [--format human|json]` as a projection of one explicitly named, strictly decoded L11-F compile-cost product.
+* Boundary: profile renders only canonical structural counts/bytes. It never measures elapsed time, CPU, memory, or host telemetry, and it never invokes compilation, discovers a project, scans output, or persists profile state.
+* Verification: focused CLI success evidence, strict CLI clippy, the L11-G-A/L11-F verifiers, and `just check` pass. Next L11-G command projections remain separate slices.
 
 * Slice: L11-G-A - Build-Trace Command Projection
 * Summary: activates `presolve trace --schema presolve.build-trace --product <file> [--format human|json]` as a projection of one explicitly named, strictly decoded L11-F build-trace product.
