@@ -21,11 +21,11 @@ L3--L8 fixture bytes.
 | `presolve.watch-session-snapshot` v1 | L8 `WatchSessionSnapshotV1` | none | process-local session inspection | restart restoration or source retention |
 | `presolve.watch-execution-report` v1 | L8 `WatchExecutionReportV1` | L9 `watch --once` result envelope | transient process-local execution result | compiler trace, profiling, or artifact facts |
 
-The registry intentionally leaves these names `reserved`: `presolve.build-trace`,
-`presolve.compile-cost-report`, and `presolve.artifact-graph`. L11 must first
-add an accepted producer contract, canonical serializer, strict validation,
-fixture, provenance/identity proof, and compatibility proof before one becomes
-available.
+L11-F makes `presolve.build-trace`, `presolve.compile-cost-report`, and
+`presolve.artifact-graph` v1 available only through their canonical source-free
+encoders and strict supplied-byte readers. They remain transient products: no
+command, build-directory reconstruction, cache entry, or durable session path
+is activated.
 
 The current products also do not establish editor-query facts for hover,
 completion, rename, references, signature help, semantic tokens, or

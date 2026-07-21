@@ -3,11 +3,17 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L11-E - Production Artifact-Graph Contract
-* Working tree: L11-E is a verified contract-only slice; no producer, decoder, command, registry availability, or persistence implementation has begun.
+* Latest completed slice: L11-F - Tooling Product Producers, Registry, and Readers
+* Working tree: L11-F is implemented as one atomic source-free product slice; no tooling command or persistence path has been activated.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L11-F - Tooling Product Producers, Registry, and Readers
+* Summary: activates canonical `presolve.build-trace`, `presolve.compile-cost-report`, and `presolve.artifact-graph` v1 encoders and strict caller-supplied-byte decoders, then transitions only those L10 schemas from `reserved` to `available`.
+* Provenance: trace construction accepts only ordered source-free established facts; cost construction binds the existing same-build Phase K report pair; artifact-graph construction consumes a validated in-memory K7 graph and same-build validated K8 artifact without scanning a build directory or generated files.
+* Validation: canonical JSON has a final newline, self-excluding SHA-256 product identities are recomputed on decode, schema/version/canonical-order validation is strict, and malformed/noncanonical product bytes map to the reserved L11 tooling-error ranges.
+* Verification: focused Phase K-derived product round trips, strict reader tests, L10 negotiation tests, strict compiler clippy, the L10 compatibility audit, and `just check` pass. No CLI product command starts until L11-G.
 
 * Slice: L11-E - Production Artifact-Graph Contract
 * Summary: defines the future immutable, source-free `presolve.artifact-graph` v1 product without activating a producer, decoder, command, registry entry, or persistence path.
@@ -49,8 +55,8 @@ Historical verification context
 
 Current phase boundary
 
-* Slice: L11-F producers, registry, and readers.
-* Status: L11-E is complete. Next boundary must atomically implement only the L11-D/E products; no command activation, expanded persistence, build-directory inspection, or compiler-semantics change may begin first.
+* Slice: L11-G command projections.
+* Status: L11-F is complete. Next boundary may activate commands one at a time as projectors of validated supplied products only; no compiler invocation, project discovery, expanded persistence, or build-directory inspection may begin first.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
 * Remaining in Phase K: none.
 
@@ -1245,12 +1251,11 @@ Known limitations
 Exact next step
 
 Phase K is complete and frozen through K21. Phase L is complete through
-L11-E. The revised delivery roadmap and L11-A/L11-D/L11-E contracts are
-authoritative. The exact next boundary is L11-F: atomically implement the
-approved trace, structural-cost, and artifact-graph products with canonical
-encoders, strict decoders, identities, source-free fixtures, determinism and
-provenance proofs, then transition only those L10 schemas to available. Do not
-activate commands yet.
+L11-F. The revised delivery roadmap and L11-A/L11-D/L11-E contracts are
+authoritative. The exact next boundary is L11-G: activate an approved command
+only as a projection of one validated supplied product, preserving the exit-6
+tooling boundary and keeping all compilation, project discovery, persistence,
+and build-directory inspection out of the command path.
 
 Useful commands
 

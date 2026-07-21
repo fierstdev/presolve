@@ -120,17 +120,17 @@ pub const fn tooling_schema_registry_v1() -> &'static [ToolingSchemaEntryV1] {
         ToolingSchemaEntryV1 {
             schema: "presolve.build-trace",
             version: 1,
-            availability: ToolingSchemaAvailabilityV1::Reserved,
+            availability: ToolingSchemaAvailabilityV1::Available,
         },
         ToolingSchemaEntryV1 {
             schema: "presolve.compile-cost-report",
             version: 1,
-            availability: ToolingSchemaAvailabilityV1::Reserved,
+            availability: ToolingSchemaAvailabilityV1::Available,
         },
         ToolingSchemaEntryV1 {
             schema: "presolve.artifact-graph",
             version: 1,
-            availability: ToolingSchemaAvailabilityV1::Reserved,
+            availability: ToolingSchemaAvailabilityV1::Available,
         },
     ]
 }
@@ -233,15 +233,17 @@ pub fn encode_tooling_schema_negotiation_response_v1(
 mod tests {
     use super::*;
     #[test]
-    fn l10_registry_is_deterministic_and_reserved_entries_reject() {
+    fn l11f_registry_is_deterministic_and_approved_entries_negotiate() {
         assert_eq!(tooling_schema_registry_v1(), tooling_schema_registry_v1());
         let request = decode_tooling_schema_negotiation_request_v1(
             br#"{"schema":"presolve.build-trace","versions":[1]}"#,
         )
         .unwrap();
         assert_eq!(
-            negotiate_tooling_schema_v1(&request).unwrap_err().code,
-            "L10S005_RESERVED_SCHEMA"
+            negotiate_tooling_schema_v1(&request)
+                .unwrap()
+                .accepted_version,
+            1
         );
     }
     #[test]
@@ -301,12 +303,6 @@ mod tests {
                 include_bytes!("../fixtures/tooling-schema/unknown-schema-v1.request.json")
                     .as_slice(),
                 include_str!("../fixtures/tooling-schema/unknown-schema-v1.code").trim(),
-                true,
-            ),
-            (
-                include_bytes!("../fixtures/tooling-schema/reserved-build-trace-v1.request.json")
-                    .as_slice(),
-                include_str!("../fixtures/tooling-schema/reserved-build-trace-v1.code").trim(),
                 true,
             ),
             (

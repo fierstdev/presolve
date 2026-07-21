@@ -12,6 +12,12 @@ use crate::platform::{
     decode_workspace_graph_json_v1, decode_workspace_snapshot_json_v1, WorkspaceGraph,
     WorkspaceSnapshot,
 };
+use crate::tooling_products::{
+    decode_tooling_artifact_graph_v1, decode_tooling_build_trace_v1,
+    decode_tooling_compile_cost_report_v1, ToolingArtifactGraphV1, ToolingBuildTraceV1,
+    ToolingCompileCostReportV1, ARTIFACT_GRAPH_TOOLING_SCHEMA_V1, BUILD_TRACE_TOOLING_SCHEMA_V1,
+    COMPILE_COST_TOOLING_SCHEMA_V1,
+};
 use crate::tooling_schema::{
     decode_tooling_schema_negotiation_request_v1, negotiate_tooling_schema_v1,
 };
@@ -23,6 +29,9 @@ pub const WORKSPACE_GRAPH_TOOLING_SCHEMA_V1: &str = "presolve.workspace-graph";
 pub enum ToolingProductV1 {
     WorkspaceSnapshot(WorkspaceSnapshot),
     WorkspaceGraph(WorkspaceGraph),
+    BuildTrace(ToolingBuildTraceV1),
+    CompileCostReport(ToolingCompileCostReportV1),
+    ArtifactGraph(ToolingArtifactGraphV1),
 }
 
 impl ToolingProductV1 {
@@ -31,6 +40,9 @@ impl ToolingProductV1 {
         match self {
             Self::WorkspaceSnapshot(_) => WORKSPACE_SNAPSHOT_TOOLING_SCHEMA_V1,
             Self::WorkspaceGraph(_) => WORKSPACE_GRAPH_TOOLING_SCHEMA_V1,
+            Self::BuildTrace(_) => BUILD_TRACE_TOOLING_SCHEMA_V1,
+            Self::CompileCostReport(_) => COMPILE_COST_TOOLING_SCHEMA_V1,
+            Self::ArtifactGraph(_) => ARTIFACT_GRAPH_TOOLING_SCHEMA_V1,
         }
     }
 
@@ -44,6 +56,9 @@ impl ToolingProductV1 {
         match self {
             Self::WorkspaceSnapshot(snapshot) => snapshot.snapshot_id.as_str(),
             Self::WorkspaceGraph(graph) => graph.snapshot_id.as_str(),
+            Self::BuildTrace(trace) => trace.snapshot_id.as_deref().unwrap_or(""),
+            Self::CompileCostReport(report) => report.build_id.as_str(),
+            Self::ArtifactGraph(graph) => graph.build_id.as_str(),
         }
     }
 }
@@ -105,6 +120,24 @@ pub fn read_tooling_product_v1(
             .map_err(|error| ToolingProductReadErrorV1 {
                 code: "L11T003",
                 message: format!("workspace graph fails strict canonical validation: {error:?}"),
+            }),
+        BUILD_TRACE_TOOLING_SCHEMA_V1 => decode_tooling_build_trace_v1(bytes)
+            .map(ToolingProductV1::BuildTrace)
+            .map_err(|error| ToolingProductReadErrorV1 {
+                code: "L11T007",
+                message: format!("build trace fails strict validation: {error:?}"),
+            }),
+        COMPILE_COST_TOOLING_SCHEMA_V1 => decode_tooling_compile_cost_report_v1(bytes)
+            .map(ToolingProductV1::CompileCostReport)
+            .map_err(|error| ToolingProductReadErrorV1 {
+                code: "L11T008",
+                message: format!("compile cost report fails strict validation: {error:?}"),
+            }),
+        ARTIFACT_GRAPH_TOOLING_SCHEMA_V1 => decode_tooling_artifact_graph_v1(bytes)
+            .map(ToolingProductV1::ArtifactGraph)
+            .map_err(|error| ToolingProductReadErrorV1 {
+                code: "L11T010",
+                message: format!("artifact graph fails strict validation: {error:?}"),
             }),
         _ => Err(ToolingProductReadErrorV1 {
             code: "L11T005",
@@ -169,10 +202,8 @@ mod tests {
     #[test]
     fn l11b_rejects_unavailable_products_and_noncanonical_bytes() {
         let (snapshot_bytes, _) = canonical_products();
-        for schema in ["presolve.build-trace", "presolve.unknown"] {
-            let error = read_tooling_product_v1(schema, &[1], &snapshot_bytes).unwrap_err();
-            assert_eq!(error.code, "L11T001");
-        }
+        let error = read_tooling_product_v1("presolve.unknown", &[1], &snapshot_bytes).unwrap_err();
+        assert_eq!(error.code, "L11T001");
         for schema in ["presolve.workspace-configuration", "presolve.watch-event"] {
             let error = read_tooling_product_v1(schema, &[1], &snapshot_bytes).unwrap_err();
             assert_eq!(error.code, "L11T005");

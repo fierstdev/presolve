@@ -243,7 +243,11 @@ fn l11c_projects_only_validated_workspace_products() {
         ])
         .output()
         .unwrap();
-    assert!(dot.status.success());
+    assert!(
+        dot.status.success(),
+        "workspace graph stderr: {}",
+        String::from_utf8_lossy(&dot.stderr)
+    );
     assert!(
         String::from_utf8_lossy(&dot.stdout).starts_with("digraph \"presolve.workspace-graph\"")
     );

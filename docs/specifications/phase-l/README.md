@@ -41,3 +41,5 @@ L11-A is governed by the [tooling capability and reader contract](PHASE_L_L11_TO
 L11-D is governed by the [trace and structural compile-cost contract](PHASE_L_L11_TRACE_AND_COST_CONTRACT.md). It defines source-free deterministic products while trace and cost schemas remain reserved.
 
 L11-E is governed by the [production artifact-graph contract](PHASE_L_L11_ARTIFACT_GRAPH_CONTRACT.md). It freezes direct Phase K graph/artifact provenance while the artifact-graph schema remains reserved.
+
+L11-F activates only the L11-D/E products through canonical encoders and strict supplied-byte readers. It transitions those three L10 schemas to available without activating a command or persistence path.
