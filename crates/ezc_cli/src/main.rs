@@ -6,7 +6,10 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process;
 
-use presolve_cli::{parse_explicit_source_spec_v1, run_explicit_build_or_check_v1};
+use presolve_cli::{
+    parse_explicit_source_spec_v1, run_explicit_build_or_check_v1, run_project_cache_operation_v1,
+    CliCacheOperationV1,
+};
 
 use ezc_core::{
     build_application_semantic_model_for_unit, build_component_graph,
@@ -78,6 +81,8 @@ fn main() {
                 run_build(args);
             }
         }
+        "cache" => run_l9_cache(&args),
+        "clean" => run_l9_clean(&args),
         _ => {
             eprintln!("unknown command: {command}");
             print_usage_and_exit();
@@ -172,6 +177,114 @@ fn run_l9_build_or_check(command: &str, args: &[String]) {
 fn l9_command_error(command: &str, message: &str, exit_code: i32) -> ! {
     eprintln!("{command}: {message}");
     process::exit(exit_code);
+}
+
+fn run_l9_cache(args: &[String]) {
+    let (operation, start) = match args.first().map(String::as_str) {
+        Some("inspect") => (CliCacheOperationV1::Inspect, 1),
+        Some("verify") => (CliCacheOperationV1::Verify, 1),
+        Some("clean") => (CliCacheOperationV1::Clean, 1),
+        Some(value) if value.starts_with('-') => (CliCacheOperationV1::Inspect, 0),
+        None => (CliCacheOperationV1::Inspect, 0),
+        Some(value) => {
+            l9_command_error("cache", &format!("unsupported cache operation: {value}"), 6)
+        }
+    };
+    let (configuration_path, json) = l9_config_and_format("cache", &args[start..]);
+    let result =
+        run_project_cache_operation_v1(&configuration_path, operation).unwrap_or_else(|error| {
+            let exit_code = if error.code.starts_with("L9P") || error.code.starts_with("L9E") {
+                2
+            } else {
+                5
+            };
+            l9_command_error("cache", &error.to_string(), exit_code);
+        });
+    if json {
+        if let Some(report) = result.report {
+            print!("{}", String::from_utf8_lossy(&report.to_canonical_json()));
+        } else {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "schema": "presolve.cli-cache-clean",
+                    "version": 1,
+                    "removed_keys": result.removed_keys,
+                })
+            );
+        }
+    } else if let Some(report) = result.report {
+        println!(
+            "cache {}: valid_entries={} payload_bytes={} artifact_bytes={}",
+            result.operation.as_str(),
+            report.valid_keys.len(),
+            report.total_payload_bytes,
+            report.total_artifact_bytes
+        );
+    } else {
+        println!("cache clean: removed_entries={}", result.removed_keys.len());
+    }
+}
+
+fn run_l9_clean(args: &[String]) {
+    let (configuration_path, json) = l9_config_and_format("clean", args);
+    let result = run_project_cache_operation_v1(&configuration_path, CliCacheOperationV1::Clean)
+        .unwrap_or_else(|error| {
+            let exit_code = if error.code.starts_with("L9P") || error.code.starts_with("L9E") {
+                2
+            } else {
+                5
+            };
+            l9_command_error("clean", &error.to_string(), exit_code);
+        });
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "schema": "presolve.cli-cache-clean",
+                "version": 1,
+                "removed_keys": result.removed_keys,
+            })
+        );
+    } else {
+        println!(
+            "clean succeeded: removed_cache_entries={}",
+            result.removed_keys.len()
+        );
+    }
+}
+
+fn l9_config_and_format(command: &str, args: &[String]) -> (PathBuf, bool) {
+    let mut configuration_path = None;
+    let mut json = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--config" => {
+                let Some(value) = args.get(index + 1) else {
+                    l9_command_error(command, "missing value for --config", 2);
+                };
+                configuration_path = Some(PathBuf::from(value));
+                index += 2;
+            }
+            "--format" => {
+                let Some(value) = args.get(index + 1) else {
+                    l9_command_error(command, "missing value for --format", 2);
+                };
+                match value.as_str() {
+                    "human" => json = false,
+                    "json" => json = true,
+                    _ => l9_command_error(command, "--format must be human or json", 2),
+                }
+                index += 2;
+            }
+            value => l9_command_error(command, &format!("unknown option: {value}"), 2),
+        }
+    }
+    let Some(configuration_path) = configuration_path else {
+        l9_command_error(command, "--config is required", 2);
+    };
+    (configuration_path, json)
 }
 
 fn run_explain(mut args: Vec<String>) {

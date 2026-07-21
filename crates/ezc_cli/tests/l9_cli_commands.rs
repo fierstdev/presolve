@@ -65,3 +65,30 @@ fn l9d_explicit_build_reports_configuration_errors_on_stderr() {
     assert!(String::from_utf8_lossy(&output.stderr).contains("L9D003_MISSING_SOURCE_INPUT"));
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn l9e_cache_inspection_projects_l6_canonical_json() {
+    let (root, config) = project();
+    let output = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args([
+            "cache",
+            "inspect",
+            "--config",
+            config.to_str().unwrap(),
+            "--format",
+            "json",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["schema"], "presolve.cache-inspection-report.v1");
+    assert_eq!(report["schema_version"], 1);
+    assert_eq!(report["enabled"], true);
+    assert!(root.join(".presolve/cache/manifest.json").is_file());
+    fs::remove_dir_all(root).unwrap();
+}
