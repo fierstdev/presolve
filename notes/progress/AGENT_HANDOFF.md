@@ -3,11 +3,17 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L12-C-0 - Language-Service Binding Prerequisite Audit
-* Working tree: L12-C remains blocked before implementation: no compiler-owned binding exists for the Rust query-snapshot decoder/product, and no language-service API, LSP, or extension implementation has begun.
+* Latest completed slice: L12-C-1 - Compiler-owned WASM Language-Service Binding Contract
+* Working tree: the L12-C-1 contract selects a compiler-owned WASM ABI that strictly decodes caller-supplied query-snapshot bytes in Rust before read-only projection. No WASM crate/package, language-service wrapper, LSP, or extension implementation has begun.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L12-C-1 - Compiler-owned WASM Language-Service Binding Contract
+* Result: selects provisional `@presolve/compiler-wasm` as the sole browser/JavaScript delivery authority. Its single synchronous `query_snapshot_v1(product_bytes, request_bytes)` operation must invoke Rust `decode_tooling_query_snapshot_v1` first, then project only existing product facts. A future `@presolve/language-service` can only be a thin wrapper over that binding.
+* Contract: freezes canonical request/response envelopes for position, definition, references, flat document symbols, and document diagnostics; it deliberately returns every matching position record rather than inventing a best-record heuristic. Unsupported capabilities return stable results; invalid product/request, unknown source unit, out-of-range offset, and unknown opaque identity fail closed with stable errors.
+* Boundary: no JavaScript decoder, compiler invocation, source/path/URI/text input, filesystem/network/clock access, semantic cache, persistence, update API, LSP, or VSCode code is authorized. Byte ownership is caller-retained and every query is synchronous/stateless.
+* Next: L12-C-2 may implement only the Rust query projection and compiler-owned WASM ABI/package required by this contract, with its frozen request/response/error fixtures and binding-surface audit. It may not introduce the language-service wrapper before that ABI proof completes.
 
 * Slice: L12-C-0 - Language-Service Binding Prerequisite Audit
 * Result: the roadmap's `@presolve/language-service` target has no compiler-owned WASM ABI, native addon, IPC protocol, or JavaScript binding for either transient `CommittedCompilation.query_snapshot` delivery or Rust strict decoding. The existing runtime package supplies none of those authorities.

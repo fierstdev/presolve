@@ -51,3 +51,5 @@ L12-B is governed by the [query-snapshot constitutional amendment](PHASE_L_L12_Q
 L12-C activates only that transient compiler-produced product, its strict decoder, frozen source-free fixture, and L10 registry entry. It does not activate a language service, LSP, extension, source discovery, edits, or persistence.
 
 The [L12-C language-service binding audit](PHASE_L_L12_LANGUAGE_SERVICE_BINDING_AUDIT.md) records the missing compiler-owned package binding. A binding contract must select the host authority before the roadmap's language-service API can begin.
+
+L12-C-1 is governed by the [compiler-owned WASM language-service binding contract](PHASE_L_L12_WASM_BINDING_CONTRACT.md). It selects strict Rust decode-first WASM delivery and freezes the read-only request, response, error, cancellation, lifecycle, packaging, and fixture boundary before any binding implementation.
