@@ -4,7 +4,7 @@ set -euo pipefail
 contract=docs/specifications/phase-l/PHASE_L_L11_TOOLING_CAPABILITY_CONTRACT.md
 
 test -s "$contract"
-rg --quiet 'capability and input-boundary contract only' "$contract"
+rg --quiet 'L11 turns existing immutable compiler-platform facts' "$contract"
 rg --quiet 'presolve <tool> --schema <registered-schema> --product <caller-named-file>' "$contract"
 rg --quiet 'L11T001' "$contract"
 rg --quiet 'L11T006' "$contract"

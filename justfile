@@ -1,6 +1,7 @@
 # Repository task recipes. These commands are intentionally simple.
 
 check:
+    ./scripts/verify-l11b-tooling-product-readers.sh
     ./scripts/verify-l11a-tooling-capability-contract.sh
     ./scripts/verify-l10-schema-contract.sh
     cargo fmt --all --check
