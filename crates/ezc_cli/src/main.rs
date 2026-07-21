@@ -6,6 +6,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process;
 
+use presolve_cli::{parse_explicit_source_spec_v1, run_explicit_build_or_check_v1};
+
 use ezc_core::{
     build_application_semantic_model_for_unit, build_component_graph,
     build_context_inspection_registry, build_effect_inspection_registry,
@@ -59,16 +61,117 @@ fn main() {
         "parse" => run_parse(args),
         "graph" => run_graph(args),
         "asm" => run_asm(&args),
-        "check" => run_check(&args),
+        "check" => {
+            if args.iter().any(|argument| argument == "--config") {
+                run_l9_build_or_check("check", &args);
+            } else {
+                run_check(&args);
+            }
+        }
         "template" => run_template(args),
         "html" => run_html(args),
         "manifest" => run_manifest(args),
-        "build" => run_build(args),
+        "build" => {
+            if args.iter().any(|argument| argument == "--config") {
+                run_l9_build_or_check("build", &args);
+            } else {
+                run_build(args);
+            }
+        }
         _ => {
             eprintln!("unknown command: {command}");
             print_usage_and_exit();
         }
     }
+}
+
+fn run_l9_build_or_check(command: &str, args: &[String]) {
+    let mut configuration_path = None;
+    let mut sources = Vec::new();
+    let mut verify_clean_equivalence = false;
+    let mut json = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--config" => {
+                let Some(value) = args.get(index + 1) else {
+                    l9_command_error(command, "missing value for --config", 2);
+                };
+                configuration_path = Some(PathBuf::from(value));
+                index += 2;
+            }
+            "--source" => {
+                let Some(value) = args.get(index + 1) else {
+                    l9_command_error(command, "missing value for --source", 2);
+                };
+                let source = parse_explicit_source_spec_v1(value).unwrap_or_else(|error| {
+                    l9_command_error(command, &error.to_string(), 2);
+                });
+                sources.push(source);
+                index += 2;
+            }
+            "--verify-clean-equivalence" => {
+                verify_clean_equivalence = true;
+                index += 1;
+            }
+            "--format" => {
+                let Some(value) = args.get(index + 1) else {
+                    l9_command_error(command, "missing value for --format", 2);
+                };
+                match value.as_str() {
+                    "human" => json = false,
+                    "json" => json = true,
+                    _ => l9_command_error(command, "--format must be human or json", 2),
+                }
+                index += 2;
+            }
+            value => l9_command_error(command, &format!("unknown option: {value}"), 2),
+        }
+    }
+    let Some(configuration_path) = configuration_path else {
+        l9_command_error(command, "--config is required", 2);
+    };
+    let result =
+        run_explicit_build_or_check_v1(&configuration_path, &sources, verify_clean_equivalence)
+            .unwrap_or_else(|error| {
+                let exit_code = if error.code.starts_with("L9D") || error.code.starts_with("L9P") {
+                    2
+                } else {
+                    4
+                };
+                l9_command_error(command, &error.to_string(), exit_code);
+            });
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "schema": "presolve.cli-result",
+                "version": 1,
+                "command": command,
+                "status": "succeeded",
+                "exit_code": 0,
+                "result": {
+                    "workspace_id": result.workspace_id,
+                    "commit_sequence": result.commit_sequence,
+                    "snapshot_id": result.snapshot_id,
+                    "graph_snapshot_id": result.graph_snapshot_id,
+                    "mode": result.mode,
+                },
+                "diagnostics": [],
+                "errors": [],
+            })
+        );
+    } else {
+        println!(
+            "{command} succeeded: workspace={} snapshot={} mode={}",
+            result.workspace_id, result.snapshot_id, result.mode
+        );
+    }
+}
+
+fn l9_command_error(command: &str, message: &str, exit_code: i32) -> ! {
+    eprintln!("{command}: {message}");
+    process::exit(exit_code);
 }
 
 fn run_explain(mut args: Vec<String>) {
@@ -3390,12 +3493,18 @@ fn print_usage_and_exit() -> ! {
     eprintln!(
         "  presolve check <file> [file...] [--format text|json] [--category parser|compiler|validation] [--fail-on error|warning|info]"
     );
+    eprintln!(
+        "  presolve check --config <file> --source <logical=relative-file> [--source ...] [--verify-clean-equivalence] [--format human|json]"
+    );
     eprintln!("  presolve parse <file>");
     eprintln!("  presolve graph <file>");
     eprintln!("  presolve template <file>");
     eprintln!("  presolve html <file>");
     eprintln!("  presolve manifest <file>");
     eprintln!("  presolve build <file> [--out dir] [--production]");
+    eprintln!(
+        "  presolve build --config <file> --source <logical=relative-file> [--source ...] [--verify-clean-equivalence] [--format human|json]"
+    );
     process::exit(1);
 }
 

@@ -15,6 +15,7 @@ check:
     ./scripts/verify-l9a1-configuration-codec-contracts.sh
     ./scripts/verify-l9b-command-framework-contracts.sh
     ./scripts/verify-l9c-compilation-adapter-contracts.sh
+    ./scripts/verify-l9d-build-check-contracts.sh
 
 repository-layout:
     ./scripts/verify-repository-layout.sh
@@ -45,6 +46,9 @@ l9b-command-framework-contracts:
 
 l9c-compilation-adapter-contracts:
     ./scripts/verify-l9c-compilation-adapter-contracts.sh
+
+l9d-build-check-contracts:
+    ./scripts/verify-l9d-build-check-contracts.sh
 
 e2e:
     cargo test -p presolve-cli --test runtime_browser -- --nocapture --test-threads=1
