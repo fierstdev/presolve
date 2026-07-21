@@ -39,3 +39,5 @@ L10 is governed by the authored [tooling-schema implementation contract](PHASE_L
 L11-A is governed by the [tooling capability and reader contract](PHASE_L_L11_TOOLING_CAPABILITY_CONTRACT.md). It maps the exact product-backed reader boundary before any developer-tool command can be activated.
 
 L11-D is governed by the [trace and structural compile-cost contract](PHASE_L_L11_TRACE_AND_COST_CONTRACT.md). It defines source-free deterministic products while trace and cost schemas remain reserved.
+
+L11-E is governed by the [production artifact-graph contract](PHASE_L_L11_ARTIFACT_GRAPH_CONTRACT.md). It freezes direct Phase K graph/artifact provenance while the artifact-graph schema remains reserved.

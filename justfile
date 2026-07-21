@@ -1,6 +1,7 @@
 # Repository task recipes. These commands are intentionally simple.
 
 check:
+    ./scripts/verify-l11e-artifact-graph-contract.sh
     ./scripts/verify-l11d-trace-cost-contract.sh
     ./scripts/verify-l11c-tooling-commands.sh
     ./scripts/verify-l11b-tooling-product-readers.sh
