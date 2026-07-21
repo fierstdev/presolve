@@ -30,3 +30,5 @@ authoritative service contract. The public implementation contract is
 [the compiler service contract](../../compiler-service-contract.md).
 
 L9 is governed by the tracked [L9 recovery and implementation contract](PHASE_L_L9_RECOVERY_AND_IMPLEMENTATION_CONTRACT.md), which incorporates the authoritative L9-A.3 construction-based codec-proof correction without adding an L3 durable decoder. The full phase sequencing authority is the [Phase L completion execution plan](PHASE_L_COMPLETION_EXECUTION_PLAN.md).
+
+L10 is governed by the authored [tooling-schema implementation contract](PHASE_L_L10_TOOLING_SCHEMA_IMPLEMENTATION_CONTRACT.md). It freezes negotiation and registry behavior without changing frozen L3–L8 product bytes.

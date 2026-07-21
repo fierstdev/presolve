@@ -32,8 +32,8 @@ Last completed slice
 
 Current phase boundary
 
-* Slice: L9 final verification gate.
-* Status: watch --once submits complete caller-owned candidates to L8 and the L9 final verifier passes. Do not begin L10.
+* Slice: L10-A tooling schema registry.
+* Status: the L10 implementation contract is authored and verified. Next boundary is a transport-neutral registry/negotiation implementation only; preserve L3-L8 bytes and do not begin L11.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
 * Remaining in Phase K: none.
 
