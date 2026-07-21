@@ -122,3 +122,24 @@ fn l9f_workspace_executes_the_explicit_project_through_l7() {
         .starts_with("sha256:"));
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn l9g_version_help_and_reserved_command_exit_contracts_are_stable() {
+    let binary = env!("CARGO_BIN_EXE_presolve");
+    let version = Command::new(binary)
+        .args(["version", "--format", "json"])
+        .output()
+        .unwrap();
+    assert!(version.status.success());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&version.stdout).unwrap()["schema"],
+        "presolve.cli-version"
+    );
+    let help = Command::new(binary).arg("help").output().unwrap();
+    assert!(help.status.success());
+    assert!(String::from_utf8_lossy(&help.stdout).contains("workspace"));
+    let reserved = Command::new(binary).arg("dev").output().unwrap();
+    assert_eq!(reserved.status.code(), Some(6));
+    assert!(reserved.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&reserved.stderr).contains("reserved"));
+}

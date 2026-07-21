@@ -1,7 +1,12 @@
 //! L9-F explicit single-project workspace requests over the L7 service API.
 
-#![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
+#![allow(
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::too_many_lines
+)]
 
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;
 
@@ -118,7 +123,7 @@ pub fn run_explicit_workspace_v1(
             session_id: session_id.clone(),
             display_name: Some("project".into()),
             configuration_identity_hint: None,
-            metadata: Default::default(),
+            metadata: BTreeMap::new(),
         }],
         dependencies: Vec::new(),
         policy: WorkspacePolicyV1 {

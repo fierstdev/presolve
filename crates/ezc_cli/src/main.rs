@@ -60,6 +60,9 @@ fn main() {
     let command = args.remove(0);
 
     match command.as_str() {
+        "version" => run_l9_version(&args),
+        "help" | "--help" | "-h" => print_l9_usage(),
+        "create" | "dev" | "profile" => l9_reserved_command(&command),
         "explain" => run_explain(args),
         "parse" => run_parse(args),
         "graph" => run_graph(args),
@@ -84,11 +87,49 @@ fn main() {
         "cache" => run_l9_cache(&args),
         "clean" => run_l9_clean(&args),
         "workspace" => run_l9_workspace(&args),
+        "watch" | "inspect" | "trace" | "benchmark" | "doctor" => l9_reserved_command(&command),
         _ => {
             eprintln!("unknown command: {command}");
             print_usage_and_exit();
         }
     }
+}
+
+fn run_l9_version(args: &[String]) {
+    if args.iter().any(|argument| argument == "--format") {
+        if args.len() != 2 || args[0] != "--format" || args[1] != "json" {
+            l9_command_error("version", "only --format json is supported", 2);
+        }
+        println!(
+            "{}",
+            serde_json::json!({
+                "schema": "presolve.cli-version",
+                "version": 1,
+                "presolve_version": env!("CARGO_PKG_VERSION"),
+            })
+        );
+    } else if args.is_empty() {
+        println!("presolve {}", env!("CARGO_PKG_VERSION"));
+    } else {
+        l9_command_error("version", "unknown option", 2);
+    }
+}
+
+fn l9_reserved_command(command: &str) -> ! {
+    l9_command_error(
+        command,
+        "reserved: no canonical L3-L8 product adapter is available for this command",
+        6,
+    )
+}
+
+fn print_l9_usage() -> ! {
+    println!("presolve <command> [options]");
+    println!("commands: version, build, check, clean, cache, workspace, watch, dev, create, explain, inspect, graph, trace, profile, benchmark, doctor");
+    println!(
+        "explicit project commands require --config <file> and --source <logical=relative-file>"
+    );
+    process::exit(0);
 }
 
 fn run_l9_build_or_check(command: &str, args: &[String]) {
