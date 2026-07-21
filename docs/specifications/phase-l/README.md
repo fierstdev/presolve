@@ -47,3 +47,5 @@ L11-F activates only the L11-D/E products through canonical encoders and strict 
 L12-A is governed by the [editor capability audit](PHASE_L_L12_EDITOR_CAPABILITY_AUDIT.md). It proves current products are insufficient for editor queries and blocks implementation pending an L12-B amendment.
 
 L12-B is governed by the [query-snapshot constitutional amendment](PHASE_L_L12_QUERY_SNAPSHOT_AMENDMENT.md). It defines the source-free compiler product required before any language-service implementation.
+
+L12-C activates only that transient compiler-produced product, its strict decoder, frozen source-free fixture, and L10 registry entry. It does not activate a language service, LSP, extension, source discovery, edits, or persistence.

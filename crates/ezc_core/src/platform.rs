@@ -20,7 +20,10 @@ use std::sync::Arc;
 
 use sha2::{Digest as _, Sha256};
 
-use crate::{build_application_semantic_model_for_unit, CompilationUnit};
+use crate::{
+    build_application_semantic_model_for_unit, tooling_products::build_tooling_query_snapshot_v1,
+    tooling_products::ToolingQuerySnapshotV1, CompilationUnit,
+};
 
 pub const WORKSPACE_GRAPH_SCHEMA_VERSION: u32 = 1;
 pub const WORKSPACE_SNAPSHOT_SCHEMA_VERSION: u32 = 1;
@@ -2144,6 +2147,9 @@ pub struct CommittedCompilation {
     pub snapshot: Arc<WorkspaceSnapshot>,
     pub graph: Arc<WorkspaceGraph>,
     pub plan: Arc<IncrementalPlan>,
+    /// L12-C's transient source-free query product for this exact successful
+    /// compiler invocation. It is not retained in the committed L3 state.
+    pub query_snapshot: Arc<ToolingQuerySnapshotV1>,
     /// Session-local L3 products that the L5 API explicitly permits a later
     /// request to offer back for validation and reuse.
     pub reusable_products: Vec<CanonicalReusableProductV1>,
@@ -2244,7 +2250,7 @@ impl CompilerSessionState {
             plan: Arc::clone(&plan),
             phase: AttemptPhase::Executing,
         });
-        let (graph, reusable_products, _, _) =
+        let (graph, query_snapshot, reusable_products, _, _) =
             match build_graph_with_reuse(&request.workspace, &snapshot, &[], &BTreeSet::new()) {
                 Ok(result) => result,
                 Err(error) => return self.fail(error),
@@ -2279,6 +2285,7 @@ impl CompilerSessionState {
             snapshot: committed.snapshot,
             graph: committed.graph,
             plan,
+            query_snapshot: Arc::new(query_snapshot),
             reusable_products,
         })
     }
@@ -2362,22 +2369,23 @@ impl CompilerSessionState {
             .iter()
             .cloned()
             .collect::<BTreeSet<_>>();
-        let (graph, reusable_products, reused, rejected) = match build_graph_with_reuse(
-            &request.workspace,
-            &snapshot,
-            &request.reusable_products,
-            &invalidated,
-        ) {
-            Ok(result) => result,
-            Err(error) => {
-                return IncrementalCompilationOutcomeV1 {
-                    outcome: self.fail(error),
-                    reused_product_identities: Vec::new(),
-                    recomputed_work_units: Vec::new(),
-                    rejected_reuse_product_identities: Vec::new(),
-                };
-            }
-        };
+        let (graph, query_snapshot, reusable_products, reused, rejected) =
+            match build_graph_with_reuse(
+                &request.workspace,
+                &snapshot,
+                &request.reusable_products,
+                &invalidated,
+            ) {
+                Ok(result) => result,
+                Err(error) => {
+                    return IncrementalCompilationOutcomeV1 {
+                        outcome: self.fail(error),
+                        reused_product_identities: Vec::new(),
+                        recomputed_work_units: Vec::new(),
+                        rejected_reuse_product_identities: Vec::new(),
+                    };
+                }
+            };
         if let Err(error) = snapshot.validate().and_then(|()| graph.validate()) {
             return IncrementalCompilationOutcomeV1 {
                 outcome: self.fail(error),
@@ -2402,6 +2410,7 @@ impl CompilerSessionState {
                 snapshot: committed.snapshot,
                 graph: committed.graph,
                 plan: legacy_plan,
+                query_snapshot: Arc::new(query_snapshot),
                 reusable_products,
             }),
             reused_product_identities: reused,
@@ -2450,6 +2459,7 @@ impl CompilerSessionState {
 }
 type GraphBuildResult = (
     WorkspaceGraph,
+    ToolingQuerySnapshotV1,
     Vec<CanonicalReusableProductV1>,
     Vec<ProductKey>,
     Vec<ProductKey>,
@@ -2512,6 +2522,12 @@ fn build_graph_with_reuse(
     }
     let unit = CompilationUnit::from_parsed_files(parsed.clone());
     let model = build_application_semantic_model_for_unit(&unit);
+    let query_snapshot = build_tooling_query_snapshot_v1(snapshot, &model).map_err(|_| {
+        PlatformFailure::new(
+            PlatformFailureCode::CommitInvariantFailed,
+            "compiler query snapshot provenance is not bound to the validated workspace snapshot",
+        )
+    })?;
     let model_digest = Digest::sha256(format!(
         "components:{};diagnostics:{}",
         model.components.len(),
@@ -2587,7 +2603,7 @@ fn build_graph_with_reuse(
     reused.dedup();
     rejected.sort();
     rejected.dedup();
-    Ok((graph, reusable_products, reused, rejected))
+    Ok((graph, query_snapshot, reusable_products, reused, rejected))
 }
 fn resolve_import(
     source: &WorkspacePath,

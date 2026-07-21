@@ -132,6 +132,11 @@ pub const fn tooling_schema_registry_v1() -> &'static [ToolingSchemaEntryV1] {
             version: 1,
             availability: ToolingSchemaAvailabilityV1::Available,
         },
+        ToolingSchemaEntryV1 {
+            schema: "presolve.query-snapshot",
+            version: 1,
+            availability: ToolingSchemaAvailabilityV1::Available,
+        },
     ]
 }
 
@@ -233,18 +238,20 @@ pub fn encode_tooling_schema_negotiation_response_v1(
 mod tests {
     use super::*;
     #[test]
-    fn l11f_registry_is_deterministic_and_approved_entries_negotiate() {
+    fn tooling_registry_is_deterministic_and_approved_entries_negotiate() {
         assert_eq!(tooling_schema_registry_v1(), tooling_schema_registry_v1());
-        let request = decode_tooling_schema_negotiation_request_v1(
-            br#"{"schema":"presolve.build-trace","versions":[1]}"#,
-        )
-        .unwrap();
-        assert_eq!(
-            negotiate_tooling_schema_v1(&request)
-                .unwrap()
-                .accepted_version,
-            1
-        );
+        for schema in ["presolve.build-trace", "presolve.query-snapshot"] {
+            let request = decode_tooling_schema_negotiation_request_v1(
+                format!(r#"{{"schema":"{schema}","versions":[1]}}"#).as_bytes(),
+            )
+            .unwrap();
+            assert_eq!(
+                negotiate_tooling_schema_v1(&request)
+                    .unwrap()
+                    .accepted_version,
+                1
+            );
+        }
     }
     #[test]
     fn l10_negotiation_validates_shape_versions_and_compatibility() {

@@ -137,12 +137,16 @@ pub use tooling_products::{
     build_tooling_artifact_graph_v1, build_tooling_build_trace_v1,
     build_tooling_compile_cost_report_v1, decode_tooling_artifact_graph_v1,
     decode_tooling_build_trace_v1, decode_tooling_compile_cost_report_v1,
-    tooling_artifact_graph_json_v1, tooling_build_trace_json_v1,
-    tooling_compile_cost_report_json_v1, ToolingArtifactGraphV1, ToolingBuildTraceStageV1,
-    ToolingBuildTraceV1, ToolingCompileCostReportV1, ToolingProductValidationErrorV1,
+    decode_tooling_query_snapshot_v1, tooling_artifact_graph_json_v1, tooling_build_trace_json_v1,
+    tooling_compile_cost_report_json_v1, tooling_query_snapshot_json_v1, ToolingArtifactGraphV1,
+    ToolingBuildTraceStageV1, ToolingBuildTraceV1, ToolingCompileCostReportV1,
+    ToolingProductValidationErrorV1, ToolingQueryDiagnosticSecondaryV1,
+    ToolingQueryDiagnosticSeverityV1, ToolingQueryDiagnosticV1, ToolingQueryRangeV1,
+    ToolingQueryReferenceKindV1, ToolingQueryReferenceV1, ToolingQuerySemanticKindV1,
+    ToolingQuerySemanticRecordV1, ToolingQuerySnapshotSourceUnitV1, ToolingQuerySnapshotV1,
     ToolingTraceIdentityV1, ToolingTraceOutcomeV1, ToolingTraceStageKindV1,
     ARTIFACT_GRAPH_TOOLING_SCHEMA_V1, BUILD_TRACE_TOOLING_SCHEMA_V1,
-    COMPILE_COST_TOOLING_SCHEMA_V1,
+    COMPILE_COST_TOOLING_SCHEMA_V1, QUERY_SNAPSHOT_TOOLING_SCHEMA_V1,
 };
 pub mod watch;
 pub mod workspace;

@@ -27,6 +27,13 @@ encoders and strict supplied-byte readers. They remain transient products: no
 command, build-directory reconstruction, cache entry, or durable session path
 is activated.
 
+L12-C makes `presolve.query-snapshot` v1 available only as one transient,
+compiler-produced result of a successful explicit L3 compilation. Its canonical
+encoder/strict decoder and source-free fixture expose opaque query identities,
+source-unit revisions, ranges, resolved references, and diagnostics; no public
+reader command, language service, LSP, extension, source path, source text,
+edit, cache, or durable session path is activated.
+
 The current products also do not establish editor-query facts for hover,
 completion, rename, references, signature help, semantic tokens, or
 source-mapping. L12 begins with a capability audit; it may not replace a

@@ -3,11 +3,18 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L12-B - Compiler Query-Snapshot Constitutional Amendment
-* Working tree: L12-B is a verified contract-only slice; no query product producer/decoder, language service, LSP, or extension implementation has begun.
+* Latest completed slice: L12-C - Query-Snapshot Product Gate
+* Working tree: L12-C is a verified product-only slice; no language-service API, LSP, or extension implementation has begun.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L12-C - Query-Snapshot Product Gate
+* Summary: activates `presolve.query-snapshot` v1 as a transient `CommittedCompilation` result produced only inside a successful explicit L3 compiler invocation. It serializes source-unit revisions/lengths, source-provenanced semantic ranges, resolved references with exported endpoints, and compiler diagnostics.
+* Privacy and identity: raw `SemanticId` values and source paths never leave the compiler. Public `QuerySemanticId` values are domain-separated SHA-256 projections; provenance-free internal entities and references without two exported endpoints are omitted rather than given fallback locations.
+* Validation: canonical JSON has a final newline, product identity is self-excluding SHA-256, strict decode checks canonical bytes/order/ranges/reference targets, and the frozen fixture proves no source path or authored component text. Reversed source enumeration produces byte-identical output.
+* Registry and lifecycle: `presolve.query-snapshot` is now L10-available with its strict decoder, but remains caller-retained transient data. It is absent from L4--L8 persistence, cache keys/payloads, CLI readers/commands, and all language-service/editor surfaces.
+* Next: L12-D may add only a language-service API that projects this validated supplied product; it may not reparse/analyze source, synthesize updates, add persistence, activate LSP, or create an editor extension.
 
 * Slice: L12-B - Compiler Query-Snapshot Constitutional Amendment
 * Summary: defines `presolve.query-snapshot` as one transient, compiler-produced, source-free product bound to a validated L3 workspace snapshot; it exposes only source-free `QuerySemanticId` values derived inside the compiler, existing kinds, provenance ranges, references, and diagnostics.
@@ -81,8 +88,8 @@ Historical verification context
 
 Current phase boundary
 
-* Slice: L12-C query-snapshot product gate.
-* Status: L12-B is complete. The next boundary may implement only the contract's source-free `presolve.query-snapshot` producer, strict decoder, fixtures, proofs, and L10 registry amendment; no language service, LSP, extension, source discovery, edit path, or persistence may begin first.
+* Slice: L12-D language-service API projection.
+* Status: L12-C is complete. The next boundary may project only one validated supplied `presolve.query-snapshot` product into the contract-approved query responses; no compiler invocation, source discovery/reparse, update synthesis, persistence, LSP, or extension may begin first.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
 * Remaining in Phase K: none.
 
@@ -1277,12 +1284,12 @@ Known limitations
 Exact next step
 
 Phase K is complete and frozen through K21. Phase L is complete through
-L12-B. The revised delivery roadmap, L12-A audit, and L12-B query-snapshot
-amendment are authoritative. The exact next boundary is L12-C: atomically
-implement only the source-free query-snapshot producer, strict decoder,
-fixtures, identity/provenance/reverse-order proof, and L10 registry amendment.
-No language service, LSP, extension, source discovery, edit path, or
-persistence begins before that product gate completes.
+L12-C. The revised delivery roadmap, L12-A audit, and L12-B query-snapshot
+amendment are authoritative. The exact next boundary is L12-D: add only a
+language-service API that projects a validated supplied query-snapshot product
+into the explicitly supported results. No compiler invocation, source
+discovery/reparse, update synthesis, persistence, LSP, or extension begins
+before that API gate completes.
 
 Useful commands
 

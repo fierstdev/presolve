@@ -1,18 +1,22 @@
-//! L11-F canonical, source-free tooling products approved by L11-D and L11-E.
+//! L11-F and L12-C canonical, source-free tooling products.
 
 #![allow(clippy::missing_errors_doc)]
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::platform::{SnapshotUnit, WorkspaceSnapshot};
 use crate::{
-    validate_production_chunk_graph, validate_production_runtime_artifact, OptimizationReportV1,
+    validate_production_chunk_graph, validate_production_runtime_artifact,
+    ApplicationSemanticModel, ComponentDiagnosticSeverity, OptimizationReportV1,
     ProductionChunkGraph, ProductionChunkKind, ProductionRuntimeArtifactV1, RuntimeCostReportV1,
+    SemanticEntityKind, SemanticReferenceKind, SourceProvenance,
 };
 
 pub const BUILD_TRACE_TOOLING_SCHEMA_V1: &str = "presolve.build-trace";
 pub const COMPILE_COST_TOOLING_SCHEMA_V1: &str = "presolve.compile-cost-report";
 pub const ARTIFACT_GRAPH_TOOLING_SCHEMA_V1: &str = "presolve.artifact-graph";
+pub const QUERY_SNAPSHOT_TOOLING_SCHEMA_V1: &str = "presolve.query-snapshot";
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -118,6 +122,125 @@ pub struct ToolingArtifactGraphV1 {
     pub activations: Vec<ToolingArtifactGraphActivationV1>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ToolingQuerySnapshotSourceUnitV1 {
+    pub source_unit_id: String,
+    pub source_revision_id: String,
+    pub source_length: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ToolingQueryRangeV1 {
+    pub source_unit_id: String,
+    pub start: u64,
+    pub end: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolingQuerySemanticKindV1 {
+    Component,
+    StateField,
+    Method,
+    Context,
+    Provider,
+    Consumer,
+    Form,
+    FormField,
+    FormFieldBinding,
+    ValidationRule,
+    Slot,
+    ComponentInvocation,
+    ComponentInstance,
+    BlockedComponentInstance,
+    SlotContentFragment,
+    SlotOutlet,
+    Computed,
+    Effect,
+    Parameter,
+    LocalVariable,
+    Action,
+    EventHandler,
+    Template,
+    TemplateEntity,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolingQueryReferenceKindV1 {
+    ActionState,
+    ComputedState,
+    ComputedComputed,
+    EffectState,
+    EffectComputed,
+    ProvidesContext,
+    ConsumesContext,
+    ResolvesToProvider,
+    EventMethod,
+    TemplateState,
+    TemplateComputed,
+    TemplateLocal,
+    FieldBindingField,
+    FieldBindingForm,
+    ValidationRuleField,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolingQueryDiagnosticSeverityV1 {
+    Error,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ToolingQuerySemanticRecordV1 {
+    pub query_semantic_id: String,
+    pub kind: ToolingQuerySemanticKindV1,
+    pub range: ToolingQueryRangeV1,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ToolingQueryReferenceV1 {
+    pub kind: ToolingQueryReferenceKindV1,
+    pub source_query_semantic_id: String,
+    pub target_query_semantic_id: String,
+    pub range: ToolingQueryRangeV1,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ToolingQueryDiagnosticSecondaryV1 {
+    pub range: ToolingQueryRangeV1,
+    pub message: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ToolingQueryDiagnosticV1 {
+    pub code: String,
+    pub severity: ToolingQueryDiagnosticSeverityV1,
+    pub message: String,
+    pub primary_range: Option<ToolingQueryRangeV1>,
+    pub secondary: Vec<ToolingQueryDiagnosticSecondaryV1>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ToolingQuerySnapshotV1 {
+    pub schema: String,
+    pub version: u32,
+    pub query_snapshot_id: String,
+    pub workspace_id: String,
+    pub snapshot_id: String,
+    pub source_units: Vec<ToolingQuerySnapshotSourceUnitV1>,
+    pub semantic_records: Vec<ToolingQuerySemanticRecordV1>,
+    pub references: Vec<ToolingQueryReferenceV1>,
+    pub diagnostics: Vec<ToolingQueryDiagnosticV1>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ToolingProductValidationErrorV1 {
     InvalidTraceProvenance,
@@ -125,6 +248,8 @@ pub enum ToolingProductValidationErrorV1 {
     InvalidSourceReport,
     InvalidArtifactGraphProvenance,
     ArtifactGraphTopologyDisagreement,
+    InvalidQuerySnapshotProvenance,
+    InvalidQuerySnapshotBinding,
     Noncanonical,
 }
 
@@ -245,6 +370,109 @@ pub fn build_tooling_artifact_graph_v1(
     Ok(product)
 }
 
+pub(crate) fn build_tooling_query_snapshot_v1(
+    snapshot: &WorkspaceSnapshot,
+    model: &ApplicationSemanticModel,
+) -> Result<ToolingQuerySnapshotV1, ToolingProductValidationErrorV1> {
+    snapshot
+        .validate()
+        .map_err(|_| ToolingProductValidationErrorV1::InvalidQuerySnapshotBinding)?;
+    let source_lengths = snapshot
+        .units
+        .iter()
+        .map(|unit| (unit.path.as_str(), unit))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let make_range =
+        |provenance: &SourceProvenance| query_range_from_provenance(provenance, &source_lengths);
+    let mut query_ids = std::collections::BTreeMap::new();
+    let mut semantic_records = Vec::new();
+    for semantic_id in model.ownership.keys() {
+        let Some(provenance) = model.provenance(semantic_id) else {
+            continue;
+        };
+        let entity = model
+            .entity(semantic_id)
+            .ok_or(ToolingProductValidationErrorV1::InvalidQuerySnapshotProvenance)?;
+        let query_semantic_id = query_semantic_id(semantic_id.as_str());
+        query_ids.insert(semantic_id.clone(), query_semantic_id.clone());
+        semantic_records.push(ToolingQuerySemanticRecordV1 {
+            query_semantic_id,
+            kind: query_semantic_kind(entity.kind()),
+            range: make_range(provenance)?,
+        });
+    }
+    semantic_records.sort_by_key(query_semantic_record_key);
+
+    let mut references = Vec::new();
+    for reference in &model.references {
+        let (Some(source_query_semantic_id), Some(target_query_semantic_id)) = (
+            query_ids.get(&reference.source),
+            query_ids.get(&reference.target),
+        ) else {
+            continue;
+        };
+        references.push(ToolingQueryReferenceV1 {
+            kind: query_reference_kind(reference.kind),
+            source_query_semantic_id: source_query_semantic_id.clone(),
+            target_query_semantic_id: target_query_semantic_id.clone(),
+            range: make_range(&reference.provenance)?,
+        });
+    }
+    references.sort_by_key(query_reference_key);
+    references.dedup();
+
+    let mut diagnostics = model
+        .diagnostics
+        .iter()
+        .map(|diagnostic| {
+            let mut secondary = diagnostic
+                .secondary_labels
+                .iter()
+                .map(|label| {
+                    Ok(ToolingQueryDiagnosticSecondaryV1 {
+                        range: make_range(&label.provenance)?,
+                        message: label.message.clone(),
+                    })
+                })
+                .collect::<Result<Vec<_>, ToolingProductValidationErrorV1>>()?;
+            secondary.sort_by_key(query_diagnostic_secondary_key);
+            secondary.dedup();
+            Ok(ToolingQueryDiagnosticV1 {
+                code: diagnostic.code.clone(),
+                severity: query_diagnostic_severity(diagnostic.severity),
+                message: diagnostic.message.clone(),
+                primary_range: diagnostic.provenance.as_ref().map(make_range).transpose()?,
+                secondary,
+            })
+        })
+        .collect::<Result<Vec<_>, ToolingProductValidationErrorV1>>()?;
+    diagnostics.sort_by_key(query_diagnostic_key);
+
+    let mut product = ToolingQuerySnapshotV1 {
+        schema: QUERY_SNAPSHOT_TOOLING_SCHEMA_V1.into(),
+        version: 1,
+        query_snapshot_id: String::new(),
+        workspace_id: snapshot.workspace_id.as_str().into(),
+        snapshot_id: snapshot.snapshot_id.as_str().into(),
+        source_units: snapshot
+            .units
+            .iter()
+            .map(|unit| ToolingQuerySnapshotSourceUnitV1 {
+                source_unit_id: unit.source_unit_id.as_str().into(),
+                source_revision_id: unit.source_revision_id.as_str().into(),
+                source_length: unit.source_length,
+            })
+            .collect(),
+        semantic_records,
+        references,
+        diagnostics,
+    };
+    product.source_units.sort();
+    validate_query_snapshot(&product)?;
+    product.query_snapshot_id = identity_without_field(&product, "querySnapshotId");
+    Ok(product)
+}
+
 #[must_use]
 pub fn tooling_build_trace_json_v1(value: &ToolingBuildTraceV1) -> String {
     canonical_json(value)
@@ -255,6 +483,10 @@ pub fn tooling_compile_cost_report_json_v1(value: &ToolingCompileCostReportV1) -
 }
 #[must_use]
 pub fn tooling_artifact_graph_json_v1(value: &ToolingArtifactGraphV1) -> String {
+    canonical_json(value)
+}
+#[must_use]
+pub fn tooling_query_snapshot_json_v1(value: &ToolingQuerySnapshotV1) -> String {
     canonical_json(value)
 }
 
@@ -307,6 +539,17 @@ pub fn decode_tooling_artifact_graph_v1(
         .then_some(value)
         .ok_or(ToolingProductValidationErrorV1::ArtifactGraphTopologyDisagreement)
 }
+pub fn decode_tooling_query_snapshot_v1(
+    bytes: &[u8],
+) -> Result<ToolingQuerySnapshotV1, ToolingProductValidationErrorV1> {
+    let value: ToolingQuerySnapshotV1 =
+        serde_json::from_slice(bytes).map_err(|_| ToolingProductValidationErrorV1::Noncanonical)?;
+    validate_query_snapshot(&value)?;
+    (value.query_snapshot_id == identity_without_field(&value, "querySnapshotId")
+        && tooling_query_snapshot_json_v1(&value).as_bytes() == bytes)
+        .then_some(value)
+        .ok_or(ToolingProductValidationErrorV1::Noncanonical)
+}
 
 fn validate_trace(value: &ToolingBuildTraceV1) -> Result<(), ToolingProductValidationErrorV1> {
     if value.schema != BUILD_TRACE_TOOLING_SCHEMA_V1
@@ -328,6 +571,213 @@ fn validate_trace(value: &ToolingBuildTraceV1) -> Result<(), ToolingProductValid
         return Err(ToolingProductValidationErrorV1::InvalidTraceProvenance);
     }
     Ok(())
+}
+fn validate_query_snapshot(
+    value: &ToolingQuerySnapshotV1,
+) -> Result<(), ToolingProductValidationErrorV1> {
+    if value.schema != QUERY_SNAPSHOT_TOOLING_SCHEMA_V1
+        || value.version != 1
+        || value.workspace_id.is_empty()
+        || value.snapshot_id.is_empty()
+        || value.source_units.is_empty()
+        || value
+            .source_units
+            .windows(2)
+            .any(|pair| pair[0].source_unit_id >= pair[1].source_unit_id)
+        || value
+            .source_units
+            .iter()
+            .any(|unit| unit.source_unit_id.is_empty() || unit.source_revision_id.is_empty())
+    {
+        return Err(ToolingProductValidationErrorV1::InvalidQuerySnapshotBinding);
+    }
+    let lengths = value
+        .source_units
+        .iter()
+        .map(|unit| (unit.source_unit_id.as_str(), unit.source_length))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let valid_range = |range: &ToolingQueryRangeV1| {
+        lengths
+            .get(range.source_unit_id.as_str())
+            .is_some_and(|length| range.start <= range.end && range.end <= *length)
+    };
+    if value
+        .semantic_records
+        .iter()
+        .any(|record| record.query_semantic_id.is_empty() || !valid_range(&record.range))
+        || value
+            .semantic_records
+            .windows(2)
+            .any(|pair| query_semantic_record_key(&pair[0]) >= query_semantic_record_key(&pair[1]))
+    {
+        return Err(ToolingProductValidationErrorV1::InvalidQuerySnapshotProvenance);
+    }
+    let query_semantic_ids = value
+        .semantic_records
+        .iter()
+        .map(|record| record.query_semantic_id.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    if query_semantic_ids.len() != value.semantic_records.len()
+        || value.references.iter().any(|reference| {
+            !valid_range(&reference.range)
+                || !query_semantic_ids.contains(reference.source_query_semantic_id.as_str())
+                || !query_semantic_ids.contains(reference.target_query_semantic_id.as_str())
+        })
+        || value
+            .references
+            .windows(2)
+            .any(|pair| query_reference_key(&pair[0]) >= query_reference_key(&pair[1]))
+        || value.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code.is_empty()
+                || diagnostic.message.is_empty()
+                || diagnostic
+                    .primary_range
+                    .as_ref()
+                    .is_some_and(|range| !valid_range(range))
+                || diagnostic
+                    .secondary
+                    .iter()
+                    .any(|secondary| secondary.message.is_empty() || !valid_range(&secondary.range))
+                || diagnostic.secondary.windows(2).any(|pair| {
+                    query_diagnostic_secondary_key(&pair[0])
+                        >= query_diagnostic_secondary_key(&pair[1])
+                })
+        })
+        || value
+            .diagnostics
+            .windows(2)
+            .any(|pair| query_diagnostic_key(&pair[0]) > query_diagnostic_key(&pair[1]))
+    {
+        return Err(ToolingProductValidationErrorV1::InvalidQuerySnapshotProvenance);
+    }
+    Ok(())
+}
+fn query_range_from_provenance(
+    provenance: &SourceProvenance,
+    source_units: &std::collections::BTreeMap<&str, &SnapshotUnit>,
+) -> Result<ToolingQueryRangeV1, ToolingProductValidationErrorV1> {
+    let path = provenance.path.to_string_lossy();
+    let source_unit = source_units
+        .get(path.as_ref())
+        .ok_or(ToolingProductValidationErrorV1::InvalidQuerySnapshotProvenance)?;
+    let start = u64::try_from(provenance.span.start)
+        .map_err(|_| ToolingProductValidationErrorV1::InvalidQuerySnapshotProvenance)?;
+    let end = u64::try_from(provenance.span.end)
+        .map_err(|_| ToolingProductValidationErrorV1::InvalidQuerySnapshotProvenance)?;
+    (start <= end && end <= source_unit.source_length)
+        .then_some(ToolingQueryRangeV1 {
+            source_unit_id: source_unit.source_unit_id.as_str().into(),
+            start,
+            end,
+        })
+        .ok_or(ToolingProductValidationErrorV1::InvalidQuerySnapshotProvenance)
+}
+fn query_semantic_id(semantic_id: &str) -> String {
+    let mut bytes = b"query-semantic-v1\0".to_vec();
+    bytes.extend_from_slice(semantic_id.as_bytes());
+    format!("query-semantic:sha256:{:x}", Sha256::digest(bytes))
+}
+fn query_semantic_kind(kind: SemanticEntityKind) -> ToolingQuerySemanticKindV1 {
+    match kind {
+        SemanticEntityKind::Component => ToolingQuerySemanticKindV1::Component,
+        SemanticEntityKind::StateField => ToolingQuerySemanticKindV1::StateField,
+        SemanticEntityKind::Method => ToolingQuerySemanticKindV1::Method,
+        SemanticEntityKind::Context => ToolingQuerySemanticKindV1::Context,
+        SemanticEntityKind::Provider => ToolingQuerySemanticKindV1::Provider,
+        SemanticEntityKind::Consumer => ToolingQuerySemanticKindV1::Consumer,
+        SemanticEntityKind::Form => ToolingQuerySemanticKindV1::Form,
+        SemanticEntityKind::FormField => ToolingQuerySemanticKindV1::FormField,
+        SemanticEntityKind::FormFieldBinding => ToolingQuerySemanticKindV1::FormFieldBinding,
+        SemanticEntityKind::ValidationRule => ToolingQuerySemanticKindV1::ValidationRule,
+        SemanticEntityKind::Slot => ToolingQuerySemanticKindV1::Slot,
+        SemanticEntityKind::ComponentInvocation => ToolingQuerySemanticKindV1::ComponentInvocation,
+        SemanticEntityKind::ComponentInstance => ToolingQuerySemanticKindV1::ComponentInstance,
+        SemanticEntityKind::BlockedComponentInstance => {
+            ToolingQuerySemanticKindV1::BlockedComponentInstance
+        }
+        SemanticEntityKind::SlotContentFragment => ToolingQuerySemanticKindV1::SlotContentFragment,
+        SemanticEntityKind::SlotOutlet => ToolingQuerySemanticKindV1::SlotOutlet,
+        SemanticEntityKind::Computed => ToolingQuerySemanticKindV1::Computed,
+        SemanticEntityKind::Effect => ToolingQuerySemanticKindV1::Effect,
+        SemanticEntityKind::Parameter => ToolingQuerySemanticKindV1::Parameter,
+        SemanticEntityKind::LocalVariable => ToolingQuerySemanticKindV1::LocalVariable,
+        SemanticEntityKind::Action => ToolingQuerySemanticKindV1::Action,
+        SemanticEntityKind::EventHandler => ToolingQuerySemanticKindV1::EventHandler,
+        SemanticEntityKind::Template => ToolingQuerySemanticKindV1::Template,
+        SemanticEntityKind::TemplateEntity => ToolingQuerySemanticKindV1::TemplateEntity,
+    }
+}
+fn query_reference_kind(kind: SemanticReferenceKind) -> ToolingQueryReferenceKindV1 {
+    match kind {
+        SemanticReferenceKind::ActionState => ToolingQueryReferenceKindV1::ActionState,
+        SemanticReferenceKind::ComputedState => ToolingQueryReferenceKindV1::ComputedState,
+        SemanticReferenceKind::ComputedComputed => ToolingQueryReferenceKindV1::ComputedComputed,
+        SemanticReferenceKind::EffectState => ToolingQueryReferenceKindV1::EffectState,
+        SemanticReferenceKind::EffectComputed => ToolingQueryReferenceKindV1::EffectComputed,
+        SemanticReferenceKind::ProvidesContext => ToolingQueryReferenceKindV1::ProvidesContext,
+        SemanticReferenceKind::ConsumesContext => ToolingQueryReferenceKindV1::ConsumesContext,
+        SemanticReferenceKind::ResolvesToProvider => {
+            ToolingQueryReferenceKindV1::ResolvesToProvider
+        }
+        SemanticReferenceKind::EventMethod => ToolingQueryReferenceKindV1::EventMethod,
+        SemanticReferenceKind::TemplateState => ToolingQueryReferenceKindV1::TemplateState,
+        SemanticReferenceKind::TemplateComputed => ToolingQueryReferenceKindV1::TemplateComputed,
+        SemanticReferenceKind::TemplateLocal => ToolingQueryReferenceKindV1::TemplateLocal,
+        SemanticReferenceKind::FieldBindingField => ToolingQueryReferenceKindV1::FieldBindingField,
+        SemanticReferenceKind::FieldBindingForm => ToolingQueryReferenceKindV1::FieldBindingForm,
+        SemanticReferenceKind::ValidationRuleField => {
+            ToolingQueryReferenceKindV1::ValidationRuleField
+        }
+    }
+}
+fn query_diagnostic_severity(
+    severity: ComponentDiagnosticSeverity,
+) -> ToolingQueryDiagnosticSeverityV1 {
+    match severity {
+        ComponentDiagnosticSeverity::Error => ToolingQueryDiagnosticSeverityV1::Error,
+    }
+}
+fn query_semantic_record_key(record: &ToolingQuerySemanticRecordV1) -> (String, u64, u64, String) {
+    (
+        record.range.source_unit_id.clone(),
+        record.range.start,
+        record.range.end,
+        record.query_semantic_id.clone(),
+    )
+}
+fn query_reference_key(
+    reference: &ToolingQueryReferenceV1,
+) -> (String, u64, u64, String, String, String) {
+    (
+        reference.range.source_unit_id.clone(),
+        reference.range.start,
+        reference.range.end,
+        reference.source_query_semantic_id.clone(),
+        reference.target_query_semantic_id.clone(),
+        format!("{:?}", reference.kind),
+    )
+}
+fn query_diagnostic_secondary_key(
+    secondary: &ToolingQueryDiagnosticSecondaryV1,
+) -> (String, u64, u64, String) {
+    (
+        secondary.range.source_unit_id.clone(),
+        secondary.range.start,
+        secondary.range.end,
+        secondary.message.clone(),
+    )
+}
+fn query_diagnostic_key(
+    diagnostic: &ToolingQueryDiagnosticV1,
+) -> (String, u64, u64, String, String) {
+    let range = diagnostic.primary_range.as_ref();
+    (
+        range.map_or_else(String::new, |range| range.source_unit_id.clone()),
+        range.map_or(0, |range| range.start),
+        range.map_or(0, |range| range.end),
+        diagnostic.code.clone(),
+        diagnostic.message.clone(),
+    )
 }
 fn forbidden(value: &str) -> bool {
     ["/", "\\", "timestamp", "duration", "millisecond"]
@@ -370,6 +820,11 @@ fn identity_without_field<T: Serialize>(value: &T, field: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::platform::{
+        derive_workspace_id_v1, CacheLimits, CancellationToken, CompilationOutcome,
+        CompileWorkspaceRequest, CompilerSessionState, RequestedCompilationMode, WorkspaceInput,
+        WorkspaceSource,
+    };
     use crate::{
         build_production_reports, build_production_runtime_artifact,
         extract_production_chunk_graph, ExecutableProgramFingerprint, ProductionReportInputs,
@@ -485,5 +940,93 @@ mod tests {
             artifact_graph
         );
         assert!(!graph_bytes.contains("production/"));
+    }
+
+    #[test]
+    fn l12c_query_snapshot_is_compiler_produced_source_free_and_strict() {
+        let source = r#"@component("x-query-fixture")
+class QueryFixture extends Component {
+  value = state(1)
+  render() { return <main>{this.value}</main>; }
+}
+"#;
+        let workspace = WorkspaceInput::new(vec![WorkspaceSource {
+            path: "src/QueryFixture.tsx".into(),
+            source: source.into(),
+            language: None,
+        }]);
+        let workspace_id = derive_workspace_id_v1(&workspace.configuration).unwrap();
+        let mut session = CompilerSessionState::new(
+            workspace_id,
+            workspace.compiler_contract.clone(),
+            CacheLimits::default(),
+        );
+        let CompilationOutcome::Committed(result) =
+            session.compile_workspace(CompileWorkspaceRequest {
+                workspace,
+                mode: RequestedCompilationMode::Full,
+                cancellation: CancellationToken::new(),
+            })
+        else {
+            panic!("query snapshot fixture compilation must commit");
+        };
+        let snapshot = result.query_snapshot.as_ref().clone();
+        let bytes = tooling_query_snapshot_json_v1(&snapshot);
+        assert_eq!(
+            decode_tooling_query_snapshot_v1(bytes.as_bytes()).unwrap(),
+            snapshot
+        );
+        assert_eq!(
+            bytes,
+            include_str!("../fixtures/tooling/query-snapshot-v1.json")
+        );
+        assert_eq!(snapshot.workspace_id, result.snapshot.workspace_id.as_str());
+        assert_eq!(snapshot.snapshot_id, result.snapshot.snapshot_id.as_str());
+        assert!(!bytes.contains("QueryFixture.tsx"), "{bytes}");
+        assert!(!bytes.contains("x-query-fixture"));
+        assert!(decode_tooling_query_snapshot_v1(bytes.trim_end().as_bytes()).is_err());
+        assert!(decode_tooling_query_snapshot_v1(
+            bytes
+                .replacen("query-semantic:", "query-semantiX:", 1)
+                .as_bytes()
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn l12c_query_snapshot_is_input_enumeration_independent() {
+        let alpha = WorkspaceSource {
+            path: "src/Alpha.tsx".into(),
+            source: "@component(\"x-alpha\") class Alpha extends Component { render() { return <main />; } }\n".into(),
+            language: None,
+        };
+        let beta = WorkspaceSource {
+            path: "src/Beta.tsx".into(),
+            source: "@component(\"x-beta\") class Beta extends Component { render() { return <aside />; } }\n".into(),
+            language: None,
+        };
+        let compile = |sources| {
+            let workspace = WorkspaceInput::new(sources);
+            let workspace_id = derive_workspace_id_v1(&workspace.configuration).unwrap();
+            let mut session = CompilerSessionState::new(
+                workspace_id,
+                workspace.compiler_contract.clone(),
+                CacheLimits::default(),
+            );
+            let CompilationOutcome::Committed(result) =
+                session.compile_workspace(CompileWorkspaceRequest {
+                    workspace,
+                    mode: RequestedCompilationMode::Full,
+                    cancellation: CancellationToken::new(),
+                })
+            else {
+                panic!("query enumeration fixture compilation must commit");
+            };
+            tooling_query_snapshot_json_v1(result.query_snapshot.as_ref())
+        };
+        assert_eq!(
+            compile(vec![alpha.clone(), beta.clone()]),
+            compile(vec![beta, alpha])
+        );
     }
 }

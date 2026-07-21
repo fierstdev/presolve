@@ -37,7 +37,7 @@ if rg --quiet 'tooling_schema' crates/ezc_core/src/{platform,service,persistent_
   echo 'L3-L8 products and CLI dispatch must not depend on the L10 registry' >&2
   exit 1
 fi
-if ! rg --quiet 'fn decode_tooling_(build_trace|compile_cost_report|artifact_graph)_v1' crates/ezc_core/src/tooling_products.rs; then
+if ! rg --quiet 'fn decode_tooling_(build_trace|compile_cost_report|artifact_graph|query_snapshot)_v1' crates/ezc_core/src/tooling_products.rs; then
   echo 'L11-F must provide canonical decoders for its now-available schemas' >&2
   exit 1
 fi
