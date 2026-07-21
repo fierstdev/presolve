@@ -98,6 +98,26 @@ pub const fn tooling_schema_registry_v1() -> &'static [ToolingSchemaEntryV1] {
             availability: ToolingSchemaAvailabilityV1::Available,
         },
         ToolingSchemaEntryV1 {
+            schema: "presolve.watch-execution-plan",
+            version: 1,
+            availability: ToolingSchemaAvailabilityV1::Available,
+        },
+        ToolingSchemaEntryV1 {
+            schema: "presolve.watch-event",
+            version: 1,
+            availability: ToolingSchemaAvailabilityV1::Available,
+        },
+        ToolingSchemaEntryV1 {
+            schema: "presolve.watch-session-snapshot",
+            version: 1,
+            availability: ToolingSchemaAvailabilityV1::Available,
+        },
+        ToolingSchemaEntryV1 {
+            schema: "presolve.watch-execution-report",
+            version: 1,
+            availability: ToolingSchemaAvailabilityV1::Available,
+        },
+        ToolingSchemaEntryV1 {
             schema: "presolve.build-trace",
             version: 1,
             availability: ToolingSchemaAvailabilityV1::Reserved,
@@ -249,5 +269,56 @@ mod tests {
             negotiate_tooling_schema_v1(&unknown).unwrap_err().code,
             "L10S004_UNKNOWN_SCHEMA"
         );
+    }
+
+    #[test]
+    fn l10_compatibility_fixtures_freeze_acceptance_and_rejection_behavior() {
+        let accepted = decode_tooling_schema_negotiation_request_v1(include_bytes!(
+            "../fixtures/tooling-schema/workspace-graph-v1.request.json"
+        ))
+        .unwrap();
+        assert_eq!(
+            encode_tooling_schema_negotiation_response_v1(
+                &negotiate_tooling_schema_v1(&accepted).unwrap()
+            ),
+            include_bytes!("../fixtures/tooling-schema/workspace-graph-v1.response.json")
+        );
+
+        for (request, code, decodes) in [
+            (
+                include_bytes!("../fixtures/tooling-schema/invalid-shape-v1.request.json")
+                    .as_slice(),
+                include_str!("../fixtures/tooling-schema/invalid-shape-v1.code").trim(),
+                false,
+            ),
+            (
+                include_bytes!("../fixtures/tooling-schema/invalid-version-list-v1.request.json")
+                    .as_slice(),
+                include_str!("../fixtures/tooling-schema/invalid-version-list-v1.code").trim(),
+                false,
+            ),
+            (
+                include_bytes!("../fixtures/tooling-schema/unknown-schema-v1.request.json")
+                    .as_slice(),
+                include_str!("../fixtures/tooling-schema/unknown-schema-v1.code").trim(),
+                true,
+            ),
+            (
+                include_bytes!("../fixtures/tooling-schema/reserved-build-trace-v1.request.json")
+                    .as_slice(),
+                include_str!("../fixtures/tooling-schema/reserved-build-trace-v1.code").trim(),
+                true,
+            ),
+            (
+                include_bytes!("../fixtures/tooling-schema/no-shared-version-v1.request.json")
+                    .as_slice(),
+                include_str!("../fixtures/tooling-schema/no-shared-version-v1.code").trim(),
+                true,
+            ),
+        ] {
+            let outcome = decode_tooling_schema_negotiation_request_v1(request)
+                .and_then(|decoded| negotiate_tooling_schema_v1(&decoded));
+            assert_eq!(outcome.unwrap_err().code, code, "fixture decodes: {decodes}");
+        }
     }
 }

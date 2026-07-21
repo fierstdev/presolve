@@ -3,17 +3,17 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L10-A - Tooling Schema Registry
-* Working tree: the revised Phase L delivery roadmap is committed as a documentation-only planning slice; no compiler or platform implementation changed.
+* Latest completed slice: L10-B - Tooling Schema Compatibility and Midpoint Gate
+* Working tree: L10-B is implemented as one atomic compatibility-only slice; verification and commit evidence are recorded below.
 * Date: 2026-07-21
 
 Last completed slice
 
-* Slice: L10-A - Tooling Schema Registry
-* Summary: adds the transport-neutral registry and strict version negotiation for existing L3-L8 products while keeping trace, compile-cost, and artifact-graph schemas explicitly reserved.
-* Key files: `crates/ezc_core/src/tooling_schema.rs`, `docs/specifications/phase-l/PHASE_L_L10_TOOLING_SCHEMA_IMPLEMENTATION_CONTRACT.md`, `scripts/verify-l10-schema-contract.sh`, `justfile`, `2026-W28.md`
-* Verification: focused registry tests, strict compiler clippy, and `./scripts/verify-l10-schema-contract.sh` pass independently. The verifier is included in `just check`.
-* Roadmap amendment: `docs/specifications/phase-l/PHASE_L_REVISED_ROADMAP.md` now governs the remaining delivery order. It preserves the frozen contracts, requires L10-B compatibility/midpoint proof before L11, moves the public test foundation before examples, and capability-gates tooling/editor surfaces so no consumer invents compiler knowledge.
+* Slice: L10-B - Tooling Schema Compatibility and Midpoint Gate
+* Summary: freezes all 31 L3-L8 canonical fixture bytes under SHA-256, adds acceptance/rejection negotiation fixtures, records every available registry schema and its absent capabilities, and completes the L10 midpoint without a new producer or reader.
+* Key files: `crates/ezc_core/src/tooling_schema.rs`, `crates/ezc_core/fixtures/tooling-schema/`, `docs/tooling-capability-inventory.md`, `scripts/verify-l10-schema-contract.sh`, `2026-W28.md`
+* Verification: focused tooling-schema tests, checksum coverage of the exact L3-L8 fixture corpus, source coupling/decoder audits, inherited L3-L9 audit chain, strict compiler clippy, formatter, and `git diff --check` pass. The L10 verifier remains in `just check`.
+* Registry correction: L10-B lists all six canonical L8 schemas, including execution plan/event/session snapshot/execution report. Trace, compile-cost, and artifact graph stay reserved and have no decoder.
 * Proof: representative constructed Rust configurations first pass existing L3 validation, retain byte-identical L3 serializer fixtures, then CLI encode/decode to equal Rust values and equal existing L3 configuration identities. CLI fixture bytes are canonical and intentionally differ from L3 bytes. Twenty shuffled object-order byte inputs produce the same Rust configuration.
 * Isolation: no public L3 decoder, durable migration, or cross-codec byte equality exists. The verifier rejects any newly introduced L3 configuration decoder and fails if L4/L6/L7 durable code imports the CLI codec; existing L4/L7 restart tests remain inherited evidence.
 * Verification: `cargo test -p presolve-cli configuration_codec --lib -- --nocapture`, `cargo clippy -p presolve-cli --all-targets -- -D warnings`, `./scripts/verify-l9a1-configuration-codec-contracts.sh`, inherited `just check`, and `git diff --check` pass. The script is included in `just check`.
@@ -33,8 +33,8 @@ Last completed slice
 
 Current phase boundary
 
-* Slice: L10-B compatibility fixtures and midpoint gate.
-* Status: L10-A registry and negotiation are complete. Next boundary is compatibility proof and the L10 midpoint gate; preserve L3-L8 bytes and do not begin L11.
+* Slice: L11-A tooling capability contract.
+* Status: L10 is complete. Next boundary is the L11-A contract only: map requested commands to exact existing products, missing immutable products, or alpha exclusions; do not implement readers or activate commands first.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
 * Remaining in Phase K: none.
 
@@ -1228,11 +1228,11 @@ Known limitations
 
 Exact next step
 
-Phase K is complete and frozen through K21. Phase L is in progress through
-L10-A. The revised delivery roadmap is authoritative for sequencing. The exact
-next implementation boundary is L10-B compatibility fixtures and the midpoint
-capability audit; preserve L3-L8 and Phase K bytes, do not activate a reserved
-command, and do not begin L11 first.
+Phase K is complete and frozen through K21. Phase L is complete through L10.
+The revised delivery roadmap is authoritative for sequencing. The exact next
+boundary is L11-A tooling capability contract only; preserve L3-L8 and Phase K
+bytes, do not implement a reader, activate a reserved command, or begin L11-B
+first.
 
 Useful commands
 
@@ -1263,4 +1263,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the Phase L roadmap planning commit.
+* None after the L10-B compatibility-gate commit.

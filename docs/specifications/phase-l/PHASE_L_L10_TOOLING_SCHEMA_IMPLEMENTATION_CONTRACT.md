@@ -47,7 +47,10 @@ unknown versions rather than guess or silently downgrade.
 
 L10-A requires registry determinism, request validation, every rejection path,
 and proof that negotiation imports no compiler service or durable/cache module.
-L10-B documents the registry and adds it to `just check`. L10 completes only
-after compatibility fixtures prove existing canonical serializer bytes are
-unchanged, the L3–L8 audits pass, and the Phase L midpoint gate is run. L11 is
-the first phase permitted to implement a reserved tooling product.
+L10-B documents the registry and adds it to `just check`. Its compatibility
+corpus is `crates/ezc_core/fixtures/tooling-schema/` and its frozen midpoint
+inventory is [`docs/tooling-capability-inventory.md`](../../tooling-capability-inventory.md).
+L10 completes only after compatibility fixtures prove existing canonical
+serializer bytes are unchanged, the L3–L8 audits pass, and the Phase L midpoint
+gate is run. L11 is the first phase permitted to implement a reserved tooling
+product.
