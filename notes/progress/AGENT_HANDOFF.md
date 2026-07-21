@@ -3,16 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L9-B - CLI Command Framework and Project Envelope
-* Working tree: L9-B is implemented as one atomic slice; verification and commit evidence are recorded below.
+* Latest completed slice: L9-C - Core Compilation Adapter
+* Working tree: L9-C is implemented as one atomic slice; verification and commit evidence are recorded below.
 * Date: 2026-07-19
 
 Last completed slice
 
-* Slice: L9-B - CLI Command Framework and Project Envelope
-* Summary: adds stable public command/exit-code metadata and an explicit-path project-envelope loader. It opens only the caller-named CLI configuration document, delegates decoding to L9-A, and never searches for configuration, enumerates source roots, or compiles sources.
-* Key files: `crates/ezc_cli/src/command_framework.rs`, `docs/cli-command-framework.md`, `scripts/verify-l9b-command-framework-contracts.sh`, `justfile`, `2026-W28.md`
-* Verification: `cargo test -p presolve-cli command_framework --lib -- --nocapture`, strict CLI clippy, and `./scripts/verify-l9b-command-framework-contracts.sh` pass independently. The L9-B verifier invokes L9-A and all inherited audits; it is included in `just check`.
+* Slice: L9-C - Core Compilation Adapter
+* Summary: adds the complete-candidate L4 adapter. It derives a canonical snapshot from caller-supplied logical source inputs, opens one local service session, delegates once to `CompilerServiceHost::compile`, then closes the session. It performs no source filesystem reads, parsing, diagnostic construction, or artifact generation.
+* Key files: `crates/ezc_cli/src/compilation_commands.rs`, `docs/cli-compilation-adapter.md`, `scripts/verify-l9c-compilation-adapter-contracts.sh`, `justfile`, `2026-W28.md`
+* Verification: `cargo test -p presolve-cli compilation_commands --lib -- --nocapture`, strict CLI clippy, and `./scripts/verify-l9c-compilation-adapter-contracts.sh` pass independently. The L9-C verifier invokes L9-B and inherited L3-L8 audits; it is included in `just check`.
 * Proof: representative constructed Rust configurations first pass existing L3 validation, retain byte-identical L3 serializer fixtures, then CLI encode/decode to equal Rust values and equal existing L3 configuration identities. CLI fixture bytes are canonical and intentionally differ from L3 bytes. Twenty shuffled object-order byte inputs produce the same Rust configuration.
 * Isolation: no public L3 decoder, durable migration, or cross-codec byte equality exists. The verifier rejects any newly introduced L3 configuration decoder and fails if L4/L6/L7 durable code imports the CLI codec; existing L4/L7 restart tests remain inherited evidence.
 * Verification: `cargo test -p presolve-cli configuration_codec --lib -- --nocapture`, `cargo clippy -p presolve-cli --all-targets -- -D warnings`, `./scripts/verify-l9a1-configuration-codec-contracts.sh`, inherited `just check`, and `git diff --check` pass. The script is included in `just check`.
@@ -32,8 +32,8 @@ Last completed slice
 
 Current phase boundary
 
-* Slice: L9-C and later CLI Platform work.
-* Status: L9-B is complete under `PHASE_L_L9_RECOVERY_AND_IMPLEMENTATION_CONTRACT.md`. L3–L8 v1 meanings remain compatible. Next boundary is L9-C core compilation commands only; do not begin L10.
+* Slice: L9-D and later CLI Platform work.
+* Status: L9-C is complete under `PHASE_L_L9_RECOVERY_AND_IMPLEMENTATION_CONTRACT.md`. L3–L8 v1 meanings remain compatible. Next boundary is L9-D public build/check command integration only; do not begin L10.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
 * Remaining in Phase K: none.
 
