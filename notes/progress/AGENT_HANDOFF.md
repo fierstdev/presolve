@@ -10,7 +10,7 @@ Repository state
 Last completed slice
 
 * Slice: L12-B - Compiler Query-Snapshot Constitutional Amendment
-* Summary: defines `presolve.query-snapshot` as one transient, compiler-produced, source-free product bound to a validated L3 workspace snapshot; it exposes only existing semantic identities, kinds, provenance ranges, references, and diagnostics.
+* Summary: defines `presolve.query-snapshot` as one transient, compiler-produced, source-free product bound to a validated L3 workspace snapshot; it exposes only source-free `QuerySemanticId` values derived inside the compiler, existing kinds, provenance ranges, references, and diagnostics.
 * Boundary: the client owns URI/path translation and supplies compiler-issued `SourceUnitId` plus UTF-8 byte offsets. The product fails closed for unknown, stale, ambiguous, or out-of-range queries and cannot persist in L4--L8, the CLI, language service, or an editor extension.
 * Capability boundary: future L12-C may support only position lookup, definition, references, document symbols, and compiler diagnostics. Hover, rename, completion, signature help, semantic tokens, source mapping, edits, and code actions remain unsupported until their facts are explicitly established.
 * Next: L12-C must atomically add the producer, strict decoder, source-free fixtures, identity/provenance/reverse-order proof, and L10 registry amendment before any language-service API begins.

@@ -19,12 +19,19 @@ out-of-range source-unit/offset input is a deterministic query error.
 ## Snapshot v1
 
 The v1 document contains exactly schema/version/snapshot identity, bound L3
-workspace and snapshot identities, ordered source-unit revisions, ordered
+workspace and snapshot identities, ordered source-unit revision records,
+ordered
 semantic records, ordered resolved references, and ordered compiler diagnostics.
 Every range is a half-open UTF-8 byte range paired with its exact
-`SourceUnitId`. A semantic record contains only existing `SemanticId`, existing
-kind, and compiler provenance range. A reference contains existing source and
-target semantic IDs plus its compiler provenance range. A diagnostic contains
+`SourceUnitId`. Each source-unit revision record contains only its exact
+`SourceUnitId`, revision identity, and existing L3 source length, which bounds
+ranges without carrying a path or source bytes. A semantic record contains only
+a source-free `QuerySemanticId`, existing kind, and compiler provenance range.
+`QuerySemanticId` is exactly `query-semantic:sha256:<hex>` computed over the
+domain-separated byte sequence `query-semantic-v1`, a zero byte, and the exact
+existing compiler `SemanticId`; the compiler retains that source-bearing input
+internally and never emits it. A reference contains source and target
+`QuerySemanticId` values plus its compiler provenance range. A diagnostic contains
 the existing compiler code/severity/message and canonical primary/secondary
 ranges when those facts exist.
 
