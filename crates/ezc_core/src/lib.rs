@@ -61,6 +61,8 @@ pub mod form_validation_plan;
 pub mod html_codegen;
 pub mod instance_context;
 pub mod intermediate_representation;
+#[cfg(any(test, all(feature = "wasm", target_arch = "wasm32")))]
+mod language_service;
 pub mod layout_graph;
 pub mod lazy_action_chunks;
 pub mod model;

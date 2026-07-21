@@ -1,6 +1,7 @@
 # Repository task recipes. These commands are intentionally simple.
 
 check:
+    ./scripts/verify-l12c2-rust-query-projection.sh
     ./scripts/verify-l12c-wasm-binding-contract.sh
     ./scripts/verify-l12c-language-service-binding-audit.sh
     ./scripts/verify-l12c-query-snapshot-product.sh

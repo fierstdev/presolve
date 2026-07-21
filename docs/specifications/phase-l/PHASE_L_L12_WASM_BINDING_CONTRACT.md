@@ -46,6 +46,8 @@ negotiation is therefore exactly the existing `presolve.query-snapshot` v1
 schema/version validation; absent, reserved, future, or noncanonical product
 bytes yield `invalid_product`. A future product version requires a distinct ABI
 entry point and contract; v1 never guesses or downcasts a version.
+For `invalid_product`, `operation` is the empty string because request bytes
+are not processed before the strict decoder succeeds.
 
 `request_bytes` and every returned response use canonical JSON: UTF-8,
 `serde_json` field order as documented below, no unknown fields, and one final

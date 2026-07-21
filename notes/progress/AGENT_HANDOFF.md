@@ -3,11 +3,17 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L12-C-1 - Compiler-owned WASM Language-Service Binding Contract
-* Working tree: the L12-C-1 contract selects a compiler-owned WASM ABI that strictly decodes caller-supplied query-snapshot bytes in Rust before read-only projection. No WASM crate/package, language-service wrapper, LSP, or extension implementation has begun.
+* Latest completed slice: L12-C-2 - Rust Query Projection Core
+* Working tree: L12-C now has a crate-private Rust strict-decode-first query projector, but no WASM crate/package, language-service wrapper, LSP, or extension implementation has begun.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L12-C-2 - Rust Query Projection Core
+* Result: adds one crate-private `query_snapshot_v1` projector which first invokes `decode_tooling_query_snapshot_v1`, then returns only existing records/references/diagnostics in canonical response envelopes. It intentionally selects all position-containing records in product order, keeps document symbols flat, and never exposes a native public language-service API.
+* Behavior: position, definition, references, document symbols, and diagnostics are contract-exact. Invalid products are rejected before requests; noncanonical/unknown requests, unknown source units/opaque IDs, and out-of-range offsets fail closed. All remaining L12 capabilities return the stable unsupported result without source access or analysis.
+* Boundary: this core is an implementation detail for the selected compiler-owned WASM ABI. It owns no host, compiler invocation, product/session/cache state, path/URI/source input, persistence, updates, LSP, or VSCode behavior.
+* Next: L12-C-3 may add only the WASM adapter and `@presolve/compiler-wasm` package/build boundary, together with frozen canonical request/response/error fixtures and a proof that JavaScript cannot bypass this Rust core.
 
 * Slice: L12-C-1 - Compiler-owned WASM Language-Service Binding Contract
 * Result: selects provisional `@presolve/compiler-wasm` as the sole browser/JavaScript delivery authority. Its single synchronous `query_snapshot_v1(product_bytes, request_bytes)` operation must invoke Rust `decode_tooling_query_snapshot_v1` first, then project only existing product facts. A future `@presolve/language-service` can only be a thin wrapper over that binding.
