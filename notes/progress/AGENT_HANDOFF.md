@@ -3,15 +3,18 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L8 - Watch Mode
-* Working tree: L8 is implemented as one atomic slice. Phase L recovery authority is complete before L9 implementation.
+* Latest completed slice: L9-A - Strict CLI Configuration Codec
+* Working tree: L9-A is implemented as one atomic slice; verification and commit evidence are recorded below.
 * Date: 2026-07-19
 
 Last completed slice
 
-* Slice: L8 - Watch Mode
-* Summary: adds explicit process-local, caller-driven watch sessions over complete L7 candidates. The state machine has source-free snapshots/events, bounded journals, canonical change evidence, injected monotonic-time debounce, latest-candidate coalescing, obsolete-attempt discard semantics, and one active operation maximum.
-* Key files: `crates/ezc_core/src/watch.rs`, `crates/ezc_core/src/service.rs`, `crates/ezc_core/fixtures/watch/`, `docs/watch-mode-contract.md`, `scripts/verify-l8-watch-contracts.sh`, `justfile`, `2026-W28.md`
+* Slice: L9-A - Strict CLI Configuration Codec
+* Summary: adds a distinct public `presolve.json` codec that constructs the existing L3 `WorkspaceConfiguration` only after strict four-field structural validation. It contains no filesystem access or source discovery, rejects duplicate object keys through byte decoding, emits tuple-shaped platform options, and never treats L3 durable JSON as an authoring format.
+* Key files: `crates/ezc_cli/src/configuration_codec.rs`, `crates/ezc_cli/src/lib.rs`, `crates/ezc_cli/fixtures/configuration/`, `docs/cli-configuration-codec.md`, `scripts/verify-l9a1-configuration-codec-contracts.sh`, `justfile`, `2026-W28.md`
+* Proof: representative constructed Rust configurations first pass existing L3 validation, retain byte-identical L3 serializer fixtures, then CLI encode/decode to equal Rust values and equal existing L3 configuration identities. CLI fixture bytes are canonical and intentionally differ from L3 bytes. Twenty shuffled object-order byte inputs produce the same Rust configuration.
+* Isolation: no public L3 decoder, durable migration, or cross-codec byte equality exists. The verifier rejects any newly introduced L3 configuration decoder and fails if L4/L6/L7 durable code imports the CLI codec; existing L4/L7 restart tests remain inherited evidence.
+* Verification: `cargo test -p presolve-cli configuration_codec --lib -- --nocapture`, `cargo clippy -p presolve-cli --all-targets -- -D warnings`, `./scripts/verify-l9a1-configuration-codec-contracts.sh`, inherited `just check`, and `git diff --check` pass. The script is included in `just check`.
 * Observer boundary: callers observe and read inputs, then submit complete exact replacement L7 workspace requests. The service does no filesystem watch/read/scan/poll/glob/manifest discovery and exposes no public watch CLI, dev server, HMR, browser refresh, or streaming transport.
 * Scheduler: test and internal execution use explicit monotonic scheduler turns. Quiet and maximum deadlines are caller-clock values; zero debounce coalesces before the next turn. Pending input is one transient complete candidate only, replaced at highest accepted sequence; the source-free evidence union is retained for reporting.
 * Publication/lifecycle: every execution delegates unchanged to `compile_workspace_v1`; L7 serial scheduling/publication, L5 ephemeral package reuse, and L6 complete-result cache behavior remain authoritative. Obsolete active success is discarded at the watch layer without rollback. Sessions are process-local and never restored; stop releases pending input.
@@ -28,8 +31,8 @@ Last completed slice
 
 Current phase boundary
 
-* Slice: L9 — CLI Platform recovery authority.
-* Status: L8 is complete under `PHASE_L_L8_WATCH_MODE_IMPLEMENTATION_CONTRACT.md`. `PHASE_L_L9_RECOVERY_AND_IMPLEMENTATION_CONTRACT.md` reconstructs the missing implementation-ready L9 authority under the user's Phase L authority and incorporates L9-A.3. `./scripts/verify-phase-l-specifications.sh`, `./scripts/verify-repository-layout.sh`, and `just check` pass for the authority slice. L3–L8 v1 meanings remain compatible. Begin only L9-A strict configuration-codec work next; no L10 work.
+* Slice: L9-B and later CLI Platform work.
+* Status: L9-A is complete under `PHASE_L_L9_RECOVERY_AND_IMPLEMENTATION_CONTRACT.md` and the L9-A.3 construction-based proof correction. L3–L8 v1 meanings remain compatible. Next boundary is L9-B command framework and project envelope only; do not begin L10.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
 * Remaining in Phase K: none.
 

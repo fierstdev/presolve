@@ -12,6 +12,7 @@ check:
     ./scripts/verify-l6-persistent-cache-contracts.sh
     ./scripts/verify-l7-workspace-contracts.sh
     ./scripts/verify-l8-watch-contracts.sh
+    ./scripts/verify-l9a1-configuration-codec-contracts.sh
 
 repository-layout:
     ./scripts/verify-repository-layout.sh
@@ -33,6 +34,9 @@ l6-persistent-cache-contracts:
 
 l8-watch-contracts:
     ./scripts/verify-l8-watch-contracts.sh
+
+l9a1-configuration-codec-contracts:
+    ./scripts/verify-l9a1-configuration-codec-contracts.sh
 
 e2e:
     cargo test -p presolve-cli --test runtime_browser -- --nocapture --test-threads=1
