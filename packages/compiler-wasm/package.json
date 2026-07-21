@@ -1,0 +1,16 @@
+{
+  "name": "@presolve/compiler-wasm",
+  "version": "0.1.0-alpha",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./dist/presolve_compiler_wasm.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "../../scripts/build-l12c-compiler-wasm.sh",
+    "check": "../../scripts/verify-l12c3-wasm-binding.sh"
+  }
+}

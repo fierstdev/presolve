@@ -3,11 +3,17 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L12-C-2 - Rust Query Projection Core
-* Working tree: L12-C now has a crate-private Rust strict-decode-first query projector, but no WASM crate/package, language-service wrapper, LSP, or extension implementation has begun.
+* Latest completed slice: L12-C-3-A - Compiler-owned WASM Binding Surface
+* Working tree: L12-C now has a compiler-owned WASM build/package boundary over the crate-private Rust projector. The contract-required frozen ABI fixture matrix is still pending; no `@presolve/language-service` wrapper, LSP, or extension implementation has begun.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L12-C-3-A - Compiler-owned WASM Binding Surface
+* Result: enables the compiler crate's `cdylib` WASM target and exports exactly one `wasm-bindgen` function, `query_snapshot_v1`, which delegates directly to the crate-private strict-decode-first Rust projector. `@presolve/compiler-wasm` is a generated-artifact package with no handwritten semantic/product code.
+* Proof: the build is pinned to the installed `wasm-bindgen` 0.2.108 generator, compiles `wasm32-unknown-unknown`, and a Node smoke test invokes the generated artifact using the frozen query product. The binding verifier rejects decoder/host imports in the package surface and inherits the Rust/product contract chain.
+* Boundary: JavaScript owns only generated loading and caller-supplied byte transfer. It cannot decode or produce the product, invoke the compiler, read sources, retain state, update documents, persist/cache data, or introduce LSP/VSCode behavior.
+* Next: L12-C-3-B must add the contract-required frozen canonical request/response/error fixture matrix and complete the binding-surface audit. Only after that proof may L12-C-4 begin a thin `@presolve/language-service` wrapper. L12-D/L12-E remain unstarted.
 
 * Slice: L12-C-2 - Rust Query Projection Core
 * Result: adds one crate-private `query_snapshot_v1` projector which first invokes `decode_tooling_query_snapshot_v1`, then returns only existing records/references/diagnostics in canonical response envelopes. It intentionally selects all position-containing records in product order, keeps document symbols flat, and never exposes a native public language-service API.

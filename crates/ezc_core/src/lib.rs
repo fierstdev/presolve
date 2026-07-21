@@ -153,6 +153,9 @@ pub use tooling_products::{
 pub mod watch;
 pub mod workspace;
 
+#[cfg(all(feature = "wasm", target_arch = "wasm32"))]
+mod wasm_binding;
+
 pub use application_semantic_model::{
     build_application_semantic_model, build_application_semantic_model_for_unit,
     build_application_semantic_model_from_component_graph, ApplicationSemanticModel,

@@ -55,3 +55,5 @@ The [L12-C language-service binding audit](PHASE_L_L12_LANGUAGE_SERVICE_BINDING_
 L12-C-1 is governed by the [compiler-owned WASM language-service binding contract](PHASE_L_L12_WASM_BINDING_CONTRACT.md). It selects strict Rust decode-first WASM delivery and freezes the read-only request, response, error, cancellation, lifecycle, packaging, and fixture boundary before any binding implementation.
 
 L12-C-2 activates only the crate-private Rust projection shared by the future WASM adapter. It strictly decodes one supplied product before interpreting a canonical request and emits only contract-defined records, errors, or unsupported results; it creates no external host surface.
+
+L12-C-3 activates the compiler-owned `@presolve/compiler-wasm` build boundary. Its generated web artifact exposes only the Rust `query_snapshot_v1` projection, and its smoke test consumes the frozen product without any JavaScript product decoder or compiler path.
