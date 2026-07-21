@@ -37,3 +37,5 @@ L9 is governed by the tracked [L9 recovery and implementation contract](PHASE_L_
 L10 is governed by the authored [tooling-schema implementation contract](PHASE_L_L10_TOOLING_SCHEMA_IMPLEMENTATION_CONTRACT.md). It freezes negotiation and registry behavior without changing frozen L3–L8 product bytes.
 
 L11-A is governed by the [tooling capability and reader contract](PHASE_L_L11_TOOLING_CAPABILITY_CONTRACT.md). It maps the exact product-backed reader boundary before any developer-tool command can be activated.
+
+L11-D is governed by the [trace and structural compile-cost contract](PHASE_L_L11_TRACE_AND_COST_CONTRACT.md). It defines source-free deterministic products while trace and cost schemas remain reserved.

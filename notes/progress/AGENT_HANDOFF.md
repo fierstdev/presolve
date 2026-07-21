@@ -3,11 +3,19 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L11-C - Workspace Tooling Projections
-* Working tree: L11-B is implemented as one atomic reader-only slice; verification and commit evidence are recorded below.
+* Latest completed slice: L11-D - Trace and Structural Compile-Cost Contract
+* Working tree: L11-D is a verified contract-only slice; no producer, decoder, command, registry availability, or persistence implementation has begun.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L11-D - Trace and Structural Compile-Cost Contract
+* Summary: defines future immutable, source-free `presolve.build-trace` and `presolve.compile-cost-report` v1 products without activating a producer, decoder, command, registry entry, or persistence path.
+* Contract: traces contain only established L3-L8/L4 publication facts in a fixed stage order; compile-cost reports project the existing paired Phase K optimization and runtime-cost reports. Neither product can contain source, paths, filenames, timestamps, durations, host measurements, or benchmark gates.
+* Boundary: both schemas stay L10 `reserved` through L11-E. L11-F must deliver encoders, strict decoders, identity proofs, source-free fixtures, reverse-order determinism, compatibility handling, and the registry transition atomically.
+* Verification: `./scripts/verify-l11d-trace-cost-contract.sh`, `./scripts/verify-phase-l-specifications.sh`, and `git diff --check` pass. The verifier runs the inherited L11-C/L11-B/L11-A/L10/L3-L9 audits and is included in `just check`.
+
+Historical verification context
 
 * Slice: L11-C - Workspace Tooling Projections
 * Summary: adds a byte-only core reader for negotiated L3 workspace snapshot and graph documents. It delegates to the existing strict decoders, retains validated snapshot identity, and rejects reserved/unknown/unreadable schemas without filesystem, source, compiler-service, cache, workspace, or watch access.
@@ -33,8 +41,8 @@ Last completed slice
 
 Current phase boundary
 
-* Slice: L11-D trace and structural-cost contract.
-* Status: L11-C is complete. Next boundary is contract-only; no trace/cost producer or registry change may begin first.
+* Slice: L11-E artifact-graph contract.
+* Status: L11-D is complete. Next boundary is contract-only; no artifact-graph producer, reader, command, registry transition, or persistence change may begin first.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
 * Remaining in Phase K: none.
 
@@ -1229,10 +1237,11 @@ Known limitations
 Exact next step
 
 Phase K is complete and frozen through K21. Phase L is complete through
-L11-B. The revised delivery roadmap and L11-A capability contract are
-authoritative. The exact next boundary is L11-C: activate only the validated
-workspace snapshot/graph readers and exact graph projections; preserve L3-L8
-and Phase K bytes, keep all other tooling views exit-6, and do not begin L11-D.
+L11-D. The revised delivery roadmap and L11-A/L11-D contracts are
+authoritative. The exact next boundary is L11-E: author the artifact-graph
+contract from established production artifact facts only; preserve L3-L8 and
+Phase K bytes, keep the schema reserved, and do not begin an artifact producer
+or command.
 
 Useful commands
 
