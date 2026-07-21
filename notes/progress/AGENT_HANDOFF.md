@@ -3,15 +3,21 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L11-G-C - Artifact-Graph Command Projection
-* Working tree: L12-A is a verified audit-only slice; no editor query, language-service, LSP, or extension implementation has begun.
+* Latest completed slice: L12-B - Compiler Query-Snapshot Constitutional Amendment
+* Working tree: L12-B is a verified contract-only slice; no query product producer/decoder, language service, LSP, or extension implementation has begun.
 * Date: 2026-07-21
 
 Last completed slice
 
+* Slice: L12-B - Compiler Query-Snapshot Constitutional Amendment
+* Summary: defines `presolve.query-snapshot` as one transient, compiler-produced, source-free product bound to a validated L3 workspace snapshot; it exposes only existing semantic identities, kinds, provenance ranges, references, and diagnostics.
+* Boundary: the client owns URI/path translation and supplies compiler-issued `SourceUnitId` plus UTF-8 byte offsets. The product fails closed for unknown, stale, ambiguous, or out-of-range queries and cannot persist in L4--L8, the CLI, language service, or an editor extension.
+* Capability boundary: future L12-C may support only position lookup, definition, references, document symbols, and compiler diagnostics. Hover, rename, completion, signature help, semantic tokens, source mapping, edits, and code actions remain unsupported until their facts are explicitly established.
+* Next: L12-C must atomically add the producer, strict decoder, source-free fixtures, identity/provenance/reverse-order proof, and L10 registry amendment before any language-service API begins.
+
 * Slice: L12-A - Editor Capability Audit
 * Summary: proves L3--L11 products lack public immutable semantic range/position, query identity, edit authority, and invalidation facts required for every advertised editor capability.
-* Boundary: L12-B must define a minimal immutable compiler-produced query snapshot and constitutional amendment before any language-service implementation may begin.
+* Boundary: L12-B authorizes only the minimal immutable compiler-produced query snapshot contract before any language-service implementation may begin.
 
 * Slice: L11-G-C - Artifact-Graph Command Projection
 * Summary: activates `presolve graph artifact` as an explicit validated artifact-graph projection in canonical JSON, deterministic human text, or deterministic DOT.
@@ -74,8 +80,8 @@ Historical verification context
 
 Current phase boundary
 
-* Slice: L11-G command projections.
-* Status: L11-F is complete. Next boundary may activate commands one at a time as projectors of validated supplied products only; no compiler invocation, project discovery, expanded persistence, or build-directory inspection may begin first.
+* Slice: L12-C query-snapshot product gate.
+* Status: L12-B is complete. The next boundary may implement only the contract's source-free `presolve.query-snapshot` producer, strict decoder, fixtures, proofs, and L10 registry amendment; no language service, LSP, extension, source discovery, edit path, or persistence may begin first.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
 * Remaining in Phase K: none.
 
@@ -1270,11 +1276,12 @@ Known limitations
 Exact next step
 
 Phase K is complete and frozen through K21. Phase L is complete through
-L11-F. The revised delivery roadmap and L11-A/L11-D/L11-E contracts are
-authoritative. The exact next boundary is L11-G: activate an approved command
-only as a projection of one validated supplied product, preserving the exit-6
-tooling boundary and keeping all compilation, project discovery, persistence,
-and build-directory inspection out of the command path.
+L12-B. The revised delivery roadmap, L12-A audit, and L12-B query-snapshot
+amendment are authoritative. The exact next boundary is L12-C: atomically
+implement only the source-free query-snapshot producer, strict decoder,
+fixtures, identity/provenance/reverse-order proof, and L10 registry amendment.
+No language service, LSP, extension, source discovery, edit path, or
+persistence begins before that product gate completes.
 
 Useful commands
 

@@ -45,3 +45,5 @@ L11-E is governed by the [production artifact-graph contract](PHASE_L_L11_ARTIFA
 L11-F activates only the L11-D/E products through canonical encoders and strict supplied-byte readers. It transitions those three L10 schemas to available without activating a command or persistence path.
 
 L12-A is governed by the [editor capability audit](PHASE_L_L12_EDITOR_CAPABILITY_AUDIT.md). It proves current products are insufficient for editor queries and blocks implementation pending an L12-B amendment.
+
+L12-B is governed by the [query-snapshot constitutional amendment](PHASE_L_L12_QUERY_SNAPSHOT_AMENDMENT.md). It defines the source-free compiler product required before any language-service implementation.

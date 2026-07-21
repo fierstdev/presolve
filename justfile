@@ -1,6 +1,7 @@
 # Repository task recipes. These commands are intentionally simple.
 
 check:
+    ./scripts/verify-l12b-query-snapshot-amendment.sh
     ./scripts/verify-l12a-editor-capability-audit.sh
     ./scripts/verify-l11g-artifact-graph-command.sh
     ./scripts/verify-l11g-profile-command.sh
