@@ -318,7 +318,11 @@ mod tests {
         ] {
             let outcome = decode_tooling_schema_negotiation_request_v1(request)
                 .and_then(|decoded| negotiate_tooling_schema_v1(&decoded));
-            assert_eq!(outcome.unwrap_err().code, code, "fixture decodes: {decodes}");
+            assert_eq!(
+                outcome.unwrap_err().code,
+                code,
+                "fixture decodes: {decodes}"
+            );
         }
     }
 }
