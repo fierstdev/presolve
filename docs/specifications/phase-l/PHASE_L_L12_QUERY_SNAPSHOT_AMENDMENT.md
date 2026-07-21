@@ -35,9 +35,16 @@ internally and never emits it. A reference contains source and target
 the existing compiler code/severity/message and canonical primary/secondary
 ranges when those facts exist.
 
+Only semantic entities with compiler-established source provenance appear as
+semantic records. Provenance-free internal or synthesized entities are not
+assigned fallback positions or exported. A resolved reference appears only when
+its own provenance maps to the bound snapshot and both endpoints are exported
+semantic records; all other internal relationships remain compiler-internal.
+
 The producer may map a semantic provenance path to a source unit only through
 the same validated L3 workspace snapshot's canonical membership. It fails
-closed if that mapping is absent or non-unique. Records sort by source unit,
+closed if that mapping is absent or non-unique; it may not substitute a fallback
+range. Records sort by source unit,
 start, end, then canonical identity; identity is SHA-256 over the canonical
 document with its identity field omitted. Strict decoding recomputes identity,
 ordering, workspace/snapshot binding, reference targets, and ranges.
