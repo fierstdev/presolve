@@ -15,6 +15,7 @@ Last completed slice
 * Contract: chunks, dependencies, and activations retain only frozen K7/K8 topology facts with canonical ordering; graph identity is self-excluding SHA-256 and the artifact checksum is the validated existing artifact checksum. No source, paths, module contents, timing, host, cache, report, or benchmark facts are included.
 * Boundary: the schema stays L10 `reserved` until L11-F atomically implements it alongside L11-D trace/cost products, complete strict readers, fixtures, determinism/provenance proofs, and registry transitions.
 * Verification: `./scripts/verify-l11e-artifact-graph-contract.sh`, `./scripts/verify-phase-l-specifications.sh`, and `git diff --check` pass. The verifier runs inherited L11-D/L11-C/L11-B/L11-A/L10/L3-L9 audits and is included in `just check`.
+* L11-D correction: `RuntimeCostReportV1` has no policy field. The cost contract therefore binds the pair by same build ID and direct same-invocation provenance, with the frozen production policy carried solely by `OptimizationReportV1`; no Phase K bytes or product fields were changed.
 
 * Slice: L11-D - Trace and Structural Compile-Cost Contract
 * Summary: defines future immutable, source-free `presolve.build-trace` and `presolve.compile-cost-report` v1 products without activating a producer, decoder, command, registry entry, or persistence path.
