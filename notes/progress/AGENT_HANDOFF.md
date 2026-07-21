@@ -3,13 +3,13 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L11-B - Strict Existing-Product Readers
+* Latest completed slice: L11-C - Workspace Tooling Projections
 * Working tree: L11-B is implemented as one atomic reader-only slice; verification and commit evidence are recorded below.
 * Date: 2026-07-21
 
 Last completed slice
 
-* Slice: L11-B - Strict Existing-Product Readers
+* Slice: L11-C - Workspace Tooling Projections
 * Summary: adds a byte-only core reader for negotiated L3 workspace snapshot and graph documents. It delegates to the existing strict decoders, retains validated snapshot identity, and rejects reserved/unknown/unreadable schemas without filesystem, source, compiler-service, cache, workspace, or watch access.
 * Key files: `crates/ezc_core/src/tooling_reader.rs`, `scripts/verify-l11b-tooling-product-readers.sh`, `justfile`, `2026-W28.md`
 * Verification: three focused reader tests prove strict decoding, source exclusion, schema negotiation/rejection, unsupported-reader rejection, and reverse-order determinism. The L11-B verifier runs inherited L11-A/L10/L3-L9 audits, formatter, strict compiler clippy, and diff check; it is included in `just check`.
@@ -33,8 +33,8 @@ Last completed slice
 
 Current phase boundary
 
-* Slice: L11-C inspect and workspace-graph projection.
-* Status: L11-B is complete. Next boundary may activate only the two validated product readers and exact workspace graph projections; retain exit-6 behavior for all other tooling views.
+* Slice: L11-D trace and structural-cost contract.
+* Status: L11-C is complete. Next boundary is contract-only; no trace/cost producer or registry change may begin first.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
 * Remaining in Phase K: none.
 
