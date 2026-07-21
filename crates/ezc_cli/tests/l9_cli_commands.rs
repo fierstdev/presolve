@@ -2,6 +2,12 @@ use std::fs;
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use ezc_core::platform::{
+    derive_workspace_id_v1, CacheLimits, CancellationToken, CompilationOutcome,
+    CompileWorkspaceRequest, CompilerSessionState, RequestedCompilationMode, WorkspaceInput,
+    WorkspaceSource,
+};
+
 static NEXT_ROOT: AtomicU64 = AtomicU64::new(1);
 
 fn project() -> (std::path::PathBuf, std::path::PathBuf) {
@@ -18,6 +24,34 @@ fn project() -> (std::path::PathBuf, std::path::PathBuf) {
     .unwrap();
     fs::write(root.join("src/main.ts"), "export const value = 1;\n").unwrap();
     (root, config)
+}
+
+fn tooling_products(root: &std::path::Path) -> (std::path::PathBuf, std::path::PathBuf) {
+    let workspace = WorkspaceInput::new(vec![WorkspaceSource {
+        path: "src/ToolingCliFixture.ts".into(),
+        source: "export const toolingCliFixture = 1;\n".into(),
+        language: None,
+    }]);
+    let workspace_id = derive_workspace_id_v1(&workspace.configuration).unwrap();
+    let mut session = CompilerSessionState::new(
+        workspace_id,
+        workspace.compiler_contract.clone(),
+        CacheLimits::default(),
+    );
+    let CompilationOutcome::Committed(result) =
+        session.compile_workspace(CompileWorkspaceRequest {
+            workspace,
+            mode: RequestedCompilationMode::Full,
+            cancellation: CancellationToken::new(),
+        })
+    else {
+        panic!("tooling CLI fixture compilation must commit");
+    };
+    let snapshot = root.join("workspace-snapshot.json");
+    let graph = root.join("workspace-graph.json");
+    fs::write(&snapshot, result.snapshot.to_canonical_json().unwrap()).unwrap();
+    fs::write(&graph, result.graph.to_canonical_json().unwrap()).unwrap();
+    (snapshot, graph)
 }
 
 #[test]
@@ -168,5 +202,64 @@ fn l9_watch_once_submits_the_complete_candidate_to_l8() {
     let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(value["schema"], "presolve.cli-watch-once");
     assert_eq!(value["outcome"], "succeeded");
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn l11c_projects_only_validated_workspace_products() {
+    let (root, _) = project();
+    let (snapshot, graph) = tooling_products(&root);
+    let binary = env!("CARGO_BIN_EXE_presolve");
+
+    let inspect = Command::new(binary)
+        .args([
+            "inspect",
+            "workspace-snapshot",
+            "--schema",
+            "presolve.workspace-snapshot",
+            "--product",
+            snapshot.to_str().unwrap(),
+            "--format",
+            "json",
+        ])
+        .output()
+        .unwrap();
+    assert!(inspect.status.success());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&inspect.stdout).unwrap()["schema_version"],
+        1
+    );
+
+    let dot = Command::new(binary)
+        .args([
+            "graph",
+            "workspace",
+            "--schema",
+            "presolve.workspace-graph",
+            "--product",
+            graph.to_str().unwrap(),
+            "--format",
+            "dot",
+        ])
+        .output()
+        .unwrap();
+    assert!(dot.status.success());
+    assert!(
+        String::from_utf8_lossy(&dot.stdout).starts_with("digraph \"presolve.workspace-graph\"")
+    );
+
+    let mismatch = Command::new(binary)
+        .args([
+            "inspect",
+            "workspace-graph",
+            "--schema",
+            "presolve.workspace-snapshot",
+            "--product",
+            snapshot.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(mismatch.status.code(), Some(6));
+    assert!(String::from_utf8_lossy(&mismatch.stderr).contains("L11T006"));
     fs::remove_dir_all(root).unwrap();
 }

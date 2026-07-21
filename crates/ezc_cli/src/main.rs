@@ -11,6 +11,7 @@ use presolve_cli::{
     run_explicit_workspace_v1, run_project_cache_operation_v1, CliCacheOperationV1,
 };
 
+use ezc_core::tooling_reader::{read_tooling_product_v1, ToolingProductV1};
 use ezc_core::{
     build_application_semantic_model_for_unit, build_component_graph,
     build_context_inspection_registry, build_effect_inspection_registry,
@@ -65,7 +66,13 @@ fn main() {
         "create" | "dev" | "profile" => l9_reserved_command(&command),
         "explain" => run_explain(args),
         "parse" => run_parse(args),
-        "graph" => run_graph(args),
+        "graph" => {
+            if args.first().is_some_and(|value| value == "workspace") {
+                run_l11_workspace_graph(&args[1..]);
+            } else {
+                run_graph(args);
+            }
+        }
         "asm" => run_asm(&args),
         "check" => {
             if args.iter().any(|argument| argument == "--config") {
@@ -88,7 +95,8 @@ fn main() {
         "clean" => run_l9_clean(&args),
         "workspace" => run_l9_workspace(&args),
         "watch" => run_l9_watch(&args),
-        "inspect" | "trace" | "benchmark" | "doctor" => l9_reserved_command(&command),
+        "inspect" => run_l11_inspect(&args),
+        "trace" | "benchmark" | "doctor" => l9_reserved_command(&command),
         _ => {
             eprintln!("unknown command: {command}");
             print_usage_and_exit();
@@ -220,6 +228,158 @@ fn run_l9_build_or_check(command: &str, args: &[String]) {
 fn l9_command_error(command: &str, message: &str, exit_code: i32) -> ! {
     eprintln!("{command}: {message}");
     process::exit(exit_code);
+}
+
+struct L11ProductInput {
+    schema: String,
+    product: PathBuf,
+    format: String,
+}
+
+fn l11_error(command: &str, code: &str, message: &str) -> ! {
+    l9_command_error(command, &format!("{code}: {message}"), 6)
+}
+
+fn parse_l11_product_input(command: &str, args: &[String], allow_dot: bool) -> L11ProductInput {
+    let mut schema = None;
+    let mut product = None;
+    let mut format = "human".to_owned();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--schema" => {
+                let Some(value) = args.get(index + 1) else {
+                    l11_error(command, "L11T002", "missing value for --schema");
+                };
+                schema = Some(value.clone());
+                index += 2;
+            }
+            "--product" => {
+                let Some(value) = args.get(index + 1) else {
+                    l11_error(command, "L11T002", "missing value for --product");
+                };
+                product = Some(PathBuf::from(value));
+                index += 2;
+            }
+            "--format" => {
+                let Some(value) = args.get(index + 1) else {
+                    l11_error(command, "L11T002", "missing value for --format");
+                };
+                if value != "human" && value != "json" && (!allow_dot || value != "dot") {
+                    l11_error(
+                        command,
+                        "L11T006",
+                        "unsupported format for this tooling view",
+                    );
+                }
+                format = value.clone();
+                index += 2;
+            }
+            value => l11_error(command, "L11T002", &format!("unknown option: {value}")),
+        }
+    }
+    L11ProductInput {
+        schema: schema.unwrap_or_else(|| l11_error(command, "L11T002", "--schema is required")),
+        product: product.unwrap_or_else(|| l11_error(command, "L11T002", "--product is required")),
+        format,
+    }
+}
+
+fn read_l11_product(command: &str, input: &L11ProductInput) -> ToolingProductV1 {
+    let bytes = fs::read(&input.product).unwrap_or_else(|error| {
+        l11_error(
+            command,
+            "L11T002",
+            &format!("failed to read product: {error}"),
+        );
+    });
+    read_tooling_product_v1(&input.schema, &[1], &bytes)
+        .unwrap_or_else(|error| l11_error(command, error.code, &error.message))
+}
+
+fn run_l11_inspect(args: &[String]) {
+    let Some(view) = args.first() else {
+        l11_error(
+            "inspect",
+            "L11T005",
+            "a supported inspection view is required",
+        );
+    };
+    let input = parse_l11_product_input("inspect", &args[1..], false);
+    let product = read_l11_product("inspect", &input);
+    match (view.as_str(), product) {
+        ("workspace-snapshot", ToolingProductV1::WorkspaceSnapshot(snapshot)) => {
+            if input.format == "json" {
+                print!(
+                    "{}",
+                    String::from_utf8(snapshot.to_canonical_json().unwrap()).unwrap()
+                );
+            } else {
+                println!(
+                    "workspace snapshot: workspace={} snapshot={} units={}",
+                    snapshot.workspace_id.as_str(),
+                    snapshot.snapshot_id.as_str(),
+                    snapshot.units.len()
+                );
+            }
+        }
+        ("workspace-graph", ToolingProductV1::WorkspaceGraph(graph)) => {
+            if input.format == "json" {
+                print!(
+                    "{}",
+                    String::from_utf8(graph.to_canonical_json().unwrap()).unwrap()
+                );
+            } else {
+                println!(
+                    "workspace graph: workspace={} snapshot={} units={} compile_edges={}",
+                    graph.workspace_id.as_str(),
+                    graph.snapshot_id.as_str(),
+                    graph.units.len(),
+                    graph.dependency_edges.len()
+                );
+            }
+        }
+        _ => l11_error(
+            "inspect",
+            "L11T006",
+            "view does not match the validated product schema",
+        ),
+    }
+}
+
+fn run_l11_workspace_graph(args: &[String]) {
+    let input = parse_l11_product_input("graph", args, true);
+    let ToolingProductV1::WorkspaceGraph(graph) = read_l11_product("graph", &input) else {
+        l11_error(
+            "graph",
+            "L11T006",
+            "workspace graph view requires workspace-graph schema",
+        );
+    };
+    match input.format.as_str() {
+        "json" => print!(
+            "{}",
+            String::from_utf8(graph.to_canonical_json().unwrap()).unwrap()
+        ),
+        "dot" => {
+            println!("digraph \"presolve.workspace-graph\" {{");
+            for edge in &graph.dependency_edges {
+                println!(
+                    "  \"{}\" -> \"{}\";",
+                    edge.source.as_str(),
+                    edge.target.as_str()
+                );
+            }
+            println!("}}");
+        }
+        _ => println!(
+            "workspace graph: workspace={} snapshot={} units={} compile_edges={}",
+            graph.workspace_id.as_str(),
+            graph.snapshot_id.as_str(),
+            graph.units.len(),
+            graph.dependency_edges.len()
+        ),
+    }
 }
 
 fn run_l9_cache(args: &[String]) {
