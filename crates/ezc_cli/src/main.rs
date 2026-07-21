@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 use presolve_cli::{
-    parse_explicit_source_spec_v1, run_explicit_build_or_check_v1, run_project_cache_operation_v1,
-    CliCacheOperationV1,
+    parse_explicit_source_spec_v1, run_explicit_build_or_check_v1, run_explicit_workspace_v1,
+    run_project_cache_operation_v1, CliCacheOperationV1,
 };
 
 use ezc_core::{
@@ -83,6 +83,7 @@ fn main() {
         }
         "cache" => run_l9_cache(&args),
         "clean" => run_l9_clean(&args),
+        "workspace" => run_l9_workspace(&args),
         _ => {
             eprintln!("unknown command: {command}");
             print_usage_and_exit();
@@ -250,6 +251,86 @@ fn run_l9_clean(args: &[String]) {
         println!(
             "clean succeeded: removed_cache_entries={}",
             result.removed_keys.len()
+        );
+    }
+}
+
+fn run_l9_workspace(args: &[String]) {
+    let mut configuration_path = None;
+    let mut sources = Vec::new();
+    let mut verify_clean_equivalence = false;
+    let mut json = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--config" => {
+                let Some(value) = args.get(index + 1) else {
+                    l9_command_error("workspace", "missing value for --config", 2);
+                };
+                configuration_path = Some(PathBuf::from(value));
+                index += 2;
+            }
+            "--source" => {
+                let Some(value) = args.get(index + 1) else {
+                    l9_command_error("workspace", "missing value for --source", 2);
+                };
+                sources.push(
+                    parse_explicit_source_spec_v1(value).unwrap_or_else(|error| {
+                        l9_command_error("workspace", &error.to_string(), 2);
+                    }),
+                );
+                index += 2;
+            }
+            "--verify-clean-equivalence" => {
+                verify_clean_equivalence = true;
+                index += 1;
+            }
+            "--format" => {
+                let Some(value) = args.get(index + 1) else {
+                    l9_command_error("workspace", "missing value for --format", 2);
+                };
+                match value.as_str() {
+                    "human" => json = false,
+                    "json" => json = true,
+                    _ => l9_command_error("workspace", "--format must be human or json", 2),
+                }
+                index += 2;
+            }
+            value => l9_command_error("workspace", &format!("unknown option: {value}"), 2),
+        }
+    }
+    let Some(configuration_path) = configuration_path else {
+        l9_command_error("workspace", "--config is required", 2);
+    };
+    let result = run_explicit_workspace_v1(&configuration_path, &sources, verify_clean_equivalence)
+        .unwrap_or_else(|error| {
+            let exit_code = if error.code.starts_with("L9") {
+                2
+            } else if error.code.starts_with("L7") || error.code == "workspace_not_found" {
+                3
+            } else {
+                4
+            };
+            l9_command_error("workspace", &error.to_string(), exit_code);
+        });
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "schema": "presolve.cli-workspace-result",
+                "version": 1,
+                "workspace_id": result.workspace_id,
+                "status": result.status,
+                "manifest_identity": result.manifest_identity,
+                "graph_identity": result.graph_identity,
+                "plan_identity": result.plan_identity,
+                "package_snapshot_id": result.package_snapshot_id,
+            })
+        );
+    } else {
+        println!(
+            "workspace succeeded: workspace={} plan={}",
+            result.workspace_id, result.plan_identity
         );
     }
 }

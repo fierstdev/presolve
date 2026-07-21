@@ -72,7 +72,9 @@ pub fn parse_explicit_source_spec_v1(
     parse_source_spec(value)
 }
 
-fn load_sources(
+/// Reads exactly the caller-authorized source paths after containment checks.
+/// No source-root traversal or membership inference is performed.
+pub fn load_explicit_source_inputs_v1(
     project_root: &Path,
     source_specs: &[CliExplicitSourceSpecV1],
 ) -> Result<Vec<CliSourceInputV1>, CliBuildCheckErrorV1> {
@@ -143,7 +145,7 @@ pub fn run_explicit_build_or_check_v1(
                 message: error.message,
             }
         })?;
-    let sources = load_sources(&envelope.project_root, source_specs)?;
+    let sources = load_explicit_source_inputs_v1(&envelope.project_root, source_specs)?;
     compile_complete_candidate_v1(
         &envelope.project_root.join(".presolve"),
         CliCompilationCandidateV1 {

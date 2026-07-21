@@ -92,3 +92,33 @@ fn l9e_cache_inspection_projects_l6_canonical_json() {
     assert!(root.join(".presolve/cache/manifest.json").is_file());
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn l9f_workspace_executes_the_explicit_project_through_l7() {
+    let (root, config) = project();
+    let output = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args([
+            "workspace",
+            "--config",
+            config.to_str().unwrap(),
+            "--source",
+            "src/main.ts=src/main.ts",
+            "--format",
+            "json",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(result["schema"], "presolve.cli-workspace-result");
+    assert_eq!(result["status"], "succeeded");
+    assert!(result["plan_identity"]
+        .as_str()
+        .unwrap()
+        .starts_with("sha256:"));
+    fs::remove_dir_all(root).unwrap();
+}

@@ -3,16 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L9-E - L6 Cache and Clean Projection
-* Working tree: L9-E is implemented as one atomic slice; verification and commit evidence are recorded below.
+* Latest completed slice: L9-F - Explicit L7 Workspace Projection
+* Working tree: L9-F is implemented as one atomic slice; verification and commit evidence are recorded below.
 * Date: 2026-07-21
 
 Last completed slice
 
-* Slice: L9-E - L6 Cache and Clean Projection
-* Summary: adds `cache inspect|verify|clean` and `clean` over the exact L6 cache root derived from an explicit configuration path. Inspection is L6 canonical JSON; deletion is L6's manifest-guarded entry cleanup. No source reads, cache implementation, or project-wide deletion is added.
-* Key files: `crates/ezc_cli/src/cache_commands.rs`, `crates/ezc_cli/src/main.rs`, `docs/cli-cache-clean.md`, `scripts/verify-l9e-cache-clean-contracts.sh`, `justfile`, `2026-W28.md`
-* Verification: `cargo test -p presolve-cli cache_commands --lib -- --nocapture` (two L6 delegation/containment fixtures), `cargo test -p presolve-cli --test l9_cli_commands -- --nocapture` (three executable fixtures), strict CLI clippy, and `./scripts/verify-l9e-cache-clean-contracts.sh` pass independently. The L9-E verifier invokes L9-D and inherited L3-L8 audits; it is included in `just check`.
+* Slice: L9-F - Explicit L7 Workspace Projection
+* Summary: adds the explicit one-project `workspace` operation. It accepts only caller-named configuration and source paths, constructs one complete package candidate, delegates serial compilation to L7, and verifies the resulting workspace state. No package/source discovery or compiler-internal call is added.
+* Key files: `crates/ezc_cli/src/workspace_commands.rs`, `crates/ezc_cli/src/main.rs`, `docs/cli-workspace.md`, `scripts/verify-l9f-workspace-contracts.sh`, `justfile`, `2026-W28.md`
+* Verification: `cargo test -p presolve-cli workspace_commands --lib -- --nocapture`, `cargo test -p presolve-cli --test l9_cli_commands -- --nocapture` (four executable fixtures), strict CLI clippy, and `./scripts/verify-l9f-workspace-contracts.sh` pass independently. The L9-F verifier invokes L9-E and inherited L3-L8 audits; it is included in `just check`.
 * Proof: representative constructed Rust configurations first pass existing L3 validation, retain byte-identical L3 serializer fixtures, then CLI encode/decode to equal Rust values and equal existing L3 configuration identities. CLI fixture bytes are canonical and intentionally differ from L3 bytes. Twenty shuffled object-order byte inputs produce the same Rust configuration.
 * Isolation: no public L3 decoder, durable migration, or cross-codec byte equality exists. The verifier rejects any newly introduced L3 configuration decoder and fails if L4/L6/L7 durable code imports the CLI codec; existing L4/L7 restart tests remain inherited evidence.
 * Verification: `cargo test -p presolve-cli configuration_codec --lib -- --nocapture`, `cargo clippy -p presolve-cli --all-targets -- -D warnings`, `./scripts/verify-l9a1-configuration-codec-contracts.sh`, inherited `just check`, and `git diff --check` pass. The script is included in `just check`.
@@ -32,8 +32,8 @@ Last completed slice
 
 Current phase boundary
 
-* Slice: L9-F and later CLI Platform work.
-* Status: L9-E's L6 cache/clean projection is complete under `PHASE_L_L9_RECOVERY_AND_IMPLEMENTATION_CONTRACT.md`. L3–L8 v1 meanings remain compatible. Next boundary is L9-F workspace/watch and remaining command-family integration only; do not begin L10.
+* Slice: L9-G final CLI Platform work.
+* Status: L9-F's L7 workspace projection is complete under `PHASE_L_L9_RECOVERY_AND_IMPLEMENTATION_CONTRACT.md`. L3–L8 v1 meanings remain compatible. Next boundary is L9-G watch dispatch, reserved commands, and final command/help/exit verification only; do not begin L10.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
 * Remaining in Phase K: none.
 
