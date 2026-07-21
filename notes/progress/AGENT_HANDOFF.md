@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L11-F - Tooling Product Producers, Registry, and Readers
-* Working tree: L11-F is implemented as one atomic source-free product slice; no tooling command or persistence path has been activated.
+* Latest completed slice: L11-G-A - Build-Trace Command Projection
+* Working tree: L11-G-A is implemented as one explicit-product command projection; no compiler, discovery, build-directory, or persistence path has been activated.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L11-G-A - Build-Trace Command Projection
+* Summary: activates `presolve trace --schema presolve.build-trace --product <file> [--format human|json]` as a projection of one explicitly named, strictly decoded L11-F build-trace product.
+* Boundary: the command reads exactly one caller-supplied file and renders canonical JSON or deterministic human text. It never invokes compilation, discovers a project, scans generated output, or persists trace state; malformed or schema-mismatched bytes retain tooling exit code 6.
+* Verification: focused CLI success/rejection evidence, strict CLI clippy, the L11-F producer/reader verifier, and `just check` pass. Next L11-G command projections remain separate slices.
 
 * Slice: L11-F - Tooling Product Producers, Registry, and Readers
 * Summary: activates canonical `presolve.build-trace`, `presolve.compile-cost-report`, and `presolve.artifact-graph` v1 encoders and strict caller-supplied-byte decoders, then transitions only those L10 schemas from `reserved` to `available`.

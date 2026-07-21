@@ -63,7 +63,7 @@ fn main() {
     match command.as_str() {
         "version" => run_l9_version(&args),
         "help" | "--help" | "-h" => print_l9_usage(),
-        "create" | "dev" | "profile" => l9_reserved_command(&command),
+        "create" | "dev" | "profile" | "benchmark" | "doctor" => l9_reserved_command(&command),
         "explain" => run_explain(args),
         "parse" => run_parse(args),
         "graph" => {
@@ -96,7 +96,7 @@ fn main() {
         "workspace" => run_l9_workspace(&args),
         "watch" => run_l9_watch(&args),
         "inspect" => run_l11_inspect(&args),
-        "trace" | "benchmark" | "doctor" => l9_reserved_command(&command),
+        "trace" => run_l11_trace(&args),
         _ => {
             eprintln!("unknown command: {command}");
             print_usage_and_exit();
@@ -272,7 +272,7 @@ fn parse_l11_product_input(command: &str, args: &[String], allow_dot: bool) -> L
                         "unsupported format for this tooling view",
                     );
                 }
-                format = value.clone();
+                format.clone_from(value);
                 index += 2;
             }
             value => l11_error(command, "L11T002", &format!("unknown option: {value}")),
@@ -379,6 +379,28 @@ fn run_l11_workspace_graph(args: &[String]) {
             graph.units.len(),
             graph.dependency_edges.len()
         ),
+    }
+}
+
+fn run_l11_trace(args: &[String]) {
+    let input = parse_l11_product_input("trace", args, false);
+    let ToolingProductV1::BuildTrace(trace) = read_l11_product("trace", &input) else {
+        l11_error(
+            "trace",
+            "L11T006",
+            "trace requires a validated build-trace product",
+        );
+    };
+    if input.format == "json" {
+        print!("{}", ezc_core::tooling_build_trace_json_v1(&trace));
+    } else {
+        println!(
+            "build trace: trace={} workspace={} outcome={:?} stages={}",
+            trace.trace_id,
+            trace.workspace_id,
+            trace.outcome,
+            trace.stages.len()
+        );
     }
 }
 

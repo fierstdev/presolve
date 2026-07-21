@@ -7,6 +7,10 @@ use ezc_core::platform::{
     CompileWorkspaceRequest, CompilerSessionState, RequestedCompilationMode, WorkspaceInput,
     WorkspaceSource,
 };
+use ezc_core::{
+    build_tooling_build_trace_v1, tooling_build_trace_json_v1, ToolingBuildTraceStageV1,
+    ToolingTraceIdentityV1, ToolingTraceOutcomeV1, ToolingTraceStageKindV1,
+};
 
 static NEXT_ROOT: AtomicU64 = AtomicU64::new(1);
 
@@ -265,5 +269,58 @@ fn l11c_projects_only_validated_workspace_products() {
         .unwrap();
     assert_eq!(mismatch.status.code(), Some(6));
     assert!(String::from_utf8_lossy(&mismatch.stderr).contains("L11T006"));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn l11g_trace_projects_only_a_validated_explicit_product() {
+    let (root, _) = project();
+    let trace = build_tooling_build_trace_v1(
+        "workspace:cli-fixture".into(),
+        "compiler-contract:v1".into(),
+        None,
+        ToolingTraceOutcomeV1::Succeeded,
+        vec![ToolingBuildTraceStageV1 {
+            ordinal: 0,
+            kind: ToolingTraceStageKindV1::L3Snapshot,
+            outcome: ToolingTraceOutcomeV1::Succeeded,
+            identities: vec![ToolingTraceIdentityV1 {
+                name: "snapshot_id".into(),
+                value: "snapshot:cli-fixture".into(),
+            }],
+        }],
+    )
+    .unwrap();
+    let product = root.join("build-trace.json");
+    fs::write(&product, tooling_build_trace_json_v1(&trace)).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args([
+            "trace",
+            "--schema",
+            "presolve.build-trace",
+            "--product",
+            product.to_str().unwrap(),
+            "--format",
+            "json",
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap()["traceId"],
+        trace.trace_id
+    );
+    let mismatch = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args([
+            "trace",
+            "--schema",
+            "presolve.workspace-graph",
+            "--product",
+            product.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(mismatch.status.code(), Some(6));
+    assert!(String::from_utf8_lossy(&mismatch.stderr).contains("L11T003"));
     fs::remove_dir_all(root).unwrap();
 }
