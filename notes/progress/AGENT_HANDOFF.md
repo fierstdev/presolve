@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L11-G-B - Structural-Profile Command Projection
+* Latest completed slice: L11-G-C - Artifact-Graph Command Projection
 * Working tree: L11-G-B is implemented as one explicit-product command projection; no compiler, discovery, build-directory, telemetry, or persistence path has been activated.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L11-G-C - Artifact-Graph Command Projection
+* Summary: activates `presolve graph artifact` as an explicit validated artifact-graph projection in canonical JSON, deterministic human text, or deterministic DOT.
+* Boundary: it reads one supplied product file only and never rebuilds graph topology from generated modules or a build directory.
+* Verification: focused Phase K-derived CLI projection, strict CLI clippy, inherited L11-G-B/L11-F verification, and `just check` pass.
 
 * Slice: L11-G-B - Structural-Profile Command Projection
 * Summary: activates `presolve profile --schema presolve.compile-cost-report --product <file> [--format human|json]` as a projection of one explicitly named, strictly decoded L11-F compile-cost product.

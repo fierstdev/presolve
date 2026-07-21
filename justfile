@@ -1,6 +1,7 @@
 # Repository task recipes. These commands are intentionally simple.
 
 check:
+    ./scripts/verify-l11g-artifact-graph-command.sh
     ./scripts/verify-l11g-profile-command.sh
     ./scripts/verify-l11g-trace-command.sh
     ./scripts/verify-l11f-tooling-products.sh

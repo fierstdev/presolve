@@ -1,5 +1,6 @@
 use std::fs;
 use std::process::Command;
+use std::str::FromStr;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use ezc_core::platform::{
@@ -8,9 +9,12 @@ use ezc_core::platform::{
     WorkspaceSource,
 };
 use ezc_core::{
+    build_production_runtime_artifact, build_tooling_artifact_graph_v1,
     build_tooling_build_trace_v1, build_tooling_compile_cost_report_v1,
-    tooling_build_trace_json_v1, tooling_compile_cost_report_json_v1, OptimizationPolicyId,
-    OptimizationReportV1, ResumeBuildId, RuntimeCostReportV1, ToolingBuildTraceStageV1,
+    extract_production_chunk_graph, tooling_artifact_graph_json_v1, tooling_build_trace_json_v1,
+    tooling_compile_cost_report_json_v1, ExecutableProgramFingerprint, OptimizationPolicyId,
+    OptimizationReportV1, ProductionRootChunkInput, ResumeBoundaryId, ResumeBuildId,
+    ResumeManifest, RuntimeCostReportV1, SharedChunkCandidatePlan, ToolingBuildTraceStageV1,
     ToolingTraceIdentityV1, ToolingTraceOutcomeV1, ToolingTraceStageKindV1,
 };
 
@@ -389,5 +393,64 @@ fn l11g_profile_projects_only_a_validated_explicit_product() {
         report.report_id
     );
     assert!(!String::from_utf8_lossy(&output.stdout).contains("timestamp"));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn l11g_artifact_graph_projects_only_a_validated_explicit_product() {
+    let (root, _) = project();
+    let manifest = ResumeManifest {
+        schema_version: 6,
+        build_id: ResumeBuildId::zero_sentinel(),
+        snapshot_schema_version: 1,
+        runtime_protocol_version: 1,
+        application_root_boundary_id: ResumeBoundaryId::from_str("resume-boundary:root").unwrap(),
+        boundaries: Vec::new(),
+        slot_schemas: Vec::new(),
+        capture_programs: Vec::new(),
+        restore_programs: Vec::new(),
+        chunks: Vec::new(),
+        activations: Vec::new(),
+        anchors: Vec::new(),
+        events: Vec::new(),
+        phase_i_component_resume_records: Vec::new(),
+        phase_i_form_resume_records: Vec::new(),
+    };
+    let graph = extract_production_chunk_graph(
+        &SharedChunkCandidatePlan {
+            candidates: Vec::new(),
+            rejections: Vec::new(),
+        },
+        &[ProductionRootChunkInput {
+            activation_root_id: "root".into(),
+            root_kind: "interaction".into(),
+            programs: vec![ExecutableProgramFingerprint::for_canonical_opcode_stream(
+                b"a",
+            )],
+        }],
+    )
+    .unwrap()
+    .0;
+    let artifact = build_production_runtime_artifact(&manifest, &graph).unwrap();
+    let product_value = build_tooling_artifact_graph_v1(&graph, &artifact).unwrap();
+    let product = root.join("artifact-graph.json");
+    fs::write(&product, tooling_artifact_graph_json_v1(&product_value)).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args([
+            "graph",
+            "artifact",
+            "--schema",
+            "presolve.artifact-graph",
+            "--product",
+            product.to_str().unwrap(),
+            "--format",
+            "dot",
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert!(
+        String::from_utf8_lossy(&output.stdout).starts_with("digraph \"presolve.artifact-graph\"")
+    );
     fs::remove_dir_all(root).unwrap();
 }

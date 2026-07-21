@@ -69,6 +69,8 @@ fn main() {
         "graph" => {
             if args.first().is_some_and(|value| value == "workspace") {
                 run_l11_workspace_graph(&args[1..]);
+            } else if args.first().is_some_and(|value| value == "artifact") {
+                run_l11_artifact_graph(&args[1..]);
             } else {
                 run_graph(args);
             }
@@ -379,6 +381,41 @@ fn run_l11_workspace_graph(args: &[String]) {
             graph.snapshot_id.as_str(),
             graph.units.len(),
             graph.dependency_edges.len()
+        ),
+    }
+}
+
+fn run_l11_artifact_graph(args: &[String]) {
+    let input = parse_l11_product_input("graph", args, true);
+    let ToolingProductV1::ArtifactGraph(graph) = read_l11_product("graph", &input) else {
+        l11_error(
+            "graph",
+            "L11T006",
+            "artifact graph requires artifact-graph schema",
+        );
+    };
+    match input.format.as_str() {
+        "json" => print!("{}", ezc_core::tooling_artifact_graph_json_v1(&graph)),
+        "dot" => {
+            println!("digraph \"presolve.artifact-graph\" {{");
+            for chunk in &graph.chunks {
+                println!("  \"{}\";", chunk.chunk_id);
+            }
+            for edge in &graph.dependencies {
+                println!(
+                    "  \"{}\" -> \"{}\";",
+                    edge.dependent_chunk_id, edge.dependency_chunk_id
+                );
+            }
+            println!("}}");
+        }
+        _ => println!(
+            "artifact graph: graph={} build={} chunks={} dependencies={} activations={}",
+            graph.graph_id,
+            graph.build_id,
+            graph.chunks.len(),
+            graph.dependencies.len(),
+            graph.activations.len()
         ),
     }
 }

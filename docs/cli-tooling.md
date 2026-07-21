@@ -6,6 +6,7 @@ L11-C activates only immutable L3 product projections:
 presolve inspect workspace-snapshot --schema presolve.workspace-snapshot --product <file> [--format human|json]
 presolve inspect workspace-graph --schema presolve.workspace-graph --product <file> [--format human|json]
 presolve graph workspace --schema presolve.workspace-graph --product <file> [--format human|json|dot]
+presolve graph artifact --schema presolve.artifact-graph --product <file> [--format human|json|dot]
 presolve trace --schema presolve.build-trace --product <file> [--format human|json]
 presolve profile --schema presolve.compile-cost-report --product <file> [--format human|json]
 ```
@@ -24,6 +25,10 @@ canonical structural facts only. It never collects elapsed time, CPU, memory,
 or host telemetry, and it does not compile, discover, inspect output, or
 persist profiling state.
 
+`graph artifact` projects one explicit validated artifact-graph product as
+canonical JSON, deterministic human text, or deterministic DOT. It never
+reconstructs topology from generated modules or a build directory.
+
 All other inspect/graph views remain unsupported tooling errors (exit code 6).
-`benchmark`, `doctor`, semantic graph projection, and artifact graph projection
-have no activated command adapter.
+`benchmark`, `doctor`, and semantic graph projection have no activated command
+adapter.
