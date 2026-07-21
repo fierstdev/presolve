@@ -32,8 +32,8 @@ Last completed slice
 
 Current phase boundary
 
-* Slice: L10-A tooling schema registry.
-* Status: the L10 implementation contract is authored and verified. Next boundary is a transport-neutral registry/negotiation implementation only; preserve L3-L8 bytes and do not begin L11.
+* Slice: L10-B compatibility fixtures and midpoint gate.
+* Status: L10-A registry and negotiation are complete. Next boundary is compatibility proof and the L10 midpoint gate; preserve L3-L8 bytes and do not begin L11.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
 * Remaining in Phase K: none.
 

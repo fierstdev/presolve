@@ -130,6 +130,7 @@ pub mod symbol_table;
 pub mod template_graph;
 pub mod template_manifest;
 pub mod template_semantics;
+pub mod tooling_schema;
 pub mod watch;
 pub mod workspace;
 
