@@ -3,17 +3,17 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L10-B - Tooling Schema Compatibility and Midpoint Gate
-* Working tree: L10-B is implemented as one atomic compatibility-only slice; verification and commit evidence are recorded below.
+* Latest completed slice: L11-A - Tooling Capability and Reader Contract
+* Working tree: L11-A is authored as one atomic contract-only slice; verification and commit evidence are recorded below.
 * Date: 2026-07-21
 
 Last completed slice
 
-* Slice: L10-B - Tooling Schema Compatibility and Midpoint Gate
-* Summary: freezes all 31 L3-L8 canonical fixture bytes under SHA-256, adds acceptance/rejection negotiation fixtures, records every available registry schema and its absent capabilities, and completes the L10 midpoint without a new producer or reader.
-* Key files: `crates/ezc_core/src/tooling_schema.rs`, `crates/ezc_core/fixtures/tooling-schema/`, `docs/tooling-capability-inventory.md`, `scripts/verify-l10-schema-contract.sh`, `2026-W28.md`
-* Verification: focused tooling-schema tests, checksum coverage of the exact L3-L8 fixture corpus, source coupling/decoder audits, inherited L3-L9 audit chain, strict compiler clippy, formatter, and `git diff --check` pass. The L10 verifier remains in `just check`.
-* Registry correction: L10-B lists all six canonical L8 schemas, including execution plan/event/session snapshot/execution report. Trace, compile-cost, and artifact graph stay reserved and have no decoder.
+* Slice: L11-A - Tooling Capability and Reader Contract
+* Summary: maps every developer-tool, CLI, and editor request to an exact existing immutable fact, an explicit missing product, or an alpha exclusion. It creates no reader or command; L11-B may read only validated L3 workspace snapshots and graphs.
+* Key files: `docs/specifications/phase-l/PHASE_L_L11_TOOLING_CAPABILITY_CONTRACT.md`, `docs/specifications/phase-l/README.md`, `scripts/verify-l11a-tooling-capability-contract.sh`, `justfile`, `2026-W28.md`
+* Verification: the L11-A contract verifier, Phase L specification audit, inherited L10 compatibility/L3-L9 audits, and `git diff --check` pass. The L11-A verifier is included in `just check`.
+* Boundary: `inspect workspace-snapshot`, `inspect workspace-graph`, and exact workspace graph projection are the only reader-ready future views. Trace/cost/artifact schemas remain reserved; legacy source-oriented inspection stays isolated; language service begins with an L12 capability audit.
 * Proof: representative constructed Rust configurations first pass existing L3 validation, retain byte-identical L3 serializer fixtures, then CLI encode/decode to equal Rust values and equal existing L3 configuration identities. CLI fixture bytes are canonical and intentionally differ from L3 bytes. Twenty shuffled object-order byte inputs produce the same Rust configuration.
 * Isolation: no public L3 decoder, durable migration, or cross-codec byte equality exists. The verifier rejects any newly introduced L3 configuration decoder and fails if L4/L6/L7 durable code imports the CLI codec; existing L4/L7 restart tests remain inherited evidence.
 * Verification: `cargo test -p presolve-cli configuration_codec --lib -- --nocapture`, `cargo clippy -p presolve-cli --all-targets -- -D warnings`, `./scripts/verify-l9a1-configuration-codec-contracts.sh`, inherited `just check`, and `git diff --check` pass. The script is included in `just check`.
@@ -33,8 +33,8 @@ Last completed slice
 
 Current phase boundary
 
-* Slice: L11-A tooling capability contract.
-* Status: L10 is complete. Next boundary is the L11-A contract only: map requested commands to exact existing products, missing immutable products, or alpha exclusions; do not implement readers or activate commands first.
+* Slice: L11-B read-only existing-product readers.
+* Status: L11-A is complete. Next boundary implements strict negotiated readers for workspace snapshot and graph only; no command activation, source discovery, configuration decoder, or new product.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
 * Remaining in Phase K: none.
 
@@ -1228,11 +1228,11 @@ Known limitations
 
 Exact next step
 
-Phase K is complete and frozen through K21. Phase L is complete through L10.
-The revised delivery roadmap is authoritative for sequencing. The exact next
-boundary is L11-A tooling capability contract only; preserve L3-L8 and Phase K
-bytes, do not implement a reader, activate a reserved command, or begin L11-B
-first.
+Phase K is complete and frozen through K21. Phase L is complete through
+L11-A. The revised delivery roadmap and L11-A capability contract are
+authoritative. The exact next boundary is L11-B strict readers for workspace
+snapshot and graph only; preserve L3-L8 and Phase K bytes, do not activate a
+command, add a public L3 configuration decoder, or begin L11-C first.
 
 Useful commands
 
@@ -1263,4 +1263,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the L10-B compatibility-gate commit.
+* None after the L11-A tooling-capability-contract commit.
