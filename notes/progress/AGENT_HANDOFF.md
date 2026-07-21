@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L12-C - Query-Snapshot Product Gate
-* Working tree: L12-C is a verified product-only slice; no language-service API, LSP, or extension implementation has begun.
+* Latest completed slice: L12-C-0 - Language-Service Binding Prerequisite Audit
+* Working tree: L12-C remains blocked before implementation: no compiler-owned binding exists for the Rust query-snapshot decoder/product, and no language-service API, LSP, or extension implementation has begun.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L12-C-0 - Language-Service Binding Prerequisite Audit
+* Result: the roadmap's `@presolve/language-service` target has no compiler-owned WASM ABI, native addon, IPC protocol, or JavaScript binding for either transient `CommittedCompilation.query_snapshot` delivery or Rust strict decoding. The existing runtime package supplies none of those authorities.
+* Boundary: a JavaScript package cannot proceed without a prohibited duplicate decoder, alternate compiler invocation, or invented transport/persistence path. LSP and VSCode remain unstarted.
+* Required decision: select one explicit delivery authority—compiler-owned WASM ABI, compiler-owned native addon, or an amendment replacing the package target with a Rust-native API—then author its request/response, error/cancellation, lifetime, packaging, and fixture contract.
 
 * Slice: L12-C - Query-Snapshot Product Gate
 * Summary: activates `presolve.query-snapshot` v1 as a transient `CommittedCompilation` result produced only inside a successful explicit L3 compiler invocation. It serializes source-unit revisions/lengths, source-provenanced semantic ranges, resolved references with exported endpoints, and compiler diagnostics.
@@ -88,8 +93,8 @@ Historical verification context
 
 Current phase boundary
 
-* Slice: L12-D language-service API projection.
-* Status: L12-C is complete. The next boundary may project only one validated supplied `presolve.query-snapshot` product into the contract-approved query responses; no compiler invocation, source discovery/reparse, update synthesis, persistence, LSP, or extension may begin first.
+* Slice: L12-C language-service binding contract.
+* Status: blocked pending an explicit selection of compiler-owned WASM ABI, native addon, or an amendment to a Rust-native API. No compiler invocation, source discovery/reparse, update synthesis, duplicate decoder, persistence, LSP, or extension may begin first.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
 * Remaining in Phase K: none.
 
@@ -1284,12 +1289,12 @@ Known limitations
 Exact next step
 
 Phase K is complete and frozen through K21. Phase L is complete through
-L12-C. The revised delivery roadmap, L12-A audit, and L12-B query-snapshot
-amendment are authoritative. The exact next boundary is L12-D: add only a
-language-service API that projects a validated supplied query-snapshot product
-into the explicitly supported results. No compiler invocation, source
-discovery/reparse, update synthesis, persistence, LSP, or extension begins
-before that API gate completes.
+L12-C. The revised delivery roadmap, L12-A audit, L12-B query-snapshot
+amendment, and L12-C binding audit are authoritative. Implementation is blocked
+until an explicit compiler-owned WASM ABI/native addon selection, or an
+amendment to a Rust-native API, supplies the missing host boundary. No compiler
+invocation, source discovery/reparse, update synthesis, duplicate decoder,
+persistence, LSP, or extension begins before that contract exists.
 
 Useful commands
 
