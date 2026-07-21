@@ -13,6 +13,7 @@ check:
     ./scripts/verify-l7-workspace-contracts.sh
     ./scripts/verify-l8-watch-contracts.sh
     ./scripts/verify-l9a1-configuration-codec-contracts.sh
+    ./scripts/verify-l9b-command-framework-contracts.sh
 
 repository-layout:
     ./scripts/verify-repository-layout.sh
@@ -37,6 +38,9 @@ l8-watch-contracts:
 
 l9a1-configuration-codec-contracts:
     ./scripts/verify-l9a1-configuration-codec-contracts.sh
+
+l9b-command-framework-contracts:
+    ./scripts/verify-l9b-command-framework-contracts.sh
 
 e2e:
     cargo test -p presolve-cli --test runtime_browser -- --nocapture --test-threads=1
