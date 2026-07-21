@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: L8 - Watch Mode
-* Working tree: L8 is implemented as one atomic slice; verify and commit evidence recorded below.
+* Working tree: L8 is implemented as one atomic slice. Phase L recovery authority is complete before L9 implementation.
 * Date: 2026-07-19
 
 Last completed slice
@@ -28,8 +28,8 @@ Last completed slice
 
 Current phase boundary
 
-* Slice: L9 and later Phase L work.
-* Status: L8 is complete under `PHASE_L_L8_WATCH_MODE_IMPLEMENTATION_CONTRACT.md`. Stop at the L9 boundary until its implementation-ready contract is supplied; L3–L8 v1 meanings remain compatible. Do not begin public CLI watch behavior or any L9 work.
+* Slice: L9 — CLI Platform recovery authority.
+* Status: L8 is complete under `PHASE_L_L8_WATCH_MODE_IMPLEMENTATION_CONTRACT.md`. `PHASE_L_L9_RECOVERY_AND_IMPLEMENTATION_CONTRACT.md` reconstructs the missing implementation-ready L9 authority under the user's Phase L authority and incorporates L9-A.3. `./scripts/verify-phase-l-specifications.sh`, `./scripts/verify-repository-layout.sh`, and `just check` pass for the authority slice. L3–L8 v1 meanings remain compatible. Begin only L9-A strict configuration-codec work next; no L10 work.
 * Completed: Phase C1 through C35; Phase D1-A through D7-E; Phase E1 through E21; Phase F1 through F20; Phase G1 through G20; Phase H1 through H21; Phase I0 through I20; Phase J0 through J21; Phase K0 through K21.
 * Remaining in Phase K: none.
 
