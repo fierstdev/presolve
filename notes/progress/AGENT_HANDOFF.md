@@ -4,10 +4,14 @@ Repository state
 
 * Branch: main
 * Latest completed slice: L11-G-C - Artifact-Graph Command Projection
-* Working tree: L11-G-B is implemented as one explicit-product command projection; no compiler, discovery, build-directory, telemetry, or persistence path has been activated.
+* Working tree: L12-A is a verified audit-only slice; no editor query, language-service, LSP, or extension implementation has begun.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L12-A - Editor Capability Audit
+* Summary: proves L3--L11 products lack public immutable semantic range/position, query identity, edit authority, and invalidation facts required for every advertised editor capability.
+* Boundary: L12-B must define a minimal immutable compiler-produced query snapshot and constitutional amendment before any language-service implementation may begin.
 
 * Slice: L11-G-C - Artifact-Graph Command Projection
 * Summary: activates `presolve graph artifact` as an explicit validated artifact-graph projection in canonical JSON, deterministic human text, or deterministic DOT.

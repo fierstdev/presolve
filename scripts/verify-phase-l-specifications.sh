@@ -16,6 +16,7 @@ readonly -a specifications=(
   PHASE_L_L11_TOOLING_CAPABILITY_CONTRACT.md
   PHASE_L_L11_TRACE_AND_COST_CONTRACT.md
   PHASE_L_L11_ARTIFACT_GRAPH_CONTRACT.md
+  PHASE_L_L12_EDITOR_CAPABILITY_AUDIT.md
 )
 
 for specification in "${specifications[@]}"; do

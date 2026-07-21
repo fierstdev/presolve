@@ -43,3 +43,5 @@ L11-D is governed by the [trace and structural compile-cost contract](PHASE_L_L1
 L11-E is governed by the [production artifact-graph contract](PHASE_L_L11_ARTIFACT_GRAPH_CONTRACT.md). It freezes direct Phase K graph/artifact provenance while the artifact-graph schema remains reserved.
 
 L11-F activates only the L11-D/E products through canonical encoders and strict supplied-byte readers. It transitions those three L10 schemas to available without activating a command or persistence path.
+
+L12-A is governed by the [editor capability audit](PHASE_L_L12_EDITOR_CAPABILITY_AUDIT.md). It proves current products are insufficient for editor queries and blocks implementation pending an L12-B amendment.
