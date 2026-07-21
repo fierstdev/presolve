@@ -3,16 +3,17 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L9-G - Command Dispatch and Reserved Boundaries
-* Working tree: L9-G is implemented as one atomic slice; verification and commit evidence are recorded below.
+* Latest completed slice: L10-A - Tooling Schema Registry
+* Working tree: the revised Phase L delivery roadmap is committed as a documentation-only planning slice; no compiler or platform implementation changed.
 * Date: 2026-07-21
 
 Last completed slice
 
-* Slice: L9-G - Command Dispatch and Reserved Boundaries
-* Summary: adds deterministic `version` and `help` and makes unsupported command families fail explicitly with tooling exit code 6. It does not invent alternate compiler, filesystem-discovery, server, profiler, graph, or trace behavior.
-* Key files: `crates/ezc_cli/src/main.rs`, `docs/cli-command-dispatch.md`, `scripts/verify-l9g-command-dispatch-contracts.sh`, `justfile`, `2026-W28.md`
-* Verification: `cargo test -p presolve-cli --test l9_cli_commands -- --nocapture` (five executable fixtures), strict CLI clippy, and `./scripts/verify-l9g-command-dispatch-contracts.sh` pass independently. The L9-G verifier invokes L9-F and inherited L3-L8 audits; it is included in `just check`.
+* Slice: L10-A - Tooling Schema Registry
+* Summary: adds the transport-neutral registry and strict version negotiation for existing L3-L8 products while keeping trace, compile-cost, and artifact-graph schemas explicitly reserved.
+* Key files: `crates/ezc_core/src/tooling_schema.rs`, `docs/specifications/phase-l/PHASE_L_L10_TOOLING_SCHEMA_IMPLEMENTATION_CONTRACT.md`, `scripts/verify-l10-schema-contract.sh`, `justfile`, `2026-W28.md`
+* Verification: focused registry tests, strict compiler clippy, and `./scripts/verify-l10-schema-contract.sh` pass independently. The verifier is included in `just check`.
+* Roadmap amendment: `docs/specifications/phase-l/PHASE_L_REVISED_ROADMAP.md` now governs the remaining delivery order. It preserves the frozen contracts, requires L10-B compatibility/midpoint proof before L11, moves the public test foundation before examples, and capability-gates tooling/editor surfaces so no consumer invents compiler knowledge.
 * Proof: representative constructed Rust configurations first pass existing L3 validation, retain byte-identical L3 serializer fixtures, then CLI encode/decode to equal Rust values and equal existing L3 configuration identities. CLI fixture bytes are canonical and intentionally differ from L3 bytes. Twenty shuffled object-order byte inputs produce the same Rust configuration.
 * Isolation: no public L3 decoder, durable migration, or cross-codec byte equality exists. The verifier rejects any newly introduced L3 configuration decoder and fails if L4/L6/L7 durable code imports the CLI codec; existing L4/L7 restart tests remain inherited evidence.
 * Verification: `cargo test -p presolve-cli configuration_codec --lib -- --nocapture`, `cargo clippy -p presolve-cli --all-targets -- -D warnings`, `./scripts/verify-l9a1-configuration-codec-contracts.sh`, inherited `just check`, and `git diff --check` pass. The script is included in `just check`.
@@ -1227,13 +1228,11 @@ Known limitations
 
 Exact next step
 
-Phase K is complete and frozen through K21. The final versions are semantic
-graph v6, template manifest v4, component artifact v3, Context artifact v2,
-Forms/Effect artifacts v1, resume manifest v6, snapshot v1,
-runtime protocol/registry v1, production artifact/table v1,
-optimization/cost reports v1, production policy v1, ASM inspection v12, and
-check JSON v6. Do not begin Phase L until its authoritative roadmap is
-available.
+Phase K is complete and frozen through K21. Phase L is in progress through
+L10-A. The revised delivery roadmap is authoritative for sequencing. The exact
+next implementation boundary is L10-B compatibility fixtures and the midpoint
+capability audit; preserve L3-L8 and Phase K bytes, do not activate a reserved
+command, and do not begin L11 first.
 
 Useful commands
 
@@ -1264,4 +1263,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the K21 freeze commit.
+* None after the Phase L roadmap planning commit.

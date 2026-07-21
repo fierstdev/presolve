@@ -12,6 +12,9 @@ Authority is applied in this order:
 4. The active slice specification: [L1-L10](PHASE_L_SLICES_L1_L10.md) or
    [L11-L20](PHASE_L_SLICES_L11_L20.md).
 5. [Phase L verification and release requirements](PHASE_L_VERIFICATION_AND_RELEASE.md).
+6. The [revised delivery roadmap](PHASE_L_REVISED_ROADMAP.md) supersedes the
+   sequencing in the completion execution plan and the heading-level order in
+   L11-L20. It retains every frozen contract and names the current L10-B gate.
 
 The [L2 repository constitution amendment](PHASE_L_L2_REPOSITORY_CONSTITUTION_AMENDMENT.md)
 supersedes only conflicting L2 wording in the L1-L10 slice specification. It

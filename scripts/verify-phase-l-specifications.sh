@@ -12,6 +12,7 @@ readonly -a specifications=(
   PHASE_L_L2_REPOSITORY_CONSTITUTION_AMENDMENT.md
   PHASE_L_L9_RECOVERY_AND_IMPLEMENTATION_CONTRACT.md
   PHASE_L_COMPLETION_EXECUTION_PLAN.md
+  PHASE_L_REVISED_ROADMAP.md
 )
 
 for specification in "${specifications[@]}"; do
