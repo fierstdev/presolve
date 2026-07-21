@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 use presolve_cli::{
-    parse_explicit_source_spec_v1, run_explicit_build_or_check_v1, run_explicit_workspace_v1,
-    run_project_cache_operation_v1, CliCacheOperationV1,
+    parse_explicit_source_spec_v1, run_explicit_build_or_check_v1, run_explicit_watch_once_v1,
+    run_explicit_workspace_v1, run_project_cache_operation_v1, CliCacheOperationV1,
 };
 
 use ezc_core::{
@@ -87,7 +87,8 @@ fn main() {
         "cache" => run_l9_cache(&args),
         "clean" => run_l9_clean(&args),
         "workspace" => run_l9_workspace(&args),
-        "watch" | "inspect" | "trace" | "benchmark" | "doctor" => l9_reserved_command(&command),
+        "watch" => run_l9_watch(&args),
+        "inspect" | "trace" | "benchmark" | "doctor" => l9_reserved_command(&command),
         _ => {
             eprintln!("unknown command: {command}");
             print_usage_and_exit();
@@ -373,6 +374,66 @@ fn run_l9_workspace(args: &[String]) {
             "workspace succeeded: workspace={} plan={}",
             result.workspace_id, result.plan_identity
         );
+    }
+}
+
+fn run_l9_watch(args: &[String]) {
+    let mut configuration_path = None;
+    let mut sources = Vec::new();
+    let mut json = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--once" => index += 1,
+            "--config" => {
+                let Some(value) = args.get(index + 1) else {
+                    l9_command_error("watch", "missing value for --config", 2);
+                };
+                configuration_path = Some(PathBuf::from(value));
+                index += 2;
+            }
+            "--source" => {
+                let Some(value) = args.get(index + 1) else {
+                    l9_command_error("watch", "missing value for --source", 2);
+                };
+                sources.push(
+                    parse_explicit_source_spec_v1(value)
+                        .unwrap_or_else(|error| l9_command_error("watch", &error.to_string(), 2)),
+                );
+                index += 2;
+            }
+            "--format" => {
+                let Some(value) = args.get(index + 1) else {
+                    l9_command_error("watch", "missing value for --format", 2);
+                };
+                json = match value.as_str() {
+                    "human" => false,
+                    "json" => true,
+                    _ => l9_command_error("watch", "--format must be human or json", 2),
+                };
+                index += 2;
+            }
+            value => l9_command_error("watch", &format!("unknown option: {value}"), 2),
+        }
+    }
+    let Some(configuration_path) = configuration_path else {
+        l9_command_error("watch", "--config is required", 2);
+    };
+    let outcome =
+        run_explicit_watch_once_v1(&configuration_path, &sources).unwrap_or_else(|error| {
+            l9_command_error(
+                "watch",
+                &error.to_string(),
+                if error.code.starts_with("L9") { 2 } else { 3 },
+            )
+        });
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({"schema":"presolve.cli-watch-once","version":1,"outcome":outcome})
+        );
+    } else {
+        println!("watch once succeeded: outcome={outcome}");
     }
 }
 

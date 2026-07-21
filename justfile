@@ -19,6 +19,7 @@ check:
     ./scripts/verify-l9e-cache-clean-contracts.sh
     ./scripts/verify-l9f-workspace-contracts.sh
     ./scripts/verify-l9g-command-dispatch-contracts.sh
+    ./scripts/verify-l9-final-contracts.sh
 
 repository-layout:
     ./scripts/verify-repository-layout.sh

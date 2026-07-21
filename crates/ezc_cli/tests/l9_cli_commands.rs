@@ -143,3 +143,30 @@ fn l9g_version_help_and_reserved_command_exit_contracts_are_stable() {
     assert!(reserved.stdout.is_empty());
     assert!(String::from_utf8_lossy(&reserved.stderr).contains("reserved"));
 }
+
+#[test]
+fn l9_watch_once_submits_the_complete_candidate_to_l8() {
+    let (root, config) = project();
+    let output = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args([
+            "watch",
+            "--once",
+            "--config",
+            config.to_str().unwrap(),
+            "--source",
+            "src/main.ts=src/main.ts",
+            "--format",
+            "json",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["schema"], "presolve.cli-watch-once");
+    assert_eq!(value["outcome"], "succeeded");
+    fs::remove_dir_all(root).unwrap();
+}

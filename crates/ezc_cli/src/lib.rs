@@ -29,5 +29,6 @@ pub use configuration_codec::{
     CliWorkspaceConfigurationDecodeError, CliWorkspaceConfigurationEncodeError,
 };
 pub use workspace_commands::{
-    run_explicit_workspace_v1, CliWorkspaceErrorV1, CliWorkspaceResultV1,
+    run_explicit_watch_once_v1, run_explicit_workspace_v1, CliWorkspaceErrorV1,
+    CliWorkspaceResultV1,
 };

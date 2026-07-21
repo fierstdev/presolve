@@ -17,7 +17,12 @@ use ezc_core::platform::{
 };
 use ezc_core::service::{
     CompileRequest, CompilerServiceHost, CompleteSource, IncrementalReportSelector,
-    WorkspaceCompileRequestV1, WorkspacePackageCompileRequestV1,
+    WatchCandidateV1, WatchChangeBatchV1, WorkspaceCompileRequestV1,
+    WorkspacePackageCompileRequestV1,
+};
+use ezc_core::watch::{
+    ObservedChangeV1, WatchDebounceV1, WatchSessionConfigurationV1, WATCH_CHANGE_BATCH_V1_SCHEMA,
+    WATCH_SESSION_CONFIGURATION_V1_SCHEMA,
 };
 use ezc_core::workspace::{
     WorkspaceManifestV1, WorkspacePackageDescriptorV1, WorkspacePolicyV1,
@@ -186,6 +191,176 @@ pub fn run_explicit_workspace_v1(
             .next()
             .and_then(|item| item.snapshot_id),
     })
+}
+
+/// Sends one fully reconstructed caller-observed candidate to L8 and runs a
+/// single scheduler turn. This intentionally leaves debounce/coalescing to L8.
+pub fn run_explicit_watch_once_v1(
+    configuration_path: &Path,
+    source_specs: &[CliExplicitSourceSpecV1],
+) -> Result<String, CliWorkspaceErrorV1> {
+    let project_root = configuration_path.parent().ok_or(CliWorkspaceErrorV1 {
+        code: "L9F001_CONFIGURATION_PATH_INVALID",
+        message: "configuration path must have a parent directory".into(),
+    })?;
+    let envelope =
+        load_explicit_project_envelope_v1(project_root, configuration_path).map_err(|error| {
+            CliWorkspaceErrorV1 {
+                code: error.code,
+                message: error.message,
+            }
+        })?;
+    let sources =
+        load_explicit_source_inputs_v1(&envelope.project_root, source_specs).map_err(|error| {
+            CliWorkspaceErrorV1 {
+                code: error.code,
+                message: error.message,
+            }
+        })?;
+    let contract = compiler_contract();
+    let workspace_id =
+        derive_workspace_id_v1(&envelope.configuration).map_err(|error| CliWorkspaceErrorV1 {
+            code: "L9F002_INVALID_CONFIGURATION",
+            message: error.message,
+        })?;
+    let snapshot = WorkspaceSnapshot::from_input(&WorkspaceInput {
+        configuration: envelope.configuration.clone(),
+        sources: sources
+            .iter()
+            .map(|source| WorkspaceSource {
+                path: source.logical_path.clone(),
+                source: source.content.clone(),
+                language: None,
+            })
+            .collect(),
+        compiler_contract: contract.clone(),
+    })
+    .map_err(|error| CliWorkspaceErrorV1 {
+        code: "L9F003_INVALID_COMPLETE_CANDIDATE",
+        message: error.message,
+    })?;
+    let mut service = CompilerServiceHost::start(envelope.project_root.join(".presolve"), contract)
+        .map_err(|error| CliWorkspaceErrorV1 {
+            code: error.code,
+            message: error.message,
+        })?;
+    let session_id = service
+        .open_session(envelope.configuration.clone(), &workspace_id)
+        .map_err(|error| CliWorkspaceErrorV1 {
+            code: error.code,
+            message: error.message,
+        })?;
+    let watch_session_id = format!("cli-watch:{workspace_id}");
+    service
+        .create_watch_session(WatchSessionConfigurationV1 {
+            schema: WATCH_SESSION_CONFIGURATION_V1_SCHEMA.into(),
+            version: 1,
+            watch_session_id: watch_session_id.clone(),
+            workspace_id: workspace_id.to_string(),
+            debounce: WatchDebounceV1 {
+                quiet_period_milliseconds: 0,
+                maximum_delay_milliseconds: 0,
+            },
+            supersession_policy: "cancel_obsolete".into(),
+            event_detail: "summary".into(),
+            event_journal_capacity: 16,
+        })
+        .map_err(|error| CliWorkspaceErrorV1 {
+            code: error.code,
+            message: error.message,
+        })?;
+    let manifest = WorkspaceManifestV1 {
+        schema: WORKSPACE_MANIFEST_V1_SCHEMA.into(),
+        version: 1,
+        workspace_id: workspace_id.to_string(),
+        packages: vec![WorkspacePackageDescriptorV1 {
+            package_id: "project".into(),
+            session_id: session_id.clone(),
+            display_name: Some("project".into()),
+            configuration_identity_hint: None,
+            metadata: BTreeMap::new(),
+        }],
+        dependencies: Vec::new(),
+        policy: WorkspacePolicyV1 {
+            failure_mode: "fail_fast".into(),
+            execution_mode: "deterministic_serial".into(),
+            result_detail: "summary".into(),
+        },
+    };
+    service
+        .submit_watch_change_batch(
+            WatchChangeBatchV1 {
+                schema: WATCH_CHANGE_BATCH_V1_SCHEMA.into(),
+                version: 1,
+                watch_session_id: watch_session_id.clone(),
+                sequence: 1,
+                observed_changes: sources
+                    .iter()
+                    .map(|source| ObservedChangeV1 {
+                        kind: "modified".into(),
+                        logical_path: source.logical_path.clone(),
+                        previous_logical_path: None,
+                    })
+                    .collect(),
+                candidate: WatchCandidateV1 {
+                    candidate_id: "initial-complete-candidate".into(),
+                    fingerprint_hint: None,
+                    verify_exact_equivalence: false,
+                    workspace_request: WorkspaceCompileRequestV1 {
+                        manifest,
+                        packages: vec![WorkspacePackageCompileRequestV1 {
+                            package_id: "project".into(),
+                            expected_commit_sequence: 0,
+                            request: CompileRequest {
+                                configuration: envelope.configuration,
+                                candidate_snapshot: snapshot,
+                                sources: sources
+                                    .into_iter()
+                                    .map(|source| CompleteSource {
+                                        path: source.logical_path,
+                                        source: source.content,
+                                        language: None,
+                                    })
+                                    .collect(),
+                                mode: RequestedCompilationMode::Automatic,
+                                incremental_report: IncrementalReportSelector::Summary,
+                                verify_exact_equivalence: false,
+                                cache_report: CacheReportSelector::Summary,
+                            },
+                        }],
+                        operation_id: "presolve-cli-watch-once-v1".into(),
+                    },
+                },
+            },
+            0,
+        )
+        .map_err(|error| CliWorkspaceErrorV1 {
+            code: error.code,
+            message: error.message,
+        })?;
+    let report = service
+        .run_watch_scheduler_turn(&watch_session_id, 0)
+        .map_err(|error| CliWorkspaceErrorV1 {
+            code: error.code,
+            message: error.message,
+        })?
+        .ok_or(CliWorkspaceErrorV1 {
+            code: "L9F004_WATCH_SCHEDULER_DID_NOT_RUN",
+            message: "L8 did not schedule candidate".into(),
+        })?;
+    service
+        .stop_watch_session(&watch_session_id)
+        .map_err(|error| CliWorkspaceErrorV1 {
+            code: error.code,
+            message: error.message,
+        })?;
+    service
+        .close_session(&session_id)
+        .map_err(|error| CliWorkspaceErrorV1 {
+            code: error.code,
+            message: error.message,
+        })?;
+    Ok(report.outcome)
 }
 
 #[cfg(test)]
