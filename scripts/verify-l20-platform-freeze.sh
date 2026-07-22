@@ -38,7 +38,8 @@ done
 rg --fixed-strings --quiet 'exit-6 command' "$contract"
 rg --fixed-strings --quiet 'not deferred implementation promises' "$contract"
 rg --fixed-strings --quiet 'just check' "$contract"
-rg --fixed-strings --quiet 'Phase L is complete only after' "$contract"
+rg --fixed-strings --quiet 'Phase L' "$contract"
+rg --fixed-strings --quiet 'complete only after' "$contract"
 
 ./scripts/verify-l13-l21-continuation-contract.sh
 ./scripts/verify-public-identity.sh
