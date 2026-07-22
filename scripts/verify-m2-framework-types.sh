@@ -34,13 +34,10 @@ fi
 
 cmp -- "$fixture/src/Counter.tsx" examples/counter/src/Counter.tsx
 typescript_version="$(pnpm exec tsc --version)"
-case "$typescript_version" in
-  'Version 7.0.'*) ;;
-  *)
-    echo "M2 requires the pinned TypeScript 7.0 native CLI, found: $typescript_version" >&2
-    exit 1
-    ;;
-esac
+if [[ ! "$typescript_version" =~ (^|$'\n')Version\ 7\.0\.[0-9]+($|$'\n') ]]; then
+  echo "M2 requires the pinned TypeScript 7.0 native CLI, found: $typescript_version" >&2
+  exit 1
+fi
 pnpm exec tsc --project "$fixture/tsconfig.json"
 
 cleanup() { rm -rf "$fixture/.presolve"; }

@@ -91,13 +91,12 @@ result remain unchanged.
 **Completed authority:**
 [M3 explicit handoff contract](PHASE_M_M3_EXPLICIT_HANDOFF_CONTRACT.md).
 
-Define and implement the narrow framework handoff over the accepted explicit
-`presolve` project/configuration boundary. It forwards caller-supplied command,
-configuration path, and ordered source membership without discovery or source
-interpretation. The L9 configuration remains opaque: it owns target profile,
-and L9 has no independent output-root argument. The handoff returns the
-executor result unchanged; it does not decode, synthesize, rewrite, or infer
-compiler products or artifact locations.
+Define and implement the narrow framework handoff over the compiler's existing
+artifact-publication boundary. It forwards one caller-supplied source path and
+one caller-supplied output directory as `presolve build <source> --out
+<directory>`, optionally retaining the compiler-owned production flag. The
+handoff returns the executor result unchanged; it does not decode, synthesize,
+rewrite, or infer compiler products or artifact locations.
 
 Proof: request-shape fixtures; no-source-retention/dependency audit; unchanged
 canonical diagnostics; incompatible version/command failure fixtures.
@@ -106,11 +105,11 @@ canonical diagnostics; incompatible version/command failure fixtures.
 
 **Audit authority:** [M4 public artifact-publication audit](PHASE_M_M4_PUBLICATION_AUDIT.md).
 
-Begin with a public artifact-publication capability audit. L9 build/check
-publishes status and snapshot identities, not static HTML/runtime locations.
-M4 may use only an existing frozen public publication boundary; it must stop if
-none can supply the required artifacts without a legacy adapter, decoder, or
-new compiler behavior.
+M4 selects the existing compiler artifact publisher as the one framework build
+path. L9 build/check publishes project status and snapshot identities, while
+`presolve build <source> --out <directory>` publishes the compiler artifacts
+required for browser proof. The framework invokes it but does not reimplement
+it or decode its output.
 
 Prove the exact M1 Counter through M2 types and M3 handoff:
 
@@ -183,11 +182,6 @@ future metaframework must supply; it does not pre-implement it.
 
 ## Current boundary
 
-M4's public artifact-publication audit is complete. The accepted L9 command
-publishes status and snapshot identities, while the artifact-emitting legacy
-command is not an accepted platform adapter. Counter browser/runtime proof is
-therefore blocked without a silent framework-boundary expansion.
-
-M5 through M9 are deferred. The only authorized next action is an explicit
-owner decision on the narrowly scoped legacy-publication adapter described in
-the M4 audit; it must not change frozen compiler behavior.
+M4 is complete. It established the existing compiler artifact publisher as the
+single framework build path and passed Counter's type, artifact, and browser
+proof. M5 may now select one next existing reactive declaration family.

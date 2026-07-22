@@ -21,7 +21,7 @@ decode or rewrite compiler products, or change compiler behavior.
 | Layer | Owns | Must not own |
 | --- | --- | --- |
 | Presolve Compiler | Frozen authoring grammar, semantic facts, diagnostics, products, runtime plans, artifacts, and schemas | Framework package resolution, guides, or compatibility presentation |
-| Presolve Framework | TypeScript declaration delivery, explicit project handoff, opaque command status, examples, and a framework compatibility table | A parser, source transform, semantic analyzer, state store, renderer, Context lookup, product decoder, artifact writer, or runtime scheduler |
+| Presolve Framework | TypeScript declaration delivery, caller-supplied artifact-build handoff, opaque command results, examples, and a framework compatibility table | A parser, source transform, semantic analyzer, state store, renderer, Context lookup, product decoder, artifact writer, or runtime scheduler |
 | Future Presolve Metaframework | Routing, loading, server rendering, dev/build orchestration, deployment, installation, project discovery, and `presolve create` | Any Phase M responsibility before a separately accepted roadmap |
 
 `create`, `dev`, `benchmark`, and `doctor` remain reserved exit-6 command
@@ -38,8 +38,8 @@ families. Phase M does not change their disposition.
    severity, spans, labels, and canonical identities intact. Optional guidance
    is separate and cannot replace, suppress, reorder, or manufacture a
    diagnostic.
-4. The framework invokes only caller-supplied explicit project configuration
-   and source membership through the accepted `presolve` command boundary. It
+4. The framework invokes only caller-supplied source and output paths through
+   the canonical `presolve build <source> --out <directory>` boundary. It
    performs no source, project, package, or artifact discovery.
 5. Compiler bytes and schema meanings are immutable compatibility inputs. A
    framework version either declares support for an exact compiler/product
@@ -94,7 +94,7 @@ configuration behavior is recorded without changing compiler-facing source.
 The framework compatibility matrix records, for every supported release:
 
 - framework declaration package version;
-- accepted `presolve` CLI grammar and explicit project-envelope version;
+- accepted `presolve` artifact-publication CLI grammar;
 - compiler and runtime artifact schema versions consumed only opaquely;
 - exact supported authoring-form rows; and
 - fixture and browser evidence.

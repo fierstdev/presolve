@@ -13,10 +13,10 @@ test -s "$package/test/project-handoff.test.mjs"
 
 rg --fixed-strings --quiet '"name": "@presolve/framework"' "$package/package.json"
 rg --fixed-strings --quiet '"private": true' "$package/package.json"
-rg --fixed-strings --quiet 'createExplicitProjectInvocation' "$package/src/index.js"
-rg --fixed-strings --quiet 'invokeExplicitProject' "$package/src/index.js"
+rg --fixed-strings --quiet 'createArtifactBuildInvocation' "$package/src/index.js"
+rg --fixed-strings --quiet 'invokeArtifactBuild' "$package/src/index.js"
 rg --fixed-strings --quiet 'executable: "presolve"' "$package/src/project-handoff.js"
-rg --fixed-strings --quiet 'argumentsList.push("--format", "json")' "$package/src/project-handoff.js"
+rg --fixed-strings --quiet '"build", sourcePath, "--out", outputDirectory' "$package/src/project-handoff.js"
 
 if rg --line-number 'node:(fs|path|child_process)|\b(fetch|spawn|exec|readFile|writeFile|glob)\b|JSON\.parse' "$package/src"; then
   echo 'M3 handoff must remain source-free, product-opaque, and runtime-free' >&2

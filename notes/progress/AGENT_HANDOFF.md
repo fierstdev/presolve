@@ -3,15 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: M4 - Public Artifact-Publication Audit
-* Working tree: Phase M M4 publication-audit documentation and verifier pending its completion commit.
+* Latest completed slice: M4 - Canonical Artifact-Publication Counter Proof
+* Working tree: Phase M M4 canonical publication handoff and Counter proof pending its completion commit.
 * Date: 2026-07-22
 
 Last completed slice
 
-* Slice: M4 - Public Artifact-Publication Audit
-* Result: the accepted L9 `build` result publishes command status plus workspace/snapshot identities only; it does not publish static HTML, runtime artifacts, or an output location. The legacy `build <file> --out <directory>` path does emit those artifacts, but is a frozen compatibility path rather than an accepted platform adapter. No framework bridge, artifact decoder, output inference, runtime, or compiler change was added.
-* Next: blocked pending an explicit owner decision that narrowly authorizes a framework adapter over the frozen legacy publication command. M5–M9 must not start without that decision.
+* Slice: M4 - Canonical Artifact-Publication Counter Proof
+* Result: Phase M adopts the existing `presolve build <source> --out <directory>` compiler artifact publisher as its sole build handoff. It is the actual current HTML/runtime/resume generator, so the pre-release “legacy compatibility” label no longer blocks framework conformance. The private handoff remains path-opaque and process-free; Counter uses compiler-recognized State, Action, and direct event binding only.
+* Verification: `./scripts/verify-m4-publication-audit.sh`, the Phase M proposal, public identity, repository-layout, formatting, and diff checks pass. The browser portion requires approved loopback-server permission in this environment.
+* Next: M5 may select one exact existing reactive declaration family; do not create new syntax or a framework runtime.
 
 * Slice: M3 - Explicit Canonical-Command Handoff
 * Result: adds private `@presolve/framework` with a source-free, one-shot request builder for the exact L9 `presolve build|check --config --source --format json` form. It preserves caller source order, makes configuration opaque, passes executor results unchanged, and has no filesystem, process, parser, compiler, decoder, or runtime behavior. The L9 JSON boundary exposes status/snapshot identities only, not static HTML/runtime artifact locations.

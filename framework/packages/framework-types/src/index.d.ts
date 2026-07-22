@@ -13,6 +13,9 @@ declare global {
    */
   function component(elementName: string): PresolveClassDecorator;
 
+  /** Declares a compiler-recognized Action without installing an event wrapper. */
+  function action(): PresolveMethodDecorator;
+
   /**
    * Describes the initializer shape for compiler-recognized State. The
    * compiler, not this declaration, establishes reactive State semantics.
@@ -24,6 +27,15 @@ declare global {
     value: TClass,
     context: ClassDecoratorContext<TClass>
   ) => TClass | void;
+
+  /** A standard-decorator-compatible declaration for `@action()`. */
+  type PresolveMethodDecorator = <
+    This,
+    Value extends (this: This, ...args: any[]) => unknown,
+  >(
+    value: Value,
+    context: ClassMethodDecoratorContext<This, Value>
+  ) => Value | void;
 
   namespace JSX {
     type Element = unknown;

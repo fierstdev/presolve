@@ -1,11 +1,11 @@
 # Phase M specifications
 
-Phase M is active through completed M0–M4 authorities. It uses the
+Phase M is active through M0–M4 implementation. It uses the
 [post-freeze governance](../../post-freeze-governance.md) intake without
-changing any frozen compiler or platform representation. M4 established that
-the accepted compiler path does not publish the artifacts required by Counter's
-browser proof; later framework work is deferred pending an explicit boundary
-decision. The metaframework and every reserved command remain unimplemented.
+adding a framework execution model. M4 reclassified the compiler's existing
+full artifact publisher as the single framework build path and has proven
+Counter through its emitted browser runtime. M5 is next. The metaframework and
+every reserved command remain unimplemented.
 
 * [Phase M conformance-first roadmap](PHASE_M_PROPOSED_ROADMAP.md)
 * [M0 framework constitution](PHASE_M_FRAMEWORK_CONSTITUTION.md)

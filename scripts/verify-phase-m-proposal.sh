@@ -12,7 +12,7 @@ for document in "$roadmap" "$constitution" "$authoring" "$m2_contract" "$m3_cont
   test -s "$document"
 done
 
-for heading in 'Product boundary' 'Governing authorities' 'Architectural decisions' 'Slice sequence' 'Evidence matrix' 'Next authorized action'; do
+for heading in 'Product boundary' 'Governing authorities' 'Architectural decisions' 'Slice sequence' 'Evidence matrix' 'Current boundary'; do
   rg --fixed-strings --quiet "$heading" "$roadmap"
 done
 
@@ -40,5 +40,5 @@ rg --fixed-strings --quiet 'M0/M1 owner-accepted' "$roadmap"
 rg --fixed-strings --quiet 'M2 framework types contract' "$roadmap"
 rg --fixed-strings --quiet 'M3 explicit handoff contract' "$roadmap"
 rg --fixed-strings --quiet 'M4 public artifact-publication audit' "$roadmap"
-rg --fixed-strings --quiet 'M5 through M9 are deferred' "$roadmap"
+rg --fixed-strings --quiet 'M4 is complete' "$roadmap"
 git diff --check

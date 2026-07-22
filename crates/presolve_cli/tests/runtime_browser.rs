@@ -2005,6 +2005,60 @@ fn double_binding_counter_increments_in_a_real_browser() {
 }
 
 #[test]
+fn framework_counter_increments_through_compiler_artifacts_in_a_real_browser() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/psc-browser-test/framework-counter");
+
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean previous framework Counter output");
+    }
+
+    let output = Command::new(presolve_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "examples/counter/src/Counter.tsx",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("framework Counter output path was not valid UTF-8"),
+        ])
+        .output()
+        .expect("failed to build framework Counter through the compiler");
+    assert!(
+        output.status.success(),
+        "expected framework Counter build to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    write_framework_counter_probe_page(&out_dir);
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile dir");
+    let user_data_dir = format!(
+        "--user-data-dir={}",
+        profile_dir
+            .to_str()
+            .expect("Chrome profile path was not valid UTF-8")
+    );
+    let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
+    let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+
+    assert!(
+        stdout.contains("PRESOLVE_FRAMEWORK_COUNTER_BROWSER_TEST_PASS"),
+        "framework Counter browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn decrement_counter_decrements_in_a_real_browser() {
     let _guard = browser_test_guard();
     let repo_root = repo_root();
@@ -3787,6 +3841,44 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     );
 
     fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
+}
+
+fn write_framework_counter_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html"))
+        .expect("failed to read built framework Counter page");
+    let probe = index.replace(
+        "</body>",
+        r#"<script>
+const fail = (message) => { throw new Error(message); };
+const waitFor = (predicate, label) => new Promise((resolve, reject) => {
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    if (predicate()) return resolve();
+    if (Date.now() > deadline) return reject(new Error(`Timed out waiting for ${label}`));
+    setTimeout(tick, 20);
+  };
+  tick();
+});
+(async () => {
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
+  const button = document.querySelector("button");
+  if (button === null) fail("Counter button was not emitted");
+  if (!document.body.textContent.includes("Count: 0")) fail("Counter did not render its initial binding");
+  button.click();
+  await waitFor(() => document.body.textContent.includes("Count: 1"), "Counter action binding");
+  if (window.__PRESOLVE__.components[0].state.count !== 1) fail("compiler state did not update");
+  if (window.__PRESOLVE__.diagnostics.length !== 0) fail("runtime reported diagnostics");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_FRAMEWORK_COUNTER_BROWSER_TEST_PASS</div>");
+})().catch((error) => {
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_FRAMEWORK_COUNTER_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  console.error(error);
+});
+</script>
+</body>"#,
+    );
+
+    fs::write(out_dir.join("probe.html"), probe)
+        .expect("failed to write framework Counter browser probe page");
 }
 
 fn write_decrement_probe_page(out_dir: &Path) {

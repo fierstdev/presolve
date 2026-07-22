@@ -2,7 +2,12 @@
 class Counter extends Component {
   count = state(0);
 
+  @action()
+  increment() {
+    this.count += 1;
+  }
+
   render() {
-    return <button>Count: {this.count}</button>;
+    return <button onClick={this.increment}>Count: {this.count}</button>;
   }
 }

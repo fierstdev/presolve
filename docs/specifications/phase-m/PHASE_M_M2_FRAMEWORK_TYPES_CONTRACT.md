@@ -12,7 +12,8 @@ declarations needed for the existing Counter form:
 @component("x-counter")
 class Counter extends Component {
   count = state(0);
-  render() { return <button>Count: {this.count}</button>; }
+  @action() increment() { this.count += 1; }
+  render() { return <button onClick={this.increment}>Count: {this.count}</button>; }
 }
 ```
 
@@ -24,7 +25,7 @@ accepted explicit `presolve check` command path.
 ## Package boundary
 
 `framework/packages/framework-types/src/index.d.ts` is the only package source
-in M2. It declares ambient `Component`, `component`, `state`, and minimal
+in M2. It declares ambient `Component`, `component`, `action`, `state`, and minimal
 preserved-TSX typing. It emits no JavaScript and does not implement a
 decorator, State, JSX factory, renderer, scheduler, Context, product reader,
 compiler adapter, or runtime behavior.
@@ -57,8 +58,6 @@ rerun of this fixture and every later declaration fixture.
 
 ## Exclusions and next boundary
 
-M2 does not expose Action, Computed, Effect, Context, Slot, or Form
-declarations; it does not add a source transform or invoke a compiler from
-JavaScript. M3 may define only the explicit canonical-command handoff contract
-and implementation. It must keep inputs caller-supplied and published compiler
-artifacts opaque.
+M2 does not expose Computed, Effect, Context, Slot, or Form declarations; it
+does not add a source transform or invoke a compiler from JavaScript. Its Action
+declaration is type-only and adds no event wrapper or reactive behavior.

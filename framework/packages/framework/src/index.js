@@ -1,1 +1,1 @@
-export { createExplicitProjectInvocation, invokeExplicitProject } from "./project-handoff.js";
+export { createArtifactBuildInvocation, invokeArtifactBuild } from "./project-handoff.js";
