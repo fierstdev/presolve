@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L12-C-3-B - WASM Response Fixture Matrix
-* Working tree: L12-C's compiler-owned WASM binding now has its frozen response matrix. No `@presolve/language-service` wrapper, LSP, or extension implementation has begun.
+* Latest completed slice: L12-C-4 - Thin Language-Service Wrapper
+* Working tree: L12-C now has a thin WASM-only `@presolve/language-service` wrapper. LSP and extension implementation have not begun.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L12-C-4 - Thin Language-Service Wrapper
+* Result: introduces `@presolve/language-service` as a direct wrapper over `@presolve/compiler-wasm`. It accepts caller-owned product bytes per query, serializes the documented request envelope, and returns the generated WASM response. It retains no product/session state and does not implement product validation, semantic analysis, source access, compiler invocation, caching, or persistence.
+* Verification: the package's workspace dependency is linked locally, its smoke proof initializes the compiled artifact and preserves both unsupported and position responses, and the audit rejects decoder/host imports from the wrapper source.
+* Next: L12-D must first author the LSP framing/capability/error/cancellation contract and fixture plan. No LSP or VSCode code is authorized yet.
 
 * Slice: L12-C-3-B - WASM Response Fixture Matrix
 * Result: freezes SHA-256 commitments over full canonical WASM response bytes for position, definition, references, flat symbols, diagnostics, an empty position result, unsupported hover, invalid request/product, and every defined query error. The Node smoke test constructs only contract-defined caller inputs and compares bytes emitted by generated WASM to that matrix.

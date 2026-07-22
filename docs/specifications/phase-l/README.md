@@ -59,3 +59,5 @@ L12-C-2 activates only the crate-private Rust projection shared by the future WA
 L12-C-3 activates the compiler-owned `@presolve/compiler-wasm` build boundary. Its generated web artifact exposes only the Rust `query_snapshot_v1` projection, and its smoke test consumes the frozen product without any JavaScript product decoder or compiler path.
 
 L12-C-3-B freezes the generated WASM response matrix by SHA-256 over exact canonical response bytes for every supported projection, its empty result, unsupported behavior, and every defined error category.
+
+L12-C-4 activates the thin `@presolve/language-service` wrapper. It initializes only the compiler-owned WASM artifact, transfers caller-owned product bytes and canonical request envelopes, and returns the WASM response without a product decoder, compiler path, cache, or source API.

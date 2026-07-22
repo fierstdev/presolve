@@ -1,0 +1,15 @@
+{
+  "name": "@presolve/language-service",
+  "version": "0.1.0-alpha",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "dependencies": {
+    "@presolve/compiler-wasm": "workspace:*"
+  },
+  "scripts": {
+    "check": "../../scripts/verify-l12c4-language-service.sh"
+  }
+}

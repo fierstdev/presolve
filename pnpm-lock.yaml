@@ -10,4 +10,12 @@ importers:
 
   examples/counter: {}
 
+  packages/compiler-wasm: {}
+
+  packages/language-service:
+    dependencies:
+      '@presolve/compiler-wasm':
+        specifier: workspace:*
+        version: link:../compiler-wasm
+
   packages/runtime: {}
