@@ -752,7 +752,7 @@ Produce AGENT_HANDOFF.md and a progress update.
 
 Stop immediately upon encountering an architectural blocker.
 
-The project is transitioning from EdgeZero to Presolve.
+The project is transitioning from Presolve to Presolve.
 
 Repository:
 

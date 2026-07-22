@@ -163,15 +163,15 @@ impl ResumeBoundaryIntegrityCode {
     #[must_use]
     pub const fn code(self) -> &'static str {
         match self {
-            Self::DuplicateBoundary => "EZASM1328",
-            Self::InvalidOwner => "EZASM1329",
-            Self::MissingOrMultipleParent => "EZASM1330",
-            Self::Cycle => "EZASM1331",
-            Self::Unreachable => "EZASM1332",
-            Self::Reciprocity => "EZASM1333",
-            Self::PhaseCorrespondence => "EZASM1334",
-            Self::ProvenanceDrift => "EZASM1335",
-            Self::OrderingOrIndexDrift => "EZASM1336",
+            Self::DuplicateBoundary => "PSASM1328",
+            Self::InvalidOwner => "PSASM1329",
+            Self::MissingOrMultipleParent => "PSASM1330",
+            Self::Cycle => "PSASM1331",
+            Self::Unreachable => "PSASM1332",
+            Self::Reciprocity => "PSASM1333",
+            Self::PhaseCorrespondence => "PSASM1334",
+            Self::ProvenanceDrift => "PSASM1335",
+            Self::OrderingOrIndexDrift => "PSASM1336",
         }
     }
 }
@@ -891,15 +891,15 @@ mod tests {
             ]
             .map(ResumeBoundaryIntegrityCode::code),
             [
-                "EZASM1328",
-                "EZASM1329",
-                "EZASM1330",
-                "EZASM1331",
-                "EZASM1332",
-                "EZASM1333",
-                "EZASM1334",
-                "EZASM1335",
-                "EZASM1336",
+                "PSASM1328",
+                "PSASM1329",
+                "PSASM1330",
+                "PSASM1331",
+                "PSASM1332",
+                "PSASM1333",
+                "PSASM1334",
+                "PSASM1335",
+                "PSASM1336",
             ]
         );
     }

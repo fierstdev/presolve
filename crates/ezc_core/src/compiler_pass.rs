@@ -931,7 +931,7 @@ class FoldedState extends Component {
             crate::generate_static_html(&crate::TemplateGraph {
                 templates: folded.templates.clone(),
             }),
-            "<output data-ez-node=\"n0\" data-ez-bindings=\"this.total\"><!-- ez-binding:n1:this.total -->9</output>\n"
+            "<output data-presolve-node=\"n0\" data-presolve-bindings=\"this.total\"><!-- presolve-binding:n1:this.total -->9</output>\n"
         );
         assert_eq!(ConstantFoldingPass.transform(&folded), folded);
         assert_eq!(asm, original);
@@ -945,7 +945,7 @@ class FoldedState extends Component {
 @component("x-non-renderable")
 class NonRenderableBinding extends Component {
   user = state({ id: "1" });
-  label = state("EdgeZero");
+  label = state("Presolve");
 
   render() {
     return <p>{this.user}{this.label}</p>;
@@ -972,7 +972,7 @@ class NonRenderableBinding extends Component {
 
         let folded = ConstantFoldingPass.transform(&asm);
         assert!(folded.diagnostics.iter().any(|diagnostic| {
-            diagnostic.code == "EZC1027"
+            diagnostic.code == "PSC1027"
                 && diagnostic.message.contains("this.user")
                 && diagnostic.message.contains("object")
         }));
@@ -990,7 +990,7 @@ class NonRenderableBinding extends Component {
 @component("x-typed-attributes")
 class TypedAttributes extends Component {
   enabled = state(true);
-  label = state("EdgeZero");
+  label = state("Presolve");
   count = state(1);
 
   render() {
@@ -1014,7 +1014,7 @@ class TypedAttributes extends Component {
         let diagnostics = folded
             .diagnostics
             .iter()
-            .filter(|diagnostic| diagnostic.code == "EZC1028")
+            .filter(|diagnostic| diagnostic.code == "PSC1028")
             .collect::<Vec<_>>();
         assert_eq!(diagnostics.len(), 2);
         assert!(diagnostics.iter().any(|diagnostic| {
@@ -1061,7 +1061,7 @@ class TypedConditions extends Component {
         let diagnostics = folded
             .diagnostics
             .iter()
-            .filter(|diagnostic| diagnostic.code == "EZC1029")
+            .filter(|diagnostic| diagnostic.code == "PSC1029")
             .collect::<Vec<_>>();
         assert_eq!(diagnostics.len(), 1);
         assert!(diagnostics[0].message.contains("this.count"));
@@ -1100,7 +1100,7 @@ class TypedLists extends Component {
 
         let folded = ConstantFoldingPass.transform(&asm);
         assert!(folded.diagnostics.iter().any(|diagnostic| {
-            diagnostic.code == "EZC1030" && diagnostic.message.contains("this.count")
+            diagnostic.code == "PSC1030" && diagnostic.message.contains("this.count")
         }));
     }
 
@@ -1136,7 +1136,7 @@ class TypedMembers extends Component {
 
         let folded = ConstantFoldingPass.transform(&asm);
         assert!(folded.diagnostics.iter().any(|diagnostic| {
-            diagnostic.code == "EZC1031" && diagnostic.message.contains("todo.missing")
+            diagnostic.code == "PSC1031" && diagnostic.message.contains("todo.missing")
         }));
     }
 
@@ -1160,7 +1160,7 @@ class StateCompatibility extends Component {
         let diagnostics = folded
             .diagnostics
             .iter()
-            .filter(|diagnostic| diagnostic.code == "EZC1016")
+            .filter(|diagnostic| diagnostic.code == "PSC1016")
             .collect::<Vec<_>>();
 
         assert_eq!(diagnostics.len(), 1);
@@ -1217,7 +1217,7 @@ class InvalidExpression extends Component {
         let diagnostic = folded
             .diagnostics
             .iter()
-            .find(|diagnostic| diagnostic.code == "EZC1022")
+            .find(|diagnostic| diagnostic.code == "PSC1022")
             .expect("constant-expression diagnostic");
 
         assert_eq!(diagnostic.provenance.as_ref(), Some(&expected_provenance));

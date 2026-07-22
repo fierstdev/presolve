@@ -50,5 +50,5 @@ are never inferred as commands.
 ## Archive
 
 The [engineering archive](archive/engineering/README.md) preserves historical
-EdgeZero-era material. It is **Archive** documentation: non-normative, not an
+Presolve-era material. It is **Archive** documentation: non-normative, not an
 active guide or reference, and not a source of public command authority.

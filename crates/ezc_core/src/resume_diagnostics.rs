@@ -27,67 +27,67 @@ pub struct ResumeDiagnosticReservation {
 /// The contiguous public compiler diagnostic range reserved by J0.
 pub const RESUME_DIAGNOSTIC_RESERVATIONS: [ResumeDiagnosticReservation; 16] = [
     ResumeDiagnosticReservation {
-        code: "EZC1096",
+        code: "PSC1096",
         meaning: "Unsupported resume value",
     },
     ResumeDiagnosticReservation {
-        code: "EZC1097",
+        code: "PSC1097",
         meaning: "Missing resume owner",
     },
     ResumeDiagnosticReservation {
-        code: "EZC1098",
+        code: "PSC1098",
         meaning: "Resume boundary cycle",
     },
     ResumeDiagnosticReservation {
-        code: "EZC1099",
+        code: "PSC1099",
         meaning: "Invalid resume retention",
     },
     ResumeDiagnosticReservation {
-        code: "EZC1100",
+        code: "PSC1100",
         meaning: "Invalid resume recomputation",
     },
     ResumeDiagnosticReservation {
-        code: "EZC1101",
+        code: "PSC1101",
         meaning: "Invalid activation policy",
     },
     ResumeDiagnosticReservation {
-        code: "EZC1102",
+        code: "PSC1102",
         meaning: "Resume chunk cycle",
     },
     ResumeDiagnosticReservation {
-        code: "EZC1103",
+        code: "PSC1103",
         meaning: "Missing resume program",
     },
     ResumeDiagnosticReservation {
-        code: "EZC1104",
+        code: "PSC1104",
         meaning: "Invalid resume anchor",
     },
     ResumeDiagnosticReservation {
-        code: "EZC1105",
+        code: "PSC1105",
         meaning: "Resume schema collision",
     },
     ResumeDiagnosticReservation {
-        code: "EZC1106",
+        code: "PSC1106",
         meaning: "Invalid snapshot stable state",
     },
     ResumeDiagnosticReservation {
-        code: "EZC1107",
+        code: "PSC1107",
         meaning: "Resume artifact mismatch",
     },
     ResumeDiagnosticReservation {
-        code: "EZC1108",
+        code: "PSC1108",
         meaning: "Lazy event payload unsupported",
     },
     ResumeDiagnosticReservation {
-        code: "EZC1109",
+        code: "PSC1109",
         meaning: "Missing resume chunk",
     },
     ResumeDiagnosticReservation {
-        code: "EZC1110",
+        code: "PSC1110",
         meaning: "Invalid resume ordering",
     },
     ResumeDiagnosticReservation {
-        code: "EZC1111",
+        code: "PSC1111",
         meaning: "Unsupported resume topology",
     },
 ];
@@ -172,10 +172,10 @@ pub fn project_resume_diagnostics_from_products(
     let liveness = &products.liveness;
     for block in &liveness.blocked {
         let code = match block.reason {
-            ResumeLivenessBlockReason::RequiredNonSerializableValue => "EZC1096",
-            ResumeLivenessBlockReason::RecomputeProofUnavailable => "EZC1100",
-            ResumeLivenessBlockReason::MissingCanonicalSource => "EZC1097",
-            ResumeLivenessBlockReason::UnknownDependency => "EZC1099",
+            ResumeLivenessBlockReason::RequiredNonSerializableValue => "PSC1096",
+            ResumeLivenessBlockReason::RecomputeProofUnavailable => "PSC1100",
+            ResumeLivenessBlockReason::MissingCanonicalSource => "PSC1097",
+            ResumeLivenessBlockReason::UnknownDependency => "PSC1099",
         };
         projected.push(ResumeProjectedDiagnostic {
             code,
@@ -191,10 +191,10 @@ pub fn project_resume_diagnostics_from_products(
     let schemas = &products.schemas;
     for block in &schemas.blocks {
         let code = match block.reason {
-            ResumeSchemaBlockReason::UnsupportedValue => "EZC1096",
-            ResumeSchemaBlockReason::UpstreamLivenessBlock => "EZC1099",
+            ResumeSchemaBlockReason::UnsupportedValue => "PSC1096",
+            ResumeSchemaBlockReason::UpstreamLivenessBlock => "PSC1099",
             ResumeSchemaBlockReason::MissingCanonicalSlotType
-            | ResumeSchemaBlockReason::MalformedSemanticType => "EZC1107",
+            | ResumeSchemaBlockReason::MalformedSemanticType => "PSC1107",
         };
         projected.push(ResumeProjectedDiagnostic {
             code,
@@ -206,7 +206,7 @@ pub fn project_resume_diagnostics_from_products(
     let boundaries = &products.boundaries;
     for block in &boundaries.blocks {
         projected.push(ResumeProjectedDiagnostic {
-            code: "EZC1111",
+            code: "PSC1111",
             message: format!(
                 "Unsupported resume topology: {:?}",
                 block.candidate_boundary
@@ -218,11 +218,11 @@ pub fn project_resume_diagnostics_from_products(
     let activation = &products.activation;
     for block in &activation.blocks {
         let code = match block.reason {
-            ResumeActivationBlockReason::MissingInteractionReference => "EZC1109",
+            ResumeActivationBlockReason::MissingInteractionReference => "PSC1109",
             ResumeActivationBlockReason::UnknownBoundary
             | ResumeActivationBlockReason::RequiredBoundaryBlocked
-            | ResumeActivationBlockReason::NoValidEagerFallback => "EZC1101",
-            ResumeActivationBlockReason::UnsupportedLazyEventPayload => "EZC1108",
+            | ResumeActivationBlockReason::NoValidEagerFallback => "PSC1101",
+            ResumeActivationBlockReason::UnsupportedLazyEventPayload => "PSC1108",
         };
         projected.push(ResumeProjectedDiagnostic {
             code,
@@ -234,9 +234,9 @@ pub fn project_resume_diagnostics_from_products(
     let chunks = &products.chunks;
     for block in &chunks.blocks {
         let code = match block.reason {
-            ResumeChunkBlockReason::MissingActivationBoundary => "EZC1109",
-            ResumeChunkBlockReason::MissingProgram => "EZC1103",
-            ResumeChunkBlockReason::UnsupportedActivationPolicy => "EZC1101",
+            ResumeChunkBlockReason::MissingActivationBoundary => "PSC1109",
+            ResumeChunkBlockReason::MissingProgram => "PSC1103",
+            ResumeChunkBlockReason::UnsupportedActivationPolicy => "PSC1101",
         };
         projected.push(ResumeProjectedDiagnostic {
             code,
@@ -253,8 +253,8 @@ pub fn project_resume_diagnostics_from_products(
             continue;
         };
         let code = match block.reason {
-            ResumeCaptureBlockReason::MissingBoundarySchema => "EZC1097",
-            ResumeCaptureBlockReason::MissingRetainedSlotSchema => "EZC1103",
+            ResumeCaptureBlockReason::MissingBoundarySchema => "PSC1097",
+            ResumeCaptureBlockReason::MissingRetainedSlotSchema => "PSC1103",
         };
         projected.push(ResumeProjectedDiagnostic {
             code,
@@ -271,9 +271,9 @@ pub fn project_resume_diagnostics_from_products(
     for block in &restore.blocks {
         let code = match block.reason {
             ResumeRestoreBlockReason::MissingSlotSchema
-            | ResumeRestoreBlockReason::MissingFormSlotOwner => "EZC1103",
+            | ResumeRestoreBlockReason::MissingFormSlotOwner => "PSC1103",
             ResumeRestoreBlockReason::MissingComputedProgram
-            | ResumeRestoreBlockReason::UnsupportedRecomputableSlot => "EZC1100",
+            | ResumeRestoreBlockReason::UnsupportedRecomputableSlot => "PSC1100",
         };
         projected.push(ResumeProjectedDiagnostic {
             code,
@@ -364,28 +364,28 @@ fn project_resume_integrity_diagnostics(
 
     for diagnostic in validate_resume_liveness_plan(model, &products.liveness) {
         let code = match diagnostic.code {
-            ResumeLivenessIntegrityCode::RequiredUnsupportedValue => "EZC1096",
-            ResumeLivenessIntegrityCode::MissingStorageOwner => "EZC1097",
+            ResumeLivenessIntegrityCode::RequiredUnsupportedValue => "PSC1096",
+            ResumeLivenessIntegrityCode::MissingStorageOwner => "PSC1097",
             ResumeLivenessIntegrityCode::UnknownDependency
             | ResumeLivenessIntegrityCode::InvalidRetentionReason
             | ResumeLivenessIntegrityCode::DuplicateClassification
-            | ResumeLivenessIntegrityCode::InvalidCandidatePromotion => "EZC1099",
-            ResumeLivenessIntegrityCode::RecomputeWithoutProof => "EZC1100",
-            ResumeLivenessIntegrityCode::ProvenanceOrderIndexDrift => "EZC1110",
+            | ResumeLivenessIntegrityCode::InvalidCandidatePromotion => "PSC1099",
+            ResumeLivenessIntegrityCode::RecomputeWithoutProof => "PSC1100",
+            ResumeLivenessIntegrityCode::ProvenanceOrderIndexDrift => "PSC1110",
         };
         push(code, diagnostic.message, slot(diagnostic.slot.as_ref()));
     }
     for diagnostic in validate_resume_boundary_graph(model, &products.boundaries) {
         let code = match diagnostic.code {
-            ResumeBoundaryIntegrityCode::Cycle => "EZC1098",
-            ResumeBoundaryIntegrityCode::DuplicateBoundary => "EZC1105",
-            ResumeBoundaryIntegrityCode::PhaseCorrespondence => "EZC1107",
-            ResumeBoundaryIntegrityCode::OrderingOrIndexDrift => "EZC1110",
+            ResumeBoundaryIntegrityCode::Cycle => "PSC1098",
+            ResumeBoundaryIntegrityCode::DuplicateBoundary => "PSC1105",
+            ResumeBoundaryIntegrityCode::PhaseCorrespondence => "PSC1107",
+            ResumeBoundaryIntegrityCode::OrderingOrIndexDrift => "PSC1110",
             ResumeBoundaryIntegrityCode::InvalidOwner
             | ResumeBoundaryIntegrityCode::MissingOrMultipleParent
             | ResumeBoundaryIntegrityCode::Unreachable
             | ResumeBoundaryIntegrityCode::Reciprocity
-            | ResumeBoundaryIntegrityCode::ProvenanceDrift => "EZC1111",
+            | ResumeBoundaryIntegrityCode::ProvenanceDrift => "PSC1111",
         };
         push(
             code,
@@ -395,12 +395,12 @@ fn project_resume_integrity_diagnostics(
     }
     for diagnostic in validate_resume_activation_plan(model, &products.activation) {
         let code = match diagnostic.code {
-            ResumeActivationIntegrityCode::UnsupportedLazyPayload => "EZC1108",
-            ResumeActivationIntegrityCode::UnknownEventOrBoundary => "EZC1109",
-            ResumeActivationIntegrityCode::OrderingOrIndexDrift => "EZC1110",
+            ResumeActivationIntegrityCode::UnsupportedLazyPayload => "PSC1108",
+            ResumeActivationIntegrityCode::UnknownEventOrBoundary => "PSC1109",
+            ResumeActivationIntegrityCode::OrderingOrIndexDrift => "PSC1110",
             ResumeActivationIntegrityCode::MissingOrDuplicatePolicy
             | ResumeActivationIntegrityCode::InvalidPrerequisite
-            | ResumeActivationIntegrityCode::InvalidPolicyAuthority => "EZC1101",
+            | ResumeActivationIntegrityCode::InvalidPolicyAuthority => "PSC1101",
         };
         push(
             code,
@@ -410,12 +410,12 @@ fn project_resume_integrity_diagnostics(
     }
     for diagnostic in validate_resume_chunk_graph(model, &products.chunks) {
         let code = match diagnostic.code {
-            ResumeChunkIntegrityCode::DependencyCycle => "EZC1102",
-            ResumeChunkIntegrityCode::MissingProgram => "EZC1103",
-            ResumeChunkIntegrityCode::RootCorrespondence => "EZC1109",
+            ResumeChunkIntegrityCode::DependencyCycle => "PSC1102",
+            ResumeChunkIntegrityCode::MissingProgram => "PSC1103",
+            ResumeChunkIntegrityCode::RootCorrespondence => "PSC1109",
             ResumeChunkIntegrityCode::DuplicateInclusion
             | ResumeChunkIntegrityCode::UnrelatedProgram
-            | ResumeChunkIntegrityCode::OrderingOrOutputDrift => "EZC1110",
+            | ResumeChunkIntegrityCode::OrderingOrOutputDrift => "PSC1110",
         };
         let primary = diagnostic.chunk.as_ref().and_then(|id| {
             products
@@ -428,12 +428,12 @@ fn project_resume_integrity_diagnostics(
     if let Err(diagnostics) = validate_resume_schema_registry(model, &products.schemas) {
         for diagnostic in diagnostics {
             let code = match diagnostic.code {
-                ResumeSchemaIntegrityCode::UnsupportedValue => "EZC1096",
-                ResumeSchemaIntegrityCode::MissingSlot => "EZC1103",
-                ResumeSchemaIntegrityCode::IdentityCollision => "EZC1105",
+                ResumeSchemaIntegrityCode::UnsupportedValue => "PSC1096",
+                ResumeSchemaIntegrityCode::MissingSlot => "PSC1103",
+                ResumeSchemaIntegrityCode::IdentityCollision => "PSC1105",
                 ResumeSchemaIntegrityCode::MalformedSemanticType
-                | ResumeSchemaIntegrityCode::DuplicateProperty => "EZC1107",
-                ResumeSchemaIntegrityCode::OrderingOrIndexDrift => "EZC1110",
+                | ResumeSchemaIntegrityCode::DuplicateProperty => "PSC1107",
+                ResumeSchemaIntegrityCode::OrderingOrIndexDrift => "PSC1110",
             };
             push(
                 code,
@@ -445,10 +445,10 @@ fn project_resume_integrity_diagnostics(
     if let Err(diagnostics) = validate_resume_capture_plan(model, &products.capture) {
         for diagnostic in diagnostics {
             let code = match diagnostic.code {
-                ResumeCaptureIntegrityCode::InvalidCaptureState => "EZC1106",
-                ResumeCaptureIntegrityCode::OrderingOrOutputDrift => "EZC1110",
+                ResumeCaptureIntegrityCode::InvalidCaptureState => "PSC1106",
+                ResumeCaptureIntegrityCode::OrderingOrOutputDrift => "PSC1110",
                 ResumeCaptureIntegrityCode::ProgramCorrespondence
-                | ResumeCaptureIntegrityCode::InvalidInstruction => "EZC1103",
+                | ResumeCaptureIntegrityCode::InvalidInstruction => "PSC1103",
             };
             push(
                 code,
@@ -461,9 +461,9 @@ fn project_resume_integrity_diagnostics(
         for diagnostic in diagnostics {
             let code = match diagnostic.code {
                 ResumeRestoreIntegrityCode::PhaseOrDuplicateWrite
-                | ResumeRestoreIntegrityCode::OrderingOrOutputDrift => "EZC1110",
+                | ResumeRestoreIntegrityCode::OrderingOrOutputDrift => "PSC1110",
                 ResumeRestoreIntegrityCode::ProgramReference
-                | ResumeRestoreIntegrityCode::MissingCompletion => "EZC1103",
+                | ResumeRestoreIntegrityCode::MissingCompletion => "PSC1103",
             };
             push(
                 code,
@@ -474,12 +474,12 @@ fn project_resume_integrity_diagnostics(
     }
     for diagnostic in validate_resume_anchor_plan(model, &products.anchors) {
         let code = match diagnostic.code {
-            ResumeAnchorIntegrityCode::OrderingOrOutputDrift => "EZC1110",
+            ResumeAnchorIntegrityCode::OrderingOrOutputDrift => "PSC1110",
             ResumeAnchorIntegrityCode::MissingTarget
             | ResumeAnchorIntegrityCode::UnstableTarget
             | ResumeAnchorIntegrityCode::DuplicateAnchor
             | ResumeAnchorIntegrityCode::WrongKind
-            | ResumeAnchorIntegrityCode::StructuralPairMismatch => "EZC1104",
+            | ResumeAnchorIntegrityCode::StructuralPairMismatch => "PSC1104",
         };
         let primary = diagnostic.anchor_id.as_ref().and_then(|id| {
             products
@@ -545,8 +545,8 @@ mod tests {
             .iter()
             .map(|reservation| reservation.code)
             .collect::<Vec<_>>();
-        assert_eq!(codes.first(), Some(&"EZC1096"));
-        assert_eq!(codes.last(), Some(&"EZC1111"));
+        assert_eq!(codes.first(), Some(&"PSC1096"));
+        assert_eq!(codes.last(), Some(&"PSC1111"));
         assert_eq!(codes.len(), 16);
         assert_eq!(RESUME_INTEGRITY_RESERVATION_START, 1289);
         assert_eq!(RESUME_INTEGRITY_RESERVATION_END, 1384);
@@ -579,7 +579,7 @@ mod tests {
         let diagnostics = project_resume_diagnostics(&model);
         let diagnostic = diagnostics
             .iter()
-            .find(|diagnostic| diagnostic.code == "EZC1096")
+            .find(|diagnostic| diagnostic.code == "PSC1096")
             .unwrap_or_else(|| panic!("unsupported retained state value: {diagnostics:#?}"));
         assert!(diagnostic.primary_identity.is_some());
         assert_eq!(
@@ -629,7 +629,7 @@ mod tests {
             .map(|diagnostic| diagnostic.code)
             .collect::<std::collections::BTreeSet<_>>();
         for code in [
-            "EZC1098", "EZC1102", "EZC1104", "EZC1105", "EZC1106", "EZC1110",
+            "PSC1098", "PSC1102", "PSC1104", "PSC1105", "PSC1106", "PSC1110",
         ] {
             assert!(codes.contains(code), "missing {code}: {codes:#?}");
         }

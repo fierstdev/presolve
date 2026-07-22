@@ -1,15 +1,15 @@
 const RUNTIME_STUB: &str = r#"(() => {
   "use strict";
 
-  const MANIFEST_ELEMENT_ID = "ez-template-manifest";
-  const COMPUTED_ARTIFACT_ELEMENT_ID = "ez-computed-runtime";
-  const EFFECT_ARTIFACT_ELEMENT_ID = "ez-effect-runtime";
-  const CONTEXT_ARTIFACT_ELEMENT_ID = "ez-context-runtime";
-  const COMPONENT_ARTIFACT_ELEMENT_ID = "ez-component-runtime";
-  const FORMS_ARTIFACT_ELEMENT_ID = "ez-forms-runtime";
-  const RESUME_MANIFEST_ELEMENT_ID = "ez-resume-runtime";
-  const RESUME_SNAPSHOT_ELEMENT_ID = "ez-resume-snapshot";
-  const PRODUCTION_RUNTIME_ELEMENT_ID = "ez-production-runtime";
+  const MANIFEST_ELEMENT_ID = "presolve-template-manifest";
+  const COMPUTED_ARTIFACT_ELEMENT_ID = "presolve-computed-runtime";
+  const EFFECT_ARTIFACT_ELEMENT_ID = "presolve-effect-runtime";
+  const CONTEXT_ARTIFACT_ELEMENT_ID = "presolve-context-runtime";
+  const COMPONENT_ARTIFACT_ELEMENT_ID = "presolve-component-runtime";
+  const FORMS_ARTIFACT_ELEMENT_ID = "presolve-forms-runtime";
+  const RESUME_MANIFEST_ELEMENT_ID = "presolve-resume-runtime";
+  const RESUME_SNAPSHOT_ELEMENT_ID = "presolve-resume-snapshot";
+  const PRODUCTION_RUNTIME_ELEMENT_ID = "presolve-production-runtime";
   const RUNTIME_VERSION = "0.0.0";
   const SUPPORTED_SCHEMA_VERSION = 4;
   const ACTION_MANIFEST_SCHEMA_VERSION = 2;
@@ -26,10 +26,10 @@ const RUNTIME_STUB: &str = r#"(() => {
   const SUPPORTED_RESUME_RUNTIME_PROTOCOL_VERSION = 1;
   const RESUME_REGISTRY_CONTRACT_VERSION = 1;
 
-  class EdgeZeroBootError extends Error {
+  class PresolveBootError extends Error {
     constructor(code) {
       super(code);
-      this.name = "EdgeZeroBootError";
+      this.name = "PresolveBootError";
       this.code = code;
     }
   }
@@ -46,7 +46,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   function reportDiagnostic(diagnostics, code, message, detail, fatal = false) {
     const diagnostic = createDiagnostic(code, message, detail, fatal);
     diagnostics.push(diagnostic);
-    console.error(`[EdgeZero] ${code}`, diagnostic);
+    console.error(`[Presolve] ${code}`, diagnostic);
     return diagnostic;
   }
 
@@ -78,13 +78,13 @@ const RUNTIME_STUB: &str = r#"(() => {
   function readResumeManifest(diagnostics) {
     const element = document.getElementById(RESUME_MANIFEST_ELEMENT_ID);
     if (!(element instanceof HTMLScriptElement)) {
-      reportDiagnostic(diagnostics, "EZR_RESUME_MANIFEST_MISSING", "Resume manifest v6 is missing", { artifactElementId: RESUME_MANIFEST_ELEMENT_ID });
+      reportDiagnostic(diagnostics, "PSR_RESUME_MANIFEST_MISSING", "Resume manifest v6 is missing", { artifactElementId: RESUME_MANIFEST_ELEMENT_ID });
       throw new ResumeBootError("ManifestVersionMismatch");
     }
     try {
       return JSON.parse(element.textContent ?? "");
     } catch (error) {
-      reportDiagnostic(diagnostics, "EZR_RESUME_MANIFEST_PARSE", "Resume manifest v6 could not be parsed", { message: error instanceof Error ? error.message : String(error) });
+      reportDiagnostic(diagnostics, "PSR_RESUME_MANIFEST_PARSE", "Resume manifest v6 could not be parsed", { message: error instanceof Error ? error.message : String(error) });
       throw new ResumeBootError("ManifestVersionMismatch");
     }
   }
@@ -128,19 +128,19 @@ const RUNTIME_STUB: &str = r#"(() => {
 
   function readOptionalResumeSnapshot(diagnostics, explicitSnapshot) {
     if (explicitSnapshot !== undefined) return explicitSnapshot;
-    if (window.__EDGEZERO_RESUME_SNAPSHOT__ !== undefined) {
-      return window.__EDGEZERO_RESUME_SNAPSHOT__;
+    if (window.__PRESOLVE_RESUME_SNAPSHOT__ !== undefined) {
+      return window.__PRESOLVE_RESUME_SNAPSHOT__;
     }
     const element = document.getElementById(RESUME_SNAPSHOT_ELEMENT_ID);
     if (element === null) return null;
     if (!(element instanceof HTMLScriptElement)) {
-      reportDiagnostic(diagnostics, "EZR_RESUME_SNAPSHOT_PARSE", "Resume snapshot was not stored in a JSON script element", { artifactElementId: RESUME_SNAPSHOT_ELEMENT_ID });
+      reportDiagnostic(diagnostics, "PSR_RESUME_SNAPSHOT_PARSE", "Resume snapshot was not stored in a JSON script element", { artifactElementId: RESUME_SNAPSHOT_ELEMENT_ID });
       throw new ResumeBootError("SnapshotParseFailure");
     }
     try {
       return JSON.parse(element.textContent ?? "");
     } catch (error) {
-      reportDiagnostic(diagnostics, "EZR_RESUME_SNAPSHOT_PARSE", "Resume snapshot v1 could not be parsed", { message: error instanceof Error ? error.message : String(error) });
+      reportDiagnostic(diagnostics, "PSR_RESUME_SNAPSHOT_PARSE", "Resume snapshot v1 could not be parsed", { message: error instanceof Error ? error.message : String(error) });
       throw new ResumeBootError("SnapshotParseFailure");
     }
   }
@@ -405,7 +405,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   function resumeEventMarker(event) {
     let current = event.target instanceof Element ? event.target : event.target?.parentElement;
     while (current !== null && current !== undefined) {
-      const marker = current.getAttribute("data-ez-e");
+      const marker = current.getAttribute("data-presolve-e");
       if (marker !== null) return marker;
       current = current.parentElement;
     }
@@ -437,12 +437,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (!(element instanceof HTMLScriptElement)) {
       reportDiagnostic(
         diagnostics,
-        "EZR_MISSING_MANIFEST",
+        "PSR_MISSING_MANIFEST",
         `Missing template manifest script #${MANIFEST_ELEMENT_ID}`,
         { manifestElementId: MANIFEST_ELEMENT_ID },
         true
       );
-      throw new EdgeZeroBootError("EZR_MISSING_MANIFEST");
+      throw new PresolveBootError("PSR_MISSING_MANIFEST");
     }
 
     try {
@@ -450,12 +450,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     } catch (error) {
       reportDiagnostic(
         diagnostics,
-        "EZR_INVALID_MANIFEST_JSON",
+        "PSR_INVALID_MANIFEST_JSON",
         "Template manifest JSON could not be parsed",
         { message: error instanceof Error ? error.message : String(error) },
         true
       );
-      throw new EdgeZeroBootError("EZR_INVALID_MANIFEST_JSON");
+      throw new PresolveBootError("PSR_INVALID_MANIFEST_JSON");
     }
   }
 
@@ -477,12 +477,12 @@ const RUNTIME_STUB: &str = r#"(() => {
         ) {
           reportDiagnostic(
             diagnostics,
-            "EZR_INVALID_ACTION_BINDING",
+            "PSR_INVALID_ACTION_BINDING",
             "Schema-v2 template action was missing compiler action identities",
             { component: component.name, action },
             true
           );
-          throw new EdgeZeroBootError("EZR_INVALID_ACTION_BINDING");
+          throw new PresolveBootError("PSR_INVALID_ACTION_BINDING");
         }
         actionsByMethod.set(action.method_id, action.action_batch_id);
       }
@@ -491,32 +491,32 @@ const RUNTIME_STUB: &str = r#"(() => {
         if (event.kind !== "action") {
           reportDiagnostic(
             diagnostics,
-            "EZR_INVALID_ACTION_BINDING",
+            "PSR_INVALID_ACTION_BINDING",
             "Schema-v2 template event was not an explicit action binding",
             { component: component.name, event },
             true
           );
-          throw new EdgeZeroBootError("EZR_INVALID_ACTION_BINDING");
+          throw new PresolveBootError("PSR_INVALID_ACTION_BINDING");
         }
         if (typeof event.method_id !== "string" || typeof event.action_batch_id !== "string") {
           reportDiagnostic(
             diagnostics,
-            "EZR_INVALID_ACTION_BINDING",
+            "PSR_INVALID_ACTION_BINDING",
             "Schema-v2 template action binding was missing an action batch identity",
             { component: component.name, event },
             true
           );
-          throw new EdgeZeroBootError("EZR_INVALID_ACTION_BINDING");
+          throw new PresolveBootError("PSR_INVALID_ACTION_BINDING");
         }
         if (actionsByMethod.get(event.method_id) !== event.action_batch_id) {
           reportDiagnostic(
             diagnostics,
-            "EZR_INVALID_ACTION_BINDING",
+            "PSR_INVALID_ACTION_BINDING",
             "Template action binding did not match its compiler action implementation",
             { component: component.name, event },
             true
           );
-          throw new EdgeZeroBootError("EZR_INVALID_ACTION_BINDING");
+          throw new PresolveBootError("PSR_INVALID_ACTION_BINDING");
         }
       }
     }
@@ -531,7 +531,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     ) {
       reportDiagnostic(
         diagnostics,
-        "EZR_UNSUPPORTED_SCHEMA",
+        "PSR_UNSUPPORTED_SCHEMA",
         `Unsupported template manifest schema version ${String(manifest?.schema_version)}`,
         {
           schema_version: manifest?.schema_version,
@@ -539,7 +539,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         },
         true
       );
-      throw new EdgeZeroBootError("EZR_UNSUPPORTED_SCHEMA");
+      throw new PresolveBootError("PSR_UNSUPPORTED_SCHEMA");
     }
 
     const isOrdinaryInstancePair = manifest.schema_version === SUPPORTED_SCHEMA_VERSION
@@ -549,12 +549,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (!isOrdinaryInstancePair && !isLegacyColdPair) {
       reportDiagnostic(
         diagnostics,
-        "EZR_UNSUPPORTED_SCHEMA",
+        "PSR_UNSUPPORTED_SCHEMA",
         "Template manifest and component artifact are not an exact runtime contract pair",
         { manifest_schema_version: manifest.schema_version, component_schema_version: componentArtifact?.schema_version },
         true
       );
-      throw new EdgeZeroBootError("EZR_UNSUPPORTED_SCHEMA");
+      throw new PresolveBootError("PSR_UNSUPPORTED_SCHEMA");
     }
 
     if (
@@ -563,12 +563,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     ) {
       reportDiagnostic(
         diagnostics,
-        "EZR_LEGACY_MANIFEST_EFFECT_ACTIONS",
+        "PSR_LEGACY_MANIFEST_EFFECT_ACTIONS",
         "A legacy template manifest cannot activate compiler-generated effect action batches",
         { schema_version: manifest.schema_version },
         true
       );
-      throw new EdgeZeroBootError("EZR_LEGACY_MANIFEST_EFFECT_ACTIONS");
+      throw new PresolveBootError("PSR_LEGACY_MANIFEST_EFFECT_ACTIONS");
     }
 
     if (manifest.schema_version >= ACTION_MANIFEST_SCHEMA_VERSION) {
@@ -580,45 +580,45 @@ const RUNTIME_STUB: &str = r#"(() => {
     const element = document.getElementById(FORMS_ARTIFACT_ELEMENT_ID);
     if (element === null) return null;
     if (!(element instanceof HTMLScriptElement)) {
-      reportDiagnostic(diagnostics, "EZR_INVALID_FORMS_ARTIFACT", "Forms runtime metadata was not stored in a script element", { artifactElementId: FORMS_ARTIFACT_ELEMENT_ID }, true);
-      throw new EdgeZeroBootError("EZR_INVALID_FORMS_ARTIFACT");
+      reportDiagnostic(diagnostics, "PSR_INVALID_FORMS_ARTIFACT", "Forms runtime metadata was not stored in a script element", { artifactElementId: FORMS_ARTIFACT_ELEMENT_ID }, true);
+      throw new PresolveBootError("PSR_INVALID_FORMS_ARTIFACT");
     }
     try { return JSON.parse(element.textContent ?? ""); } catch (error) {
-      reportDiagnostic(diagnostics, "EZR_INVALID_FORMS_ARTIFACT", "Forms runtime metadata JSON could not be parsed", { message: error instanceof Error ? error.message : String(error) }, true);
-      throw new EdgeZeroBootError("EZR_INVALID_FORMS_ARTIFACT");
+      reportDiagnostic(diagnostics, "PSR_INVALID_FORMS_ARTIFACT", "Forms runtime metadata JSON could not be parsed", { message: error instanceof Error ? error.message : String(error) }, true);
+      throw new PresolveBootError("PSR_INVALID_FORMS_ARTIFACT");
     }
   }
 
   function validateFormsArtifact(formsArtifact, manifest, diagnostics) {
     if (formsArtifact === null) {
       if (manifest.schema_version >= 3) {
-        reportDiagnostic(diagnostics, "EZR_MISSING_FORMS_ARTIFACT", "A schema-v3 template manifest requires Forms runtime metadata", {}, true);
-        throw new EdgeZeroBootError("EZR_MISSING_FORMS_ARTIFACT");
+        reportDiagnostic(diagnostics, "PSR_MISSING_FORMS_ARTIFACT", "A schema-v3 template manifest requires Forms runtime metadata", {}, true);
+        throw new PresolveBootError("PSR_MISSING_FORMS_ARTIFACT");
       }
       return;
     }
     if (formsArtifact.schema_version !== SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION || !Array.isArray(formsArtifact.forms) || !Array.isArray(formsArtifact.instances) || !Array.isArray(formsArtifact.hosts)) {
-      reportDiagnostic(diagnostics, "EZR_UNSUPPORTED_FORMS_ARTIFACT_SCHEMA", "Forms runtime metadata did not match the compiler artifact contract", { schema_version: formsArtifact.schema_version }, true);
-      throw new EdgeZeroBootError("EZR_UNSUPPORTED_FORMS_ARTIFACT_SCHEMA");
+      reportDiagnostic(diagnostics, "PSR_UNSUPPORTED_FORMS_ARTIFACT_SCHEMA", "Forms runtime metadata did not match the compiler artifact contract", { schema_version: formsArtifact.schema_version }, true);
+      throw new PresolveBootError("PSR_UNSUPPORTED_FORMS_ARTIFACT_SCHEMA");
     }
     const hasForms = formsArtifact.forms.length > 0 || formsArtifact.instances.length > 0;
     if (hasForms && manifest.schema_version < 3) {
-      reportDiagnostic(diagnostics, "EZR_FORMS_MANIFEST_MISMATCH", "Forms runtime metadata requires a schema-v3 template manifest", { schema_version: manifest.schema_version }, true);
-      throw new EdgeZeroBootError("EZR_FORMS_MANIFEST_MISMATCH");
+      reportDiagnostic(diagnostics, "PSR_FORMS_MANIFEST_MISMATCH", "Forms runtime metadata requires a schema-v3 template manifest", { schema_version: manifest.schema_version }, true);
+      throw new PresolveBootError("PSR_FORMS_MANIFEST_MISMATCH");
     }
     const instances = new Set(formsArtifact.instances.map((instance) => instance.id));
     for (const binding of manifest.form_bindings ?? []) {
       if (!instances.has(binding.form_instance_id)) {
-        reportDiagnostic(diagnostics, "EZR_FORMS_MANIFEST_MISMATCH", "Forms manifest bridge referenced an unknown Form instance", { binding }, true);
-        throw new EdgeZeroBootError("EZR_FORMS_MANIFEST_MISMATCH");
+        reportDiagnostic(diagnostics, "PSR_FORMS_MANIFEST_MISMATCH", "Forms manifest bridge referenced an unknown Form instance", { binding }, true);
+        throw new PresolveBootError("PSR_FORMS_MANIFEST_MISMATCH");
       }
     }
     const artifactHosts = new Map(formsArtifact.hosts.map((host) => [`${host.host_anchor}|${host.form_instance}`, host]));
     for (const host of manifest.form_hosts ?? []) {
       const artifact = artifactHosts.get(`${host.host_anchor}|${host.form_instance_id}`);
       if (artifact === undefined || artifact.id !== host.submission_host_id || artifact.event !== host.event || artifact.submit_action !== host.submit_action || artifact.action_batch !== host.action_batch || artifact.serialization_plan !== host.serialization_plan || artifact.prevent_default !== host.prevent_default) {
-        reportDiagnostic(diagnostics, "EZR_FORMS_MANIFEST_MISMATCH", "Forms manifest host bridge did not match an exact compiler host record", { host }, true);
-        throw new EdgeZeroBootError("EZR_FORMS_MANIFEST_MISMATCH");
+        reportDiagnostic(diagnostics, "PSR_FORMS_MANIFEST_MISMATCH", "Forms manifest host bridge did not match an exact compiler host record", { host }, true);
+        throw new PresolveBootError("PSR_FORMS_MANIFEST_MISMATCH");
       }
     }
   }
@@ -633,12 +633,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (!(element instanceof HTMLScriptElement)) {
       reportDiagnostic(
         diagnostics,
-        "EZR_INVALID_COMPUTED_ARTIFACT",
+        "PSR_INVALID_COMPUTED_ARTIFACT",
         "Computed runtime metadata was not stored in a script element",
         { artifactElementId: COMPUTED_ARTIFACT_ELEMENT_ID },
         true
       );
-      throw new EdgeZeroBootError("EZR_INVALID_COMPUTED_ARTIFACT");
+      throw new PresolveBootError("PSR_INVALID_COMPUTED_ARTIFACT");
     }
 
     try {
@@ -646,12 +646,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     } catch (error) {
       reportDiagnostic(
         diagnostics,
-        "EZR_INVALID_COMPUTED_ARTIFACT",
+        "PSR_INVALID_COMPUTED_ARTIFACT",
         "Computed runtime metadata JSON could not be parsed",
         { message: error instanceof Error ? error.message : String(error) },
         true
       );
-      throw new EdgeZeroBootError("EZR_INVALID_COMPUTED_ARTIFACT");
+      throw new PresolveBootError("PSR_INVALID_COMPUTED_ARTIFACT");
     }
   }
 
@@ -663,7 +663,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (artifact.schema_version !== SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION) {
       reportDiagnostic(
         diagnostics,
-        "EZR_UNSUPPORTED_COMPUTED_ARTIFACT_SCHEMA",
+        "PSR_UNSUPPORTED_COMPUTED_ARTIFACT_SCHEMA",
         `Unsupported computed runtime metadata schema version ${String(artifact.schema_version)}`,
         {
           schema_version: artifact.schema_version,
@@ -671,7 +671,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         },
         true
       );
-      throw new EdgeZeroBootError("EZR_UNSUPPORTED_COMPUTED_ARTIFACT_SCHEMA");
+      throw new PresolveBootError("PSR_UNSUPPORTED_COMPUTED_ARTIFACT_SCHEMA");
     }
   }
 
@@ -685,12 +685,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (!(element instanceof HTMLScriptElement)) {
       reportDiagnostic(
         diagnostics,
-        "EZR_INVALID_EFFECT_ARTIFACT",
+        "PSR_INVALID_EFFECT_ARTIFACT",
         "Effect runtime metadata was not stored in a script element",
         { artifactElementId: EFFECT_ARTIFACT_ELEMENT_ID },
         true
       );
-      throw new EdgeZeroBootError("EZR_INVALID_EFFECT_ARTIFACT");
+      throw new PresolveBootError("PSR_INVALID_EFFECT_ARTIFACT");
     }
 
     try {
@@ -698,12 +698,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     } catch (error) {
       reportDiagnostic(
         diagnostics,
-        "EZR_INVALID_EFFECT_ARTIFACT",
+        "PSR_INVALID_EFFECT_ARTIFACT",
         "Effect runtime metadata JSON could not be parsed",
         { message: error instanceof Error ? error.message : String(error) },
         true
       );
-      throw new EdgeZeroBootError("EZR_INVALID_EFFECT_ARTIFACT");
+      throw new PresolveBootError("PSR_INVALID_EFFECT_ARTIFACT");
     }
   }
 
@@ -715,7 +715,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (artifact.schema_version !== SUPPORTED_EFFECT_ARTIFACT_SCHEMA_VERSION) {
       reportDiagnostic(
         diagnostics,
-        "EZR_UNSUPPORTED_EFFECT_ARTIFACT_SCHEMA",
+        "PSR_UNSUPPORTED_EFFECT_ARTIFACT_SCHEMA",
         `Unsupported effect runtime metadata schema version ${String(artifact.schema_version)}`,
         {
           schema_version: artifact.schema_version,
@@ -723,7 +723,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         },
         true
       );
-      throw new EdgeZeroBootError("EZR_UNSUPPORTED_EFFECT_ARTIFACT_SCHEMA");
+      throw new PresolveBootError("PSR_UNSUPPORTED_EFFECT_ARTIFACT_SCHEMA");
     }
   }
 
@@ -731,12 +731,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     const element = document.getElementById(COMPONENT_ARTIFACT_ELEMENT_ID);
     if (element === null) return null;
     if (!(element instanceof HTMLScriptElement)) {
-      reportDiagnostic(diagnostics, "EZR_INVALID_COMPONENT_ARTIFACT", "Component runtime metadata was not stored in a script element", { artifactElementId: COMPONENT_ARTIFACT_ELEMENT_ID }, true);
-      throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+      reportDiagnostic(diagnostics, "PSR_INVALID_COMPONENT_ARTIFACT", "Component runtime metadata was not stored in a script element", { artifactElementId: COMPONENT_ARTIFACT_ELEMENT_ID }, true);
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
     }
     try { return JSON.parse(element.textContent ?? ""); } catch (error) {
-      reportDiagnostic(diagnostics, "EZR_INVALID_COMPONENT_ARTIFACT", "Component runtime metadata JSON could not be parsed", { message: error instanceof Error ? error.message : String(error) }, true);
-      throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+      reportDiagnostic(diagnostics, "PSR_INVALID_COMPONENT_ARTIFACT", "Component runtime metadata JSON could not be parsed", { message: error instanceof Error ? error.message : String(error) }, true);
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
     }
   }
 
@@ -754,8 +754,8 @@ const RUNTIME_STUB: &str = r#"(() => {
   function validateComponentArtifactSchema(artifact, diagnostics) {
     if (artifact === null) return;
     if ((artifact.schema_version !== SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION && artifact.schema_version !== LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION) || !Array.isArray(artifact.instances) || !Array.isArray(artifact.initialization_batches)) {
-      reportDiagnostic(diagnostics, "EZR_INVALID_COMPONENT_ARTIFACT", "Component runtime metadata did not match the compiler artifact contract", { schema_version: artifact.schema_version }, true);
-      throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+      reportDiagnostic(diagnostics, "PSR_INVALID_COMPONENT_ARTIFACT", "Component runtime metadata did not match the compiler artifact contract", { schema_version: artifact.schema_version }, true);
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
     }
     const instances = new Set(artifact.instances.map((instance) => instance.instance));
     const structuralTemplates = new Set(
@@ -770,12 +770,12 @@ const RUNTIME_STUB: &str = r#"(() => {
       && !instances.has(instance.parent)
       && !structuralTemplates.has(instance.parent)
     ) {
-      reportDiagnostic(diagnostics, "EZR_INVALID_COMPONENT_ARTIFACT", "Component runtime metadata referenced an unknown parent instance", { instance: instance.instance, parent: instance.parent }, true);
-      throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+      reportDiagnostic(diagnostics, "PSR_INVALID_COMPONENT_ARTIFACT", "Component runtime metadata referenced an unknown parent instance", { instance: instance.instance, parent: instance.parent }, true);
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
     }
     if (artifact.schema_version === SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION) {
       for (const instance of artifact.instances) {
-        if (!Array.isArray(instance.state_slots)) throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+        if (!Array.isArray(instance.state_slots)) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
         for (const slot of instance.state_slots) {
           const pair = `${instance.instance}|${slot.storage_id}`;
           if (
@@ -787,7 +787,7 @@ const RUNTIME_STUB: &str = r#"(() => {
             || stateSlots.has(slot.slot_id)
             || statePairs.has(pair)
           ) {
-            throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+            throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
           }
           stateSlots.add(slot.slot_id);
           statePairs.add(pair);
@@ -799,20 +799,20 @@ const RUNTIME_STUB: &str = r#"(() => {
   function readContextArtifact(diagnostics) {
     const element = document.getElementById(CONTEXT_ARTIFACT_ELEMENT_ID);
     if (!(element instanceof HTMLScriptElement)) {
-      reportDiagnostic(diagnostics, "EZR_INVALID_CONTEXT_ARTIFACT", "Context runtime metadata was not stored in a script element", { artifactElementId: CONTEXT_ARTIFACT_ELEMENT_ID }, true);
-      throw new EdgeZeroBootError("EZR_INVALID_CONTEXT_ARTIFACT");
+      reportDiagnostic(diagnostics, "PSR_INVALID_CONTEXT_ARTIFACT", "Context runtime metadata was not stored in a script element", { artifactElementId: CONTEXT_ARTIFACT_ELEMENT_ID }, true);
+      throw new PresolveBootError("PSR_INVALID_CONTEXT_ARTIFACT");
     }
     try { return JSON.parse(element.textContent ?? ""); }
     catch (error) {
-      reportDiagnostic(diagnostics, "EZR_INVALID_CONTEXT_ARTIFACT", "Context runtime metadata JSON could not be parsed", { message: error instanceof Error ? error.message : String(error) }, true);
-      throw new EdgeZeroBootError("EZR_INVALID_CONTEXT_ARTIFACT");
+      reportDiagnostic(diagnostics, "PSR_INVALID_CONTEXT_ARTIFACT", "Context runtime metadata JSON could not be parsed", { message: error instanceof Error ? error.message : String(error) }, true);
+      throw new PresolveBootError("PSR_INVALID_CONTEXT_ARTIFACT");
     }
   }
 
   function validateContextArtifactSchema(artifact, diagnostics) {
     if (artifact.schema_version !== SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION) {
-      reportDiagnostic(diagnostics, "EZR_UNSUPPORTED_CONTEXT_ARTIFACT_SCHEMA", `Unsupported Context runtime metadata schema version ${String(artifact.schema_version)}`, { schema_version: artifact.schema_version, supported_schema_version: SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION }, true);
-      throw new EdgeZeroBootError("EZR_UNSUPPORTED_CONTEXT_ARTIFACT_SCHEMA");
+      reportDiagnostic(diagnostics, "PSR_UNSUPPORTED_CONTEXT_ARTIFACT_SCHEMA", `Unsupported Context runtime metadata schema version ${String(artifact.schema_version)}`, { schema_version: artifact.schema_version, supported_schema_version: SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION }, true);
+      throw new PresolveBootError("PSR_UNSUPPORTED_CONTEXT_ARTIFACT_SCHEMA");
     }
   }
 
@@ -830,7 +830,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
     while (walker.nextNode()) {
       const value = (walker.currentNode.nodeValue ?? "").trim();
-      const match = /^ez-binding:([^:]+):(.*)$/.exec(value);
+      const match = /^presolve-binding:([^:]+):(.*)$/.exec(value);
 
       if (match !== null) {
         anchors.set(match[1], {
@@ -854,7 +854,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
     while (walker.nextNode()) {
       const value = (walker.currentNode.nodeValue ?? "").trim();
-      const startMatch = /^ez-conditional-start:([^:]+):(.*)$/.exec(value);
+      const startMatch = /^presolve-conditional-start:([^:]+):(.*)$/.exec(value);
 
       if (startMatch !== null) {
         starts.set(startMatch[1], {
@@ -865,7 +865,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         continue;
       }
 
-      const endMatch = /^ez-conditional-end:([^:]+)$/.exec(value);
+      const endMatch = /^presolve-conditional-end:([^:]+)$/.exec(value);
 
       if (endMatch !== null) {
         ends.set(endMatch[1], {
@@ -891,7 +891,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
     while (walker.nextNode()) {
       const value = (walker.currentNode.nodeValue ?? "").trim();
-      const startMatch = /^ez-list-start:([^:]+):(.*)$/.exec(value);
+      const startMatch = /^presolve-list-start:([^:]+):(.*)$/.exec(value);
 
       if (startMatch !== null) {
         starts.set(startMatch[1], {
@@ -902,7 +902,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         continue;
       }
 
-      const endMatch = /^ez-list-end:([^:]+)$/.exec(value);
+      const endMatch = /^presolve-list-end:([^:]+)$/.exec(value);
 
       if (endMatch !== null) {
         ends.set(endMatch[1], {
@@ -921,7 +921,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   function collectElementAnchors() {
     const elementsByNode = new Map();
 
-    for (const element of document.querySelectorAll("[data-ez-node]")) {
+    for (const element of document.querySelectorAll("[data-presolve-node]")) {
       elementsByNode.set(element.dataset.ezNode, element);
     }
 
@@ -945,7 +945,7 @@ const RUNTIME_STUB: &str = r#"(() => {
               component: component.name,
               id: node.id,
               kind: node.kind,
-              code: "EZR_MISSING_ELEMENT_ANCHOR"
+              code: "PSR_MISSING_ELEMENT_ANCHOR"
             });
           }
         }
@@ -959,7 +959,7 @@ const RUNTIME_STUB: &str = r#"(() => {
             component: component.name,
             id: node.id,
             kind: node.kind,
-            code: "EZR_MISSING_BINDING_ANCHOR"
+            code: "PSR_MISSING_BINDING_ANCHOR"
           });
         }
 
@@ -969,7 +969,7 @@ const RUNTIME_STUB: &str = r#"(() => {
               component: component.name,
               id: node.start,
               kind: node.kind,
-              code: "EZR_MISSING_CONDITIONAL_ANCHOR"
+              code: "PSR_MISSING_CONDITIONAL_ANCHOR"
             });
           }
 
@@ -978,7 +978,7 @@ const RUNTIME_STUB: &str = r#"(() => {
               component: component.name,
               id: node.end,
               kind: node.kind,
-              code: "EZR_MISSING_CONDITIONAL_ANCHOR"
+              code: "PSR_MISSING_CONDITIONAL_ANCHOR"
             });
           }
         }
@@ -989,7 +989,7 @@ const RUNTIME_STUB: &str = r#"(() => {
               component: component.name,
               id: node.start,
               kind: node.kind,
-              code: "EZR_MISSING_LIST_ANCHOR"
+              code: "PSR_MISSING_LIST_ANCHOR"
             });
           }
 
@@ -998,7 +998,7 @@ const RUNTIME_STUB: &str = r#"(() => {
               component: component.name,
               id: node.end,
               kind: node.kind,
-              code: "EZR_MISSING_LIST_ANCHOR"
+              code: "PSR_MISSING_LIST_ANCHOR"
             });
           }
         }
@@ -1107,7 +1107,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     ) {
       reportDiagnostic(
         store.diagnostics,
-        "EZR_MISSING_CONDITIONAL_ANCHOR",
+        "PSR_MISSING_CONDITIONAL_ANCHOR",
         "Conditional anchor range was not contiguous in one parent",
         {}
       );
@@ -1293,7 +1293,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         textNode.textContent = text;
       } else if (
         textNode instanceof Comment &&
-        String(textNode.nodeValue ?? "").startsWith("ez-list-binding-end:")
+        String(textNode.nodeValue ?? "").startsWith("presolve-list-binding-end:")
       ) {
         textNode.before(document.createTextNode(text));
       }
@@ -1301,7 +1301,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   }
 
   function listItemElements(root) {
-    return [root, ...root.querySelectorAll("[data-ez-list-bindings]")];
+    return [root, ...root.querySelectorAll("[data-presolve-list-bindings]")];
   }
 
   function updateListItemAttributes(node, instance) {
@@ -1324,7 +1324,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   }
 
   function listItemEventElements(root) {
-    return [root, ...root.querySelectorAll("[data-ez-on-click]")];
+    return [root, ...root.querySelectorAll("[data-presolve-on-click]")];
   }
 
   function registerListItemEvents(store, component, instance) {
@@ -1384,7 +1384,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     ) {
       reportDiagnostic(
         store.diagnostics,
-        "EZR_MISSING_LIST_ANCHOR",
+        "PSR_MISSING_LIST_ANCHOR",
         "List anchor range was not contiguous in one parent",
         {}
       );
@@ -1401,7 +1401,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       if (nextInstances.has(key)) {
         reportDiagnostic(
           store.diagnostics,
-          "EZR_DUPLICATE_LIST_KEY",
+          "PSR_DUPLICATE_LIST_KEY",
           "List update produced a duplicate key",
           { id: node.id, key }
         );
@@ -1416,7 +1416,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         if (element === null) {
           reportDiagnostic(
             store.diagnostics,
-            "EZR_INVALID_LIST_TEMPLATE",
+            "PSR_INVALID_LIST_TEMPLATE",
             "List item template did not produce a root element",
             node
           );
@@ -1522,20 +1522,20 @@ const RUNTIME_STUB: &str = r#"(() => {
     const componentInstanceId = store.activeExecutionContext?.component_instance_id;
     if (componentInstanceId === undefined) return undefined;
     const slot = store.computedSlotsByInstanceComputed.get(`${componentInstanceId}|${computed}`);
-    if (slot === undefined) throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+    if (slot === undefined) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
     return slot;
   }
 
   function stateSlotForInstanceStorage(store, componentInstanceId, storage) {
     const slot = store.stateSlotsByInstanceStorage.get(`${componentInstanceId}|${storage}`);
-    if (slot === undefined) throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+    if (slot === undefined) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
     return slot;
   }
 
   function stateValueForStorage(store, storage) {
     if (!store.instanceQualifiedState) return store.storageValues.get(storage);
     const componentInstanceId = store.activeExecutionContext?.component_instance_id;
-    if (componentInstanceId === undefined) throw new EdgeZeroBootError("EZR_MISSING_EXECUTION_CONTEXT");
+    if (componentInstanceId === undefined) throw new PresolveBootError("PSR_MISSING_EXECUTION_CONTEXT");
     return store.storageValues.get(
       stateSlotForInstanceStorage(store, componentInstanceId, storage).slot_id
     );
@@ -1631,7 +1631,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       if (isComputedDirty(store, instruction.computed)) {
         reportDiagnostic(
           store.diagnostics,
-          "EZR_UNPLANNED_COMPUTED_DEPENDENCY",
+          "PSR_UNPLANNED_COMPUTED_DEPENDENCY",
           "Compiler program depended on a value not yet evaluated by the compiler plan",
           { subject, dependency: instruction.computed }
         );
@@ -1744,7 +1744,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       default:
         reportDiagnostic(
           store.diagnostics,
-          "EZR_UNSUPPORTED_EFFECT_CAPABILITY",
+          "PSR_UNSUPPORTED_EFFECT_CAPABILITY",
           "Effect program referenced an unsupported compiler runtime lowering",
           { effect: effect.effect, runtime_lowering: runtimeLowering }
         );
@@ -1772,7 +1772,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
       reportDiagnostic(
         store.diagnostics,
-        "EZR_UNSUPPORTED_EFFECT_INSTRUCTION",
+        "PSR_UNSUPPORTED_EFFECT_INSTRUCTION",
         "Effect program contained an unsupported compiler instruction",
         { effect: effect.effect, kind: instruction.kind }
       );
@@ -1848,7 +1848,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         if (evaluation === undefined) {
           reportDiagnostic(
             store.diagnostics,
-            "EZR_UNPLANNED_COMPUTED_DEPENDENCY",
+            "PSR_UNPLANNED_COMPUTED_DEPENDENCY",
             "Compiler plan referenced a missing computed evaluation",
             { computed }
           );
@@ -1942,7 +1942,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         if (evaluation === undefined) {
           reportDiagnostic(
             store.diagnostics,
-            "EZR_UNPLANNED_COMPUTED_DEPENDENCY",
+            "PSR_UNPLANNED_COMPUTED_DEPENDENCY",
             "Compiler update batch referenced a missing computed evaluation",
             { computed }
           );
@@ -1963,7 +1963,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   function readField(store, component, field, storageId = null) {
     if (store.instanceQualifiedState) {
       if (typeof component.instance_id !== "string" || typeof storageId !== "string") {
-        throw new EdgeZeroBootError("EZR_INVALID_STATE_OPERATION");
+        throw new PresolveBootError("PSR_INVALID_STATE_OPERATION");
       }
       return store.storageValues.get(
         stateSlotForInstanceStorage(store, component.instance_id, storageId).slot_id
@@ -1972,7 +1972,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (!(field in component.state)) {
       reportDiagnostic(
         store.diagnostics,
-        "EZR_INVALID_STATE_OPERATION",
+        "PSR_INVALID_STATE_OPERATION",
         "Action referenced a missing state field",
         { component: component.name, field }
       );
@@ -1985,7 +1985,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   function writeField(store, component, field, value, storageId = null) {
     if (store.instanceQualifiedState) {
       if (typeof component.instance_id !== "string" || typeof storageId !== "string") {
-        throw new EdgeZeroBootError("EZR_INVALID_STATE_OPERATION");
+        throw new PresolveBootError("PSR_INVALID_STATE_OPERATION");
       }
       const slot = stateSlotForInstanceStorage(store, component.instance_id, storageId);
       store.storageValues.set(slot.slot_id, value);
@@ -1999,7 +1999,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (!(field in component.state)) {
       reportDiagnostic(
         store.diagnostics,
-        "EZR_INVALID_STATE_OPERATION",
+        "PSR_INVALID_STATE_OPERATION",
         "Action referenced a missing state field",
         { component: component.name, field }
       );
@@ -2028,7 +2028,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (bindings === undefined) {
       reportDiagnostic(
         store.diagnostics,
-        "EZR_MISSING_BINDING_ANCHOR",
+        "PSR_MISSING_BINDING_ANCHOR",
         "State field has no registered binding anchor",
         { component: component.name, field }
       );
@@ -2043,7 +2043,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   function registerBinding(store, component, field, updateBinding, storageId = null) {
     if (store.instanceQualifiedState) {
       if (typeof component.instance_id !== "string" || typeof storageId !== "string") {
-        throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_BINDING");
+        throw new PresolveBootError("PSR_INVALID_ORDINARY_BINDING");
       }
       const slot = stateSlotForInstanceStorage(store, component.instance_id, storageId);
       const bindings = store.bindingsByStateSlot.get(slot.slot_id) ?? [];
@@ -2069,7 +2069,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (event.event !== "click") {
       reportDiagnostic(
         store.diagnostics,
-        "EZR_UNRESOLVED_EVENT",
+        "PSR_UNRESOLVED_EVENT",
         "Unsupported event type in template manifest",
         event
       );
@@ -2084,7 +2084,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     ) {
       reportDiagnostic(
         store.diagnostics,
-        "EZR_UNRESOLVED_ACTION",
+        "PSR_UNRESOLVED_ACTION",
         "Event handler did not resolve to a compiler action",
         event
       );
@@ -2096,7 +2096,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (eventsByNode.has(event.node)) {
       reportDiagnostic(
         store.diagnostics,
-        "EZR_UNRESOLVED_EVENT",
+        "PSR_UNRESOLVED_EVENT",
         "Duplicate event registration for template node",
         event
       );
@@ -2236,7 +2236,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       if (!(textNode instanceof Text)) {
         reportDiagnostic(
           store.diagnostics,
-          "EZR_MISSING_BINDING_ANCHOR",
+          "PSR_MISSING_BINDING_ANCHOR",
           "Binding anchor was not followed by a text node",
           node
         );
@@ -2266,7 +2266,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       if (Number.isNaN(operand)) {
         reportDiagnostic(
           store.diagnostics,
-          "EZR_INVALID_STATE_OPERATION",
+          "PSR_INVALID_STATE_OPERATION",
           "Numeric state operation had a non-numeric operand",
           action
         );
@@ -2290,7 +2290,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     ) {
       reportDiagnostic(
         store.diagnostics,
-        "EZR_INVALID_STATE_OPERATION",
+        "PSR_INVALID_STATE_OPERATION",
         "Action used an unsupported state operation",
         action
       );
@@ -2303,7 +2303,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       if (typeof current !== "boolean") {
         reportDiagnostic(
           store.diagnostics,
-          "EZR_INVALID_STATE_OPERATION",
+          "PSR_INVALID_STATE_OPERATION",
           "Toggle action requires a boolean state field",
           action
         );
@@ -2324,7 +2324,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (Number.isNaN(current)) {
       reportDiagnostic(
         store.diagnostics,
-        "EZR_INVALID_STATE_OPERATION",
+        "PSR_INVALID_STATE_OPERATION",
         "Numeric state operation requires a numeric state field",
         action
       );
@@ -2416,8 +2416,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       if (targets.has(id)) duplicates.add(id);
       targets.set(id, target);
     };
-    for (const element of document.querySelectorAll("[data-ez-ti]")) {
-      const id = element.getAttribute("data-ez-ti");
+    for (const element of document.querySelectorAll("[data-presolve-ti]")) {
+      const id = element.getAttribute("data-presolve-ti");
       if (id === null) continue;
       register(id, element);
     }
@@ -2427,12 +2427,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     while (walker.nextNode()) {
       const marker = walker.currentNode;
       const value = String(marker.nodeValue ?? "");
-      const conditionalStart = /^ez-conditional-start:[^:]+:ti:(.+)$/.exec(value);
+      const conditionalStart = /^presolve-conditional-start:[^:]+:ti:(.+)$/.exec(value);
       if (conditionalStart !== null) {
         conditionalStarts.set(conditionalStart[1], marker);
         continue;
       }
-      const conditionalEnd = /^ez-conditional-end:[^:]+:ti:(.+)$/.exec(value);
+      const conditionalEnd = /^presolve-conditional-end:[^:]+:ti:(.+)$/.exec(value);
       if (conditionalEnd !== null) {
         const start = conditionalStarts.get(conditionalEnd[1]);
         if (start !== undefined) {
@@ -2441,12 +2441,12 @@ const RUNTIME_STUB: &str = r#"(() => {
         }
         continue;
       }
-      const listStart = /^ez-ti-target-start:(.+)$/.exec(value);
+      const listStart = /^presolve-ti-target-start:(.+)$/.exec(value);
       if (listStart !== null) {
         listStarts.set(listStart[1], marker);
         continue;
       }
-      const listEnd = /^ez-ti-target-end:(.+)$/.exec(value);
+      const listEnd = /^presolve-ti-target-end:(.+)$/.exec(value);
       if (listEnd !== null) {
         const start = listStarts.get(listEnd[1]);
         if (start !== undefined) {
@@ -2464,8 +2464,8 @@ const RUNTIME_STUB: &str = r#"(() => {
 
   function ordinaryTextBindingNode(bindingId) {
     const walker = document.createTreeWalker(document, NodeFilter.SHOW_COMMENT);
-    const start = `ez-ti-binding-start:${bindingId}`;
-    const end = `ez-ti-binding-end:${bindingId}`;
+    const start = `presolve-ti-binding-start:${bindingId}`;
+    const end = `presolve-ti-binding-end:${bindingId}`;
     let startMarker = null;
     while (walker.nextNode()) {
       if (walker.currentNode.data === start) { startMarker = walker.currentNode; continue; }
@@ -2489,7 +2489,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     const storageId = artifactBinding.state_storage_ids?.length === 1
       ? artifactBinding.state_storage_ids[0]
       : null;
-    if (component === undefined || field === null || storageId === null) throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_BINDING");
+    if (component === undefined || field === null || storageId === null) throw new PresolveBootError("PSR_INVALID_ORDINARY_BINDING");
     const target = store.templateTargetsById.get(binding.instance_target_id);
     const slot = stateSlotForInstanceStorage(store, binding.component_instance_id, storageId);
     let update = null;
@@ -2540,7 +2540,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         };
       }
     }
-    if (update === null) throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_BINDING");
+    if (update === null) throw new PresolveBootError("PSR_INVALID_ORDINARY_BINDING");
     update(store.storageValues.get(slot.slot_id));
     registerBinding(store, component, field, update, storageId);
   }
@@ -2562,13 +2562,13 @@ const RUNTIME_STUB: &str = r#"(() => {
     for (const target of manifest.ordinary_targets ?? []) {
       const artifactTarget = artifactTargets.get(target.id);
       if (artifactTarget === undefined || artifactTarget.component_instance_id !== target.component_instance_id || anchors.duplicates.has(target.id) || !anchors.targets.has(target.id)) {
-        throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_TARGET");
+        throw new PresolveBootError("PSR_INVALID_ORDINARY_TARGET");
       }
     }
     for (const binding of manifest.ordinary_bindings ?? []) {
       const artifactBinding = artifactBindings.get(binding.instance_binding_id);
       if (artifactBinding === undefined || artifactBinding.component_instance_id !== binding.component_instance_id || artifactBinding.target_id !== binding.instance_target_id) {
-        throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_BINDING");
+        throw new PresolveBootError("PSR_INVALID_ORDINARY_BINDING");
       }
       store.ordinaryBindingsById.set(binding.instance_binding_id, {
         ...binding,
@@ -2580,7 +2580,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       const key = ordinaryEventKey(event.instance_target_id, event.event_type);
       const artifactEvent = artifactEvents.get(key);
       if (artifactEvent === undefined || artifactEvent.component_instance_id !== event.component_instance_id || store.ordinaryEventsByTargetAndType.has(key)) {
-        throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_EVENT");
+        throw new PresolveBootError("PSR_INVALID_ORDINARY_EVENT");
       }
       store.ordinaryEventsByTargetAndType.set(key, event);
     }
@@ -2625,7 +2625,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   function ordinaryTargetFromEvent(target) {
     let current = target instanceof Element ? target : target?.parentElement;
     while (current !== null && current !== undefined) {
-      const targetId = current.getAttribute("data-ez-ti");
+      const targetId = current.getAttribute("data-presolve-ti");
       if (targetId !== null) return targetId;
       current = current.parentElement;
     }
@@ -2640,7 +2640,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     const actionRecord = store.actionsByMethod.get(record.handler_method_id);
     const component = store.components.get(record.component_instance_id);
     if (actionRecord === undefined || component === undefined || actionRecord.action_batch_id !== record.action_batch_id) {
-      throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_EVENT");
+      throw new PresolveBootError("PSR_INVALID_ORDINARY_EVENT");
     }
     const context = {
       component_instance_id: record.component_instance_id,
@@ -2672,7 +2672,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     for (const instance of formsArtifact.instances) {
       const definition = definitions.get(instance.form);
       if (definition === undefined) {
-        reportDiagnostic(diagnostics, "EZR_UNKNOWN_FORM_INSTANCE", "Forms artifact referenced an unknown Form definition", { instance: instance.id, form: instance.form }, true);
+        reportDiagnostic(diagnostics, "PSR_UNKNOWN_FORM_INSTANCE", "Forms artifact referenced an unknown Form definition", { instance: instance.id, form: instance.form }, true);
         continue;
       }
       const fields = new Map(definition.fields.map((field) => [field.id, {
@@ -2698,12 +2698,12 @@ const RUNTIME_STUB: &str = r#"(() => {
         : elementsByNode.get(bridge.control_anchor);
       const formInstance = store.formInstances.get(bridge.form_instance_id);
       if (element === undefined || formInstance === undefined) {
-        reportDiagnostic(diagnostics, "EZR_FORMS_MANIFEST_MISMATCH", "Forms manifest bridge did not resolve an exact compiler anchor and instance", { bridge }, true);
+        reportDiagnostic(diagnostics, "PSR_FORMS_MANIFEST_MISMATCH", "Forms manifest bridge did not resolve an exact compiler anchor and instance", { bridge }, true);
         continue;
       }
       const binding = formInstance.definition.bindings.find((item) => item.id === bridge.field_binding_id);
       if (binding === undefined || binding.field === undefined || binding.channel !== bridge.channel) {
-        reportDiagnostic(diagnostics, "EZR_UNKNOWN_FORM_BINDING", "Forms manifest bridge did not match an artifact binding", { bridge }, true);
+        reportDiagnostic(diagnostics, "PSR_UNKNOWN_FORM_BINDING", "Forms manifest bridge did not match an artifact binding", { bridge }, true);
         continue;
       }
       const record = { bridge, binding, element, formInstance };
@@ -2722,7 +2722,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       const formInstance = store.formInstances.get(bridge.form_instance_id);
       const host = (formsArtifact.hosts ?? []).find((candidate) => candidate.host_anchor === bridge.host_anchor && candidate.form_instance === bridge.form_instance_id);
       if (!(element instanceof HTMLFormElement) || formInstance === undefined || host === undefined || host.event !== "submit") {
-        reportDiagnostic(diagnostics, "EZR_FORMS_MANIFEST_MISMATCH", "Forms host bridge did not resolve an exact compiler-owned form anchor", { bridge }, true);
+        reportDiagnostic(diagnostics, "PSR_FORMS_MANIFEST_MISMATCH", "Forms host bridge did not resolve an exact compiler-owned form anchor", { bridge }, true);
         continue;
       }
       const anchor = manifest.schema_version === SUPPORTED_SCHEMA_VERSION ? bridge.instance_target_id : bridge.host_anchor;
@@ -2733,7 +2733,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     document.addEventListener("input", (event) => dispatchFormEvent(store, event, false));
     document.addEventListener("change", (event) => dispatchFormEvent(store, event, false));
     document.addEventListener("focusout", (event) => dispatchFormEvent(store, event, true));
-    window.__EDGEZERO_FORMS__ = {
+    window.__PRESOLVE_FORMS__ = {
       resetForm: (instanceId) => resetForm(store, instanceId),
       resetField: (instanceId, fieldId) => resetField(store, instanceId, fieldId)
     };
@@ -2748,7 +2748,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     const action = store.actionsByMethod.get(record.host.submit_action);
     const component = store.components.get(record.bridge.component_instance_id) ?? action?.component;
     if (action === undefined || action.action_batch_id !== record.host.action_batch || component === undefined) {
-      reportDiagnostic(store.diagnostics, "EZR_UNRESOLVED_FORM_SUBMIT_ACTION", "Submission host did not resolve its exact compiler action", { host: record.host }, true);
+      reportDiagnostic(store.diagnostics, "PSR_UNRESOLVED_FORM_SUBMIT_ACTION", "Submission host did not resolve its exact compiler action", { host: record.host }, true);
       record.formInstance.submission = "Failed";
       return;
     }
@@ -2770,7 +2770,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (!(element instanceof HTMLElement)) return;
     const anchor = store.templateTargetsById instanceof Map
       ? ordinaryTargetFromEvent(element)
-      : element.getAttribute("data-ez-node");
+      : element.getAttribute("data-presolve-node");
     const record = anchor === null ? undefined : store.formBindingsByAnchor.get(anchor);
     if (record === undefined) return;
     if (blur) {
@@ -2879,18 +2879,18 @@ const RUNTIME_STUB: &str = r#"(() => {
   }
 
   function refreshComputedDebugState(store) {
-    if (window.__EDGEZERO__?.store !== store) {
+    if (window.__PRESOLVE__?.store !== store) {
       return;
     }
 
-    window.__EDGEZERO__.computed = debugComputed(store);
-    window.__EDGEZERO__.computed_update_runs = store.computedUpdateRuns;
+    window.__PRESOLVE__.computed = debugComputed(store);
+    window.__PRESOLVE__.computed_update_runs = store.computedUpdateRuns;
   }
 
   function initialStateSlotValue(slot) {
     if (slot.semantic_type !== "number") return slot.initial_value;
     const value = Number(slot.initial_value);
-    if (!Number.isFinite(value)) throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+    if (!Number.isFinite(value)) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
     return value;
   }
 
@@ -3172,8 +3172,8 @@ const RUNTIME_STUB: &str = r#"(() => {
 
   function collectExactResumeAnchors(manifest) {
     const elements = new Map();
-    for (const element of document.querySelectorAll("[data-ez-r]")) {
-      const id = element.getAttribute("data-ez-r");
+    for (const element of document.querySelectorAll("[data-presolve-r]")) {
+      const id = element.getAttribute("data-presolve-r");
       if (elements.has(id)) throw new ResumeBootError("DuplicateIdentity");
       elements.set(id, element);
     }
@@ -3181,7 +3181,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     const walker = document.createTreeWalker(document, NodeFilter.SHOW_COMMENT);
     for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
       const value = node.nodeValue ?? "";
-      if (!value.startsWith("ez-r-start:") && !value.startsWith("ez-r-end:")) continue;
+      if (!value.startsWith("presolve-r-start:") && !value.startsWith("presolve-r-end:")) continue;
       const id = value.slice(value.indexOf(":") + 1);
       if (comments.has(id)) throw new ResumeBootError("DuplicateIdentity");
       comments.set(id, node);
@@ -3419,7 +3419,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
     const expectedBindings = [...instances.values()].reduce((count, instance) => count + (definitions.get(instance.form)?.bindings?.length ?? 0), 0);
     if (store.formBindingsByAnchor.size !== expectedBindings) throw new ResumeBootError("ResumeArtifactMismatch");
-    window.__EDGEZERO_FORMS__ = {
+    window.__PRESOLVE_FORMS__ = {
       resetForm: (instanceId) => resetForm(store, instanceId),
       resetField: (instanceId, fieldId) => resetField(store, instanceId, fieldId)
     };
@@ -3570,12 +3570,12 @@ const RUNTIME_STUB: &str = r#"(() => {
       const definitions = new Map((manifest.components ?? []).map((component) => [component.component_id, component]));
       for (const instance of componentArtifact.instances ?? []) {
         const definition = definitions.get(instance.component);
-        if (definition === undefined) throw new EdgeZeroBootError("EZR_INVALID_ORDINARY_COMPONENT");
+        if (definition === undefined) throw new PresolveBootError("PSR_INVALID_ORDINARY_COMPONENT");
         const definitionStates = (computedArtifact?.state ?? []).filter(
           (state) => state.component === definition.name
         );
         if ((instance.state_slots ?? []).length !== definitionStates.length) {
-          throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
         }
         for (const slot of instance.state_slots ?? []) {
           const pair = `${instance.instance}|${slot.storage_id}`;
@@ -3583,14 +3583,14 @@ const RUNTIME_STUB: &str = r#"(() => {
             store.stateSlotsByInstanceStorage.has(pair)
             || store.storageValues.has(slot.slot_id)
           ) {
-            throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+            throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
           }
           store.stateSlotsByInstanceStorage.set(pair, slot);
           store.storageValues.set(slot.slot_id, initialStateSlotValue(slot));
         }
         for (const state of definitionStates) {
           if (!store.stateSlotsByInstanceStorage.has(`${instance.instance}|${state.storage}`)) {
-            throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+            throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
           }
         }
         for (const slot of instance.computed_slots ?? []) {
@@ -3599,7 +3599,7 @@ const RUNTIME_STUB: &str = r#"(() => {
             || !slot.dirty_slot_id.startsWith(`${instance.instance}/computed-dirty:`)
             || store.computedSlotsByInstanceComputed.has(pair)
             || store.computedDirtySlots.has(slot.dirty_slot_id)) {
-            throw new EdgeZeroBootError("EZR_INVALID_COMPONENT_ARTIFACT");
+            throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
           }
           store.computedSlotsByInstanceComputed.set(pair, slot);
           store.computedDirtySlots.set(slot.dirty_slot_id, slot.dirty_initial_value === true);
@@ -3737,17 +3737,17 @@ const RUNTIME_STUB: &str = r#"(() => {
         ? "error"
         : "ready";
 
-      document.documentElement.dataset.ezRuntime = status;
-      window.__EDGEZERO__ = state;
+      document.documentElement.dataset.presolveRuntime = status;
+      window.__PRESOLVE__ = state;
 
       document.dispatchEvent(
-        new CustomEvent("edgezero:ready", {
+        new CustomEvent("presolve:ready", {
           detail: state
         })
       );
     } catch (error) {
-      document.documentElement.dataset.ezRuntime = "error";
-      if (error instanceof EdgeZeroBootError) {
+      document.documentElement.dataset.presolveRuntime = "error";
+      if (error instanceof PresolveBootError) {
         reportDiagnostic(
           diagnostics,
           error.code,
@@ -3758,26 +3758,26 @@ const RUNTIME_STUB: &str = r#"(() => {
       } else {
         reportDiagnostic(
           diagnostics,
-          "EZR_RUNTIME_BOOT_FAILED",
+          "PSR_RUNTIME_BOOT_FAILED",
           "Runtime boot failed",
           { message: error instanceof Error ? error.message : String(error) },
           true
         );
       }
 
-      window.__EDGEZERO__ = runtimeState({
+      window.__PRESOLVE__ = runtimeState({
         diagnostics
       });
 
       document.dispatchEvent(
-        new CustomEvent("edgezero:ready", {
-          detail: window.__EDGEZERO__
+        new CustomEvent("presolve:ready", {
+          detail: window.__PRESOLVE__
         })
       );
     }
   }
 
-  window.__EDGEZERO_RESUME__ = Object.freeze({
+  window.__PRESOLVE_RESUME__ = Object.freeze({
     bootstrapResume,
     captureSnapshot,
     activateByEvent,
@@ -3811,23 +3811,23 @@ mod tests {
     fn emits_runtime_manifest_bootstrap() {
         let runtime = generate_runtime_stub();
 
-        assert!(runtime.contains("ez-template-manifest"));
-        assert!(runtime.contains("ez-effect-runtime"));
-        assert!(runtime.contains("ez-context-runtime"));
+        assert!(runtime.contains("presolve-template-manifest"));
+        assert!(runtime.contains("presolve-effect-runtime"));
+        assert!(runtime.contains("presolve-context-runtime"));
         assert!(runtime.contains("executeInitialContext(store)"));
         assert!(runtime.contains("executeContextUpdates(store, actionBatchId)"));
         assert!(runtime.contains("contextSlots: new Map()"));
         assert!(runtime.contains("RUNTIME_VERSION = \"0.0.0\""));
         assert!(runtime.contains("SUPPORTED_SCHEMA_VERSION = 4"));
-        assert!(runtime.contains("ez-forms-runtime"));
+        assert!(runtime.contains("presolve-forms-runtime"));
         assert!(runtime.contains("initializeFormsRuntime"));
         assert!(runtime.contains("dispatchFormSubmit"));
         assert!(runtime.contains("form_hosts"));
         assert!(!runtime.contains("FormData(formElement)"));
-        assert!(runtime.contains("EZR_MISSING_MANIFEST"));
-        assert!(runtime.contains("EZR_INVALID_MANIFEST_JSON"));
-        assert!(runtime.contains("EZR_UNSUPPORTED_SCHEMA"));
-        assert!(runtime.contains("data-ez-node"));
+        assert!(runtime.contains("PSR_MISSING_MANIFEST"));
+        assert!(runtime.contains("PSR_INVALID_MANIFEST_JSON"));
+        assert!(runtime.contains("PSR_UNSUPPORTED_SCHEMA"));
+        assert!(runtime.contains("data-presolve-node"));
         assert!(runtime.contains("ordinaryEventsByTargetAndType"));
         assert!(runtime.contains("component_instance_id: record.component_instance_id"));
         assert!(runtime.contains("computedSlotsByInstanceComputed: new Map()"));
@@ -3852,9 +3852,9 @@ mod tests {
         assert!(runtime.contains("function installResumeDomBindings"));
         assert!(runtime.contains("function establishResumeEffects"));
         assert!(runtime.contains("function collectExactResumeAnchors"));
-        assert!(runtime.contains("window.__EDGEZERO_RESUME__ = Object.freeze"));
+        assert!(runtime.contains("window.__PRESOLVE_RESUME__ = Object.freeze"));
         assert!(runtime.contains("throw new ResumeBootError(\"DoubleBootstrap\")"));
-        assert!(runtime.contains("ez-binding:"));
+        assert!(runtime.contains("presolve-binding:"));
         assert!(runtime.contains("reportDiagnostic"));
         assert!(runtime.contains("validateManifestSchema"));
         assert!(runtime.contains("validateEffectArtifactSchema"));
@@ -3883,7 +3883,7 @@ mod tests {
         assert!(runtime.contains("updateListItemAttributes"));
         assert!(runtime.contains("registerListItemEvents"));
         assert!(runtime.contains("unregisterListItemEvents"));
-        assert!(runtime.contains("ez-list-binding-end:"));
+        assert!(runtime.contains("presolve-list-binding-end:"));
         assert!(runtime.contains("renderListItemElement"));
         assert!(runtime.contains("component.state[field] = node.initial_value"));
         assert!(!runtime.contains("component.state[field] = Number(node.initial_value)"));
@@ -3893,16 +3893,16 @@ mod tests {
         assert!(runtime.contains("action.operation !== \"toggle\""));
         assert!(runtime.contains("action.operation === \"assign\""));
         assert!(runtime.contains("action.operation === \"toggle\""));
-        assert!(runtime.contains("EZR_MISSING_ELEMENT_ANCHOR"));
-        assert!(runtime.contains("EZR_MISSING_BINDING_ANCHOR"));
-        assert!(runtime.contains("EZR_UNRESOLVED_EVENT"));
-        assert!(runtime.contains("EZR_UNRESOLVED_ACTION"));
-        assert!(runtime.contains("EZR_INVALID_STATE_OPERATION"));
+        assert!(runtime.contains("PSR_MISSING_ELEMENT_ANCHOR"));
+        assert!(runtime.contains("PSR_MISSING_BINDING_ANCHOR"));
+        assert!(runtime.contains("PSR_UNRESOLVED_EVENT"));
+        assert!(runtime.contains("PSR_UNRESOLVED_ACTION"));
+        assert!(runtime.contains("PSR_INVALID_STATE_OPERATION"));
         assert!(runtime.contains("current + delta"));
-        assert!(runtime.contains("dataset.ezRuntime"));
-        assert!(runtime.contains("edgezero:ready"));
+        assert!(runtime.contains("dataset.presolveRuntime"));
+        assert!(runtime.contains("presolve:ready"));
         assert!(runtime.contains("runtime_version"));
         assert!(runtime.contains("diagnostics"));
-        assert!(runtime.contains("window.__EDGEZERO__"));
+        assert!(runtime.contains("window.__PRESOLVE__"));
     }
 }

@@ -3172,7 +3172,7 @@ fn production_mode_page_html(
     page_html.replacen(
         "    <script src=\"./runtime.js\" defer></script>",
         &format!(
-            "    <script type=\"application/json\" id=\"ez-production-runtime\">{artifact}    </script>\n    <script src=\"./runtime.js\" defer></script>"
+            "    <script type=\"application/json\" id=\"presolve-production-runtime\">{artifact}    </script>\n    <script src=\"./runtime.js\" defer></script>"
         ),
         1,
     )
@@ -3198,7 +3198,7 @@ fn run_parse(mut args: Vec<String>) {
 
 fn page_title_from_graph(graph: &TemplateGraph) -> String {
     graph.templates.first().map_or_else(
-        || "EdgeZero App".to_string(),
+        || "Presolve App".to_string(),
         |template| template.component_name.clone(),
     )
 }
@@ -4064,11 +4064,11 @@ mod tests {
 
         let diagnostics = vec![
             AsmValidationDiagnostic {
-                code: "EZASM1002".to_string(),
+                code: "PSASM1002".to_string(),
                 message: "second".to_string(),
             },
             AsmValidationDiagnostic {
-                code: "EZASM1001".to_string(),
+                code: "PSASM1001".to_string(),
                 message: "first".to_string(),
             },
         ];
@@ -4076,7 +4076,7 @@ mod tests {
         assert_eq!(
             asm_validation_diagnostics_text(&diagnostics),
             Some(
-                "  ASM validation diagnostics:\n    EZASM1001: first\n    EZASM1002: second\n"
+                "  ASM validation diagnostics:\n    PSASM1001: first\n    PSASM1002: second\n"
                     .to_string()
             )
         );
@@ -4132,7 +4132,7 @@ class Profile {
         let resume_diagnostics = project_resume_diagnostics(&asm);
         assert!(resume_diagnostics
             .iter()
-            .any(|diagnostic| diagnostic.code == "EZC1096"));
+            .any(|diagnostic| diagnostic.code == "PSC1096"));
 
         let full: serde_json::Value = serde_json::from_str(&asm_inspection_json(
             std::slice::from_ref(&path),
@@ -4146,8 +4146,8 @@ class Profile {
             .as_array()
             .expect("resume diagnostics")
             .iter()
-            .find(|diagnostic| diagnostic["code"] == "EZC1096")
-            .expect("EZC1096");
+            .find(|diagnostic| diagnostic["code"] == "PSC1096")
+            .expect("PSC1096");
         assert!(full_diagnostic["primary_identity"].as_str().is_some());
 
         let entity = asm
@@ -4168,7 +4168,7 @@ class Profile {
             .as_array()
             .expect("selected resume diagnostics")
             .iter()
-            .any(|diagnostic| diagnostic["code"] == "EZC1096"));
+            .any(|diagnostic| diagnostic["code"] == "PSC1096"));
 
         let check: serde_json::Value = serde_json::from_str(&check_json(
             &unit,
@@ -4184,6 +4184,6 @@ class Profile {
             .as_array()
             .expect("check resume diagnostics")
             .iter()
-            .any(|diagnostic| diagnostic["code"] == "EZC1096"));
+            .any(|diagnostic| diagnostic["code"] == "PSC1096"));
     }
 }

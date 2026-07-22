@@ -71,10 +71,10 @@ reliable source locations include optional JSON `provenance` using `path`,
 location omit that field. Check policy is currently selected per command; no
 project configuration file is interpreted yet.
 
-Computed diagnostics use stable compiler codes: `EZC1034` purity violations,
-`EZC1035` dependency cycles, `EZC1036` invalid declarations, `EZC1037`
-unsupported bodies, `EZC1038` unresolved reads, `EZC1039` declared-return type
-mismatches, and `EZC1040` non-serializable results. Every computed diagnostic
+Computed diagnostics use stable compiler codes: `PSC1034` purity violations,
+`PSC1035` dependency cycles, `PSC1036` invalid declarations, `PSC1037`
+unsupported bodies, `PSC1038` unresolved reads, `PSC1039` declared-return type
+mismatches, and `PSC1040` non-serializable results. Every computed diagnostic
 is derived from canonical compiler products and includes source provenance.
 
 ## ASM entity inspection
@@ -231,7 +231,7 @@ arithmetic operands and support `===`, `!==`, `<`, `<=`, `>`, and `>=`; they
 evaluate to a boolean. Logical `&&` and `||` compose boolean literals and
 comparisons with compiler-time short-circuit semantics. Division or remainder
 by zero, invalid numeric literals, and non-finite arithmetic results report
-`EZC1022` for arithmetic initializers, `EZC1023` for comparisons, or `EZC1024`
+`PSC1022` for arithmetic initializers, `PSC1023` for comparisons, or `PSC1024`
 when reached through a logical initializer. This is deliberately not general
 JavaScript evaluation: state reads, local variables, calls, coercions,
 truthiness, unary operators, and action expressions are outside this slice.
@@ -239,7 +239,7 @@ truthiness, unary operators, and action expressions are outside this slice.
 Nullish coalescing `??` selects between supported constant primitives and B1-B3
 expressions. It evaluates left-to-right at compile time and only evaluates the
 right side when the left result is `null`; a reached invalid arithmetic branch
-reports `EZC1025`.
+reports `PSC1025`.
 
 Unary `!`, `+`, and `-` are evaluated by the compiler for supported boolean and numeric constant expressions.
 

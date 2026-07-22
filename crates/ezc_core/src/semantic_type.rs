@@ -499,24 +499,24 @@ impl TypeDiagnosticCode {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::IncompatibleStateInitializer => "EZC1016",
-            Self::IncompatibleAssignment => "EZC1017",
-            Self::InvalidToggleTarget => "EZC1018",
-            Self::InvalidNumericMutationTarget => "EZC1019",
-            Self::InvalidCompoundMutationTarget => "EZC1020",
-            Self::InvalidCompoundMutationOperand => "EZC1021",
-            Self::InvalidArithmeticOperator => "EZC1022",
-            Self::InvalidComparisonOperator => "EZC1023",
-            Self::InvalidLogicalOperator => "EZC1024",
-            Self::InvalidNullishOperator => "EZC1025",
-            Self::InvalidUnaryOperator => "EZC1026",
-            Self::NonRenderableValue => "EZC1027",
-            Self::InvalidBinding => "EZC1028",
-            Self::InvalidCondition => "EZC1029",
-            Self::NonIterableList => "EZC1030",
-            Self::MissingMember => "EZC1031",
-            Self::UnknownType => "EZC1032",
-            Self::NonSerializableState => "EZC1033",
+            Self::IncompatibleStateInitializer => "PSC1016",
+            Self::IncompatibleAssignment => "PSC1017",
+            Self::InvalidToggleTarget => "PSC1018",
+            Self::InvalidNumericMutationTarget => "PSC1019",
+            Self::InvalidCompoundMutationTarget => "PSC1020",
+            Self::InvalidCompoundMutationOperand => "PSC1021",
+            Self::InvalidArithmeticOperator => "PSC1022",
+            Self::InvalidComparisonOperator => "PSC1023",
+            Self::InvalidLogicalOperator => "PSC1024",
+            Self::InvalidNullishOperator => "PSC1025",
+            Self::InvalidUnaryOperator => "PSC1026",
+            Self::NonRenderableValue => "PSC1027",
+            Self::InvalidBinding => "PSC1028",
+            Self::InvalidCondition => "PSC1029",
+            Self::NonIterableList => "PSC1030",
+            Self::MissingMember => "PSC1031",
+            Self::UnknownType => "PSC1032",
+            Self::NonSerializableState => "PSC1033",
         }
     }
 
@@ -2848,7 +2848,7 @@ mod tests {
 
     #[test]
     fn assigns_stable_codes_to_canonical_type_diagnostic_families() {
-        assert_eq!(TypeDiagnosticCode::UnknownType.as_str(), "EZC1032");
+        assert_eq!(TypeDiagnosticCode::UnknownType.as_str(), "PSC1032");
         assert_eq!(
             TypeDiagnosticCode::InvalidArithmeticOperator.family(),
             TypeDiagnosticFamily::InvalidOperator

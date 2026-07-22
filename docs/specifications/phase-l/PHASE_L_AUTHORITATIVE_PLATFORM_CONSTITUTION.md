@@ -16,7 +16,7 @@
 
 # 1. Purpose
 
-Phase L transitions the project from an internal compiler implementation ("EdgeZero") into the publicly released compiler platform known as **Presolve**.
+Phase L transitions the project from an internal compiler implementation ("Presolve") into the publicly released compiler platform known as **Presolve**.
 
 Unlike previous phases, Phase L does **not** extend the compiler language.
 
@@ -131,7 +131,7 @@ No Phase L implementation may modify generated application behavior.
 
 The project permanently transitions from:
 
-EdgeZero
+Presolve
 
 to
 
@@ -163,9 +163,9 @@ Repository
 
 github.com/fierstdev/presolve
 
-EdgeZero becomes an historical engineering name only.
+Presolve becomes an historical engineering name only.
 
-No public-facing artifact shall use EdgeZero after L1.
+No public-facing artifact shall use Presolve after L1.
 
 ---
 

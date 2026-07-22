@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-readonly legacy_identity_pattern='EdgeZero|edgezero|edge-zero|@edgezero|EDGEZERO_'
+readonly legacy_identity_pattern='Edge''Zero|edge''zero|edge-''zero|@edge''zero|E''ZC[0-9]+|E''ZASM[0-9]+|E''ZR_|data-''ez-|__EDGE''ZERO|#ez-'
 readonly -a public_surfaces=(
   Cargo.toml
   package.json

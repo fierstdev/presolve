@@ -1,6 +1,6 @@
 # Production Optimization Contract
 
-Phase K freezes EdgeZero production optimization policy v1 and production
+Phase K freezes Presolve production optimization policy v1 and production
 runtime artifact v1. Production is a compiler-owned projection of the frozen
 Phase A-J products; it does not reinterpret source, DOM, authored names, or
 runtime registration order.
@@ -10,7 +10,7 @@ runtime registration order.
 `ezc_cli build <input> --out <directory> --production` emits the normal
 development artifacts plus a production artifact and content-addressed modules
 under `production/`. Development builds keep their existing HTML/runtime path.
-Production HTML adds the exact packed artifact as `#ez-production-runtime`
+Production HTML adds the exact packed artifact as `#presolve-production-runtime`
 before `runtime.js`; browser validation completes before any authored action,
 Form submission, Effect, or resumed activation can execute.
 
@@ -120,11 +120,11 @@ artifact identity, cleanup closure, V0-V10 phases, static costs, blocks, and
 exclusions. Full and selected inspection share the same immutable projection;
 invalid source shows blocks without fabricated production IDs.
 
-`EZC1112` through `EZC1127` are the ordered public production diagnostics.
+`PSC1112` through `PSC1127` are the ordered public production diagnostics.
 Projection deduplicates by code, exact identity, and primary span. Identity and
 provenance appear only when established, and secondary evidence is sorted.
 Check JSON remains v6 because its existing identity/provenance envelope is
-sufficient. `EZASM1385` through `EZASM1512` remain reserved for internal Phase K
+sufficient. `PSASM1385` through `PSASM1512` remain reserved for internal Phase K
 integrity failures.
 
 ## Frozen versions

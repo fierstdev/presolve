@@ -127,35 +127,35 @@ impl ValidationDependencyPlanIntegrityKind {
     #[must_use]
     pub const fn code(self) -> &'static str {
         match self {
-            Self::DuplicatePlan => "EZASM1242",
-            Self::MissingPlanForm => "EZASM1243",
-            Self::UnknownForm => "EZASM1244",
-            Self::UnknownSourceField => "EZASM1245",
-            Self::UnknownTargetField => "EZASM1246",
-            Self::UnknownRule => "EZASM1247",
-            Self::RuleNotInValidationGraph => "EZASM1248",
-            Self::MissingI6Dependency => "EZASM1249",
-            Self::DuplicateDependencyProjection => "EZASM1250",
-            Self::MissingDependencyProjection => "EZASM1251",
-            Self::PlanFormMismatch => "EZASM1252",
-            Self::FieldFormMismatch => "EZASM1253",
-            Self::RuleTargetMismatch => "EZASM1254",
-            Self::RuleFormMismatch => "EZASM1255",
-            Self::ComponentMismatch => "EZASM1256",
-            Self::SelfDependency => "EZASM1257",
-            Self::CycleRulePromoted => "EZASM1258",
-            Self::UnsupportedBoundary => "EZASM1259",
-            Self::SourceIndexMismatch => "EZASM1260",
-            Self::TargetIndexMismatch => "EZASM1261",
-            Self::InvalidationIndexMismatch => "EZASM1262",
-            Self::DuplicateScheduledRule => "EZASM1263",
-            Self::DuplicateScheduledTarget => "EZASM1264",
-            Self::TransitiveInvalidationLeak => "EZASM1265",
-            Self::CandidateIdentityPromoted => "EZASM1266",
-            Self::InstanceIdentityLeak => "EZASM1267",
-            Self::MissingProvenance => "EZASM1268",
-            Self::NonCanonicalOrdering => "EZASM1269",
-            Self::PlanIdentityDrift => "EZASM1270",
+            Self::DuplicatePlan => "PSASM1242",
+            Self::MissingPlanForm => "PSASM1243",
+            Self::UnknownForm => "PSASM1244",
+            Self::UnknownSourceField => "PSASM1245",
+            Self::UnknownTargetField => "PSASM1246",
+            Self::UnknownRule => "PSASM1247",
+            Self::RuleNotInValidationGraph => "PSASM1248",
+            Self::MissingI6Dependency => "PSASM1249",
+            Self::DuplicateDependencyProjection => "PSASM1250",
+            Self::MissingDependencyProjection => "PSASM1251",
+            Self::PlanFormMismatch => "PSASM1252",
+            Self::FieldFormMismatch => "PSASM1253",
+            Self::RuleTargetMismatch => "PSASM1254",
+            Self::RuleFormMismatch => "PSASM1255",
+            Self::ComponentMismatch => "PSASM1256",
+            Self::SelfDependency => "PSASM1257",
+            Self::CycleRulePromoted => "PSASM1258",
+            Self::UnsupportedBoundary => "PSASM1259",
+            Self::SourceIndexMismatch => "PSASM1260",
+            Self::TargetIndexMismatch => "PSASM1261",
+            Self::InvalidationIndexMismatch => "PSASM1262",
+            Self::DuplicateScheduledRule => "PSASM1263",
+            Self::DuplicateScheduledTarget => "PSASM1264",
+            Self::TransitiveInvalidationLeak => "PSASM1265",
+            Self::CandidateIdentityPromoted => "PSASM1266",
+            Self::InstanceIdentityLeak => "PSASM1267",
+            Self::MissingProvenance => "PSASM1268",
+            Self::NonCanonicalOrdering => "PSASM1269",
+            Self::PlanIdentityDrift => "PSASM1270",
         }
     }
 }
@@ -1820,7 +1820,7 @@ class Profile {
             .clear();
         assert!(validate_application_semantic_model(&stale)
             .iter()
-            .any(|diagnostic| diagnostic.code == "EZASM1272"));
+            .any(|diagnostic| diagnostic.code == "PSASM1272"));
     }
 
     #[test]

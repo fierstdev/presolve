@@ -229,6 +229,6 @@ mod tests {
         asm.component_initialization.root_instances.clear();
         assert!(validate_application_semantic_model(&asm)
             .iter()
-            .any(|diagnostic| diagnostic.code == "EZASM1198"));
+            .any(|diagnostic| diagnostic.code == "PSASM1198"));
     }
 }

@@ -24,20 +24,20 @@ pub fn validate_application_semantic_model(
     for (id, owner) in &model.ownership {
         if model.entity(id).is_none() {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1001".to_string(),
+                code: "PSASM1001".to_string(),
                 message: format!("ownership references missing semantic entity `{id}`"),
             });
         }
         if !model.provenance.contains_key(id) {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1002".to_string(),
+                code: "PSASM1002".to_string(),
                 message: format!("semantic entity `{id}` is missing source provenance"),
             });
         }
         if let SemanticOwner::Entity(owner_id) = owner {
             if model.entity(owner_id).is_none() {
                 diagnostics.push(AsmValidationDiagnostic {
-                    code: "EZASM1003".to_string(),
+                    code: "PSASM1003".to_string(),
                     message: format!("semantic entity `{id}` has missing owner `{owner_id}`"),
                 });
             }
@@ -47,7 +47,7 @@ pub fn validate_application_semantic_model(
     for id in model.provenance.keys() {
         if !model.ownership.contains_key(id) {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1004".to_string(),
+                code: "PSASM1004".to_string(),
                 message: format!("provenance references unowned semantic entity `{id}`"),
             });
         }
@@ -56,7 +56,7 @@ pub fn validate_application_semantic_model(
     for reference in &model.references {
         if model.entity(&reference.source).is_none() || model.entity(&reference.target).is_none() {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1005".to_string(),
+                code: "PSASM1005".to_string(),
                 message: format!(
                     "reference from `{}` to `{}` has a missing endpoint",
                     reference.source, reference.target
@@ -85,7 +85,7 @@ pub fn validate_application_semantic_model(
                 .any(|node| node.provenance == reference.provenance);
         if !source_provenance_matches {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1006".to_string(),
+                code: "PSASM1006".to_string(),
                 message: format!(
                     "reference source `{}` has mismatched provenance",
                     reference.source
@@ -165,7 +165,7 @@ fn validate_form_validation(
         || model.validation_rules != expected_products.rules
     {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1241".to_string(),
+            code: "PSASM1241".to_string(),
             message: "validation products do not match canonical I6 lowering".to_string(),
         });
     }
@@ -189,7 +189,7 @@ fn validate_form_validation(
     );
     if model.validation_graph.validation != validation {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1240".to_string(),
+            code: "PSASM1240".to_string(),
             message: "validation graph retained stale validation facts".to_string(),
         });
     }
@@ -202,7 +202,7 @@ fn validate_form_validation(
     );
     if model.validation_dependency_plans != expected_plans {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1272".to_string(),
+            code: "PSASM1272".to_string(),
             message: "validation dependency plans do not match canonical I7 planning".to_string(),
         });
     }
@@ -225,7 +225,7 @@ fn validate_form_validation(
     );
     if model.validation_dependency_plans.validation != planning {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1271".to_string(),
+            code: "PSASM1271".to_string(),
             message: "validation dependency plans retained stale validation facts".to_string(),
         });
     }
@@ -243,7 +243,7 @@ fn validate_form_tracking(
     );
     if model.form_tracking != expected {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1285".to_string(),
+            code: "PSASM1285".to_string(),
             message: "I8 form tracking products do not match canonical declaration planning"
                 .to_string(),
         });
@@ -287,7 +287,7 @@ fn validate_form_submissions(
     );
     if model.submissions != expected {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1286".to_string(),
+            code: "PSASM1286".to_string(),
             message: "I9 submission products do not match canonical declaration planning"
                 .to_string(),
         });
@@ -306,7 +306,7 @@ fn validate_form_serialization(
     );
     if model.serialization != expected {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1287".to_string(),
+            code: "PSASM1287".to_string(),
             message: "I10 serialization products do not match canonical declaration planning"
                 .to_string(),
         });
@@ -325,7 +325,7 @@ fn validate_form_reset(
     );
     if model.reset != expected {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1288".to_string(),
+            code: "PSASM1288".to_string(),
             message: "I11 reset products do not match canonical declaration planning".to_string(),
         });
     }
@@ -347,7 +347,7 @@ fn validate_form_ownership(
     );
     if model.form_ownership.validation != validation {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1220".to_string(),
+            code: "PSASM1220".to_string(),
             message: "Form ownership graph retained stale validation facts".to_string(),
         });
     }
@@ -368,7 +368,7 @@ fn validate_form_field_bindings(
         || model.form_field_bindings != expected.bindings
     {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1202".to_string(),
+            code: "PSASM1202".to_string(),
             message: "Form Field bindings do not match canonical I3/template lowering".to_string(),
         });
     }
@@ -380,7 +380,7 @@ fn validate_component_ir(
 ) {
     if !crate::validate_component_ir(model, &model.component_ir).is_empty() {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1199".to_string(),
+            code: "PSASM1199".to_string(),
             message: "component IR does not match canonical H10 operations".to_string(),
         });
     }
@@ -392,7 +392,7 @@ fn validate_optimized_component_ir(
 ) {
     if !crate::validate_optimized_component_ir(&model.component_ir_optimization).is_empty() {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1200".to_string(),
+            code: "PSASM1200".to_string(),
             message: "optimized component IR does not match the canonical H12 projection"
                 .to_string(),
         });
@@ -411,7 +411,7 @@ fn validate_component_initialization(
     );
     if model.component_initialization != expected {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1198".to_string(),
+            code: "PSASM1198".to_string(),
             message: "component initialization plan does not match canonical H4/H6/H7/H8 products"
                 .to_string(),
         });
@@ -434,7 +434,7 @@ fn validate_component_composition(
     );
     if model.component_composition != expected {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1197".to_string(),
+            code: "PSASM1197".to_string(),
             message: "component composition cycles do not match canonical resolved invocations"
                 .to_string(),
         });
@@ -467,7 +467,7 @@ fn validate_composition_types(
     );
     if model.composition_types != expected {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1196".to_string(),
+            code: "PSASM1196".to_string(),
             message: "composition typing does not match canonical H2/H6/H7 products".to_string(),
         });
     }
@@ -486,7 +486,7 @@ fn validate_slot_bindings(
     );
     if model.slot_bindings != expected {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1195".to_string(),
+            code: "PSASM1195".to_string(),
             message: "Slot binding registry does not match canonical H3 facts and H4 instances"
                 .to_string(),
         });
@@ -505,7 +505,7 @@ fn validate_instance_context(
     );
     if model.instance_context != expected {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1194".to_string(),
+            code: "PSASM1194".to_string(),
             message:
                 "instance Context registry does not match canonical declarations and H5 ancestry"
                     .to_string(),
@@ -520,7 +520,7 @@ fn validate_component_instance_scope(
     let expected = crate::build_component_instance_scope_graph(&model.component_instance_plan);
     if model.component_instance_scope != expected {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1192".to_string(),
+            code: "PSASM1192".to_string(),
             message: "component instance scope graph does not match the canonical H4 plan"
                 .to_string(),
         });
@@ -529,7 +529,7 @@ fn validate_component_instance_scope(
         crate::validate_component_instance_scope_graph(&model.component_instance_scope)
             .into_iter()
             .map(|diagnostic| AsmValidationDiagnostic {
-                code: "EZASM1193".to_string(),
+                code: "PSASM1193".to_string(),
                 message: format!(
                     "component instance scope {:?} at `{}`{}",
                     diagnostic.violation,
@@ -560,7 +560,7 @@ fn validate_context_dependency(
     );
     if model.context_dependency != expected {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1189".to_string(),
+            code: "PSASM1189".to_string(),
             message: "Context dependency graph does not match canonical ASM products".to_string(),
         });
     }
@@ -584,7 +584,7 @@ fn validate_context_lifetime(
     );
     if model.context_lifetime != expected {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1190".to_string(),
+            code: "PSASM1190".to_string(),
             message: "Context lifetime analysis does not match canonical ASM products".to_string(),
         });
     }
@@ -608,7 +608,7 @@ fn validate_context_evaluation(
     );
     if model.context_evaluation != expected {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1191".to_string(),
+            code: "PSASM1191".to_string(),
             message: "Context evaluation plan does not match canonical ASM products".to_string(),
         });
     }
@@ -626,7 +626,7 @@ fn validate_context_ownership(
         .any(|node| matches!(node.id, crate::ContextOwnershipNodeId::Component(ref id) if model.component(id).is_none()))
     {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1182".to_string(),
+            code: "PSASM1182".to_string(),
             message: "Context ownership graph references a missing component".to_string(),
         });
     }
@@ -641,7 +641,7 @@ fn validate_context_ownership(
                 .count()
     {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1183".to_string(),
+            code: "PSASM1183".to_string(),
             message: "Context ownership graph has an invalid node domain".to_string(),
         });
     }
@@ -660,7 +660,7 @@ fn validate_context_ownership(
             })
         {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1184".to_string(),
+                code: "PSASM1184".to_string(),
                 message: format!("Context `{}` has an invalid ownership record", context.id),
             });
         }
@@ -676,7 +676,7 @@ fn validate_context_ownership(
             });
             if default_edge.is_none_or(|edge| Some(&edge.provenance) != default_provenance) {
                 diagnostics.push(AsmValidationDiagnostic {
-                    code: "EZASM1188".to_string(),
+                    code: "PSASM1188".to_string(),
                     message: format!(
                         "Context `{}` has an invalid default ownership edge",
                         context.id
@@ -697,7 +697,7 @@ fn validate_context_ownership(
             })
         {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1185".to_string(),
+                code: "PSASM1185".to_string(),
                 message: format!("Provider `{}` has an invalid ownership record", provider.id),
             });
         }
@@ -714,7 +714,7 @@ fn validate_context_ownership(
             })
         {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1186".to_string(),
+                code: "PSASM1186".to_string(),
                 message: format!("Consumer `{}` has an invalid ownership record", consumer.id),
             });
         }
@@ -745,7 +745,7 @@ fn validate_context_ownership(
         )
     }) {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1187".to_string(),
+            code: "PSASM1187".to_string(),
             message: "Context ownership graph has an invalid edge domain or order".to_string(),
         });
     }
@@ -775,7 +775,7 @@ fn validate_context_typing(
         || model.context_binding_types.len() != model.consumers.len()
     {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1176".to_string(),
+            code: "PSASM1176".to_string(),
             message: "Context typing records do not exactly cover canonical entities".to_string(),
         });
     }
@@ -785,7 +785,7 @@ fn validate_context_typing(
                 || record.normalized_type != context.declared_type_id
         }) {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1177".to_string(),
+                code: "PSASM1177".to_string(),
                 message: format!("Context `{}` has an invalid type record", context.id),
             });
         }
@@ -797,7 +797,7 @@ fn validate_context_typing(
                 || record.context != Some(provider.context.clone())
         }) {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1178".to_string(),
+                code: "PSASM1178".to_string(),
                 message: format!("Provider `{}` has an invalid type record", provider.id),
             });
         }
@@ -814,14 +814,14 @@ fn validate_context_typing(
             .is_none_or(|resolution| binding.resolution != resolution.result)
         {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1179".to_string(),
+                code: "PSASM1179".to_string(),
                 message: format!("Consumer `{}` has an invalid type record", consumer.id),
             });
         }
         if let crate::ContextResolutionResult::Provider { provider, .. } = &binding.resolution {
             if binding.provider.as_ref() != Some(provider) {
                 diagnostics.push(AsmValidationDiagnostic {
-                    code: "EZASM1180".to_string(),
+                    code: "PSASM1180".to_string(),
                     message: format!("Consumer `{}` does not retain its G4 Provider", consumer.id),
                 });
             }
@@ -833,7 +833,7 @@ fn validate_context_typing(
                 || binding.serialization != crate::ContextSerializationCompatibility::Serializable)
         {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1181".to_string(),
+                code: "PSASM1181".to_string(),
                 message: format!(
                     "Consumer `{}` has a permissively compatible binding",
                     consumer.id
@@ -850,7 +850,7 @@ fn validate_context_resolution(
 ) {
     for scope_diagnostic in model.component_scope.diagnostics() {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1165".to_string(),
+            code: "PSASM1165".to_string(),
             message: scope_diagnostic.message,
         });
     }
@@ -861,7 +861,7 @@ fn validate_context_resolution(
             .any(|consumer| !model.consumers.contains_key(consumer))
     {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1166".to_string(),
+            code: "PSASM1166".to_string(),
             message: "Context resolution records do not exactly cover canonical Consumers"
                 .to_string(),
         });
@@ -876,7 +876,7 @@ fn validate_context_resolution(
             || resolution.context != consumer.context().cloned()
         {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1167".to_string(),
+                code: "PSASM1167".to_string(),
                 message: format!("consumer `{consumer_id}` has a non-canonical resolution record"),
             });
         }
@@ -885,7 +885,7 @@ fn validate_context_resolution(
         });
         if resolution.searched_scopes != expected_scopes {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1168".to_string(),
+                code: "PSASM1168".to_string(),
                 message: format!(
                     "consumer `{consumer_id}` searched non-canonical component scopes"
                 ),
@@ -907,7 +907,7 @@ fn validate_context_resolution(
                 let expected_owner = resolution.searched_scopes.get(*distance as usize);
                 if !context_matches || !owner_matches || expected_owner != Some(provider_owner) {
                     diagnostics.push(AsmValidationDiagnostic {
-                        code: "EZASM1169".to_string(),
+                        code: "PSASM1169".to_string(),
                         message: format!(
                             "consumer `{consumer_id}` has an invalid Provider resolution"
                         ),
@@ -925,7 +925,7 @@ fn validate_context_resolution(
                         != 1
                 {
                     diagnostics.push(AsmValidationDiagnostic {
-                        code: "EZASM1170".to_string(),
+                        code: "PSASM1170".to_string(),
                         message: format!(
                             "consumer `{consumer_id}` does not select the nearest Provider"
                         ),
@@ -948,7 +948,7 @@ fn validate_context_resolution(
                         .any(|scope| !resolution_candidates(model, scope, Some(context)).is_empty())
                 {
                     diagnostics.push(AsmValidationDiagnostic {
-                        code: "EZASM1171".to_string(),
+                        code: "PSASM1171".to_string(),
                         message: format!(
                             "consumer `{consumer_id}` has an invalid Context default fallback"
                         ),
@@ -966,7 +966,7 @@ fn validate_context_resolution(
                 });
                 if resolution.context.is_none() || has_visible_provider || has_default {
                     diagnostics.push(AsmValidationDiagnostic {
-                        code: "EZASM1172".to_string(),
+                        code: "PSASM1172".to_string(),
                         message: format!(
                             "consumer `{consumer_id}` has an invalid unresolved result"
                         ),
@@ -979,7 +979,7 @@ fn validate_context_resolution(
             } => {
                 let Some(scope) = resolution.searched_scopes.get(*distance as usize) else {
                     diagnostics.push(AsmValidationDiagnostic {
-                        code: "EZASM1173".to_string(),
+                        code: "PSASM1173".to_string(),
                         message: format!(
                             "consumer `{consumer_id}` has an invalid ambiguity distance"
                         ),
@@ -998,7 +998,7 @@ fn validate_context_resolution(
                         })
                 {
                     diagnostics.push(AsmValidationDiagnostic {
-                        code: "EZASM1174".to_string(),
+                        code: "PSASM1174".to_string(),
                         message: format!(
                             "consumer `{consumer_id}` has an invalid ambiguity result"
                         ),
@@ -1008,7 +1008,7 @@ fn validate_context_resolution(
             crate::ContextResolutionResult::InvalidContextReference => {
                 if resolution.context.is_some() || consumer.context().is_some() {
                     diagnostics.push(AsmValidationDiagnostic {
-                        code: "EZASM1175".to_string(),
+                        code: "PSASM1175".to_string(),
                         message: format!(
                             "consumer `{consumer_id}` has an invalid Context-reference result"
                         ),
@@ -1044,27 +1044,27 @@ fn validate_contexts(
     for context in model.contexts.values() {
         let Some(component_id) = context.owner.entity_id() else {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1135".to_string(),
+                code: "PSASM1135".to_string(),
                 message: format!("context `{}` is not component-owned", context.id),
             });
             continue;
         };
         let Some(component) = model.component(component_id) else {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1136".to_string(),
+                code: "PSASM1136".to_string(),
                 message: format!("context `{}` has a missing component owner", context.id),
             });
             continue;
         };
         if context.id != crate::ContextId::for_component(component_id, &context.name) {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1137".to_string(),
+                code: "PSASM1137".to_string(),
                 message: format!("context `{}` has a non-canonical identity", context.id),
             });
         }
         if context.authored_field != component.id.context_field(&context.name) {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1138".to_string(),
+                code: "PSASM1138".to_string(),
                 message: format!(
                     "context `{}` has a non-canonical authored field",
                     context.id
@@ -1073,7 +1073,7 @@ fn validate_contexts(
         }
         if context.declared_type.text.is_empty() {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1139".to_string(),
+                code: "PSASM1139".to_string(),
                 message: format!(
                     "context `{}` is missing an explicit declared type",
                     context.id
@@ -1082,7 +1082,7 @@ fn validate_contexts(
         }
         if context.execution_boundary != crate::ExecutionBoundary::Client {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1140".to_string(),
+                code: "PSASM1140".to_string(),
                 message: format!(
                     "context `{}` has a non-client execution boundary",
                     context.id
@@ -1095,7 +1095,7 @@ fn validate_contexts(
             .any(|field| field.name == context.name)
         {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1141".to_string(),
+                code: "PSASM1141".to_string(),
                 message: format!("context `{}` also lowered as state", context.id),
             });
         }
@@ -1105,7 +1105,7 @@ fn validate_contexts(
             .find(|declaration| declaration.authored_field == context.authored_field);
         if declaration.is_none_or(|declaration| declaration.provenance != context.provenance) {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1142".to_string(),
+                code: "PSASM1142".to_string(),
                 message: format!(
                     "context `{}` has non-canonical field provenance",
                     context.id
@@ -1115,7 +1115,7 @@ fn validate_contexts(
         if context.default_expression != model.expression_root(context.id.as_semantic_id()).cloned()
         {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1143".to_string(),
+                code: "PSASM1143".to_string(),
                 message: format!("context `{}` has an invalid default expression", context.id),
             });
         }
@@ -1130,27 +1130,27 @@ fn validate_providers(
     for provider in model.providers.values() {
         let Some(component_id) = provider.owner.entity_id() else {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1144".to_string(),
+                code: "PSASM1144".to_string(),
                 message: format!("provider `{}` is not component-owned", provider.id),
             });
             continue;
         };
         let Some(component) = model.component(component_id) else {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1145".to_string(),
+                code: "PSASM1145".to_string(),
                 message: format!("provider `{}` has a missing component owner", provider.id),
             });
             continue;
         };
         if provider.id != crate::ProviderId::for_component(component_id, &provider.name) {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1146".to_string(),
+                code: "PSASM1146".to_string(),
                 message: format!("provider `{}` has a non-canonical identity", provider.id),
             });
         }
         if provider.authored_field != component.id.provider_field(&provider.name) {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1147".to_string(),
+                code: "PSASM1147".to_string(),
                 message: format!(
                     "provider `{}` has a non-canonical authored field",
                     provider.id
@@ -1160,7 +1160,7 @@ fn validate_providers(
         let context = model.context(&provider.context);
         if context.is_none() {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1148".to_string(),
+                code: "PSASM1148".to_string(),
                 message: format!("provider `{}` targets a missing Context", provider.id),
             });
         }
@@ -1175,7 +1175,7 @@ fn validate_providers(
                     })
         }) {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1149".to_string(),
+                code: "PSASM1149".to_string(),
                 message: format!(
                     "provider `{}` has a mismatched Context designator",
                     provider.id
@@ -1184,7 +1184,7 @@ fn validate_providers(
         }
         if provider.declared_type.text.is_empty() {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1150".to_string(),
+                code: "PSASM1150".to_string(),
                 message: format!(
                     "provider `{}` is missing an explicit declared type",
                     provider.id
@@ -1193,13 +1193,13 @@ fn validate_providers(
         }
         if model.expression_root(provider.id.as_semantic_id()) != Some(&provider.value_expression) {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1151".to_string(),
+                code: "PSASM1151".to_string(),
                 message: format!("provider `{}` has an invalid value expression", provider.id),
             });
         }
         if provider.execution_boundary != crate::ExecutionBoundary::Client {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1152".to_string(),
+                code: "PSASM1152".to_string(),
                 message: format!(
                     "provider `{}` has a non-client execution boundary",
                     provider.id
@@ -1216,7 +1216,7 @@ fn validate_providers(
                 .any(|context| context.name == provider.name)
         {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1153".to_string(),
+                code: "PSASM1153".to_string(),
                 message: format!(
                     "provider `{}` has a conflicting semantic primitive",
                     provider.id
@@ -1229,7 +1229,7 @@ fn validate_providers(
             .find(|declaration| declaration.authored_field == provider.authored_field);
         if declaration.is_none_or(|declaration| declaration.provenance != provider.provenance) {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1154".to_string(),
+                code: "PSASM1154".to_string(),
                 message: format!(
                     "provider `{}` has non-canonical field provenance",
                     provider.id
@@ -1247,27 +1247,27 @@ fn validate_consumers(
     for consumer in model.consumers.values() {
         let Some(component_id) = consumer.owner.entity_id() else {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1155".to_string(),
+                code: "PSASM1155".to_string(),
                 message: format!("consumer `{}` is not component-owned", consumer.id),
             });
             continue;
         };
         let Some(component) = model.component(component_id) else {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1156".to_string(),
+                code: "PSASM1156".to_string(),
                 message: format!("consumer `{}` has a missing component owner", consumer.id),
             });
             continue;
         };
         if consumer.id != crate::ConsumerId::for_component(component_id, &consumer.name) {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1157".to_string(),
+                code: "PSASM1157".to_string(),
                 message: format!("consumer `{}` has a non-canonical identity", consumer.id),
             });
         }
         if consumer.authored_field != component.id.consumer_field(&consumer.name) {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1158".to_string(),
+                code: "PSASM1158".to_string(),
                 message: format!(
                     "consumer `{}` has a non-canonical authored field",
                     consumer.id
@@ -1278,7 +1278,7 @@ fn validate_consumers(
             let context = model.context(context_id);
             if context.is_none() {
                 diagnostics.push(AsmValidationDiagnostic {
-                    code: "EZASM1159".to_string(),
+                    code: "PSASM1159".to_string(),
                     message: format!("consumer `{}` targets a missing Context", consumer.id),
                 });
             }
@@ -1293,7 +1293,7 @@ fn validate_consumers(
                         })
             }) {
                 diagnostics.push(AsmValidationDiagnostic {
-                    code: "EZASM1160".to_string(),
+                    code: "PSASM1160".to_string(),
                     message: format!(
                         "consumer `{}` has a mismatched Context designator",
                         consumer.id
@@ -1303,7 +1303,7 @@ fn validate_consumers(
         }
         if consumer.requested_type.text.is_empty() {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1161".to_string(),
+                code: "PSASM1161".to_string(),
                 message: format!(
                     "consumer `{}` is missing an explicit requested type",
                     consumer.id
@@ -1312,7 +1312,7 @@ fn validate_consumers(
         }
         if consumer.execution_boundary != crate::ExecutionBoundary::Client {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1162".to_string(),
+                code: "PSASM1162".to_string(),
                 message: format!(
                     "consumer `{}` has a non-client execution boundary",
                     consumer.id
@@ -1333,7 +1333,7 @@ fn validate_consumers(
                 .any(|provider| provider.name == consumer.name)
         {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1163".to_string(),
+                code: "PSASM1163".to_string(),
                 message: format!(
                     "consumer `{}` has a conflicting semantic primitive",
                     consumer.id
@@ -1346,7 +1346,7 @@ fn validate_consumers(
             .find(|declaration| declaration.authored_field == consumer.authored_field);
         if declaration.is_none_or(|declaration| declaration.provenance != consumer.provenance) {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1164".to_string(),
+                code: "PSASM1164".to_string(),
                 message: format!(
                     "consumer `{}` has non-canonical field provenance",
                     consumer.id
@@ -1364,13 +1364,13 @@ fn validate_component_diagnostic_metadata(
     let actual_component_diagnostics = model
         .diagnostics
         .iter()
-        .filter(|item| ("EZC1068"..="EZC1083").contains(&item.code.as_str()))
+        .filter(|item| ("PSC1068"..="PSC1083").contains(&item.code.as_str()))
         .cloned()
         .collect::<Vec<_>>();
     let expected_component_diagnostics = crate::collect_component_diagnostics(model);
     if actual_component_diagnostics != expected_component_diagnostics {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1201".to_string(),
+            code: "PSASM1201".to_string(),
             message: "component diagnostics do not match the canonical H19 projection".to_string(),
         });
     }
@@ -1398,7 +1398,7 @@ fn validate_component_diagnostic_metadata(
             });
         if !(valid_context && valid_provider && valid_consumer && valid_candidate) {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1135".to_string(),
+                code: "PSASM1135".to_string(),
                 message: format!(
                     "compiler diagnostic `{}` references an unknown Context diagnostic subject",
                     diagnostic.code
@@ -1414,7 +1414,7 @@ fn validate_component_diagnostic_metadata(
         ) {
             if &provider.context != context {
                 diagnostics.push(AsmValidationDiagnostic {
-                    code: "EZASM1138".to_string(),
+                    code: "PSASM1138".to_string(),
                     message: format!(
                         "compiler diagnostic `{}` references a Provider for the wrong Context",
                         diagnostic.code
@@ -1431,7 +1431,7 @@ fn validate_component_diagnostic_metadata(
         ) {
             if consumer.context() != Some(context) {
                 diagnostics.push(AsmValidationDiagnostic {
-                    code: "EZASM1139".to_string(),
+                    code: "PSASM1139".to_string(),
                     message: format!(
                         "compiler diagnostic `{}` references a Consumer for the wrong Context",
                         diagnostic.code
@@ -1444,13 +1444,13 @@ fn validate_component_diagnostic_metadata(
                 || diagnostic.provider_id.is_some()
                 || diagnostic.consumer_id.is_some())
         {
-            diagnostics.push(AsmValidationDiagnostic { code: "EZASM1136".to_string(), message: format!("invalid Context declaration diagnostic `{}` carries a semantic entity identity", diagnostic.code) });
+            diagnostics.push(AsmValidationDiagnostic { code: "PSASM1136".to_string(), message: format!("invalid Context declaration diagnostic `{}` carries a semantic entity identity", diagnostic.code) });
         }
-        if ("EZC1052"..="EZC1067").contains(&diagnostic.code.as_str()) {
+        if ("PSC1052"..="PSC1067").contains(&diagnostic.code.as_str()) {
             if let Some(primary) = diagnostic.provenance.as_ref() {
                 if !context_diagnostic_primary_is_canonical(model, diagnostic, primary) {
                     diagnostics.push(AsmValidationDiagnostic {
-                        code: "EZASM1140".to_string(),
+                        code: "PSASM1140".to_string(),
                         message: format!(
                             "Context diagnostic `{}` has non-canonical primary provenance",
                             diagnostic.code
@@ -1458,7 +1458,7 @@ fn validate_component_diagnostic_metadata(
                     });
                 }
             }
-            if diagnostic.code == "EZC1058" {
+            if diagnostic.code == "PSC1058" {
                 let mut expected = diagnostic
                     .consumer_id
                     .as_ref()
@@ -1482,7 +1482,7 @@ fn validate_component_diagnostic_metadata(
                     .collect::<Vec<_>>();
                 if diagnostic.secondary_labels != expected {
                     diagnostics.push(AsmValidationDiagnostic {
-                        code: "EZASM1134".to_string(),
+                        code: "PSASM1134".to_string(),
                         message: "Context ambiguity diagnostic has non-canonical Provider evidence"
                             .to_string(),
                     });
@@ -1497,7 +1497,7 @@ fn validate_component_diagnostic_metadata(
         });
         if diagnostic.effect_id.is_some() && effect.is_none() {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1129".to_string(),
+                code: "PSASM1129".to_string(),
                 message: format!(
                     "compiler diagnostic `{}` references a missing effect subject",
                     diagnostic.code
@@ -1513,7 +1513,7 @@ fn validate_component_diagnostic_metadata(
         });
         if diagnostic.statement_id.is_some() && diagnostic.effect_id.is_none() {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1130".to_string(),
+                code: "PSASM1130".to_string(),
                 message: format!(
                     "compiler diagnostic `{}` has an effect statement without an effect subject",
                     diagnostic.code
@@ -1525,7 +1525,7 @@ fn validate_component_diagnostic_metadata(
                 .is_none_or(|statement| effect.is_none_or(|effect| statement.owner != effect.id))
         {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1131".to_string(),
+                code: "PSASM1131".to_string(),
                 message: format!(
                     "compiler diagnostic `{}` has a statement that does not belong to its effect",
                     diagnostic.code
@@ -1539,7 +1539,7 @@ fn validate_component_diagnostic_metadata(
         if let (Some(primary), Some(subject)) = (&diagnostic.provenance, primary_subject) {
             if !provenance_contains(subject, primary) {
                 diagnostics.push(AsmValidationDiagnostic {
-                    code: "EZASM1132".to_string(),
+                    code: "PSASM1132".to_string(),
                     message: format!(
                         "compiler diagnostic `{}` has non-canonical primary provenance",
                         diagnostic.code
@@ -1553,7 +1553,7 @@ fn validate_component_diagnostic_metadata(
         sorted.dedup();
         if sorted != diagnostic.secondary_labels {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1133".to_string(),
+                code: "PSASM1133".to_string(),
                 message: format!(
                     "compiler diagnostic `{}` has unordered or duplicate secondary labels",
                     diagnostic.code
@@ -1563,7 +1563,7 @@ fn validate_component_diagnostic_metadata(
         for label in &diagnostic.secondary_labels {
             if diagnostic.provenance.as_ref() == Some(&label.provenance) {
                 diagnostics.push(AsmValidationDiagnostic {
-                    code: "EZASM1137".to_string(),
+                    code: "PSASM1137".to_string(),
                     message: format!(
                         "compiler diagnostic `{}` repeats primary provenance as a secondary label",
                         diagnostic.code
@@ -1582,7 +1582,7 @@ fn validate_component_diagnostic_metadata(
                 || context_diagnostic_secondary_is_canonical(model, diagnostic, &label.provenance);
             if !canonical {
                 diagnostics.push(AsmValidationDiagnostic {
-                    code: "EZASM1134".to_string(),
+                    code: "PSASM1134".to_string(),
                     message: format!(
                         "compiler diagnostic `{}` has non-canonical secondary-label provenance",
                         diagnostic.code
@@ -1599,12 +1599,12 @@ fn context_diagnostic_secondary_is_canonical(
     provenance: &crate::SourceProvenance,
 ) -> bool {
     match diagnostic.code.as_str() {
-        "EZC1059" => diagnostic
+        "PSC1059" => diagnostic
             .provider_id
             .as_ref()
             .and_then(|id| model.provider(id))
             .is_some_and(|provider| &provider.declared_type.provenance == provenance),
-        "EZC1060" | "EZC1061" | "EZC1062" | "EZC1063" | "EZC1064" => diagnostic
+        "PSC1060" | "PSC1061" | "PSC1062" | "PSC1063" | "PSC1064" => diagnostic
             .context_id
             .as_ref()
             .and_then(|id| model.context(id))
@@ -1620,7 +1620,7 @@ fn context_diagnostic_primary_is_canonical(
     primary: &crate::SourceProvenance,
 ) -> bool {
     match diagnostic.code.as_str() {
-        "EZC1052" | "EZC1053" | "EZC1054" | "EZC1055" | "EZC1056" => diagnostic
+        "PSC1052" | "PSC1053" | "PSC1054" | "PSC1055" | "PSC1056" => diagnostic
             .context_declaration_candidate_id
             .as_ref()
             .and_then(|id| model.context_declaration_candidates().candidate(id))
@@ -1651,12 +1651,12 @@ fn context_diagnostic_primary_is_canonical(
                 .unwrap_or(&candidate.authored.provenance);
                 expected == primary
             }),
-        "EZC1057" | "EZC1058" => diagnostic
+        "PSC1057" | "PSC1058" => diagnostic
             .consumer_id
             .as_ref()
             .and_then(|id| model.context_resolutions.get(id))
             .is_some_and(|record| &record.provenance == primary),
-        "EZC1059" => {
+        "PSC1059" => {
             diagnostic
                 .provider_id
                 .as_ref()
@@ -1668,12 +1668,12 @@ fn context_diagnostic_primary_is_canonical(
                 })
                 == Some(primary)
         }
-        "EZC1060" => diagnostic
+        "PSC1060" => diagnostic
             .provider_id
             .as_ref()
             .and_then(|id| model.provider(id))
             .is_some_and(|provider| &provider.declared_type.provenance == primary),
-        "EZC1061" => {
+        "PSC1061" => {
             diagnostic
                 .context_id
                 .as_ref()
@@ -1682,12 +1682,12 @@ fn context_diagnostic_primary_is_canonical(
                 .and_then(|expression| model.expression_graph.provenance_of(expression))
                 == Some(primary)
         }
-        "EZC1062" => diagnostic
+        "PSC1062" => diagnostic
             .consumer_id
             .as_ref()
             .and_then(|id| model.consumer(id))
             .is_some_and(|consumer| &consumer.requested_type.provenance == primary),
-        "EZC1063" | "EZC1064" => {
+        "PSC1063" | "PSC1064" => {
             if let Some(provider) = diagnostic
                 .provider_id
                 .as_ref()
@@ -1711,7 +1711,7 @@ fn context_diagnostic_primary_is_canonical(
                         == primary
                 })
         }
-        "EZC1065" => {
+        "PSC1065" => {
             diagnostic
                 .consumer_id
                 .as_ref()
@@ -1723,7 +1723,7 @@ fn context_diagnostic_primary_is_canonical(
                     .iter()
                     .any(|record| &record.provenance == primary)
         }
-        "EZC1066" | "EZC1067" => model
+        "PSC1066" | "PSC1067" => model
             .context_evaluation
             .source_entries
             .values()
@@ -1735,7 +1735,7 @@ fn context_diagnostic_primary_is_canonical(
                 crate::ContextValueSourceId::ContextDefault(_) => diagnostic.provider_id.is_none(),
             })
             .any(|entry| {
-                if diagnostic.code == "EZC1067" {
+                if diagnostic.code == "PSC1067" {
                     return model
                         .expression_graph
                         .provenance_of(&entry.expression_root)
@@ -1817,7 +1817,7 @@ fn validate_template_action_bindings(
             // executable for every materialized instance.
             let Some(component) = component else {
                 diagnostics.push(AsmValidationDiagnostic {
-                    code: "EZASM1126".to_string(),
+                    code: "PSASM1126".to_string(),
                     message: "ordinary event references a missing component".to_string(),
                 });
                 continue;
@@ -1836,7 +1836,7 @@ fn validate_template_action_bindings(
             if batch.is_none_or(|batch| Some(batch.id.as_str()) != event.action_batch_id.as_deref())
             {
                 diagnostics.push(AsmValidationDiagnostic {
-                    code: "EZASM1128".to_string(),
+                    code: "PSASM1128".to_string(),
                     message: "ordinary event does not resolve to its canonical F8 action batch"
                         .to_string(),
                 });
@@ -1851,7 +1851,7 @@ fn validate_template_action_bindings(
             .find(|component| component.class_name == component_manifest.name)
         else {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1126".to_string(),
+                code: "PSASM1126".to_string(),
                 message: format!(
                     "template manifest references missing component `{}`",
                     component_manifest.name
@@ -1862,7 +1862,7 @@ fn validate_template_action_bindings(
         for event in &component_manifest.template.events {
             if event.kind != Some(ManifestEventKind::Action) {
                 diagnostics.push(AsmValidationDiagnostic {
-                    code: "EZASM1127".to_string(),
+                    code: "PSASM1127".to_string(),
                     message: format!(
                         "template event `{}` is missing canonical action binding metadata",
                         event.node
@@ -1884,7 +1884,7 @@ fn validate_template_action_bindings(
             if batch.is_none_or(|batch| Some(batch.id.as_str()) != event.action_batch_id.as_deref())
             {
                 diagnostics.push(AsmValidationDiagnostic {
-                    code: "EZASM1128".to_string(),
+                    code: "PSASM1128".to_string(),
                     message: format!(
                         "template event `{}` does not resolve to its canonical F8 action batch",
                         event.node
@@ -1902,7 +1902,7 @@ fn validate_effect_execution_plan(
     let plan = model.effect_execution_plan();
     if plan.initial.render_boundary != Some(EffectRenderBoundary::AfterInitialRender) {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1120".to_string(),
+            code: "PSASM1120".to_string(),
             message: "initial effect execution plan is missing the after-initial-render boundary"
                 .to_string(),
         });
@@ -1925,7 +1925,7 @@ fn validate_effect_execution_plan(
             .find(|trigger| trigger.action_batch == action.action_batch)
         else {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1121".to_string(),
+                code: "PSASM1121".to_string(),
                 message: format!(
                     "effect execution plan references untriggered action batch `{}`",
                     action.action_batch
@@ -1966,7 +1966,7 @@ fn validate_effect_execution_entry(
             .any(|computed| !model.computed_values.contains_key(computed))
     {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1122".to_string(),
+            code: "PSASM1122".to_string(),
             message: format!("effect plan `{context}` has invalid required computed membership"),
         });
     }
@@ -1994,7 +1994,7 @@ fn validate_effect_execution_entry(
             || prior_source_index.is_some_and(|prior| prior >= batch.source_batch_index)
         {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1123".to_string(),
+                code: "PSASM1123".to_string(),
                 message: format!(
                     "effect plan `{context}` does not preserve canonical computed batch membership"
                 ),
@@ -2005,7 +2005,7 @@ fn validate_effect_execution_entry(
     }
     if batch_membership != required {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1124".to_string(),
+            code: "PSASM1124".to_string(),
             message: format!(
                 "effect plan `{context}` required computed values do not match prerequisite batches"
             ),
@@ -2037,7 +2037,7 @@ fn validate_effect_execution_entry(
         })
     {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1125".to_string(),
+            code: "PSASM1125".to_string(),
             message: format!("effect plan `{context}` has invalid effect eligibility membership"),
         });
     }
@@ -2045,7 +2045,7 @@ fn validate_effect_execution_entry(
         batch.index != u32::try_from(index).expect("effect scheduler batch index should fit u32")
     }) {
         diagnostics.push(AsmValidationDiagnostic {
-            code: "EZASM1126".to_string(),
+            code: "PSASM1126".to_string(),
             message: format!("effect plan `{context}` has non-contiguous terminal batch indexes"),
         });
     }
@@ -2058,7 +2058,7 @@ fn validate_effect_statement_types(
     for (statement, record) in &model.semantic_types.effect_statements {
         if statement != &record.statement {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1110".to_string(),
+                code: "PSASM1110".to_string(),
                 message: format!(
                     "effect statement type record key `{statement}` does not match statement `{}`",
                     record.statement
@@ -2067,7 +2067,7 @@ fn validate_effect_statement_types(
         }
         let Some(canonical_statement) = model.effect_statement(statement) else {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1111".to_string(),
+                code: "PSASM1111".to_string(),
                 message: format!(
                     "effect statement type record references missing statement `{statement}`"
                 ),
@@ -2076,7 +2076,7 @@ fn validate_effect_statement_types(
         };
         if canonical_statement.provenance != record.provenance {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1112".to_string(),
+                code: "PSASM1112".to_string(),
                 message: format!(
                     "effect statement type record for `{statement}` has inconsistent provenance"
                 ),
@@ -2093,7 +2093,7 @@ fn validate_effect_statement_types(
             && !operation_exists
         {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1113".to_string(),
+                code: "PSASM1113".to_string(),
                 message: format!(
                     "recognized effect statement `{statement}` has no registry capability operation"
                 ),
@@ -2103,7 +2103,7 @@ fn validate_effect_statement_types(
             && record.capability_operation.is_some()
         {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1114".to_string(),
+                code: "PSASM1114".to_string(),
                 message: format!(
                     "non-capability effect statement `{statement}` unexpectedly names a registry operation"
                 ),
@@ -2119,7 +2119,7 @@ fn validate_semantic_types(
     for (subject, assignment) in &model.semantic_types.assignments {
         if subject != &assignment.subject {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1101".to_string(),
+                code: "PSASM1101".to_string(),
                 message: format!(
                     "semantic type assignment map key `{subject}` does not match subject `{}`",
                     assignment.subject
@@ -2128,7 +2128,7 @@ fn validate_semantic_types(
         }
         if assignment.id != SemanticTypeId::for_subject(&assignment.subject) {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1102".to_string(),
+                code: "PSASM1102".to_string(),
                 message: format!(
                     "semantic type assignment for `{subject}` has an invalid canonical type ID `{}`",
                     assignment.id
@@ -2140,7 +2140,7 @@ fn validate_semantic_types(
             .or_else(|| model.expression_provenance(&assignment.subject));
         if subject_provenance.is_none() {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1103".to_string(),
+                code: "PSASM1103".to_string(),
                 message: format!(
                     "semantic type assignment references missing subject `{}`",
                     assignment.subject
@@ -2149,7 +2149,7 @@ fn validate_semantic_types(
         }
         if subject_provenance != Some(&assignment.provenance) {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1104".to_string(),
+                code: "PSASM1104".to_string(),
                 message: format!(
                     "semantic type assignment for `{subject}` has inconsistent provenance"
                 ),
@@ -2162,7 +2162,7 @@ fn validate_semantic_types(
                 .contains_key(&assignment.origin)
         {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1105".to_string(),
+                code: "PSASM1105".to_string(),
                 message: format!(
                     "semantic type assignment for `{subject}` has unresolved origin `{}`",
                     assignment.origin
@@ -2175,7 +2175,7 @@ fn validate_semantic_types(
         let expected = crate::SemanticId::type_alias_in_module(&alias.provenance.path, &alias.name);
         if alias.id != expected {
             diagnostics.push(AsmValidationDiagnostic {
-                code: "EZASM1106".to_string(),
+                code: "PSASM1106".to_string(),
                 message: format!(
                     "type alias `{}` has invalid canonical identity `{}`",
                     alias.name, alias.id

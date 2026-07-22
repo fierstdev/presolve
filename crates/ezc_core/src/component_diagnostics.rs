@@ -27,7 +27,7 @@ pub struct ComponentDiagnosticContract {
 
 pub const COMPONENT_DIAGNOSTIC_CONTRACTS: [ComponentDiagnosticContract; 16] = [
     contract((
-        "EZC1068",
+        "PSC1068",
         "Invalid slot declaration.",
         "H1 slot declaration candidates",
         "invalid authored slot declaration",
@@ -38,7 +38,7 @@ pub const COMPONENT_DIAGNOSTIC_CONTRACTS: [ComponentDiagnosticContract; 16] = [
         "shared diagnostic envelope",
     )),
     contract((
-        "EZC1069",
+        "PSC1069",
         "Invalid component invocation.",
         "H2 invocation resolution",
         "component invocation",
@@ -49,7 +49,7 @@ pub const COMPONENT_DIAGNOSTIC_CONTRACTS: [ComponentDiagnosticContract; 16] = [
         "shared diagnostic envelope",
     )),
     contract((
-        "EZC1070",
+        "PSC1070",
         "Unresolved component symbol.",
         "H2 invocation resolution",
         "component invocation symbol",
@@ -60,7 +60,7 @@ pub const COMPONENT_DIAGNOSTIC_CONTRACTS: [ComponentDiagnosticContract; 16] = [
         "shared diagnostic envelope",
     )),
     contract((
-        "EZC1071",
+        "PSC1071",
         "Component composition cycle.",
         "H9 composition analysis",
         "cycle invocation",
@@ -71,7 +71,7 @@ pub const COMPONENT_DIAGNOSTIC_CONTRACTS: [ComponentDiagnosticContract; 16] = [
         "shared diagnostic envelope",
     )),
     contract((
-        "EZC1072",
+        "PSC1072",
         "Component inheritance is unsupported.",
         "H1 normalized component heritage",
         "component base class",
@@ -82,7 +82,7 @@ pub const COMPONENT_DIAGNOSTIC_CONTRACTS: [ComponentDiagnosticContract; 16] = [
         "shared diagnostic envelope",
     )),
     contract((
-        "EZC1073",
+        "PSC1073",
         "Inherited semantic declaration is unsupported.",
         "H1 normalized heritage and semantic declarations",
         "component base class",
@@ -93,7 +93,7 @@ pub const COMPONENT_DIAGNOSTIC_CONTRACTS: [ComponentDiagnosticContract; 16] = [
         "shared diagnostic envelope",
     )),
     contract((
-        "EZC1074",
+        "PSC1074",
         "Unknown slot.",
         "H3 slot fragment/outlet registry",
         "unknown supplied slot",
@@ -104,7 +104,7 @@ pub const COMPONENT_DIAGNOSTIC_CONTRACTS: [ComponentDiagnosticContract; 16] = [
         "shared diagnostic envelope",
     )),
     contract((
-        "EZC1075",
+        "PSC1075",
         "Duplicate slot content.",
         "H3 slot fragment registry",
         "duplicate supplied content",
@@ -115,7 +115,7 @@ pub const COMPONENT_DIAGNOSTIC_CONTRACTS: [ComponentDiagnosticContract; 16] = [
         "shared diagnostic envelope",
     )),
     contract((
-        "EZC1076",
+        "PSC1076",
         "Duplicate slot outlet.",
         "H3 slot outlet registry",
         "duplicate callee outlet",
@@ -126,7 +126,7 @@ pub const COMPONENT_DIAGNOSTIC_CONTRACTS: [ComponentDiagnosticContract; 16] = [
         "shared diagnostic envelope",
     )),
     contract((
-        "EZC1077",
+        "PSC1077",
         "Missing slot outlet.",
         "H7 slot binding registry",
         "instance slot binding",
@@ -137,7 +137,7 @@ pub const COMPONENT_DIAGNOSTIC_CONTRACTS: [ComponentDiagnosticContract; 16] = [
         "shared diagnostic envelope",
     )),
     contract((
-        "EZC1078",
+        "PSC1078",
         "Invalid slot content ownership.",
         "H7 binding and H8 ownership typing",
         "instance slot binding",
@@ -148,7 +148,7 @@ pub const COMPONENT_DIAGNOSTIC_CONTRACTS: [ComponentDiagnosticContract; 16] = [
         "shared diagnostic envelope",
     )),
     contract((
-        "EZC1079",
+        "PSC1079",
         "Slot type or boundary incompatibility.",
         "H8 composition typing",
         "instance slot binding",
@@ -159,7 +159,7 @@ pub const COMPONENT_DIAGNOSTIC_CONTRACTS: [ComponentDiagnosticContract; 16] = [
         "shared diagnostic envelope",
     )),
     contract((
-        "EZC1080",
+        "PSC1080",
         "Component instance planning failure.",
         "H4 blocked instance plan",
         "blocked component instance",
@@ -170,7 +170,7 @@ pub const COMPONENT_DIAGNOSTIC_CONTRACTS: [ComponentDiagnosticContract; 16] = [
         "shared diagnostic envelope",
     )),
     contract((
-        "EZC1081",
+        "PSC1081",
         "Instance-aware Context binding unavailable.",
         "H6 instance Context and H8 typing",
         "consumer instance binding",
@@ -181,7 +181,7 @@ pub const COMPONENT_DIAGNOSTIC_CONTRACTS: [ComponentDiagnosticContract; 16] = [
         "shared diagnostic envelope",
     )),
     contract((
-        "EZC1082",
+        "PSC1082",
         "Structural region cannot be planned.",
         "H4 blocked structural instance plan",
         "structural region",
@@ -192,7 +192,7 @@ pub const COMPONENT_DIAGNOSTIC_CONTRACTS: [ComponentDiagnosticContract; 16] = [
         "shared diagnostic envelope",
     )),
     contract((
-        "EZC1083",
+        "PSC1083",
         "Component/slot source cannot be lowered.",
         "H10 initialization exclusions and H11 lowering",
         "blocked component or slot source",
@@ -267,7 +267,7 @@ fn collect_declarations_and_inheritance(
                 continue;
             };
             let primary = slot_declaration_primary(candidate, violation);
-            let mut diagnostic = diagnostic("EZC1068", primary, Some(component.id.clone()));
+            let mut diagnostic = diagnostic("PSC1068", primary, Some(component.id.clone()));
             diagnostic.secondary_labels = component
                 .slot_declaration_candidates
                 .iter()
@@ -288,14 +288,14 @@ fn collect_declarations_and_inheritance(
         let inherited = inherited_semantic_provenances(model, component, &heritage.base);
         if inherited.is_empty() {
             diagnostics.push(diagnostic(
-                "EZC1072",
+                "PSC1072",
                 heritage.provenance.clone(),
                 Some(component.id.clone()),
             ));
         } else {
             for provenance in inherited {
                 let mut item = diagnostic(
-                    "EZC1073",
+                    "PSC1073",
                     heritage.provenance.clone(),
                     Some(component.id.clone()),
                 );
@@ -359,10 +359,10 @@ fn collect_invocations_and_cycles(
     for invocation in model.component_invocations.values() {
         let code = match invocation.status {
             ComponentInvocationResolutionStatus::Resolved => continue,
-            ComponentInvocationResolutionStatus::UnresolvedSymbol => "EZC1070",
+            ComponentInvocationResolutionStatus::UnresolvedSymbol => "PSC1070",
             ComponentInvocationResolutionStatus::ResolvedNonComponent
             | ComponentInvocationResolutionStatus::Ambiguous
-            | ComponentInvocationResolutionStatus::UnsupportedDynamicTarget => "EZC1069",
+            | ComponentInvocationResolutionStatus::UnsupportedDynamicTarget => "PSC1069",
         };
         let mut item = diagnostic(
             code,
@@ -378,7 +378,7 @@ fn collect_invocations_and_cycles(
                 continue;
             };
             let mut item = diagnostic(
-                "EZC1071",
+                "PSC1071",
                 invocation.provenance.clone(),
                 Some(invocation.owner_component.clone()),
             );
@@ -404,7 +404,7 @@ fn collect_slot_composition(
             .violations
             .contains(&SlotContentFragmentViolation::DuplicateFragment)
         {
-            Some("EZC1075")
+            Some("PSC1075")
         } else if fragment.violations.iter().any(|item| {
             matches!(
                 item,
@@ -414,7 +414,7 @@ fn collect_slot_composition(
                     | SlotContentFragmentViolation::InvalidWrapperForm
             )
         }) {
-            Some("EZC1074")
+            Some("PSC1074")
         } else {
             None
         };
@@ -448,7 +448,7 @@ fn collect_slot_composition(
             continue;
         }
         let mut item = diagnostic(
-            "EZC1076",
+            "PSC1076",
             outlet.provenance.clone(),
             Some(outlet.owner_component.clone()),
         );
@@ -473,8 +473,8 @@ fn collect_slot_bindings(
 ) {
     for binding in model.slot_bindings.bindings.values() {
         let code = match binding.status {
-            SlotBindingStatus::MissingOutlet => Some("EZC1077"),
-            SlotBindingStatus::InvalidOwnership => Some("EZC1078"),
+            SlotBindingStatus::MissingOutlet => Some("PSC1077"),
+            SlotBindingStatus::InvalidOwnership => Some("PSC1078"),
             _ => None,
         };
         if let Some(code) = code {
@@ -488,7 +488,7 @@ fn collect_slot_bindings(
                 record.type_compatibility == CompositionCompatibility::Incompatible
             })
         {
-            diagnostics.push(binding_diagnostic(model, binding, "EZC1079"));
+            diagnostics.push(binding_diagnostic(model, binding, "PSC1079"));
         }
     }
 }
@@ -512,7 +512,7 @@ fn binding_diagnostic(
         item.secondary_labels
             .push(label(slot.provenance.clone(), "Slot declaration."));
     }
-    if code == "EZC1078" {
+    if code == "PSC1078" {
         if let Some(fragment) = binding
             .content_fragment
             .as_ref()
@@ -561,7 +561,7 @@ fn collect_instance_context(
             .consumer_instances
             .get(&resolution.consumer_instance)
             .map(|item| item.component.clone());
-        let mut item = diagnostic("EZC1081", resolution.provenance.clone(), component);
+        let mut item = diagnostic("PSC1081", resolution.provenance.clone(), component);
         item.context_id.clone_from(&resolution.context);
         item.provider_id = resolution
             .provider_instance
@@ -593,9 +593,9 @@ fn collect_planning_and_lowering(
         .collect::<BTreeSet<_>>();
     for blocked in model.component_instance_plan.blocked.values() {
         let code = if blocked.structural_region.is_some() {
-            "EZC1082"
+            "PSC1082"
         } else {
-            "EZC1080"
+            "PSC1080"
         };
         let component = blocked.target_component.clone().or_else(|| {
             model
@@ -618,7 +618,7 @@ fn collect_planning_and_lowering(
         }
         diagnostics.push(item);
         if blocked_ids.contains(&blocked.id) {
-            let mut lowering = diagnostic("EZC1083", blocked.provenance.clone(), component);
+            let mut lowering = diagnostic("PSC1083", blocked.provenance.clone(), component);
             lowering.invocation_id = Some(blocked.invocation.clone());
             lowering.component_instance_id = Some(blocked.id.clone());
             lowering
@@ -633,7 +633,7 @@ fn collect_planning_and_lowering(
             SlotBindingStatus::Bound | SlotBindingStatus::Empty
         )
     }) {
-        let mut item = binding_diagnostic(model, binding, "EZC1083");
+        let mut item = binding_diagnostic(model, binding, "PSC1083");
         item.secondary_labels.clear();
         diagnostics.push(item);
     }
@@ -642,17 +642,17 @@ fn collect_planning_and_lowering(
 fn suppress_derivative_cascades(diagnostics: &mut Vec<ComponentDiagnostic>) {
     let invalid_components = diagnostics
         .iter()
-        .filter(|item| matches!(item.code.as_str(), "EZC1072" | "EZC1073"))
+        .filter(|item| matches!(item.code.as_str(), "PSC1072" | "PSC1073"))
         .filter_map(|item| item.component_id.clone())
         .collect::<BTreeSet<_>>();
     let unresolved_invocations = diagnostics
         .iter()
-        .filter(|item| matches!(item.code.as_str(), "EZC1069" | "EZC1070"))
+        .filter(|item| matches!(item.code.as_str(), "PSC1069" | "PSC1070"))
         .filter_map(|item| item.invocation_id.clone())
         .collect::<BTreeSet<_>>();
     let cycle_invocations = diagnostics
         .iter()
-        .filter(|item| item.code == "EZC1071")
+        .filter(|item| item.code == "PSC1071")
         .filter_map(|item| item.invocation_id.clone())
         .collect::<BTreeSet<_>>();
     let invalid_bindings = diagnostics
@@ -660,24 +660,24 @@ fn suppress_derivative_cascades(diagnostics: &mut Vec<ComponentDiagnostic>) {
         .filter(|item| {
             matches!(
                 item.code.as_str(),
-                "EZC1074" | "EZC1075" | "EZC1076" | "EZC1077" | "EZC1078" | "EZC1079"
+                "PSC1074" | "PSC1075" | "PSC1076" | "PSC1077" | "PSC1078" | "PSC1079"
             )
         })
         .filter_map(|item| item.slot_binding_id.clone())
         .collect::<BTreeSet<_>>();
     let invalid_slot_invocations = diagnostics
         .iter()
-        .filter(|item| matches!(item.code.as_str(), "EZC1074" | "EZC1075"))
+        .filter(|item| matches!(item.code.as_str(), "PSC1074" | "PSC1075"))
         .filter_map(|item| item.invocation_id.clone())
         .collect::<BTreeSet<_>>();
     let context_instances = diagnostics
         .iter()
-        .filter(|item| item.code == "EZC1081")
+        .filter(|item| item.code == "PSC1081")
         .filter_map(|item| item.component_instance_id.clone())
         .collect::<BTreeSet<_>>();
     let planning_failures = diagnostics
         .iter()
-        .filter(|item| matches!(item.code.as_str(), "EZC1080" | "EZC1082"))
+        .filter(|item| matches!(item.code.as_str(), "PSC1080" | "PSC1082"))
         .filter_map(|item| item.component_instance_id.clone())
         .collect::<BTreeSet<_>>();
     diagnostics.retain(|item| {
@@ -712,7 +712,7 @@ fn suppress_derivative_cascades(diagnostics: &mut Vec<ComponentDiagnostic>) {
                 .component_instance_id
                 .as_ref()
                 .is_some_and(|id| context_instances.contains(id));
-        let failed_planning = item.code == "EZC1083"
+        let failed_planning = item.code == "PSC1083"
             && item
                 .component_instance_id
                 .as_ref()
@@ -729,11 +729,11 @@ fn suppress_derivative_cascades(diagnostics: &mut Vec<ComponentDiagnostic>) {
 
 const fn suppression_rank(code: &str) -> u8 {
     match code.as_bytes() {
-        b"EZC1068" | b"EZC1072" | b"EZC1073" => 1,
-        b"EZC1069" | b"EZC1070" => 2,
-        b"EZC1071" => 3,
-        b"EZC1074" | b"EZC1075" | b"EZC1076" | b"EZC1077" | b"EZC1078" | b"EZC1079" => 4,
-        b"EZC1081" => 5,
+        b"PSC1068" | b"PSC1072" | b"PSC1073" => 1,
+        b"PSC1069" | b"PSC1070" => 2,
+        b"PSC1071" => 3,
+        b"PSC1074" | b"PSC1075" | b"PSC1076" | b"PSC1077" | b"PSC1078" | b"PSC1079" => 4,
+        b"PSC1081" => 5,
         _ => 6,
     }
 }
@@ -881,7 +881,7 @@ mod tests {
         assert_eq!(
             codes,
             (1068..=1083)
-                .map(|code| format!("EZC{code}"))
+                .map(|code| format!("PSC{code}"))
                 .collect::<Vec<_>>()
         );
         for item in COMPONENT_DIAGNOSTIC_CONTRACTS {
@@ -923,7 +923,7 @@ class Base { @slot() inherited!: SlotContent; render() { return <div />; } }
             .map(|item| item.code.as_str())
             .collect::<BTreeSet<_>>();
         for code in [
-            "EZC1068", "EZC1070", "EZC1071", "EZC1073", "EZC1074", "EZC1076",
+            "PSC1068", "PSC1070", "PSC1071", "PSC1073", "PSC1074", "PSC1076",
         ] {
             assert!(codes.contains(code), "missing {code}: {first:#?}");
         }
@@ -972,10 +972,10 @@ class Base { @slot() inherited!: SlotContent; render() { return <div />; } }
             r#"@component("x-page") class Page extends Component { render() { return <main><Missing /></main>; } }"#,
         );
         let diagnostics = collect_component_diagnostics(&unresolved);
-        assert!(diagnostics.iter().any(|item| item.code == "EZC1070"));
+        assert!(diagnostics.iter().any(|item| item.code == "PSC1070"));
         assert!(!diagnostics
             .iter()
-            .any(|item| matches!(item.code.as_str(), "EZC1080" | "EZC1082" | "EZC1083")));
+            .any(|item| matches!(item.code.as_str(), "PSC1080" | "PSC1082" | "PSC1083")));
 
         let independent = model(
             r#"@component("x-a") class A extends Component { @slot("bad") invalid!: SlotContent; render() { return <B />; } } @component("x-b") class B extends Component { render() { return <A />; } }"#,
@@ -984,8 +984,8 @@ class Base { @slot() inherited!: SlotContent; render() { return <div />; } }
             .into_iter()
             .map(|item| item.code)
             .collect::<BTreeSet<_>>();
-        assert!(codes.contains("EZC1068"));
-        assert!(codes.contains("EZC1071"));
+        assert!(codes.contains("PSC1068"));
+        assert!(codes.contains("PSC1071"));
     }
 
     #[test]
@@ -996,7 +996,7 @@ class Base { @slot() inherited!: SlotContent; render() { return <div />; } }
         let index = unknown_identity
             .diagnostics
             .iter()
-            .position(|item| item.code == "EZC1070")
+            .position(|item| item.code == "PSC1070")
             .expect("component diagnostic");
         unknown_identity.diagnostics[index].component_id =
             Some(SemanticId::component(Some("x-fabricated"), "Fabricated"));
@@ -1007,7 +1007,7 @@ class Base { @slot() inherited!: SlotContent; render() { return <div />; } }
             ));
         assert!(validate_application_semantic_model(&unknown_identity)
             .iter()
-            .any(|item| item.code == "EZASM1201"));
+            .any(|item| item.code == "PSASM1201"));
 
         let mut cross_owner = model(
             r#"@component("x-a") class A extends Component { render() { return <Missing />; } } @component("x-b") class B extends Component { render() { return <main />; } }"#,
@@ -1022,12 +1022,12 @@ class Base { @slot() inherited!: SlotContent; render() { return <div />; } }
         let index = cross_owner
             .diagnostics
             .iter()
-            .position(|item| item.code == "EZC1070")
+            .position(|item| item.code == "PSC1070")
             .unwrap();
         cross_owner.diagnostics[index].component_id = Some(other);
         assert!(validate_application_semantic_model(&cross_owner)
             .iter()
-            .any(|item| item.code == "EZASM1201"));
+            .any(|item| item.code == "PSASM1201"));
 
         let mut bad_provenance = model(
             r#"@component("x-page") class Page extends Component { render() { return <Missing />; } }"#,
@@ -1035,7 +1035,7 @@ class Base { @slot() inherited!: SlotContent; render() { return <div />; } }
         let index = bad_provenance
             .diagnostics
             .iter()
-            .position(|item| item.code == "EZC1070")
+            .position(|item| item.code == "PSC1070")
             .unwrap();
         bad_provenance.diagnostics[index]
             .provenance
@@ -1045,7 +1045,7 @@ class Base { @slot() inherited!: SlotContent; render() { return <div />; } }
             .start += 1;
         assert!(validate_application_semantic_model(&bad_provenance)
             .iter()
-            .any(|item| item.code == "EZASM1201"));
+            .any(|item| item.code == "PSASM1201"));
 
         let mut bad_labels = model(
             r#"@component("x-card") class Card extends Component { @slot() children!: SlotContent; render() { return <main><slot /><slot /></main>; } }"#,
@@ -1053,7 +1053,7 @@ class Base { @slot() inherited!: SlotContent; render() { return <div />; } }
         let index = bad_labels
             .diagnostics
             .iter()
-            .position(|item| item.code == "EZC1076")
+            .position(|item| item.code == "PSC1076")
             .unwrap();
         let duplicate = bad_labels.diagnostics[index].secondary_labels[0].clone();
         bad_labels.diagnostics[index]
@@ -1061,7 +1061,7 @@ class Base { @slot() inherited!: SlotContent; render() { return <div />; } }
             .push(duplicate);
         assert!(validate_application_semantic_model(&bad_labels)
             .iter()
-            .any(|item| item.code == "EZASM1201"));
+            .any(|item| item.code == "PSASM1201"));
 
         let mut primary_repeated = model(
             r#"@component("x-card") class Card extends Component { @slot() children!: SlotContent; render() { return <main><slot /><slot /></main>; } }"#,
@@ -1069,7 +1069,7 @@ class Base { @slot() inherited!: SlotContent; render() { return <div />; } }
         let index = primary_repeated
             .diagnostics
             .iter()
-            .position(|item| item.code == "EZC1076")
+            .position(|item| item.code == "PSC1076")
             .unwrap();
         primary_repeated.diagnostics[index].secondary_labels[0].provenance = primary_repeated
             .diagnostics[index]
@@ -1078,7 +1078,7 @@ class Base { @slot() inherited!: SlotContent; render() { return <div />; } }
             .unwrap();
         assert!(validate_application_semantic_model(&primary_repeated)
             .iter()
-            .any(|item| item.code == "EZASM1201"));
+            .any(|item| item.code == "PSASM1201"));
 
         let mut unsupported = model(
             r#"@component("x-page") class Page extends Component { render() { return <Missing />; } }"#,
@@ -1086,55 +1086,55 @@ class Base { @slot() inherited!: SlotContent; render() { return <div />; } }
         let mut fabricated = unsupported
             .diagnostics
             .iter()
-            .find(|item| item.code == "EZC1070")
+            .find(|item| item.code == "PSC1070")
             .unwrap()
             .clone();
-        fabricated.code = "EZC1083".to_string();
+        fabricated.code = "PSC1083".to_string();
         fabricated.message = "Component/slot source cannot be lowered.".to_string();
         unsupported.diagnostics.push(fabricated);
         assert!(validate_application_semantic_model(&unsupported)
             .iter()
-            .any(|item| item.code == "EZASM1201"));
+            .any(|item| item.code == "PSASM1201"));
     }
 
     fn example_model(code: &str) -> crate::ApplicationSemanticModel {
         match code {
-            "EZC1068" => model(
+            "PSC1068" => model(
                 r#"@component("x-page") class Page extends Component { @slot("bad") value!: SlotContent; render() { return <main />; } }"#,
             ),
-            "EZC1069" => model(
+            "PSC1069" => model(
                 r#"@component("x-page") class Page extends Component { render() { return <Registry.Card />; } }"#,
             ),
-            "EZC1070" => model(
+            "PSC1070" => model(
                 r#"@component("x-page") class Page extends Component { render() { return <Missing />; } }"#,
             ),
-            "EZC1071" => model(
+            "PSC1071" => model(
                 r#"@component("x-a") class A extends Component { render() { return <B />; } } @component("x-b") class B extends Component { render() { return <A />; } }"#,
             ),
-            "EZC1072" => model(
+            "PSC1072" => model(
                 r#"class Base { render() { return <div />; } } @component("x-page") class Page extends Base { render() { return <main />; } }"#,
             ),
-            "EZC1073" => model(
+            "PSC1073" => model(
                 r#"class Base { value = state(0); render() { return <div />; } } @component("x-page") class Page extends Base { render() { return <main />; } }"#,
             ),
-            "EZC1074" => slot_model(r#"<Card><template slot="missing"><b /></template></Card>"#),
-            "EZC1075" => slot_model(
+            "PSC1074" => slot_model(r#"<Card><template slot="missing"><b /></template></Card>"#),
+            "PSC1075" => slot_model(
                 r#"<Card><template slot="header"><b /></template><template slot="header"><i /></template></Card>"#,
             ),
-            "EZC1076" => model(
+            "PSC1076" => model(
                 r#"@component("x-card") class Card extends Component { @slot() children!: SlotContent; render() { return <article><slot /><slot /></article>; } }"#,
             ),
-            "EZC1077" => slot_model(r#"<Card><template slot="header"><b /></template></Card>"#),
-            "EZC1078" | "EZC1079" | "EZC1083" => {
+            "PSC1077" => slot_model(r#"<Card><template slot="header"><b /></template></Card>"#),
+            "PSC1078" | "PSC1079" | "PSC1083" => {
                 slot_model(r#"<Card><template slot="header"><b /></template></Card>"#)
             }
-            "EZC1080" => model(
+            "PSC1080" => model(
                 r#"@component("x-page") class Page extends Component { render() { return <Missing />; } } @component("x-card") class Card extends Component { render() { return <div />; } }"#,
             ),
-            "EZC1081" => model(
+            "PSC1081" => model(
                 r#"@component("x-theme") class Theme extends Component { @context() color!: string; render() { return <div />; } } @component("x-leaf") class Leaf extends Component { @consume(Theme.color) color!: number; render() { return <span />; } } @component("x-card") class Card extends Component { @provide(Theme.color) color: string = "blue"; render() { return <Leaf />; } } @component("x-page") class Page extends Component { render() { return <Card />; } }"#,
             ),
-            "EZC1082" => model(
+            "PSC1082" => model(
                 r#"@component("x-card") class Card extends Component { render() { return <div />; } } @component("x-page") class Page extends Component { visible = state(true); render() { return <main>{this.visible ? <Card /> : <span />}</main>; } }"#,
             ),
             _ => unreachable!(),
@@ -1145,7 +1145,7 @@ class Base { @slot() inherited!: SlotContent; render() { return <div />; } }
         let mut model = example_model(code);
 
         match code {
-            "EZC1078" => {
+            "PSC1078" => {
                 model
                     .slot_bindings
                     .bindings
@@ -1154,7 +1154,7 @@ class Base { @slot() inherited!: SlotContent; render() { return <div />; } }
                     .unwrap()
                     .status = SlotBindingStatus::InvalidOwnership;
             }
-            "EZC1079" => {
+            "PSC1079" => {
                 let record = model
                     .composition_types
                     .slot_bindings
@@ -1164,7 +1164,7 @@ class Base { @slot() inherited!: SlotContent; render() { return <div />; } }
                 record.type_compatibility = CompositionCompatibility::Incompatible;
                 record.overall = CompositionCompatibility::Incompatible;
             }
-            "EZC1080" => {
+            "PSC1080" => {
                 let target = model
                     .components
                     .iter()
@@ -1191,7 +1191,7 @@ class Base { @slot() inherited!: SlotContent; render() { return <div />; } }
                     .unwrap()
                     .target_component = Some(target);
             }
-            "EZC1082" => {
+            "PSC1082" => {
                 let id = model
                     .component_instance_plan
                     .instances
@@ -1216,7 +1216,7 @@ class Base { @slot() inherited!: SlotContent; render() { return <div />; } }
                     },
                 );
             }
-            "EZC1083" => {
+            "PSC1083" => {
                 model
                     .slot_bindings
                     .bindings

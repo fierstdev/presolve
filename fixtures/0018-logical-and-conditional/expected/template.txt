@@ -4,8 +4,8 @@ TemplateGraph:
     template LogicalAndStatus
       root: <button> id=n0 @ fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx:12:7 span=218..314
       attributes:
-        data-ez-on-click = event-handler(click -> this.toggle) @ fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx:12:15 span=226..255
-        data-ez-bindings = bindings(this.enabled) @ generated
+        data-presolve-on-click = event-handler(click -> this.toggle) @ fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx:12:15 span=226..255
+        data-presolve-bindings = bindings(this.enabled) @ generated
       children:
         Conditional id=n1 start=n2 end=n3 condition="this.enabled" initial=Some(true) @ fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx:13:10 span=266..297
           true:

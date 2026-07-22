@@ -142,7 +142,7 @@ class InvalidContexts extends Component {
                 .iter()
                 .map(|diagnostic| diagnostic.code.as_str())
                 .collect::<Vec<_>>(),
-            vec!["EZC1052", "EZC1052", "EZC1052", "EZC1052", "EZC1052"]
+            vec!["PSC1052", "PSC1052", "PSC1052", "PSC1052", "PSC1052"]
         );
     }
 

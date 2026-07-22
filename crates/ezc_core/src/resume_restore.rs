@@ -186,10 +186,10 @@ impl ResumeRestoreIntegrityCode {
     #[must_use]
     pub const fn code(self) -> &'static str {
         match self {
-            Self::ProgramReference => "EZASM1359",
-            Self::PhaseOrDuplicateWrite => "EZASM1360",
-            Self::MissingCompletion => "EZASM1361",
-            Self::OrderingOrOutputDrift => "EZASM1362",
+            Self::ProgramReference => "PSASM1359",
+            Self::PhaseOrDuplicateWrite => "PSASM1360",
+            Self::MissingCompletion => "PSASM1361",
+            Self::OrderingOrOutputDrift => "PSASM1362",
         }
     }
 }
@@ -961,7 +961,7 @@ mod tests {
                 ResumeRestoreIntegrityCode::OrderingOrOutputDrift,
             ]
             .map(ResumeRestoreIntegrityCode::code),
-            ["EZASM1359", "EZASM1360", "EZASM1361", "EZASM1362"]
+            ["PSASM1359", "PSASM1360", "PSASM1361", "PSASM1362"]
         );
     }
 }

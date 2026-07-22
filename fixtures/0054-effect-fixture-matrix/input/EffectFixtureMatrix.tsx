@@ -1,7 +1,7 @@
 @component("x-effect-fixture-matrix")
 class EffectFixtureMatrix extends Component {
   count = state(1);
-  title = state("EdgeZero effects");
+  title = state("Presolve effects");
 
   @computed()
   get total() { return this.count * 2; }
@@ -13,7 +13,7 @@ class EffectFixtureMatrix extends Component {
   }
 
   @action()
-  rename() { this.title = "EdgeZero renamed"; }
+  rename() { this.title = "Presolve renamed"; }
 
   @effect()
   syncTitle() { document.title = this.title; }
@@ -21,13 +21,13 @@ class EffectFixtureMatrix extends Component {
   @effect()
   persistTotal() {
     console.log(this.total);
-    localStorage.setItem("edgezero-total", "ready");
+    localStorage.setItem("presolve-total", "ready");
   }
 
   @effect()
   rememberTotal() {
     console.info(this.total);
-    sessionStorage.setItem("edgezero-total", "ready");
+    sessionStorage.setItem("presolve-total", "ready");
   }
 
   @effect()

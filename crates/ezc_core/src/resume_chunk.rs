@@ -122,12 +122,12 @@ impl ResumeChunkIntegrityCode {
     #[must_use]
     pub const fn code(self) -> &'static str {
         match self {
-            Self::DuplicateInclusion => "EZASM1343",
-            Self::MissingProgram => "EZASM1344",
-            Self::DependencyCycle => "EZASM1345",
-            Self::RootCorrespondence => "EZASM1346",
-            Self::UnrelatedProgram => "EZASM1347",
-            Self::OrderingOrOutputDrift => "EZASM1348",
+            Self::DuplicateInclusion => "PSASM1343",
+            Self::MissingProgram => "PSASM1344",
+            Self::DependencyCycle => "PSASM1345",
+            Self::RootCorrespondence => "PSASM1346",
+            Self::UnrelatedProgram => "PSASM1347",
+            Self::OrderingOrOutputDrift => "PSASM1348",
         }
     }
 }
@@ -563,12 +563,12 @@ mod tests {
             ]
             .map(ResumeChunkIntegrityCode::code),
             [
-                "EZASM1343",
-                "EZASM1344",
-                "EZASM1345",
-                "EZASM1346",
-                "EZASM1347",
-                "EZASM1348",
+                "PSASM1343",
+                "PSASM1344",
+                "PSASM1345",
+                "PSASM1346",
+                "PSASM1347",
+                "PSASM1348",
             ]
         );
     }

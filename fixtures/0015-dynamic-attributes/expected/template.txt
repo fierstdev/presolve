@@ -6,8 +6,8 @@ TemplateGraph:
       attributes:
         disabled = binding(id=n1 expression="this.disabled" initial=Some(false)) @ fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx:14:15 span=293..317
         title = binding(id=n2 expression="this.label" initial=Some("Ready")) @ fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx:14:40 span=318..336
-        data-ez-on-click = event-handler(click -> this.lock) @ fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx:14:59 span=337..364
-        data-ez-bindings = bindings(this.label) @ generated
+        data-presolve-on-click = event-handler(click -> this.lock) @ fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx:14:59 span=337..364
+        data-presolve-bindings = bindings(this.label) @ generated
       children:
         Text("Status:") @ fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx:15:9 span=374..381
         Binding id=n3 expression="this.label" initial=Some("Ready") @ fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx:15:17 span=382..394

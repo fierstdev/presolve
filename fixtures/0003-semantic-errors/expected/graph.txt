@@ -1,9 +1,9 @@
 File: fixtures/0003-semantic-errors/input/BrokenSemantics.tsx
 ComponentGraph:
   diagnostics:
-    EZC1001: class `BrokenSemantics` is missing @component(...)
-    EZC1003: render binding `this.missingCount` references unknown field `missingCount` in class `BrokenSemantics`
-    EZC1004: event handler `this.increment` references unknown method `increment` in class `BrokenSemantics`
+    PSC1001: class `BrokenSemantics` is missing @component(...)
+    PSC1003: render binding `this.missingCount` references unknown field `missingCount` in class `BrokenSemantics`
+    PSC1004: event handler `this.increment` references unknown method `increment` in class `BrokenSemantics`
   components:
     component BrokenSemantics
       element: <missing>

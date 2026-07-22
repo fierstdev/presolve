@@ -181,10 +181,10 @@ impl ResumeCaptureIntegrityCode {
     #[must_use]
     pub const fn code(self) -> &'static str {
         match self {
-            Self::ProgramCorrespondence => "EZASM1355",
-            Self::InvalidInstruction => "EZASM1356",
-            Self::InvalidCaptureState => "EZASM1357",
-            Self::OrderingOrOutputDrift => "EZASM1358",
+            Self::ProgramCorrespondence => "PSASM1355",
+            Self::InvalidInstruction => "PSASM1356",
+            Self::InvalidCaptureState => "PSASM1357",
+            Self::OrderingOrOutputDrift => "PSASM1358",
         }
     }
 }
@@ -1069,7 +1069,7 @@ mod tests {
                 ResumeCaptureIntegrityCode::OrderingOrOutputDrift,
             ]
             .map(ResumeCaptureIntegrityCode::code),
-            ["EZASM1355", "EZASM1356", "EZASM1357", "EZASM1358"]
+            ["PSASM1355", "PSASM1356", "PSASM1357", "PSASM1358"]
         );
     }
 

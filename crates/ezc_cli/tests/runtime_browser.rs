@@ -136,7 +136,7 @@ fn component_runtime_consumes_only_compiler_plans_in_a_real_browser() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_COMPONENT_RUNTIME_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_COMPONENT_RUNTIME_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout tail:\n{}\nstderr:\n{}",
         output.status,
         stdout
@@ -189,7 +189,7 @@ fn phase_k_production_artifact_runs_under_csp_and_rejects_malformed_boot_in_a_re
 
     assert!(
         String::from_utf8_lossy(&production.stdout)
-            .contains("EDGEZERO_PHASE_K_PRODUCTION_BROWSER_PASS"),
+            .contains("PRESOLVE_PHASE_K_PRODUCTION_BROWSER_PASS"),
         "production CSP probe failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         production.status,
         String::from_utf8_lossy(&production.stdout),
@@ -197,7 +197,7 @@ fn phase_k_production_artifact_runs_under_csp_and_rejects_malformed_boot_in_a_re
     );
     assert!(
         String::from_utf8_lossy(&malformed.stdout)
-            .contains("EDGEZERO_PHASE_K_MALFORMED_BROWSER_PASS"),
+            .contains("PRESOLVE_PHASE_K_MALFORMED_BROWSER_PASS"),
         "malformed production probe failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         malformed.status,
         String::from_utf8_lossy(&malformed.stdout),
@@ -233,9 +233,9 @@ fn write_phase_k_production_probe_pages(out_dir: &Path) {
         r#"const fail=(message)=>{{throw new Error(message)}};
 const waitFor=(predicate,label)=>new Promise((resolve,reject)=>{{const deadline=Date.now()+3000;const tick=()=>{{if(predicate()){{resolve();return}}if(Date.now()>deadline){{reject(new Error(`Timed out waiting for ${{label}}`));return}}setTimeout(tick,20)}};tick()}});
 (async()=>{{
-  await waitFor(()=>["ready","error"].includes(document.documentElement.dataset.ezRuntime),"production runtime");
-  const runtime=window.__EDGEZERO__;
-  if(document.documentElement.dataset.ezRuntime==="error")fail(`production runtime failed: ${{JSON.stringify(runtime.diagnostics)}}`);
+  await waitFor(()=>["ready","error"].includes(document.documentElement.dataset.presolveRuntime),"production runtime");
+  const runtime=window.__PRESOLVE__;
+  if(document.documentElement.dataset.presolveRuntime==="error")fail(`production runtime failed: ${{JSON.stringify(runtime.diagnostics)}}`);
   if(runtime.production===null||runtime.production.table_kinds.length!==6)fail("packed ordinal tables were not installed exactly");
   if(new Set(runtime.production.table_kinds).size!==runtime.production.table_kinds.length)fail("duplicate production table installation");
   const before=Object.values(runtime.store).filter(value=>value instanceof Map||value instanceof Set).map(value=>value.size).join(",");
@@ -245,8 +245,8 @@ const waitFor=(predicate,label)=>new Promise((resolve,reject)=>{{const deadline=
   if(after!==before)fail("compiler-owned registry counts grew across 100 create/remove cycles");
   const sources=await Promise.all(["runtime.js",...{module_names}.map(name=>`production/${{name}}`)].map(path=>fetch(path).then(response=>response.text())));
   if(sources.some(source=>source.includes("eval(")||source.includes("Function(")))fail("CSP-unsafe dynamic code was emitted");
-  document.body.insertAdjacentHTML("beforeend","<div>EDGEZERO_PHASE_K_PRODUCTION_BROWSER_PASS</div>");
-}})().catch(error=>{{document.body.insertAdjacentHTML("beforeend",`<div>EDGEZERO_PHASE_K_PRODUCTION_BROWSER_FAIL: ${{error.message}}</div>`);console.error(error)}});
+  document.body.insertAdjacentHTML("beforeend","<div>PRESOLVE_PHASE_K_PRODUCTION_BROWSER_PASS</div>");
+}})().catch(error=>{{document.body.insertAdjacentHTML("beforeend",`<div>PRESOLVE_PHASE_K_PRODUCTION_BROWSER_FAIL: ${{error.message}}</div>`);console.error(error)}});
 "#
     );
     fs::write(out_dir.join("phase-k-production-probe.js"), probe)
@@ -262,7 +262,7 @@ const waitFor=(predicate,label)=>new Promise((resolve,reject)=>{{const deadline=
         .expect("write malformed production page");
     fs::write(
         out_dir.join("phase-k-malformed-probe.js"),
-        r#"const wait=setInterval(()=>{if(document.documentElement.dataset.ezRuntime!=="error")return;clearInterval(wait);const runtime=window.__EDGEZERO__;if(runtime.production!==undefined&&runtime.production!==null){document.body.insertAdjacentHTML("beforeend","<div>EDGEZERO_PHASE_K_MALFORMED_BROWSER_FAIL</div>");return}document.body.insertAdjacentHTML("beforeend","<div>EDGEZERO_PHASE_K_MALFORMED_BROWSER_PASS</div>")},20);"#,
+        r#"const wait=setInterval(()=>{if(document.documentElement.dataset.presolveRuntime!=="error")return;clearInterval(wait);const runtime=window.__PRESOLVE__;if(runtime.production!==undefined&&runtime.production!==null){document.body.insertAdjacentHTML("beforeend","<div>PRESOLVE_PHASE_K_MALFORMED_BROWSER_FAIL</div>");return}document.body.insertAdjacentHTML("beforeend","<div>PRESOLVE_PHASE_K_MALFORMED_BROWSER_PASS</div>")},20);"#,
     )
     .expect("write malformed production probe");
 }
@@ -319,7 +319,7 @@ fn repeated_component_state_and_computed_updates_stay_instance_qualified_in_a_re
     let stdout = String::from_utf8_lossy(&output.stdout);
     server.stop();
     assert!(
-        stdout.contains("EDGEZERO_STATE_INSTANCE_STORAGE_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_STATE_INSTANCE_STORAGE_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -365,11 +365,11 @@ fn phase_j_rejects_component_v2_while_legacy_v2_cold_boot_remains_accepted() {
     for (index, (file_name, marker)) in [
         (
             "phase-j-component-v2.html",
-            "EDGEZERO_PHASE_J_COMPONENT_V2_REJECTION_PASS",
+            "PRESOLVE_PHASE_J_COMPONENT_V2_REJECTION_PASS",
         ),
         (
             "legacy-component-v2-cold.html",
-            "EDGEZERO_LEGACY_COMPONENT_V2_COLD_PASS",
+            "PRESOLVE_LEGACY_COMPONENT_V2_COLD_PASS",
         ),
     ]
     .into_iter()
@@ -442,7 +442,7 @@ fn explicit_form_hosts_submit_only_through_compiler_emitted_records() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     server.stop();
     assert!(
-        stdout.contains("EDGEZERO_FORM_SUBMISSION_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_FORM_SUBMISSION_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -490,18 +490,18 @@ fn resume_bootstrap_registry_accepts_and_atomically_falls_back_in_a_real_browser
     let server = StaticServer::start(out_dir.clone());
     let chrome = chrome_bin().expect("headless Chrome was not found");
     for (index, (page, marker)) in [
-        ("cold.html", "EDGEZERO_RESUME_COLD_PASS"),
-        ("accepted.html", "EDGEZERO_RESUME_ACCEPTED_PASS"),
-        ("build-mismatch.html", "EDGEZERO_RESUME_BUILD_FALLBACK_PASS"),
+        ("cold.html", "PRESOLVE_RESUME_COLD_PASS"),
+        ("accepted.html", "PRESOLVE_RESUME_ACCEPTED_PASS"),
+        ("build-mismatch.html", "PRESOLVE_RESUME_BUILD_FALLBACK_PASS"),
         (
             "protocol-mismatch.html",
-            "EDGEZERO_RESUME_ARTIFACT_FALLBACK_PASS",
+            "PRESOLVE_RESUME_ARTIFACT_FALLBACK_PASS",
         ),
         (
             "malformed-snapshot.html",
-            "EDGEZERO_RESUME_SNAPSHOT_FALLBACK_PASS",
+            "PRESOLVE_RESUME_SNAPSHOT_FALLBACK_PASS",
         ),
-        ("value-mismatch.html", "EDGEZERO_RESUME_VALUE_FALLBACK_PASS"),
+        ("value-mismatch.html", "PRESOLVE_RESUME_VALUE_FALLBACK_PASS"),
     ]
     .into_iter()
     .enumerate()
@@ -578,7 +578,7 @@ fn resume_restores_repeated_state_and_recomputes_computed_in_a_real_browser() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     server.stop();
     assert!(
-        stdout.contains("EDGEZERO_RESUME_STATE_COMPUTED_PASS"),
+        stdout.contains("PRESOLVE_RESUME_STATE_COMPUTED_PASS"),
         "resume State/Computed probe failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -623,7 +623,7 @@ fn resume_restores_exact_nested_context_bindings_in_a_real_browser() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     server.stop();
     assert!(
-        stdout.contains("EDGEZERO_RESUME_CONTEXT_PASS"),
+        stdout.contains("PRESOLVE_RESUME_CONTEXT_PASS"),
         "resume Context probe failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -678,7 +678,7 @@ class ResumeContextFallback extends Component {
     let stdout = String::from_utf8_lossy(&output.stdout);
     server.stop();
     assert!(
-        stdout.contains("EDGEZERO_RESUME_CONTEXT_FALLBACK_PASS"),
+        stdout.contains("PRESOLVE_RESUME_CONTEXT_FALLBACK_PASS"),
         "resume Context fallback probe failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -720,14 +720,14 @@ fn resume_restores_components_and_structural_state_without_dom_reconstruction() 
     let server = StaticServer::start(out_dir.clone());
     let chrome = chrome_bin().expect("headless Chrome was not found");
     for (index, (page, marker)) in [
-        ("probe.html", "EDGEZERO_RESUME_STRUCTURE_PASS"),
+        ("probe.html", "PRESOLVE_RESUME_STRUCTURE_PASS"),
         (
             "state-mismatch.html",
-            "EDGEZERO_RESUME_STRUCTURE_FALLBACK_PASS",
+            "PRESOLVE_RESUME_STRUCTURE_FALLBACK_PASS",
         ),
         (
             "missing-anchor.html",
-            "EDGEZERO_RESUME_ANCHOR_FALLBACK_PASS",
+            "PRESOLVE_RESUME_ANCHOR_FALLBACK_PASS",
         ),
     ]
     .into_iter()
@@ -793,7 +793,7 @@ fn resume_restores_exact_slot_bindings_without_component_initialization() {
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("EDGEZERO_RESUME_SLOT_PASS"),
+        stdout.contains("PRESOLVE_RESUME_SLOT_PASS"),
         "resume Slot probe failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -835,8 +835,8 @@ fn resume_restores_compiler_owned_form_state_and_rejects_active_submission() {
     let server = StaticServer::start(out_dir.clone());
     let chrome = chrome_bin().expect("headless Chrome was not found");
     for (index, (page, marker)) in [
-        ("probe.html", "EDGEZERO_RESUME_FORMS_PASS"),
-        ("submitting.html", "EDGEZERO_RESUME_FORMS_FALLBACK_PASS"),
+        ("probe.html", "PRESOLVE_RESUME_FORMS_PASS"),
+        ("submitting.html", "PRESOLVE_RESUME_FORMS_FALLBACK_PASS"),
     ]
     .into_iter()
     .enumerate()
@@ -892,7 +892,7 @@ fn write_resume_state_computed_probe_page(out_dir: &Path) {
     let probe = resume_bootstrap_probe_page(
         &index,
         &format!(
-            "window.__EDGEZERO_RESUME_SNAPSHOT__ = {};",
+            "window.__PRESOLVE_RESUME_SNAPSHOT__ = {};",
             serde_json::to_string(&snapshot).expect("snapshot JSON")
         ),
         r#"
@@ -905,7 +905,7 @@ if (runtime.computed.some((entry) => entry.dirty)) fail("Computed slots remained
 if (runtime.resume_recomputation_runs.length !== 2 || new Set(runtime.resume_recomputation_runs).size !== 2) fail("Computed recomputation did not execute exactly once per instance");
 if (runtime.initial_effect_runs.length !== 0) fail("Effects ran during R3-R5");
 if (runtime.diagnostics.some((diagnostic) => diagnostic.fatal)) fail("resume reported a fatal diagnostic");"#,
-        "EDGEZERO_RESUME_STATE_COMPUTED_PASS",
+        "PRESOLVE_RESUME_STATE_COMPUTED_PASS",
     );
     fs::write(out_dir.join("probe.html"), probe).expect("resume State probe");
 }
@@ -925,7 +925,7 @@ fn write_resume_slot_probe_page(out_dir: &Path) {
     let probe = resume_bootstrap_probe_page(
         &index,
         &format!(
-            "window.__EDGEZERO_RESUME_SNAPSHOT__ = {};",
+            "window.__PRESOLVE_RESUME_SNAPSHOT__ = {};",
             serde_json::to_string(&snapshot).expect("snapshot JSON")
         ),
         r#"
@@ -944,12 +944,12 @@ for (const [bindingId, binding] of expected) {
 if (runtime.resume_registry.component_records.size !== runtime.component_instance_tree.length) fail("component runtime records were incomplete");
 if (runtime.component_initialization_runs.length !== 0 || runtime.slot_binding_runs.length !== 0) fail("resume executed component or Slot initialization");
 if (runtime.initial_effect_runs.length !== 0) fail("resume executed cold effects");
-if (document.querySelector("main").innerHTML !== window.__edgezeroInitialHtml) fail("resume reconstructed component DOM");"#,
-        "EDGEZERO_RESUME_SLOT_PASS",
+if (document.querySelector("main").innerHTML !== window.__presolveInitialHtml) fail("resume reconstructed component DOM");"#,
+        "PRESOLVE_RESUME_SLOT_PASS",
     )
     .replace(
-        "window.__EDGEZERO_RESUME_SNAPSHOT__",
-        "window.__edgezeroInitialHtml = document.querySelector(\"main\").innerHTML;\nwindow.__EDGEZERO_RESUME_SNAPSHOT__",
+        "window.__PRESOLVE_RESUME_SNAPSHOT__",
+        "window.__presolveInitialHtml = document.querySelector(\"main\").innerHTML;\nwindow.__PRESOLVE_RESUME_SNAPSHOT__",
     );
     fs::write(out_dir.join("probe.html"), probe).expect("resume Slot probe");
 }
@@ -997,7 +997,7 @@ fn write_resume_form_probe_pages(out_dir: &Path) {
     let snapshot_json = serde_json::to_string(&snapshot).expect("snapshot JSON");
     let probe = resume_bootstrap_probe_page(
         &index,
-        &format!("window.__EDGEZERO_RESUME_SNAPSHOT__ = {snapshot_json};"),
+        &format!("window.__PRESOLVE_RESUME_SNAPSHOT__ = {snapshot_json};"),
         r#"
 if (runtime.resume?.mode !== "resume") fail("Form snapshot was not resumed: " + JSON.stringify({resume: runtime.resume, diagnostics: runtime.diagnostics}));
 if (runtime.forms.length !== 1 || runtime.forms[0].submission !== "Completed" || runtime.forms[0].aggregate_valid !== true) fail("stable Form state was not restored");
@@ -1005,9 +1005,9 @@ const instance = runtime.store.formInstances.values().next().value;
 const field = instance.fields.values().next().value;
 if (field.value !== "resumed-name" || field.dirty !== true || field.touched !== true || field.validation.length !== 0) fail("Field slots were not restored exactly");
 if (document.querySelector("input").value !== "resumed-name") fail("exact Form control was not synchronized");
-if (!window.__EDGEZERO_FORMS__.resetForm(instance.instance.id)) fail("reset plan was not installed");
+if (!window.__PRESOLVE_FORMS__.resetForm(instance.instance.id)) fail("reset plan was not installed");
 if (field.value !== "" || field.dirty || field.touched || field.validation.length !== 0 || document.querySelector("input").value !== "") fail("reset did not use compiled initial Form values");"#,
-        "EDGEZERO_RESUME_FORMS_PASS",
+        "PRESOLVE_RESUME_FORMS_PASS",
     );
     fs::write(out_dir.join("probe.html"), probe).expect("resume Forms probe");
 
@@ -1035,13 +1035,13 @@ if (field.value !== "" || field.dirty || field.touched || field.validation.lengt
     let submitting_page = resume_bootstrap_probe_page(
         &index,
         &format!(
-            "window.__EDGEZERO_RESUME_SNAPSHOT__ = {};",
+            "window.__PRESOLVE_RESUME_SNAPSHOT__ = {};",
             serde_json::to_string(&submitting).expect("submitting snapshot")
         ),
         r#"
 if (runtime.resume.mode !== "cold" || runtime.resume.failure !== "UnstableFormSubmission") fail("active Form submission did not cold fall back");
 if (runtime.resume_registry !== null || runtime.forms[0].submission !== "Idle") fail("active Form submission retained resume state");"#,
-        "EDGEZERO_RESUME_FORMS_FALLBACK_PASS",
+        "PRESOLVE_RESUME_FORMS_FALLBACK_PASS",
     );
     fs::write(out_dir.join("submitting.html"), submitting_page).expect("submitting Forms probe");
 }
@@ -1084,7 +1084,7 @@ fn write_resume_context_probe_pages(out_dir: &Path) {
     }
     assert!(next.next().is_none(), "expected three Context value slots");
     let prelude = format!(
-        "window.__EDGEZERO_RESUME_SNAPSHOT__ = {}; window.__J13_EXPECTED__ = {};",
+        "window.__PRESOLVE_RESUME_SNAPSHOT__ = {}; window.__J13_EXPECTED__ = {};",
         serde_json::to_string(&snapshot).expect("snapshot JSON"),
         serde_json::to_string(&expected).expect("expected Context JSON")
     );
@@ -1101,7 +1101,7 @@ const expected = new Map(Object.entries(window.__J13_EXPECTED__));
 for (const [slot, value] of runtime.context_slots) {
   if (expected.get(slot) !== value) fail("Context value did not use its exact instance slot");
 }
-const componentArtifact = JSON.parse(document.getElementById("ez-component-runtime").textContent);
+const componentArtifact = JSON.parse(document.getElementById("presolve-component-runtime").textContent);
 for (const binding of componentArtifact.instance_context_bindings) {
   const installedSlot = runtime.store.contextConsumerBindings.get(binding.consumer_instance);
   const installed = runtime.resume_registry.context_bindings.get(binding.consumer_instance);
@@ -1112,7 +1112,7 @@ for (const binding of componentArtifact.instance_context_bindings) {
 }
 if (runtime.context_failures.length !== 0) fail("Context restore reported failures");
 if (runtime.initial_effect_runs.length !== 0) fail("Effect ran during Context restore");"#,
-        "EDGEZERO_RESUME_CONTEXT_PASS",
+        "PRESOLVE_RESUME_CONTEXT_PASS",
     );
     fs::write(out_dir.join("probe.html"), probe).expect("resume Context probe");
 }
@@ -1124,7 +1124,7 @@ fn write_resume_context_mismatch_probe(out_dir: &Path) {
     )
     .expect("resume manifest JSON");
     let snapshot = resume_bootstrap_snapshot(&manifest);
-    let mismatch = replace_json_script(&index, "ez-resume-runtime", |value| {
+    let mismatch = replace_json_script(&index, "presolve-resume-runtime", |value| {
         let instruction = value["restore_programs"]
             .as_array_mut()
             .expect("restore programs")
@@ -1143,7 +1143,7 @@ fn write_resume_context_mismatch_probe(out_dir: &Path) {
     let probe = resume_bootstrap_probe_page(
         &mismatch,
         &format!(
-            "window.__EDGEZERO_RESUME_SNAPSHOT__ = {};",
+            "window.__PRESOLVE_RESUME_SNAPSHOT__ = {};",
             serde_json::to_string(&snapshot).expect("snapshot JSON")
         ),
         r#"
@@ -1151,7 +1151,7 @@ if (runtime.resume.mode !== "cold" || runtime.resume.failure !== "ResumeArtifact
 if (runtime.resume_registry !== null) fail("Context mismatch retained a partial registry");
 if (runtime.context_initial_source_runs.length !== 1 || runtime.context_slots.length !== 1) fail("cold fallback did not initialize Context once");
 if (runtime.context_consumer_bindings.length !== 1) fail("cold fallback reselected or lost Consumer binding");"#,
-        "EDGEZERO_RESUME_CONTEXT_FALLBACK_PASS",
+        "PRESOLVE_RESUME_CONTEXT_FALLBACK_PASS",
     );
     fs::write(out_dir.join("probe.html"), probe).expect("Context fallback probe");
 }
@@ -1173,10 +1173,10 @@ fn write_resume_structure_probe_pages(out_dir: &Path) {
     let probe = resume_bootstrap_probe_page(
         &index,
         &format!(
-            "window.__EDGEZERO_RESUME_SNAPSHOT__ = {snapshot_json}; window.__J14_DOM__ = document.querySelector('main').innerHTML;"
+            "window.__PRESOLVE_RESUME_SNAPSHOT__ = {snapshot_json}; window.__J14_DOM__ = document.querySelector('main').innerHTML;"
         ),
         r#"
-if (runtime.resume === undefined) fail("structural boot failed: " + JSON.stringify({ diagnostics: runtime.diagnostics, resume: window.__EDGEZERO_RESUME__.debugEvidence() }));
+if (runtime.resume === undefined) fail("structural boot failed: " + JSON.stringify({ diagnostics: runtime.diagnostics, resume: window.__PRESOLVE_RESUME__.debugEvidence() }));
 if (runtime.resume.mode !== "resume") fail("structural snapshot was not resumed");
 if (runtime.resume_registry.component_records.size !== 5) fail("Component runtime records were incomplete");
 if (runtime.resume_registry.structural_records.size !== 2) fail("structural runtime records were incomplete");
@@ -1185,7 +1185,7 @@ if (runtime.store.resumeAnchors.size !== runtime.resume_registry.definitions.anc
 if (runtime.component_initialization_runs.length !== 0) fail("Component initialization ran during R8");
 if (runtime.initial_effect_runs.length !== 0) fail("Effect ran during R8-R10");
 if (document.querySelector("main").innerHTML !== window.__J14_DOM__) fail("resume reconstructed the DOM");"#,
-        "EDGEZERO_RESUME_STRUCTURE_PASS",
+        "PRESOLVE_RESUME_STRUCTURE_PASS",
     );
     fs::write(out_dir.join("probe.html"), probe).expect("resume structure probe");
 
@@ -1213,11 +1213,11 @@ if (document.querySelector("main").innerHTML !== window.__J14_DOM__) fail("resum
     let mismatch_page = resume_bootstrap_probe_page(
         &index,
         &format!(
-            "window.__EDGEZERO_RESUME_SNAPSHOT__ = {};",
+            "window.__PRESOLVE_RESUME_SNAPSHOT__ = {};",
             serde_json::to_string(&mismatch).expect("mismatch snapshot")
         ),
         &structural_fallback_assertions("StructuralStateMismatch"),
-        "EDGEZERO_RESUME_STRUCTURE_FALLBACK_PASS",
+        "PRESOLVE_RESUME_STRUCTURE_FALLBACK_PASS",
     );
     fs::write(out_dir.join("state-mismatch.html"), mismatch_page)
         .expect("structural mismatch probe");
@@ -1234,14 +1234,14 @@ if (document.querySelector("main").innerHTML !== window.__J14_DOM__) fail("resum
         })
         .and_then(|anchor| anchor["anchor_id"].as_str())
         .expect("structural anchor ID");
-    let missing = index.replace(&format!("<!--ez-r-end:{first_anchor}-->"), "");
-    let missing = missing.replace(&format!("<!--ez-r-start:{first_anchor}-->"), "");
+    let missing = index.replace(&format!("<!--presolve-r-end:{first_anchor}-->"), "");
+    let missing = missing.replace(&format!("<!--presolve-r-start:{first_anchor}-->"), "");
     assert_ne!(missing, index, "resume anchor comment was not emitted");
     let missing_page = resume_bootstrap_probe_page(
         &missing,
-        &format!("window.__EDGEZERO_RESUME_SNAPSHOT__ = {snapshot_json};"),
+        &format!("window.__PRESOLVE_RESUME_SNAPSHOT__ = {snapshot_json};"),
         &structural_fallback_assertions("MissingAnchor"),
-        "EDGEZERO_RESUME_ANCHOR_FALLBACK_PASS",
+        "PRESOLVE_RESUME_ANCHOR_FALLBACK_PASS",
     );
     fs::write(out_dir.join("missing-anchor.html"), missing_page).expect("missing anchor probe");
 }
@@ -1337,14 +1337,14 @@ if (!(runtime.store?.components instanceof Map) || runtime.components[0].state.c
 if (runtime.resume_registry !== null) fail("cold boot retained a resume registry");
 document.querySelector("button").click();
 await waitFor(() => runtime.components[0].state.count === 2, "cold action");"#,
-        "EDGEZERO_RESUME_COLD_PASS",
+        "PRESOLVE_RESUME_COLD_PASS",
     );
     fs::write(out_dir.join("cold.html"), cold).expect("cold probe");
 
     let accepted = resume_bootstrap_probe_page(
         &index,
         &format!(
-            "window.__EDGEZERO_RESUME_SNAPSHOT__ = {};",
+            "window.__PRESOLVE_RESUME_SNAPSHOT__ = {};",
             serde_json::to_string(&snapshot).expect("snapshot JSON")
         ),
         r#"
@@ -1356,15 +1356,15 @@ if (!(runtime.store?.components instanceof Map) || runtime.components[0].state.c
 if (document.querySelector("button").textContent !== "7") fail("R16 did not patch the exact text binding before Ready");
 if (runtime.initial_effect_runs.length !== 0) fail("resume path executed cold authored initialization");
 const eventId = runtime.resume_registry.definitions.events.keys().next().value;
-const activation = await window.__EDGEZERO_RESUME__.activateByEvent(eventId);
+const activation = await window.__PRESOLVE_RESUME__.activateByEvent(eventId);
 if (activation.status !== "active") fail("event activation API did not load the exact chunk");
 document.querySelector("button").click();
 await waitFor(() => runtime.components[0].state.count === 8, "activated action");
-if (window.__EDGEZERO_RESUME__.captureSnapshot().failure !== "NotQuiescent") fail("capture API contract was absent");
+if (window.__PRESOLVE_RESUME__.captureSnapshot().failure !== "NotQuiescent") fail("capture API contract was absent");
 let doubleFailure = null;
-try { await window.__EDGEZERO_RESUME__.bootstrapResume(); } catch (error) { doubleFailure = error.failure; }
+try { await window.__PRESOLVE_RESUME__.bootstrapResume(); } catch (error) { doubleFailure = error.failure; }
 if (doubleFailure !== "DoubleBootstrap") fail("double bootstrap was not rejected");"#,
-        "EDGEZERO_RESUME_ACCEPTED_PASS",
+        "PRESOLVE_RESUME_ACCEPTED_PASS",
     );
     fs::write(out_dir.join("accepted.html"), accepted).expect("accepted probe");
 
@@ -1375,22 +1375,22 @@ if (doubleFailure !== "DoubleBootstrap") fail("double bootstrap was not rejected
     let rejected = resume_bootstrap_probe_page(
         &index,
         &format!(
-            "window.__EDGEZERO_RESUME_SNAPSHOT__ = {};",
+            "window.__PRESOLVE_RESUME_SNAPSHOT__ = {};",
             serde_json::to_string(&wrong_build).expect("wrong build snapshot JSON")
         ),
         &fallback_assertions("BuildIdMismatch"),
-        "EDGEZERO_RESUME_BUILD_FALLBACK_PASS",
+        "PRESOLVE_RESUME_BUILD_FALLBACK_PASS",
     );
     fs::write(out_dir.join("build-mismatch.html"), rejected).expect("build fallback probe");
 
-    let protocol_page = replace_json_script(&index, "ez-resume-runtime", |value| {
+    let protocol_page = replace_json_script(&index, "presolve-resume-runtime", |value| {
         value["runtime_protocol_version"] = serde_json::Value::from(2);
     });
     let protocol_page = resume_bootstrap_probe_page(
         &protocol_page,
         "",
         &fallback_assertions("RuntimeProtocolMismatch"),
-        "EDGEZERO_RESUME_ARTIFACT_FALLBACK_PASS",
+        "PRESOLVE_RESUME_ARTIFACT_FALLBACK_PASS",
     );
     fs::write(out_dir.join("protocol-mismatch.html"), protocol_page)
         .expect("artifact fallback probe");
@@ -1402,11 +1402,11 @@ if (doubleFailure !== "DoubleBootstrap") fail("double bootstrap was not rejected
     let malformed_page = resume_bootstrap_probe_page(
         &index,
         &format!(
-            "window.__EDGEZERO_RESUME_SNAPSHOT__ = {};",
+            "window.__PRESOLVE_RESUME_SNAPSHOT__ = {};",
             serde_json::to_string(&malformed).expect("malformed snapshot JSON")
         ),
         &fallback_assertions("SnapshotSchemaMismatch"),
-        "EDGEZERO_RESUME_SNAPSHOT_FALLBACK_PASS",
+        "PRESOLVE_RESUME_SNAPSHOT_FALLBACK_PASS",
     );
     fs::write(out_dir.join("malformed-snapshot.html"), malformed_page)
         .expect("snapshot fallback probe");
@@ -1430,11 +1430,11 @@ fn write_resume_value_mismatch_probe(out_dir: &Path, index: &str, snapshot: &ser
     let page = resume_bootstrap_probe_page(
         index,
         &format!(
-            "window.__EDGEZERO_RESUME_SNAPSHOT__ = {};",
+            "window.__PRESOLVE_RESUME_SNAPSHOT__ = {};",
             serde_json::to_string(&mismatch).expect("mismatch snapshot JSON")
         ),
         &fallback_assertions("ValueTypeMismatch"),
-        "EDGEZERO_RESUME_VALUE_FALLBACK_PASS",
+        "PRESOLVE_RESUME_VALUE_FALLBACK_PASS",
     );
     fs::write(out_dir.join("value-mismatch.html"), page).expect("value fallback probe");
 }
@@ -1511,7 +1511,7 @@ fn fallback_assertions(failure: &str) -> String {
 if (runtime.resume.mode !== "cold" || runtime.resume.failure !== "{failure}") fail("resume failure did not select one cold boot");
 if (!(runtime.store?.components instanceof Map) || runtime.components[0].state.count !== 1) fail("cold fallback did not initialize exactly once");
 if (runtime.resume_registry !== null) fail("failed resume retained a partial registry");
-const evidence = window.__EDGEZERO_RESUME__.debugEvidence()[0];
+const evidence = window.__PRESOLVE_RESUME__.debugEvidence()[0];
 if (evidence.failure !== "{failure}" || (evidence.boundary_ids ?? []).length !== 0) fail("fallback debug evidence retained partial state");"#
     )
 }
@@ -1541,12 +1541,12 @@ const waitFor = async (predicate, label) => {{
   fail(`Timed out waiting for ${{label}}`);
 }};
 (async () => {{
-  await waitFor(() => window.__EDGEZERO__ !== undefined, "runtime");
-  const runtime = window.__EDGEZERO__;
+  await waitFor(() => window.__PRESOLVE__ !== undefined, "runtime");
+  const runtime = window.__PRESOLVE__;
   {assertions}
   document.body.insertAdjacentHTML("beforeend", "<div>" + "{marker_start}" + "{marker_end}" + "</div>");
 }})().catch((error) => {{
-  document.body.insertAdjacentHTML("beforeend", `<pre>EDGEZERO_RESUME_BOOTSTRAP_FAIL: ${{error.message}}</pre>`);
+  document.body.insertAdjacentHTML("beforeend", `<pre>PRESOLVE_RESUME_BOOTSTRAP_FAIL: ${{error.message}}</pre>`);
 }});
 </script>
 </body>"#
@@ -1601,7 +1601,7 @@ fn component_structural_programs_preserve_host_dom_identity_in_a_real_browser() 
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_COMPONENT_STRUCTURAL_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_COMPONENT_STRUCTURAL_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -1620,8 +1620,8 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   const deadline = Date.now() + 3000;
   const tick = () => {
     if (predicate()) { resolve(); return; }
-    if (document.documentElement.dataset.ezRuntime === "error") {
-      const diagnostic = window.__EDGEZERO__?.diagnostics?.map(({ code, message }) => `${code}: ${message}`).join(" | ") ?? "runtime error";
+    if (document.documentElement.dataset.presolveRuntime === "error") {
+      const diagnostic = window.__PRESOLVE__?.diagnostics?.map(({ code, message }) => `${code}: ${message}`).join(" | ") ?? "runtime error";
       reject(new Error(`Runtime failed before ${label}: ${diagnostic}`));
       return;
     }
@@ -1631,9 +1631,9 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   tick();
 });
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
-  const runtime = window.__EDGEZERO__;
-  const artifact = JSON.parse(document.getElementById("ez-component-runtime").textContent);
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
+  const runtime = window.__PRESOLVE__;
+  const artifact = JSON.parse(document.getElementById("presolve-component-runtime").textContent);
   if (artifact.schema_version !== 2 || artifact.structural_programs.length !== 2) fail("structural component programs were missing");
   if (runtime.store.componentRegions.size !== artifact.structural_programs.length) fail("closed structural region table diverged from the artifact");
   if (!artifact.structural_programs.every((program) => JSON.stringify(runtime.store.componentRegions.get(program.region)) === JSON.stringify(program))) {
@@ -1650,7 +1650,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   if (buttons.length !== 3) fail("structural controls were missing");
   const main = document.querySelector("main");
   const listParent = document.querySelector("main ul");
-  const row = (key) => document.querySelector(`[data-ez-node='${list.item_root}:${key}']`);
+  const row = (key) => document.querySelector(`[data-presolve-node='${list.item_root}:${key}']`);
   const a = row("a");
   const b = row("b");
   const c = row("c");
@@ -1673,9 +1673,9 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   if (row("d") !== d) fail("retained keyed component row was recreated");
   if (document.querySelector("main") !== main || document.querySelector("main ul") !== listParent) fail("unaffected host identity changed after list destruction");
   if (runtime.component_failures.length !== 0) fail("structural component runtime reported failures");
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_COMPONENT_STRUCTURAL_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_COMPONENT_STRUCTURAL_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_COMPONENT_STRUCTURAL_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_COMPONENT_STRUCTURAL_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -1695,7 +1695,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   const deadline = Date.now() + 3000;
   const tick = () => {
     if (predicate()) { resolve(); return; }
-    if (document.documentElement.dataset.ezRuntime === "error") {
+    if (document.documentElement.dataset.presolveRuntime === "error") {
       reject(new Error(`Runtime failed before ${label}`));
       return;
     }
@@ -1705,9 +1705,9 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   tick();
 });
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
-  const runtime = window.__EDGEZERO__;
-  const artifact = JSON.parse(document.getElementById("ez-component-runtime").textContent);
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
+  const runtime = window.__PRESOLVE__;
+  const artifact = JSON.parse(document.getElementById("presolve-component-runtime").textContent);
   const instances = artifact.instances.filter((instance) => instance.component.endsWith("/component:x-repeated-counter"));
   if (instances.length !== 2) fail("repeated component instances were not planned exactly");
   const firstState = instances[0].state_slots[0];
@@ -1749,10 +1749,10 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     fail("schema-v3 runtime exposed a declaration-level State storage key");
   }
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_STATE_INSTANCE_STORAGE_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_STATE_INSTANCE_STORAGE_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_STATE_INSTANCE_STORAGE_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_STATE_INSTANCE_STORAGE_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -1806,18 +1806,18 @@ fn write_state_instance_compatibility_probe_pages(out_dir: &Path) {
 
     let rejected = replace_json_script(
         &index,
-        "ez-component-runtime",
+        "presolve-component-runtime",
         downgrade_component_artifact_to_v2,
     );
     let rejected = rejected.replace(
         "</body>",
         r#"<script>
 const wait = setInterval(() => {
-  if (document.documentElement.dataset.ezRuntime !== "error") return;
+  if (document.documentElement.dataset.presolveRuntime !== "error") return;
   clearInterval(wait);
-  const codes = window.__EDGEZERO__?.diagnostics?.map((diagnostic) => diagnostic.code) ?? [];
-  if (codes.includes("EZR_UNSUPPORTED_SCHEMA")) {
-    document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_PHASE_J_COMPONENT_V2_REJECTION_PASS</div>");
+  const codes = window.__PRESOLVE__?.diagnostics?.map((diagnostic) => diagnostic.code) ?? [];
+  if (codes.includes("PSR_UNSUPPORTED_SCHEMA")) {
+    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_PHASE_J_COMPONENT_V2_REJECTION_PASS</div>");
   }
 }, 20);
 </script>
@@ -1826,7 +1826,7 @@ const wait = setInterval(() => {
     fs::write(out_dir.join("phase-j-component-v2.html"), rejected)
         .expect("failed to write Phase J v2 rejection probe");
 
-    let legacy = replace_json_script(&index, "ez-template-manifest", |value| {
+    let legacy = replace_json_script(&index, "presolve-template-manifest", |value| {
         value["schema_version"] = serde_json::json!(3);
         value["ordinary_targets"] = serde_json::json!([]);
         value["ordinary_bindings"] = serde_json::json!([]);
@@ -1834,16 +1834,16 @@ const wait = setInterval(() => {
     });
     let legacy = replace_json_script(
         &legacy,
-        "ez-component-runtime",
+        "presolve-component-runtime",
         downgrade_component_artifact_to_v2,
     );
     let legacy = legacy.replace(
         "</body>",
         r#"<script>
 const wait = setInterval(() => {
-  if (document.documentElement.dataset.ezRuntime !== "ready") return;
+  if (document.documentElement.dataset.presolveRuntime !== "ready") return;
   clearInterval(wait);
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_LEGACY_COMPONENT_V2_COLD_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_LEGACY_COMPONENT_V2_COLD_PASS</div>");
 }, 20);
 </script>
 </body>"#,
@@ -1868,9 +1868,9 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   tick();
 });
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
-  const runtime = window.__EDGEZERO__;
-  const artifact = JSON.parse(document.getElementById("ez-component-runtime").textContent);
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
+  const runtime = window.__PRESOLVE__;
+  const artifact = JSON.parse(document.getElementById("presolve-component-runtime").textContent);
   for (const record of document.querySelectorAll('script[type="application/json"]')) record.remove();
   if (artifact.schema_version !== 3) fail("component artifact schema was not v3");
   if (artifact.instances.length < 6) fail("component instances were not materialized from the plan");
@@ -1908,10 +1908,10 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   }
   if (runtime.component_failures.length !== 0) fail("component runtime reported failures");
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_COMPONENT_RUNTIME_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_COMPONENT_RUNTIME_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_COMPONENT_RUNTIME_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_COMPONENT_RUNTIME_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -1927,19 +1927,19 @@ fn write_form_submission_probe_page(out_dir: &Path) {
 const fail = (message) => { throw new Error(message); };
 const waitFor = (predicate, label) => new Promise((resolve, reject) => { const deadline = Date.now() + 3000; const tick = () => predicate() ? resolve() : Date.now() > deadline ? reject(new Error(`Timed out waiting for ${label}`)) : setTimeout(tick, 20); tick(); });
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
-  const forms = JSON.parse(document.getElementById("ez-forms-runtime").textContent);
-  const manifest = JSON.parse(document.getElementById("ez-template-manifest").textContent);
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
+  const forms = JSON.parse(document.getElementById("presolve-forms-runtime").textContent);
+  const manifest = JSON.parse(document.getElementById("presolve-template-manifest").textContent);
   if (forms.hosts.length !== 1 || manifest.form_hosts.length !== 1) fail("exact host records were absent");
   const host = document.querySelector("form");
   const event = new Event("submit", { bubbles: true, cancelable: true });
   host.dispatchEvent(event);
-  await waitFor(() => window.__EDGEZERO__.components[0].state.submitted === 1, "submit action");
+  await waitFor(() => window.__PRESOLVE__.components[0].state.submitted === 1, "submit action");
   if (!event.defaultPrevented) fail("compiler host policy did not prevent default");
-  if (window.__EDGEZERO__.forms[0].submission !== "Completed") fail("submission did not complete");
-  if (window.__EDGEZERO__.diagnostics.length !== 0) fail("runtime reported Forms diagnostics");
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_FORM_SUBMISSION_BROWSER_TEST_PASS</div>");
-})().catch((error) => { document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_FORM_SUBMISSION_BROWSER_TEST_FAIL: ${error.message}</div>`); console.error(error); });
+  if (window.__PRESOLVE__.forms[0].submission !== "Completed") fail("submission did not complete");
+  if (window.__PRESOLVE__.diagnostics.length !== 0) fail("runtime reported Forms diagnostics");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_FORM_SUBMISSION_BROWSER_TEST_PASS</div>");
+})().catch((error) => { document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_FORM_SUBMISSION_BROWSER_TEST_FAIL: ${error.message}</div>`); console.error(error); });
 </script>
 </body>"#);
     fs::write(out_dir.join("probe.html"), probe).expect("failed to write Forms probe page");
@@ -1996,7 +1996,7 @@ fn double_binding_counter_increments_in_a_real_browser() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -2055,7 +2055,7 @@ fn decrement_counter_decrements_in_a_real_browser() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_DECREMENT_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_DECREMENT_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -2114,7 +2114,7 @@ fn add_subtract_assign_counter_updates_in_a_real_browser() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_ADD_SUBTRACT_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_ADD_SUBTRACT_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -2173,7 +2173,7 @@ fn direct_assignment_counter_resets_in_a_real_browser() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_DIRECT_ASSIGN_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_DIRECT_ASSIGN_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -2232,7 +2232,7 @@ fn boolean_toggle_flips_in_a_real_browser() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_BOOLEAN_TOGGLE_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_BOOLEAN_TOGGLE_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -2291,7 +2291,7 @@ fn multi_step_action_runs_all_steps_in_a_real_browser() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_MULTI_STEP_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_MULTI_STEP_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -2350,7 +2350,7 @@ fn dynamic_attributes_update_in_a_real_browser() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_DYNAMIC_ATTRIBUTES_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_DYNAMIC_ATTRIBUTES_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -2409,7 +2409,7 @@ fn fragments_preserve_sibling_identity_in_a_real_browser() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_FRAGMENTS_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_FRAGMENTS_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -2468,7 +2468,7 @@ fn conditional_branches_switch_in_a_real_browser() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_CONDITIONAL_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_CONDITIONAL_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -2527,7 +2527,7 @@ fn logical_and_conditional_switches_to_empty_branch_in_a_real_browser() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_LOGICAL_AND_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_LOGICAL_AND_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -2585,7 +2585,7 @@ fn keyed_lists_reconcile_in_a_real_browser() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_KEYED_LIST_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_KEYED_LIST_BROWSER_TEST_PASS"),
         "browser probe did not pass\\nstatus: {}\\nstdout:\\n{}\\nstderr:\\n{}",
         output.status,
         stdout,
@@ -2643,7 +2643,7 @@ fn object_keyed_lists_reconcile_in_a_real_browser() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_OBJECT_KEYED_LIST_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_OBJECT_KEYED_LIST_BROWSER_TEST_PASS"),
         "browser probe did not pass\\nstatus: {}\\nstdout:\\n{}\\nstderr:\\n{}",
         output.status,
         stdout,
@@ -2701,7 +2701,7 @@ fn dynamic_list_items_refresh_in_a_real_browser() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_DYNAMIC_LIST_ITEM_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_DYNAMIC_LIST_ITEM_BROWSER_TEST_PASS"),
         "browser probe did not pass\\nstatus: {}\\nstdout:\\n{}\\nstderr:\\n{}",
         output.status,
         stdout,
@@ -2743,20 +2743,20 @@ fn runtime_contract_diagnostics_report_manifest_boot_failures_in_a_real_browser(
         (
             "missing-manifest.html",
             None,
-            "EZR_MISSING_MANIFEST",
-            "EDGEZERO_MISSING_MANIFEST_DIAGNOSTIC_PASS",
+            "PSR_MISSING_MANIFEST",
+            "PRESOLVE_MISSING_MANIFEST_DIAGNOSTIC_PASS",
         ),
         (
             "invalid-json.html",
             Some("{"),
-            "EZR_INVALID_MANIFEST_JSON",
-            "EDGEZERO_INVALID_JSON_DIAGNOSTIC_PASS",
+            "PSR_INVALID_MANIFEST_JSON",
+            "PRESOLVE_INVALID_JSON_DIAGNOSTIC_PASS",
         ),
         (
             "unsupported-schema.html",
             Some(r#"{"schema_version":999,"components":[]}"#),
-            "EZR_UNSUPPORTED_SCHEMA",
-            "EDGEZERO_UNSUPPORTED_SCHEMA_DIAGNOSTIC_PASS",
+            "PSR_UNSUPPORTED_SCHEMA",
+            "PRESOLVE_UNSUPPORTED_SCHEMA_DIAGNOSTIC_PASS",
         ),
     ];
 
@@ -2849,7 +2849,7 @@ fn string_state_initializes_in_a_real_browser() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_STRING_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_STRING_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -2908,7 +2908,7 @@ fn boolean_state_initializes_in_a_real_browser() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_BOOLEAN_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_BOOLEAN_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -2967,7 +2967,7 @@ fn null_state_initializes_in_a_real_browser() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_NULL_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_NULL_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -3018,7 +3018,7 @@ fn computed_values_execute_once_from_compiler_generated_runtime_programs() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_COMPUTED_RUNTIME_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_COMPUTED_RUNTIME_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -3069,7 +3069,7 @@ fn initial_effects_execute_once_from_compiler_generated_runtime_programs() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_INITIAL_EFFECT_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_INITIAL_EFFECT_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -3120,7 +3120,7 @@ fn completed_action_batches_execute_compiler_planned_effects_once() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_COMPLETED_ACTION_EFFECT_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_COMPLETED_ACTION_EFFECT_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -3175,7 +3175,7 @@ fn context_sources_bind_and_update_from_compiler_plans_in_a_real_browser() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_CONTEXT_RUNTIME_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_CONTEXT_RUNTIME_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -3230,7 +3230,7 @@ fn context_source_failure_preserves_compiler_binding_without_reselection_in_a_re
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_CONTEXT_FAILURE_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_CONTEXT_FAILURE_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -3281,7 +3281,7 @@ fn multi_step_actions_flush_one_compiler_generated_computed_batch() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_COMPUTED_BATCH_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_COMPUTED_BATCH_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -3332,7 +3332,7 @@ fn diamond_computed_values_recompute_from_compiler_generated_batches() {
     server.stop();
 
     assert!(
-        stdout.contains("EDGEZERO_COMPUTED_DIAMOND_BROWSER_TEST_PASS"),
+        stdout.contains("PRESOLVE_COMPUTED_DIAMOND_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -3356,20 +3356,20 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   tick();
 });
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
-  const computed = window.__EDGEZERO__.computed;
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
+  const computed = window.__PRESOLVE__.computed;
   if (!Array.isArray(computed) || computed.length !== 2) fail("computed cache records were missing");
   const doubled = computed.find((entry) => entry.computed.endsWith("/computed:doubled"));
   const label = computed.find((entry) => entry.computed.endsWith("/computed:label"));
   if (doubled?.value !== 2 || label?.value !== 3) fail("computed programs did not evaluate in compiler order");
   if (doubled?.dirty !== false || label?.dirty !== false) fail("computed caches remained dirty after execution");
-  if (!(window.__EDGEZERO__.store.computedCaches instanceof Map)) fail("computed cache store was not a Map");
-  if (window.__EDGEZERO__.diagnostics.length !== 0) fail("computed execution reported diagnostics");
+  if (!(window.__PRESOLVE__.store.computedCaches instanceof Map)) fail("computed cache store was not a Map");
+  if (window.__PRESOLVE__.diagnostics.length !== 0) fail("computed execution reported diagnostics");
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_COMPUTED_RUNTIME_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_COMPUTED_RUNTIME_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_COMPUTED_RUNTIME_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_COMPUTED_RUNTIME_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -3395,10 +3395,10 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   tick();
 });
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
-  if (document.title !== "EdgeZero initial effect") fail("effect did not update document title");
-  if (localStorage.getItem("edgezero-effect-initial") !== "ready") fail("effect did not update local storage");
-  const runs = window.__EDGEZERO__.initial_effect_runs;
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
+  if (document.title !== "Presolve initial effect") fail("effect did not update document title");
+  if (localStorage.getItem("presolve-effect-initial") !== "ready") fail("effect did not update local storage");
+  const runs = window.__PRESOLVE__.initial_effect_runs;
   if (!Array.isArray(runs) || runs.length !== 1) fail("initial effect did not execute exactly once");
   const run = runs[0];
   if (!run.effect.endsWith("/effect:report") || run.effect_batch_index !== 0) fail("initial effect debug evidence was not deterministic");
@@ -3406,15 +3406,15 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   if (operations !== "builtin.browser.console.log|builtin.browser.document.title.assign|builtin.browser.local_storage.set_item") {
     fail("effect capability dispatch order did not match the compiler program");
   }
-  if (window.__EDGEZERO__.computed.find((entry) => entry.computed.endsWith("/computed:doubled"))?.value !== 4) {
+  if (window.__PRESOLVE__.computed.find((entry) => entry.computed.endsWith("/computed:doubled"))?.value !== 4) {
     fail("effect did not observe initialized computed state");
   }
-  if (window.__EDGEZERO__.diagnostics.length !== 0) fail("initial effect execution reported diagnostics");
+  if (window.__PRESOLVE__.diagnostics.length !== 0) fail("initial effect execution reported diagnostics");
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_INITIAL_EFFECT_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_INITIAL_EFFECT_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_INITIAL_EFFECT_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_INITIAL_EFFECT_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -3440,30 +3440,30 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   tick();
 });
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
-  const manifestEvent = window.__EDGEZERO__.manifest.components[0].template.events[0];
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
+  const manifestEvent = window.__PRESOLVE__.manifest.components[0].template.events[0];
   if (manifestEvent.kind !== "action" || !manifestEvent.method_id || !manifestEvent.action_batch_id) {
     fail("template manifest did not carry canonical action activation identities");
   }
   document.querySelector("button")?.click();
-  await waitFor(() => window.__EDGEZERO__.completed_action_effect_runs.length === 1, "completed action effect");
-  if (document.title !== "EdgeZero after action") fail("completed action effect did not synchronize title");
-  const run = window.__EDGEZERO__.completed_action_effect_runs[0];
+  await waitFor(() => window.__PRESOLVE__.completed_action_effect_runs.length === 1, "completed action effect");
+  if (document.title !== "Presolve after action") fail("completed action effect did not synchronize title");
+  const run = window.__PRESOLVE__.completed_action_effect_runs[0];
   if (run.action_batch_id !== manifestEvent.action_batch_id || run.effect_batch_index !== 0) {
     fail("runtime did not consume the exact compiler action batch plan");
   }
   if (run.capability_operations.length !== 3) fail("completed action effect did not preserve capability program");
-  if (window.__EDGEZERO__.initial_effect_runs.length !== 1) fail("initial effect plan was replayed after action");
-  if (window.__EDGEZERO__.computed.find((entry) => entry.computed.endsWith("/computed:doubled"))?.value !== 6) {
+  if (window.__PRESOLVE__.initial_effect_runs.length !== 1) fail("initial effect plan was replayed after action");
+  if (window.__PRESOLVE__.computed.find((entry) => entry.computed.endsWith("/computed:doubled"))?.value !== 6) {
     fail("completed action effect ran before compiler computed flush");
   }
-  if (window.__EDGEZERO__.store.activeActionBatch !== null) fail("runtime retained an active action batch");
-  if (window.__EDGEZERO__.diagnostics.length !== 0) fail("completed action effect reported diagnostics");
+  if (window.__PRESOLVE__.store.activeActionBatch !== null) fail("runtime retained an active action batch");
+  if (window.__PRESOLVE__.diagnostics.length !== 0) fail("completed action effect reported diagnostics");
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_COMPLETED_ACTION_EFFECT_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_COMPLETED_ACTION_EFFECT_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_COMPLETED_ACTION_EFFECT_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_COMPLETED_ACTION_EFFECT_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -3489,9 +3489,9 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   tick();
 });
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
-  const runtime = window.__EDGEZERO__;
-  const artifactElement = document.getElementById("ez-context-runtime");
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
+  const runtime = window.__PRESOLVE__;
+  const artifactElement = document.getElementById("presolve-context-runtime");
   if (artifactElement === null) fail("compiler Context artifact was missing");
   const artifact = JSON.parse(artifactElement.textContent);
   const serializedArtifact = JSON.stringify(artifact);
@@ -3532,10 +3532,10 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   if (runtime.store.contextSlots.get(slot) !== 6) fail("unrelated action changed the Context slot");
   if (runtime.diagnostics.length !== 0) fail("Context execution reported runtime diagnostics");
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_CONTEXT_RUNTIME_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_CONTEXT_RUNTIME_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_CONTEXT_RUNTIME_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_CONTEXT_RUNTIME_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -3550,7 +3550,7 @@ fn write_context_source_failure_probe_page(out_dir: &Path) {
     let index = index.replace(
         r#"<script src="./runtime.js"></script>"#,
         r#"<script>
-const contextArtifactElement = document.getElementById("ez-context-runtime");
+const contextArtifactElement = document.getElementById("presolve-context-runtime");
 const contextArtifact = JSON.parse(contextArtifactElement.textContent);
 const initialize = contextArtifact.sources[0].program.instructions
   .find((instruction) => instruction.kind === "initialize_context_slot");
@@ -3573,8 +3573,8 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   tick();
 });
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
-  const runtime = window.__EDGEZERO__;
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
+  const runtime = window.__PRESOLVE__;
   if (runtime.context_initial_source_runs.length !== 0) fail("failed source was recorded as initialized");
   if (runtime.context_slots.length !== 0) fail("failed source populated a Context slot");
   if (runtime.context_consumer_bindings.length !== 2) fail("compiler Consumer bindings were not retained after source failure");
@@ -3585,14 +3585,14 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   }
   const unavailable = runtime.context_failures.filter((failure) => failure.failure === "source-slot-unavailable");
   if (unavailable.length !== 2) fail("each compiler-bound Consumer did not report the unavailable slot");
-  const artifact = JSON.parse(document.getElementById("ez-context-runtime").textContent);
+  const artifact = JSON.parse(document.getElementById("presolve-context-runtime").textContent);
   if (artifact.sources.length !== 1 || artifact.consumers.length !== 2) fail("runtime reconstructed or reselected Context bindings");
   if (runtime.store.contextConsumerBindings.size !== 2) fail("runtime discarded direct Consumer slot bindings");
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_CONTEXT_FAILURE_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_CONTEXT_FAILURE_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_CONTEXT_FAILURE_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_CONTEXT_FAILURE_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -3617,22 +3617,22 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   };
   tick();
 });
-const computedValue = (name) => window.__EDGEZERO__.computed
+const computedValue = (name) => window.__PRESOLVE__.computed
   .find((entry) => entry.computed.endsWith(`/computed:${name}`))?.value;
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
   if (computedValue("doubled") !== 0 || computedValue("label") !== 1) fail("initial computed caches were incorrect");
   document.querySelector("button")?.click();
   await waitFor(() => computedValue("doubled") === 4 && computedValue("label") === 5, "batched computed values");
-  if (window.__EDGEZERO__.components[0].state.count !== 2) fail("multi-step action did not finish both state writes");
-  if (window.__EDGEZERO__.computed_update_runs !== 1) fail("multi-step action triggered more than one computed update run");
-  if (window.__EDGEZERO__.computed.some((entry) => entry.dirty)) fail("computed values remained dirty after the batch");
-  if (window.__EDGEZERO__.diagnostics.length !== 0) fail("computed batching reported diagnostics");
+  if (window.__PRESOLVE__.components[0].state.count !== 2) fail("multi-step action did not finish both state writes");
+  if (window.__PRESOLVE__.computed_update_runs !== 1) fail("multi-step action triggered more than one computed update run");
+  if (window.__PRESOLVE__.computed.some((entry) => entry.dirty)) fail("computed values remained dirty after the batch");
+  if (window.__PRESOLVE__.diagnostics.length !== 0) fail("computed batching reported diagnostics");
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_COMPUTED_BATCH_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_COMPUTED_BATCH_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_COMPUTED_BATCH_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_COMPUTED_BATCH_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -3656,24 +3656,24 @@ const waitFor = async (predicate, label) => {
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 };
-const computedValue = (name) => window.__EDGEZERO__.computed
+const computedValue = (name) => window.__PRESOLVE__.computed
   .find((entry) => entry.computed.endsWith(`/computed:${name}`))?.value;
 (async () => {
-  await waitFor(() => window.__EDGEZERO__?.ready === true, "runtime readiness");
+  await waitFor(() => window.__PRESOLVE__?.ready === true, "runtime readiness");
   if (computedValue("doubled") !== 2 || computedValue("tripled") !== 3 || computedValue("total") !== 5) {
     fail("initial computed diamond values were incorrect");
   }
   document.querySelector("button")?.click();
   await waitFor(() => computedValue("total") === 10, "computed diamond update");
   if (computedValue("doubled") !== 4 || computedValue("tripled") !== 6) fail("diamond prerequisites did not refresh");
-  if (window.__EDGEZERO__.computed_update_runs !== 1) fail("diamond action did not flush one batch");
-  if (window.__EDGEZERO__.computed.some((entry) => entry.dirty)) fail("computed diamond caches remained dirty");
-  if (window.__EDGEZERO__.diagnostics.length !== 0) fail("computed diamond reported diagnostics");
+  if (window.__PRESOLVE__.computed_update_runs !== 1) fail("diamond action did not flush one batch");
+  if (window.__PRESOLVE__.computed.some((entry) => entry.dirty)) fail("computed diamond caches remained dirty");
+  if (window.__PRESOLVE__.diagnostics.length !== 0) fail("computed diamond reported diagnostics");
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_COMPUTED_DIAMOND_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_COMPUTED_DIAMOND_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<pre>EDGEZERO_COMPUTED_DIAMOND_BROWSER_TEST_FAIL: ${error.message}</pre>`);
+  document.body.insertAdjacentHTML("beforeend", `<pre>PRESOLVE_COMPUTED_DIAMOND_BROWSER_TEST_FAIL: ${error.message}</pre>`);
 });
 </script></body></html>"#,
     )
@@ -3689,7 +3689,7 @@ const fail = (message) => {
   throw new Error(message);
 };
 
-const edgezeroConsoleErrors = [];
+const presolveConsoleErrors = [];
 const originalConsoleError = console.error.bind(console);
 console.error = (...args) => {
   const message = args.map((arg) => {
@@ -3698,7 +3698,7 @@ console.error = (...args) => {
     return JSON.stringify(arg);
   }).join(" ");
 
-  edgezeroConsoleErrors.push(message);
+  presolveConsoleErrors.push(message);
   originalConsoleError(...args);
 };
 
@@ -3722,7 +3722,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 });
 
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
 
   const buttons = document.querySelectorAll("button");
   const countTarget = document.querySelector("button span");
@@ -3739,47 +3739,47 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   await waitFor(() => document.body.textContent.includes("Count:2"), "count 2");
   if (!document.body.textContent.includes("Mirror:2")) fail("mirror was not 2");
 
-  if (document.documentElement.dataset.ezRuntime !== "ready") {
+  if (document.documentElement.dataset.presolveRuntime !== "ready") {
     fail("runtime was not ready");
   }
 
-  if (!Array.isArray(window.__EDGEZERO__.missingAnchors) || window.__EDGEZERO__.missingAnchors.length !== 0) {
+  if (!Array.isArray(window.__PRESOLVE__.missingAnchors) || window.__PRESOLVE__.missingAnchors.length !== 0) {
     fail("missing anchors were present");
   }
 
-  if (!Array.isArray(window.__EDGEZERO__.diagnostics) || window.__EDGEZERO__.diagnostics.length !== 0) {
+  if (!Array.isArray(window.__PRESOLVE__.diagnostics) || window.__PRESOLVE__.diagnostics.length !== 0) {
     fail("unexpected diagnostics were present");
   }
 
-  if (window.__EDGEZERO__.runtime_version !== "0.0.0") {
+  if (window.__PRESOLVE__.runtime_version !== "0.0.0") {
     fail("runtime version was not exposed");
   }
 
-  if (window.__EDGEZERO__.supported_schema_version !== 4) {
+  if (window.__PRESOLVE__.supported_schema_version !== 4) {
     fail("supported schema version was not exposed");
   }
 
-  if (window.__EDGEZERO__.components[0].state.count !== 2) {
+  if (window.__PRESOLVE__.components[0].state.count !== 2) {
     fail("debug state did not update to 2");
   }
 
-  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
-    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  if (presolveConsoleErrors.some((message) => message.includes("[Presolve]"))) {
+    fail(`unexpected Presolve console error: ${presolveConsoleErrors.join(" | ")}`);
   }
 
-  if (!(window.__EDGEZERO__.store.components instanceof Map)) {
+  if (!(window.__PRESOLVE__.store.components instanceof Map)) {
     fail("runtime store components was not a Map");
   }
 
-  if (!(window.__EDGEZERO__.store.bindingsByField instanceof Map)) {
+  if (!(window.__PRESOLVE__.store.bindingsByField instanceof Map)) {
     fail("runtime store bindingsByField was not a Map");
   }
 
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -3798,7 +3798,7 @@ const fail = (message) => {
   throw new Error(message);
 };
 
-const edgezeroConsoleErrors = [];
+const presolveConsoleErrors = [];
 const originalConsoleError = console.error.bind(console);
 console.error = (...args) => {
   const message = args.map((arg) => {
@@ -3807,7 +3807,7 @@ console.error = (...args) => {
     return JSON.stringify(arg);
   }).join(" ");
 
-  edgezeroConsoleErrors.push(message);
+  presolveConsoleErrors.push(message);
   originalConsoleError(...args);
 };
 
@@ -3831,7 +3831,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 });
 
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
 
   const button = document.querySelector("button");
   if (button === null) fail("decrement button was not found");
@@ -3840,19 +3840,19 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   button.click();
   await waitFor(() => document.body.textContent.includes("Count:1"), "count 1");
 
-  if (window.__EDGEZERO__.components[0].state.count !== 1) {
+  if (window.__PRESOLVE__.components[0].state.count !== 1) {
     fail("debug state did not update to 1");
   }
 
-  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
-    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  if (presolveConsoleErrors.some((message) => message.includes("[Presolve]"))) {
+    fail(`unexpected Presolve console error: ${presolveConsoleErrors.join(" | ")}`);
   }
 
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_DECREMENT_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_DECREMENT_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_DECREMENT_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_DECREMENT_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -3871,7 +3871,7 @@ const fail = (message) => {
   throw new Error(message);
 };
 
-const edgezeroConsoleErrors = [];
+const presolveConsoleErrors = [];
 const originalConsoleError = console.error.bind(console);
 console.error = (...args) => {
   const message = args.map((arg) => {
@@ -3880,7 +3880,7 @@ console.error = (...args) => {
     return JSON.stringify(arg);
   }).join(" ");
 
-  edgezeroConsoleErrors.push(message);
+  presolveConsoleErrors.push(message);
   originalConsoleError(...args);
 };
 
@@ -3904,14 +3904,14 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 });
 
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
 
   const buttons = document.querySelectorAll("button");
   if (buttons.length !== 2) fail("expected two step buttons");
   if (!document.body.textContent.includes("Add:4")) fail("initial add text was not 4");
   if (!document.body.textContent.includes("Subtract:4")) fail("initial subtract text was not 4");
 
-  const actions = window.__EDGEZERO__.manifest.components[0].actions;
+  const actions = window.__PRESOLVE__.manifest.components[0].actions;
   if (actions[0].operation !== "add_assign" || actions[0].operand !== "2") {
     fail("manifest did not preserve add_assign operand");
   }
@@ -3927,19 +3927,19 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   await waitFor(() => document.body.textContent.includes("Add:3"), "add text 3");
   if (!document.body.textContent.includes("Subtract:3")) fail("subtract text was not 3");
 
-  if (window.__EDGEZERO__.components[0].state.count !== 3) {
+  if (window.__PRESOLVE__.components[0].state.count !== 3) {
     fail("debug state did not update to 3");
   }
 
-  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
-    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  if (presolveConsoleErrors.some((message) => message.includes("[Presolve]"))) {
+    fail(`unexpected Presolve console error: ${presolveConsoleErrors.join(" | ")}`);
   }
 
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_ADD_SUBTRACT_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_ADD_SUBTRACT_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_ADD_SUBTRACT_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_ADD_SUBTRACT_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -3958,7 +3958,7 @@ const fail = (message) => {
   throw new Error(message);
 };
 
-const edgezeroConsoleErrors = [];
+const presolveConsoleErrors = [];
 const originalConsoleError = console.error.bind(console);
 console.error = (...args) => {
   const message = args.map((arg) => {
@@ -3967,7 +3967,7 @@ console.error = (...args) => {
     return JSON.stringify(arg);
   }).join(" ");
 
-  edgezeroConsoleErrors.push(message);
+  presolveConsoleErrors.push(message);
   originalConsoleError(...args);
 };
 
@@ -3991,13 +3991,13 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 });
 
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
 
   const button = document.querySelector("button");
   if (button === null) fail("reset button was not found");
   if (!document.body.textContent.includes("Count:5")) fail("initial count was not 5");
 
-  const action = window.__EDGEZERO__.manifest.components[0].actions[0];
+  const action = window.__PRESOLVE__.manifest.components[0].actions[0];
   if (action.operation !== "assign" || action.operand !== "0") {
     fail("manifest did not preserve assign operand");
   }
@@ -4005,19 +4005,19 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   button.click();
   await waitFor(() => document.body.textContent.includes("Count:0"), "count 0");
 
-  if (window.__EDGEZERO__.components[0].state.count !== "0") {
+  if (window.__PRESOLVE__.components[0].state.count !== "0") {
     fail("debug state did not preserve assigned literal");
   }
 
-  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
-    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  if (presolveConsoleErrors.some((message) => message.includes("[Presolve]"))) {
+    fail(`unexpected Presolve console error: ${presolveConsoleErrors.join(" | ")}`);
   }
 
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_DIRECT_ASSIGN_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_DIRECT_ASSIGN_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_DIRECT_ASSIGN_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_DIRECT_ASSIGN_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -4036,7 +4036,7 @@ const fail = (message) => {
   throw new Error(message);
 };
 
-const edgezeroConsoleErrors = [];
+const presolveConsoleErrors = [];
 const originalConsoleError = console.error.bind(console);
 console.error = (...args) => {
   const message = args.map((arg) => {
@@ -4045,7 +4045,7 @@ console.error = (...args) => {
     return JSON.stringify(arg);
   }).join(" ");
 
-  edgezeroConsoleErrors.push(message);
+  presolveConsoleErrors.push(message);
   originalConsoleError(...args);
 };
 
@@ -4069,38 +4069,38 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 });
 
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
 
   const button = document.querySelector("button");
   if (button === null) fail("toggle button was not found");
   if (!document.body.textContent.includes("Enabled:false")) fail("initial enabled text was not false");
 
-  const action = window.__EDGEZERO__.manifest.components[0].actions[0];
+  const action = window.__PRESOLVE__.manifest.components[0].actions[0];
   if (action.operation !== "toggle" || Object.prototype.hasOwnProperty.call(action, "operand")) {
     fail("manifest did not preserve closed toggle operation");
   }
 
   button.click();
   await waitFor(() => document.body.textContent.includes("Enabled:true"), "enabled true");
-  if (window.__EDGEZERO__.components[0].state.enabled !== true) {
+  if (window.__PRESOLVE__.components[0].state.enabled !== true) {
     fail("debug state did not update to true");
   }
 
   button.click();
   await waitFor(() => document.body.textContent.includes("Enabled:false"), "enabled false");
-  if (window.__EDGEZERO__.components[0].state.enabled !== false) {
+  if (window.__PRESOLVE__.components[0].state.enabled !== false) {
     fail("debug state did not update to false");
   }
 
-  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
-    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  if (presolveConsoleErrors.some((message) => message.includes("[Presolve]"))) {
+    fail(`unexpected Presolve console error: ${presolveConsoleErrors.join(" | ")}`);
   }
 
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_BOOLEAN_TOGGLE_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_BOOLEAN_TOGGLE_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_BOOLEAN_TOGGLE_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_BOOLEAN_TOGGLE_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -4119,7 +4119,7 @@ const fail = (message) => {
   throw new Error(message);
 };
 
-const edgezeroConsoleErrors = [];
+const presolveConsoleErrors = [];
 const originalConsoleError = console.error.bind(console);
 console.error = (...args) => {
   const message = args.map((arg) => {
@@ -4128,7 +4128,7 @@ console.error = (...args) => {
     return JSON.stringify(arg);
   }).join(" ");
 
-  edgezeroConsoleErrors.push(message);
+  presolveConsoleErrors.push(message);
   originalConsoleError(...args);
 };
 
@@ -4152,7 +4152,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 });
 
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
 
   const button = document.querySelector("button");
   if (button === null) fail("multi-step button was not found");
@@ -4160,7 +4160,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     fail("initial multi-step text did not render");
   }
 
-  const actions = window.__EDGEZERO__.manifest.components[0].actions;
+  const actions = window.__PRESOLVE__.manifest.components[0].actions;
   const operations = actions.map((action) => `${action.method}:${action.operation}:${action.field}`);
   const expected = [
     "apply:add_assign:count",
@@ -4180,20 +4180,20 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     "multi-step final text"
   );
 
-  const state = window.__EDGEZERO__.components[0].state;
+  const state = window.__PRESOLVE__.components[0].state;
   if (state.count !== 9 || state.enabled !== true) {
     fail(`debug state did not reflect ordered plan: ${JSON.stringify(state)}`);
   }
 
-  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
-    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  if (presolveConsoleErrors.some((message) => message.includes("[Presolve]"))) {
+    fail(`unexpected Presolve console error: ${presolveConsoleErrors.join(" | ")}`);
   }
 
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_MULTI_STEP_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_MULTI_STEP_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_MULTI_STEP_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_MULTI_STEP_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -4212,7 +4212,7 @@ const fail = (message) => {
   throw new Error(message);
 };
 
-const edgezeroConsoleErrors = [];
+const presolveConsoleErrors = [];
 const originalConsoleError = console.error.bind(console);
 console.error = (...args) => {
   const message = args.map((arg) => {
@@ -4221,7 +4221,7 @@ console.error = (...args) => {
     return JSON.stringify(arg);
   }).join(" ");
 
-  edgezeroConsoleErrors.push(message);
+  presolveConsoleErrors.push(message);
   originalConsoleError(...args);
 };
 
@@ -4245,7 +4245,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 });
 
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
 
   const button = document.querySelector("button");
   if (button === null) fail("dynamic attribute button was not found");
@@ -4254,7 +4254,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   if (button.getAttribute("title") !== "Ready") fail("title attribute was not initialized");
   if (!document.body.textContent.includes("Status:Ready")) fail("initial status text was not Ready");
 
-  const nodes = window.__EDGEZERO__.manifest.components[0].template.nodes;
+  const nodes = window.__PRESOLVE__.manifest.components[0].template.nodes;
   const disabledBinding = nodes.find((node) => node.attribute === "disabled");
   const titleBinding = nodes.find((node) => node.attribute === "title");
   if (disabledBinding?.target !== "attribute" || disabledBinding?.element !== "n0") {
@@ -4273,20 +4273,20 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     "dynamic attributes locked"
   );
 
-  const state = window.__EDGEZERO__.components[0].state;
+  const state = window.__PRESOLVE__.components[0].state;
   if (state.disabled !== true || state.label !== "Locked") {
     fail(`debug state did not reflect dynamic attribute update: ${JSON.stringify(state)}`);
   }
 
-  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
-    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  if (presolveConsoleErrors.some((message) => message.includes("[Presolve]"))) {
+    fail(`unexpected Presolve console error: ${presolveConsoleErrors.join(" | ")}`);
   }
 
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_DYNAMIC_ATTRIBUTES_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_DYNAMIC_ATTRIBUTES_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_DYNAMIC_ATTRIBUTES_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_DYNAMIC_ATTRIBUTES_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -4305,7 +4305,7 @@ const fail = (message) => {
   throw new Error(message);
 };
 
-const edgezeroConsoleErrors = [];
+const presolveConsoleErrors = [];
 const originalConsoleError = console.error.bind(console);
 console.error = (...args) => {
   const message = args.map((arg) => {
@@ -4314,7 +4314,7 @@ console.error = (...args) => {
     return JSON.stringify(arg);
   }).join(" ");
 
-  edgezeroConsoleErrors.push(message);
+  presolveConsoleErrors.push(message);
   originalConsoleError(...args);
 };
 
@@ -4338,7 +4338,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 });
 
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
 
   const elements = Array.from(document.body.children)
     .filter((element) => ["H1", "P", "SPAN"].includes(element.tagName));
@@ -4347,7 +4347,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     fail(`fragment siblings did not render in order: ${tags.join(",")}`);
   }
 
-  if (document.querySelector("[data-ez-node='n0'], [data-ez-node='n2']") !== null) {
+  if (document.querySelector("[data-presolve-node='n0'], [data-presolve-node='n2']") !== null) {
     fail("fragment IDs should not render as wrapper DOM nodes");
   }
 
@@ -4361,25 +4361,25 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     fail("fragment text content did not render expected sibling output");
   }
 
-  const nodes = window.__EDGEZERO__.manifest.components[0].template.nodes;
+  const nodes = window.__PRESOLVE__.manifest.components[0].template.nodes;
   const nodeIds = nodes.map((node) => node.id);
   if (JSON.stringify(nodeIds) !== JSON.stringify(["n1", "n3", "n4", "n5"])) {
     fail(`fragment manifest should omit fragment nodes: ${nodeIds.join(",")}`);
   }
 
-  if (window.__EDGEZERO__.components[0].state.label !== "Ready") {
+  if (window.__PRESOLVE__.components[0].state.label !== "Ready") {
     fail("fragment component state did not initialize");
   }
 
-  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
-    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  if (presolveConsoleErrors.some((message) => message.includes("[Presolve]"))) {
+    fail(`unexpected Presolve console error: ${presolveConsoleErrors.join(" | ")}`);
   }
 
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_FRAGMENTS_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_FRAGMENTS_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_FRAGMENTS_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_FRAGMENTS_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -4398,7 +4398,7 @@ const fail = (message) => {
   throw new Error(message);
 };
 
-const edgezeroConsoleErrors = [];
+const presolveConsoleErrors = [];
 const originalConsoleError = console.error.bind(console);
 console.error = (...args) => {
   const message = args.map((arg) => {
@@ -4407,7 +4407,7 @@ console.error = (...args) => {
     return JSON.stringify(arg);
   }).join(" ");
 
-  edgezeroConsoleErrors.push(message);
+  presolveConsoleErrors.push(message);
   originalConsoleError(...args);
 };
 
@@ -4431,7 +4431,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 });
 
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
 
   const button = document.querySelector("button");
   if (button === null) {
@@ -4442,11 +4442,11 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     fail(`initial conditional branch was not On: ${button.textContent}`);
   }
 
-  if (document.querySelector("[data-ez-node='n4']") === null) {
+  if (document.querySelector("[data-presolve-node='n4']") === null) {
     fail("true branch node identity was not present initially");
   }
 
-  const manifestNode = window.__EDGEZERO__.manifest.components[0].template.nodes[1];
+  const manifestNode = window.__PRESOLVE__.manifest.components[0].template.nodes[1];
   if (manifestNode.kind !== "conditional" || manifestNode.start !== "n2" || manifestNode.end !== "n3") {
     fail("conditional manifest node did not expose stable boundaries");
   }
@@ -4454,34 +4454,34 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   button.click();
   await waitFor(() => button.textContent.trim() === "Off", "false branch");
 
-  if (document.querySelector("[data-ez-node='n4']") !== null) {
+  if (document.querySelector("[data-presolve-node='n4']") !== null) {
     fail("true branch node should have been removed after toggle");
   }
 
-  if (document.querySelector("[data-ez-node='n5']") === null) {
+  if (document.querySelector("[data-presolve-node='n5']") === null) {
     fail("false branch node identity was not present after toggle");
   }
 
   button.click();
   await waitFor(() => button.textContent.trim() === "On", "true branch");
 
-  if (document.querySelector("[data-ez-node='n4']") === null) {
+  if (document.querySelector("[data-presolve-node='n4']") === null) {
     fail("true branch node identity was not restored after second toggle");
   }
 
-  if (window.__EDGEZERO__.store.elementsByNode.get("n4") !== document.querySelector("[data-ez-node='n4']")) {
+  if (window.__PRESOLVE__.store.elementsByNode.get("n4") !== document.querySelector("[data-presolve-node='n4']")) {
     fail("runtime element index did not refresh after conditional replacement");
   }
 
-  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
-    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  if (presolveConsoleErrors.some((message) => message.includes("[Presolve]"))) {
+    fail(`unexpected Presolve console error: ${presolveConsoleErrors.join(" | ")}`);
   }
 
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_CONDITIONAL_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_CONDITIONAL_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_CONDITIONAL_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_CONDITIONAL_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -4501,7 +4501,7 @@ const fail = (message) => {
   throw new Error(message);
 };
 
-const edgezeroConsoleErrors = [];
+const presolveConsoleErrors = [];
 const originalConsoleError = console.error.bind(console);
 console.error = (...args) => {
   const message = args.map((arg) => {
@@ -4510,7 +4510,7 @@ console.error = (...args) => {
     return JSON.stringify(arg);
   }).join(" ");
 
-  edgezeroConsoleErrors.push(message);
+  presolveConsoleErrors.push(message);
   originalConsoleError(...args);
 };
 
@@ -4536,7 +4536,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 const listLabels = () => [...document.querySelectorAll("ol li")].map((item) => item.textContent);
 
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
 
   const buttons = document.querySelectorAll("button");
   if (buttons.length !== 2) fail("expected list reconciliation controls");
@@ -4545,11 +4545,11 @@ const listLabels = () => [...document.querySelectorAll("ol li")].map((item) => i
     fail(`initial list contents were unexpected: ${listLabels().join(" | ")}`);
   }
 
-  const north = document.querySelector("[data-ez-node='n7:North']");
-  const south = document.querySelector("[data-ez-node='n7:South']");
+  const north = document.querySelector("[data-presolve-node='n7:North']");
+  const south = document.querySelector("[data-presolve-node='n7:South']");
   if (north === null || south === null) fail("initial keyed list nodes were not found");
 
-  const listNode = window.__EDGEZERO__.manifest.components[0].template.nodes.find(
+  const listNode = window.__PRESOLVE__.manifest.components[0].template.nodes.find(
     (node) => node.kind === "list"
   );
   if (
@@ -4567,20 +4567,20 @@ const listLabels = () => [...document.querySelectorAll("ol li")].map((item) => i
     "reconciled list"
   );
 
-  if (document.querySelector("[data-ez-node='n7:North']") !== north) {
+  if (document.querySelector("[data-presolve-node='n7:North']") !== north) {
     fail("North node was recreated instead of retained during movement");
   }
-  if (document.querySelector("[data-ez-node='n7:South']") !== south) {
+  if (document.querySelector("[data-presolve-node='n7:South']") !== south) {
     fail("South node was recreated instead of retained during movement");
   }
-  const east = document.querySelector("[data-ez-node='n7:East']");
+  const east = document.querySelector("[data-presolve-node='n7:East']");
   if (east === null) {
     fail("East node was not inserted during reconciliation");
   }
-  if (window.__EDGEZERO__.store.elementsByNode.get("n7:North") !== north) {
+  if (window.__PRESOLVE__.store.elementsByNode.get("n7:North") !== north) {
     fail("runtime element index did not retain the North node");
   }
-  if (JSON.stringify(window.__EDGEZERO__.components[0].state.labels) !== JSON.stringify(["South", "East", "North"])) {
+  if (JSON.stringify(window.__PRESOLVE__.components[0].state.labels) !== JSON.stringify(["South", "East", "North"])) {
     fail("debug state did not retain the reconciled array");
   }
 
@@ -4590,24 +4590,24 @@ const listLabels = () => [...document.querySelectorAll("ol li")].map((item) => i
     "trimmed list"
   );
 
-  if (document.querySelector("[data-ez-node='n7:East']") !== east) {
+  if (document.querySelector("[data-presolve-node='n7:East']") !== east) {
     fail("East node was recreated instead of retained during deletion");
   }
-  if (document.querySelector("[data-ez-node='n7:North']") !== null || document.querySelector("[data-ez-node='n7:South']") !== null) {
+  if (document.querySelector("[data-presolve-node='n7:North']") !== null || document.querySelector("[data-presolve-node='n7:South']") !== null) {
     fail("stale keyed list nodes were not removed during deletion");
   }
-  if (JSON.stringify(window.__EDGEZERO__.components[0].state.labels) !== JSON.stringify(["East"])) {
+  if (JSON.stringify(window.__PRESOLVE__.components[0].state.labels) !== JSON.stringify(["East"])) {
     fail("debug state did not retain the trimmed array");
   }
-  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
-    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  if (presolveConsoleErrors.some((message) => message.includes("[Presolve]"))) {
+    fail(`unexpected Presolve console error: ${presolveConsoleErrors.join(" | ")}`);
   }
 
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_KEYED_LIST_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_KEYED_LIST_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_KEYED_LIST_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_KEYED_LIST_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -4627,7 +4627,7 @@ const fail = (message) => {
   throw new Error(message);
 };
 
-const edgezeroConsoleErrors = [];
+const presolveConsoleErrors = [];
 const originalConsoleError = console.error.bind(console);
 console.error = (...args) => {
   const message = args.map((arg) => {
@@ -4636,7 +4636,7 @@ console.error = (...args) => {
     return JSON.stringify(arg);
   }).join(" ");
 
-  edgezeroConsoleErrors.push(message);
+  presolveConsoleErrors.push(message);
   originalConsoleError(...args);
 };
 
@@ -4662,7 +4662,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 const listLabels = () => [...document.querySelectorAll("ol li")].map((item) => item.textContent);
 
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
 
   const buttons = document.querySelectorAll("button");
   if (buttons.length !== 2) fail("expected object list reconciliation controls");
@@ -4671,11 +4671,11 @@ const listLabels = () => [...document.querySelectorAll("ol li")].map((item) => i
     fail(`initial object list contents were unexpected: ${listLabels().join(" | ")}`);
   }
 
-  const north = document.querySelector("[data-ez-node='n7:north']");
-  const south = document.querySelector("[data-ez-node='n7:south']");
+  const north = document.querySelector("[data-presolve-node='n7:north']");
+  const south = document.querySelector("[data-presolve-node='n7:south']");
   if (north === null || south === null) fail("initial object keyed list nodes were not found");
 
-  const listNode = window.__EDGEZERO__.manifest.components[0].template.nodes.find(
+  const listNode = window.__PRESOLVE__.manifest.components[0].template.nodes.find(
     (node) => node.kind === "list"
   );
   if (
@@ -4694,20 +4694,20 @@ const listLabels = () => [...document.querySelectorAll("ol li")].map((item) => i
     "reconciled object list"
   );
 
-  if (document.querySelector("[data-ez-node='n7:north']") !== north) {
+  if (document.querySelector("[data-presolve-node='n7:north']") !== north) {
     fail("North object node was recreated instead of retained during movement");
   }
-  if (document.querySelector("[data-ez-node='n7:south']") !== south) {
+  if (document.querySelector("[data-presolve-node='n7:south']") !== south) {
     fail("South object node was recreated instead of retained during movement");
   }
-  const east = document.querySelector("[data-ez-node='n7:east']");
+  const east = document.querySelector("[data-presolve-node='n7:east']");
   if (east === null || east.textContent !== "1:East(central)") {
     fail("East object node did not receive member bindings during insertion");
   }
-  if (window.__EDGEZERO__.store.elementsByNode.get("n7:north") !== north) {
+  if (window.__PRESOLVE__.store.elementsByNode.get("n7:north") !== north) {
     fail("runtime element index did not retain the North object node");
   }
-  if (JSON.stringify(window.__EDGEZERO__.components[0].state.items.map((item) => item.id)) !== JSON.stringify(["south", "east", "north"])) {
+  if (JSON.stringify(window.__PRESOLVE__.components[0].state.items.map((item) => item.id)) !== JSON.stringify(["south", "east", "north"])) {
     fail("debug state did not retain the reconciled object array");
   }
 
@@ -4717,21 +4717,21 @@ const listLabels = () => [...document.querySelectorAll("ol li")].map((item) => i
     "trimmed object list"
   );
 
-  if (document.querySelector("[data-ez-node='n7:east']") !== east) {
+  if (document.querySelector("[data-presolve-node='n7:east']") !== east) {
     fail("East object node was recreated instead of retained during deletion");
   }
-  if (document.querySelector("[data-ez-node='n7:north']") !== null || document.querySelector("[data-ez-node='n7:south']") !== null) {
+  if (document.querySelector("[data-presolve-node='n7:north']") !== null || document.querySelector("[data-presolve-node='n7:south']") !== null) {
     fail("stale object keyed list nodes were not removed during deletion");
   }
-  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
-    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  if (presolveConsoleErrors.some((message) => message.includes("[Presolve]"))) {
+    fail(`unexpected Presolve console error: ${presolveConsoleErrors.join(" | ")}`);
   }
 
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_OBJECT_KEYED_LIST_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_OBJECT_KEYED_LIST_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_OBJECT_KEYED_LIST_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_OBJECT_KEYED_LIST_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -4751,7 +4751,7 @@ const fail = (message) => {
   throw new Error(message);
 };
 
-const edgezeroConsoleErrors = [];
+const presolveConsoleErrors = [];
 const originalConsoleError = console.error.bind(console);
 console.error = (...args) => {
   const message = args.map((arg) => {
@@ -4760,7 +4760,7 @@ console.error = (...args) => {
     return JSON.stringify(arg);
   }).join(" ");
 
-  edgezeroConsoleErrors.push(message);
+  presolveConsoleErrors.push(message);
   originalConsoleError(...args);
 };
 
@@ -4786,12 +4786,12 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 const itemButtons = () => [...document.querySelectorAll("ol li button")];
 
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
 
   const refresh = document.querySelector("section > button");
   const selections = document.querySelector("p");
-  const north = document.querySelector("[data-ez-node='n8:north']");
-  const south = document.querySelector("[data-ez-node='n8:south']");
+  const north = document.querySelector("[data-presolve-node='n8:north']");
+  const south = document.querySelector("[data-presolve-node='n8:south']");
   if (refresh === null || selections === null || north === null || south === null) {
     fail("initial dynamic list controls or roots were missing");
   }
@@ -4808,10 +4808,10 @@ const itemButtons = () => [...document.querySelectorAll("ol li button")];
     "refreshed list item bindings"
   );
 
-  if (document.querySelector("[data-ez-node='n8:north']") !== north) {
+  if (document.querySelector("[data-presolve-node='n8:north']") !== north) {
     fail("North root was replaced instead of refreshed in place");
   }
-  if (document.querySelector("[data-ez-node='n8:south']") !== south) {
+  if (document.querySelector("[data-presolve-node='n8:south']") !== south) {
     fail("South root was replaced instead of refreshed in place");
   }
   if (north.title !== "central" || north.dataset.label !== "Northern") {
@@ -4821,7 +4821,7 @@ const itemButtons = () => [...document.querySelectorAll("ol li button")];
     fail("retained South attributes did not refresh");
   }
 
-  const east = document.querySelector("[data-ez-node='n8:east']");
+  const east = document.querySelector("[data-presolve-node='n8:east']");
   if (east === null || east.title !== "coastal" || east.dataset.label !== "East") {
     fail("inserted East attributes were not materialized");
   }
@@ -4831,15 +4831,15 @@ const itemButtons = () => [...document.querySelectorAll("ol li button")];
   itemButtons()[0].click();
   await waitFor(() => selections.textContent === "3", "retained list item event");
 
-  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
-    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  if (presolveConsoleErrors.some((message) => message.includes("[Presolve]"))) {
+    fail(`unexpected Presolve console error: ${presolveConsoleErrors.join(" | ")}`);
   }
 
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_DYNAMIC_LIST_ITEM_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_DYNAMIC_LIST_ITEM_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_DYNAMIC_LIST_ITEM_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_DYNAMIC_LIST_ITEM_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -4858,7 +4858,7 @@ const fail = (message) => {
   throw new Error(message);
 };
 
-const edgezeroConsoleErrors = [];
+const presolveConsoleErrors = [];
 const originalConsoleError = console.error.bind(console);
 console.error = (...args) => {
   const message = args.map((arg) => {
@@ -4867,7 +4867,7 @@ console.error = (...args) => {
     return JSON.stringify(arg);
   }).join(" ");
 
-  edgezeroConsoleErrors.push(message);
+  presolveConsoleErrors.push(message);
   originalConsoleError(...args);
 };
 
@@ -4891,7 +4891,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 });
 
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
 
   const button = document.querySelector("button");
   if (button === null) {
@@ -4902,7 +4902,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     fail(`initial logical-and branch was not On: ${button.textContent}`);
   }
 
-  const manifestNode = window.__EDGEZERO__.manifest.components[0].template.nodes[1];
+  const manifestNode = window.__PRESOLVE__.manifest.components[0].template.nodes[1];
   if (manifestNode.kind !== "conditional" || manifestNode.when_false_html !== "") {
     fail("logical-and manifest node did not expose an empty false branch");
   }
@@ -4910,26 +4910,26 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   button.click();
   await waitFor(() => button.textContent.trim() === "", "empty false branch");
 
-  if (document.querySelector("[data-ez-node='n4']") !== null) {
+  if (document.querySelector("[data-presolve-node='n4']") !== null) {
     fail("true branch node should have been removed for logical-and false branch");
   }
 
   button.click();
   await waitFor(() => button.textContent.trim() === "On", "restored true branch");
 
-  if (document.querySelector("[data-ez-node='n4']") === null) {
+  if (document.querySelector("[data-presolve-node='n4']") === null) {
     fail("true branch node identity was not restored for logical-and true branch");
   }
 
-  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
-    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  if (presolveConsoleErrors.some((message) => message.includes("[Presolve]"))) {
+    fail(`unexpected Presolve console error: ${presolveConsoleErrors.join(" | ")}`);
   }
 
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_LOGICAL_AND_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_LOGICAL_AND_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_LOGICAL_AND_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_LOGICAL_AND_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -4951,7 +4951,7 @@ fn write_runtime_contract_probe_page(
     page.push_str("<!doctype html>\n<html lang=\"en\">\n<body>\n");
 
     if let Some(manifest_json) = manifest_json {
-        page.push_str("<script type=\"application/json\" id=\"ez-template-manifest\">\n");
+        page.push_str("<script type=\"application/json\" id=\"presolve-template-manifest\">\n");
         page.push_str(manifest_json);
         page.push_str("\n</script>\n");
     }
@@ -4969,10 +4969,10 @@ fn write_runtime_contract_probe_page(
     page.push_str("  tick();\n");
     page.push_str("});\n");
     page.push_str("(async () => {\n");
-    page.push_str("  await waitFor(() => document.documentElement.dataset.ezRuntime === \"error\" && window.__EDGEZERO__, \"runtime error\");\n");
-    page.push_str("  if (window.__EDGEZERO__.runtime_version !== \"0.0.0\") fail(\"runtime version was not exposed\");\n");
-    page.push_str("  if (window.__EDGEZERO__.supported_schema_version !== 4) fail(\"supported schema version was not exposed\");\n");
-    page.push_str("  const diagnostics = window.__EDGEZERO__.diagnostics;\n");
+    page.push_str("  await waitFor(() => document.documentElement.dataset.presolveRuntime === \"error\" && window.__PRESOLVE__, \"runtime error\");\n");
+    page.push_str("  if (window.__PRESOLVE__.runtime_version !== \"0.0.0\") fail(\"runtime version was not exposed\");\n");
+    page.push_str("  if (window.__PRESOLVE__.supported_schema_version !== 4) fail(\"supported schema version was not exposed\");\n");
+    page.push_str("  const diagnostics = window.__PRESOLVE__.diagnostics;\n");
     page.push_str("  if (!Array.isArray(diagnostics) || diagnostics.length === 0) fail(\"diagnostics were not exposed\");\n");
     page.push_str("  if (diagnostics[0].code !== \"");
     page.push_str(expected_code);
@@ -4986,7 +4986,7 @@ fn write_runtime_contract_probe_page(
     page.push_str("</div>\");\n");
     page.push_str("})().catch((error) => {\n");
     page.push_str("  document.body.dataset.browserTest = \"fail\";\n");
-    page.push_str("  document.body.insertAdjacentHTML(\"beforeend\", `<div>EDGEZERO_RUNTIME_CONTRACT_DIAGNOSTIC_FAIL: ${error.message}</div>`);\n");
+    page.push_str("  document.body.insertAdjacentHTML(\"beforeend\", `<div>PRESOLVE_RUNTIME_CONTRACT_DIAGNOSTIC_FAIL: ${error.message}</div>`);\n");
     page.push_str("  console.error(error);\n");
     page.push_str("});\n");
     page.push_str("</script>\n</body>\n</html>\n");
@@ -5003,7 +5003,7 @@ const fail = (message) => {
   throw new Error(message);
 };
 
-const edgezeroConsoleErrors = [];
+const presolveConsoleErrors = [];
 const originalConsoleError = console.error.bind(console);
 console.error = (...args) => {
   const message = args.map((arg) => {
@@ -5012,7 +5012,7 @@ console.error = (...args) => {
     return JSON.stringify(arg);
   }).join(" ");
 
-  edgezeroConsoleErrors.push(message);
+  presolveConsoleErrors.push(message);
   originalConsoleError(...args);
 };
 
@@ -5036,25 +5036,25 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 });
 
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
 
   if (!document.body.textContent.includes("Name:Austin & <Zero>")) {
     fail("string binding text was not rendered");
   }
 
-  if (window.__EDGEZERO__.components[0].state.name !== "Austin & <Zero>") {
+  if (window.__PRESOLVE__.components[0].state.name !== "Austin & <Zero>") {
     fail("debug state did not preserve string value");
   }
 
-  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
-    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  if (presolveConsoleErrors.some((message) => message.includes("[Presolve]"))) {
+    fail(`unexpected Presolve console error: ${presolveConsoleErrors.join(" | ")}`);
   }
 
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_STRING_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_STRING_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_STRING_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_STRING_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -5073,7 +5073,7 @@ const fail = (message) => {
   throw new Error(message);
 };
 
-const edgezeroConsoleErrors = [];
+const presolveConsoleErrors = [];
 const originalConsoleError = console.error.bind(console);
 console.error = (...args) => {
   const message = args.map((arg) => {
@@ -5082,7 +5082,7 @@ console.error = (...args) => {
     return JSON.stringify(arg);
   }).join(" ");
 
-  edgezeroConsoleErrors.push(message);
+  presolveConsoleErrors.push(message);
   originalConsoleError(...args);
 };
 
@@ -5106,7 +5106,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 });
 
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
 
   if (!document.body.textContent.includes("Enabled:true")) {
     fail("true boolean binding text was not rendered");
@@ -5116,7 +5116,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     fail("false boolean binding text was not rendered");
   }
 
-  const state = window.__EDGEZERO__.components[0].state;
+  const state = window.__PRESOLVE__.components[0].state;
   if (state.enabled !== true) {
     fail("enabled state did not preserve boolean true");
   }
@@ -5125,15 +5125,15 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     fail("disabled state did not preserve boolean false");
   }
 
-  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
-    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  if (presolveConsoleErrors.some((message) => message.includes("[Presolve]"))) {
+    fail(`unexpected Presolve console error: ${presolveConsoleErrors.join(" | ")}`);
   }
 
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_BOOLEAN_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_BOOLEAN_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_BOOLEAN_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_BOOLEAN_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>
@@ -5152,7 +5152,7 @@ const fail = (message) => {
   throw new Error(message);
 };
 
-const edgezeroConsoleErrors = [];
+const presolveConsoleErrors = [];
 const originalConsoleError = console.error.bind(console);
 console.error = (...args) => {
   const message = args.map((arg) => {
@@ -5161,7 +5161,7 @@ console.error = (...args) => {
     return JSON.stringify(arg);
   }).join(" ");
 
-  edgezeroConsoleErrors.push(message);
+  presolveConsoleErrors.push(message);
   originalConsoleError(...args);
 };
 
@@ -5185,7 +5185,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 });
 
 (async () => {
-  await waitFor(() => document.documentElement.dataset.ezRuntime === "ready", "runtime ready");
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
 
   const paragraph = document.querySelector("p");
   if (paragraph === null) {
@@ -5196,25 +5196,25 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     fail(`null binding text was not empty: ${paragraph.textContent}`);
   }
 
-  const manifestNode = window.__EDGEZERO__.manifest.components[0].template.nodes[1];
+  const manifestNode = window.__PRESOLVE__.manifest.components[0].template.nodes[1];
   if (manifestNode.initial_value !== null) {
     fail("manifest did not preserve null initial value");
   }
 
-  const state = window.__EDGEZERO__.components[0].state;
+  const state = window.__PRESOLVE__.components[0].state;
   if (state.selection !== null) {
     fail("selection state did not preserve null");
   }
 
-  if (edgezeroConsoleErrors.some((message) => message.includes("[EdgeZero]"))) {
-    fail(`unexpected EdgeZero console error: ${edgezeroConsoleErrors.join(" | ")}`);
+  if (presolveConsoleErrors.some((message) => message.includes("[Presolve]"))) {
+    fail(`unexpected Presolve console error: ${presolveConsoleErrors.join(" | ")}`);
   }
 
   document.body.dataset.browserTest = "pass";
-  document.body.insertAdjacentHTML("beforeend", "<div>EDGEZERO_NULL_BROWSER_TEST_PASS</div>");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_NULL_BROWSER_TEST_PASS</div>");
 })().catch((error) => {
   document.body.dataset.browserTest = "fail";
-  document.body.insertAdjacentHTML("beforeend", `<div>EDGEZERO_NULL_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_NULL_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
 });
 </script>

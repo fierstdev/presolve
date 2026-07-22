@@ -4,7 +4,7 @@ TemplateGraph:
     template NullSelection
       root: <p> id=n0 @ fixtures/0008-null-state/input/NullSelection.tsx:7:12 span=149..182
       attributes:
-        data-ez-bindings = bindings(this.selection) @ generated
+        data-presolve-bindings = bindings(this.selection) @ generated
       children:
         Text("Selection:") @ fixtures/0008-null-state/input/NullSelection.tsx:7:15 span=152..162
         Binding id=n1 expression="this.selection" initial=Some(null) @ fixtures/0008-null-state/input/NullSelection.tsx:7:25 span=162..178

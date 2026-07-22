@@ -93,12 +93,12 @@ impl ResumeAnchorIntegrityCode {
     #[must_use]
     pub const fn code(self) -> &'static str {
         match self {
-            Self::MissingTarget => "EZASM1363",
-            Self::UnstableTarget => "EZASM1364",
-            Self::DuplicateAnchor => "EZASM1365",
-            Self::WrongKind => "EZASM1366",
-            Self::StructuralPairMismatch => "EZASM1367",
-            Self::OrderingOrOutputDrift => "EZASM1368",
+            Self::MissingTarget => "PSASM1363",
+            Self::UnstableTarget => "PSASM1364",
+            Self::DuplicateAnchor => "PSASM1365",
+            Self::WrongKind => "PSASM1366",
+            Self::StructuralPairMismatch => "PSASM1367",
+            Self::OrderingOrOutputDrift => "PSASM1368",
         }
     }
 }
@@ -403,13 +403,13 @@ pub fn validate_resume_marker_html(
     for anchor in &plan.anchors {
         let marker = match anchor.placement {
             ResumeAnchorPlacement::ElementAttribute | ResumeAnchorPlacement::TextTemplate => {
-                format!("data-ez-r=\"{}\"", anchor.anchor_id)
+                format!("data-presolve-r=\"{}\"", anchor.anchor_id)
             }
             ResumeAnchorPlacement::StructuralStartComment => {
-                format!("<!--ez-r-start:{}-->", anchor.anchor_id)
+                format!("<!--presolve-r-start:{}-->", anchor.anchor_id)
             }
             ResumeAnchorPlacement::StructuralEndComment => {
-                format!("<!--ez-r-end:{}-->", anchor.anchor_id)
+                format!("<!--presolve-r-end:{}-->", anchor.anchor_id)
             }
         };
         let count = html.matches(&marker).count();
@@ -428,7 +428,7 @@ pub fn validate_resume_marker_html(
         }
     }
     for event in &plan.events {
-        let marker = format!("data-ez-e=\"{}\"", event.resume_event_id);
+        let marker = format!("data-presolve-e=\"{}\"", event.resume_event_id);
         let count = html.matches(&marker).count();
         if count == 0 {
             diagnostics.push(anchor_diagnostic(
@@ -453,8 +453,8 @@ pub fn validate_resume_marker_html(
             anchor.marker_target_id == start.marker_target_id
                 && anchor.kind == ResumeAnchorKind::StructuralEnd
         }) {
-            let start_marker = format!("<!--ez-r-start:{}-->", start.anchor_id);
-            let end_marker = format!("<!--ez-r-end:{}-->", end.anchor_id);
+            let start_marker = format!("<!--presolve-r-start:{}-->", start.anchor_id);
+            let end_marker = format!("<!--presolve-r-end:{}-->", end.anchor_id);
             if html
                 .find(&start_marker)
                 .zip(html.find(&end_marker))
@@ -617,9 +617,9 @@ mod tests {
         assert!(plan.anchors.is_empty());
         assert!(plan.events.is_empty());
         let html = crate::generate_ordinary_instance_html(&model);
-        assert!(!html.contains("data-ez-r"));
-        assert!(!html.contains("data-ez-e"));
-        assert!(!html.contains("ez-r-start:"));
+        assert!(!html.contains("data-presolve-r"));
+        assert!(!html.contains("data-presolve-e"));
+        assert!(!html.contains("presolve-r-start:"));
         assert!(validate_resume_marker_html(&plan, &html).is_empty());
     }
 
@@ -665,12 +665,12 @@ mod tests {
             ]
             .map(ResumeAnchorIntegrityCode::code),
             [
-                "EZASM1363",
-                "EZASM1364",
-                "EZASM1365",
-                "EZASM1366",
-                "EZASM1367",
-                "EZASM1368",
+                "PSASM1363",
+                "PSASM1364",
+                "PSASM1365",
+                "PSASM1366",
+                "PSASM1367",
+                "PSASM1368",
             ]
         );
     }
@@ -684,7 +684,7 @@ mod tests {
         let html = crate::generate_ordinary_instance_html(&model);
         assert!(validate_resume_marker_html(&plan, &html).is_empty());
         assert_eq!(html, crate::generate_ordinary_instance_html(&model));
-        let missing = html.replacen("data-ez-r=", "data-missing-r=", 1);
+        let missing = html.replacen("data-presolve-r=", "data-missing-r=", 1);
         assert!(validate_resume_marker_html(&plan, &missing)
             .iter()
             .any(|diagnostic| diagnostic.code == ResumeAnchorIntegrityCode::MissingTarget));

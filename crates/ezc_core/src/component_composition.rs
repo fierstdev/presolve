@@ -228,6 +228,6 @@ mod tests {
         asm.component_composition.cycles.clear();
         assert!(validate_application_semantic_model(&asm)
             .iter()
-            .any(|diagnostic| diagnostic.code == "EZASM1197"));
+            .any(|diagnostic| diagnostic.code == "PSASM1197"));
     }
 }

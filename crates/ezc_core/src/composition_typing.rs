@@ -487,6 +487,6 @@ mod tests {
             .target_boundary = None;
         assert!(validate_application_semantic_model(&asm)
             .iter()
-            .any(|diagnostic| diagnostic.code == "EZASM1196"));
+            .any(|diagnostic| diagnostic.code == "PSASM1196"));
     }
 }

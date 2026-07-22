@@ -1,11 +1,11 @@
 File: fixtures/0022-keyed-list-diagnostics/input/ListKeyDiagnostics.tsx
 ComponentGraph:
   diagnostics:
-    EZC1011: list over `this.labels` in class `ListKeyDiagnostics` is missing a `key={...}` attribute; stable keys are required for retained-node reconciliation
-    EZC1012: list key `index` in class `ListKeyDiagnostics` uses the iteration index; index keys are unstable when items move
-    EZC1015: list key `label.length` cannot resolve a primitive member value for initial item at index 0 in class `ListKeyDiagnostics`; every item must provide that member
-    EZC1014: list key `label` resolves to duplicate initial value `North` in class `ListKeyDiagnostics`; keyed reconciliation requires unique keys
-    EZC1015: list key `record.slug` cannot resolve a primitive member value for initial item at index 0 in class `ListKeyDiagnostics`; every item must provide that member
+    PSC1011: list over `this.labels` in class `ListKeyDiagnostics` is missing a `key={...}` attribute; stable keys are required for retained-node reconciliation
+    PSC1012: list key `index` in class `ListKeyDiagnostics` uses the iteration index; index keys are unstable when items move
+    PSC1015: list key `label.length` cannot resolve a primitive member value for initial item at index 0 in class `ListKeyDiagnostics`; every item must provide that member
+    PSC1014: list key `label` resolves to duplicate initial value `North` in class `ListKeyDiagnostics`; keyed reconciliation requires unique keys
+    PSC1015: list key `record.slug` cannot resolve a primitive member value for initial item at index 0 in class `ListKeyDiagnostics`; every item must provide that member
   components:
     component ListKeyDiagnostics
       element: x-list-key-diagnostics

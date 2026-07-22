@@ -323,7 +323,7 @@ mod tests {
 @component("x-runtime-effect-artifact")
 class RuntimeEffectArtifact extends Component {
   count = state(1);
-  title = state("EdgeZero");
+  title = state("Presolve");
 
   @computed()
   get doubled() { return this.count * 2; }

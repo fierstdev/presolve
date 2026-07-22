@@ -29,22 +29,22 @@ impl OrdinaryTemplateIntegrityCode {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::MissingTarget => "EZASM1289",
-            Self::DuplicateTarget => "EZASM1290",
-            Self::DuplicateBinding => "EZASM1291",
-            Self::TargetConstructorMismatch => "EZASM1292",
-            Self::BindingConstructorMismatch => "EZASM1293",
-            Self::TargetComponentMismatch => "EZASM1294",
-            Self::DeclarationOwnershipMismatch => "EZASM1295",
-            Self::EventActionBatchOwnershipMismatch => "EZASM1296",
-            Self::ArtifactManifestDrift => "EZASM1297",
-            Self::DomMarkerProjectionMismatch => "EZASM1298",
-            Self::FormTargetReciprocityMismatch => "EZASM1299",
-            Self::StructuralProjectionMismatch => "EZASM1300",
-            Self::VersionPairMismatch => "EZASM1301",
-            Self::LegacyRecordInPhaseJPath => "EZASM1302",
-            Self::MissingRuntimeComponentInstance => "EZASM1303",
-            Self::StaleRegistry => "EZASM1304",
+            Self::MissingTarget => "PSASM1289",
+            Self::DuplicateTarget => "PSASM1290",
+            Self::DuplicateBinding => "PSASM1291",
+            Self::TargetConstructorMismatch => "PSASM1292",
+            Self::BindingConstructorMismatch => "PSASM1293",
+            Self::TargetComponentMismatch => "PSASM1294",
+            Self::DeclarationOwnershipMismatch => "PSASM1295",
+            Self::EventActionBatchOwnershipMismatch => "PSASM1296",
+            Self::ArtifactManifestDrift => "PSASM1297",
+            Self::DomMarkerProjectionMismatch => "PSASM1298",
+            Self::FormTargetReciprocityMismatch => "PSASM1299",
+            Self::StructuralProjectionMismatch => "PSASM1300",
+            Self::VersionPairMismatch => "PSASM1301",
+            Self::LegacyRecordInPhaseJPath => "PSASM1302",
+            Self::MissingRuntimeComponentInstance => "PSASM1303",
+            Self::StaleRegistry => "PSASM1304",
         }
     }
 }
@@ -65,13 +65,13 @@ impl ComputedInstanceSlotIntegrityCode {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::MissingProjection => "EZASM1305",
-            Self::DuplicateCacheSlot => "EZASM1306",
-            Self::DuplicateDirtySlot => "EZASM1307",
-            Self::ConstructorMismatch => "EZASM1308",
-            Self::OwnershipMismatch => "EZASM1309",
-            Self::StaleRegistry => "EZASM1310",
-            Self::ArtifactProjectionDrift => "EZASM1311",
+            Self::MissingProjection => "PSASM1305",
+            Self::DuplicateCacheSlot => "PSASM1306",
+            Self::DuplicateDirtySlot => "PSASM1307",
+            Self::ConstructorMismatch => "PSASM1308",
+            Self::OwnershipMismatch => "PSASM1309",
+            Self::StaleRegistry => "PSASM1310",
+            Self::ArtifactProjectionDrift => "PSASM1311",
         }
     }
 }
@@ -93,14 +93,14 @@ impl StateInstanceStorageIntegrityCode {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::MissingProjection => "EZASM1312",
-            Self::DuplicateSlot => "EZASM1313",
-            Self::ConstructorMismatch => "EZASM1314",
-            Self::OwnershipMismatch => "EZASM1315",
-            Self::StaleRegistry => "EZASM1316",
-            Self::ArtifactProjectionDrift => "EZASM1317",
-            Self::DeclarationRuntimeKey => "EZASM1318",
-            Self::UnknownResumeSlot => "EZASM1319",
+            Self::MissingProjection => "PSASM1312",
+            Self::DuplicateSlot => "PSASM1313",
+            Self::ConstructorMismatch => "PSASM1314",
+            Self::OwnershipMismatch => "PSASM1315",
+            Self::StaleRegistry => "PSASM1316",
+            Self::ArtifactProjectionDrift => "PSASM1317",
+            Self::DeclarationRuntimeKey => "PSASM1318",
+            Self::UnknownResumeSlot => "PSASM1319",
         }
     }
 }
@@ -132,8 +132,8 @@ mod tests {
             OrdinaryTemplateIntegrityCode::MissingRuntimeComponentInstance,
             OrdinaryTemplateIntegrityCode::StaleRegistry,
         ];
-        assert_eq!(codes.first().map(|code| code.as_str()), Some("EZASM1289"));
-        assert_eq!(codes.last().map(|code| code.as_str()), Some("EZASM1304"));
+        assert_eq!(codes.first().map(|code| code.as_str()), Some("PSASM1289"));
+        assert_eq!(codes.last().map(|code| code.as_str()), Some("PSASM1304"));
     }
 
     #[test]
@@ -147,8 +147,8 @@ mod tests {
             ComputedInstanceSlotIntegrityCode::StaleRegistry,
             ComputedInstanceSlotIntegrityCode::ArtifactProjectionDrift,
         ];
-        assert_eq!(codes.first().map(|code| code.as_str()), Some("EZASM1305"));
-        assert_eq!(codes.last().map(|code| code.as_str()), Some("EZASM1311"));
+        assert_eq!(codes.first().map(|code| code.as_str()), Some("PSASM1305"));
+        assert_eq!(codes.last().map(|code| code.as_str()), Some("PSASM1311"));
     }
 
     #[test]
@@ -163,7 +163,7 @@ mod tests {
             StateInstanceStorageIntegrityCode::DeclarationRuntimeKey,
             StateInstanceStorageIntegrityCode::UnknownResumeSlot,
         ];
-        assert_eq!(codes.first().map(|code| code.as_str()), Some("EZASM1312"));
-        assert_eq!(codes.last().map(|code| code.as_str()), Some("EZASM1319"));
+        assert_eq!(codes.first().map(|code| code.as_str()), Some("PSASM1312"));
+        assert_eq!(codes.last().map(|code| code.as_str()), Some("PSASM1319"));
     }
 }

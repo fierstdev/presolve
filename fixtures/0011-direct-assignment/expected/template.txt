@@ -4,8 +4,8 @@ TemplateGraph:
     template ResetCounter
       root: <button> id=n0 @ fixtures/0011-direct-assignment/input/ResetCounter.tsx:12:7 span=184..265
       attributes:
-        data-ez-on-click = event-handler(click -> this.reset) @ fixtures/0011-direct-assignment/input/ResetCounter.tsx:12:15 span=192..220
-        data-ez-bindings = bindings(this.count) @ generated
+        data-presolve-on-click = event-handler(click -> this.reset) @ fixtures/0011-direct-assignment/input/ResetCounter.tsx:12:15 span=192..220
+        data-presolve-bindings = bindings(this.count) @ generated
       children:
         Text("Count:") @ fixtures/0011-direct-assignment/input/ResetCounter.tsx:13:9 span=230..236
         Binding id=n1 expression="this.count" initial=Some("5") @ fixtures/0011-direct-assignment/input/ResetCounter.tsx:13:16 span=237..249

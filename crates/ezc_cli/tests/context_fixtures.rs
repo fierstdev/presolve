@@ -50,7 +50,7 @@ fn run_cli(args: &[&str]) -> Output {
 fn context_codes(diagnostics: &[ezc_core::ComponentDiagnostic]) -> BTreeSet<String> {
     diagnostics
         .iter()
-        .filter(|diagnostic| ("EZC1052"..="EZC1067").contains(&diagnostic.code.as_str()))
+        .filter(|diagnostic| ("PSC1052"..="PSC1067").contains(&diagnostic.code.as_str()))
         .map(|diagnostic| diagnostic.code.clone())
         .collect()
 }
@@ -430,7 +430,7 @@ fn context_typing_fixture_covers_frozen_edge_cases() {
         .serialization = ContextSerializationCompatibility::NonSerializable;
     assert!(collect_context_diagnostics(&serialization)
         .iter()
-        .any(|diagnostic| diagnostic.code == "EZC1063"));
+        .any(|diagnostic| diagnostic.code == "PSC1063"));
     let mut boundary_failure = model.clone();
     boundary_failure
         .provider_types
@@ -439,7 +439,7 @@ fn context_typing_fixture_covers_frozen_edge_cases() {
         .boundary_compatibility = CompatibilityStatus::Incompatible;
     assert!(collect_context_diagnostics(&boundary_failure)
         .iter()
-        .any(|diagnostic| diagnostic.code == "EZC1064"));
+        .any(|diagnostic| diagnostic.code == "PSC1064"));
 }
 
 #[test]
@@ -534,7 +534,7 @@ fn context_diagnostic_fixtures_cover_the_complete_stable_catalog() {
 
     assert_eq!(
         codes,
-        (1052..=1067).map(|code| format!("EZC{code}")).collect()
+        (1052..=1067).map(|code| format!("PSC{code}")).collect()
     );
     assert!(base
         .context_declaration_candidates()

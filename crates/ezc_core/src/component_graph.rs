@@ -690,7 +690,7 @@ pub enum ConstantEvaluationError {
 }
 
 impl ArithmeticExpression {
-    /// Evaluate a finite constant numeric expression using `EdgeZero` arithmetic semantics.
+    /// Evaluate a finite constant numeric expression using `Presolve` arithmetic semantics.
     ///
     /// # Errors
     ///
@@ -741,7 +741,7 @@ impl ArithmeticExpression {
 }
 
 impl ConstantExpression {
-    /// Evaluate a constant state initializer using `EdgeZero` expression semantics.
+    /// Evaluate a constant state initializer using `Presolve` expression semantics.
     ///
     /// # Errors
     ///
@@ -830,7 +830,7 @@ impl ConstantExpression {
 }
 
 fn numbers_are_equal(left: f64, right: f64) -> bool {
-    // EdgeZero constant expressions deliberately use exact finite numeric equality.
+    // Presolve constant expressions deliberately use exact finite numeric equality.
     // No tolerance is compiler semantics because the language has no approximate
     // comparison operator or configurable precision model.
     #[allow(clippy::float_cmp)]
@@ -1338,7 +1338,7 @@ fn build_component_graph_with_identity(
             consumer_instance_id: None,
             secondary_labels: Vec::new(),
             provenance: None,
-            code: "EZC1000".to_string(),
+            code: "PSC1000".to_string(),
             message: "no component classes found".to_string(),
         });
     }
@@ -1365,7 +1365,7 @@ fn build_component_node(
 
     if element_name.is_none() {
         diagnostics.push(ComponentDiagnostic::error(
-            "EZC1001",
+            "PSC1001",
             format!("class `{}` is missing @component(...)", class.name),
         ));
     }
@@ -1422,7 +1422,7 @@ fn build_component_node(
 
     if render.is_none() {
         diagnostics.push(ComponentDiagnostic::error(
-            "EZC1002",
+            "PSC1002",
             format!("class `{}` is missing render()", class.name),
         ));
     }
@@ -1534,7 +1534,7 @@ fn form_declaration_candidates_from_class(
             let mut conflicting_decorators = property
                 .decorators
                 .iter()
-                .filter(|other| other.name != "form" && is_edgezero_semantic_decorator(&other.name))
+                .filter(|other| other.name != "form" && is_presolve_semantic_decorator(&other.name))
                 .map(|other| other.name.clone())
                 .collect::<Vec<_>>();
             if property.initializer.as_deref() == Some("state(...)") {
@@ -2170,7 +2170,7 @@ fn retain_validation_rule_facts(
         .iter()
         .filter(|decorator| {
             !matches!(decorator.name.as_str(), "field" | "validate")
-                && is_edgezero_semantic_decorator(&decorator.name)
+                && is_presolve_semantic_decorator(&decorator.name)
         })
         .map(|decorator| decorator.name.clone())
         .collect::<Vec<_>>();
@@ -2403,7 +2403,7 @@ fn form_field_candidate_source_order(
         ))
 }
 
-fn is_edgezero_semantic_decorator(name: &str) -> bool {
+fn is_presolve_semantic_decorator(name: &str) -> bool {
     matches!(
         name,
         "form"
@@ -3593,7 +3593,7 @@ fn collect_render_binding_diagnostics(
             consumer_instance_id: None,
             secondary_labels: Vec::new(),
                     provenance: None,
-                    code: "EZC1003".to_string(),
+                    code: "PSC1003".to_string(),
                     message: format!(
                         "render binding `{binding}` references unknown field `{name}` in class `{}`",
                         class.name
@@ -3635,7 +3635,7 @@ fn collect_render_event_diagnostics(
                 consumer_instance_id: None,
                 secondary_labels: Vec::new(),
                 provenance: None,
-                code: "EZC1005".to_string(),
+                code: "PSC1005".to_string(),
                 message: format!(
                     "event `{}` is not supported yet in class `{}`",
                     event_handler.event, class.name
@@ -3663,7 +3663,7 @@ fn collect_render_event_diagnostics(
                     consumer_instance_id: None,
                     secondary_labels: Vec::new(),
                     provenance: None,
-                    code: "EZC1004".to_string(),
+                    code: "PSC1004".to_string(),
                     message: format!(
                         "event handler `{}` references unknown method `{name}` in class `{}`",
                         event_handler.handler, class.name
@@ -4205,7 +4205,7 @@ fn collect_list_diagnostics(
             consumer_instance_id: None,
             secondary_labels: Vec::new(),
             provenance: None,
-            code: "EZC1011".to_string(),
+            code: "PSC1011".to_string(),
             message: format!(
                 "list over `{}` in class `{class_name}` is missing a `key={{...}}` attribute; stable keys are required for retained-node reconciliation",
                 list.iterable
@@ -4233,7 +4233,7 @@ fn collect_list_diagnostics(
             consumer_instance_id: None,
             secondary_labels: Vec::new(),
             provenance: None,
-            code: "EZC1012".to_string(),
+            code: "PSC1012".to_string(),
             message: format!(
                 "list key `{}` in class `{class_name}` uses the iteration index; index keys are unstable when items move",
                 list.key_expression
@@ -4262,7 +4262,7 @@ fn collect_list_diagnostics(
             consumer_instance_id: None,
             secondary_labels: Vec::new(),
             provenance: None,
-            code: "EZC1013".to_string(),
+            code: "PSC1013".to_string(),
             message: format!(
                 "list key `{}` in class `{class_name}` is not supported yet; use the item variable `{}` or one of its object members",
                 list.key_expression, list.item_variable
@@ -4304,7 +4304,7 @@ fn collect_list_diagnostics(
             consumer_instance_id: None,
             secondary_labels: Vec::new(),
                 provenance: None,
-                code: "EZC1015".to_string(),
+                code: "PSC1015".to_string(),
                 message: member_path.map_or_else(
                     || format!(
                         "list key `{}` resolves to a non-primitive initial item at index {index} in class `{class_name}`; keyed reconciliation requires primitive keys",
@@ -4338,7 +4338,7 @@ fn collect_list_diagnostics(
             consumer_instance_id: None,
             secondary_labels: Vec::new(),
                 provenance: None,
-                code: "EZC1014".to_string(),
+                code: "PSC1014".to_string(),
                 message: format!(
                     "list key `{}` resolves to duplicate initial value `{key}` in class `{class_name}`; keyed reconciliation requires unique keys",
                     list.key_expression
@@ -4453,7 +4453,7 @@ fn collect_attribute_diagnostics_for_attributes(
             consumer_instance_id: None,
             secondary_labels: Vec::new(),
                     provenance: None,
-                    code: "EZC1007".to_string(),
+                    code: "PSC1007".to_string(),
                     message: format!(
                         "attribute `{}` is declared more than once on the same element in class `{}`",
                         attribute.name, class_name
@@ -4497,7 +4497,7 @@ fn collect_attribute_diagnostics_for_attributes(
             consumer_instance_id: None,
             secondary_labels: Vec::new(),
                         provenance: None,
-                        code: "EZC1003".to_string(),
+                        code: "PSC1003".to_string(),
                         message: format!(
                             "attribute binding `{}` references unknown state field `{field_name}` in class `{}`",
                             attribute.name, class_name
@@ -4521,7 +4521,7 @@ fn collect_attribute_diagnostics_for_attributes(
             consumer_instance_id: None,
             secondary_labels: Vec::new(),
                         provenance: None,
-                        code: "EZC1008".to_string(),
+                        code: "PSC1008".to_string(),
                         message: format!(
                             "attribute `{}` uses an unsupported expression value in class `{}`",
                             attribute.name, class_name
@@ -4548,7 +4548,7 @@ fn collect_attribute_diagnostics_for_attributes(
                     consumer_instance_id: None,
                     secondary_labels: Vec::new(),
                     provenance: None,
-                    code: "EZC1009".to_string(),
+                    code: "PSC1009".to_string(),
                     message: format!(
                         "JSX spread attributes are not supported yet in class `{class_name}`"
                     ),
@@ -4573,7 +4573,7 @@ fn collect_attribute_diagnostics_for_attributes(
                     consumer_instance_id: None,
                     secondary_labels: Vec::new(),
                     provenance: None,
-                    code: "EZC1010".to_string(),
+                    code: "PSC1010".to_string(),
                     message: format!(
                         "attribute `{}` uses an unsupported JSX value in class `{}`",
                         attribute.name, class_name
@@ -4741,7 +4741,7 @@ fn collect_duplicate_events_for_handlers(
                 consumer_instance_id: None,
                 secondary_labels: Vec::new(),
                 provenance: None,
-                code: "EZC1006".to_string(),
+                code: "PSC1006".to_string(),
                 message: format!(
                     "event `{}` is declared more than once on the same element in class `{}`",
                     event_handler.event, class_name

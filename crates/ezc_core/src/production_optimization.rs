@@ -22,67 +22,67 @@ pub struct ProductionOptimizationDiagnosticReservation {
 pub const PRODUCTION_OPTIMIZATION_DIAGNOSTIC_RESERVATIONS:
     [ProductionOptimizationDiagnosticReservation; 16] = [
     ProductionOptimizationDiagnosticReservation {
-        code: "EZC1112",
+        code: "PSC1112",
         meaning: "Invalid optimization root",
     },
     ProductionOptimizationDiagnosticReservation {
-        code: "EZC1113",
+        code: "PSC1113",
         meaning: "Invalid program fingerprint",
     },
     ProductionOptimizationDiagnosticReservation {
-        code: "EZC1114",
+        code: "PSC1114",
         meaning: "Unsafe program deduplication",
     },
     ProductionOptimizationDiagnosticReservation {
-        code: "EZC1115",
+        code: "PSC1115",
         meaning: "Invalid constant pool entry",
     },
     ProductionOptimizationDiagnosticReservation {
-        code: "EZC1116",
+        code: "PSC1116",
         meaning: "Invalid shared chunk candidate",
     },
     ProductionOptimizationDiagnosticReservation {
-        code: "EZC1117",
+        code: "PSC1117",
         meaning: "Production chunk cycle",
     },
     ProductionOptimizationDiagnosticReservation {
-        code: "EZC1118",
+        code: "PSC1118",
         meaning: "Invalid runtime ordinal table",
     },
     ProductionOptimizationDiagnosticReservation {
-        code: "EZC1119",
+        code: "PSC1119",
         meaning: "Production artifact mismatch",
     },
     ProductionOptimizationDiagnosticReservation {
-        code: "EZC1120",
+        code: "PSC1120",
         meaning: "Unsafe binding write coalescing",
     },
     ProductionOptimizationDiagnosticReservation {
-        code: "EZC1121",
+        code: "PSC1121",
         meaning: "Missing runtime cleanup",
     },
     ProductionOptimizationDiagnosticReservation {
-        code: "EZC1122",
+        code: "PSC1122",
         meaning: "Invalid runtime cleanup order",
     },
     ProductionOptimizationDiagnosticReservation {
-        code: "EZC1123",
+        code: "PSC1123",
         meaning: "Detached activation target",
     },
     ProductionOptimizationDiagnosticReservation {
-        code: "EZC1124",
+        code: "PSC1124",
         meaning: "Invalid production failure record",
     },
     ProductionOptimizationDiagnosticReservation {
-        code: "EZC1125",
+        code: "PSC1125",
         meaning: "Optimization report mismatch",
     },
     ProductionOptimizationDiagnosticReservation {
-        code: "EZC1126",
+        code: "PSC1126",
         meaning: "Production budget regression",
     },
     ProductionOptimizationDiagnosticReservation {
-        code: "EZC1127",
+        code: "PSC1127",
         meaning: "Production determinism failure",
     },
 ];
@@ -412,8 +412,8 @@ mod tests {
             .iter()
             .map(|reservation| reservation.code)
             .collect::<Vec<_>>();
-        assert_eq!(codes.first(), Some(&"EZC1112"));
-        assert_eq!(codes.last(), Some(&"EZC1127"));
+        assert_eq!(codes.first(), Some(&"PSC1112"));
+        assert_eq!(codes.last(), Some(&"PSC1127"));
         assert_eq!(codes.len(), 16);
         assert_eq!(PRODUCTION_OPTIMIZATION_INTEGRITY_RESERVATION_START, 1385);
         assert_eq!(PRODUCTION_OPTIMIZATION_INTEGRITY_RESERVATION_END, 1512);

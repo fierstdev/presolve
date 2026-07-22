@@ -866,7 +866,7 @@ mod tests {
 class Effects extends Component {
   @effect()
   syncTitle() {
-    document.title = "EdgeZero";
+    document.title = "Presolve";
   }
 }
 "#,
@@ -895,7 +895,7 @@ class Effects extends Component {
             r#"
 @component("x-effects")
 class Effects extends Component {
-  title = state("EdgeZero");
+  title = state("Presolve");
 
   @effect()
   syncTitle() {
@@ -1025,7 +1025,7 @@ class Effects extends Component {
             r#"
 @component("x-effects")
 class Effects extends Component {
-  title = state("EdgeZero");
+  title = state("Presolve");
   theme = state("dark");
   total = state(3);
   profile = state({ name: "Ada" });
@@ -1373,7 +1373,7 @@ class EffectExecutionPlan extends Component {
             r#"
 @component("x-async-effect")
 class AsyncEffect extends Component {
-  title = state("EdgeZero");
+  title = state("Presolve");
 
   @effect()
   async syncTitle() {
@@ -1428,6 +1428,6 @@ class AsyncEffect extends Component {
             .iter()
             .map(|diagnostic| diagnostic.code.as_str())
             .collect::<Vec<_>>();
-        assert_eq!(codes, vec!["EZC1042", "EZC1046", "EZC1046"]);
+        assert_eq!(codes, vec!["PSC1042", "PSC1046", "PSC1046"]);
     }
 }

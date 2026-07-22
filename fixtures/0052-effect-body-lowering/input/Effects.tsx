@@ -1,6 +1,6 @@
 @component("x-effects")
 class Effects extends Component {
-  title = state("EdgeZero");
+  title = state("Presolve");
   subtotal = state(1);
   tax = state(2);
 

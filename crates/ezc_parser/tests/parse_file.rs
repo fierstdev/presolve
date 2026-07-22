@@ -21,9 +21,9 @@ fn parses_module_imports_and_exports() {
         "src/App.tsx",
         r#"
 import AppShell, { Card as AppCard } from "./ui";
-import * as runtime from "edgezero-runtime";
+import * as runtime from "presolve-runtime";
 export { AppCard as Card };
-export const title = "EdgeZero";
+export const title = "Presolve";
 export { Status } from "./status";
 export * as shared from "./shared";
 export default class App {}
@@ -158,7 +158,7 @@ fn retains_constrained_method_parameters() {
 @component("x-parameters")
 class Parameters extends Component {
   save(title: string, retries?: number) {}
-  ignored({ title }, fallback = "EdgeZero", ...rest) {}
+  ignored({ title }, fallback = "Presolve", ...rest) {}
 }
 "#;
 

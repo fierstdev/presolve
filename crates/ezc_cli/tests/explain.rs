@@ -250,7 +250,7 @@ fn asm_command_emits_deterministic_json_inspection() {
         references.iter().any(|reference| {
             reference["kind"] == "event-method"
                 && reference["source"]
-                    == "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/template:render/event-attribute:root.data-ez-on-click"
+                    == "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/template:render/event-attribute:root.data-presolve-on-click"
                 && reference["target"]
                     == "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/method:increment"
         })
@@ -264,7 +264,7 @@ fn k17_invalid_candidates_expose_blocks_without_production_id_fabrication() {
         .args([
             "explain",
             "--inspect",
-            "fixtures/0066-component-diagnostics/input/EZC1068.tsx",
+            "fixtures/0066-component-diagnostics/input/PSC1068.tsx",
             "--format",
             "json",
         ])
@@ -281,7 +281,7 @@ fn k17_invalid_candidates_expose_blocks_without_production_id_fabrication() {
     );
     assert!(document["production"]["blocks"]
         .as_array()
-        .is_some_and(|blocks| blocks.iter().any(|block| block["code"] == "EZC1068")));
+        .is_some_and(|blocks| blocks.iter().any(|block| block["code"] == "PSC1068")));
     assert!(document["production"].get("artifact_identity").is_none());
 }
 
@@ -344,7 +344,7 @@ fn k17_inspection_static_costs_match_the_emitted_reports() {
 #[test]
 fn k18_production_diagnostics_have_full_selected_text_and_check_json_parity() {
     let root = repo_root();
-    let input = "fixtures/0066-component-diagnostics/input/EZC1068.tsx";
+    let input = "fixtures/0066-component-diagnostics/input/PSC1068.tsx";
     let component = format!("module:{input}/component:x-diagnostic");
     let full = Command::new(ezc_cli_bin())
         .current_dir(&root)
@@ -386,11 +386,11 @@ fn k18_production_diagnostics_have_full_selected_text_and_check_json_parity() {
         check["production_diagnostics"]
     );
     let diagnostic = &full["production_diagnostics"][0];
-    assert_eq!(diagnostic["code"], "EZC1112");
+    assert_eq!(diagnostic["code"], "PSC1112");
     assert_eq!(diagnostic["name"], "InvalidOptimizationRoot");
     assert_eq!(diagnostic["primary_identity"], component);
     let text = String::from_utf8(text.stdout).expect("K18 text UTF-8");
-    assert!(text.contains("EZC1112 InvalidOptimizationRoot"));
+    assert!(text.contains("PSC1112 InvalidOptimizationRoot"));
     assert!(text.contains("span=66..82"));
 }
 
@@ -866,7 +866,7 @@ fn computed_fixture_suite_covers_arithmetic_diamond_and_cycles() {
         .is_some_and(|diagnostics| {
             diagnostics
                 .iter()
-                .any(|diagnostic| diagnostic["code"] == "EZC1035")
+                .any(|diagnostic| diagnostic["code"] == "PSC1035")
         }));
 }
 
@@ -1225,10 +1225,10 @@ fn asm_command_covers_the_semantic_type_system_fixture_across_modules() {
     let diagnostics = document["diagnostics"].as_array().expect("diagnostics");
     assert!(diagnostics
         .iter()
-        .any(|diagnostic| diagnostic["code"] == "EZC1031"));
+        .any(|diagnostic| diagnostic["code"] == "PSC1031"));
     assert!(!diagnostics
         .iter()
-        .any(|diagnostic| diagnostic["code"] == "EZC1032"));
+        .any(|diagnostic| diagnostic["code"] == "PSC1032"));
 }
 
 #[test]
@@ -1343,7 +1343,7 @@ fn asm_command_exposes_method_local_constants() {
         .expect("render method entity");
     assert_eq!(
         method["local_variables"],
-        serde_json::json!(["title = String(\"EdgeZero\")", "enabled = Boolean(true)"])
+        serde_json::json!(["title = String(\"Presolve\")", "enabled = Boolean(true)"])
     );
 }
 
@@ -1431,7 +1431,7 @@ fn asm_command_resolves_supported_method_local_bindings() {
     assert!(html.status.success());
     assert!(String::from_utf8(html.stdout)
         .expect("HTML output")
-        .contains("title=\"EdgeZero\""));
+        .contains("title=\"Presolve\""));
 }
 
 #[test]
@@ -1532,7 +1532,7 @@ fn asm_command_reports_primitive_declared_state_type_mismatches() {
 
     assert_eq!(diagnostics.len(), 6);
     assert!(diagnostics.iter().all(|diagnostic| {
-        diagnostic["code"] == "EZC1016"
+        diagnostic["code"] == "PSC1016"
             && diagnostic["message"].as_str().is_some_and(|message| {
                 message.contains("declares") && message.contains("initializes")
             })
@@ -1574,7 +1574,7 @@ fn asm_command_omits_unavailable_diagnostic_provenance() {
         .and_then(|diagnostics| {
             diagnostics
                 .iter()
-                .find(|diagnostic| diagnostic["code"] == "EZC1003")
+                .find(|diagnostic| diagnostic["code"] == "PSC1003")
         })
         .expect("unlocated semantic diagnostic");
 
@@ -1602,7 +1602,7 @@ fn asm_command_reports_primitive_action_type_mismatches() {
 
     assert_eq!(diagnostics.len(), 7);
     assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic["code"] == "EZC1016"
+        diagnostic["code"] == "PSC1016"
             && diagnostic["message"]
                 .as_str()
                 .is_some_and(|message| message.contains("state field `collection`"))
@@ -1610,13 +1610,13 @@ fn asm_command_reports_primitive_action_type_mismatches() {
     assert_eq!(
         diagnostics
             .iter()
-            .filter(|diagnostic| diagnostic["code"] == "EZC1017")
+            .filter(|diagnostic| diagnostic["code"] == "PSC1017")
             .count(),
         6
     );
     assert!(diagnostics
         .iter()
-        .filter(|diagnostic| diagnostic["code"] == "EZC1017")
+        .filter(|diagnostic| diagnostic["code"] == "PSC1017")
         .all(|diagnostic| diagnostic["message"]
             .as_str()
             .is_some_and(|message| message.contains("action `apply` assigns"))));
@@ -1655,7 +1655,7 @@ fn asm_command_reports_non_boolean_primitive_toggle_actions() {
 
     assert_eq!(diagnostics.len(), 4);
     assert!(diagnostics.iter().all(|diagnostic| {
-        diagnostic["code"] == "EZC1018"
+        diagnostic["code"] == "PSC1018"
             && diagnostic["message"]
                 .as_str()
                 .is_some_and(|message| message.contains("applies a boolean toggle"))
@@ -1696,7 +1696,7 @@ fn asm_command_reports_non_numeric_primitive_increment_and_decrement_actions() {
 
     assert_eq!(diagnostics.len(), 4);
     assert!(diagnostics.iter().all(|diagnostic| {
-        diagnostic["code"] == "EZC1019"
+        diagnostic["code"] == "PSC1019"
             && diagnostic["message"]
                 .as_str()
                 .is_some_and(|message| message.contains("applies numeric"))
@@ -1738,7 +1738,7 @@ fn asm_command_reports_compound_numeric_action_target_and_operand_mismatches() {
     assert_eq!(diagnostics.len(), 7);
     assert!(diagnostics
         .iter()
-        .all(|diagnostic| diagnostic["code"] == "EZC1020" || diagnostic["code"] == "EZC1021"));
+        .all(|diagnostic| diagnostic["code"] == "PSC1020" || diagnostic["code"] == "PSC1021"));
 
     let title = diagnostics
         .iter()
@@ -1769,8 +1769,8 @@ fn asm_command_text_reports_source_provenanced_compiler_diagnostics() {
 
     let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
     assert!(actual.contains("  compiler diagnostics:\n"));
-    assert!(actual.contains("    error[EZC1020]: state field `title`"));
-    assert!(actual.contains("    error[EZC1021]: action `apply`"));
+    assert!(actual.contains("    error[PSC1020]: state field `title`"));
+    assert!(actual.contains("    error[PSC1021]: action `apply`"));
     assert!(actual.contains(&format!("      at {path}:9:5 span=")));
 }
 
@@ -1807,7 +1807,7 @@ fn check_command_fails_for_compiler_diagnostics() {
     assert!(!output.status.success());
     let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
     assert!(actual.contains("  compiler diagnostics: 7\n"));
-    assert!(actual.contains("    error[EZC1020]: state field `title`"));
+    assert!(actual.contains("    error[PSC1020]: state field `title`"));
 }
 
 #[test]
@@ -1865,7 +1865,7 @@ fn check_command_omits_unavailable_compiler_diagnostic_provenance_in_json() {
         .as_array()
         .expect("compiler diagnostics")
         .iter()
-        .find(|diagnostic| diagnostic["code"] == "EZC1001")
+        .find(|diagnostic| diagnostic["code"] == "PSC1001")
         .expect("missing component diagnostic");
     assert!(component_diagnostic.get("provenance").is_none());
 }
@@ -1957,7 +1957,7 @@ fn context_diagnostics_share_check_full_asm_selected_asm_and_explain_projection(
             .iter()
             .map(|diagnostic| diagnostic["code"].as_str().unwrap())
             .collect::<Vec<_>>(),
-        ["EZC1060", "EZC1059", "EZC1062", "EZC1081"]
+        ["PSC1060", "PSC1059", "PSC1062", "PSC1081"]
     );
 
     let full_asm_output = run(&["explain", "--inspect", path, "--format", "json"]);
@@ -2036,7 +2036,7 @@ fn component_diagnostics_share_check_full_asm_selected_asm_and_explain_projectio
             .iter()
             .map(|diagnostic| diagnostic["code"].as_str().unwrap())
             .collect::<Vec<_>>(),
-        ["EZC1068", "EZC1070"]
+        ["PSC1068", "PSC1070"]
     );
     assert!(expected.iter().all(|diagnostic| {
         diagnostic["component_id"] == component_id && diagnostic["primary_provenance"].is_object()
@@ -2068,8 +2068,8 @@ fn component_diagnostics_share_check_full_asm_selected_asm_and_explain_projectio
     let check_text = String::from_utf8(check_text.stdout).unwrap();
     let asm_text = String::from_utf8(asm_text.stdout).unwrap();
     for (code, message) in [
-        ("EZC1068", "Invalid slot declaration."),
-        ("EZC1070", "Unresolved component symbol."),
+        ("PSC1068", "Invalid slot declaration."),
+        ("PSC1070", "Unresolved component symbol."),
     ] {
         assert!(check_text.contains(code) && check_text.contains(message));
         assert!(asm_text.contains(code) && asm_text.contains(message));
@@ -4300,12 +4300,12 @@ fn build_command_writes_page_manifest_and_runtime_artifacts() {
 
     assert!(actual_html.starts_with("<!doctype html>\n"));
     assert!(actual_html.contains("<title>NestedCounter</title>"));
-    assert!(actual_html.contains("<section data-ez-node=\"n0\">"));
-    assert!(actual_html.contains("<button data-ez-node=\"n1\""));
-    assert!(actual_html.contains("<!--ez-ti-binding-start:"));
-    assert!(actual_html.contains("<!--ez-ti-binding-end:"));
-    assert!(actual_html.contains("id=\"ez-template-manifest\""));
-    assert!(actual_html.contains("id=\"ez-resume-runtime\""));
+    assert!(actual_html.contains("<section data-presolve-node=\"n0\">"));
+    assert!(actual_html.contains("<button data-presolve-node=\"n1\""));
+    assert!(actual_html.contains("<!--presolve-ti-binding-start:"));
+    assert!(actual_html.contains("<!--presolve-ti-binding-end:"));
+    assert!(actual_html.contains("id=\"presolve-template-manifest\""));
+    assert!(actual_html.contains("id=\"presolve-resume-runtime\""));
     assert!(actual_html.contains("\"name\": \"NestedCounter\""));
     assert!(actual_html.contains("<script src=\"./runtime.js\" defer></script>"));
 
@@ -4328,7 +4328,7 @@ fn build_command_writes_page_manifest_and_runtime_artifacts() {
         .as_str()
         .is_some_and(|build_id| build_id.starts_with("resume-build:")));
     assert_resume_markers_match_manifest(&actual_html, &parsed_resume);
-    let resume_script_prefix = "<script type=\"application/json\" id=\"ez-resume-runtime\">";
+    let resume_script_prefix = "<script type=\"application/json\" id=\"presolve-resume-runtime\">";
     let embedded_start = actual_html
         .find(resume_script_prefix)
         .expect("embedded resume manifest")
@@ -4342,14 +4342,14 @@ fn build_command_writes_page_manifest_and_runtime_artifacts() {
     let actual_runtime =
         std::fs::read_to_string(out_dir.join("runtime.js")).expect("failed to read built runtime");
 
-    assert!(actual_runtime.contains("ez-template-manifest"));
+    assert!(actual_runtime.contains("presolve-template-manifest"));
     assert!(actual_runtime.contains("SUPPORTED_SCHEMA_VERSION = 4"));
     assert!(actual_runtime.contains("RUNTIME_VERSION = \"0.0.0\""));
     assert!(actual_runtime.contains("validateManifestSchema"));
-    assert!(actual_runtime.contains("EZR_UNSUPPORTED_SCHEMA"));
+    assert!(actual_runtime.contains("PSR_UNSUPPORTED_SCHEMA"));
     assert!(actual_runtime.contains("diagnostics"));
-    assert!(actual_runtime.contains("data-ez-node"));
-    assert!(actual_runtime.contains("ez-binding:"));
+    assert!(actual_runtime.contains("data-presolve-node"));
+    assert!(actual_runtime.contains("presolve-binding:"));
     assert!(!actual_runtime.contains("normalizeHandlerReference"));
     assert!(actual_runtime.contains("createRuntimeStore"));
     assert!(actual_runtime.contains("readField"));
@@ -4359,18 +4359,18 @@ fn build_command_writes_page_manifest_and_runtime_artifacts() {
     assert!(actual_runtime.contains("document.addEventListener(eventType"));
     assert!(!actual_runtime.contains("element.addEventListener(\"click\""));
     assert!(actual_runtime.contains("action.operation !== \"increment\""));
-    assert!(actual_runtime.contains("dataset.ezRuntime"));
-    assert!(actual_runtime.contains("edgezero:ready"));
-    assert!(actual_runtime.contains("window.__EDGEZERO__"));
+    assert!(actual_runtime.contains("dataset.presolveRuntime"));
+    assert!(actual_runtime.contains("presolve:ready"));
+    assert!(actual_runtime.contains("window.__PRESOLVE__"));
 }
 
 fn assert_resume_markers_match_manifest(actual_html: &str, parsed_resume: &serde_json::Value) {
     for anchor in parsed_resume["anchors"].as_array().expect("resume anchors") {
         let id = anchor["anchor_id"].as_str().expect("resume anchor ID");
         let marker = match anchor["kind"].as_str().expect("resume anchor kind") {
-            "structural_start" => format!("<!--ez-r-start:{id}-->"),
-            "structural_end" => format!("<!--ez-r-end:{id}-->"),
-            _ => format!("data-ez-r=\"{id}\""),
+            "structural_start" => format!("<!--presolve-r-start:{id}-->"),
+            "structural_end" => format!("<!--presolve-r-end:{id}-->"),
+            _ => format!("data-presolve-r=\"{id}\""),
         };
         assert_eq!(
             actual_html.matches(&marker).count(),
@@ -4381,7 +4381,9 @@ fn assert_resume_markers_match_manifest(actual_html: &str, parsed_resume: &serde
     for event in parsed_resume["events"].as_array().expect("resume events") {
         let id = event["resume_event_id"].as_str().expect("resume event ID");
         assert_eq!(
-            actual_html.matches(&format!("data-ez-e=\"{id}\"")).count(),
+            actual_html
+                .matches(&format!("data-presolve-e=\"{id}\""))
+                .count(),
             1,
             "resume event marker {id}"
         );
@@ -4505,7 +4507,7 @@ class FormArtifact {
 
     let page = std::fs::read_to_string(out_dir.join("index.html"))
         .expect("failed to read Forms artifact page");
-    assert!(page.contains("id=\"ez-forms-runtime\""));
+    assert!(page.contains("id=\"presolve-forms-runtime\""));
     assert!(!page.contains(" form=\""));
 }
 
@@ -4633,7 +4635,7 @@ fn build_command_writes_compiler_generated_effect_runtime_metadata() {
 
     let page = std::fs::read_to_string(out_dir.join("index.html"))
         .expect("failed to read generated effect runtime page");
-    assert!(page.contains("id=\"ez-effect-runtime\""));
+    assert!(page.contains("id=\"presolve-effect-runtime\""));
 
     let manifest = std::fs::read_to_string(out_dir.join("template.manifest.json"))
         .expect("failed to read generated template manifest");
@@ -4728,7 +4730,7 @@ class ContextRuntime extends Component {
     assert!(stdout.contains("context.runtime.json"));
     let page = std::fs::read_to_string(out_dir.join("index.html"))
         .expect("failed to read generated Context runtime page");
-    assert!(page.contains("id=\"ez-context-runtime\""));
+    assert!(page.contains("id=\"presolve-context-runtime\""));
     let artifact = std::fs::read_to_string(out_dir.join("context.runtime.json"))
         .expect("failed to read Context runtime artifact");
     let artifact: serde_json::Value = serde_json::from_str(&artifact).expect("artifact JSON");

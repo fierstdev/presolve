@@ -552,7 +552,7 @@ class Page extends Component {
             .status = InstanceContextResolutionStatus::Unresolved;
         let diagnostics = validate_application_semantic_model(&asm);
         assert!(diagnostics.iter().any(|diagnostic| {
-            diagnostic.code == "EZASM1194"
+            diagnostic.code == "PSASM1194"
                 && diagnostic.message
                     == "instance Context registry does not match canonical declarations and H5 ancestry"
         }));

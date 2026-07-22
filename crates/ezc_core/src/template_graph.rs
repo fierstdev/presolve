@@ -343,7 +343,7 @@ fn template_attributes(
 
     for event_handler in event_handlers {
         attributes.push(TemplateAttribute {
-            name: format!("data-ez-on-{}", event_handler.event),
+            name: format!("data-presolve-on-{}", event_handler.event),
             value: AttributeValue::EventHandler {
                 event: event_handler.event.clone(),
                 handler: event_handler.handler.clone(),
@@ -354,7 +354,7 @@ fn template_attributes(
 
     if !bindings.is_empty() {
         attributes.push(TemplateAttribute {
-            name: "data-ez-bindings".to_string(),
+            name: "data-presolve-bindings".to_string(),
             value: AttributeValue::BindingList(bindings.to_vec()),
             span: None,
         });

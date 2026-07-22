@@ -105,12 +105,12 @@ impl ResumeSchemaIntegrityCode {
     #[must_use]
     pub const fn code(self) -> &'static str {
         match self {
-            Self::MalformedSemanticType => "EZASM1349",
-            Self::DuplicateProperty => "EZASM1350",
-            Self::UnsupportedValue => "EZASM1351",
-            Self::MissingSlot => "EZASM1352",
-            Self::IdentityCollision => "EZASM1353",
-            Self::OrderingOrIndexDrift => "EZASM1354",
+            Self::MalformedSemanticType => "PSASM1349",
+            Self::DuplicateProperty => "PSASM1350",
+            Self::UnsupportedValue => "PSASM1351",
+            Self::MissingSlot => "PSASM1352",
+            Self::IdentityCollision => "PSASM1353",
+            Self::OrderingOrIndexDrift => "PSASM1354",
         }
     }
 }
@@ -732,12 +732,12 @@ mod tests {
             ]
             .map(ResumeSchemaIntegrityCode::code),
             [
-                "EZASM1349",
-                "EZASM1350",
-                "EZASM1351",
-                "EZASM1352",
-                "EZASM1353",
-                "EZASM1354",
+                "PSASM1349",
+                "PSASM1350",
+                "PSASM1351",
+                "PSASM1352",
+                "PSASM1353",
+                "PSASM1354",
             ]
         );
     }

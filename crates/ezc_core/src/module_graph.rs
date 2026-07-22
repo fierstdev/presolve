@@ -166,7 +166,7 @@ mod tests {
                 "src/app/App.tsx",
                 r#"
 import { Card as AppCard } from "../ui/Card";
-import "edgezero-runtime";
+import "presolve-runtime";
 export { Status } from "./status";
 export * from "./shared";
 export default class App {}

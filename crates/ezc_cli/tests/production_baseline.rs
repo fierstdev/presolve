@@ -247,7 +247,7 @@ fn k9_cli_production_layout_is_syntax_safe_and_deterministic() {
     let second = build_fixture(&repo_root, fixture, "production-second", true);
     assert!(std::fs::read_to_string(first.join("index.html"))
         .expect("production page")
-        .contains("id=\"ez-production-runtime\""));
+        .contains("id=\"presolve-production-runtime\""));
     let read_layout = |output: &Path| {
         let mut modules = std::fs::read_dir(output.join("production"))
             .expect("production module directory")

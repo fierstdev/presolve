@@ -12,51 +12,51 @@ pub struct FormDiagnosticReservation {
 /// The next contiguous public compiler diagnostic range after Phase H.
 pub const FORM_DIAGNOSTIC_RESERVATIONS: [FormDiagnosticReservation; 12] = [
     FormDiagnosticReservation {
-        code: "EZC1084",
+        code: "PSC1084",
         meaning: "Duplicate form",
     },
     FormDiagnosticReservation {
-        code: "EZC1085",
+        code: "PSC1085",
         meaning: "Duplicate field",
     },
     FormDiagnosticReservation {
-        code: "EZC1086",
+        code: "PSC1086",
         meaning: "Missing submit",
     },
     FormDiagnosticReservation {
-        code: "EZC1087",
+        code: "PSC1087",
         meaning: "Invalid validator",
     },
     FormDiagnosticReservation {
-        code: "EZC1088",
+        code: "PSC1088",
         meaning: "Cyclic validation dependency",
     },
     FormDiagnosticReservation {
-        code: "EZC1089",
+        code: "PSC1089",
         meaning: "Invalid serialization",
     },
     FormDiagnosticReservation {
-        code: "EZC1090",
+        code: "PSC1090",
         meaning: "Invalid reset",
     },
     FormDiagnosticReservation {
-        code: "EZC1091",
+        code: "PSC1091",
         meaning: "Duplicate binding",
     },
     FormDiagnosticReservation {
-        code: "EZC1092",
+        code: "PSC1092",
         meaning: "Nested forms",
     },
     FormDiagnosticReservation {
-        code: "EZC1093",
+        code: "PSC1093",
         meaning: "Invalid ownership",
     },
     FormDiagnosticReservation {
-        code: "EZC1094",
+        code: "PSC1094",
         meaning: "Invalid submit signature",
     },
     FormDiagnosticReservation {
-        code: "EZC1095",
+        code: "PSC1095",
         meaning: "Invalid field scope",
     },
 ];
@@ -93,13 +93,13 @@ pub fn collect_form_diagnostics(
             .contains(&FormDeclarationViolation::DuplicateName)
         {
             diagnostics.push(form_diagnostic(
-                "EZC1084",
+                "PSC1084",
                 candidate.provenance.clone(),
                 candidate.id.as_semantic_id().clone(),
             ));
         } else if !candidate.violations().is_empty() {
             diagnostics.push(form_diagnostic(
-                "EZC1093",
+                "PSC1093",
                 candidate.provenance.clone(),
                 candidate.id.as_semantic_id().clone(),
             ));
@@ -114,7 +114,7 @@ pub fn collect_form_diagnostics(
             .violations
             .contains(&FormFieldDeclarationViolation::DuplicateName)
         {
-            Some("EZC1085")
+            Some("PSC1085")
         } else if candidate.violations.iter().any(|violation| {
             matches!(
                 violation,
@@ -125,11 +125,11 @@ pub fn collect_form_diagnostics(
                     | FormFieldDeclarationViolation::InvalidOwner
             )
         }) {
-            Some("EZC1093")
+            Some("PSC1093")
         } else if candidate.violations.is_empty() {
             None
         } else {
-            Some("EZC1095")
+            Some("PSC1095")
         };
         if let Some(code) = code {
             diagnostics.push(form_diagnostic(
@@ -142,7 +142,7 @@ pub fn collect_form_diagnostics(
     for candidate in &model.validation_rule_candidates {
         if !candidate.violations.is_empty() {
             diagnostics.push(form_diagnostic(
-                "EZC1087",
+                "PSC1087",
                 candidate.decorator_provenance.clone(),
                 candidate.id.as_semantic_id().clone(),
             ));
@@ -157,7 +157,7 @@ pub fn collect_form_diagnostics(
                 .map(|item| item.decorator_provenance.clone())
                 .expect("validation cycle candidate retained");
             diagnostics.push(form_diagnostic(
-                "EZC1088",
+                "PSC1088",
                 provenance,
                 candidate.as_semantic_id().clone(),
             ));
@@ -173,11 +173,11 @@ pub fn collect_form_diagnostics(
                     | SubmissionDeclarationViolation::InvalidReturnType
             )
         }) {
-            Some("EZC1094")
+            Some("PSC1094")
         } else if candidate.violations.is_empty() {
             None
         } else {
-            Some("EZC1093")
+            Some("PSC1093")
         };
         if let Some(code) = code {
             diagnostics.push(form_diagnostic(
@@ -197,7 +197,7 @@ pub fn collect_form_diagnostics(
                 )
             {
                 diagnostics.push(form_diagnostic(
-                    "EZC1089",
+                    "PSC1089",
                     declaration.provenance.clone(),
                     form.as_semantic_id().clone(),
                 ));
@@ -215,7 +215,7 @@ pub fn collect_form_diagnostics(
             )
         }) {
             diagnostics.push(form_diagnostic(
-                "EZC1091",
+                "PSC1091",
                 candidate.provenance.clone(),
                 candidate.id.as_semantic_id().clone(),
             ));
@@ -231,12 +231,12 @@ pub fn collect_form_diagnostics(
                     | SubmissionHostViolation::InvalidHostExpression
             )
         }) {
-            Some("EZC1092")
+            Some("PSC1092")
         } else if candidate
             .violations
             .contains(&SubmissionHostViolation::MissingSubmissionPlan)
         {
-            Some("EZC1086")
+            Some("PSC1086")
         } else if candidate.violations.iter().any(|violation| {
             matches!(
                 violation,
@@ -244,7 +244,7 @@ pub fn collect_form_diagnostics(
                     | SubmissionHostViolation::ContainedControlForDifferentForm
             )
         }) {
-            Some("EZC1093")
+            Some("PSC1093")
         } else {
             None
         };
@@ -263,7 +263,7 @@ pub fn collect_form_diagnostics(
             .contains_key(&crate::ResetPlanId::for_form(&form.id))
         {
             diagnostics.push(form_diagnostic(
-                "EZC1090",
+                "PSC1090",
                 form.provenance.clone(),
                 form.id.as_semantic_id().clone(),
             ));
@@ -345,7 +345,7 @@ mod tests {
         let diagnostics = super::collect_form_diagnostics(&model);
         assert!(diagnostics
             .iter()
-            .all(|diagnostic| diagnostic.code == "EZC1084"));
+            .all(|diagnostic| diagnostic.code == "PSC1084"));
         assert_eq!(diagnostics.len(), 2);
         assert!(diagnostics
             .iter()
@@ -363,16 +363,16 @@ mod tests {
             .map(|reservation| reservation.code)
             .collect::<Vec<_>>();
 
-        assert_eq!(phase_h_codes.last(), Some(&"EZC1083"));
-        assert_eq!(form_codes.first(), Some(&"EZC1084"));
-        assert_eq!(form_codes.last(), Some(&"EZC1095"));
+        assert_eq!(phase_h_codes.last(), Some(&"PSC1083"));
+        assert_eq!(form_codes.first(), Some(&"PSC1084"));
+        assert_eq!(form_codes.last(), Some(&"PSC1095"));
         assert_eq!(
             form_codes.len(),
             form_codes.iter().collect::<BTreeSet<_>>().len()
         );
 
         for (offset, reservation) in FORM_DIAGNOSTIC_RESERVATIONS.iter().enumerate() {
-            assert_eq!(reservation.code, format!("EZC{}", 1084 + offset));
+            assert_eq!(reservation.code, format!("PSC{}", 1084 + offset));
             assert!(!reservation.meaning.is_empty());
         }
     }

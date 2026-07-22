@@ -18,8 +18,8 @@
             "end": "n3",
             "condition": "this.enabled",
             "initial_value": true,
-            "when_true_html": "<span data-ez-node=\"n4\">On</span>",
-            "when_false_html": "<span data-ez-node=\"n5\">Off</span>"
+            "when_true_html": "<span data-presolve-node=\"n4\">On</span>",
+            "when_false_html": "<span data-presolve-node=\"n5\">Off</span>"
           }
         ],
         "events": [

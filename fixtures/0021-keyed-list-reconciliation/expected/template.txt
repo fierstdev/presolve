@@ -8,23 +8,23 @@ TemplateGraph:
       children:
         Element <button> id=n1 @ fixtures/0021-keyed-list-reconciliation/input/KeyedListReconciliation.tsx:17:9 span=329..388
           attributes:
-            data-ez-on-click = event-handler(click -> this.reconcile) @ fixtures/0021-keyed-list-reconciliation/input/KeyedListReconciliation.tsx:17:17 span=337..369
+            data-presolve-on-click = event-handler(click -> this.reconcile) @ fixtures/0021-keyed-list-reconciliation/input/KeyedListReconciliation.tsx:17:17 span=337..369
           children:
             Text("Reconcile") @ fixtures/0021-keyed-list-reconciliation/input/KeyedListReconciliation.tsx:17:50 span=370..379
         Element <button> id=n2 @ fixtures/0021-keyed-list-reconciliation/input/KeyedListReconciliation.tsx:18:9 span=397..446
           attributes:
-            data-ez-on-click = event-handler(click -> this.trim) @ fixtures/0021-keyed-list-reconciliation/input/KeyedListReconciliation.tsx:18:17 span=405..432
+            data-presolve-on-click = event-handler(click -> this.trim) @ fixtures/0021-keyed-list-reconciliation/input/KeyedListReconciliation.tsx:18:17 span=405..432
           children:
             Text("Trim") @ fixtures/0021-keyed-list-reconciliation/input/KeyedListReconciliation.tsx:18:45 span=433..437
         Element <ol> id=n3 @ fixtures/0021-keyed-list-reconciliation/input/KeyedListReconciliation.tsx:19:9 span=455..558
           attributes:
-            data-ez-bindings = bindings(this.labels) @ generated
+            data-presolve-bindings = bindings(this.labels) @ generated
           children:
             List id=n4 start=n5 end=n6 iterable="this.labels" initial=Some([String("North"), String("South")]) item="label" index=Some("index") key="label" @ fixtures/0021-keyed-list-reconciliation/input/KeyedListReconciliation.tsx:20:12 span=471..543
               item template:
                 Element <li> id=n7 @ fixtures/0021-keyed-list-reconciliation/input/KeyedListReconciliation.tsx:20:46 span=505..542
                   attributes:
-                    data-ez-bindings = bindings(index, label) @ generated
+                    data-presolve-bindings = bindings(index, label) @ generated
                   children:
                     Binding id=n8 expression="index" initial=None @ fixtures/0021-keyed-list-reconciliation/input/KeyedListReconciliation.tsx:20:62 span=521..528
                     Text(":") @ fixtures/0021-keyed-list-reconciliation/input/KeyedListReconciliation.tsx:20:69 span=528..529

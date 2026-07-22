@@ -60,7 +60,7 @@ fn generate_element_html(element: &ElementNode, scope: Option<&ListRenderScope<'
     html.push('<');
     html.push_str(&element.tag_name);
 
-    html.push_str(" data-ez-node=\"");
+    html.push_str(" data-presolve-node=\"");
     html.push_str(&escape_attr(&node_id_for_scope(&element.id.0, scope)));
     html.push('"');
 
@@ -72,7 +72,7 @@ fn generate_element_html(element: &ElementNode, scope: Option<&ListRenderScope<'
     }
 
     if let Some(list_attribute_bindings) = list_attribute_bindings(&element.attributes, scope) {
-        html.push_str(" data-ez-list-bindings=\"");
+        html.push_str(" data-presolve-list-bindings=\"");
         html.push_str(&escape_attr(&list_attribute_bindings));
         html.push('"');
     }
@@ -101,7 +101,7 @@ fn generate_child_html(child: &TemplateChild, scope: Option<&ListRenderScope<'_>
         } => {
             let mut html = String::new();
 
-            html.push_str("<!-- ez-binding:");
+            html.push_str("<!-- presolve-binding:");
             html.push_str(&escape_comment(&node_id_for_scope(&id.0, scope)));
             html.push(':');
             html.push_str(&escape_comment(expression));
@@ -114,7 +114,7 @@ fn generate_child_html(child: &TemplateChild, scope: Option<&ListRenderScope<'_>
             )));
 
             if scope.is_some() {
-                html.push_str("<!-- ez-list-binding-end:");
+                html.push_str("<!-- presolve-list-binding-end:");
                 html.push_str(&escape_comment(&node_id_for_scope(&id.0, scope)));
                 html.push_str(" -->");
             }
@@ -134,7 +134,7 @@ fn generate_conditional_html(
 ) -> String {
     let mut html = String::new();
 
-    html.push_str("<!-- ez-conditional-start:");
+    html.push_str("<!-- presolve-conditional-start:");
     html.push_str(&escape_comment(&node_id_for_scope(
         &conditional.start_id.0,
         scope,
@@ -149,7 +149,7 @@ fn generate_conditional_html(
     };
 
     html.push_str(&generate_children_html_with_scope(children, scope));
-    html.push_str("<!-- ez-conditional-end:");
+    html.push_str("<!-- presolve-conditional-end:");
     html.push_str(&escape_comment(&node_id_for_scope(
         &conditional.end_id.0,
         scope,
@@ -161,7 +161,7 @@ fn generate_conditional_html(
 
 pub(crate) fn generate_list_html(list: &ListNode) -> String {
     let mut html = String::new();
-    html.push_str("<!-- ez-list-start:");
+    html.push_str("<!-- presolve-list-start:");
     html.push_str(&escape_comment(&list.start_id.0));
     html.push(':');
     html.push_str(&escape_comment(&list.iterable));
@@ -184,7 +184,7 @@ pub(crate) fn generate_list_html(list: &ListNode) -> String {
         }
     }
 
-    html.push_str("<!-- ez-list-end:");
+    html.push_str("<!-- presolve-list-end:");
     html.push_str(&escape_comment(&list.end_id.0));
     html.push_str(" -->");
     html

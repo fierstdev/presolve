@@ -277,13 +277,13 @@ fn render_child(
                 .and_then(|target| resume_markers.text_anchors.get(target))
                 .map_or_else(String::new, |anchor| {
                     format!(
-                        "<template data-ez-r=\"{}\"></template>",
+                        "<template data-presolve-r=\"{}\"></template>",
                         escape_attr(anchor)
                     )
                 });
             bindings.get(&(instance.clone(), entity)).map_or_else(
-                || format!("{resume_marker}<!-- ez-binding:{expression} -->{value}"),
-                |id| format!("{resume_marker}<!--ez-ti-binding-start:{id}-->{value}<!--ez-ti-binding-end:{id}-->"),
+                || format!("{resume_marker}<!-- presolve-binding:{expression} -->{value}"),
+                |id| format!("{resume_marker}<!--presolve-ti-binding-start:{id}-->{value}<!--presolve-ti-binding-end:{id}-->"),
             )
         }
         TemplateChild::Element(element) => render_element(
@@ -334,7 +334,7 @@ fn render_child(
                 &conditional.when_false
             };
             format!(
-                "<!--ez-r-start:{}--><!--ez-conditional-start:{}:ti:{}-->{}<!--ez-conditional-end:{}:ti:{}--><!--ez-r-end:{}-->",
+                "<!--presolve-r-start:{}--><!--presolve-conditional-start:{}:ti:{}-->{}<!--presolve-conditional-end:{}:ti:{}--><!--presolve-r-end:{}-->",
                 escape_comment(resume_start),
                 conditional.start_id.0,
                 marker,
@@ -370,7 +370,7 @@ fn render_child(
                 .get(marker)
                 .map_or("", String::as_str);
             format!(
-                "<!--ez-r-start:{}--><!--ez-ti-target-start:{marker}-->{}<!--ez-ti-target-end:{marker}--><!--ez-r-end:{}-->",
+                "<!--presolve-r-start:{}--><!--presolve-ti-target-start:{marker}-->{}<!--presolve-ti-target-end:{marker}--><!--presolve-r-end:{}-->",
                 escape_comment(resume_start),
                 crate::html_codegen::generate_list_html(list),
                 escape_comment(resume_end),
@@ -461,21 +461,21 @@ fn render_element(
         }
     }
     let mut html = format!(
-        "<{} data-ez-node=\"{}\"",
+        "<{} data-presolve-node=\"{}\"",
         element.tag_name,
         escape_attr(&element.id.0)
     );
     if let Some(target) = targets.get(&(instance.clone(), entity)) {
-        html.push_str(" data-ez-ti=\"");
+        html.push_str(" data-presolve-ti=\"");
         html.push_str(&escape_attr(target));
         html.push('"');
         if let Some(anchor) = resume_markers.element_anchors.get(target) {
-            html.push_str(" data-ez-r=\"");
+            html.push_str(" data-presolve-r=\"");
             html.push_str(&escape_attr(anchor));
             html.push('"');
         }
         if let Some(event) = resume_markers.events.get(target) {
-            html.push_str(" data-ez-e=\"");
+            html.push_str(" data-presolve-e=\"");
             html.push_str(&escape_attr(event));
             html.push('"');
         }
@@ -670,10 +670,10 @@ mod tests {
 "#,
         ));
         let html = generate_ordinary_instance_html(&model);
-        assert_eq!(html.matches("data-ez-ti=").count(), 2);
-        assert_eq!(html.matches("ez-ti-binding-start:").count(), 2);
-        assert_eq!(html.matches("data-ez-r=").count(), 4);
-        assert_eq!(html.matches("data-ez-e=").count(), 2);
+        assert_eq!(html.matches("data-presolve-ti=").count(), 2);
+        assert_eq!(html.matches("presolve-ti-binding-start:").count(), 2);
+        assert_eq!(html.matches("data-presolve-r=").count(), 4);
+        assert_eq!(html.matches("data-presolve-e=").count(), 2);
         assert_eq!(html, generate_ordinary_instance_html(&model));
     }
 
@@ -699,7 +699,7 @@ mod tests {
 
         assert_eq!(html.matches("<button").count(), 2);
         assert!(!html.contains("<slot"));
-        assert_eq!(html.matches("ez-ti-binding-start:").count(), 2);
+        assert_eq!(html.matches("presolve-ti-binding-start:").count(), 2);
         assert!(
             validate_resume_marker_html(&resume, &html).is_empty(),
             "caller-owned Slot content must carry every required resume marker"

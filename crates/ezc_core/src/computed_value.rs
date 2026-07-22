@@ -32,13 +32,13 @@ impl ComputedDiagnosticCode {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::PurityViolation => "EZC1034",
-            Self::DependencyCycle => "EZC1035",
-            Self::InvalidDeclaration => "EZC1036",
-            Self::UnsupportedBody => "EZC1037",
-            Self::UnresolvedRead => "EZC1038",
-            Self::TypeMismatch => "EZC1039",
-            Self::SerializationViolation => "EZC1040",
+            Self::PurityViolation => "PSC1034",
+            Self::DependencyCycle => "PSC1035",
+            Self::InvalidDeclaration => "PSC1036",
+            Self::UnsupportedBody => "PSC1037",
+            Self::UnresolvedRead => "PSC1038",
+            Self::TypeMismatch => "PSC1039",
+            Self::SerializationViolation => "PSC1040",
         }
     }
 }

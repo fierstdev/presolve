@@ -13,7 +13,7 @@ TemplateGraph:
             type = "button" @ fixtures/0014-static-attributes/input/StaticAttributePanel.tsx:9:17 span=251..264
             data-mode = "safe & sound" @ fixtures/0014-static-attributes/input/StaticAttributePanel.tsx:9:31 span=265..289
             title = "Use <carefully>" @ fixtures/0014-static-attributes/input/StaticAttributePanel.tsx:9:56 span=290..313
-            data-ez-bindings = bindings(this.label) @ generated
+            data-presolve-bindings = bindings(this.label) @ generated
           children:
             Text("Label:") @ fixtures/0014-static-attributes/input/StaticAttributePanel.tsx:10:11 span=325..331
             Binding id=n2 expression="this.label" initial=Some("Ready") @ fixtures/0014-static-attributes/input/StaticAttributePanel.tsx:10:18 span=332..344

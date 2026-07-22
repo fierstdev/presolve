@@ -578,7 +578,7 @@ mod tests {
         let html = generate_static_html(&crate::TemplateGraph {
             templates: model.templates.clone(),
         });
-        assert!(html.contains("<form data-ez-node="));
+        assert!(html.contains("<form data-presolve-node="));
         assert!(!html.contains(" form="));
     }
 

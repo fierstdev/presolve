@@ -176,6 +176,6 @@ mod tests {
         asm.component_ir.instructions.clear();
         assert!(crate::validate_application_semantic_model(&asm)
             .iter()
-            .any(|diagnostic| diagnostic.code == "EZASM1199"));
+            .any(|diagnostic| diagnostic.code == "PSASM1199"));
     }
 }

@@ -459,7 +459,7 @@ mod tests {
 import { Widget as CounterWidget } from "../ui/Counter";
 import StatusCard from "../ui/Status";
 import * as counter from "../ui/Counter";
-import { packageValue } from "edgezero-runtime";
+import { packageValue } from "presolve-runtime";
 "#,
             ),
             (

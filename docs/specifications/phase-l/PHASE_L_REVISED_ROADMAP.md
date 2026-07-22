@@ -304,7 +304,7 @@ validation, not an assumed web platform.
 
 **L19-A -- alpha manifest.** Freeze the alpha support matrix: available
 commands/products/editor features/packages, known limitations, migration from
-EdgeZero terminology, compatibility policy, contribution/support policy, and
+Presolve terminology, compatibility policy, contribution/support policy, and
 rollback criteria.
 
 **L19-B -- clean-room rehearsal.** From a fresh checkout and a clean install,

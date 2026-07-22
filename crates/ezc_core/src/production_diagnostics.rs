@@ -35,22 +35,22 @@ pub struct ProductionDiagnosticContract {
 }
 
 pub const PRODUCTION_DIAGNOSTIC_CATALOG: [ProductionDiagnosticContract; 16] = [
-    contract(ProductionDiagnosticKind::InvalidOptimizationRoot, "EZC1112", "InvalidOptimizationRoot", "A production executable root references no exact valid canonical program or owner."),
-    contract(ProductionDiagnosticKind::InvalidProgramFingerprint, "EZC1113", "InvalidProgramFingerprint", "A fingerprint disagrees with its canonical opcode stream or collides with non-identical bytes."),
-    contract(ProductionDiagnosticKind::UnsafeProgramDeduplication, "EZC1114", "UnsafeProgramDeduplication", "A program merge crosses an identity, side-effect, schedule, protocol, or instance-ownership boundary."),
-    contract(ProductionDiagnosticKind::InvalidConstantPoolEntry, "EZC1115", "InvalidConstantPoolEntry", "A constant pool entry has incompatible bytes, observable identity, an invalid consumer, or noncanonical order."),
-    contract(ProductionDiagnosticKind::InvalidSharedChunkCandidate, "EZC1116", "InvalidSharedChunkCandidate", "A shared candidate violates root-count, byte, savings, root-specificity, or registration-only requirements."),
-    contract(ProductionDiagnosticKind::ProductionChunkCycle, "EZC1117", "ProductionChunkCycle", "Production chunk topology contains a cycle or dependency depth greater than one."),
-    contract(ProductionDiagnosticKind::InvalidRuntimeOrdinalTable, "EZC1118", "InvalidRuntimeOrdinalTable", "A runtime table has invalid ordinals, width, identities, ordering, or checksum."),
-    contract(ProductionDiagnosticKind::ProductionArtifactMismatch, "EZC1119", "ProductionArtifactMismatch", "Packed production records disagree with frozen canonical artifacts, versions, build identity, ownership, or ordering."),
-    contract(ProductionDiagnosticKind::UnsafeBindingWriteCoalescing, "EZC1120", "UnsafeBindingWriteCoalescing", "A removed DOM write lacks proof that no observable operation, read, or boundary depends on it."),
-    contract(ProductionDiagnosticKind::MissingRuntimeCleanup, "EZC1121", "MissingRuntimeCleanup", "A destroyable runtime owner lacks exact cleanup coverage for compiler-owned registrations or slots."),
-    contract(ProductionDiagnosticKind::InvalidRuntimeCleanupOrder, "EZC1122", "InvalidRuntimeCleanupOrder", "Cleanup can expose stale dispatch, remove required state early, or violate structural ordering."),
-    contract(ProductionDiagnosticKind::DetachedActivationTarget, "EZC1123", "DetachedActivationTarget", "An imported or queued activation can execute against a destroyed or detached target."),
-    contract(ProductionDiagnosticKind::InvalidProductionFailureRecord, "EZC1124", "InvalidProductionFailureRecord", "A compact production failure cannot be resolved safely or leaks forbidden provenance."),
-    contract(ProductionDiagnosticKind::OptimizationReportMismatch, "EZC1125", "OptimizationReportMismatch", "Reported decisions, sizes, counts, or savings disagree with immutable optimized products."),
-    contract(ProductionDiagnosticKind::ProductionBudgetRegression, "EZC1126", "ProductionBudgetRegression", "A normative static size, count, or operation budget was exceeded without an authorized revision."),
-    contract(ProductionDiagnosticKind::ProductionDeterminismFailure, "EZC1127", "ProductionDeterminismFailure", "Equivalent builds produced different optimized products, artifacts, reports, ordinals, modules, names, or hashes."),
+    contract(ProductionDiagnosticKind::InvalidOptimizationRoot, "PSC1112", "InvalidOptimizationRoot", "A production executable root references no exact valid canonical program or owner."),
+    contract(ProductionDiagnosticKind::InvalidProgramFingerprint, "PSC1113", "InvalidProgramFingerprint", "A fingerprint disagrees with its canonical opcode stream or collides with non-identical bytes."),
+    contract(ProductionDiagnosticKind::UnsafeProgramDeduplication, "PSC1114", "UnsafeProgramDeduplication", "A program merge crosses an identity, side-effect, schedule, protocol, or instance-ownership boundary."),
+    contract(ProductionDiagnosticKind::InvalidConstantPoolEntry, "PSC1115", "InvalidConstantPoolEntry", "A constant pool entry has incompatible bytes, observable identity, an invalid consumer, or noncanonical order."),
+    contract(ProductionDiagnosticKind::InvalidSharedChunkCandidate, "PSC1116", "InvalidSharedChunkCandidate", "A shared candidate violates root-count, byte, savings, root-specificity, or registration-only requirements."),
+    contract(ProductionDiagnosticKind::ProductionChunkCycle, "PSC1117", "ProductionChunkCycle", "Production chunk topology contains a cycle or dependency depth greater than one."),
+    contract(ProductionDiagnosticKind::InvalidRuntimeOrdinalTable, "PSC1118", "InvalidRuntimeOrdinalTable", "A runtime table has invalid ordinals, width, identities, ordering, or checksum."),
+    contract(ProductionDiagnosticKind::ProductionArtifactMismatch, "PSC1119", "ProductionArtifactMismatch", "Packed production records disagree with frozen canonical artifacts, versions, build identity, ownership, or ordering."),
+    contract(ProductionDiagnosticKind::UnsafeBindingWriteCoalescing, "PSC1120", "UnsafeBindingWriteCoalescing", "A removed DOM write lacks proof that no observable operation, read, or boundary depends on it."),
+    contract(ProductionDiagnosticKind::MissingRuntimeCleanup, "PSC1121", "MissingRuntimeCleanup", "A destroyable runtime owner lacks exact cleanup coverage for compiler-owned registrations or slots."),
+    contract(ProductionDiagnosticKind::InvalidRuntimeCleanupOrder, "PSC1122", "InvalidRuntimeCleanupOrder", "Cleanup can expose stale dispatch, remove required state early, or violate structural ordering."),
+    contract(ProductionDiagnosticKind::DetachedActivationTarget, "PSC1123", "DetachedActivationTarget", "An imported or queued activation can execute against a destroyed or detached target."),
+    contract(ProductionDiagnosticKind::InvalidProductionFailureRecord, "PSC1124", "InvalidProductionFailureRecord", "A compact production failure cannot be resolved safely or leaks forbidden provenance."),
+    contract(ProductionDiagnosticKind::OptimizationReportMismatch, "PSC1125", "OptimizationReportMismatch", "Reported decisions, sizes, counts, or savings disagree with immutable optimized products."),
+    contract(ProductionDiagnosticKind::ProductionBudgetRegression, "PSC1126", "ProductionBudgetRegression", "A normative static size, count, or operation budget was exceeded without an authorized revision."),
+    contract(ProductionDiagnosticKind::ProductionDeterminismFailure, "PSC1127", "ProductionDeterminismFailure", "Equivalent builds produced different optimized products, artifacts, reports, ordinals, modules, names, or hashes."),
 ];
 
 const fn contract(
@@ -208,8 +208,8 @@ mod tests {
         facts.reverse();
         let diagnostics = project_production_diagnostics(&facts);
         assert_eq!(diagnostics.len(), 16);
-        assert_eq!(diagnostics.first().map(|value| value.code), Some("EZC1112"));
-        assert_eq!(diagnostics.last().map(|value| value.code), Some("EZC1127"));
+        assert_eq!(diagnostics.first().map(|value| value.code), Some("PSC1112"));
+        assert_eq!(diagnostics.last().map(|value| value.code), Some("PSC1127"));
         assert!(diagnostics
             .iter()
             .all(|diagnostic| diagnostic.secondary_evidence == ["a", "z"]));

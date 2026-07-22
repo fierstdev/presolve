@@ -712,7 +712,7 @@ fn normalize_marker_identities(manifest: &mut ResumeManifest) {
         .map(|(index, anchor)| {
             (
                 anchor.anchor_id.clone(),
-                format!("ez-r:canonical-{index}")
+                format!("presolve-r:canonical-{index}")
                     .parse::<ResumeAnchorId>()
                     .expect("canonical anchor placeholder"),
             )
@@ -1612,11 +1612,11 @@ mod tests {
     fn build_id_ignores_absolute_source_and_output_paths() {
         let source = r#"@component("x-counter") class Counter { count = state(1); render() { return <button>{this.count}</button>; } }"#;
         let first = crate::build_application_semantic_model_for_unit(
-            &crate::CompilationUnit::parse_sources([("/tmp/edgezero-a/src/Counter.tsx", source)]),
+            &crate::CompilationUnit::parse_sources([("/tmp/presolve-a/src/Counter.tsx", source)]),
         );
         let second = crate::build_application_semantic_model_for_unit(
             &crate::CompilationUnit::parse_sources([(
-                "/var/tmp/edgezero-b/src/Counter.tsx",
+                "/var/tmp/presolve-b/src/Counter.tsx",
                 source,
             )]),
         );

@@ -8,15 +8,15 @@ TemplateGraph:
       children:
         Element <button> id=n1 @ fixtures/0010-add-subtract-assign/input/StepCounter.tsx:17:9 span=247..331
           attributes:
-            data-ez-on-click = event-handler(click -> this.addTwo) @ fixtures/0010-add-subtract-assign/input/StepCounter.tsx:17:17 span=255..284
-            data-ez-bindings = bindings(this.count) @ generated
+            data-presolve-on-click = event-handler(click -> this.addTwo) @ fixtures/0010-add-subtract-assign/input/StepCounter.tsx:17:17 span=255..284
+            data-presolve-bindings = bindings(this.count) @ generated
           children:
             Text("Add:") @ fixtures/0010-add-subtract-assign/input/StepCounter.tsx:18:11 span=296..300
             Binding id=n2 expression="this.count" initial=Some("4") @ fixtures/0010-add-subtract-assign/input/StepCounter.tsx:18:16 span=301..313
         Element <button> id=n3 @ fixtures/0010-add-subtract-assign/input/StepCounter.tsx:20:9 span=340..436
           attributes:
-            data-ez-on-click = event-handler(click -> this.subtractThree) @ fixtures/0010-add-subtract-assign/input/StepCounter.tsx:20:17 span=348..384
-            data-ez-bindings = bindings(this.count) @ generated
+            data-presolve-on-click = event-handler(click -> this.subtractThree) @ fixtures/0010-add-subtract-assign/input/StepCounter.tsx:20:17 span=348..384
+            data-presolve-bindings = bindings(this.count) @ generated
           children:
             Text("Subtract:") @ fixtures/0010-add-subtract-assign/input/StepCounter.tsx:21:11 span=396..405
             Binding id=n4 expression="this.count" initial=Some("4") @ fixtures/0010-add-subtract-assign/input/StepCounter.tsx:21:21 span=406..418

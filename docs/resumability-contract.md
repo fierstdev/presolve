@@ -1,6 +1,6 @@
 # Resumability Contract
 
-Phase J freezes EdgeZero resumability v1: same-build continuation from a
+Phase J freezes Presolve resumability v1: same-build continuation from a
 compiler-generated snapshot, without replaying authored initialization, render,
 validation, submission, action, or Effect bodies.
 
@@ -37,7 +37,7 @@ restore retained values, recompute only authorized Computed slots, establish
 Context/Component/Form state and bindings, then mark Ready. Effects are
 subscribed without running their bodies during restore.
 
-Anchors (`data-ez-r`) and events (`data-ez-e`) contain exact compiler IDs.
+Anchors (`data-presolve-r`) and events (`data-presolve-e`) contain exact compiler IDs.
 The listener finds only the nearest emitted event marker, looks up its closed
 manifest entry, and loads the exact deterministic chunk. Failed chunks never
 dispatch the action; successful chunks activate once.
@@ -65,7 +65,7 @@ environment remains responsible for CSP, escaping, CSRF, and action authority.
 ## Inspection and diagnostics
 
 Full/selected ASM, text inspection, and check JSON project the same ordered
-resume diagnostics. `EZC1096`–`EZC1111` cover unsupported values, missing
+resume diagnostics. `PSC1096`–`PSC1111` cover unsupported values, missing
 owners/programs/chunks, retention/recomputation/policy/order failures, boundary
 or chunk cycles, anchors, schema collisions, stable-state violations, artifact
 mismatches, unsupported lazy payloads, and excluded topology. Each record uses

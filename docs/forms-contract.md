@@ -37,7 +37,7 @@ semantic authority.
 
 Semantic graph v6 exposes Form, Field, FieldBinding, and ValidationRule nodes
 with typed Forms edges. ASM inspection v9 exposes the shared canonical Forms
-projection. Check JSON v5 projects `EZC1084` through `EZC1095` only from
+projection. Check JSON v5 projects `PSC1084` through `PSC1095` only from
 retained compiler facts. Template manifest v4 and component artifact v3 extend
 the existing Forms bridge with reciprocal `TemplateInstanceTargetId` and
 `ComponentInstanceId` records; `forms.runtime.json` remains v1 and retains

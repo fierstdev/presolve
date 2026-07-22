@@ -4,7 +4,7 @@ TemplateGraph:
     template StringGreeting
       root: <p> id=n0 @ fixtures/0006-string-state/input/StringGreeting.tsx:7:12 span=160..183
       attributes:
-        data-ez-bindings = bindings(this.name) @ generated
+        data-presolve-bindings = bindings(this.name) @ generated
       children:
         Text("Name:") @ fixtures/0006-string-state/input/StringGreeting.tsx:7:15 span=163..168
         Binding id=n1 expression="this.name" initial=Some("Austin & <Zero>") @ fixtures/0006-string-state/input/StringGreeting.tsx:7:20 span=168..179

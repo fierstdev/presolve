@@ -27,17 +27,17 @@ impl EffectDiagnosticCode {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::InvalidDeclaration => "EZC1041",
-            Self::UnsupportedBody => "EZC1042",
-            Self::UnresolvedReference => "EZC1043",
-            Self::ReactiveStateMutation => "EZC1044",
-            Self::InvalidComponentInvocation => "EZC1045",
-            Self::AsyncOrCleanupUnsupported => "EZC1046",
-            Self::UnknownCapability => "EZC1047",
-            Self::CapabilitySignature => "EZC1048",
-            Self::CapabilityBoundary => "EZC1049",
-            Self::CapabilitySerialization => "EZC1050",
-            Self::UnavailableComputedPrerequisite => "EZC1051",
+            Self::InvalidDeclaration => "PSC1041",
+            Self::UnsupportedBody => "PSC1042",
+            Self::UnresolvedReference => "PSC1043",
+            Self::ReactiveStateMutation => "PSC1044",
+            Self::InvalidComponentInvocation => "PSC1045",
+            Self::AsyncOrCleanupUnsupported => "PSC1046",
+            Self::UnknownCapability => "PSC1047",
+            Self::CapabilitySignature => "PSC1048",
+            Self::CapabilityBoundary => "PSC1049",
+            Self::CapabilitySerialization => "PSC1050",
+            Self::UnavailableComputedPrerequisite => "PSC1051",
         }
     }
 }
@@ -578,7 +578,7 @@ class EffectDiagnostics extends Component {
             .iter()
             .map(|diagnostic| diagnostic.code.as_str())
             .collect::<Vec<_>>();
-        assert_eq!(codes, vec!["EZC1044", "EZC1045", "EZC1047"]);
+        assert_eq!(codes, vec!["PSC1044", "PSC1045", "PSC1047"]);
         assert!(diagnostics.iter().all(|diagnostic| {
             diagnostic.effect_id.is_some()
                 && diagnostic.statement_id.is_some()
@@ -591,36 +591,36 @@ class EffectDiagnostics extends Component {
     #[test]
     fn maps_each_existing_f5_violation_category_to_one_stable_public_code() {
         let cases = [
-            (EffectSemanticViolationKind::UnsupportedStatement, "EZC1042"),
+            (EffectSemanticViolationKind::UnsupportedStatement, "PSC1042"),
             (
                 EffectSemanticViolationKind::UnresolvedComponentAssignment,
-                "EZC1043",
+                "PSC1043",
             ),
             (
                 EffectSemanticViolationKind::ReactiveStateMutation,
-                "EZC1044",
+                "PSC1044",
             ),
-            (EffectSemanticViolationKind::ActionInvocation, "EZC1045"),
-            (EffectSemanticViolationKind::EffectInvocation, "EZC1045"),
+            (EffectSemanticViolationKind::ActionInvocation, "PSC1045"),
+            (EffectSemanticViolationKind::EffectInvocation, "PSC1045"),
             (
                 EffectSemanticViolationKind::ComponentMethodInvocation,
-                "EZC1045",
+                "PSC1045",
             ),
             (
                 EffectSemanticViolationKind::UnresolvedComponentCall,
-                "EZC1045",
+                "PSC1045",
             ),
-            (EffectSemanticViolationKind::Async, "EZC1046"),
-            (EffectSemanticViolationKind::ValueReturn, "EZC1046"),
+            (EffectSemanticViolationKind::Async, "PSC1046"),
+            (EffectSemanticViolationKind::ValueReturn, "PSC1046"),
             (
                 EffectSemanticViolationKind::UnknownExternalCapability,
-                "EZC1047",
+                "PSC1047",
             ),
-            (EffectSemanticViolationKind::CapabilitySignature, "EZC1048"),
-            (EffectSemanticViolationKind::CapabilityBoundary, "EZC1049"),
+            (EffectSemanticViolationKind::CapabilitySignature, "PSC1048"),
+            (EffectSemanticViolationKind::CapabilityBoundary, "PSC1049"),
             (
                 EffectSemanticViolationKind::CapabilitySerialization,
-                "EZC1050",
+                "PSC1050",
             ),
         ];
 
@@ -664,7 +664,7 @@ class UnplannedEffect extends Component {
         let diagnostics = collect_effect_diagnostics(&model);
         assert_eq!(diagnostics.len(), 1);
         let diagnostic = &diagnostics[0];
-        assert_eq!(diagnostic.code, "EZC1051");
+        assert_eq!(diagnostic.code, "PSC1051");
         assert_eq!(
             diagnostic.effect_id.as_ref().map(crate::EffectId::as_str),
             Some(effect.as_str())

@@ -71,7 +71,7 @@ fn component_codes(model: &ezc_core::ApplicationSemanticModel) -> BTreeSet<Strin
     collect_component_diagnostics(model)
         .into_iter()
         .map(|diagnostic| diagnostic.code)
-        .filter(|code| ("EZC1068"..="EZC1083").contains(&code.as_str()))
+        .filter(|code| ("PSC1068"..="PSC1083").contains(&code.as_str()))
         .collect()
 }
 
@@ -113,7 +113,7 @@ fn component_declaration_fixture_covers_slots_inheritance_imports_and_repeated_i
     assert!(invalid.slots.is_empty());
     assert_eq!(
         component_codes(&invalid),
-        BTreeSet::from(["EZC1068".to_string()])
+        BTreeSet::from(["PSC1068".to_string()])
     );
     let candidates = invalid
         .components
@@ -128,7 +128,7 @@ fn component_declaration_fixture_covers_slots_inheritance_imports_and_repeated_i
     let inheritance = fixture_model("fixtures/0062-component-declarations/input/Inheritance.tsx");
     assert_eq!(
         component_codes(&inheritance),
-        BTreeSet::from(["EZC1072".to_string(), "EZC1073".to_string()])
+        BTreeSet::from(["PSC1072".to_string(), "PSC1073".to_string()])
     );
 }
 
@@ -191,7 +191,7 @@ fn component_composition_fixture_covers_topology_slots_caller_ownership_and_bloc
     let invalid = fixture_model("fixtures/0063-component-composition/input/InvalidComposition.tsx");
     let codes = component_codes(&invalid);
     for code in [
-        "EZC1070", "EZC1071", "EZC1074", "EZC1075", "EZC1076", "EZC1077",
+        "PSC1070", "PSC1071", "PSC1074", "PSC1075", "PSC1076", "PSC1077",
     ] {
         assert!(codes.contains(code), "missing {code}: {codes:#?}");
     }
@@ -287,7 +287,7 @@ fn instance_context_fixture_selects_exact_nearest_sources_without_leakage() {
         ambiguous
             .diagnostics
             .iter()
-            .filter(|diagnostic| diagnostic.code == "EZC1056")
+            .filter(|diagnostic| diagnostic.code == "PSC1056")
             .count(),
         1
     );
@@ -513,7 +513,7 @@ fn component_runtime_and_resume_fixtures_preserve_order_isolation_structure_and_
     let failure = fixture_model("fixtures/0065-component-runtime/input/FailureIsolation.tsx");
     assert_eq!(
         component_codes(&failure),
-        BTreeSet::from(["EZC1070".to_string()])
+        BTreeSet::from(["PSC1070".to_string()])
     );
     assert!(failure
         .component_instance_plan
@@ -830,7 +830,7 @@ fn assert_contract_identities(diagnostic: &ezc_core::ComponentDiagnostic, identi
 
 fn mutate_authoritative_product(code: &str, model: &mut ezc_core::ApplicationSemanticModel) {
     match code {
-        "EZC1078" => {
+        "PSC1078" => {
             model
                 .slot_bindings
                 .bindings
@@ -839,7 +839,7 @@ fn mutate_authoritative_product(code: &str, model: &mut ezc_core::ApplicationSem
                 .unwrap()
                 .status = SlotBindingStatus::InvalidOwnership;
         }
-        "EZC1079" => {
+        "PSC1079" => {
             let record = model
                 .composition_types
                 .slot_bindings
@@ -849,7 +849,7 @@ fn mutate_authoritative_product(code: &str, model: &mut ezc_core::ApplicationSem
             record.type_compatibility = CompositionCompatibility::Incompatible;
             record.overall = CompositionCompatibility::Incompatible;
         }
-        "EZC1080" => {
+        "PSC1080" => {
             let target = model
                 .components
                 .iter()
@@ -876,7 +876,7 @@ fn mutate_authoritative_product(code: &str, model: &mut ezc_core::ApplicationSem
                 .unwrap()
                 .target_component = Some(target);
         }
-        "EZC1082" => {
+        "PSC1082" => {
             let id = model
                 .component_instance_plan
                 .instances
@@ -901,7 +901,7 @@ fn mutate_authoritative_product(code: &str, model: &mut ezc_core::ApplicationSem
                 },
             );
         }
-        "EZC1083" => {
+        "PSC1083" => {
             model
                 .slot_bindings
                 .bindings

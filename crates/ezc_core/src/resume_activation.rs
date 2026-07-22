@@ -110,12 +110,12 @@ impl ResumeActivationIntegrityCode {
     #[must_use]
     pub const fn code(self) -> &'static str {
         match self {
-            Self::MissingOrDuplicatePolicy => "EZASM1337",
-            Self::InvalidPrerequisite => "EZASM1338",
-            Self::UnknownEventOrBoundary => "EZASM1339",
-            Self::InvalidPolicyAuthority => "EZASM1340",
-            Self::UnsupportedLazyPayload => "EZASM1341",
-            Self::OrderingOrIndexDrift => "EZASM1342",
+            Self::MissingOrDuplicatePolicy => "PSASM1337",
+            Self::InvalidPrerequisite => "PSASM1338",
+            Self::UnknownEventOrBoundary => "PSASM1339",
+            Self::InvalidPolicyAuthority => "PSASM1340",
+            Self::UnsupportedLazyPayload => "PSASM1341",
+            Self::OrderingOrIndexDrift => "PSASM1342",
         }
     }
 }
@@ -489,12 +489,12 @@ mod tests {
             ]
             .map(ResumeActivationIntegrityCode::code),
             [
-                "EZASM1337",
-                "EZASM1338",
-                "EZASM1339",
-                "EZASM1340",
-                "EZASM1341",
-                "EZASM1342",
+                "PSASM1337",
+                "PSASM1338",
+                "PSASM1339",
+                "PSASM1340",
+                "PSASM1341",
+                "PSASM1342",
             ]
         );
     }

@@ -124,18 +124,18 @@ impl FormTrackingIntegrityKind {
     #[must_use]
     pub const fn code(self) -> &'static str {
         match self {
-            Self::MissingForm => "EZASM1273",
-            Self::MissingField => "EZASM1274",
-            Self::PlanIdentityMismatch => "EZASM1275",
-            Self::TrackingIdentityMismatch => "EZASM1276",
-            Self::FieldFormMismatch => "EZASM1277",
-            Self::ComponentMismatch => "EZASM1278",
-            Self::InitialValueMismatch => "EZASM1279",
-            Self::BindingMismatch => "EZASM1280",
-            Self::DuplicateTrackingRecord => "EZASM1281",
-            Self::MissingTrackingRecord => "EZASM1282",
-            Self::MissingProvenance => "EZASM1283",
-            Self::NonCanonicalOrdering => "EZASM1284",
+            Self::MissingForm => "PSASM1273",
+            Self::MissingField => "PSASM1274",
+            Self::PlanIdentityMismatch => "PSASM1275",
+            Self::TrackingIdentityMismatch => "PSASM1276",
+            Self::FieldFormMismatch => "PSASM1277",
+            Self::ComponentMismatch => "PSASM1278",
+            Self::InitialValueMismatch => "PSASM1279",
+            Self::BindingMismatch => "PSASM1280",
+            Self::DuplicateTrackingRecord => "PSASM1281",
+            Self::MissingTrackingRecord => "PSASM1282",
+            Self::MissingProvenance => "PSASM1283",
+            Self::NonCanonicalOrdering => "PSASM1284",
         }
     }
 }

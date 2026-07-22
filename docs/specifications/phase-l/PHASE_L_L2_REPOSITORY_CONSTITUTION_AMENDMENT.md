@@ -154,7 +154,7 @@ Create an archive index:
 docs/archive/engineering/README.md
 ```
 
-The index shall state that archived material records EdgeZero-era and pre-public Presolve engineering history, may contain obsolete names or proposals, and is non-normative unless another authoritative document explicitly incorporates it.
+The index shall state that archived material records Presolve-era and pre-public Presolve engineering history, may contain obsolete names or proposals, and is non-normative unless another authoritative document explicitly incorporates it.
 
 ### 5.2 Planning documents
 

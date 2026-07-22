@@ -25,15 +25,15 @@ pub fn collect_context_diagnostics(model: &ApplicationSemanticModel) -> Vec<Comp
             continue;
         };
         let code = match violation {
-            ContextDeclarationViolation::UnresolvedContextDesignator => "EZC1055",
-            ContextDeclarationViolation::DuplicateProvider => "EZC1056",
+            ContextDeclarationViolation::UnresolvedContextDesignator => "PSC1055",
+            ContextDeclarationViolation::DuplicateProvider => "PSC1056",
             _ => match candidate.authored.kind {
-                ContextDeclarationCandidateKind::Context => "EZC1052",
-                ContextDeclarationCandidateKind::Provider => "EZC1053",
-                ContextDeclarationCandidateKind::Consumer => "EZC1054",
+                ContextDeclarationCandidateKind::Context => "PSC1052",
+                ContextDeclarationCandidateKind::Provider => "PSC1053",
+                ContextDeclarationCandidateKind::Consumer => "PSC1054",
             },
         };
-        if code == "EZC1056" {
+        if code == "PSC1056" {
             let Some(designator) = &candidate.authored.context_designator else {
                 continue;
             };
@@ -90,13 +90,13 @@ pub fn collect_context_diagnostics(model: &ApplicationSemanticModel) -> Vec<Comp
         match &resolution.result {
             ContextResolutionResult::Unresolved => push(
                 &mut diagnostics,
-                "EZC1057",
+                "PSC1057",
                 "Consumer Context binding is unresolved.",
                 &resolution.provenance,
             ),
             ContextResolutionResult::Ambiguous { .. } => push(
                 &mut diagnostics,
-                "EZC1058",
+                "PSC1058",
                 "Consumer Context binding is ambiguous.",
                 &resolution.provenance,
             ),
@@ -113,7 +113,7 @@ pub fn collect_context_diagnostics(model: &ApplicationSemanticModel) -> Vec<Comp
                 .unwrap_or(&record.provenance);
             push(
                 &mut diagnostics,
-                "EZC1059",
+                "PSC1059",
                 "Provider value is incompatible with its declared type.",
                 provenance,
             );
@@ -126,7 +126,7 @@ pub fn collect_context_diagnostics(model: &ApplicationSemanticModel) -> Vec<Comp
                 });
             push(
                 &mut diagnostics,
-                "EZC1060",
+                "PSC1060",
                 "Provider declared type is incompatible with its Context.",
                 provenance,
             );
@@ -141,7 +141,7 @@ pub fn collect_context_diagnostics(model: &ApplicationSemanticModel) -> Vec<Comp
                 .unwrap_or(&record.provenance);
             push(
                 &mut diagnostics,
-                "EZC1063",
+                "PSC1063",
                 "Context Provider source is not serializable.",
                 provenance,
             );
@@ -155,7 +155,7 @@ pub fn collect_context_diagnostics(model: &ApplicationSemanticModel) -> Vec<Comp
                 .unwrap_or(&record.provenance);
             push(
                 &mut diagnostics,
-                "EZC1064",
+                "PSC1064",
                 "Context Provider source crosses an incompatible boundary.",
                 provenance,
             );
@@ -169,7 +169,7 @@ pub fn collect_context_diagnostics(model: &ApplicationSemanticModel) -> Vec<Comp
                 context_default_provenance(model, &record.context).unwrap_or(&record.provenance);
             push(
                 &mut diagnostics,
-                "EZC1061",
+                "PSC1061",
                 "Context default is incompatible with its declared type.",
                 provenance,
             );
@@ -181,7 +181,7 @@ pub fn collect_context_diagnostics(model: &ApplicationSemanticModel) -> Vec<Comp
                 .unwrap_or(&record.provenance);
             push(
                 &mut diagnostics,
-                "EZC1063",
+                "PSC1063",
                 "Context default is not serializable.",
                 provenance,
             );
@@ -192,7 +192,7 @@ pub fn collect_context_diagnostics(model: &ApplicationSemanticModel) -> Vec<Comp
                 .unwrap_or(&record.provenance);
             push(
                 &mut diagnostics,
-                "EZC1064",
+                "PSC1064",
                 "Context crosses an incompatible boundary.",
                 provenance,
             );
@@ -207,7 +207,7 @@ pub fn collect_context_diagnostics(model: &ApplicationSemanticModel) -> Vec<Comp
                 });
             push(
                 &mut diagnostics,
-                "EZC1062",
+                "PSC1062",
                 "Context is incompatible with the Consumer request.",
                 provenance,
             );
@@ -217,7 +217,7 @@ pub fn collect_context_diagnostics(model: &ApplicationSemanticModel) -> Vec<Comp
         if record.compatibility == LifetimeCompatibilityStatus::Incompatible {
             push(
                 &mut diagnostics,
-                "EZC1065",
+                "PSC1065",
                 "Context dependency lifetime is incompatible.",
                 &record.provenance,
             );
@@ -227,7 +227,7 @@ pub fn collect_context_diagnostics(model: &ApplicationSemanticModel) -> Vec<Comp
         if record.compatibility == ContextBindingLifetimeStatus::Incompatible {
             push(
                 &mut diagnostics,
-                "EZC1065",
+                "PSC1065",
                 "Context Consumer binding lifetime is incompatible.",
                 &record.provenance,
             );
@@ -250,10 +250,10 @@ pub fn collect_context_diagnostics(model: &ApplicationSemanticModel) -> Vec<Comp
                 )
             })
         {
-            let provenance = context_source_failure_provenance(model, entry, "EZC1066");
+            let provenance = context_source_failure_provenance(model, entry, "PSC1066");
             push(
                 &mut diagnostics,
-                "EZC1066",
+                "PSC1066",
                 "Context source has an unavailable dependency.",
                 provenance,
             );
@@ -263,10 +263,10 @@ pub fn collect_context_diagnostics(model: &ApplicationSemanticModel) -> Vec<Comp
                 .iter()
                 .any(|reason| matches!(reason, ContextSourceBlockReason::UnsupportedExpression))
         {
-            let provenance = context_source_failure_provenance(model, entry, "EZC1067");
+            let provenance = context_source_failure_provenance(model, entry, "PSC1067");
             push(
                 &mut diagnostics,
-                "EZC1067",
+                "PSC1067",
                 "Context source cannot be planned from an unsupported expression.",
                 provenance,
             );
@@ -328,7 +328,7 @@ fn context_source_failure_provenance<'a>(
     entry: &'a ContextSourcePlanEntry,
     code: &str,
 ) -> &'a SourceProvenance {
-    if code == "EZC1066" {
+    if code == "PSC1066" {
         let dependent = match &entry.source {
             ContextValueSourceId::Provider(provider) => {
                 ContextDependencyNodeId::Provider(provider.clone())
@@ -357,7 +357,7 @@ fn context_source_failure_provenance<'a>(
             return provenance;
         }
     }
-    if code == "EZC1067" {
+    if code == "PSC1067" {
         if let Some(provenance) = expression_provenance(model, &entry.expression_root) {
             return provenance;
         }
@@ -371,7 +371,7 @@ fn populate_secondary_labels(
     diagnostics: &mut [ComponentDiagnostic],
 ) {
     for diagnostic in diagnostics {
-        if diagnostic.code == "EZC1058" {
+        if diagnostic.code == "PSC1058" {
             let mut labels = diagnostic
                 .consumer_id
                 .as_ref()
@@ -410,7 +410,7 @@ fn populate_secondary_labels(
             .as_ref()
             .and_then(|id| model.provider(id));
         match diagnostic.code.as_str() {
-            "EZC1057" => {
+            "PSC1057" => {
                 if let Some(context) = context {
                     labels.push(crate::DiagnosticSecondaryLabel {
                         provenance: context.provenance.clone(),
@@ -418,7 +418,7 @@ fn populate_secondary_labels(
                     });
                 }
             }
-            "EZC1059" => {
+            "PSC1059" => {
                 if let Some(provider) = provider {
                     labels.push(crate::DiagnosticSecondaryLabel {
                         provenance: provider.declared_type.provenance.clone(),
@@ -426,7 +426,7 @@ fn populate_secondary_labels(
                     });
                 }
             }
-            "EZC1060" | "EZC1061" | "EZC1062" | "EZC1063" | "EZC1064" => {
+            "PSC1060" | "PSC1061" | "PSC1062" | "PSC1063" | "PSC1064" => {
                 if let Some(context) = context {
                     labels.push(crate::DiagnosticSecondaryLabel {
                         provenance: context.declared_type.provenance.clone(),
@@ -434,8 +434,8 @@ fn populate_secondary_labels(
                     });
                 }
             }
-            "EZC1065" => populate_lifetime_labels(model, diagnostic, &mut labels),
-            "EZC1067" => {
+            "PSC1065" => populate_lifetime_labels(model, diagnostic, &mut labels),
+            "PSC1067" => {
                 if let Some(provider) = provider {
                     labels.push(crate::DiagnosticSecondaryLabel {
                         provenance: provider.provenance.clone(),
@@ -450,14 +450,14 @@ fn populate_secondary_labels(
             }
             _ => {}
         }
-        if diagnostic.code == "EZC1066" {
+        if diagnostic.code == "PSC1066" {
             if let Some(entry) = model
                 .context_evaluation
                 .source_entries
                 .values()
                 .find(|entry| {
                     diagnostic.provenance.as_ref()
-                        == Some(context_source_failure_provenance(model, entry, "EZC1066"))
+                        == Some(context_source_failure_provenance(model, entry, "PSC1066"))
                 })
             {
                 for reason in &entry.reasons {
@@ -562,7 +562,7 @@ fn populate_identities(model: &ApplicationSemanticModel, diagnostics: &mut [Comp
             continue;
         };
         match diagnostic.code.as_str() {
-            "EZC1057" | "EZC1058" => {
+            "PSC1057" | "PSC1058" => {
                 if let Some(resolution) = model
                     .context_resolutions
                     .values()
@@ -572,12 +572,12 @@ fn populate_identities(model: &ApplicationSemanticModel, diagnostics: &mut [Comp
                     diagnostic.context_id = resolution.context.clone();
                 }
             }
-            "EZC1059" | "EZC1060" => {
+            "PSC1059" | "PSC1060" => {
                 if let Some(record) = model.provider_types.values().find(|record| {
                     let Some(provider) = model.provider(&record.provider) else {
                         return false;
                     };
-                    let expected = if diagnostic.code == "EZC1059" {
+                    let expected = if diagnostic.code == "PSC1059" {
                         expression_provenance(model, &provider.value_expression)
                             .unwrap_or(&record.provenance)
                     } else {
@@ -589,7 +589,7 @@ fn populate_identities(model: &ApplicationSemanticModel, diagnostics: &mut [Comp
                     diagnostic.context_id = record.context.clone();
                 }
             }
-            "EZC1061" => {
+            "PSC1061" => {
                 if let Some(record) = model.context_types.values().find(|record| {
                     context_default_provenance(model, &record.context).unwrap_or(&record.provenance)
                         == provenance
@@ -597,7 +597,7 @@ fn populate_identities(model: &ApplicationSemanticModel, diagnostics: &mut [Comp
                     diagnostic.context_id = Some(record.context.clone());
                 }
             }
-            "EZC1062" => {
+            "PSC1062" => {
                 if let Some(record) = model.consumer_types.values().find(|record| {
                     model
                         .consumer(&record.consumer)
@@ -610,7 +610,7 @@ fn populate_identities(model: &ApplicationSemanticModel, diagnostics: &mut [Comp
                     diagnostic.context_id = record.context.clone();
                 }
             }
-            "EZC1063" | "EZC1064" => {
+            "PSC1063" | "PSC1064" => {
                 if let Some(record) = model.provider_types.values().find(|record| {
                     model
                         .provider(&record.provider)
@@ -630,7 +630,7 @@ fn populate_identities(model: &ApplicationSemanticModel, diagnostics: &mut [Comp
                     diagnostic.context_id = Some(record.context.clone());
                 }
             }
-            "EZC1065" => {
+            "PSC1065" => {
                 if let Some(record) = model
                     .context_lifetime
                     .binding_lifetimes
@@ -669,7 +669,7 @@ fn populate_identities(model: &ApplicationSemanticModel, diagnostics: &mut [Comp
                     }
                 }
             }
-            "EZC1066" | "EZC1067" => {
+            "PSC1066" | "PSC1067" => {
                 if let Some(entry) =
                     model
                         .context_evaluation
@@ -725,11 +725,11 @@ fn message(code: &str, field: Option<&str>) -> String {
         format!("declaration `{field}`")
     });
     match code {
-        "EZC1052" => format!("Invalid Context {subject}."),
-        "EZC1053" => format!("Invalid Provider {subject}."),
-        "EZC1054" => format!("Invalid Consumer {subject}."),
-        "EZC1055" => format!("Unresolved Context designator for {subject}."),
-        "EZC1056" => "Duplicate Provider declarations target the same Context.".to_string(),
+        "PSC1052" => format!("Invalid Context {subject}."),
+        "PSC1053" => format!("Invalid Provider {subject}."),
+        "PSC1054" => format!("Invalid Consumer {subject}."),
+        "PSC1055" => format!("Unresolved Context designator for {subject}."),
+        "PSC1056" => "Duplicate Provider declarations target the same Context.".to_string(),
         _ => unreachable!("frozen Context diagnostic code"),
     }
 }
@@ -754,7 +754,7 @@ mod tests {
     ) {
         let context_diagnostics = diagnostics
             .iter()
-            .filter(|diagnostic| ("EZC1052"..="EZC1067").contains(&diagnostic.code.as_str()))
+            .filter(|diagnostic| ("PSC1052"..="PSC1067").contains(&diagnostic.code.as_str()))
             .collect::<Vec<_>>();
         assert!(context_diagnostics.windows(2).all(|pair| {
             let key = |diagnostic: &crate::ComponentDiagnostic| {
@@ -774,7 +774,7 @@ mod tests {
             let primary = diagnostic.provenance.as_ref().expect("Context primary");
             let mut expected_labels = Vec::new();
             match diagnostic.code.as_str() {
-                "EZC1052" | "EZC1053" | "EZC1054" | "EZC1055" | "EZC1056" => {
+                "PSC1052" | "PSC1053" | "PSC1054" | "PSC1055" | "PSC1056" => {
                     let candidate_id = diagnostic
                         .context_declaration_candidate_id
                         .as_ref()
@@ -814,7 +814,7 @@ mod tests {
                             && diagnostic.consumer_id.is_none()
                     );
                 }
-                "EZC1057" | "EZC1058" => {
+                "PSC1057" | "PSC1058" => {
                     assert!(diagnostic.context_declaration_candidate_id.is_none());
                     assert!(diagnostic.provider_id.is_none());
                     let consumer = diagnostic.consumer_id.as_ref().expect("Consumer identity");
@@ -824,7 +824,7 @@ mod tests {
                         .expect("G4 resolution");
                     assert_eq!(primary, &resolution.provenance);
                     assert_eq!(diagnostic.context_id, resolution.context);
-                    if diagnostic.code == "EZC1057" {
+                    if diagnostic.code == "PSC1057" {
                         if let Some(context) = diagnostic
                             .context_id
                             .as_ref()
@@ -839,7 +839,7 @@ mod tests {
                         let crate::ContextResolutionResult::Ambiguous { providers, .. } =
                             &resolution.result
                         else {
-                            panic!("EZC1058 requires G4 ambiguity");
+                            panic!("PSC1058 requires G4 ambiguity");
                         };
                         expected_labels.extend(providers.iter().filter_map(|id| {
                             model
@@ -853,13 +853,13 @@ mod tests {
                         expected_labels.dedup();
                     }
                 }
-                "EZC1059" | "EZC1060" => {
+                "PSC1059" | "PSC1060" => {
                     assert!(diagnostic.context_declaration_candidate_id.is_none());
                     assert!(diagnostic.consumer_id.is_none());
                     let provider_id = diagnostic.provider_id.as_ref().expect("Provider identity");
                     let provider = model.provider(provider_id).expect("Provider entity");
                     assert_eq!(diagnostic.context_id.as_ref(), Some(&provider.context));
-                    if diagnostic.code == "EZC1059" {
+                    if diagnostic.code == "PSC1059" {
                         assert_eq!(
                             primary,
                             super::expression_provenance(model, &provider.value_expression)
@@ -878,7 +878,7 @@ mod tests {
                         });
                     }
                 }
-                "EZC1061" => {
+                "PSC1061" => {
                     assert!(diagnostic.context_declaration_candidate_id.is_none());
                     assert!(diagnostic.provider_id.is_none() && diagnostic.consumer_id.is_none());
                     let context = model
@@ -897,7 +897,7 @@ mod tests {
                         message: "Context declared type.".to_string(),
                     });
                 }
-                "EZC1062" => {
+                "PSC1062" => {
                     let consumer = model
                         .consumer(diagnostic.consumer_id.as_ref().expect("Consumer identity"))
                         .unwrap();
@@ -909,7 +909,7 @@ mod tests {
                         message: "Context declared type.".to_string(),
                     });
                 }
-                "EZC1063" | "EZC1064" => {
+                "PSC1063" | "PSC1064" => {
                     let context = model
                         .context(diagnostic.context_id.as_ref().expect("Context identity"))
                         .unwrap();
@@ -936,7 +936,7 @@ mod tests {
                         message: "Context declared type.".to_string(),
                     });
                 }
-                "EZC1065" => {
+                "PSC1065" => {
                     let consumer = diagnostic.consumer_id.as_ref().expect("Consumer identity");
                     let record = model
                         .context_lifetime
@@ -960,7 +960,7 @@ mod tests {
                         });
                     }
                 }
-                "EZC1066" | "EZC1067" => {
+                "PSC1066" | "PSC1067" => {
                     let entry = model
                         .context_evaluation
                         .source_entries
@@ -974,7 +974,7 @@ mod tests {
                     match &entry.source {
                         crate::ContextValueSourceId::Provider(provider) => {
                             assert_eq!(diagnostic.provider_id.as_ref(), Some(provider));
-                            if diagnostic.code == "EZC1067" {
+                            if diagnostic.code == "PSC1067" {
                                 expected_labels.push(crate::DiagnosticSecondaryLabel {
                                     provenance: model
                                         .provider(provider)
@@ -987,7 +987,7 @@ mod tests {
                         }
                         crate::ContextValueSourceId::ContextDefault(_) => {
                             assert!(diagnostic.provider_id.is_none());
-                            if diagnostic.code == "EZC1067" {
+                            if diagnostic.code == "PSC1067" {
                                 expected_labels.push(crate::DiagnosticSecondaryLabel {
                                     provenance: model
                                         .context(&entry.context)
@@ -1031,7 +1031,7 @@ mod tests {
         );
         let diagnostic = diagnostics
             .iter()
-            .find(|item| item.code == "EZC1052")
+            .find(|item| item.code == "PSC1052")
             .unwrap();
         assert_eq!(diagnostic.severity, ComponentDiagnosticSeverity::Error);
         assert!(diagnostic.provenance.is_some());
@@ -1042,7 +1042,7 @@ mod tests {
                 && diagnostic.consumer_id.is_none()
         );
         assert!(diagnostic.secondary_labels.is_empty());
-        assert!(!diagnostics.iter().any(|item| item.code == "EZC1055"));
+        assert!(!diagnostics.iter().any(|item| item.code == "PSC1055"));
     }
 
     #[test]
@@ -1056,12 +1056,12 @@ mod tests {
         );
         let diagnostic = diagnostics
             .iter()
-            .find(|item| item.code == "EZC1055")
+            .find(|item| item.code == "PSC1055")
             .unwrap();
         assert_eq!(diagnostic.severity, ComponentDiagnosticSeverity::Error);
         assert!(diagnostic.context_declaration_candidate_id.is_some());
         assert!(diagnostic.provenance.is_some());
-        assert!(!diagnostics.iter().any(|item| item.code == "EZC1053"));
+        assert!(!diagnostics.iter().any(|item| item.code == "PSC1053"));
     }
 
     #[test]
@@ -1073,7 +1073,7 @@ mod tests {
         );
         let diagnostic = diagnostics
             .iter()
-            .find(|item| item.code == "EZC1053")
+            .find(|item| item.code == "PSC1053")
             .unwrap();
         assert_eq!(diagnostic.severity, ComponentDiagnosticSeverity::Error);
         assert!(diagnostic.context_declaration_candidate_id.is_some());
@@ -1082,7 +1082,7 @@ mod tests {
                 && diagnostic.provider_id.is_none()
                 && diagnostic.consumer_id.is_none()
         );
-        assert!(!diagnostics.iter().any(|item| item.code == "EZC1055"));
+        assert!(!diagnostics.iter().any(|item| item.code == "PSC1055"));
     }
 
     #[test]
@@ -1098,12 +1098,12 @@ mod tests {
         );
         let matches = diagnostics
             .iter()
-            .filter(|item| item.code == "EZC1056")
+            .filter(|item| item.code == "PSC1056")
             .collect::<Vec<_>>();
         assert_eq!(matches.len(), 1);
         assert!(matches[0].context_declaration_candidate_id.is_some());
         assert!(matches[0].provider_id.is_none());
-        assert!(!diagnostics.iter().any(|item| item.code == "EZC1058"));
+        assert!(!diagnostics.iter().any(|item| item.code == "PSC1058"));
     }
 
     #[test]
@@ -1117,12 +1117,12 @@ mod tests {
         );
         let diagnostic = diagnostics
             .iter()
-            .find(|item| item.code == "EZC1054")
+            .find(|item| item.code == "PSC1054")
             .unwrap();
         assert!(diagnostic.context_declaration_candidate_id.is_some());
         assert!(!diagnostics.iter().any(|item| matches!(
             item.code.as_str(),
-            "EZC1057" | "EZC1058" | "EZC1062" | "EZC1065" | "EZC1066" | "EZC1067"
+            "PSC1057" | "PSC1058" | "PSC1062" | "PSC1065" | "PSC1066" | "PSC1067"
         )));
     }
 
@@ -1136,7 +1136,7 @@ mod tests {
   render() { return <main />; }
 }"#,
         );
-        for code in ["EZC1059", "EZC1060"] {
+        for code in ["PSC1059", "PSC1060"] {
             let diagnostic = diagnostics.iter().find(|item| item.code == code).unwrap();
             assert_eq!(diagnostic.severity, ComponentDiagnosticSeverity::Error);
             assert!(diagnostic.provider_id.is_some() && diagnostic.context_id.is_some());
@@ -1144,7 +1144,7 @@ mod tests {
         }
         assert!(!diagnostics
             .iter()
-            .any(|item| matches!(item.code.as_str(), "EZC1066" | "EZC1067")));
+            .any(|item| matches!(item.code.as_str(), "PSC1066" | "PSC1067")));
     }
 
     #[test]
@@ -1156,10 +1156,10 @@ mod tests {
         );
         let diagnostic = diagnostics
             .iter()
-            .find(|item| item.code == "EZC1059")
+            .find(|item| item.code == "PSC1059")
             .unwrap();
         assert!(diagnostic.provider_id.is_some() && diagnostic.context_id.is_some());
-        assert!(!diagnostics.iter().any(|item| item.code == "EZC1060"));
+        assert!(!diagnostics.iter().any(|item| item.code == "PSC1060"));
     }
 
     #[test]
@@ -1171,10 +1171,10 @@ mod tests {
         );
         let diagnostic = diagnostics
             .iter()
-            .find(|item| item.code == "EZC1060")
+            .find(|item| item.code == "PSC1060")
             .unwrap();
         assert!(diagnostic.provider_id.is_some() && diagnostic.context_id.is_some());
-        assert!(!diagnostics.iter().any(|item| item.code == "EZC1059"));
+        assert!(!diagnostics.iter().any(|item| item.code == "PSC1059"));
     }
 
     #[test]
@@ -1188,13 +1188,13 @@ mod tests {
         );
         let diagnostic = diagnostics
             .iter()
-            .find(|item| item.code == "EZC1061")
+            .find(|item| item.code == "PSC1061")
             .unwrap();
         assert_eq!(diagnostic.severity, ComponentDiagnosticSeverity::Error);
         assert!(diagnostic.context_id.is_some() && diagnostic.provenance.is_some());
         assert!(!diagnostics.iter().any(|item| matches!(
             item.code.as_str(),
-            "EZC1063" | "EZC1064" | "EZC1066" | "EZC1067"
+            "PSC1063" | "PSC1064" | "PSC1066" | "PSC1067"
         )));
     }
 
@@ -1210,7 +1210,7 @@ mod tests {
         );
         let diagnostic = diagnostics
             .iter()
-            .find(|item| item.code == "EZC1062")
+            .find(|item| item.code == "PSC1062")
             .unwrap();
         assert_eq!(diagnostic.severity, ComponentDiagnosticSeverity::Error);
         assert!(diagnostic.context_id.is_some() && diagnostic.consumer_id.is_some());
@@ -1235,14 +1235,14 @@ mod tests {
         assert_catalog_shapes(&model, &diagnostics);
         let diagnostic = diagnostics
             .iter()
-            .find(|item| item.code == "EZC1057")
+            .find(|item| item.code == "PSC1057")
             .unwrap();
         assert_eq!(diagnostic.severity, ComponentDiagnosticSeverity::Error);
         assert_eq!(diagnostic.consumer_id, Some(consumer));
         assert!(diagnostic.context_id.is_some());
         assert!(!diagnostics.iter().any(|item| matches!(
             item.code.as_str(),
-            "EZC1062" | "EZC1065" | "EZC1066" | "EZC1067"
+            "PSC1062" | "PSC1065" | "PSC1066" | "PSC1067"
         )));
     }
 
@@ -1279,7 +1279,7 @@ mod tests {
         assert_catalog_shapes(&model, &diagnostics);
         let matches = diagnostics
             .iter()
-            .filter(|item| item.code == "EZC1058")
+            .filter(|item| item.code == "PSC1058")
             .collect::<Vec<_>>();
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].consumer_id, Some(consumer));
@@ -1287,26 +1287,26 @@ mod tests {
         assert_eq!(matches[0].secondary_labels.len(), 2);
         assert!(!diagnostics.iter().any(|item| matches!(
             item.code.as_str(),
-            "EZC1062" | "EZC1065" | "EZC1066" | "EZC1067"
+            "PSC1062" | "PSC1065" | "PSC1066" | "PSC1067"
         )));
         let mut validation_model = model.clone();
         validation_model.diagnostics.clone_from(&diagnostics);
         assert!(
             !crate::validate_application_semantic_model(&validation_model)
                 .iter()
-                .any(|item| item.code == "EZASM1134")
+                .any(|item| item.code == "PSASM1134")
         );
         validation_model
             .diagnostics
             .iter_mut()
-            .find(|item| item.code == "EZC1058")
+            .find(|item| item.code == "PSC1058")
             .unwrap()
             .secondary_labels
             .reverse();
         assert!(
             crate::validate_application_semantic_model(&validation_model)
                 .iter()
-                .any(|item| item.code == "EZASM1134")
+                .any(|item| item.code == "PSASM1134")
         );
     }
 
@@ -1324,14 +1324,14 @@ mod tests {
         assert_eq!(
             diagnostics
                 .iter()
-                .find(|item| item.code == "EZC1063")
+                .find(|item| item.code == "PSC1063")
                 .unwrap()
                 .context_id,
             Some(context)
         );
         assert!(!diagnostics
             .iter()
-            .any(|item| matches!(item.code.as_str(), "EZC1066" | "EZC1067")));
+            .any(|item| matches!(item.code.as_str(), "PSC1066" | "PSC1067")));
     }
 
     #[test]
@@ -1351,14 +1351,14 @@ mod tests {
         assert_eq!(
             diagnostics
                 .iter()
-                .find(|item| item.code == "EZC1064")
+                .find(|item| item.code == "PSC1064")
                 .unwrap()
                 .context_id,
             Some(context)
         );
         assert!(!diagnostics
             .iter()
-            .any(|item| matches!(item.code.as_str(), "EZC1066" | "EZC1067")));
+            .any(|item| matches!(item.code.as_str(), "PSC1066" | "PSC1067")));
     }
 
     fn planned_provider_model() -> crate::ApplicationSemanticModel {
@@ -1388,13 +1388,13 @@ mod tests {
         assert_catalog_shapes(&model, &diagnostics);
         let diagnostic = diagnostics
             .iter()
-            .find(|item| item.code == "EZC1065")
+            .find(|item| item.code == "PSC1065")
             .unwrap();
         assert_eq!(diagnostic.consumer_id, Some(consumer));
         assert!(diagnostic.context_id.is_some());
         assert!(!diagnostics
             .iter()
-            .any(|item| matches!(item.code.as_str(), "EZC1066" | "EZC1067")));
+            .any(|item| matches!(item.code.as_str(), "PSC1066" | "PSC1067")));
     }
 
     #[test]
@@ -1416,10 +1416,10 @@ mod tests {
         assert_catalog_shapes(&model, &diagnostics);
         let diagnostic = diagnostics
             .iter()
-            .find(|item| item.code == "EZC1066")
+            .find(|item| item.code == "PSC1066")
             .unwrap();
         assert!(diagnostic.context_id.is_some() && diagnostic.provider_id.is_some());
-        assert!(!diagnostics.iter().any(|item| item.code == "EZC1067"));
+        assert!(!diagnostics.iter().any(|item| item.code == "PSC1067"));
     }
 
     #[test]
@@ -1437,7 +1437,7 @@ mod tests {
         assert_catalog_shapes(&model, &diagnostics);
         let diagnostic = diagnostics
             .iter()
-            .find(|item| item.code == "EZC1067")
+            .find(|item| item.code == "PSC1067")
             .unwrap();
         assert!(diagnostic.context_id.is_some() && diagnostic.provider_id.is_some());
         let mut without_reason = model.clone();
@@ -1451,7 +1451,7 @@ mod tests {
             .clear();
         assert!(!super::collect_context_diagnostics(&without_reason)
             .iter()
-            .any(|item| item.code == "EZC1067"));
+            .any(|item| item.code == "PSC1067"));
     }
 
     #[test]
@@ -1464,7 +1464,7 @@ mod tests {
         ));
         assert!(!super::collect_context_diagnostics(&model)
             .iter()
-            .any(|item| ("EZC1052"..="EZC1067").contains(&item.code.as_str())));
+            .any(|item| ("PSC1052"..="PSC1067").contains(&item.code.as_str())));
     }
 
     #[test]
@@ -1478,7 +1478,7 @@ mod tests {
         let diagnostic = model
             .diagnostics
             .iter_mut()
-            .find(|item| item.code == "EZC1052")
+            .find(|item| item.code == "PSC1052")
             .unwrap();
         diagnostic.context_declaration_candidate_id = Some(
             crate::ContextDeclarationCandidateId::for_component_position(
@@ -1491,8 +1491,8 @@ mod tests {
             "fabricated",
         ));
         let validation = crate::validate_application_semantic_model(&model);
-        assert!(validation.iter().any(|item| item.code == "EZASM1135"));
-        assert!(validation.iter().any(|item| item.code == "EZASM1136"));
+        assert!(validation.iter().any(|item| item.code == "PSASM1135"));
+        assert!(validation.iter().any(|item| item.code == "PSASM1136"));
     }
 
     #[test]
@@ -1517,11 +1517,11 @@ mod tests {
         model
             .diagnostics
             .iter_mut()
-            .filter(|item| matches!(item.code.as_str(), "EZC1060" | "EZC1062"))
+            .filter(|item| matches!(item.code.as_str(), "PSC1060" | "PSC1062"))
             .for_each(|item| item.context_id = Some(wrong.clone()));
         let validation = crate::validate_application_semantic_model(&model);
-        assert!(validation.iter().any(|item| item.code == "EZASM1138"));
-        assert!(validation.iter().any(|item| item.code == "EZASM1139"));
+        assert!(validation.iter().any(|item| item.code == "PSASM1138"));
+        assert!(validation.iter().any(|item| item.code == "PSASM1139"));
     }
 
     #[test]
@@ -1535,7 +1535,7 @@ mod tests {
         let diagnostic = model
             .diagnostics
             .iter_mut()
-            .find(|item| item.code == "EZC1060")
+            .find(|item| item.code == "PSC1060")
             .unwrap();
         let primary = diagnostic.provenance.clone().unwrap();
         diagnostic.secondary_labels = vec![
@@ -1549,8 +1549,8 @@ mod tests {
             },
         ];
         let validation = crate::validate_application_semantic_model(&model);
-        assert!(validation.iter().any(|item| item.code == "EZASM1133"));
-        assert!(validation.iter().any(|item| item.code == "EZASM1137"));
+        assert!(validation.iter().any(|item| item.code == "PSASM1133"));
+        assert!(validation.iter().any(|item| item.code == "PSASM1137"));
     }
 
     #[test]
@@ -1564,11 +1564,11 @@ mod tests {
         let diagnostic = model
             .diagnostics
             .iter_mut()
-            .find(|item| item.code == "EZC1052")
+            .find(|item| item.code == "PSC1052")
             .unwrap();
         diagnostic.provenance.as_mut().unwrap().span.start += 1;
         let validation = crate::validate_application_semantic_model(&model);
-        assert!(validation.iter().any(|item| item.code == "EZASM1140"));
+        assert!(validation.iter().any(|item| item.code == "PSASM1140"));
     }
 
     #[test]
@@ -1582,10 +1582,10 @@ mod tests {
         let diagnostic = model
             .diagnostics
             .iter_mut()
-            .find(|item| item.code == "EZC1060")
+            .find(|item| item.code == "PSC1060")
             .unwrap();
         diagnostic.secondary_labels[0].provenance.span.start += 1;
         let validation = crate::validate_application_semantic_model(&model);
-        assert!(validation.iter().any(|item| item.code == "EZASM1134"));
+        assert!(validation.iter().any(|item| item.code == "PSASM1134"));
     }
 }

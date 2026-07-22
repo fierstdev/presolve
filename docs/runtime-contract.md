@@ -1,6 +1,6 @@
 # Runtime Contract
 
-EdgeZero compiler output and the browser runtime communicate through the template manifest embedded in `#ez-template-manifest` and emitted as `template.manifest.json`.
+Presolve compiler output and the browser runtime communicate through the template manifest embedded in `#presolve-template-manifest` and emitted as `template.manifest.json`.
 
 ## J1-A State instance storage
 
@@ -51,8 +51,8 @@ snapshot record, retained-slot classification, or lazy activation behavior.
   artifact v3.
 - Template manifest v3/component artifact v2 remains accepted only as the
   legacy cold-boot pair without a Phase J resume product or snapshot.
-- The current browser runtime version is `0.0.0` and is exposed as `window.__EDGEZERO__.runtime_version`.
-- Runtime state also exposes `window.__EDGEZERO__.supported_schema_version`.
+- The current browser runtime version is `0.0.0` and is exposed as `window.__PRESOLVE__.runtime_version`.
+- Runtime state also exposes `window.__PRESOLVE__.supported_schema_version`.
 
 The runtime rejects missing, future, mixed, or otherwise unsupported manifest
 and component-artifact versions. It consumes only compiler-generated
@@ -69,7 +69,7 @@ diagnostic rules are frozen in the
 ## Phase K production runtime
 
 Production HTML embeds `production.runtime.json` as
-`#ez-production-runtime` before `runtime.js`. The browser validates the exact
+`#presolve-production-runtime` before `runtime.js`. The browser validates the exact
 build/protocol pair, every packed table and checksum, identity/ordinal
 bijections, references, fingerprints, chunks, eager closure, resume agreement,
 and lifecycle closure before installing production state or executing authored
@@ -86,7 +86,7 @@ are frozen in the
 
 ## Diagnostics
 
-Runtime diagnostics are exposed as `window.__EDGEZERO__.diagnostics`. Each diagnostic has:
+Runtime diagnostics are exposed as `window.__PRESOLVE__.diagnostics`. Each diagnostic has:
 
 - `code`: stable machine-readable code.
 - `message`: developer-facing summary.
@@ -95,13 +95,13 @@ Runtime diagnostics are exposed as `window.__EDGEZERO__.diagnostics`. Each diagn
 
 Stable runtime diagnostic codes in schema `1`:
 
-- `EZR_MISSING_MANIFEST`
-- `EZR_INVALID_MANIFEST_JSON`
-- `EZR_UNSUPPORTED_SCHEMA`
-- `EZR_MISSING_ELEMENT_ANCHOR`
-- `EZR_MISSING_BINDING_ANCHOR`
-- `EZR_UNRESOLVED_EVENT`
-- `EZR_UNRESOLVED_ACTION`
-- `EZR_INVALID_STATE_OPERATION`
+- `PSR_MISSING_MANIFEST`
+- `PSR_INVALID_MANIFEST_JSON`
+- `PSR_UNSUPPORTED_SCHEMA`
+- `PSR_MISSING_ELEMENT_ANCHOR`
+- `PSR_MISSING_BINDING_ANCHOR`
+- `PSR_UNRESOLVED_EVENT`
+- `PSR_UNRESOLVED_ACTION`
+- `PSR_INVALID_STATE_OPERATION`
 
-Fatal boot failures set `data-ez-runtime="error"` on the document element and still expose `window.__EDGEZERO__.diagnostics`.
+Fatal boot failures set `data-presolve-runtime="error"` on the document element and still expose `window.__PRESOLVE__.diagnostics`.

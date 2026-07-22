@@ -193,7 +193,7 @@ fn generate_page(
         output.push('\n');
     }
 
-    output.push_str("    <script type=\"application/json\" id=\"ez-template-manifest\">\n");
+    output.push_str("    <script type=\"application/json\" id=\"presolve-template-manifest\">\n");
 
     for line in manifest_json.lines() {
         output.push_str("      ");
@@ -203,7 +203,8 @@ fn generate_page(
 
     output.push_str("    </script>\n");
     if let Some(computed) = computed {
-        output.push_str("    <script type=\"application/json\" id=\"ez-computed-runtime\">\n");
+        output
+            .push_str("    <script type=\"application/json\" id=\"presolve-computed-runtime\">\n");
         for line in runtime_computed_artifact_json(computed).lines() {
             output.push_str("      ");
             output.push_str(&escape_script_json_line(line));
@@ -212,7 +213,7 @@ fn generate_page(
         output.push_str("    </script>\n");
     }
     if let Some(context) = context {
-        output.push_str("    <script type=\"application/json\" id=\"ez-context-runtime\">\n");
+        output.push_str("    <script type=\"application/json\" id=\"presolve-context-runtime\">\n");
         for line in runtime_context_artifact_json(context).lines() {
             output.push_str("      ");
             output.push_str(&escape_script_json_line(line));
@@ -221,7 +222,7 @@ fn generate_page(
         output.push_str("    </script>\n");
     }
     if let Some(effects) = effects {
-        output.push_str("    <script type=\"application/json\" id=\"ez-effect-runtime\">\n");
+        output.push_str("    <script type=\"application/json\" id=\"presolve-effect-runtime\">\n");
         for line in runtime_effect_artifact_json(effects).lines() {
             output.push_str("      ");
             output.push_str(&escape_script_json_line(line));
@@ -230,7 +231,8 @@ fn generate_page(
         output.push_str("    </script>\n");
     }
     if let Some(components) = components {
-        output.push_str("    <script type=\"application/json\" id=\"ez-component-runtime\">\n");
+        output
+            .push_str("    <script type=\"application/json\" id=\"presolve-component-runtime\">\n");
         for line in runtime_component_artifact_json(components).lines() {
             output.push_str("      ");
             output.push_str(&escape_script_json_line(line));
@@ -239,7 +241,7 @@ fn generate_page(
         output.push_str("    </script>\n");
     }
     if let Some(forms) = forms {
-        output.push_str("    <script type=\"application/json\" id=\"ez-forms-runtime\">\n");
+        output.push_str("    <script type=\"application/json\" id=\"presolve-forms-runtime\">\n");
         for line in runtime_forms_artifact_json(forms).lines() {
             output.push_str("      ");
             output.push_str(&escape_script_json_line(line));
@@ -248,7 +250,7 @@ fn generate_page(
         output.push_str("    </script>\n");
     }
     if let Some(resume) = resume {
-        output.push_str("    <script type=\"application/json\" id=\"ez-resume-runtime\">");
+        output.push_str("    <script type=\"application/json\" id=\"presolve-resume-runtime\">");
         output.push_str(&crate::resume_manifest_json(resume));
         output.push_str("    </script>\n");
     }

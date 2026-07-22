@@ -3602,7 +3602,7 @@ class TypedState extends Component {
 @component("x-type-queries")
 class TypeQueries extends Component {
   count: number = state(0);
-  label = state("EdgeZero");
+  label = state("Presolve");
 }
 "#,
         );
@@ -3663,7 +3663,7 @@ class Parameters extends Component {
             r#"
 @component("x-returns")
 class Returns extends Component {
-  declared(): string { return "EdgeZero"; }
+  declared(): string { return "Presolve"; }
   inferred() { return 1; }
 }
 "#,
@@ -3963,7 +3963,7 @@ class ComputedDependencyCycles extends Component {
         let diagnostics = asm
             .diagnostics
             .iter()
-            .filter(|diagnostic| diagnostic.code == "EZC1035")
+            .filter(|diagnostic| diagnostic.code == "PSC1035")
             .collect::<Vec<_>>();
         assert_eq!(diagnostics.len(), 2);
         assert_eq!(
@@ -4075,7 +4075,7 @@ class CyclicComputedEvaluationPlan extends Component {
 @component("x-computed-types")
 class ComputedTypes extends Component {
   count: number = state(1);
-  profile = state({ label: "EdgeZero" });
+  profile = state({ label: "Presolve" });
 
   @computed()
   get doubled(): number { return this.count * 2; }
@@ -4192,7 +4192,7 @@ class ComputedDiagnostics extends Component {
         assert_eq!(
             codes,
             std::collections::BTreeSet::from([
-                "EZC1034", "EZC1035", "EZC1036", "EZC1037", "EZC1038", "EZC1039", "EZC1040",
+                "PSC1034", "PSC1035", "PSC1036", "PSC1037", "PSC1038", "PSC1039", "PSC1040",
             ])
         );
         assert_eq!(
@@ -4407,7 +4407,7 @@ class ComputedPurity extends Component {
         let diagnostics = asm
             .diagnostics
             .iter()
-            .filter(|diagnostic| diagnostic.code == "EZC1034")
+            .filter(|diagnostic| diagnostic.code == "PSC1034")
             .collect::<Vec<_>>();
         assert_eq!(diagnostics.len(), 7);
         assert!(diagnostics
@@ -4496,7 +4496,7 @@ class LiteralTypes extends Component {
 class CollectionTypes extends Component {
   names: string[] = state([]);
   todos: Todo[] = state([]);
-  pair: [string, number] = state(["EdgeZero", 1]);
+  pair: [string, number] = state(["Presolve", 1]);
 }
 "#,
         );
@@ -4542,7 +4542,7 @@ class CollectionTypes extends Component {
             r#"
 @component("x-object-types")
 class ObjectTypes extends Component {
-  todo: { id: string; title: string; completed: boolean } = state({ id: "1", title: "EdgeZero", completed: false });
+  todo: { id: string; title: string; completed: boolean } = state({ id: "1", title: "Presolve", completed: false });
 }
 "#,
         );
@@ -4704,7 +4704,7 @@ class App extends Component {
 class InferredState extends Component {
   count = state(0);
   todos = state([]);
-  tags = state(["EdgeZero"]);
+  tags = state(["Presolve"]);
   todo = state({ id: "1", completed: false });
 }
 "#,
@@ -5228,7 +5228,7 @@ class Counter extends Component {
 @component("x-local-resolution")
 class LocalResolution extends Component {
   render() {
-    const title = "EdgeZero";
+    const title = "Presolve";
     return <output title={title}>{title}</output>;
   }
 }
@@ -5286,7 +5286,7 @@ class LocalResolution extends Component {
         let template_graph = build_template_graph(&build_component_graph_for_module(&parsed));
         assert_eq!(
             crate::generate_static_html(&template_graph),
-            "<output data-ez-node=\"n0\" title=\"EdgeZero\" data-ez-bindings=\"title\"><!-- ez-binding:n2:title -->EdgeZero</output>\n"
+            "<output data-presolve-node=\"n0\" title=\"Presolve\" data-presolve-bindings=\"title\"><!-- presolve-binding:n2:title -->Presolve</output>\n"
         );
     }
 

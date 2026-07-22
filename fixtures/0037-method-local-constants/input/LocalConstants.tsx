@@ -1,7 +1,7 @@
 @component("x-local-constants")
 class LocalConstants extends Component {
   render() {
-    const title = "EdgeZero";
+    const title = "Presolve";
     const enabled = true;
     return <output>{this.count}</output>;
   }

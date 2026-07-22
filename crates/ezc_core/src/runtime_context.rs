@@ -243,20 +243,20 @@ pub fn validate_runtime_context_registry(
     let mut diagnostics = Vec::new();
     if registry.schema_contract_version != RUNTIME_CONTEXT_REGISTRY_SCHEMA_CONTRACT_VERSION {
         diagnostics.push(RuntimeContextRegistryValidationDiagnostic {
-            code: "EZCTX1200",
+            code: "PSCTX1200",
             message: "Context runtime registry has an unsupported schema contract version"
                 .to_string(),
         });
     }
     if registry.sources != expected.sources {
         diagnostics.push(RuntimeContextRegistryValidationDiagnostic {
-            code: "EZCTX1201",
+            code: "PSCTX1201",
             message: "Context runtime registry sources do not exactly join planned G9 and optimized G11 identities".to_string(),
         });
     }
     if registry.consumers != expected.consumers {
         diagnostics.push(RuntimeContextRegistryValidationDiagnostic {
-            code: "EZCTX1202",
+            code: "PSCTX1202",
             message:
                 "Context runtime registry Consumers do not retain exact available G10 bindings"
                     .to_string(),
@@ -264,7 +264,7 @@ pub fn validate_runtime_context_registry(
     }
     if registry.initial_batches != expected.initial_batches {
         diagnostics.push(RuntimeContextRegistryValidationDiagnostic {
-            code: "EZCTX1203",
+            code: "PSCTX1203",
             message: "Context runtime registry batches do not retain G9 scheduler order"
                 .to_string(),
         });

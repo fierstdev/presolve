@@ -4,8 +4,8 @@ TemplateGraph:
     template ConditionalStatus
       root: <button> id=n0 @ fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx:12:7 span=219..333
       attributes:
-        data-ez-on-click = event-handler(click -> this.toggle) @ fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx:12:15 span=227..256
-        data-ez-bindings = bindings(this.enabled) @ generated
+        data-presolve-on-click = event-handler(click -> this.toggle) @ fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx:12:15 span=227..256
+        data-presolve-bindings = bindings(this.enabled) @ generated
       children:
         Conditional id=n1 start=n2 end=n3 condition="this.enabled" initial=Some(true) @ fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx:13:10 span=267..316
           true:

@@ -4481,7 +4481,7 @@ class ComputedIr extends Component {
             r#"
 @component("x-effect-ir")
 class EffectIr extends Component {
-  title = state("EdgeZero");
+  title = state("Presolve");
   theme = state("light");
   count = state(1);
 
@@ -4617,7 +4617,7 @@ class EffectIr extends Component {
             r#"
 @component("x-optimized-effect-ir")
 class OptimizedEffectIr extends Component {
-  title = state("EdgeZero");
+  title = state("Presolve");
 
   @computed()
   get unrelated() { return 4 + 5; }

@@ -32,7 +32,7 @@ No slice may proceed if an authoritative contract is missing.
 
 ## Purpose
 
-Transition the project from EdgeZero to Presolve.
+Transition the project from Presolve to Presolve.
 
 This slice changes identity only.
 
@@ -44,7 +44,7 @@ No compiler semantics change.
 
 Rename public identity:
 
-EdgeZero
+Presolve
 
 ↓
 
@@ -118,7 +118,7 @@ Example:
 
 Verify:
 
-No remaining public EdgeZero references
+No remaining public Presolve references
 
 Compiler builds
 

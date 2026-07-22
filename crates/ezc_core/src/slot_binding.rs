@@ -457,6 +457,6 @@ mod tests {
             .status = SlotBindingStatus::Bound;
         assert!(validate_application_semantic_model(&asm)
             .iter()
-            .any(|diagnostic| diagnostic.code == "EZASM1195"));
+            .any(|diagnostic| diagnostic.code == "PSASM1195"));
     }
 }

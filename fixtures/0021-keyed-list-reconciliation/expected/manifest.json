@@ -40,7 +40,7 @@
             "index_variable": "index",
             "key_expression": "label",
             "item_root": "n7",
-            "item_template_html": "<li data-ez-node=\"n7:__ez_list_key__\" data-ez-bindings=\"index,label\"><!-- ez-binding:n8:__ez_list_key__:index -->__ez_list_index__<!-- ez-list-binding-end:n8:__ez_list_key__ -->:<!-- ez-binding:n9:__ez_list_key__:label -->__ez_list_item__<!-- ez-list-binding-end:n9:__ez_list_key__ --></li>"
+            "item_template_html": "<li data-presolve-node=\"n7:__ez_list_key__\" data-presolve-bindings=\"index,label\"><!-- presolve-binding:n8:__ez_list_key__:index -->__ez_list_index__<!-- presolve-list-binding-end:n8:__ez_list_key__ -->:<!-- presolve-binding:n9:__ez_list_key__:label -->__ez_list_item__<!-- presolve-list-binding-end:n9:__ez_list_key__ --></li>"
           }
         ],
         "events": [

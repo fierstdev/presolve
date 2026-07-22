@@ -260,14 +260,14 @@ impl ResumeLivenessIntegrityCode {
     #[must_use]
     pub const fn code(self) -> &'static str {
         match self {
-            Self::DuplicateClassification => "EZASM1320",
-            Self::MissingStorageOwner => "EZASM1321",
-            Self::UnknownDependency => "EZASM1322",
-            Self::InvalidRetentionReason => "EZASM1323",
-            Self::RecomputeWithoutProof => "EZASM1324",
-            Self::RequiredUnsupportedValue => "EZASM1325",
-            Self::InvalidCandidatePromotion => "EZASM1326",
-            Self::ProvenanceOrderIndexDrift => "EZASM1327",
+            Self::DuplicateClassification => "PSASM1320",
+            Self::MissingStorageOwner => "PSASM1321",
+            Self::UnknownDependency => "PSASM1322",
+            Self::InvalidRetentionReason => "PSASM1323",
+            Self::RecomputeWithoutProof => "PSASM1324",
+            Self::RequiredUnsupportedValue => "PSASM1325",
+            Self::InvalidCandidatePromotion => "PSASM1326",
+            Self::ProvenanceOrderIndexDrift => "PSASM1327",
         }
     }
 }
@@ -1250,14 +1250,14 @@ mod tests {
             ]
             .map(ResumeLivenessIntegrityCode::code),
             [
-                "EZASM1320",
-                "EZASM1321",
-                "EZASM1322",
-                "EZASM1323",
-                "EZASM1324",
-                "EZASM1325",
-                "EZASM1326",
-                "EZASM1327",
+                "PSASM1320",
+                "PSASM1321",
+                "PSASM1322",
+                "PSASM1323",
+                "PSASM1324",
+                "PSASM1325",
+                "PSASM1326",
+                "PSASM1327",
             ]
         );
     }

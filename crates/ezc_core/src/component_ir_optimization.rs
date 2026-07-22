@@ -73,6 +73,6 @@ mod tests {
             .clear();
         assert!(crate::validate_application_semantic_model(&model)
             .iter()
-            .any(|diagnostic| diagnostic.code == "EZASM1200"));
+            .any(|diagnostic| diagnostic.code == "PSASM1200"));
     }
 }

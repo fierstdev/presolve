@@ -164,12 +164,12 @@ compiler-emitted pair.
 
 Component runtime artifact v3 and template manifest v4 are one closed pair.
 Their ordinary tables carry exact instance/target/binding/event records and
-Forms records reciprocally name the same target. DOM has only `data-ez-ti` for
-executable element targets and paired `ez-ti-binding` comments for text
+Forms records reciprocally name the same target. DOM has only `data-presolve-ti` for
+executable element targets and paired `presolve-ti-binding` comments for text
 bindings. Conditional/list payloads carry their precomputed target IDs.
-Neither resume anchors/events nor `data-ez-r`/`data-ez-e` are emitted here.
+Neither resume anchors/events nor `data-presolve-r`/`data-presolve-e` are emitted here.
 
-The runtime may walk event bubbling only to the first exact `data-ez-ti`
+The runtime may walk event bubbling only to the first exact `data-presolve-ti`
 marker, then dispatches through `(target ID, event type)` and the serialized
 `RuntimeExecutionContext`. It never selects an instance by component name,
 DOM ancestry, order, or runtime counter. Structural program records retain
@@ -248,22 +248,22 @@ The frozen component diagnostic range is:
 
 | Code | Meaning |
 | --- | --- |
-| `EZC1068` | Invalid Slot declaration |
-| `EZC1069` | Invalid component invocation |
-| `EZC1070` | Unresolved component symbol |
-| `EZC1071` | Component composition cycle |
-| `EZC1072` | Component inheritance is unsupported |
-| `EZC1073` | Inherited semantic declaration is unsupported |
-| `EZC1074` | Unknown Slot |
-| `EZC1075` | Duplicate Slot content |
-| `EZC1076` | Duplicate Slot outlet |
-| `EZC1077` | Missing Slot outlet |
-| `EZC1078` | Invalid Slot content ownership |
-| `EZC1079` | Slot type or boundary incompatibility |
-| `EZC1080` | Component instance planning failure |
-| `EZC1081` | Instance-aware Context binding unavailable |
-| `EZC1082` | Structural region cannot be planned |
-| `EZC1083` | Component or Slot source cannot be lowered |
+| `PSC1068` | Invalid Slot declaration |
+| `PSC1069` | Invalid component invocation |
+| `PSC1070` | Unresolved component symbol |
+| `PSC1071` | Component composition cycle |
+| `PSC1072` | Component inheritance is unsupported |
+| `PSC1073` | Inherited semantic declaration is unsupported |
+| `PSC1074` | Unknown Slot |
+| `PSC1075` | Duplicate Slot content |
+| `PSC1076` | Duplicate Slot outlet |
+| `PSC1077` | Missing Slot outlet |
+| `PSC1078` | Invalid Slot content ownership |
+| `PSC1079` | Slot type or boundary incompatibility |
+| `PSC1080` | Component instance planning failure |
+| `PSC1081` | Instance-aware Context binding unavailable |
+| `PSC1082` | Structural region cannot be planned |
+| `PSC1083` | Component or Slot source cannot be lowered |
 
 Check, full ASM, selected-entity ASM, and explain use the same canonical
 diagnostic vector. Diagnostics never reparse source, reconstruct relationships,
@@ -277,7 +277,7 @@ The frozen Phase H contract does not support:
 - component props, spread props, callbacks as component arguments, or dynamic
   component argument transport;
 - component inheritance, user-authored base classes, mixins, traits, or
-  inherited EdgeZero semantics;
+  inherited Presolve semantics;
 - fallback Slot content, required Slots, duplicate Slot outlets, or Slot
   forwarding;
 - runtime Slot matching or runtime component discovery;

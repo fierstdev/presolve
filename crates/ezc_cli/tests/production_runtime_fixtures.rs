@@ -42,7 +42,7 @@ fn build(root: &Path, input: &str, name: &str, production: bool) -> PathBuf {
 }
 
 fn without_production_artifact(html: &str) -> String {
-    let marker = "    <script type=\"application/json\" id=\"ez-production-runtime\">";
+    let marker = "    <script type=\"application/json\" id=\"presolve-production-runtime\">";
     let Some(start) = html.find(marker) else {
         return html.to_string();
     };
@@ -125,7 +125,7 @@ fn k19_development_and_production_builds_are_observably_equivalent_and_determini
         without_production_artifact(&production_html),
         development_html
     );
-    assert!(production_html.contains("id=\"ez-production-runtime\""));
+    assert!(production_html.contains("id=\"presolve-production-runtime\""));
     let mut development_report: serde_json::Value = serde_json::from_slice(
         &std::fs::read(development.join("optimization-report.json"))
             .expect("development optimization report"),

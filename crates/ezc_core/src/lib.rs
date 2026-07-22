@@ -1,4 +1,4 @@
-//! Core compiler data structures for the first `EdgeZero` learning slice.
+//! Core compiler data structures for the first `Presolve` learning slice.
 //!
 //! This crate deliberately does **not** parse TSX yet. It records a source summary,
 //! spans, obvious declarations, and diagnostics. That gives the project a stable
@@ -1062,8 +1062,8 @@ class Parameters extends Component {
             .iter()
             .map(|diagnostic| diagnostic.code.as_str())
             .collect::<Vec<_>>();
-        assert!(codes.contains(&"EZASM1002"));
-        assert!(codes.contains(&"EZASM1006"));
+        assert!(codes.contains(&"PSASM1002"));
+        assert!(codes.contains(&"PSASM1006"));
 
         let mut invalid_type = asm.clone();
         let state_id = component.state_fields[0].id.clone();
@@ -1076,7 +1076,7 @@ class Parameters extends Component {
         let diagnostics = validate_application_semantic_model(&invalid_type);
         assert!(diagnostics
             .iter()
-            .any(|diagnostic| diagnostic.code == "EZASM1102"));
+            .any(|diagnostic| diagnostic.code == "PSASM1102"));
 
         let dependencies = DependencyAnalysisPass.analyze(&asm);
         assert_eq!(dependencies.dependencies[&component.actions[0].id].len(), 1);
@@ -1180,7 +1180,7 @@ class ArithmeticState extends Component {
         let diagnostic = graph
             .diagnostics
             .iter()
-            .find(|diagnostic| diagnostic.code == "EZC1022")
+            .find(|diagnostic| diagnostic.code == "PSC1022")
             .expect("arithmetic diagnostic");
 
         assert!(diagnostic.message.contains("division or remainder by zero"));
@@ -1253,7 +1253,7 @@ class ComparisonState extends Component {
         let diagnostic = graph
             .diagnostics
             .iter()
-            .find(|diagnostic| diagnostic.code == "EZC1023")
+            .find(|diagnostic| diagnostic.code == "PSC1023")
             .expect("comparison diagnostic");
 
         assert!(diagnostic.message.contains("division or remainder by zero"));
@@ -1325,7 +1325,7 @@ class LogicalState extends Component {
         let diagnostic = graph
             .diagnostics
             .iter()
-            .find(|diagnostic| diagnostic.code == "EZC1024")
+            .find(|diagnostic| diagnostic.code == "PSC1024")
             .expect("logical diagnostic");
 
         assert!(diagnostic.message.contains("division or remainder by zero"));
@@ -1415,7 +1415,7 @@ class NullishState extends Component {
         let diagnostic = graph
             .diagnostics
             .iter()
-            .find(|diagnostic| diagnostic.code == "EZC1025")
+            .find(|diagnostic| diagnostic.code == "PSC1025")
             .expect("nullish diagnostic");
         assert!(diagnostic.message.contains("division or remainder by zero"));
     }
@@ -1475,7 +1475,7 @@ class NullishState extends Component {
             .collect::<Vec<_>>();
 
         assert_eq!(diagnostics.len(), 6);
-        assert!(diagnostics.iter().all(|(code, _)| *code == "EZC1016"));
+        assert!(diagnostics.iter().all(|(code, _)| *code == "PSC1016"));
 
         let provenance = folded.diagnostics[0]
             .provenance
@@ -1505,12 +1505,12 @@ class NullishState extends Component {
         let diagnostics = folded
             .diagnostics
             .iter()
-            .filter(|diagnostic| diagnostic.code == "EZC1017")
+            .filter(|diagnostic| diagnostic.code == "PSC1017")
             .map(|diagnostic| (diagnostic.code.as_str(), diagnostic.message.as_str()))
             .collect::<Vec<_>>();
 
         assert_eq!(diagnostics.len(), 6);
-        assert!(diagnostics.iter().all(|(code, _)| *code == "EZC1017"));
+        assert!(diagnostics.iter().all(|(code, _)| *code == "PSC1017"));
         assert!(diagnostics.iter().any(|(_, message)| {
             message.contains("state field `status`") && message.contains("assigns `number`")
         }));
@@ -1521,7 +1521,7 @@ class NullishState extends Component {
         let provenance = folded
             .diagnostics
             .iter()
-            .find(|diagnostic| diagnostic.code == "EZC1017")
+            .find(|diagnostic| diagnostic.code == "PSC1017")
             .expect("action mismatch diagnostic")
             .provenance
             .as_ref()
@@ -1556,7 +1556,7 @@ class NullishState extends Component {
             .collect::<Vec<_>>();
 
         assert_eq!(diagnostics.len(), 4);
-        assert!(diagnostics.iter().all(|(code, _)| *code == "EZC1018"));
+        assert!(diagnostics.iter().all(|(code, _)| *code == "PSC1018"));
 
         let provenance = folded.diagnostics[0]
             .provenance
@@ -1592,7 +1592,7 @@ class NullishState extends Component {
             .collect::<Vec<_>>();
 
         assert_eq!(diagnostics.len(), 4);
-        assert!(diagnostics.iter().all(|(code, _)| *code == "EZC1019"));
+        assert!(diagnostics.iter().all(|(code, _)| *code == "PSC1019"));
 
         let provenance = folded.diagnostics[0]
             .provenance
@@ -1631,14 +1631,14 @@ class NullishState extends Component {
         assert_eq!(
             diagnostics
                 .iter()
-                .filter(|(code, _)| *code == "EZC1020")
+                .filter(|(code, _)| *code == "PSC1020")
                 .count(),
             3
         );
         assert_eq!(
             diagnostics
                 .iter()
-                .filter(|(code, _)| *code == "EZC1021")
+                .filter(|(code, _)| *code == "PSC1021")
                 .count(),
             4
         );
@@ -1725,9 +1725,9 @@ class Alpha extends Component {
             .map(|diagnostic| diagnostic.code.as_str())
             .collect::<Vec<_>>();
 
-        assert!(codes.contains(&"EZC1001"));
-        assert!(codes.contains(&"EZC1003"));
-        assert!(codes.contains(&"EZC1004"));
+        assert!(codes.contains(&"PSC1001"));
+        assert!(codes.contains(&"PSC1003"));
+        assert!(codes.contains(&"PSC1004"));
         assert!(graph.references.is_empty());
     }
 
@@ -1755,7 +1755,7 @@ class Counter extends Component {
         assert!(graph
             .diagnostics
             .iter()
-            .any(|diagnostic| diagnostic.code == "EZC1005"));
+            .any(|diagnostic| diagnostic.code == "PSC1005"));
     }
 
     #[test]
@@ -1831,7 +1831,7 @@ class Counter extends Component {
         assert!(graph
             .diagnostics
             .iter()
-            .any(|diagnostic| diagnostic.code == "EZC1006"));
+            .any(|diagnostic| diagnostic.code == "PSC1006"));
     }
 
     fn test_span() -> ezc_parser::SourceSpan {
@@ -2111,7 +2111,7 @@ class Counter extends Component {
 
         assert_eq!(
             html,
-            "<button data-ez-node=\"n0\" data-ez-on-click=\"this.increment\" data-ez-bindings=\"this.count\">Count:<!-- ez-binding:n1:this.count -->0</button>\n"
+            "<button data-presolve-node=\"n0\" data-presolve-on-click=\"this.increment\" data-presolve-bindings=\"this.count\">Count:<!-- presolve-binding:n1:this.count -->0</button>\n"
         );
     }
 
@@ -2140,7 +2140,7 @@ class Counter extends Component {
 
         assert_eq!(
             html,
-            "<p data-ez-node=\"n0\" data-ez-bindings=\"this.name\">Name:<!-- ez-binding:n1:this.name -->Austin &amp; &lt;Zero&gt;</p>\n"
+            "<p data-presolve-node=\"n0\" data-presolve-bindings=\"this.name\">Name:<!-- presolve-binding:n1:this.name -->Austin &amp; &lt;Zero&gt;</p>\n"
         );
 
         let manifest = build_template_manifest(&component_graph, &template_graph);
@@ -2226,13 +2226,13 @@ class Counter extends Component {
             button.attributes[2].value,
             AttributeValue::Static("Use <carefully>".to_string())
         );
-        assert_eq!(button.attributes[3].name, "data-ez-bindings");
+        assert_eq!(button.attributes[3].name, "data-presolve-bindings");
 
         let html = generate_static_html(&template_graph);
 
         assert_eq!(
             html,
-            "<section data-ez-node=\"n0\" id=\"panel-root\" aria-label=\"Status &quot;Panel&quot;\" hidden><button data-ez-node=\"n1\" type=\"button\" data-mode=\"safe &amp; sound\" title=\"Use &lt;carefully&gt;\" data-ez-bindings=\"this.label\">Label:<!-- ez-binding:n2:this.label -->Ready</button></section>\n"
+            "<section data-presolve-node=\"n0\" id=\"panel-root\" aria-label=\"Status &quot;Panel&quot;\" hidden><button data-presolve-node=\"n1\" type=\"button\" data-mode=\"safe &amp; sound\" title=\"Use &lt;carefully&gt;\" data-presolve-bindings=\"this.label\">Label:<!-- presolve-binding:n2:this.label -->Ready</button></section>\n"
         );
     }
 
@@ -2257,9 +2257,9 @@ class BadAttrs extends Component {
             .map(|diagnostic| diagnostic.code.as_str())
             .collect::<Vec<_>>();
 
-        assert!(codes.contains(&"EZC1007"));
-        assert!(codes.contains(&"EZC1008"));
-        assert!(codes.contains(&"EZC1009"));
+        assert!(codes.contains(&"PSC1007"));
+        assert!(codes.contains(&"PSC1008"));
+        assert!(codes.contains(&"PSC1009"));
     }
 
     #[test]
@@ -2305,7 +2305,7 @@ class BadAttrs extends Component {
 
         assert_eq!(
             html,
-            "<button data-ez-node=\"n0\" title=\"Ready\" data-ez-on-click=\"this.lock\" data-ez-bindings=\"this.label\">Status:<!-- ez-binding:n3:this.label -->Ready</button>\n"
+            "<button data-presolve-node=\"n0\" title=\"Ready\" data-presolve-on-click=\"this.lock\" data-presolve-bindings=\"this.label\">Status:<!-- presolve-binding:n3:this.label -->Ready</button>\n"
         );
     }
 
@@ -2336,7 +2336,7 @@ class BadAttrs extends Component {
 
         assert_eq!(
             html,
-            "<section data-ez-node=\"n0\"><p data-ez-node=\"n1\" data-ez-bindings=\"this.enabled\">Enabled:<!-- ez-binding:n2:this.enabled -->true</p><p data-ez-node=\"n3\" data-ez-bindings=\"this.disabled\">Disabled:<!-- ez-binding:n4:this.disabled -->false</p></section>\n"
+            "<section data-presolve-node=\"n0\"><p data-presolve-node=\"n1\" data-presolve-bindings=\"this.enabled\">Enabled:<!-- presolve-binding:n2:this.enabled -->true</p><p data-presolve-node=\"n3\" data-presolve-bindings=\"this.disabled\">Disabled:<!-- presolve-binding:n4:this.disabled -->false</p></section>\n"
         );
 
         let manifest = build_template_manifest(&component_graph, &template_graph);
@@ -2412,7 +2412,7 @@ class BadAttrs extends Component {
 
         assert_eq!(
             html,
-            "<p data-ez-node=\"n0\" data-ez-bindings=\"this.selection\">Selection:<!-- ez-binding:n1:this.selection --></p>\n"
+            "<p data-presolve-node=\"n0\" data-presolve-bindings=\"this.selection\">Selection:<!-- presolve-binding:n1:this.selection --></p>\n"
         );
 
         let manifest = build_template_manifest(&component_graph, &template_graph);
@@ -2478,7 +2478,7 @@ class BadAttrs extends Component {
         assert_eq!(root.span.column, 7);
 
         assert_eq!(root.attributes.len(), 2);
-        assert_eq!(root.attributes[0].name, "data-ez-on-click");
+        assert_eq!(root.attributes[0].name, "data-presolve-on-click");
         assert_eq!(
             root.attributes[0].span.expect("expected event span").line,
             12
@@ -2495,7 +2495,7 @@ class BadAttrs extends Component {
             }
         );
 
-        assert_eq!(root.attributes[1].name, "data-ez-bindings");
+        assert_eq!(root.attributes[1].name, "data-presolve-bindings");
         assert_eq!(root.attributes[1].span, None);
         assert_eq!(
             root.attributes[1].value,
@@ -2627,7 +2627,7 @@ class Beta extends Component {
         assert_eq!(button.tag_name, "button");
         assert_eq!(button.span.line, 13);
         assert_eq!(button.span.column, 9);
-        assert_eq!(button.attributes[0].name, "data-ez-on-click");
+        assert_eq!(button.attributes[0].name, "data-presolve-on-click");
         assert_eq!(
             button.attributes[0].span.expect("expected event span").line,
             13
@@ -2639,7 +2639,7 @@ class Beta extends Component {
                 .column,
             17
         );
-        assert_eq!(button.attributes[1].name, "data-ez-bindings");
+        assert_eq!(button.attributes[1].name, "data-presolve-bindings");
         assert_eq!(button.attributes[1].span, None);
 
         let TemplateChild::Text { value, span } = &button.children[0] else {
@@ -2701,7 +2701,7 @@ class Beta extends Component {
         let html = generate_static_html(&template_graph);
         assert_eq!(
             html,
-            "<h1 data-ez-node=\"n1\">Title</h1><p data-ez-node=\"n3\" data-ez-bindings=\"this.label\">Status:<!-- ez-binding:n4:this.label -->Ready</p><span data-ez-node=\"n5\">Done</span>\n"
+            "<h1 data-presolve-node=\"n1\">Title</h1><p data-presolve-node=\"n3\" data-presolve-bindings=\"this.label\">Status:<!-- presolve-binding:n4:this.label -->Ready</p><span data-presolve-node=\"n5\">Done</span>\n"
         );
 
         let manifest = build_template_manifest(&component_graph, &template_graph);
@@ -2753,7 +2753,7 @@ class Beta extends Component {
             .expect("expected root element");
 
         assert_eq!(root.id.0, "n0");
-        assert_eq!(root.attributes[1].name, "data-ez-bindings");
+        assert_eq!(root.attributes[1].name, "data-presolve-bindings");
 
         let TemplateChild::Conditional(conditional) = &root.children[0] else {
             panic!("expected conditional child");
@@ -2783,7 +2783,7 @@ class Beta extends Component {
         let html = generate_static_html(&template_graph);
         assert_eq!(
             html,
-            "<button data-ez-node=\"n0\" data-ez-on-click=\"this.toggle\" data-ez-bindings=\"this.enabled\"><!-- ez-conditional-start:n2:this.enabled --><span data-ez-node=\"n4\">On</span><!-- ez-conditional-end:n3 --></button>\n"
+            "<button data-presolve-node=\"n0\" data-presolve-on-click=\"this.toggle\" data-presolve-bindings=\"this.enabled\"><!-- presolve-conditional-start:n2:this.enabled --><span data-presolve-node=\"n4\">On</span><!-- presolve-conditional-end:n3 --></button>\n"
         );
 
         let manifest = build_template_manifest(&component_graph, &template_graph);
@@ -2800,8 +2800,8 @@ class Beta extends Component {
                     end: "n3".to_string(),
                     condition: "this.enabled".to_string(),
                     initial_value: Some(SerializableValue::Boolean(true)),
-                    when_true_html: "<span data-ez-node=\"n4\">On</span>".to_string(),
-                    when_false_html: "<span data-ez-node=\"n5\">Off</span>".to_string(),
+                    when_true_html: "<span data-presolve-node=\"n4\">On</span>".to_string(),
+                    when_false_html: "<span data-presolve-node=\"n5\">Off</span>".to_string(),
                 },
             ]
         );
@@ -2843,7 +2843,7 @@ class Beta extends Component {
                 end: "n3".to_string(),
                 condition: "this.enabled".to_string(),
                 initial_value: Some(SerializableValue::Boolean(true)),
-                when_true_html: "<span data-ez-node=\"n4\">On</span>".to_string(),
+                when_true_html: "<span data-presolve-node=\"n4\">On</span>".to_string(),
                 when_false_html: String::new(),
             }
         );
@@ -2869,7 +2869,7 @@ class Beta extends Component {
             .expect("expected root element");
 
         assert_eq!(root.id.0, "n0");
-        assert_eq!(root.attributes[0].name, "data-ez-bindings");
+        assert_eq!(root.attributes[0].name, "data-presolve-bindings");
 
         let TemplateChild::List(list) = &root.children[0] else {
             panic!("expected keyed list child");
@@ -2895,7 +2895,7 @@ class Beta extends Component {
 
         assert_eq!(
             generate_static_html(&template_graph),
-            "<ul data-ez-node=\"n0\" data-ez-bindings=\"this.items\"><!-- ez-list-start:n2:this.items --><!-- ez-list-end:n3 --></ul>\n"
+            "<ul data-presolve-node=\"n0\" data-presolve-bindings=\"this.items\"><!-- presolve-list-start:n2:this.items --><!-- presolve-list-end:n3 --></ul>\n"
         );
 
         let manifest = build_template_manifest(&component_graph, &template_graph);
@@ -2916,7 +2916,7 @@ class Beta extends Component {
                     index_variable: Some("index".to_string()),
                     key_expression: "item.id".to_string(),
                     item_root: "n4".to_string(),
-                    item_template_html: "<li data-ez-node=\"n4:__ez_list_key__\" data-ez-bindings=\"index,item.label\"><!-- ez-binding:n5:__ez_list_key__:index -->__ez_list_index__<!-- ez-list-binding-end:n5:__ez_list_key__ -->:<!-- ez-binding:n6:__ez_list_key__:item.label --><!-- ez-list-binding-end:n6:__ez_list_key__ --></li>".to_string(),
+                    item_template_html: "<li data-presolve-node=\"n4:__ez_list_key__\" data-presolve-bindings=\"index,item.label\"><!-- presolve-binding:n5:__ez_list_key__:index -->__ez_list_index__<!-- presolve-list-binding-end:n5:__ez_list_key__ -->:<!-- presolve-binding:n6:__ez_list_key__:item.label --><!-- presolve-list-binding-end:n6:__ez_list_key__ --></li>".to_string(),
                 },
             ]
         );
@@ -3002,7 +3002,7 @@ class Beta extends Component {
         let template_graph = build_template_graph(&component_graph);
         assert_eq!(
             generate_static_html(&template_graph),
-            "<ol data-ez-node=\"n0\" data-ez-bindings=\"this.items\"><!-- ez-list-start:n2:this.items --><li data-ez-node=\"n4:north\" data-ez-bindings=\"index,item.label,item.details.region\"><!-- ez-binding:n5:north:index -->0<!-- ez-list-binding-end:n5:north -->:<!-- ez-binding:n6:north:item.label -->North<!-- ez-list-binding-end:n6:north -->(<!-- ez-binding:n7:north:item.details.region -->west<!-- ez-list-binding-end:n7:north -->)</li><li data-ez-node=\"n4:south\" data-ez-bindings=\"index,item.label,item.details.region\"><!-- ez-binding:n5:south:index -->1<!-- ez-list-binding-end:n5:south -->:<!-- ez-binding:n6:south:item.label -->South<!-- ez-list-binding-end:n6:south -->(<!-- ez-binding:n7:south:item.details.region -->east<!-- ez-list-binding-end:n7:south -->)</li><!-- ez-list-end:n3 --></ol>\n"
+            "<ol data-presolve-node=\"n0\" data-presolve-bindings=\"this.items\"><!-- presolve-list-start:n2:this.items --><li data-presolve-node=\"n4:north\" data-presolve-bindings=\"index,item.label,item.details.region\"><!-- presolve-binding:n5:north:index -->0<!-- presolve-list-binding-end:n5:north -->:<!-- presolve-binding:n6:north:item.label -->North<!-- presolve-list-binding-end:n6:north -->(<!-- presolve-binding:n7:north:item.details.region -->west<!-- presolve-list-binding-end:n7:north -->)</li><li data-presolve-node=\"n4:south\" data-presolve-bindings=\"index,item.label,item.details.region\"><!-- presolve-binding:n5:south:index -->1<!-- presolve-list-binding-end:n5:south -->:<!-- presolve-binding:n6:south:item.label -->South<!-- presolve-list-binding-end:n6:south -->(<!-- presolve-binding:n7:south:item.details.region -->east<!-- presolve-list-binding-end:n7:south -->)</li><!-- presolve-list-end:n3 --></ol>\n"
         );
     }
 
@@ -3037,7 +3037,7 @@ class Beta extends Component {
 
         assert_eq!(
             generate_static_html(&template_graph),
-            "<ol data-ez-node=\"n0\" data-ez-bindings=\"this.labels\"><!-- ez-list-start:n2:this.labels --><li data-ez-node=\"n4:North\" data-ez-bindings=\"index,label\"><!-- ez-binding:n5:North:index -->0<!-- ez-list-binding-end:n5:North -->:<!-- ez-binding:n6:North:label -->North<!-- ez-list-binding-end:n6:North --></li><li data-ez-node=\"n4:South\" data-ez-bindings=\"index,label\"><!-- ez-binding:n5:South:index -->1<!-- ez-list-binding-end:n5:South -->:<!-- ez-binding:n6:South:label -->South<!-- ez-list-binding-end:n6:South --></li><!-- ez-list-end:n3 --></ol>\n"
+            "<ol data-presolve-node=\"n0\" data-presolve-bindings=\"this.labels\"><!-- presolve-list-start:n2:this.labels --><li data-presolve-node=\"n4:North\" data-presolve-bindings=\"index,label\"><!-- presolve-binding:n5:North:index -->0<!-- presolve-list-binding-end:n5:North -->:<!-- presolve-binding:n6:North:label -->North<!-- presolve-list-binding-end:n6:North --></li><li data-presolve-node=\"n4:South\" data-presolve-bindings=\"index,label\"><!-- presolve-binding:n5:South:index -->1<!-- presolve-list-binding-end:n5:South -->:<!-- presolve-binding:n6:South:label -->South<!-- presolve-list-binding-end:n6:South --></li><!-- presolve-list-end:n3 --></ol>\n"
         );
 
         let manifest = build_template_manifest(&component_graph, &template_graph);
@@ -3061,7 +3061,7 @@ class Beta extends Component {
                     index_variable: Some("index".to_string()),
                     key_expression: "label".to_string(),
                     item_root: "n4".to_string(),
-                    item_template_html: "<li data-ez-node=\"n4:__ez_list_key__\" data-ez-bindings=\"index,label\"><!-- ez-binding:n5:__ez_list_key__:index -->__ez_list_index__<!-- ez-list-binding-end:n5:__ez_list_key__ -->:<!-- ez-binding:n6:__ez_list_key__:label -->__ez_list_item__<!-- ez-list-binding-end:n6:__ez_list_key__ --></li>".to_string(),
+                    item_template_html: "<li data-presolve-node=\"n4:__ez_list_key__\" data-presolve-bindings=\"index,label\"><!-- presolve-binding:n5:__ez_list_key__:index -->__ez_list_index__<!-- presolve-list-binding-end:n5:__ez_list_key__ -->:<!-- presolve-binding:n6:__ez_list_key__:label -->__ez_list_item__<!-- presolve-list-binding-end:n6:__ez_list_key__ --></li>".to_string(),
                 },
             ]
         );
@@ -3461,8 +3461,8 @@ class Beta extends Component {
 
         assert!(page.starts_with("<!doctype html>\n"));
         assert!(page.contains("<title>NestedCounter</title>"));
-        assert!(page.contains("<section data-ez-node=\"n0\">"));
-        assert!(page.contains("id=\"ez-template-manifest\""));
+        assert!(page.contains("<section data-presolve-node=\"n0\">"));
+        assert!(page.contains("id=\"presolve-template-manifest\""));
         assert!(page.contains("\"name\": \"NestedCounter\""));
         assert!(page.contains("<script src=\"./runtime.js\" defer></script>"));
     }

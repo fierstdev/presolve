@@ -443,7 +443,7 @@ impl ResumeAnchorId {
     #[must_use]
     pub fn for_target(boundary: &ResumeBoundaryId, kind: &str, target: &str) -> Self {
         Self(format!(
-            "ez-r:{:016x}",
+            "presolve-r:{:016x}",
             canonical_hash(&format!("{boundary}\n{kind}\n{target}"))
         ))
     }
