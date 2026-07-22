@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L12-D-2 - Stateless LSP Dispatcher
+* Latest completed slice: L12-D-3 - LSP Fixture Matrix
 * Working tree: L12-C now has a thin WASM-only `@presolve/language-service` wrapper. LSP and extension implementation have not begun.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L12-D-3 - LSP Fixture Matrix
+* Result: freezes exact JSON-RPC response hashes for all supported mappings, unsupported hover, invalid framing, and an underlying unknown-identity error. The fixture proof exercises the generated WASM through language-service and LSP without any alternative decoder or compiler path.
+* Next: L12-E may now author the `@presolve/vscode` extension boundary contract before implementation.
 
 * Slice: L12-D-2 - Stateless LSP Dispatcher
 * Result: adds `@presolve/lsp` as an in-process JSON-RPC dispatcher over the language service. It supports exactly the contracted definition, references, flat symbols, diagnostics, and position mappings, preserves language-service errors, and returns a stable unsupported result for every unadvertised method.
