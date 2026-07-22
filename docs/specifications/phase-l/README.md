@@ -73,3 +73,5 @@ L12-E is governed by the [VSCode extension contract](PHASE_L_L12_VSCODE_CONTRACT
 L12-E-2 activates the pinned-fixture `@presolve/vscode` facade. It imports only `@presolve/lsp`, forwards caller-owned product/request values, and has no editor/document capability of its own.
 
 The [L13--L21 continuation contracts](PHASE_L_L13_L21_CONTINUATION_CONTRACT.md) are the authoritative remaining Phase L slice sequence. They govern public testing, examples, documentation, community readiness, reproducible distribution, launch content, rehearsal, freeze, and post-freeze stewardship without expanding compiler authority.
+
+L15-A is governed by the [public testing contract](../../testing-contract.md). It maps existing fixtures and commands before any test utility or example is added.
