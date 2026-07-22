@@ -20,6 +20,7 @@ reference does not establish.
 | Reference | resumability and production runtime | [resumability](resumability-contract.md), [production optimization](production-optimization-contract.md) |
 | Reference | testing lanes and alpha examples | [testing](testing-contract.md), [reproducibility lanes](reproducibility-lanes.md), [examples](examples-contract.md) |
 | Reference | versioned, content-only launch site source | [launch content](launch-content-contract.md), [site source](../site/README.md) |
+| Reference | verified alpha availability, exclusions, and rollback policy | [alpha support matrix](alpha-support-matrix.md) |
 
 ## Guides
 

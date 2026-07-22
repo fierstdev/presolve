@@ -76,6 +76,8 @@ The [L13--L21 continuation contracts](PHASE_L_L13_L21_CONTINUATION_CONTRACT.md) 
 
 L18 is governed by the versioned repository-local [launch content contract](../../launch-content-contract.md). It owns content and link verification only; deployment remains external.
 
+L19-A is governed by the frozen [alpha support matrix](../../alpha-support-matrix.md). It maps only already-verified alpha surfaces, support boundaries, and rollback policy.
+
 The owner-directed [Presolve identity migration contract](../../presolve-identity-migration-contract.md)
 supersedes conflicting retained-identity exceptions. It governs the active
 compiler, runtime, fixture, implementation-path, and inspection-command
