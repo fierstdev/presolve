@@ -11,7 +11,7 @@ From a clean checkout at the committed alpha revision, install only local
 dependencies and build the committed CLI:
 
 ```sh
-pnpm install --offline
+pnpm install --offline --force
 cargo build -p presolve-cli
 ```
 

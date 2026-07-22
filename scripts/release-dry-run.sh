@@ -3,7 +3,7 @@ set -euo pipefail
 temporary_dir="$(mktemp -d)"
 cleanup() { rm -rf "$temporary_dir"; }
 trap cleanup EXIT
-pnpm install --offline
+pnpm install --offline --force
 # Existing package verifiers resolve repository-root-relative compiler fixtures;
 # execute their root-owned entry points instead of package-local pnpm scripts.
 ./scripts/verify-l12c3-wasm-binding.sh

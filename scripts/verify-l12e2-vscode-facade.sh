@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 package=packages/vscode
-pnpm install --offline
+pnpm install --offline --force
 cleanup_workspace_links() {
   rm -rf packages/language-service/node_modules packages/lsp/node_modules packages/vscode/node_modules
 }

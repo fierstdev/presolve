@@ -25,7 +25,7 @@ git worktree add --detach "$clean_room" HEAD >/dev/null
 test -z "$(git -C "$clean_room" status --porcelain)"
 cd "$clean_room"
 
-pnpm install --offline >/dev/null
+pnpm install --offline --force >/dev/null
 cargo build -q -p presolve-cli
 bin=target/debug/presolve
 "$bin" version --format json | rg --quiet '"schema":"presolve.cli-version"'
