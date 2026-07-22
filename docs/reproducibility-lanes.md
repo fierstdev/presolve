@@ -8,7 +8,7 @@ records no host-performance result as correctness evidence.
 | deterministic-contracts | committed Rust/CLI/tooling fixtures | `just check` | canonical products, schema, CLI, lifecycle checks | required |
 | browser-runtime | committed runtime fixture plus configured Chrome | `pnpm test:e2e` | browser runtime result | required when browser fixture applies |
 | package-smoke | committed package smoke inputs and local WASM build | `pnpm -r check` | package dependency/smoke boundary | required |
-| documented-examples | Counter and Components/Context/Slots explicit config/source; later L14 corpus | L14 example verifiers | accepted public command output | first two required; later examples deferred |
+| documented-examples | all five contracted explicit alpha examples | L14 example verifiers | accepted public command output | required |
 | observation | declared corpus and host manifest | future report command | noncanonical observation report | never a gate |
 
 The deterministic lane is the complete local reproduction baseline. Browser
@@ -18,4 +18,4 @@ lane cannot compare elapsed time, CPU, memory, machine identity, or benchmark
 values as a correctness condition.
 
 L14-A is governed by the [alpha example contract](examples-contract.md). The
-example lane stays deferred until each contracted example is proven.
+example lane is required because each contracted example is proven.
