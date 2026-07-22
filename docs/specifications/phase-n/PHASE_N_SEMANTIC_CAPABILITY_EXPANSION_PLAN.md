@@ -42,8 +42,9 @@ unsupported boundaries and a later compiler-owned opaque-code escape hatch.
    front-end contract, but framework declarations and arbitrary JavaScript
    execution cannot establish Presolve semantics.
 5. **Preserve explicit boundaries.** Router, SSR request handling, deployment,
-   package discovery, and scaffolding remain metaframework concerns. Phase N
-   expands application semantics, not product orchestration.
+   package-manager discovery, and scaffolding remain metaframework concerns.
+   Phase N accepts explicit package-resolution inputs and semantic package
+   contracts; it does not resolve or install npm packages itself.
 6. **Opaque means explicit.** Arbitrary TypeScript is permitted only through a
    later compiler-owned boundary that makes its lost guarantees visible.
 
@@ -63,6 +64,52 @@ The `native` and `bounded` distinction is important: a serializable object
 literal may be native State while an arbitrary class instance remains rejected,
 even though both are ordinary TypeScript values.
 
+## Third-party semantic package contracts
+
+Presolve does not need to read a package's implementation to understand the
+semantics of its use. It needs a versioned, explicit contract for the package's
+public exports. A package contract is a compiler input, resolved from an
+application-supplied package-resolution table; package-manager installation and
+lockfile discovery remain outside compiler authority.
+
+Each contract must declare:
+
+- package coordinate, resolved version, export path, and content integrity;
+- contract schema/version and compatible compiler capability versions;
+- exported type signatures and structural input/output boundary schemas;
+- semantic kind: `pure`, `capability`, `resource`, `codec`, or precompiled
+  `component`;
+- dependency behavior, lifecycle, error behavior, scheduling, and allowed
+  execution targets;
+- serialization, static-evaluation, and resume status; and
+- runtime module/chunk identity when executable package code is required.
+
+The compiler trusts the declared public contract for the selected package
+version, not inferred package internals. Inspection records the contract
+identity, integrity, export, semantic kind, and every application use site.
+An integrity mismatch, unsupported contract version, unknown export, or invalid
+use is a canonical compiler failure.
+
+| Package kind | What the compiler understands | Where it may be used initially |
+| --- | --- | --- |
+| `pure` | declared signature, dependency behavior, deterministic operation/lowering, optional static evaluator | bounded expressions, Computed, templates only when static evaluation is declared |
+| `codec` | value schema and encode/decode/resume behavior | State/Form/Resource boundaries |
+| `capability` | inputs, terminal effects, activation and failure behavior | Effect, Action, or Resource terminal operations |
+| `resource` | key, inputs, loading/success/error/cancellation and resume policy | compiler-owned Resource declarations |
+| precompiled `component` | typed inputs, Slots, emitted artifact identity and lifecycle contract | compiler component invocation |
+| no contract | nothing | rejected in compiler-native code; later N9 opaque boundary only |
+
+Package contracts cannot claim hidden State writes, dynamic dependency discovery,
+arbitrary DOM ownership, implicit hydration, or resumability without the
+corresponding compiler contract. A package that does not publish a suitable
+contract can still be isolated later as opaque; it is not retroactively treated
+as native.
+
+An application may publish an adapter contract for a package it controls, but
+the adapter is itself a versioned compiler input with integrity, fixtures, and
+all declared semantic restrictions. It does not let application TypeScript
+pretend that unknown package internals are compiler-proven.
+
 ## Developer capability target
 
 Phase N should make the following ordinary application patterns compiler-native
@@ -70,7 +117,7 @@ or bounded before it introduces opaque code.
 
 | Need | Target compiler capability | Explicit non-goal in Phase N |
 | --- | --- | --- |
-| Organize applications | typed local/imported modules, exports, aliases, namespaces rejected deterministically | package discovery or npm resolution policy |
+| Organize applications | typed local/imported modules, exports, aliases, explicit third-party semantic package contracts | package installation or automatic npm resolution policy |
 | Model application data | objects, arrays, readonly data, optional/nullable values, discriminated unions, selected maps/sets only when serializable | arbitrary prototype/class-instance State |
 | Derive UI data | property/index access, conditionals, arithmetic/comparison/logical expressions, approved collection transforms, compiler-known pure helpers | arbitrary dynamic evaluation |
 | Render real views | conditional blocks, keyed repeated blocks, fragments, common intrinsic attributes/classes/styles, event payload binding | runtime VDOM or DOM diffing |
@@ -106,6 +153,20 @@ must reject unresolved, cyclic-where-unsupported, dynamic, ambient-global, or
 package-policy-dependent imports deterministically. Define a versioned
 TypeScript front-end integration boundary before relying on checker facts not
 present in the current parser model.
+
+### N1-A — package semantic contracts and explicit resolution
+
+Define the canonical package-resolution input and semantic package-contract
+schema. Resolve normal import specifiers only through this caller-supplied map,
+binding a package export to its exact contract/integrity identity. Add contract
+diagnostics, cache keys, inspection records, artifact provenance, and
+compatibility checks before admitting any package use.
+
+Implement one end-to-end `pure` contract and one terminal `capability` contract
+as vertical slices. Prove that package source is neither parsed nor inspected,
+that a changed integrity value invalidates the build, and that the compiler
+still derives every application-side dependency, activation, and runtime record
+from the declared contract.
 
 ### N2 — values, expressions, and pure helpers
 
@@ -194,7 +255,8 @@ catalog. Freeze the supported semantic subset before adding opaque code.
 Only after N8, introduce `opaque` as a compiler-recognized boundary. It must
 not be a generic escape hatch. An opaque declaration specifies its execution
 target, activation mode, typed serializable inputs/outputs, permitted compiler
-entry points, lifecycle, error policy, and resume policy.
+entry points, lifecycle, error policy, resume policy, and package/runtime
+integrity identity when it uses third-party code.
 
 Initial restrictions:
 
@@ -228,7 +290,8 @@ explicit unsupported/opaque classification test.
 
 ## Explicit exclusions
 
-Phase N does not promise arbitrary npm packages, arbitrary classes in reactive
-State, dynamic `eval`, reflection-based dependency discovery, arbitrary JSX
-factories, unrestricted DOM access, untracked mutation, dynamic code loading,
-router semantics, deployment, or a second framework runtime.
+Phase N does not promise arbitrary npm packages in compiler-native code,
+arbitrary classes in reactive State, dynamic `eval`, reflection-based dependency
+discovery, arbitrary JSX factories, unrestricted DOM access, untracked
+mutation, dynamic code loading, router semantics, deployment, or a second
+framework runtime.

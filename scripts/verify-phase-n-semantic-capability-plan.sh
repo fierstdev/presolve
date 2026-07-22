@@ -11,6 +11,7 @@ for section in \
   'Objective' \
   'Governing principles' \
   'Capability classes' \
+  'Third-party semantic package contracts' \
   'Developer capability target' \
   'Phase sequence' \
   'Required proof per capability' \
@@ -27,6 +28,8 @@ for phrase in \
   'No implicit fallback' \
   'compiler-owned opaque-code escape hatch' \
   'not a generic escape hatch' \
+  'package-manager installation and lockfile discovery remain outside compiler authority' \
+  'no contract' \
   'Phase N does not promise arbitrary npm packages'; do
   rg --fixed-strings --quiet "$phrase" "$plan"
 done

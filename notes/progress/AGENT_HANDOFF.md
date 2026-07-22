@@ -10,8 +10,8 @@ Repository state
 Last completed slice
 
 * Slice: Phase N - Semantic Capability Expansion Plan
-* Result: creates a planning-only compiler roadmap that expands compiler-native application semantics before introducing an explicit opaque TypeScript boundary. It establishes capability classes and full-path admission, then sequences modules/types, expressions/pure helpers, real-data reactivity, structural templates, typed composition, Resources, richer Forms, semantic freeze, opaque code, and framework adoption.
-* Next: N0 may define the semantic capability registry and admission contract only. Do not implement a source feature, opaque escape hatch, router, SSR, or framework runtime before that contract is accepted.
+* Result: creates a planning-only compiler roadmap that expands compiler-native application semantics before introducing an explicit opaque TypeScript boundary. It establishes capability classes and full-path admission, then sequences modules/types, explicit third-party semantic package contracts, expressions/pure helpers, real-data reactivity, structural templates, typed composition, Resources, richer Forms, semantic freeze, opaque code, and framework adoption. Package internals are never inferred: an application-supplied resolution map binds imports to versioned, integrity-checked contracts that declare public semantics.
+* Next: N0 may define the semantic capability registry and admission contract only. N1-A must define package contract/resolution inputs before compiler-native third-party package use. Do not implement a source feature, opaque escape hatch, router, SSR, or framework runtime before those contracts are accepted.
 
 * Slice: M9 - Framework Freeze
 * Result: freezes the private declaration surface, canonical artifact-build handoff, compiler-backed explanation policy, supported source forms, TypeScript 7.0 compatibility, and unavailable features. The M9 verifier is the complete focused M2–M8 evidence matrix. Future metaframework work must obtain separate authority and may not reinterpret compiler artifacts or add compatibility shims.
