@@ -345,6 +345,10 @@ class ProfileEditor {
         assert!(editor.properties[4].decorators[0]
             .this_member_argument
             .is_none());
+        assert_eq!(
+            editor.properties[4].decorators[0].argument.as_deref(),
+            Some("profileForm")
+        );
         assert!(editor.properties[5].decorators[0]
             .this_member_argument
             .is_none());

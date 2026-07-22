@@ -6,12 +6,14 @@ reconstruct Form semantics from browser state.
 
 ## Syntax and identity
 
-`@form()` declares one component-owned `Form`; `@field(this.form)` declares a
+`@form()` declares one component-owned `Form`; `@field("form")` declares a
 Form-owned Field; `field={this.field}` binds one supported intrinsic control.
 Validation, tracking, submission, serialization, reset, instances, slots, IR,
 runtime registry, and artifacts all consume those canonical IDs. The only
 submit host syntax is `<form form={this.form}>`. Its `form` attribute is a
-compiler-only bridge and is never ordinary emitted HTML.
+compiler-only bridge and is never ordinary emitted HTML. `@submit("form")`
+names the same local Form with compile-time source syntax; it is not a runtime
+lookup or decorator-time instance expression.
 
 Forms and Fields are not inherited. Fields, validators, and controls never
 derive ownership from DOM ancestry. A host is one explicit same-component Form

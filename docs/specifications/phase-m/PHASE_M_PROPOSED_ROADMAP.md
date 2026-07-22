@@ -160,6 +160,8 @@ forms. Then prove the framework uses existing production/resume artifacts
 unchanged, including malformed-artifact failure behavior. It adds neither a
 new Form API nor a resume/runtime wrapper.
 
+**M7 authority:** [Forms, production, and resume conformance](PHASE_M_M7_FORMS_RESUME_CONFORMANCE.md).
+
 ### M8 — framework DX, examples, and compatibility
 
 Add a compiler-backed explanation presentation, an error guide, conformance
@@ -193,7 +195,7 @@ future metaframework must supply; it does not pre-implement it.
 
 ## Current boundary
 
-M4 and M5 are complete. M6-A Component/Slot conformance is complete. M6-B
-selects static Context declarations and compiler-resolved qualified designators
-as the production Context language; Context is complete only after its targeted
-compiler and browser matrix passes.
+M4 and M5 are complete. M6 is complete. M7 selects compiler-resolved literal
+Form designators for `field` and `submit`, because decorator-time instance
+expressions are not sound TypeScript. Forms, production, and resume conformance
+are complete only after the two targeted compiler/browser matrices pass.

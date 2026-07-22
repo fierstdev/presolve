@@ -70,8 +70,10 @@ when all of the following are true:
 M6-B applies this policy to Context. It replaces the framework-facing inherited
 instance Context declaration and static-member expression designator with a
 static Context declaration and a compiler-resolved qualified string designator.
-The quoted text is compile-time source syntax, never a dynamic key, lookup, or
-framework runtime token.
+M7 applies the same rule to Form Field and submit targets: literal local Form
+designators replace decorator-time instance expressions. The quoted text is
+compile-time source syntax, never a dynamic key, lookup, or framework runtime
+token.
 
 ## Initial package decision
 

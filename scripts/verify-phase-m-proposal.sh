@@ -11,8 +11,9 @@ readonly m5_computed=docs/specifications/phase-m/PHASE_M_M5_COMPUTED_CONFORMANCE
 readonly m5_effect=docs/specifications/phase-m/PHASE_M_M5_EFFECT_CONFORMANCE.md
 readonly m6_component_slot=docs/specifications/phase-m/PHASE_M_M6_COMPONENT_SLOT_CONFORMANCE.md
 readonly m6_context=docs/specifications/phase-m/PHASE_M_M6_CONTEXT_LANGUAGE_CONTRACT.md
+readonly m7_forms_resume=docs/specifications/phase-m/PHASE_M_M7_FORMS_RESUME_CONFORMANCE.md
 
-for document in "$roadmap" "$constitution" "$authoring" "$m2_contract" "$m3_contract" "$m4_audit" "$m5_computed" "$m5_effect" "$m6_component_slot" "$m6_context"; do
+for document in "$roadmap" "$constitution" "$authoring" "$m2_contract" "$m3_contract" "$m4_audit" "$m5_computed" "$m5_effect" "$m6_component_slot" "$m6_context" "$m7_forms_resume"; do
   test -s "$document"
 done
 
@@ -28,7 +29,7 @@ for phrase in 'conformance-first' 'reserved exit-6' 'Presolve Metaframework' 'st
   rg --fixed-strings --quiet "$phrase" "$roadmap" "$constitution" "$authoring"
 done
 
-for phrase in '@component("x-name")' 'count = state(0)' '@action()' '@computed()' '@effect()' '@context()' '@provide("Theme.theme")' '@consume("Theme.theme")' '@slot()' '@form()'; do
+for phrase in '@component("x-name")' 'count = state(0)' '@action()' '@computed()' '@effect()' '@context()' '@provide("Theme.theme")' '@consume("Theme.theme")' '@slot()' '@form()' '@field("profile")' '@submit("profile")'; do
   rg --fixed-strings --quiet "$phrase" "$authoring"
 done
 
@@ -46,4 +47,5 @@ rg --fixed-strings --quiet 'M3 explicit handoff contract' "$roadmap"
 rg --fixed-strings --quiet 'M4 public artifact-publication audit' "$roadmap"
 rg --fixed-strings --quiet 'M6-A Component/Slot conformance is complete' "$roadmap"
 rg --fixed-strings --quiet 'M6-B authority' "$roadmap"
+rg --fixed-strings --quiet 'M7 authority' "$roadmap"
 git diff --check

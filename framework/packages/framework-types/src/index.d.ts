@@ -41,6 +41,43 @@ declare global {
   /** Declares a compiler-recognized slot field with no children runtime. */
   function slot(): PresolveFieldDecorator;
 
+  /** The compiler-owned Form declaration marker; it has no runtime value. */
+  interface Form {
+    readonly __presolveFormBrand: unique symbol;
+  }
+
+  /** Declares a component-owned Form without creating a form controller. */
+  function form(): PresolveFieldDecorator;
+
+  /** Declares the compiler-owned serialization policy for a Form. */
+  function serialize(
+    format: "json" | "form-data" | "url-encoded"
+  ): PresolveFieldDecorator;
+
+  /**
+   * A compiler-resolved local Form identity. It is source syntax, never a
+   * runtime controller lookup or an instance expression evaluated by a
+   * decorator.
+   */
+  type FormDesignator = string;
+
+  /** Declares a compiler-owned Field attached to the named local Form. */
+  function field(form: FormDesignator): PresolveFieldDecorator;
+
+  /** A compiler-owned validation-rule expression marker. */
+  interface ValidationRule {
+    readonly __presolveValidationRuleBrand: unique symbol;
+  }
+
+  /** Declares compiler-owned validation for one Form Field. */
+  function validate(rule: ValidationRule): PresolveFieldDecorator;
+
+  /** Declares compiler-owned required validation; it has no runtime behavior. */
+  function required(): ValidationRule;
+
+  /** Declares that a compiler-owned Action is the named Form's submit action. */
+  function submit(form: FormDesignator): PresolveMethodDecorator;
+
   /**
    * Describes the initializer shape for compiler-recognized State. The
    * compiler, not this declaration, establishes reactive State semantics.

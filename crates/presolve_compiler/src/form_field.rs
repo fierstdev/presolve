@@ -532,7 +532,8 @@ class Profile extends BaseEditor {
         let asm = build_application_semantic_model(&parsed);
         let candidates = asm.form_field_declaration_candidates();
 
-        assert!(asm.form_fields().is_empty());
+        assert_eq!(asm.form_fields().len(), 1);
+        assert_eq!(asm.form_fields()[0].name, "stringArg");
         assert_eq!(candidates.len(), 20);
         assert_eq!(
             candidates
@@ -542,11 +543,20 @@ class Profile extends BaseEditor {
                 .len(),
             candidates.len()
         );
-        assert!(candidates.iter().all(|candidate| {
-            candidate.field_id.is_none()
-                && candidate.type_assignment.is_none()
-                && !candidate.violations.is_empty()
+        assert!(candidates.iter().any(|candidate| {
+            candidate.authored_name.as_deref() == Some("stringArg")
+                && candidate.field_id.is_some()
+                && candidate.type_assignment.is_some()
+                && candidate.violations.is_empty()
         }));
+        assert!(candidates
+            .iter()
+            .filter(|candidate| { candidate.authored_name.as_deref() != Some("stringArg") })
+            .all(|candidate| {
+                candidate.field_id.is_none()
+                    && candidate.type_assignment.is_none()
+                    && !candidate.violations.is_empty()
+            }));
         assert!(candidates.iter().any(|candidate| candidate
             .violations
             .contains(&FormFieldDeclarationViolation::InvalidDecoratorInvocation)));

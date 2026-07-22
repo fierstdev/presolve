@@ -404,21 +404,11 @@ fn explicit_form_hosts_submit_only_through_compiler_emitted_records() {
     if out_dir.exists() {
         fs::remove_dir_all(&out_dir).expect("failed to clean Forms browser output");
     }
-    fs::create_dir_all(&out_dir).expect("failed to create Forms browser output");
-    let input = out_dir.join("FormHost.tsx");
-    fs::write(&input, r#"
-@component("form-host") class FormHost {
-  @form() @serialize("json") profile!: Form;
-  @field(this.profile) name = "";
-  submitted = 0;
-  @action() @submit(this.profile) save(): void { this.submitted += 1; }
-  render() { return <form form={this.profile}><input field={this.name}/><span>{this.submitted}</span></form>; }
-}"#).expect("failed to write Forms browser source");
     let output = Command::new(presolve_cli_bin())
         .current_dir(&repo_root)
         .args([
             "build",
-            input.to_str().expect("input UTF-8"),
+            "framework/tests/forms-types/src/FormHost.tsx",
             "--out",
             out_dir.to_str().expect("output UTF-8"),
         ])
@@ -809,21 +799,11 @@ fn resume_restores_compiler_owned_form_state_and_rejects_active_submission() {
     if out_dir.exists() {
         fs::remove_dir_all(&out_dir).expect("failed to clean resume Forms output");
     }
-    fs::create_dir_all(&out_dir).expect("failed to create resume Forms output");
-    let input = out_dir.join("ResumeForms.tsx");
-    fs::write(&input, r#"
-@component("resume-forms") class ResumeForms {
-  @form() @serialize("json") profile!: Form;
-  @validate(required()) @field(this.profile) name = "";
-  submitted = state(0);
-  @action() @submit(this.profile) save(): void { this.submitted += 1; }
-  render() { return <form form={this.profile}><input field={this.name}/><span>{this.submitted}</span></form>; }
-}"#).expect("failed to write resume Forms source");
     let output = Command::new(presolve_cli_bin())
         .current_dir(&repo_root)
         .args([
             "build",
-            input.to_str().expect("input UTF-8"),
+            "framework/tests/forms-resume-types/src/ResumeForms.tsx",
             "--out",
             out_dir.to_str().expect("output UTF-8"),
         ])

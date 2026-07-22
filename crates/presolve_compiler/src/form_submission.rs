@@ -318,9 +318,9 @@ mod tests {
 @component("profile-editor")
 class ProfileEditor {
   @form() profile!: Form;
-  @validate(required()) @field(this.profile) name = "";
-  @validate(min(0)) @field(this.profile) age = 0;
-  @action() @submit(this.profile) save(): void {}
+  @validate(required()) @field("profile") name = "";
+  @validate(min(0)) @field("profile") age = 0;
+  @action() @submit("profile") save(): void {}
   render() { return <input field={this.name} />; }
 }
 "#,

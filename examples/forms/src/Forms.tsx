@@ -1,9 +1,9 @@
 @component("profile")
 class Profile {
   @form() @serialize("json") profile!: Form;
-  @field(this.profile) name = "";
+  @field("profile") name = "";
 
-  @action() @submit(this.profile)
+  @action() @submit("profile")
   save(): void {}
 
   render() {

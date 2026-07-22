@@ -3,16 +3,21 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: M6-B - Context Language Conformance
-* Working tree: Phase M M6-B static Context language, compiler conformance, fixture, and verifier pending its completion commit.
+* Latest completed slice: M7 - Forms, Production, and Resume Conformance
+* Working tree: Phase M M7 Form language, declaration fixtures, and verifier pending its completion commit.
 * Date: 2026-07-22
 
 Last completed slice
 
+* Slice: M7 - Forms, Production, and Resume Conformance
+* Result: adopts compiler-resolved literal local Form designators: `@field("profile")` and `@submit("profile")`. This replaces decorator-time `this.profile`, which cannot be typed honestly because decorators run in class-definition scope. The explicit render host remains `<form form={this.profile}>`. The declaration package has only ambient Form/Field/validation/submit types; it has no Form controller, transport, validation runtime, DOM lookup, artifact decoder, or resume wrapper. The two framework fixtures are the exact sources built by the existing Form submission and Form resume browser tests.
+* Verification: focused compiler/parser tests cover literal target lowering and retained invalid candidates; TypeScript 7.0, canonical compiler checks, explicit host submission, and resume restoration/fail-closed browser proofs pass. The browser portion requires approved loopback-server permission in this environment.
+* Next: M8 may add only compiler-backed DX, examples, and a compatibility matrix. Do not add source analysis, an editor intelligence implementation, or a framework runtime.
+
 * Slice: M6-B - Context Language Conformance
 * Result: adopts a production compiler-language Context contract: `@context()` decorates a typed static field, and `@provide("Owner.member")` / `@consume("Owner.member")` use compiler-resolved qualified designators. The string is compile-time source syntax, never a dynamic lookup. The compiler directly validates and lowers it; the declaration package types it without a suppression, rewrite, proxy, registry, or runtime. The framework fixture is byte-identical to the canonical Context runtime source.
 * Verification: focused compiler unit tests cover static declarations and qualified designators; TypeScript 7.0, canonical compiler check, Context fixture validation, and the real-browser Context source/update proof pass. The browser portion requires approved loopback-server permission in this environment.
-* Next: M7 may select frozen Forms and resume/production conformance only. Do not add a framework Form runtime, submit transport, lifecycle wrapper, or Context compatibility shim.
+* Next: M7 completed the Forms and resume/production family without a framework Form runtime or Context compatibility shim.
 
 * Slice: M6-A - Component and Slot Conformance
 * Result: adds the existing `SlotContent` and `@slot()` declarations only. The type fixture is byte-identical to the compiler's valid component fixture; TypeScript 7.0, unchanged compiler check, and browser instance/slot-plan proof pass. No children runtime, JSX renderer, forwarding protocol, or ownership lookup was added.

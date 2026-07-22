@@ -2081,10 +2081,7 @@ fn submission_declaration_facts_from_class(
                         .map(|annotation| annotation.text.clone()),
                     submit_invoked: decorator.is_invoked,
                     submit_argument_count: decorator.argument_count,
-                    form_designator: decorator
-                        .this_member_argument
-                        .as_ref()
-                        .map(|designator| designator.member.clone()),
+                    form_designator: normalized_submission_form_designator(decorator),
                     has_action: action.is_some(),
                     action_invoked: action.is_some_and(|decorator| decorator.is_invoked),
                     action_argument_count: action.map_or(0, |decorator| decorator.argument_count),
@@ -2343,6 +2340,18 @@ fn normalized_form_designator(
             authored_name: designator.member.clone(),
             provenance: SourceProvenance::new(path, designator.span),
             name_provenance: SourceProvenance::new(path, designator.member_span),
+        })
+        .or_else(|| {
+            let span = *decorator.argument_spans.first()?;
+            decorator
+                .argument
+                .as_ref()
+                .filter(|name| form_designator_name_is_valid(name))
+                .map(|name| FormDesignatorFact {
+                    authored_name: name.clone(),
+                    provenance: SourceProvenance::new(path, span),
+                    name_provenance: SourceProvenance::new(path, span),
+                })
         });
     let unsupported =
         decorator
@@ -2354,6 +2363,30 @@ fn normalized_form_designator(
                 provenance: SourceProvenance::new(path, designator.span),
             });
     (designator, unsupported)
+}
+
+fn normalized_submission_form_designator(
+    decorator: &presolve_parser::ParsedDecorator,
+) -> Option<String> {
+    decorator
+        .this_member_argument
+        .as_ref()
+        .map(|designator| designator.member.clone())
+        .or_else(|| {
+            decorator
+                .argument
+                .as_ref()
+                .filter(|name| form_designator_name_is_valid(name))
+                .cloned()
+        })
+}
+
+fn form_designator_name_is_valid(name: &str) -> bool {
+    let mut characters = name.chars();
+    matches!(characters.next(), Some(character) if character == '_' || character == '$' || character.is_ascii_alphabetic())
+        && characters.all(|character| {
+            character == '_' || character == '$' || character.is_ascii_alphanumeric()
+        })
 }
 
 fn canonicalize_form_field_violations(violations: &mut Vec<FormFieldDeclarationViolation>) {
