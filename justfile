@@ -1,6 +1,7 @@
 # Repository task recipes. These commands are intentionally simple.
 
 check:
+    ./scripts/verify-l17a-distribution-contract.sh
     ./scripts/verify-l16-community-readiness.sh
     ./scripts/verify-l13d-public-surface-matrix.sh
     ./scripts/verify-l13c-frozen-contract-map.sh

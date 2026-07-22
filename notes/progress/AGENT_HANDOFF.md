@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L16 - Community Readiness
-* Working tree: clean after repository-only community readiness material; all editor-package boundaries remain product-free.
+* Latest completed slice: L17-A - Distribution Contract
+* Working tree: clean after the private-package distribution inventory; all editor-package boundaries remain product-free.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L17-A - Distribution Contract
+* Result: inventories only existing private package manifests, exports, dependency direction, provenance, and offline package-smoke evidence. It authorizes no publish, signing, upload, or release artifact.
+* Next: L17-B may add a fail-closed local/CI dry run only.
 
 * Slice: L16 - Community Readiness
 * Result: adds repository-only license, changelog, contribution, security, conduct, support-boundary, and issue/PR material. The audit checks files, labels, links, credentials, and root ownership; it makes no hosting, publication, private-support, or SLA claim.
@@ -1395,9 +1399,8 @@ Known limitations
 Exact next step
 
 Phase K is complete and frozen through K21. Phase L is complete through
-L16. Repository-only community readiness is complete, with no hosted-service,
-publication, private-support, or SLA claim. Next: L17-A distribution facts from
-existing package manifests only.
+L17-A. The distribution contract inventories existing private manifests only and
+authorizes no publication. Next: L17-B fail-closed local/CI dry run only.
 
 Useful commands
 
