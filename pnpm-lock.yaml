@@ -25,3 +25,9 @@ importers:
         version: link:../language-service
 
   packages/runtime: {}
+
+  packages/vscode:
+    dependencies:
+      '@presolve/lsp':
+        specifier: workspace:*
+        version: link:../lsp

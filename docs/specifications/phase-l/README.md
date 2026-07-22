@@ -69,3 +69,5 @@ L12-D-2 activates the in-process `@presolve/lsp` dispatcher only. It maps the co
 L12-D-3 freezes exact JSON-RPC response hashes for every mapping, unsupported behavior, invalid framing, and propagated query error.
 
 L12-E is governed by the [VSCode extension contract](PHASE_L_L12_VSCODE_CONTRACT.md). It permits only a product-free extension client over the completed LSP package.
+
+L12-E-2 activates the pinned-fixture `@presolve/vscode` facade. It imports only `@presolve/lsp`, forwards caller-owned product/request values, and has no editor/document capability of its own.

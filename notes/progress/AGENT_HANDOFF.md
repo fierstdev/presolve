@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L12-E-1 - VSCode Extension Contract
+* Latest completed slice: L12-E-2 - Pinned VSCode Facade
 * Working tree: L12-C now has a thin WASM-only `@presolve/language-service` wrapper. LSP and extension implementation have not begun.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L12-E-2 - Pinned VSCode Facade
+* Result: adds `@presolve/vscode` as a product-free facade depending exclusively on `@presolve/lsp`. Its pinned extension-shaped fixture proves definition and unsupported behavior through the completed LSP/language-service/WASM chain.
+* Boundary: no VSCode API, document/workspace model, source/path/URI access, compiler/language-service direct import, product decoder, cache, persistence, transport, or edit capability was added.
+* Next: Phase L completion requires the final cross-package/frozen-contract/release audit before declaring the phase complete.
 
 * Slice: L12-E-1 - VSCode Extension Contract
 * Result: freezes `@presolve/vscode` as a product-free client that depends exclusively on the completed LSP package. It may render only established LSP results and must not acquire source, compiler, URI/path, cache, persistence, document-model, transport, or edit authority.

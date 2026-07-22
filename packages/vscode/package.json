@@ -1,0 +1,15 @@
+{
+  "name": "@presolve/vscode",
+  "version": "0.1.0-alpha",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "dependencies": {
+    "@presolve/lsp": "workspace:*"
+  },
+  "scripts": {
+    "check": "../../scripts/verify-l12e2-vscode-facade.sh"
+  }
+}
