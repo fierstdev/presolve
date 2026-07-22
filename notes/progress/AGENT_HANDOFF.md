@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L14-B-4 - Explicit Workspace Canonical Example
-* Working tree: clean after the explicit-source workspace proof; all editor-package boundaries remain product-free.
+* Latest completed slice: L14-B-5 - Production/Resume Canonical Example
+* Working tree: clean after the five-example alpha corpus; all editor-package boundaries remain product-free.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L14-B-5 - Production/Resume Canonical Example
+* Result: adds the exact Phase K computed-diamond source and uses the established production build only. The proof asserts the emitted production/resume artifacts and invokes the existing CSP/malformed-boot browser probe; it adds no deployment, benchmark, or author-time edit behavior.
+* Next: L13-A may establish the public documentation index and snippet format only.
 
 * Slice: L14-B-4 - Explicit Workspace Canonical Example
 * Result: adds one exact source mapping from the existing L9-F CLI fixture and invokes only `presolve workspace`. The proof asserts the existing workspace-result schema/status and does not discover packages, manifests, dependencies, or sources.
@@ -1371,12 +1375,11 @@ Known limitations
 Exact next step
 
 Phase K is complete and frozen through K21. Phase L is complete through
-L14-B-4. The owner-authorized L13-L21 continuation contract remains the
-authority. Explicit workspace uses exactly one caller-supplied L9-F source
-mapping and reports only the established workspace-result schema/status; it
-does not discover packages, manifests, dependencies, or sources. Next:
-L14-B-5, production/resume only from existing Phase K artifacts and browser
-evidence.
+L14-B. The five canonical alpha examples are complete and remain bounded to
+explicit inputs and frozen evidence. The production/resume proof emits the
+existing artifacts and reuses the existing production browser test; it does not
+add deployment, benchmarks, or author-time editing. Next: L13-A public
+documentation index and verifier-ready snippet format only.
 
 Useful commands
 

@@ -10,7 +10,7 @@ semantics, source discovery, or a create command.
 | Components/Context/Slots | `fixtures/0059`, `0062`--`0065`; component/context contracts | listed component source files | frozen component/runtime fixture evidence | inheritance/slot behavior beyond frozen contracts |
 | Forms | `docs/forms-contract.md`; `crates/ezc_core/src/form_submission_host.rs` | `examples/forms/src/Forms.tsx` | explicit `presolve check` proof | browser submit/network behavior |
 | Explicit workspace | `crates/ezc_core/fixtures/workspace/{chain-v1,cycle-v1}.json`; `crates/ezc_cli/tests/l9_cli_commands.rs` | `examples/explicit-workspace/src/main.ts` | explicit `presolve workspace` proof | manifests/dependency discovery |
-| Production/resume | Phase K corpus and resumability contract | explicit compiler input and existing artifact fixtures | existing production/browser evidence | benchmarks, deployment, author-time edits |
+| Production/resume | `fixtures/0047-computed-diamond`; `docs/production-optimization-contract.md`; `crates/ezc_cli/tests/runtime_browser.rs` | `examples/production-resume/src/ComputedDiamond.tsx` | explicit production build plus the frozen browser probe | benchmarks, deployment, author-time edits |
 
 Each L14-B example must declare its own supplied configuration and source
 membership, run a public accepted command, cite only existing expected product
