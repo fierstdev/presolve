@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L15-B - Public Testing Utility
+* Latest completed slice: L15-C - Reproducibility Lane Manifest
 * Working tree: L12-C now has a thin WASM-only `@presolve/language-service` wrapper. LSP and extension implementation have not begun.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L15-C - Reproducibility Lane Manifest
+* Result: declares deterministic-contract, browser/runtime, package-smoke, deferred-example, and non-gating observation lanes with their existing local commands and artifacts. Host measurements are expressly non-correctness evidence.
+* Next: L14-A canonical alpha example contract only.
 
 * Slice: L15-B - Public Testing Utility
 * Result: adds `@presolve/testing` with only canonical-byte equality and immutable declared-test metadata. It is deliberately unable to read fixtures, execute commands, access the compiler, start a browser, or establish performance criteria.

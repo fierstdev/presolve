@@ -1,6 +1,7 @@
 # Repository task recipes. These commands are intentionally simple.
 
 check:
+    ./scripts/verify-l15c-reproducibility-lanes.sh
     ./scripts/verify-l15b-testing-package.sh
     ./scripts/verify-l15a-testing-contract.sh
     ./scripts/verify-l13-l21-continuation-contract.sh
