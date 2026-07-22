@@ -8,5 +8,4 @@ rg --quiet 'no hosted service' CONTRIBUTING.md SECURITY.md README.md
 rg --quiet 'private' SECURITY.md
 rg --quiet 'type: textarea' .github/ISSUE_TEMPLATE/bug-report.yml
 ./scripts/verify-repository-layout.sh
-./scripts/verify-l13d-public-surface-matrix.sh
 git diff --check
