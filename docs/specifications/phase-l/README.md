@@ -82,6 +82,8 @@ L19-B is governed by the [alpha clean-room rehearsal](../../alpha-rehearsal.md).
 
 L20 is governed by the [platform freeze contract](../../platform-freeze-contract.md). It freezes only evidence-backed alpha support and requires its final verifier, `just check`, and a clean committed tree.
 
+L21 is governed by the [post-freeze governance](../../post-freeze-governance.md). It is a non-feature stewardship handoff and requires the completed L20 evidence plus a clean committed tree.
+
 The owner-directed [Presolve identity migration contract](../../presolve-identity-migration-contract.md)
 supersedes conflicting retained-identity exceptions. It governs the active
 compiler, runtime, fixture, implementation-path, and inspection-command

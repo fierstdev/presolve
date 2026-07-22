@@ -23,6 +23,7 @@ reference does not establish.
 | Reference | verified alpha availability, exclusions, and rollback policy | [alpha support matrix](alpha-support-matrix.md) |
 | Reference | clean-room alpha workflow evidence | [alpha rehearsal](alpha-rehearsal.md) |
 | Reference | final Phase L support and verification boundary | [platform freeze](platform-freeze-contract.md) |
+| Reference | post-freeze amendment, release, deprecation, and roadmap intake authority | [post-freeze governance](post-freeze-governance.md) |
 
 ## Guides
 

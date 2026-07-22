@@ -1,9 +1,9 @@
 # Presolve platform freeze contract
 
-**Status:** L20 final platform-freeze candidate. This document becomes the
-Phase L freeze evidence only when `verify-l20-platform-freeze.sh`, `just check`,
-and a clean committed tree pass. It adds no language, compiler, runtime,
-package, hosting, publication, signing, or registry behavior.
+**Status:** L20 final platform freeze. `verify-l20-platform-freeze.sh` and the
+complete inherited `just check` matrix passed from a clean committed tree on
+2026-07-22. It adds no language, compiler, runtime, package, hosting,
+publication, signing, or registry behavior.
 
 ## Frozen public platform
 
