@@ -8,7 +8,7 @@ readonly contract=docs/specifications/phase-n/PHASE_N_N0_CAPABILITY_REGISTRY_CON
 test -s "$contract"
 for phrase in \
   'schema version `1`' \
-  'semantic_packages' \
+  'semantic_package_exports' \
   'not a source-level escape hatch' \
   'Existing ASM, artifact, runtime, resume, and framework schema' \
   'does not run unrelated compiler suites'; do
@@ -20,6 +20,6 @@ cargo test -q -p presolve-compiler \
 cargo run -q -p presolve-cli -- explain --capabilities --format json \
   | rg --fixed-strings --quiet '"schema_version": 1'
 cargo run -q -p presolve-cli -- explain --capabilities --format json \
-  | rg --fixed-strings --quiet '"semantic_packages"'
+  | rg --fixed-strings --quiet '"semantic_package_exports"'
 cargo fmt --all --check
 git diff --check

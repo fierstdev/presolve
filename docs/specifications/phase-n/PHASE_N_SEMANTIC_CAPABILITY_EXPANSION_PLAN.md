@@ -163,8 +163,16 @@ present in the current parser model.
 Define the canonical package-resolution input and semantic package-contract
 schema. Resolve normal import specifiers only through this caller-supplied map,
 binding a package export to its exact contract/integrity identity. Add contract
-diagnostics, cache keys, inspection records, artifact provenance, and
-compatibility checks before admitting any package use.
+diagnostics and an inspection record before admitting the non-executable
+binding. No source fallback or package-manager resolution is permitted.
+
+N1-A1 admits only that binding identity. A contract declaration is never itself
+an executable capability, so the binding-table product is the terminal product
+for this slice. The registry must distinguish it from package-export use.
+
+N1-A2 admits executable package kinds one at a time. Each kind requires its own
+cache key, inspection record, IR/artifact provenance, compatibility check, and
+full runtime/resume proof before application code may invoke it.
 
 Implement one end-to-end `pure` contract and one terminal `capability` contract
 as vertical slices. Prove that package source is neither parsed nor inspected,

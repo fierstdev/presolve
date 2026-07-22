@@ -159,16 +159,27 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
                 "no artifact representation",
                 "N1-B must define advanced type semantics",
             ),
+            admitted(
+                "semantic_package_bindings",
+                SemanticCapabilityClass::Bounded,
+                "named or default external import with a caller-supplied semantic package contract",
+                "SemanticPackageContract and BindingTable",
+                "validated schema, SHA-256 integrity, declared named/default export",
+                "declared binding only; executable use awaits its semantic-kind admission",
+                "binding itself owns no independently resumable state",
+                "canonical binding-table product records package/version/integrity/export",
+                "binding_table::tests::resolves_external_imports_only_through_semantic_package_contracts",
+            ),
             deferred(
-                "semantic_packages",
+                "semantic_package_exports",
                 SemanticCapabilityClass::Unsupported,
-                "third-party import resolved through a semantic package contract",
-                "N1-A package contract and explicit-resolution products",
-                "no integrity-checked package contract schema yet",
-                "cannot derive package export behavior",
-                "no resume policy before admission",
-                "no package artifact provenance",
-                "N1-A must define package contracts",
+                "use of a pure, capability, resource, codec, or component package export",
+                "N1-A2 semantic-kind lowering products",
+                "declared export metadata is not yet an executable compiler semantic",
+                "cannot derive reactive, capability, resource, codec, or component behavior from a binding alone",
+                "no export-kind resume policy has been admitted",
+                "no package-kind IR or artifact provenance has been admitted",
+                "N1-A2 must admit each package kind through full-path lowering",
             ),
             deferred(
                 "resources",
@@ -280,7 +291,8 @@ mod tests {
                 "form",
                 "module_bindings",
                 "advanced_types",
-                "semantic_packages",
+                "semantic_package_bindings",
+                "semantic_package_exports",
                 "resources",
                 "opaque_typescript"
             ]
@@ -290,6 +302,6 @@ mod tests {
             .iter()
             .filter(|capability| capability.status == SemanticCapabilityStatus::Deferred)
             .all(|capability| capability.rejection_reason.is_some()));
-        assert!(semantic_capability_registry_json().contains("\"semantic_packages\""));
+        assert!(semantic_capability_registry_json().contains("\"semantic_package_bindings\""));
     }
 }

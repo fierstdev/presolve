@@ -48,6 +48,9 @@ pub enum ImportBindingTarget {
         integrity: String,
         export: String,
         kind: SemanticPackageKind,
+        type_signature: String,
+        runtime_module: String,
+        resume_policy: String,
     },
 }
 
@@ -250,7 +253,7 @@ fn resolve_semantic_package_import(
     diagnostics: &mut Vec<BindingDiagnostic>,
     module: &Path,
 ) {
-    let Some(contract) = packages.contracts.get(&import.source) else {
+    let Some(contract) = packages.contract(&import.source) else {
         diagnostics.push(BindingDiagnostic {
             code: "PSBIND1009".into(),
             module: module.to_path_buf(),
@@ -288,6 +291,9 @@ fn resolve_semantic_package_import(
                     integrity: contract.integrity.clone(),
                     export: specifier.imported.clone(),
                     kind: export.kind.clone(),
+                    type_signature: export.type_signature.clone(),
+                    runtime_module: export.runtime_module.clone(),
+                    resume_policy: export.resume_policy.clone(),
                 },
             },
         );
@@ -527,7 +533,10 @@ fn insert_import(
 
 #[cfg(test)]
 mod tests {
-    use super::{build_binding_table, ImportBindingTarget};
+    use super::{build_binding_table, build_binding_table_with_packages, ImportBindingTarget};
+    use crate::semantic_package::{
+        parse_semantic_package_contract, SemanticPackageResolutionTable,
+    };
     use crate::{build_module_graph, build_symbol_table, CompilationUnit, SemanticId};
 
     #[test]
@@ -572,7 +581,14 @@ export default class Status extends Component {
         let bindings = build_binding_table(&unit, &symbols, &modules);
         let app = bindings.module("src/app/App.tsx").expect("app module");
 
-        assert!(bindings.diagnostics.is_empty());
+        assert_eq!(
+            bindings
+                .diagnostics
+                .iter()
+                .map(|diagnostic| diagnostic.code.as_str())
+                .collect::<Vec<_>>(),
+            vec!["PSBIND1009"]
+        );
         assert_eq!(app.imports.len(), 3);
         assert_eq!(app.exports.len(), 0);
         assert_eq!(
@@ -744,5 +760,73 @@ class Second extends Component {
                 .symbols["Second"]
                 .id
         );
+    }
+
+    #[test]
+    fn resolves_external_imports_only_through_semantic_package_contracts() {
+        let unit = CompilationUnit::parse_sources([(
+            "src/App.tsx",
+            "import { format } from \"date-kit\"; export class App {}",
+        )]);
+        let symbols = build_symbol_table(&unit);
+        let modules = build_module_graph(&unit);
+        let contract = parse_semantic_package_contract(r#"{"schema_version":1,"package":"date-kit","version":"1.0.0","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"format":{"kind":"pure","type_signature":"(Date)->string","runtime_module":"dist/format.js","resume_policy":"input_only"}}}"#).unwrap();
+        let mut packages = SemanticPackageResolutionTable::default();
+        packages.insert("date-kit".into(), contract).unwrap();
+        let bindings = build_binding_table_with_packages(&unit, &symbols, &modules, &packages);
+        assert!(bindings.diagnostics.is_empty());
+        let ImportBindingTarget::SemanticPackage {
+            package,
+            version,
+            integrity,
+            export,
+            kind,
+            type_signature,
+            runtime_module,
+            resume_policy,
+        } = &bindings
+            .resolve_import("src/App.tsx", "format")
+            .unwrap()
+            .target
+        else {
+            panic!("expected semantic package binding");
+        };
+        assert_eq!(package, "date-kit");
+        assert_eq!(version, "1.0.0");
+        assert_eq!(
+            integrity,
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        );
+        assert_eq!(export, "format");
+        assert_eq!(kind, &crate::semantic_package::SemanticPackageKind::Pure);
+        assert_eq!(type_signature, "(Date)->string");
+        assert_eq!(runtime_module, "dist/format.js");
+        assert_eq!(resume_policy, "input_only");
+    }
+
+    #[test]
+    fn rejects_external_imports_without_a_matching_contract_or_export() {
+        let unit = CompilationUnit::parse_sources([(
+            "src/App.tsx",
+            "import present from \"date-kit\"; import { absent } from \"date-kit\"; import { other } from \"other-kit\"; export class App {}",
+        )]);
+        let symbols = build_symbol_table(&unit);
+        let modules = build_module_graph(&unit);
+        let contract = parse_semantic_package_contract(r#"{"schema_version":1,"package":"date-kit","version":"1.0.0","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"default":{"kind":"pure","type_signature":"(Date)->string","runtime_module":"dist/default.js","resume_policy":"input_only"}}}"#).unwrap();
+        let mut packages = SemanticPackageResolutionTable::default();
+        packages.insert("date-kit".into(), contract).unwrap();
+
+        let bindings = build_binding_table_with_packages(&unit, &symbols, &modules, &packages);
+        assert_eq!(
+            bindings
+                .diagnostics
+                .iter()
+                .map(|diagnostic| diagnostic.code.as_str())
+                .collect::<Vec<_>>(),
+            vec!["PSBIND1010", "PSBIND1009"]
+        );
+        assert!(bindings.resolve_import("src/App.tsx", "present").is_some());
+        assert!(bindings.resolve_import("src/App.tsx", "absent").is_none());
+        assert!(bindings.resolve_import("src/App.tsx", "other").is_none());
     }
 }

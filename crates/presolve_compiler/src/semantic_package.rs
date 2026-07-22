@@ -39,7 +39,9 @@ pub enum SemanticPackageContractError {
     UnsupportedSchema,
     InvalidIntegrity,
     EmptyPackage,
+    EmptyVersion,
     EmptyExport,
+    InvalidExportContract,
     DuplicateSpecifier,
 }
 
@@ -54,6 +56,9 @@ pub fn parse_semantic_package_contract(
     if contract.package.is_empty() {
         return Err(SemanticPackageContractError::EmptyPackage);
     }
+    if contract.version.is_empty() {
+        return Err(SemanticPackageContractError::EmptyVersion);
+    }
     if !contract.integrity.starts_with("sha256:")
         || contract.integrity.len() != 71
         || !contract.integrity[7..]
@@ -65,12 +70,19 @@ pub fn parse_semantic_package_contract(
     if contract.exports.is_empty() || contract.exports.keys().any(|name| name.is_empty()) {
         return Err(SemanticPackageContractError::EmptyExport);
     }
+    if contract.exports.values().any(|export| {
+        export.type_signature.is_empty()
+            || export.runtime_module.is_empty()
+            || export.resume_policy.is_empty()
+    }) {
+        return Err(SemanticPackageContractError::InvalidExportContract);
+    }
     Ok(contract)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SemanticPackageResolutionTable {
-    pub contracts: BTreeMap<String, SemanticPackageContract>,
+    contracts: BTreeMap<String, SemanticPackageContract>,
 }
 
 impl SemanticPackageResolutionTable {
@@ -79,10 +91,16 @@ impl SemanticPackageResolutionTable {
         specifier: String,
         contract: SemanticPackageContract,
     ) -> Result<(), SemanticPackageContractError> {
-        if self.contracts.insert(specifier, contract).is_some() {
+        if self.contracts.contains_key(&specifier) {
             return Err(SemanticPackageContractError::DuplicateSpecifier);
         }
+        self.contracts.insert(specifier, contract);
         Ok(())
+    }
+
+    #[must_use]
+    pub fn contract(&self, specifier: &str) -> Option<&SemanticPackageContract> {
+        self.contracts.get(specifier)
     }
     #[must_use]
     pub fn resolve(&self, specifier: &str, export: &str) -> Option<&SemanticPackageExport> {
@@ -102,5 +120,22 @@ mod tests {
             table.resolve("date-kit", "format").unwrap().kind,
             SemanticPackageKind::Pure
         );
+    }
+
+    #[test]
+    fn rejects_incomplete_contracts_without_replacing_existing_resolution() {
+        let valid = parse_semantic_package_contract(r#"{"schema_version":1,"package":"date-kit","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"format":{"kind":"pure","type_signature":"(Date) -> string","runtime_module":"dist/format.js","resume_policy":"input_only"}}}"#).unwrap();
+        let invalid = parse_semantic_package_contract(
+            r#"{"schema_version":1,"package":"date-kit","version":"","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"format":{"kind":"pure","type_signature":"","runtime_module":"","resume_policy":""}}}"#,
+        );
+        assert_eq!(invalid, Err(SemanticPackageContractError::EmptyVersion));
+
+        let mut table = SemanticPackageResolutionTable::default();
+        table.insert("date-kit".into(), valid.clone()).unwrap();
+        assert_eq!(
+            table.insert("date-kit".into(), valid),
+            Err(SemanticPackageContractError::DuplicateSpecifier)
+        );
+        assert_eq!(table.contract("date-kit").unwrap().version, "1.2.3");
     }
 }

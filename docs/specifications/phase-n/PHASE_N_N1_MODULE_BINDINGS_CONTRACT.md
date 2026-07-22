@@ -29,7 +29,9 @@ remain deferred as `advanced_types`.
 ## Inspection and diagnostics
 
 The N0 capability registry changes `module_bindings` to admitted and retains
-explicit deferred records for `advanced_types` and `semantic_packages`.
+explicit deferred records for `advanced_types` and executable
+`semantic_package_exports`. N1-A subsequently admits only the separately
+contracted import-binding identity; it does not make a package call executable.
 Existing `PSBIND1001` through `PSBIND1006` diagnostics remain the canonical
 binding failures. This slice does not change ASM, artifact, runtime, or resume
 schemas.

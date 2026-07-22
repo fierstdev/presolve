@@ -19,15 +19,18 @@ artifact impact, proof fixture, and rejection reason for every deferred family.
 ## Admission contract
 
 A capability can move from `deferred` to `admitted` only when its implementation
-has source normalization, semantic identity, type/boundary rules, dependency and
-lifecycle analysis, IR, artifact/runtime/resume policy, canonical diagnostics,
-and the required fixtures. N0 records current compiler-native and bounded
-families without changing any of those existing products.
+has every product relevant to that capability: source normalization, semantic
+identity, type/boundary rules, dependency and lifecycle analysis, IR,
+artifact/runtime/resume policy, canonical diagnostics, and the required
+fixtures. A non-executable binding may end at the canonical binding-table
+product; an executable capability must satisfy the full lowering path. N0
+records current compiler-native and bounded families without changing any of
+those existing products.
 
-`semantic_packages`, `module_types`, `resources`, and `opaque_typescript` are
-deliberately deferred records. In particular, a third-party npm package remains
-unsupported in compiler-native application code until N1-A supplies its explicit
-resolution and semantic package-contract identity.
+`semantic_package_exports`, `module_types`, `resources`, and `opaque_typescript`
+are deliberately deferred records. N1-A admits only an integrity-checked
+third-party **binding**; invoking an imported package export remains unsupported
+until N1-A2 supplies its explicit executable semantic contract.
 
 ## Boundaries
 

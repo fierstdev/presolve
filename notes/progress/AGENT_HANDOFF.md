@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N1 - Module Bindings
-* Working tree: Phase N N1 module capability admission, contract, and verifier pending its completion commit.
+* Latest completed slice: N1-A1 - Semantic Package Bindings
+* Working tree: clean after the N1-A1 semantic package-binding commit.
 * Date: 2026-07-22
 
 Last completed slice
+
+* Slice: N1-A1 - Semantic Package Bindings
+* Result: admits only integrity-checked third-party import identity. A caller-supplied `SemanticPackageResolutionTable` maps an external specifier to one validated schema-v1 package/version/SHA-256 contract and declared named/default export; the `BindingTable` retains that coordinate plus semantic kind, type signature, runtime module, and resume policy. Missing contracts fail `PSBIND1009`; missing exports fail `PSBIND1010`; duplicate resolutions fail without overwriting the accepted entry. There is no package discovery, lockfile/node_modules read, source inspection, installation, execution, runtime fallback, or package-export lowering.
+* Verification: `./scripts/verify-n1a-semantic-package-bindings.sh` and `cargo check -q -p presolve-compiler` pass.
+* Next: N1-A2 may admit one package kind only through the complete source-to-runtime/resume path. Begin with `pure`; keep capability/resource/codec/component package use deferred. Do not add opaque code, package source fallback, router, SSR, or a framework runtime.
 
 * Slice: N1 - Module Bindings
 * Result: admits the compiler's existing caller-supplied local/relative named/default/namespace imports, exports, re-exports, and local type declarations as the bounded `module_bindings` capability. The compiler registry retains `advanced_types` and `semantic_packages` as explicit deferrals. No file discovery, package resolution, package source inspection, ASM/artifact/runtime/resume schema change, or new lowering was added.
