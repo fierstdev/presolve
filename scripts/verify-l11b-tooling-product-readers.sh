@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-reader=crates/ezc_core/src/tooling_reader.rs
+reader=crates/presolve_compiler/src/tooling_reader.rs
 
 cargo test -p presolve-compiler tooling_reader --lib -- --nocapture
 rg --quiet 'read_tooling_product_v1' "$reader"
@@ -11,7 +11,7 @@ if awk '/^#\[cfg\(test\)\]/{exit} {print}' "$reader" | rg -n 'std::fs|read_to_(e
   echo 'L11-B readers must consume supplied bytes without execution, persistence, or source access' >&2
   exit 1
 fi
-if rg -n 'tooling_reader' crates/ezc_core/src/{service,persistent_cache,workspace,watch}.rs; then
+if rg -n 'tooling_reader' crates/presolve_compiler/src/{service,persistent_cache,workspace,watch}.rs; then
   echo 'L3-L8 execution modules must not depend on L11-B readers' >&2
   exit 1
 fi

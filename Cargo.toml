@@ -1,9 +1,9 @@
 [workspace]
 members = [
-  "crates/ezc_core",
-  "crates/ezc_cli",
-  "crates/ezc_parser",
-  "crates/ezc_parser_spike",
+  "crates/presolve_compiler",
+  "crates/presolve_cli",
+  "crates/presolve_parser",
+  "crates/presolve_parser_spike",
 ]
 resolver = "2"
 

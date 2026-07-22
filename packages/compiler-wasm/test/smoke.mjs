@@ -4,9 +4,9 @@ import { fileURLToPath } from "node:url";
 import init, { query_snapshot_v1 } from "../dist/presolve_compiler_wasm.js";
 
 const product = await readFile(
-  fileURLToPath(new URL("../../../crates/ezc_core/fixtures/tooling/query-snapshot-v1.json", import.meta.url)),
+  fileURLToPath(new URL("../../../crates/presolve_compiler/fixtures/tooling/query-snapshot-v1.json", import.meta.url)),
 );
-const fixture = JSON.parse(await readFile(fileURLToPath(new URL("../../../crates/ezc_core/fixtures/tooling/language-service-wasm-v1.json", import.meta.url))));
+const fixture = JSON.parse(await readFile(fileURLToPath(new URL("../../../crates/presolve_compiler/fixtures/tooling/language-service-wasm-v1.json", import.meta.url))));
 const snapshot = JSON.parse(product);
 const wasm = await readFile(
   fileURLToPath(new URL("../dist/presolve_compiler_wasm_bg.wasm", import.meta.url)),

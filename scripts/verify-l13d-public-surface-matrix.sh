@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 matrix=docs/public-surface-matrix.md
-registry=crates/ezc_core/src/tooling_schema.rs
+registry=crates/presolve_compiler/src/tooling_schema.rs
 test -s "$matrix"
 help="$(cargo run -q -p presolve-cli -- help)"
 for command in version build check clean cache workspace watch dev create explain inspect graph trace profile benchmark doctor; do

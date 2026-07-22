@@ -3,9 +3,9 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { initializeLsp } from "../src/index.js";
 
-const product = await readFile(fileURLToPath(new URL("../../../crates/ezc_core/fixtures/tooling/query-snapshot-v1.json", import.meta.url)));
+const product = await readFile(fileURLToPath(new URL("../../../crates/presolve_compiler/fixtures/tooling/query-snapshot-v1.json", import.meta.url)));
 const snapshot = JSON.parse(product);
-const fixtures = JSON.parse(await readFile(fileURLToPath(new URL("../../../crates/ezc_core/fixtures/tooling/lsp-v1.json", import.meta.url))));
+const fixtures = JSON.parse(await readFile(fileURLToPath(new URL("../../../crates/presolve_compiler/fixtures/tooling/lsp-v1.json", import.meta.url))));
 const wasm = await readFile(fileURLToPath(new URL("../../compiler-wasm/dist/presolve_compiler_wasm_bg.wasm", import.meta.url)));
 const lsp = await initializeLsp(wasm);
 const target = snapshot.references[0].targetQuerySemanticId;

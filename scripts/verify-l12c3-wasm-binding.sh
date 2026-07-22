@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-binding=crates/ezc_core/src/wasm_binding.rs
+binding=crates/presolve_compiler/src/wasm_binding.rs
 package=packages/compiler-wasm/package.json
 test -s "$binding"
 test -s "$package"

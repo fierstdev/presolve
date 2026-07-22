@@ -77,7 +77,8 @@ Authoritative action:
 - Do not create a root `compiler/` directory.
 - Do not create a root `cli/` directory.
 
-Any remaining internal `ezc_*` crate directory or Rust crate name after L1 is governed by L1's completed compatibility and identity decisions. L2 shall not reopen that decision.
+Any remaining implementation crate directory or Rust crate name after L1 is
+governed by the completed identity decisions. L2 shall not reopen that decision.
 
 ### 4.2 JavaScript/TypeScript packages
 

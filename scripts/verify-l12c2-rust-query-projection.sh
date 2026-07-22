@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-module=crates/ezc_core/src/language_service.rs
+module=crates/presolve_compiler/src/language_service.rs
 test -s "$module"
 rg --quiet 'decode_tooling_query_snapshot_v1' "$module"
 rg --quiet 'query_snapshot_v1' "$module"

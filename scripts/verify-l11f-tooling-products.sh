@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-products=crates/ezc_core/src/tooling_products.rs
+products=crates/presolve_compiler/src/tooling_products.rs
 rg --quiet 'build_tooling_build_trace_v1' "$products"
 rg --quiet 'build_tooling_compile_cost_report_v1' "$products"
 rg --quiet 'build_tooling_artifact_graph_v1' "$products"

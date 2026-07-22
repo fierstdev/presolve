@@ -2,9 +2,9 @@
 
 set -euo pipefail
 
-readonly platform_source='crates/ezc_core/src/platform.rs'
-readonly service_source='crates/ezc_core/src/service.rs'
-readonly fixture_dir='crates/ezc_core/fixtures/incremental'
+readonly platform_source='crates/presolve_compiler/src/platform.rs'
+readonly service_source='crates/presolve_compiler/src/service.rs'
+readonly fixture_dir='crates/presolve_compiler/fixtures/incremental'
 
 test -f docs/incremental-compilation-contract.md
 test -f "$fixture_dir/plan-v1.json"
@@ -27,7 +27,7 @@ rg --quiet 'twenty_run_determinism' "$service_source"
 
 # The service remains a boundary/orchestrator: no source discovery and no
 # alternate parser/binder/semantic implementation is permitted here.
-! rg --quiet 'read_to_string|read_to_end|read_dir|ezc_parser::|build_application_semantic_model' "$service_source"
+! rg --quiet 'read_to_string|read_to_end|read_dir|presolve_parser::|build_application_semantic_model' "$service_source"
 ! rg --quiet 'SystemTime|Instant|modified\(' "$platform_source" "$service_source"
 ! rg --quiet 'source.*session\.json|source.*journal|source.*commit\.json' "$service_source"
 

@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { activate } from "../src/index.js";
 
-const product = await readFile(fileURLToPath(new URL("../../../crates/ezc_core/fixtures/tooling/query-snapshot-v1.json", import.meta.url)));
+const product = await readFile(fileURLToPath(new URL("../../../crates/presolve_compiler/fixtures/tooling/query-snapshot-v1.json", import.meta.url)));
 const snapshot = JSON.parse(product);
 const wasm = await readFile(fileURLToPath(new URL("../../compiler-wasm/dist/presolve_compiler_wasm_bg.wasm", import.meta.url)));
 const extension = await activate(wasm);

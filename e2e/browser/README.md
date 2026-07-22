@@ -3,7 +3,7 @@
 The permanent browser gate is the Rust integration harness in:
 
 ```text
-crates/ezc_cli/tests/runtime_browser.rs
+crates/presolve_cli/tests/runtime_browser.rs
 ```
 
 It builds the double-binding counter fixture, serves the generated output with a tiny in-test static server, opens the page in real Chrome, and fails on unexpected generated-runtime console errors.

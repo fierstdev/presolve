@@ -2,9 +2,9 @@
 
 set -euo pipefail
 
-readonly service_source='crates/ezc_core/src/service.rs'
-readonly platform_source='crates/ezc_core/src/platform.rs'
-readonly fixture_dir='crates/ezc_core/fixtures/service'
+readonly service_source='crates/presolve_compiler/src/service.rs'
+readonly platform_source='crates/presolve_compiler/src/platform.rs'
+readonly fixture_dir='crates/presolve_compiler/fixtures/service'
 
 test -f "$service_source"
 test -f docs/compiler-service-contract.md

@@ -185,7 +185,7 @@ Historical verification context
 
 * Slice: L11-C - Workspace Tooling Projections
 * Summary: adds a byte-only core reader for negotiated L3 workspace snapshot and graph documents. It delegates to the existing strict decoders, retains validated snapshot identity, and rejects reserved/unknown/unreadable schemas without filesystem, source, compiler-service, cache, workspace, or watch access.
-* Key files: `crates/ezc_core/src/tooling_reader.rs`, `scripts/verify-l11b-tooling-product-readers.sh`, `justfile`, `2026-W28.md`
+* Key files: `crates/presolve_compiler/src/tooling_reader.rs`, `scripts/verify-l11b-tooling-product-readers.sh`, `justfile`, `2026-W28.md`
 * Verification: three focused reader tests prove strict decoding, source exclusion, schema negotiation/rejection, unsupported-reader rejection, and reverse-order determinism. The L11-B verifier runs inherited L11-A/L10/L3-L9 audits, formatter, strict compiler clippy, and diff check; it is included in `just check`.
 * Fixture correction: the historical L3 compatibility fixtures are intentionally structural zero-identity documents and not strict-decodable products. L11-B preserves them byte-for-byte and uses source-free canonical documents generated through the existing public L3 API solely in the focused reader proof.
 * Proof: representative constructed Rust configurations first pass existing L3 validation, retain byte-identical L3 serializer fixtures, then CLI encode/decode to equal Rust values and equal existing L3 configuration identities. CLI fixture bytes are canonical and intentionally differ from L3 bytes. Twenty shuffled object-order byte inputs produce the same Rust configuration.
@@ -234,134 +234,134 @@ Verification
 
 * J9 verification: 8 focused manifest tests, all 405 core tests, 2 CLI units, 7 Component fixtures, 12 Context fixtures, all 128 CLI inspection/build tests, all 29 sequential real-browser probes, strict all-target core/CLI clippy, formatting, and `git diff --check` pass. Coverage includes v5/unknown-field rejection, every endpoint family, canonical snapshot/manifest examples, executable sensitivity, provenance and absolute-source-root independence, reverse-order determinism, `resume.runtime.json` emission, and exact page-embedded byte equality.
 
-* J8 verification: `cargo test -p ezc_core --lib` passes all 400 core tests; strict all-target core clippy, formatting, and `git diff --check` pass. Five focused proofs cover all R0-R20 phases, retained/recomputable assignment, exact Form phase classes, dangling program references, wrong phases, duplicate writes, missing completion, parent-order rejection, reverse-input determinism, and `EZASM1359`-`EZASM1362`.
+* J8 verification: `cargo test -p presolve_compiler --lib` passes all 400 core tests; strict all-target core clippy, formatting, and `git diff --check` pass. Five focused proofs cover all R0-R20 phases, retained/recomputable assignment, exact Form phase classes, dangling program references, wrong phases, duplicate writes, missing completion, parent-order rejection, reverse-input determinism, and `PSASM1359`-`PSASM1362`.
 
-* J7 verification: `cargo test -p ezc_core --lib` passes all 395 core tests; strict all-target core clippy, formatting, and `git diff --check` pass. Nine focused proofs cover every value variant, canonical object/number encoding, negative zero/non-finite rejection, unsupported runtime shape rejection, retained-only program generation, equal-state byte equality, no mutation/timestamp, full quiescence, stable Form submission, malformed product rejection, reverse-input determinism, and `EZASM1355`-`EZASM1358`.
+* J7 verification: `cargo test -p presolve_compiler --lib` passes all 395 core tests; strict all-target core clippy, formatting, and `git diff --check` pass. Nine focused proofs cover every value variant, canonical object/number encoding, negative zero/non-finite rejection, unsupported runtime shape rejection, retained-only program generation, equal-state byte equality, no mutation/timestamp, full quiescence, stable Form submission, malformed product rejection, reverse-input determinism, and `PSASM1355`-`PSASM1358`.
 
-* J6 verification: `cargo test -p ezc_core --lib` passes all 385 core tests; strict all-target core clippy, formatting, and `git diff --check` pass. Focused proofs cover canonical object order, explicit nullable codecs, non-null union rejection, one schema per boundary, exact J2 slot reciprocity, reverse-input determinism, frozen Form runtime slot codecs, and `EZASM1349`-`EZASM1354`. The J7 entry audit additionally corrected schema collection order to preserve J3 parent-before-child ordering; all 7 focused schema tests and strict all-target core clippy pass after the correction.
+* J6 verification: `cargo test -p presolve_compiler --lib` passes all 385 core tests; strict all-target core clippy, formatting, and `git diff --check` pass. Focused proofs cover canonical object order, explicit nullable codecs, non-null union rejection, one schema per boundary, exact J2 slot reciprocity, reverse-input determinism, frozen Form runtime slot codecs, and `PSASM1349`-`PSASM1354`. The J7 entry audit additionally corrected schema collection order to preserve J3 parent-before-child ordering; all 7 focused schema tests and strict all-target core clippy pass after the correction.
 
-* J5 verification: `cargo test -p ezc_core --lib` passes all 379 core tests; strict all-target core clippy, formatting, and `git diff --check` pass. Focused proofs cover one eager root, isolated interaction roots, no lazy dependencies/shared chunks, exact action isolation, reversed-input determinism, and `EZASM1343`-`EZASM1348`.
+* J5 verification: `cargo test -p presolve_compiler --lib` passes all 379 core tests; strict all-target core clippy, formatting, and `git diff --check` pass. Focused proofs cover one eager root, isolated interaction roots, no lazy dependencies/shared chunks, exact action isolation, reversed-input determinism, and `PSASM1343`-`PSASM1348`.
 
-* J4 verification: `cargo test -p ezc_core --lib` passes all 376 core tests; strict all-target core clippy, formatting, and `git diff --check` pass. Focused proofs cover Eager/Interaction/None assignment, eager Forms runtime with interaction-scoped submit, zero Visible/Manual output, fixed precedence, and `EZASM1337`-`EZASM1342`.
+* J4 verification: `cargo test -p presolve_compiler --lib` passes all 376 core tests; strict all-target core clippy, formatting, and `git diff --check` pass. Focused proofs cover Eager/Interaction/None assignment, eager Forms runtime with interaction-scoped submit, zero Visible/Manual output, fixed precedence, and `PSASM1337`-`PSASM1342`.
 
-* J3 verification: `cargo test -p ezc_core --lib` passes all 372 core tests; `cargo clippy -p ezc_core --all-targets -- -D warnings`, `cargo fmt --all --check`, and `git diff --check` pass. Focused proofs cover parent-before-child application/Component/structural/Form ownership, structural-template event ownership, ordinary and Form-submit activation references, upstream Component/liveness block preservation, reverse-input determinism, invalid parent reciprocity, and the complete `EZASM1328`-`EZASM1336` range.
+* J3 verification: `cargo test -p presolve_compiler --lib` passes all 372 core tests; `cargo clippy -p presolve_compiler --all-targets -- -D warnings`, `cargo fmt --all --check`, and `git diff --check` pass. Focused proofs cover parent-before-child application/Component/structural/Form ownership, structural-template event ownership, ordinary and Form-submit activation references, upstream Component/liveness block preservation, reverse-input determinism, invalid parent reciprocity, and the complete `PSASM1328`-`PSASM1336` range.
 
-* J2 verification: `cargo test -p ezc_core --lib` passes all 368 core tests; `cargo clippy -p ezc_core --all-targets -- -D warnings`, `cargo fmt --all --check`, and `git diff --check` pass. Focused proofs cover repeated exact State/Computed slots, one shared instance-qualified Context provider slot with exact State dependency evidence, all six Form v5 slot classes, deterministic transitive Computed evidence, input-order determinism, classification uniqueness, and dedicated policy/owner/boundary/proof integrity failures.
+* J2 verification: `cargo test -p presolve_compiler --lib` passes all 368 core tests; `cargo clippy -p presolve_compiler --all-targets -- -D warnings`, `cargo fmt --all --check`, and `git diff --check` pass. Focused proofs cover repeated exact State/Computed slots, one shared instance-qualified Context provider slot with exact State dependency evidence, all six Form v5 slot classes, deterministic transitive Computed evidence, input-order determinism, classification uniqueness, and dedicated policy/owner/boundary/proof integrity failures.
 
 * J1-A verification: `just check` passes formatting, strict workspace clippy, 2 CLI units, 7 Component fixtures, 12 Context fixtures, 128 CLI inspection/build tests, 29 sequential real-browser probes, 364 core tests, 13 parser units, and 26 parser integrations. Focused browser proofs cover repeated State cold initialization, A-only action/binding updates, computed invalidation isolation, exact State-slot-only runtime keys, malformed/missing projection failure, Phase J component-v2 rejection, and retained legacy v2 cold compatibility.
 * J1-A fixture repair: all template-manifest goldens now match the already-authorized v4 ordinary-instance contract, including canonical action `storage_id` operands; stale Phase G/H schema assertions now acknowledge template v4/component artifact v3.
 
-* J1-C verification: `cargo test -p ezc_core --lib` (359), `cargo clippy -p ezc_core --all-targets -- -D warnings`, `cargo fmt --all --check`, `git diff --check`, and `cargo test -p ezc_cli --test runtime_browser` (27 real-browser probes) all pass. The component-runtime watchdog was a harness pipe backpressure failure, not a runtime-readiness regression: Chrome filled the piped DOM output while the runner waited to read it. The harness now drains both streams concurrently; the probe keeps its 20-second watchdog, removes parsed JSON metadata before DOM dumping, and reports terminal runtime errors immediately.
+* J1-C verification: `cargo test -p presolve_compiler --lib` (359), `cargo clippy -p presolve_compiler --all-targets -- -D warnings`, `cargo fmt --all --check`, `git diff --check`, and `cargo test -p presolve_cli --test runtime_browser` (27 real-browser probes) all pass. The component-runtime watchdog was a harness pipe backpressure failure, not a runtime-readiness regression: Chrome filled the piped DOM output while the runner waited to read it. The harness now drains both streams concurrently; the probe keeps its 20-second watchdog, removes parsed JSON metadata before DOM dumping, and reports terminal runtime errors immediately.
 
 * J1-P implementation audit: ordinary targets/bindings/events are compiler projections of Phase H `ComponentInstanceId` and canonical template IDs. Runtime sees only exact marker indexes and `RuntimeExecutionContext`; it does not infer ownership from names, DOM ancestry, order, or counters. J1-P emits no J10 resume markers.
-* J1-P verification: `cargo test -p ezc_core --lib`, `cargo clippy -p ezc_core --all-targets -- -D warnings`, `cargo fmt --all --check`, `git diff --check`, `just check`, and `pnpm test:e2e` completed for the bridge. The focused marker/registry/manifest tests cover repeated component instances, paired binding markers, v4/v3 pair enforcement, reciprocal Forms target records, deterministic projections, and absence of J10 markers.
+* J1-P verification: `cargo test -p presolve_compiler --lib`, `cargo clippy -p presolve_compiler --all-targets -- -D warnings`, `cargo fmt --all --check`, `git diff --check`, `just check`, and `pnpm test:e2e` completed for the bridge. The focused marker/registry/manifest tests cover repeated component instances, paired binding markers, v4/v3 pair enforcement, reciprocal Forms target records, deterministic projections, and absence of J10 markers.
 
-* J1 `cargo test -p ezc_core resume_identity::tests::j1_resume_identities_are_typed_deterministic_and_instance_qualified`: pass
-* J1 `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass
+* J1 `cargo test -p presolve_compiler resume_identity::tests::j1_resume_identities_are_typed_deterministic_and_instance_qualified`: pass
+* J1 `cargo clippy -p presolve_compiler --all-targets -- -D warnings`: pass
 * J1 `cargo fmt --all --check`: pass
 * J1 `git diff --check`: pass
 
-* J0 `cargo test -p ezc_core j0_reserves_the_public_and_internal_resumability_ranges_without_products`: pass (1 focused entry-freeze test)
-* J0 `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass
+* J0 `cargo test -p presolve_compiler j0_reserves_the_public_and_internal_resumability_ranges_without_products`: pass (1 focused entry-freeze test)
+* J0 `cargo clippy -p presolve_compiler --all-targets -- -D warnings`: pass
 * J0 `cargo fmt --all --check`: pass
 * J0 `git diff --check`: pass
 
-* Phase I freeze repair `cargo test -p ezc_cli --bin ezc_cli i17_forms_inspection_projects_validation_rules_in_schema_v9`: pass (the committed Forms inspection now positively asserts `validation-rule` projection in ASM v9)
-* Phase I freeze repair `cargo clippy -p ezc_cli --all-targets -- -D warnings`: pass
+* Phase I freeze repair `cargo test -p presolve_cli --bin presolve_cli i17_forms_inspection_projects_validation_rules_in_schema_v9`: pass (the committed Forms inspection now positively asserts `validation-rule` projection in ASM v9)
+* Phase I freeze repair `cargo clippy -p presolve_cli --all-targets -- -D warnings`: pass
 * Phase I freeze repair `cargo fmt --all --check`: pass
 * Phase I freeze repair `git diff --check`: pass
 * Phase I freeze repair `just check`: pass (strict workspace clippy; 2 CLI units; 7 Component fixtures; 12 Context fixtures; 128 CLI tests; 27 sequential real-browser tests; 350 core tests; 13 parser units; 26 parser integrations)
 
-* I17 `cargo test -p ezc_core --lib`: pass (348 core tests, including canonical Forms inspection projection coverage)
-* I17 `cargo test -p ezc_cli --test explain --test component_fixtures --test context_fixtures`: pass (128 inspection/build, 7 component, and 12 context tests)
-* I17 `cargo clippy -p ezc_core -p ezc_cli --all-targets -- -D warnings`: pass
+* I17 `cargo test -p presolve_compiler --lib`: pass (348 core tests, including canonical Forms inspection projection coverage)
+* I17 `cargo test -p presolve_cli --test explain --test component_fixtures --test context_fixtures`: pass (128 inspection/build, 7 component, and 12 context tests)
+* I17 `cargo clippy -p presolve_compiler -p presolve_cli --all-targets -- -D warnings`: pass
 * I17 `cargo fmt --check`: pass
 * I17 `git diff --check`: pass
 
-* I15 `cargo test -p ezc_core --lib`: pass (345 core tests)
-* I15 `cargo test -p ezc_cli`: pass (including Forms build/artifact/embed coverage and 26 browser tests)
-* `cargo clippy -p ezc_core -p ezc_cli --all-targets -- -D warnings`: pass
+* I15 `cargo test -p presolve_compiler --lib`: pass (345 core tests)
+* I15 `cargo test -p presolve_cli`: pass (including Forms build/artifact/embed coverage and 26 browser tests)
+* `cargo clippy -p presolve_compiler -p presolve_cli --all-targets -- -D warnings`: pass
 * `cargo fmt --check`: pass
 * `git diff --check`: pass
 
-* I14 `cargo test -p ezc_core`: pass (343 core tests, including versioned instance-qualified registry coverage)
-* `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass
+* I14 `cargo test -p presolve_compiler`: pass (343 core tests, including versioned instance-qualified registry coverage)
+* `cargo clippy -p presolve_compiler --all-targets -- -D warnings`: pass
 * `cargo fmt --check`: pass
 * git diff --check: pass
 
-* I13 `cargo test -p ezc_core`: pass (342 core tests, including immutable Form IR optimization coverage)
-* `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass
+* I13 `cargo test -p presolve_compiler`: pass (342 core tests, including immutable Form IR optimization coverage)
+* `cargo clippy -p presolve_compiler --all-targets -- -D warnings`: pass
 * `cargo fmt --check`: pass
 * git diff --check: pass
 
-* I12 `cargo test -p ezc_core`: pass (341 core tests, including instance-qualified Form IR coverage)
-* `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass
+* I12 `cargo test -p presolve_compiler`: pass (341 core tests, including instance-qualified Form IR coverage)
+* `cargo clippy -p presolve_compiler --all-targets -- -D warnings`: pass
 * `cargo fmt --check`: pass
 * git diff --check: pass
 
-* I11 `cargo test -p ezc_core`: pass (340 core tests, including focused I11 reset planning)
-* `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass
+* I11 `cargo test -p presolve_compiler`: pass (340 core tests, including focused I11 reset planning)
+* `cargo clippy -p presolve_compiler --all-targets -- -D warnings`: pass
 * `cargo fmt --check`: pass
 * git diff --check: pass
 
-* I10 `cargo test -p ezc_parser -p ezc_core`: pass (13 parser unit, 26 parser integration, 339 core tests including 2 focused I10 tests)
-* `cargo clippy -p ezc_parser -p ezc_core --all-targets -- -D warnings`: pass
+* I10 `cargo test -p presolve_parser -p presolve_compiler`: pass (13 parser unit, 26 parser integration, 339 core tests including 2 focused I10 tests)
+* `cargo clippy -p presolve_parser -p presolve_compiler --all-targets -- -D warnings`: pass
 * `cargo fmt --check`: pass
 * git diff --check: pass
 
-* I9 `cargo test -p ezc_parser`: pass (13 parser unit, 26 parser integration tests)
-* I9 `cargo test -p ezc_core`: pass (337 core tests, including 2 focused I9 tests)
-* `cargo clippy -p ezc_parser -p ezc_core --all-targets -- -D warnings`: pass
+* I9 `cargo test -p presolve_parser`: pass (13 parser unit, 26 parser integration tests)
+* I9 `cargo test -p presolve_compiler`: pass (337 core tests, including 2 focused I9 tests)
+* `cargo clippy -p presolve_parser -p presolve_compiler --all-targets -- -D warnings`: pass
 * `cargo fmt --check`: pass
 * git diff --check: pass
 
-* I8 `cargo test -p ezc_core`: pass (334 core tests, including 4 focused I8 tests)
-* `cargo clippy -p ezc_core --all-targets -- -D warnings`: pass
+* I8 `cargo test -p presolve_compiler`: pass (334 core tests, including 4 focused I8 tests)
+* `cargo clippy -p presolve_compiler --all-targets -- -D warnings`: pass
 * `cargo fmt --check`: pass
 * git diff --check: pass
 
 * I7 `just check`: pass (formatting, strict workspace clippy, 331 core tests, 12 parser unit tests, 26 parser integration tests, 2 CLI unit tests, 7 Component fixture/freeze tests, 12 Context fixture/freeze tests, all 126 CLI inspection/build tests, and all 26 real-browser tests)
-* `cargo test -p ezc_core form_validation_plan --lib`: pass (5 focused I7 planning tests)
-* `cargo test -p ezc_core semantic_id::tests::derives_distinct_form_definition_instance_and_field_identities --lib`: pass (I7 identity extension)
-* `cargo clippy -p ezc_core --all-targets --all-features -- -D warnings`: pass
+* `cargo test -p presolve_compiler form_validation_plan --lib`: pass (5 focused I7 planning tests)
+* `cargo test -p presolve_compiler semantic_id::tests::derives_distinct_form_definition_instance_and_field_identities --lib`: pass (I7 identity extension)
+* `cargo clippy -p presolve_compiler --all-targets --all-features -- -D warnings`: pass
 * `cargo fmt --all --check`: pass
 * git diff --check: pass
 
 * I6 `just check`: pass (formatting, strict workspace clippy, 326 core tests, 12 parser unit tests, 26 parser integration tests, 2 CLI unit tests, 7 Component fixture/freeze tests, 12 Context fixture/freeze tests, all 126 CLI inspection/build tests, and all 26 real-browser tests)
-* `cargo test -p ezc_core form_validation`: pass (7 focused I6 tests)
-* `cargo test -p ezc_parser validation`: pass (2 focused parser-retention tests)
-* `cargo clippy -p ezc_parser -p ezc_core -p ezc_cli --all-targets --all-features -- -D warnings`: pass
+* `cargo test -p presolve_compiler form_validation`: pass (7 focused I6 tests)
+* `cargo test -p presolve_parser validation`: pass (2 focused parser-retention tests)
+* `cargo clippy -p presolve_parser -p presolve_compiler -p presolve_cli --all-targets --all-features -- -D warnings`: pass
 * `cargo fmt --all --check`: pass
 * git diff --check: pass
 
 * I0 entry `just check`: pass (workspace formatting, strict workspace clippy, 292 baseline core, 6 parser unit, 26 parser integration, 1 CLI unit, 7 component fixture/audit, 12 Context fixture/freeze, 126 CLI inspection/build, and 26 real-browser tests)
-* `cargo test -p ezc_core`: pass (295)
-* `cargo test -p ezc_core semantic_id::tests::derives_distinct_form_definition_instance_and_field_identities -- --nocapture`: pass (1)
-* `cargo test -p ezc_cli --test component_fixtures phase_h_freezes_authorities_schemas_and_no_discovery_contract -- --nocapture`: pass (1)
-* `cargo test -p ezc_cli --test component_fixtures -- --nocapture`: pass (7)
-* `cargo clippy -p ezc_core -p ezc_cli --all-targets -- -D warnings`: pass
+* `cargo test -p presolve_compiler`: pass (295)
+* `cargo test -p presolve_compiler semantic_id::tests::derives_distinct_form_definition_instance_and_field_identities -- --nocapture`: pass (1)
+* `cargo test -p presolve_cli --test component_fixtures phase_h_freezes_authorities_schemas_and_no_discovery_contract -- --nocapture`: pass (1)
+* `cargo test -p presolve_cli --test component_fixtures -- --nocapture`: pass (7)
+* `cargo clippy -p presolve_compiler -p presolve_cli --all-targets -- -D warnings`: pass
 * `cargo fmt --all --check`: pass
 * git diff --check: pass
-* `cargo test -p ezc_core form_ownership::tests -- --nocapture`: pass (7)
-* `cargo test -p ezc_parser -p ezc_core`: pass (10 parser unit, 26 parser integration, 319 core)
+* `cargo test -p presolve_compiler form_ownership::tests -- --nocapture`: pass (7)
+* `cargo test -p presolve_parser -p presolve_compiler`: pass (10 parser unit, 26 parser integration, 319 core)
 * `just check`: pass (formatting, strict workspace clippy, 319 core, 10 parser unit, 26 parser integration, 1 CLI unit, 7 component fixtures, 12 Context fixtures, 126 CLI inspection/build, and 26 real-browser tests)
 * git diff --check: pass
-* `cargo test -p ezc_parser -p ezc_core`: pass (10 parser unit, 26 parser integration, 312 core)
-* `cargo test -p ezc_core form_binding::tests -- --nocapture`: pass (6)
-* `cargo test -p ezc_cli --test explain`: pass (126)
-* `cargo test -p ezc_cli --test component_fixtures -- --nocapture`: pass (7)
+* `cargo test -p presolve_parser -p presolve_compiler`: pass (10 parser unit, 26 parser integration, 312 core)
+* `cargo test -p presolve_compiler form_binding::tests -- --nocapture`: pass (6)
+* `cargo test -p presolve_cli --test explain`: pass (126)
+* `cargo test -p presolve_cli --test component_fixtures -- --nocapture`: pass (7)
 * `cargo clippy --workspace --all-targets -- -D warnings`: pass
 * `cargo fmt --all --check`: pass
 * git diff --check: pass
-* `cargo test -p ezc_parser -p ezc_core`: pass (8 parser unit, 26 parser integration, 301 core)
-* `cargo test -p ezc_core form::tests -- --nocapture`: pass (6)
-* `cargo test -p ezc_cli --test explain`: pass (126)
-* `cargo test -p ezc_cli --test component_fixtures phase_h_freezes_authorities_schemas_and_no_discovery_contract -- --nocapture`: pass (1)
+* `cargo test -p presolve_parser -p presolve_compiler`: pass (8 parser unit, 26 parser integration, 301 core)
+* `cargo test -p presolve_compiler form::tests -- --nocapture`: pass (6)
+* `cargo test -p presolve_cli --test explain`: pass (126)
+* `cargo test -p presolve_cli --test component_fixtures phase_h_freezes_authorities_schemas_and_no_discovery_contract -- --nocapture`: pass (1)
 * `cargo clippy --workspace --all-targets -- -D warnings`: pass
-* `cargo test -p ezc_parser -p ezc_core`: pass (9 parser unit, 26 parser integration, 306 core)
-* `cargo test -p ezc_core form_field::tests -- --nocapture`: pass (5)
-* `cargo test -p ezc_cli --test explain`: pass (126)
-* `cargo test -p ezc_cli --test component_fixtures phase_h_freezes_authorities_schemas_and_no_discovery_contract -- --nocapture`: pass (1)
+* `cargo test -p presolve_parser -p presolve_compiler`: pass (9 parser unit, 26 parser integration, 306 core)
+* `cargo test -p presolve_compiler form_field::tests -- --nocapture`: pass (5)
+* `cargo test -p presolve_cli --test explain`: pass (126)
+* `cargo test -p presolve_cli --test component_fixtures phase_h_freezes_authorities_schemas_and_no_discovery_contract -- --nocapture`: pass (1)
 * `cargo clippy --workspace --all-targets -- -D warnings`: pass
 * `cargo fmt --all --check`: pass
 * git diff --check: pass
@@ -376,7 +376,7 @@ Architecture decisions made
 * Reason: The fingerprint must change for executable behavior while remaining independent of provenance, absolute paths, time, output directory, and build machine.
 * Tradeoff: Build identity performs a second deterministic projection of existing artifacts during manifest construction; it does not make provenance or paths part of runtime authority.
 
-* Decision: J0 reserves `EZC1096` through `EZC1111` in exact roadmap order and internal `EZASM1289` through `EZASM1384` inclusive (96 codes).
+* Decision: J0 reserves `PSC1096` through `PSC1111` in exact roadmap order and internal `PSASM1289` through `PSASM1384` inclusive (96 codes).
 * Reason: Later Phase J validators and the J19 projector need monotonic, non-overlapping diagnostic space without prematurely creating identities, schemas, manifests, snapshots, chunks, or runtime behavior.
 * Tradeoff: The reservations are inert metadata and a freeze test only; diagnostics remain unprojected until J19.
 
@@ -420,7 +420,7 @@ Architecture decisions made
 * Reason: Validation reads Field values; a validation result is not a Field write. Direct-only scheduling prevents a cross-Field chain from becoming an invented Rule-to-Rule execution graph or transitive invalidation engine.
 * Tradeoff: Unary Rules, target-Field writes, initial validation, submission, reset, dirty/touched transitions, values, browser events, and execution remain outside I7.
 
-* Decision: I7 integrity validation derives internal `EZASM1242` through `EZASM1270` findings for plan/dependency identity, I5/I6 reciprocity, Form/Component/boundary/provenance/order/index consistency, duplicate/missing projections, direct-only leakage, and instance identity leakage. `EZASM1271` and `EZASM1272` detect stale retained validation and stale whole planning products in ASM validation.
+* Decision: I7 integrity validation derives internal `PSASM1242` through `PSASM1270` findings for plan/dependency identity, I5/I6 reciprocity, Form/Component/boundary/provenance/order/index consistency, duplicate/missing projections, direct-only leakage, and instance identity leakage. `PSASM1271` and `PSASM1272` detect stale retained validation and stale whole planning products in ASM validation.
 * Reason: Later consumers must be able to reject malformed staged products deterministically without re-resolving validation syntax or repairing graph drift.
 * Tradeoff: Blocked downstream records retain only malformed/stale canonical I6 evidence and receive no fabricated dependency identity; ordinary invalid authored rules remain solely in I6 candidate registries.
 
@@ -442,7 +442,7 @@ Architecture decisions made
 
 * Decision: `ValidationGraphId` derives from the same sorted Phase H build-root authority as I5. Graph nodes retain canonical Form, Field, and ValidationRule identities; `FormOwnsField` projects I5, `FieldOwnsRule` projects ASM ownership, and `RuleDependsOnField` projects canonical references.
 * Reason: I5 remains the sole declaration-ownership authority, and the validation graph is an immutable typed projection/validator rather than a competing owner map or a syntax-derived graph.
-* Tradeoff: Internal `EZASM1221` through `EZASM1239` cover validation-graph integrity, `EZASM1240` detects stale retained graph validation, and `EZASM1241` detects stale candidate/rule products. No public EZC diagnostic or public schema projection changes in I6.
+* Tradeoff: Internal `PSASM1221` through `PSASM1239` cover validation-graph integrity, `PSASM1240` detects stale retained graph validation, and `PSASM1241` detects stale candidate/rule products. No public PSC diagnostic or public schema projection changes in I6.
 
 * Decision: `FormOwnershipGraphId` derives from the sorted, deduplicated Phase H `ComponentRootId` set, while graph nodes retain existing Component, Form, Field, template-control, and Field-binding identities in a typed sum key.
 * Reason: I5 identifies one application/build projection without manufacturing replacement semantic identities or depending on file order, spans, counts, runtime boot, or map insertion.
@@ -452,7 +452,7 @@ Architecture decisions made
 * Reason: The canonical control is the narrowest authored use-site identity and already participates in the Template ownership tree. Direct control ownership makes the target relationship exact without duplicating a `TargetsControl` reference.
 * Tradeoff: `FormFieldBinding.owner_template` remains the render-template metadata needed for authored ordering, while generic `owner_of(binding)` returns the exact control.
 
-* Decision: I5 validates immutable graph structure and canonical-product reciprocity through internal `EZASM1203` through `EZASM1220` integrity facts. Validation is deterministic, retained on the graph, recomputed by ASM validation, and never repairs malformed input.
+* Decision: I5 validates immutable graph structure and canonical-product reciprocity through internal `PSASM1203` through `PSASM1220` integrity facts. Validation is deterministic, retained on the graph, recomputed by ASM validation, and never repairs malformed input.
 * Reason: Later compiler stages require trustworthy exact owners, endpoints, provenance, root reachability, acyclicity, component isolation, and ordering without returning to syntax or selecting fallback semantics.
 * Tradeoff: These are internal integrity diagnostics only; I18 still owns public Form diagnostics and I6 owns value-validation language semantics.
 
@@ -470,7 +470,7 @@ Architecture decisions made
 
 * Decision: Every recognized binding gets `FormFieldBindingCandidateId`; only a violation-free occurrence gets `FieldBindingId`, derived from its canonical control semantic entity plus `FieldId`. Valid bindings are Template-owned use sites with dedicated `FieldBindingField` and `FieldBindingForm` references; they never own the Form or Field.
 * Reason: A Field declaration and each authored control occurrence are different identity domains. Candidate-only invalid identity preserves ambiguity, duplicate, partial resolution, compatibility, and provenance evidence without fabricating executable semantics.
-* Tradeoff: Frozen semantic graph v5 and CLI ASM inspection v8 filter bindings and their references until a roadmap-owned versioned projection. Internal `EZASM1202` detects retained-product drift.
+* Tradeoff: Frozen semantic graph v5 and CLI ASM inspection v8 filter bindings and their references until a roadmap-owned versioned projection. Internal `PSASM1202` detects retained-product drift.
 
 * Decision: Control channels and normalization are compiler-selected immutable metadata. Text/null, numeric/null, checkbox, radio, single-select, and multiple-select compatibility reuse canonical `SemanticType`, literal-value typing, and `is_assignable`; non-radio multiplicity considers otherwise-valid candidates only, while radio groups use exact `(ComponentId, FieldId)` ownership and static value identity.
 * Reason: Later runtime execution must consume an exact channel and normalization policy without inspecting DOM element type or reconstructing group membership. Invalid controls must not poison unrelated valid bindings merely because partial Field resolution succeeded.
@@ -520,7 +520,7 @@ Architecture decisions made
 * Reason: Phase H freezes `ComponentInstanceId` constructors to component-instance planning; Forms must qualify against that immutable product instead of creating parallel instance topology.
 * Tradeoff: Form instances cannot exist before a canonical component instance exists, and I1 intentionally creates no fallback identity.
 
-* Decision: I0 reserves `EZC1084` through `EZC1095` in one ordered `FORM_DIAGNOSTIC_RESERVATIONS` authority matching the roadmap's twelve diagnostic meanings.
+* Decision: I0 reserves `PSC1084` through `PSC1095` in one ordered `FORM_DIAGNOSTIC_RESERVATIONS` authority matching the roadmap's twelve diagnostic meanings.
 * Reason: Phase I needs a deterministic range after frozen Phase H without allowing early slices to emit ad hoc diagnostics or duplicate code ownership.
 * Tradeoff: The table reserves codes and meanings only. Identity requirements, provenance, suppression, deduplication, messages, and projection remain I18 work over canonical I1-I17 products.
 
@@ -538,19 +538,19 @@ Architecture decisions made
 
 * Decision: H20 organizes the authored regression matrix into five fixture families: declaration/import facts, composition and Slot facts, instance Context reprojection, runtime/structural/resume products, and one source file per reserved H19 diagnostic code. Compiler assertions stay in `component_fixtures`; browser-only behavior stays in `runtime_browser`.
 * Reason: Every Phase H contract now has an authored, repeatable proof without duplicating semantic authority in fixtures or using browser probes for compiler-only products. Reversing multi-file inputs and rebuilding every serialized surface verifies canonical ordering rather than source discovery order.
-* Tradeoff: The five H19 states that canonical valid construction prevents (`EZC1078`, `EZC1079`, `EZC1080`, `EZC1082`, and `EZC1083`) still use the H19-approved mutation of retained authoritative products after parsing their focused source fixture.
+* Tradeoff: The five H19 states that canonical valid construction prevents (`PSC1078`, `PSC1079`, `PSC1080`, `PSC1082`, and `PSC1083`) still use the H19-approved mutation of retained authoritative products after parsing their focused source fixture.
 
-* Decision: instance-qualified Context selection supersedes declaration-only Phase G lifetime compatibility only inside H8 composition typing. The frozen Phase G lifetime record and `EZC1065` projection remain available and unchanged.
+* Decision: instance-qualified Context selection supersedes declaration-only Phase G lifetime compatibility only inside H8 composition typing. The frozen Phase G lifetime record and `PSC1065` projection remain available and unchanged.
 * Reason: An H6-selected ancestor Provider or root-qualified default outlives its exact Consumer instance even when the retained declaration graph cannot express the composed ancestry. Runtime-facing Phase H eligibility must use that exact instance fact without rewriting frozen Phase G evidence.
 * Tradeoff: Valid composed Context fixtures may retain a declaration-level Phase G lifetime diagnostic while emitting no Phase H component diagnostic and producing compatible instance-qualified runtime records.
 
-* Decision: duplicate Slot outlets emit one `EZC1076` per component/Slot-name group, with deterministic secondary outlet evidence, rather than one public diagnostic per duplicated outlet record.
+* Decision: duplicate Slot outlets emit one `PSC1076` per component/Slot-name group, with deterministic secondary outlet evidence, rather than one public diagnostic per duplicated outlet record.
 * Reason: H19 freezes group-level deduplication and the H20 duplicate-outlet fixture exposed the per-record projector leak.
 * Tradeoff: Independent duplicate outlet groups remain independent findings; only records in the same canonical owner/name group coalesce.
 
-* Decision: H19 has one table-defined diagnostic contract and one canonical projector over H1-H17 ASM products. The projector adds only identities already owned by those products; invalid Slot candidates retain candidate/source evidence without a `SlotId`, and blocked invocations retain their canonical invocation identity without a fabricated target component identity. `EZASM1201` rejects any stored H19 diagnostic vector that differs from recomputation.
+* Decision: H19 has one table-defined diagnostic contract and one canonical projector over H1-H17 ASM products. The projector adds only identities already owned by those products; invalid Slot candidates retain candidate/source evidence without a `SlotId`, and blocked invocations retain their canonical invocation identity without a fabricated target component identity. `PSASM1201` rejects any stored H19 diagnostic vector that differs from recomputation.
 * Reason: Check, full ASM, selected-entity ASM, and explain can consume the same validated diagnostic vector and serializer without reparsing source, reconstructing component relationships, or allowing public surfaces to invent identities or labels.
-* Tradeoff: The currently authored language subset naturally exercises declaration, invocation, cycle, Slot, and instance-Context failures. Independent H4/H7/H8 failure states used by `EZC1078`, `EZC1079`, `EZC1080`, `EZC1082`, and `EZC1083` are covered by canonical-product mutation tests because valid upstream construction normally prevents those retained states; no authored syntax or runtime fallback was invented to make them reachable.
+* Tradeoff: The currently authored language subset naturally exercises declaration, invocation, cycle, Slot, and instance-Context failures. Independent H4/H7/H8 failure states used by `PSC1078`, `PSC1079`, `PSC1080`, `PSC1082`, and `PSC1083` are covered by canonical-product mutation tests because valid upstream construction normally prevents those retained states; no authored syntax or runtime fallback was invented to make them reachable.
 
 * Decision: suppression is subject-qualified and precedence ordered: inheritance suppresses downstream findings only for that component; unresolved invocations and cycles suppress only the same invocation; invalid Slot findings suppress only the same invocation or binding; unavailable instance Context suppresses only the same instance; and planning failures suppress only the derivative lowering failure for that instance.
 * Reason: This removes cascades caused by an already-reported authoritative failure while preserving diagnostics for unrelated components, invocations, bindings, regions, and instances in the same compilation.
@@ -562,35 +562,35 @@ Architecture decisions made
 
 * Decision: H12 has an explicit immutable `OptimizedComponentIrReport`, but preserves the full H11 stream because every current operation is observable and H11 already excludes blocked/static-empty work.
 * Reason: The optimizer boundary is canonical and testable without granting it authority to merge instances/bindings/Context slots, move caller-owned content, or change parent/child operation order.
-* Tradeoff: H12 adds no lowered simplification, runtime behavior, or public schema. Internal `EZASM1200` rejects source/optimized projection drift.
+* Tradeoff: H12 adds no lowered simplification, runtime behavior, or public schema. Internal `PSASM1200` rejects source/optimized projection drift.
 
 * Decision: H11 lowers immutable H10 instance and Slot batches into a dedicated canonical `ComponentIrReport`. Create, initialize, and materialize operations preserve instance order; Slot binds retain exact caller-owned fragment and callee outlet placement. `DestroyComponentInstance` is a typed reserved operation and is not emitted before H16.
 * Reason: Runtime-facing phases receive compiler-owned operation IDs and instance-qualified Context slots without declaration-slot aliases, parser walks, tag/slot-name lookup, DOM inspection, or generic rerendering.
-* Tradeoff: H11 does not optimize, serialize, execute, or structurally update the report. Internal `EZASM1199` rejects IR drift; public inspection and schemas wait for their roadmap slices.
+* Tradeoff: H11 does not optimize, serialize, execute, or structurally update the report. Internal `PSASM1199` rejects IR drift; public inspection and schemas wait for their roadmap slices.
 
 * Decision: H10 projects H4 instance topology through the existing `IrUpdateScheduler`, then schedules compatible H7 binding insertion only after exact caller/callee batches. Instance Context source readiness travels with the owning instance batch.
 * Reason: The compiler retains stable initial ordering and prerequisites without a second scheduler, runtime traversal, DOM inspection, or executing structural updates early.
-* Tradeoff: H10 is initial planning only. It adds no IR/runtime/schema or public diagnostic surface; `EZASM1198` detects retained-plan drift.
+* Tradeoff: H10 is initial planning only. It adds no IR/runtime/schema or public diagnostic surface; `PSASM1198` detects retained-plan drift.
 
 * Decision: H9 SCC analysis consumes only canonical resolved H2 definition edges and maps H4 `CompositionCycleBoundary` records to sorted cycle indexes. Slot ownership/content placement and unresolved invocation attempts never contribute edges.
 * Reason: Static recursion is inspectable and finite without parser rewalk, runtime discovery, or accidental callee-to-caller edges from lexical Slot ownership.
-* Tradeoff: H9 adds no runtime behavior or public diagnostic/schema projection. Internal `EZASM1197` rejects analysis drift; H4 remains the expansion-boundary authority.
+* Tradeoff: H9 adds no runtime behavior or public diagnostic/schema projection. Internal `PSASM1197` rejects analysis drift; H4 remains the expansion-boundary authority.
 
 * Decision: H8 records invocation, Slot binding, and instance Context compatibility without rewriting any H2, H6, or H7 identity or selection. All Phase H component boundaries are `Client`; unresolved targets retain no fabricated boundary.
 * Reason: Later planning and diagnostics can consume one immutable eligibility product while exact `SlotContent`, caller scope, outlet ownership, cardinality, Context typing, serialization, boundary, and lifetime facts remain compiler-owned.
-* Tradeoff: An incompatible Context Provider remains selected and identified. Unknown stays conservative, and no props, server/shared boundaries, public diagnostics, runtime behavior, or schema projection is added. Internal `EZASM1196` rejects product drift.
+* Tradeoff: An incompatible Context Provider remains selected and identified. Unknown stays conservative, and no props, server/shared boundaries, public diagnostics, runtime behavior, or schema projection is added. Internal `PSASM1196` rejects product drift.
 
 * Decision: H7 creates one callee-instance-qualified `SlotBindingId` per declared Slot, supplied unknown fragment, or otherwise empty blocked invocation boundary. Status is closed over `Bound`, `Empty`, `MissingOutlet`, `UnknownSlot`, `DuplicateContent`, `DuplicateOutlet`, `InvalidOwnership`, and `BlockedInvocation`.
 * Reason: Later IR/runtime stages receive exact IDs and cardinality facts for every caller/callee relationship without matching slot names, inspecting templates, or inferring placement at runtime.
-* Tradeoff: The binding record deliberately separates caller `content_owner_instance` from callee outlet placement and does not enter generic declaration ownership. H7 adds no props, forwarding, fallback/required Slots, runtime execution, public inspection shape, or user-facing diagnostics; internal `EZASM1195` rejects registry drift.
+* Tradeoff: The binding record deliberately separates caller `content_owner_instance` from callee outlet placement and does not enter generic declaration ownership. H7 adds no props, forwarding, fallback/required Slots, runtime execution, public inspection shape, or user-facing diagnostics; internal `PSASM1195` rejects registry drift.
 
 * Decision: H6 retains Phase G declaration-level Context facts and adds a parallel `InstanceContextRegistry` derived only from exact `ContextId` relations and canonical H5 self-to-root ancestry. `ProviderInstanceId`, `ConsumerInstanceId`, `ContextSourceInstanceId`, root default sources, and value slots are all instance qualified.
 * Reason: Repeated component definitions can bind to different Provider instances while every later compiler/runtime product consumes an immutable selected source and never discovers Providers by names, parent traversal, DOM state, or runtime typing.
-* Tradeoff: Invalid declarations without canonical Phase G identities remain excluded rather than receiving fabricated identities. Same-scope candidate ordering and ambiguity are represented, but H6 performs no runtime execution, slot binding, public inspection projection, or user-facing H19 diagnostics. Shared ASM validation uses internal `EZASM1194` for a noncanonical retained registry.
+* Tradeoff: Invalid declarations without canonical Phase G identities remain excluded rather than receiving fabricated identities. Same-scope candidate ordering and ambiguity are represented, but H6 performs no runtime execution, slot binding, public inspection projection, or user-facing H19 diagnostics. Shared ASM validation uses internal `PSASM1194` for a noncanonical retained registry.
 
 * Decision: H5 derives the executable instance scope graph exclusively from H4 `instances`; H4 `blocked` records never enter its nodes, parent map, child map, roots, or traversal queries. Node metadata retains definition, owner root, depth, structural region, and planned/template status.
 * Reason: This graph is the sole future runtime ancestry authority while declaration ownership and Phase G `ComponentScopeGraph` remain unchanged. Independent deterministic validation exposes mutated/corrupt topology without inferring parents from templates, imports, DOM, or runtime traversal.
-* Tradeoff: Canonical H5 construction is diagnostic-free. Shared ASM validation adds internal `EZASM1192`/`EZASM1193` integrity failures for a graph that diverges from H4 or violates endpoints, reciprocity, depth, roots, cycles, reachability, multi-parent, owner-root, or ordering invariants. No user-facing H19 diagnostic or public schema changes.
+* Tradeoff: Canonical H5 construction is diagnostic-free. Shared ASM validation adds internal `PSASM1192`/`PSASM1193` integrity failures for a graph that diverges from H4 or violates endpoints, reciprocity, depth, roots, cycles, reachability, multi-parent, owner-root, or ordering invariants. No user-facing H19 diagnostic or public schema changes.
 
 * Decision: H4 defines one compiler-owned `ComponentBuildRoot` per routed page when routes exist. Without routes, every valid definition with no incoming resolved invocation is a build entry; if a cycle-only graph has no such definition, the lexicographically first valid component is the single canonical fallback root.
 * Reason: The repository has route records and build-all-template behavior but no explicit multi-root build identity. The narrow root product preserves routed pages and disconnected build entries without treating every library definition as a root, while the cycle fallback guarantees a finite plan and an explicit cycle boundary.
@@ -613,11 +613,11 @@ Architecture decisions made
 * Tradeoff: The shared resolver establishes only `ContextId`. It does not select a Provider, add scope edges, interpret runtime names, or broaden the language.
 
 * Decision: declaration-expression typing is limited to canonical State, valid Context, and valid Provider owners. Retained invalid Provider candidates may keep authored/expression evidence, but receive no type assignment whose origin pretends that an executable Provider entity exists.
-* Reason: This makes deliberately invalid G18 fixtures valid immutable compiler products and removes `EZASM1105` without accepting fabricated invalid semantic origins.
+* Reason: This makes deliberately invalid G18 fixtures valid immutable compiler products and removes `PSASM1105` without accepting fabricated invalid semantic origins.
 * Tradeoff: No valid Provider typing changes. Invalid candidates remain excluded from G4-G17, IR, runtime artifacts, and resume state.
 
 * Decision: Context diagnostic secondary type labels validate against the exact canonical Provider or Context declared-type provenance already used by G18 projection. Check JSON now names its frozen v3 constant rather than embedding an unowned literal.
-* Reason: Canonical `EZC1059`–`EZC1064` evidence must pass shared ASM validation, while mutated/noncanonical provenance must continue to fail. Naming the version makes the serialized freeze explicit without changing output.
+* Reason: Canonical `PSC1059`–`PSC1064` evidence must pass shared ASM validation, while mutated/noncanonical provenance must continue to fail. Naming the version makes the serialized freeze explicit without changing output.
 * Tradeoff: No diagnostic code, identity, message, label, suppression, ordering, or serialized shape changes.
 
 * Decision: G19 is fixture expansion only. It adds no semantic product, language form, Provider selection, type/lifetime rule, lowering behavior, artifact field, runtime operation, or schema version.
@@ -712,7 +712,7 @@ Architecture decisions made
 * Reason: The runtime needs exact slot/function/batch/type metadata, but no semantic authority. Projecting only existing compiler products retains G4 selection, G5 typing, G8 lifetime eligibility, and G9 scheduling without creating a Provider search key, Context name key, ancestry chain, or reverse dependency table.
 * Tradeoff: G12 records metadata only. It does not serialize an artifact, allocate or evaluate slots, perform cold boot/update ordering, emit diagnostics/inspection, alias slots, or permit runtime lookup/reconstruction.
 
-* Decision: G13 emits a distinct `context.runtime.json` artifact at schema version 1 and embeds the same serialized artifact under `ez-context-runtime`. It reuses existing operand instruction encoding and adds only `initialize_context_slot` and `load_context_slot` operations.
+* Decision: G13 emits a distinct `context.runtime.json` artifact at schema version 1 and embeds the same serialized artifact under `presolve-context-runtime`. It reuses existing operand instruction encoding and adds only `initialize_context_slot` and `load_context_slot` operations.
 * Reason: The emitted artifact carries compiler-generated source, function, slot, batch, type, and Consumer-load identities directly into the generated page, so G14 can execute a closed plan without Context-name matching, Provider searches, or graph rebuilding.
 * Tradeoff: G13 serializes programs but does not execute them. It does not unify Context with computed/effect schemas, add lookup instructions, or create any fallback/rebinding behavior.
 
@@ -812,7 +812,7 @@ Architecture decisions made
 * Reason: Compiler-only contracts (cycles, folding, serialization, and multi-file identity) stay deterministic and cheap to diagnose, while chain, batching, and diamond cache refreshes are proven in a real browser against compiler-generated artifacts.
 * Tradeoff: Fixture coverage validates existing Phase E products; it does not add new language semantics, make computed template bindings dynamically refresh, or introduce runtime dependency discovery. E21 owns the final stability audit and contract freeze.
 
-* Decision: `ComputedDiagnosticCode` centralizes the stable `EZC1034`--`EZC1040` catalog, while E19 projects invalid declarations, unsupported bodies, unresolved reads, type compatibility, and serialization from existing canonical ASM products.
+* Decision: `ComputedDiagnosticCode` centralizes the stable `PSC1034`--`PSC1040` catalog, while E19 projects invalid declarations, unsupported bodies, unresolved reads, type compatibility, and serialization from existing canonical ASM products.
 * Reason: Diagnostics share the same computed entities, expression graph, purity facts, reactive cycle analysis, and semantic type model used by the rest of the compiler; no runtime observation or CLI-specific analysis determines an error.
 * Tradeoff: E19 reports only behavior already represented by the current parser and semantic products. It does not widen E2 getter-body support, add runtime validation, or create the comprehensive fixture matrix; E20 owns that fixture work.
 
@@ -858,7 +858,7 @@ Architecture decisions made
 
 * Decision: Computed cycles are canonical strongly connected components of direct computed `Reads` edges, with node membership and cycle ordering derived in stable semantic-ID order.
 * Reason: Diagnostics and later scheduling can consume one immutable compiler-owned cycle product without treating state invalidation edges, source names, or runtime observation as cycle authority.
-* Tradeoff: E8 reports one `EZC1035` diagnostic per cycle at the first member's provenance. It does not reject or alter graph construction, infer an evaluation order, create update batches, lower computed IR, or add runtime behavior; E9 owns planning.
+* Tradeoff: E8 reports one `PSC1035` diagnostic per cycle at the first member's provenance. It does not reject or alter graph construction, infer an evaluation order, create update batches, lower computed IR, or add runtime behavior; E9 owns planning.
 
 * Decision: Transitive reactive topology is an immutable ASM analysis with deterministic dependency and dependent adjacency maps for every canonical reactive node.
 * Reason: Later cycle detection, scheduler, runtime, and inspection consumers can query compiler-produced closures without traversing source expressions or rediscovering reactive paths.
@@ -868,7 +868,7 @@ Architecture decisions made
 * Reason: Later dependency analysis and scheduler consumers can query one deterministic topology without rediscovering getter reads or relying on runtime observation.
 * Tradeoff: E6 records only direct state/computed topology. It computes no transitive closures, detects no cycles, plans no updates, and adds no action/template/runtime edges; E7 owns transitive dependency and dependent analysis.
 
-* Decision: Purity is a compiler-owned computed-value classification with ordered violation records, while `EZC1034` diagnostics project each violation using its source provenance.
+* Decision: Purity is a compiler-owned computed-value classification with ordered violation records, while `PSC1034` diagnostics project each violation using its source provenance.
 * Reason: The compiler can reject behavior before any reactive or runtime product consumes the getter, and later tooling can query canonical purity facts rather than reanalyzing method bodies.
 * Tradeoff: E5 detects retained direct method-call facts and existing mutation/async metadata only. It does not model arbitrary nested control flow, resource declarations, or full call-graph effects; E19 will extend the diagnostic catalog beyond this purity contract.
 
@@ -984,7 +984,7 @@ Architecture decisions made
 * Reason: State APIs receive useful stable type contracts without prematurely encoding literal-value constraints or assuming an empty collection element type.
 * Tradeoff: C9 infers only direct serializable values; constant expression nodes, actions, and non-serializable values remain later work.
 
-* Decision: C10 uses a canonical state-initializer assignability relation and preserves `EZC1016` for incompatibilities.
+* Decision: C10 uses a canonical state-initializer assignability relation and preserves `PSC1016` for incompatibilities.
 * Reason: Arrays, tuples, objects, unions, and nullability now receive one compiler semantic compatibility check instead of primitive-only special cases.
 * Tradeoff: C10 is limited to state initializers; C29 will establish the final general assignability engine for all compiler consumers.
 
@@ -993,7 +993,7 @@ Architecture decisions made
 * Tradeoff: C11 propagates types only for the current constant state-initializer expression language. C12 still defines operand validity, while state reads, locals, templates, actions, and arbitrary JavaScript expressions remain later work.
 
 * Decision: Operator typing is one compiler-owned relation over semantic operands and returns an explicit result or invalidity.
-* Reason: Expression propagation, later diagnostics, and future optimizations can share defined EdgeZero semantics rather than inheriting JavaScript coercion behavior.
+* Reason: Expression propagation, later diagnostics, and future optimizations can share defined Presolve semantics rather than inheriting JavaScript coercion behavior.
 * Tradeoff: C12 covers only the current constant-expression operators. Invalid operations become `unknown` without new diagnostics until C32; strings, truthiness, calls, and non-state expression forms remain unsupported.
 
 * Decision: Existing method-local declaration entities receive inferred type assignments directly from their lowered serializable values.
@@ -1076,9 +1076,9 @@ Architecture decisions made
 * Reason: Diagnostics, IDE tooling, and future type consumers can categorize semantic failures without relying on message text or scattered string literals.
 * Tradeoff: C32 reports unresolved declared state types now. Non-serializable-state has a reserved stable family but awaits source-level resource/boundary declarations before it can be emitted meaningfully.
 
-* Decision: Type-system integrity is enforced by the existing ASM validator using deterministic `EZASM1101` through `EZASM1106` diagnostics.
+* Decision: Type-system integrity is enforced by the existing ASM validator using deterministic `PSASM1101` through `PSASM1106` diagnostics.
 * Reason: Type consumers fail early on corrupted canonical identities, ownership, provenance, or alias origins instead of relying on unchecked map contents.
-* Tradeoff: Semantic types are value-owned, so recursive type cycles are unrepresentable; unresolved aliases are reported at lowering as `EZC1032`, while the validator checks the resulting model's origins and identities.
+* Tradeoff: Semantic types are value-owned, so recursive type cycles are unrepresentable; unresolved aliases are reported at lowering as `PSC1032`, while the validator checks the resulting model's origins and identities.
 
 * Decision: Browser runtime integration tests acquire one process-wide lock before creating a Chrome probe, and the probe deadline allows 20 seconds for a cold Chrome start.
 * Reason: Cargo's workspace runner schedules tests concurrently, and the previous five-second harness deadline could kill an otherwise healthy cold-start probe with SIGKILL.
@@ -1112,11 +1112,11 @@ Architecture decisions made
 * Reason: The existing render-handler edge remains for backend compatibility, while ASM consumers can now trace an event directly from its authored template entity to the resolved method.
 * Tradeoff: Both legacy render-handler and canonical template-event sources point at the same method until the backend-facing graph is migrated.
 
-* Decision: `ezc asm --format json` owns an explicit schema-versioned inspection document rather than serializing compiler structs directly.
+* Decision: `psc asm --format json` owns an explicit schema-versioned inspection document rather than serializing compiler structs directly.
 * Reason: CLI consumers need a stable, deterministic interface that can evolve independently of Rust data-layout changes.
 * Tradeoff: The document exposes generic entity kinds, owners, provenance, relations, and diagnostics, not every compiler-internal field or backend artifact.
 
-* Decision: `ezc asm` accepts explicit source paths and constructs a `CompilationUnit` in compiler path order.
+* Decision: `psc asm` accepts explicit source paths and constructs a `CompilationUnit` in compiler path order.
 * Reason: Multi-file semantic inspection must share the compiler's application input boundary rather than independently aggregating file-local outputs.
 * Tradeoff: The command does not discover project files. Multi-file JSON retains the C4-A primary `file` field and adds an ordered `files` field only when more than one input is supplied.
 
@@ -1144,23 +1144,23 @@ Architecture decisions made
 * Reason: The canonical compiler can provide immediately reliable diagnostics from authored source without implying general TypeScript assignment compatibility or runtime flow analysis.
 * Tradeoff: Unclassified declarations, arrays, objects, missing values, action updates, inferred types, aliases, imports, and unions do not produce type diagnostics in this slice.
 
-* Decision: Compiler diagnostics carry optional provenance, and `EZC1016` locates the declared type annotation that establishes the incompatible contract.
+* Decision: Compiler diagnostics carry optional provenance, and `PSC1016` locates the declared type annotation that establishes the incompatible contract.
 * Reason: Developer tools can navigate from a semantic diagnostic to authoritative authored source while legacy diagnostics remain compatible when no reliable location exists.
 * Tradeoff: Only primitive initializer mismatches populate diagnostic provenance in this slice; other compiler and ASM validation diagnostics intentionally omit the optional JSON field.
 
-* Decision: Direct literal action assignments use a distinct `EZC1017` diagnostic and the parser's action-expression span.
+* Decision: Direct literal action assignments use a distinct `PSC1017` diagnostic and the parser's action-expression span.
 * Reason: Initializer and action failures have different authored causes, so tooling can explain the operation precisely without collapsing them into one generic type mismatch.
 * Tradeoff: Only `this.<field> = <primitive literal>` participates; increments, compound assignments, toggles, composite literals, variable flow, and unclassified types remain unvalidated.
 
-* Decision: Boolean toggle validation uses distinct `EZC1018` diagnostics for exact primitive declared fields that are not `boolean`.
+* Decision: Boolean toggle validation uses distinct `PSC1018` diagnostics for exact primitive declared fields that are not `boolean`.
 * Reason: The recognized toggle action has a fixed boolean result, so the compiler can validate it without interpreting arbitrary expressions.
 * Tradeoff: Only the exact self-toggle form participates; numeric operators, compound assignments, variable flow, and unclassified types remain unvalidated.
 
-* Decision: Increment and decrement validation uses distinct `EZC1019` diagnostics for exact primitive declared fields that are not `number`.
+* Decision: Increment and decrement validation uses distinct `PSC1019` diagnostics for exact primitive declared fields that are not `number`.
 * Reason: The recognized numeric update operations have fixed numeric requirements, so the compiler can validate their targets without evaluating application state.
 * Tradeoff: Compound arithmetic operands, arbitrary expressions, variable flow, and unclassified types remain unvalidated.
 
-* Decision: Compound arithmetic uses `EZC1020` for non-number exact primitive targets and `EZC1021` for non-number literal operands.
+* Decision: Compound arithmetic uses `PSC1020` for non-number exact primitive targets and `PSC1021` for non-number literal operands.
 * Reason: Target and operand failures are independent compiler facts, so separate diagnostics give tools actionable, source-provenanced evidence without expression evaluation.
 * Tradeoff: Only serializable literal operands are classified; arbitrary expressions, variable flow, and unclassified declarations remain outside the type system.
 
@@ -1170,7 +1170,7 @@ Architecture decisions made
 
 * Decision: Text ASM inspection appends deterministic ASM validation diagnostic details only when validation failures exist.
 * Reason: Inspectors can now see every diagnostic class in the text surface while normal source compilation stays compact and compatibility-safe.
-* Tradeoff: Standard source-driven `ezc asm` inputs generally have no ASM validation failures; direct formatter coverage exercises this defensive contract without inventing invalid CLI inputs.
+* Tradeoff: Standard source-driven `psc asm` inputs generally have no ASM validation failures; direct formatter coverage exercises this defensive contract without inventing invalid CLI inputs.
 
 * Decision: Canonical ASM/frontend consumers use module-qualified semantic IDs, while the existing backend-facing graph retains legacy component-scoped IDs until its runtime contracts are deliberately migrated.
 * Reason: A canonical application model must distinguish semantically equivalent components from different modules, but the established HTML/template runtime protocol does not serialize these IDs and should not be changed implicitly.
@@ -1181,7 +1181,7 @@ Architecture decisions made
 * Tradeoff: External and namespace re-exports remain unresolved, and the current component-scoped semantic IDs still require the next module-qualified identity migration.
 
 * Decision: C2-B resolves only local exports and imports whose module-graph target is a relative file in the current `CompilationUnit`.
-* Reason: Compiler bindings must use the same source/module/symbol products as the rest of `ezco`, while package resolution and re-export chains require additional well-defined frontend semantics.
+* Reason: Compiler bindings must use the same source/module/symbol products as the rest of `psco`, while package resolution and re-export chains require additional well-defined frontend semantics.
 * Tradeoff: External packages remain unbound, and `export { ... } from` / `export * from` chains remain C2-C work.
 
 * Decision: C2-A indexes only declarations local to each source module using class-qualified member names.
@@ -1193,7 +1193,7 @@ Architecture decisions made
 * Tradeoff: C1-B resolves only relative source files already present in the unit. Package resolution, tsconfig aliases, extension remapping, and symbol bindings remain C2 or later frontend work.
 
 * Decision: The compiler frontend now accepts a deterministic `CompilationUnit` before application-level semantic construction.
-* Reason: `ezco` needs a project-wide input boundary so every later graph, analysis, plan, and developer product can consume one semantic model rather than independently reparsing files.
+* Reason: `psco` needs a project-wide input boundary so every later graph, analysis, plan, and developer product can consume one semantic model rather than independently reparsing files.
 * Tradeoff: C1-A aggregates existing file-local semantics only. Import/export declarations, resolved module edges, duplicate semantic identity diagnostics, and symbols remain later compiler-front-end work.
 
 * Decision: Existing route, module, layout, and resume metadata remain experimental compiler consumers rather than evidence that application-platform semantics are complete.
@@ -1204,7 +1204,7 @@ Architecture decisions made
 * Reason: The handoff preserves immediate continuation context while the progress log preserves the durable implementation chronology.
 * Tradeoff: Documentation-only recovery commits may be required when a prior checkpoint omitted the weekly entry.
 
-* Decision: `ezc check` defaults parser failures to `error` and keeps that policy command-scoped until a project configuration format is deliberately designed.
+* Decision: `psc check` defaults parser failures to `error` and keeps that policy command-scoped until a project configuration format is deliberately designed.
 * Reason: The compiler can establish a predictable default without implying that an undocumented configuration file is accepted or that compiler/ASM integrity findings are suppressible.
 * Tradeoff: Teams must pass a policy threshold in their command invocation; project presets and policy-file discovery remain future work.
 
@@ -1212,11 +1212,11 @@ Architecture decisions made
 * Reason: Each test launches a real Chrome process, and serial execution prevents host-resource contention and stale profile locks during the documented verification commands.
 * Tradeoff: The browser suite takes longer to run, but `pnpm test:e2e` and `just e2e` now produce a reproducible result on constrained development hosts.
 
-* Decision: `ezc check` projects parser label provenance as a deterministic array of source coordinates.
+* Decision: `psc check` projects parser label provenance as a deterministic array of source coordinates.
 * Reason: CLI and automation consumers can navigate from a parser diagnostic to every parser-provided span without reparsing the source or depending on backend-specific diagnostics.
 * Tradeoff: Labels currently provide only positional spans. Label messages, source excerpts, code frames, and compiler/ASM provenance in check JSON remain separate follow-up work.
 
-* Decision: `ezc check --format json` reuses the ASM source-provenance shape for compiler diagnostics and omits it when unavailable.
+* Decision: `psc check --format json` reuses the ASM source-provenance shape for compiler diagnostics and omits it when unavailable.
 * Reason: Check consumers receive the same canonical coordinates as ASM inspection without representing missing provenance as an invented location or a misleading null contract.
 * Tradeoff: Only diagnostics with reliable compiler provenance include the field. Source remapping, code frames, and provenance for ASM validation diagnostics remain future work.
 
@@ -1256,7 +1256,7 @@ Architecture decisions made
 * Reason: The CLI can reuse canonical ASM categories while making the result boundary unambiguous: direct child lists and incoming/outgoing relation lists are filtered without changing the selected entity or its ownership traversal.
 * Tradeoff: C8-C accepts one child-kind and one reference-kind filter. Composite predicates, descendant filtering, diagnostics filtering, line/column selection, and path normalization remain future work.
 
-* Decision: `ezc explain` delegates entity inspection to the same canonical ASM inspection runner as `ezc asm`.
+* Decision: `psc explain` delegates entity inspection to the same canonical ASM inspection runner as `psc asm`.
 * Reason: The developer-facing source-summary command can expose compiler semantics without duplicating selection, ordering, filtering, diagnostic, or schema behavior.
 * Tradeoff: Plain `explain` remains a legacy source-summary surface; only explicit entity-selection or entity-filter options activate ASM inspection.
 
@@ -1328,7 +1328,7 @@ Architecture decisions made
 * Tradeoff: Inserting an earlier action step changes later action IDs; source-provenance-backed refinement remains deferred to ASM-4.
 * Decision: Semantic IDs do not change template manifests, static HTML, or runtime artifacts in ASM-1.
 * Reason: This establishes a compiler-platform contract without forcing a backend schema change before ownership and cross-reference semantics exist.
-* Tradeoff: Semantic IDs are inspectable through compiler APIs only until the planned `ez asm` CLI slice.
+* Tradeoff: Semantic IDs are inspectable through compiler APIs only until the planned `presolve explain` CLI slice.
 * Decision: Ownership is a typed relationship with either the application root or a direct owning `SemanticId`.
 * Reason: The compiler can distinguish top-level component roots from semantic children without reserving a synthetic application ID before the Application Semantic Model exists.
 * Tradeoff: Ownership is currently stored on existing graph entities rather than in a centralized ASM relation table; the query API and ASM shell will consolidate access later.
@@ -1368,9 +1368,9 @@ Known limitations
 * Item: Conditional rendering only supports simple `this.<stateField>` conditions with JSX element or fragment branches.
 * Item: Conditional branch snippets are replaced as static HTML. Bindings, events, and nested dynamic behavior inside swapped-in branch snippets are not re-registered yet.
 * Item: Keyed lists currently accept only `iterable.map((item, index?) => <element>...</element>)` with identifier parameters and an expression-bodied callback. Static and runtime reconciliation support a direct primitive item key or a dot-member key such as `item.id` that resolves to a unique primitive.
-* Item: Missing keys, index keys, unsupported expressions, duplicate statically-known primitive keys, and missing/non-primitive member keys emit `EZC1011` through `EZC1015`.
+* Item: Missing keys, index keys, unsupported expressions, duplicate statically-known primitive keys, and missing/non-primitive member keys emit `PSC1011` through `PSC1015`.
 * Item: List item templates must have one root element. Retained and inserted items refresh direct item/index/member text and direct item/index/member attributes, and hydrate delegated click actions. Nested dynamic behavior still does not refresh or re-register.
-* Item: Duplicate runtime list keys that arise from dynamic state still produce `EZR_DUPLICATE_LIST_KEY` and the later duplicate is skipped. A missing/non-primitive dynamic member key falls back to index identity; compiler diagnostics cover only statically-known initial items.
+* Item: Duplicate runtime list keys that arise from dynamic state still produce `PSR_DUPLICATE_LIST_KEY` and the later duplicate is skipped. A missing/non-primitive dynamic member key falls back to index identity; compiler diagnostics cover only statically-known initial items.
 * Item: Only `this.<field>++`, `this.<field>--`, `this.<field> += <literal>`, `this.<field> -= <literal>`, `this.<field> = <literal>`, and `this.<field> = !this.<field>` are recognized as action steps.
 * Item: The browser runtime supports only delegated click events, ordered closed action steps, numeric/string/boolean/null initial state, binding callback text/attribute updates, and conditional branch replacement.
 * Item: Static and `this.<stateField>` dynamic JSX attributes are preserved, but `className`/`htmlFor` normalization policy is still intentionally undecided.
@@ -1382,20 +1382,20 @@ Known limitations
 * Item: Semantic IDs, direct ownership, and provenance cover components, state fields, methods, action steps, rendered templates, event handlers, and authored template descendants. Backend HTML/template-manifest nodes still use local `n*` IDs as a compatibility contract.
 * Item: Resolved references cover action-to-state, event-to-method, and exact direct text-binding/dynamic-attribute/conditional/keyed-list-iterable pairs to state or computed entities. Routes, member expressions, calls, computed evaluation, and unresolved reference attempts have no semantic relation records yet.
 * Item: Canonical compiler products now include module-qualified template entities, direct template state dependencies, and direct template event-method dependencies, while `BindingTable` resolves local/relative re-export chains plus named/default/namespace imports. External and namespace re-exports, external package bindings, tsconfig aliases, source remapping, and type semantics are still absent. Legacy backend graph identity remains a compatibility path.
-* Item: `ezc asm` accepts explicit source files and exposes generic JSON and text inspection. Text includes compiler and ASM validation diagnostic detail when present. Project discovery, tsconfig resolution, source remapping, typed action payloads, and machine-readable backend plans remain future slices.
-* Item: Declared state types include canonical primitive classification, optional ASM JSON `declared_type.kind`, and source-provenanced `EZC1016` through `EZC1021` diagnostics for supported initializer and action forms. Other compiler/ASM diagnostics may omit provenance. Arbitrary action expressions, variable flow, manifests, runtime, imported types, non-state annotations, inference, unions, aliases, generics, and general assignment compatibility remain outside current type validation.
-* Item: Browser e2e requires a local Chrome binary or `EDGEZERO_CHROME=/path/to/chrome`.
+* Item: `psc asm` accepts explicit source files and exposes generic JSON and text inspection. Text includes compiler and ASM validation diagnostic detail when present. Project discovery, tsconfig resolution, source remapping, typed action payloads, and machine-readable backend plans remain future slices.
+* Item: Declared state types include canonical primitive classification, optional ASM JSON `declared_type.kind`, and source-provenanced `PSC1016` through `PSC1021` diagnostics for supported initializer and action forms. Other compiler/ASM diagnostics may omit provenance. Arbitrary action expressions, variable flow, manifests, runtime, imported types, non-state annotations, inference, unions, aliases, generics, and general assignment compatibility remain outside current type validation.
+* Item: Browser e2e requires a local Chrome binary or `PRESOLVE_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 * Item: Check policy is selected per CLI invocation. Project policy files, presets, and policy discovery are not interpreted yet.
 * Item: Parser diagnostic labels expose only `line`, `column`, `start`, and `end`; parser label messages and rendered source excerpts are not available yet. Compiler provenance in check JSON is optional, and ASM validation diagnostics still have no provenance field.
 * Item: ASM query APIs expose nearest-first parent traversal through the application root, direct and transitive ownership traversal, broad entity kinds, entity/reference provenance lookup, and reference-kind filtering. `asm` and explicit `explain` inspection mode support semantic-ID or source-byte selection plus parent, direct-child, and incoming/outgoing reference navigation, with one typed child and relation filter; composite predicates, descendant/diagnostic filtering, line/column input, path normalization, and source remapping remain future work.
-* Item: `ezc asm --format graph` exports a schema-versioned canonical semantic graph with roots, typed nodes, provenance, ownership edges, and resolved reference edges. It intentionally does not discover project files, include diagnostics, expose parser/backend/runtime artifacts, or provide graph filtering, mutation, or alternate serialization formats.
+* Item: `psc asm --format graph` exports a schema-versioned canonical semantic graph with roots, typed nodes, provenance, ownership edges, and resolved reference edges. It intentionally does not discover project files, include diagnostics, expose parser/backend/runtime artifacts, or provide graph filtering, mutation, or alternate serialization formats.
 * Item: Canonical ASM ownership now drives template entity lookup, template dependency lowering, and dead-action analysis. Legacy ComponentGraph, TemplateSemanticEntity construction, and SymbolTable records still carry owner fields as compatibility/lowering data; their removal or migration requires a later dedicated frontend/backend compatibility slice.
 * Item: Constant `state(...)` initializers use one compiler-owned expression model. Numeric arithmetic, comparisons, boolean logic, nullish coalescing, and unary `!`, `+`, and `-` evaluate statically. State reads, local variables, calls, coercions, truthiness, control flow, and semantic expression typing remain later Phase B work.
 * Item: Method parameters are compiler-owned identifier declarations with canonical source provenance only. They do not execute, close over values, resolve local/template/action references, or support destructuring, defaults, rest declarations, or semantic type checking.
 * Item: Method-local resolution accepts only exact, uniquely declared supported locals from `render()` template scope. List-item scopes, duplicate local names, member access, arbitrary expressions, calls, closures, action references, runtime updates, and semantic typing remain unresolved.
 * Item: Constant folding handles only the existing supported state initializer expression language. It does not fold local-variable values, evaluate actions or templates generically, perform flow/type analysis, or introduce runtime evaluation.
-* Item: The canonical expression graph covers supported state initializer expressions and direct supported computed getter returns. Computed expression nodes and entities have inferred canonical types through resolved state/computed reads; exact template binding uses can resolve to computed entities, but do not evaluate them. Computed values are pure or impure with `EZC1034` purity diagnostics, compiler-owned direct/transitive reactive topology is available, computed cycles emit `EZC1035`, and evaluation plans expose stable order/batches. Pure scheduled E2 expressions lower to canonical IR functions, a separate immutable optimized IR product, and emitted `computed.runtime.json` programs. Runtime state writes mark compiler-emitted transitive dependents dirty and one post-action scheduler flush refreshes caches. Resume plans now identify serializable computed caches, but no live cache snapshot or restore transport exists yet; template updates remain later work.
+* Item: The canonical expression graph covers supported state initializer expressions and direct supported computed getter returns. Computed expression nodes and entities have inferred canonical types through resolved state/computed reads; exact template binding uses can resolve to computed entities, but do not evaluate them. Computed values are pure or impure with `PSC1034` purity diagnostics, compiler-owned direct/transitive reactive topology is available, computed cycles emit `PSC1035`, and evaluation plans expose stable order/batches. Pure scheduled E2 expressions lower to canonical IR functions, a separate immutable optimized IR product, and emitted `computed.runtime.json` programs. Runtime state writes mark compiler-emitted transitive dependents dirty and one post-action scheduler flush refreshes caches. Resume plans now identify serializable computed caches, but no live cache snapshot or restore transport exists yet; template updates remain later work.
 * Item: C30 exposes direct ASM type queries only. CLI inspection output, source diagnostics, backend enforcement, resource declaration lowering, and final type diagnostic families remain later Phase C work.
 * Item: Authored method IR functions still contain only empty entry basic blocks plus structural branch-edge and natural-loop records. Computed E10 functions lower the supported E2 expression graph into value-producing instructions, but neither form has source-lowered branches/loops, explicit terminators, or general statement instructions.
 * Item: Authored method lowering still creates empty function value registries and no method load/store instructions. Computed E10 functions register their defining values and resolved state/computed loads; D3-A analyses apply to both canonical forms without adding general source statement lowering.
@@ -1409,36 +1409,37 @@ all active compiler/runtime namespaces, diagnostics, generated marker names,
 fixtures, and implementation paths must move together. The first migration
 slice makes `presolve explain` the sole inspection command (`--inspect` for
 complete inspection; the retired short command exits 6). Compiler/runtime
-diagnostics, generated marker names, fixture bytes, browser globals, and
-browser assertions now use the Presolve namespace. Next: migrate the Rust crate
-paths/imports and remaining implementation identity before resuming L18.
+diagnostics, generated marker names, fixture bytes, browser globals, browser
+assertions, crate paths, imports, and implementation diagnostic families now use
+the Presolve namespace. Next: run the full identity-migration audit and resume
+L18 only after every active legacy representation is absent.
 
 Useful commands
 
 * `cargo fmt --all --check`
-* `cargo test -p ezc_parser`
-* `cargo test -p ezc_core`
-* `cargo test -p ezc_cli`
-* `RUST_TEST_THREADS=1 cargo test -p ezc_cli --test runtime_browser -- --nocapture`
+* `cargo test -p presolve_parser`
+* `cargo test -p presolve_compiler`
+* `cargo test -p presolve_cli`
+* `RUST_TEST_THREADS=1 cargo test -p presolve_cli --test runtime_browser -- --nocapture`
 * `cargo clippy --workspace --all-targets -- -D warnings`
 * `pnpm test:e2e`
 * `just e2e`
 * `RUST_TEST_THREADS=1 cargo test --workspace`
-* `cargo run -p ezc_cli -- build fixtures/0005-double-binding-counter/input/DoubleBindingCounter.tsx --out target/ezc-manual/double-binding-counter`
-* `cargo run -p ezc_cli -- build fixtures/0009-decrement-counter/input/DecrementCounter.tsx --out target/ezc-manual/decrement-counter`
-* `cargo run -p ezc_cli -- build fixtures/0010-add-subtract-assign/input/StepCounter.tsx --out target/ezc-manual/step-counter`
-* `cargo run -p ezc_cli -- build fixtures/0011-direct-assignment/input/ResetCounter.tsx --out target/ezc-manual/reset-counter`
-* `cargo run -p ezc_cli -- build fixtures/0012-boolean-toggle/input/ToggleFlag.tsx --out target/ezc-manual/toggle-flag`
-* `cargo run -p ezc_cli -- build fixtures/0013-multi-step-action/input/BatchActionCounter.tsx --out target/ezc-manual/batch-action-counter`
-* `cargo run -p ezc_cli -- build fixtures/0014-static-attributes/input/StaticAttributePanel.tsx --out target/ezc-manual/static-attributes`
-* `cargo run -p ezc_cli -- build fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx --out target/ezc-manual/dynamic-attributes`
-* `cargo run -p ezc_cli -- build fixtures/0016-fragments/input/FragmentPanel.tsx --out target/ezc-manual/fragments`
-* `cargo run -p ezc_cli -- build fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx --out target/ezc-manual/conditional-rendering`
-* `cargo run -p ezc_cli -- build fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx --out target/ezc-manual/logical-and-conditional`
-* `cargo run -p ezc_cli -- template fixtures/0019-keyed-list-semantics/input/KeyedList.tsx`
-* `cargo run -p ezc_cli -- html fixtures/0020-static-keyed-list/input/StaticKeyedList.tsx`
-* `RUST_TEST_THREADS=1 cargo test -p ezc_cli --test runtime_browser keyed_lists_reconcile_in_a_real_browser -- --nocapture`
-* `cargo run -p ezc_cli -- build fixtures/0004-nested-jsx/input/NestedCounter.tsx --out target/ezc-manual/runtime-contract`
+* `cargo run -p presolve_cli -- build fixtures/0005-double-binding-counter/input/DoubleBindingCounter.tsx --out target/presolve-manual/double-binding-counter`
+* `cargo run -p presolve_cli -- build fixtures/0009-decrement-counter/input/DecrementCounter.tsx --out target/presolve-manual/decrement-counter`
+* `cargo run -p presolve_cli -- build fixtures/0010-add-subtract-assign/input/StepCounter.tsx --out target/presolve-manual/step-counter`
+* `cargo run -p presolve_cli -- build fixtures/0011-direct-assignment/input/ResetCounter.tsx --out target/presolve-manual/reset-counter`
+* `cargo run -p presolve_cli -- build fixtures/0012-boolean-toggle/input/ToggleFlag.tsx --out target/presolve-manual/toggle-flag`
+* `cargo run -p presolve_cli -- build fixtures/0013-multi-step-action/input/BatchActionCounter.tsx --out target/presolve-manual/batch-action-counter`
+* `cargo run -p presolve_cli -- build fixtures/0014-static-attributes/input/StaticAttributePanel.tsx --out target/presolve-manual/static-attributes`
+* `cargo run -p presolve_cli -- build fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx --out target/presolve-manual/dynamic-attributes`
+* `cargo run -p presolve_cli -- build fixtures/0016-fragments/input/FragmentPanel.tsx --out target/presolve-manual/fragments`
+* `cargo run -p presolve_cli -- build fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx --out target/presolve-manual/conditional-rendering`
+* `cargo run -p presolve_cli -- build fixtures/0018-logical-and-conditional/input/LogicalAndStatus.tsx --out target/presolve-manual/logical-and-conditional`
+* `cargo run -p presolve_cli -- template fixtures/0019-keyed-list-semantics/input/KeyedList.tsx`
+* `cargo run -p presolve_cli -- html fixtures/0020-static-keyed-list/input/StaticKeyedList.tsx`
+* `RUST_TEST_THREADS=1 cargo test -p presolve_cli --test runtime_browser keyed_lists_reconcile_in_a_real_browser -- --nocapture`
+* `cargo run -p presolve_cli -- build fixtures/0004-nested-jsx/input/NestedCounter.tsx --out target/presolve-manual/runtime-contract`
 
 Changed but uncommitted files
 

@@ -7,7 +7,7 @@ runtime registration order.
 
 ## Build mode and authority
 
-`ezc_cli build <input> --out <directory> --production` emits the normal
+`presolve_cli build <input> --out <directory> --production` emits the normal
 development artifacts plus a production artifact and content-addressed modules
 under `production/`. Development builds keep their existing HTML/runtime path.
 Production HTML adds the exact packed artifact as `#presolve-production-runtime`
