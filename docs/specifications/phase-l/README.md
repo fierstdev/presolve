@@ -84,6 +84,9 @@ L20 is governed by the [platform freeze contract](../../platform-freeze-contract
 
 L21 is governed by the [post-freeze governance](../../post-freeze-governance.md). It is a non-feature stewardship handoff and requires the completed L20 evidence plus a clean committed tree.
 
+The proposed next roadmap is [Phase M](../phase-m/README.md). It is not active
+until its owner acceptance checklist is satisfied.
+
 The owner-directed [Presolve identity migration contract](../../presolve-identity-migration-contract.md)
 supersedes conflicting retained-identity exceptions. It governs the active
 compiler, runtime, fixture, implementation-path, and inspection-command
