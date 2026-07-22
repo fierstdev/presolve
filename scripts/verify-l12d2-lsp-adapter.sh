@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 package=packages/lsp
+pnpm install --offline --force
+cleanup_workspace_links() {
+  rm -rf packages/language-service/node_modules packages/lsp/node_modules packages/vscode/node_modules
+}
+trap cleanup_workspace_links EXIT
 rg --quiet '@presolve/language-service' "$package/package.json"
 rg --quiet 'textDocument/definition' "$package/src/index.js"
 rg --quiet 'textDocument/references' "$package/src/index.js"

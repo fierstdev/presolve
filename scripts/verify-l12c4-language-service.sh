@@ -2,6 +2,11 @@
 set -euo pipefail
 
 package=packages/language-service
+pnpm install --offline --force
+cleanup_workspace_links() {
+  rm -rf packages/language-service/node_modules packages/lsp/node_modules packages/vscode/node_modules
+}
+trap cleanup_workspace_links EXIT
 test -s "$package/package.json"
 test -s "$package/src/index.js"
 rg --quiet '@presolve/compiler-wasm' "$package/package.json"
