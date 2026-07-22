@@ -88,17 +88,27 @@ result remain unchanged.
 
 ### M3 — explicit compiler handoff contract
 
+**Completed authority:**
+[M3 explicit handoff contract](PHASE_M_M3_EXPLICIT_HANDOFF_CONTRACT.md).
+
 Define and implement the narrow framework handoff over the accepted explicit
-`presolve` project/configuration boundary. It forwards caller-supplied paths,
-configuration, source membership, target profile, and output root without
-discovery or source interpretation. It returns only command status and opaque
-published artifact locations; it does not decode, synthesize, or rewrite
-compiler products.
+`presolve` project/configuration boundary. It forwards caller-supplied command,
+configuration path, and ordered source membership without discovery or source
+interpretation. The L9 configuration remains opaque: it owns target profile,
+and L9 has no independent output-root argument. The handoff returns the
+executor result unchanged; it does not decode, synthesize, rewrite, or infer
+compiler products or artifact locations.
 
 Proof: request-shape fixtures; no-source-retention/dependency audit; unchanged
 canonical diagnostics; incompatible version/command failure fixtures.
 
 ### M4 — Counter vertical slice
+
+Begin with a public artifact-publication capability audit. L9 build/check
+publishes status and snapshot identities, not static HTML/runtime locations.
+M4 may use only an existing frozen public publication boundary; it must stop if
+none can supply the required artifacts without a legacy adapter, decoder, or
+new compiler behavior.
 
 Prove the exact M1 Counter through M2 types and M3 handoff:
 
@@ -171,6 +181,7 @@ future metaframework must supply; it does not pre-implement it.
 
 ## Next authorized action
 
-M3 only: define the explicit canonical-command handoff contract and its
-focused request/diagnostic integrity fixtures. Stop before the Counter runtime
-vertical slice until M3's opaque, caller-supplied handoff evidence is committed.
+M4 only: perform the public artifact-publication capability audit. Stop before
+the Counter runtime vertical proof unless an existing frozen public publication
+boundary supplies the required artifacts without a legacy adapter, decoder, or
+new compiler behavior.

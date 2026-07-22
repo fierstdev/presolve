@@ -5,8 +5,9 @@ readonly roadmap=docs/specifications/phase-m/PHASE_M_PROPOSED_ROADMAP.md
 readonly constitution=docs/specifications/phase-m/PHASE_M_FRAMEWORK_CONSTITUTION.md
 readonly authoring=docs/specifications/phase-m/PHASE_M_CONFORMANCE_AUTHORING_CONTRACT.md
 readonly m2_contract=docs/specifications/phase-m/PHASE_M_M2_FRAMEWORK_TYPES_CONTRACT.md
+readonly m3_contract=docs/specifications/phase-m/PHASE_M_M3_EXPLICIT_HANDOFF_CONTRACT.md
 
-for document in "$roadmap" "$constitution" "$authoring" "$m2_contract"; do
+for document in "$roadmap" "$constitution" "$authoring" "$m2_contract" "$m3_contract"; do
   test -s "$document"
 done
 
@@ -36,5 +37,6 @@ done
 
 rg --fixed-strings --quiet 'M0/M1 owner-accepted' "$roadmap"
 rg --fixed-strings --quiet 'M2 framework types contract' "$roadmap"
-rg --fixed-strings --quiet 'M3 only' "$roadmap"
+rg --fixed-strings --quiet 'M3 explicit handoff contract' "$roadmap"
+rg --fixed-strings --quiet 'M4 only' "$roadmap"
 git diff --check

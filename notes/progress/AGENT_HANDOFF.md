@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: M2 - Isolated Ambient Type Package
-* Working tree: Phase M M2 framework types implementation pending its completion commit.
+* Latest completed slice: M3 - Explicit Canonical-Command Handoff
+* Working tree: Phase M M3 framework handoff implementation pending its completion commit.
 * Date: 2026-07-22
 
 Last completed slice
+
+* Slice: M3 - Explicit Canonical-Command Handoff
+* Result: adds private `@presolve/framework` with a source-free, one-shot request builder for the exact L9 `presolve build|check --config --source --format json` form. It preserves caller source order, makes configuration opaque, passes executor results unchanged, and has no filesystem, process, parser, compiler, decoder, or runtime behavior. The L9 JSON boundary exposes status/snapshot identities only, not static HTML/runtime artifact locations.
+* Next: M4 must begin with a public artifact-publication capability audit. Do not bridge the missing output locations with a legacy adapter, artifact decoder, or compiler change.
 
 * Slice: M2 - Isolated Ambient Type Package
 * Result: adds private declaration-only `@presolve/framework-types` under the isolated `framework/` workspace. The focused Counter fixture is byte-identical to the canonical example, resolves types through an explicit `tsconfig` entry using the pinned TypeScript 7.0 native CLI, and succeeds through the unchanged explicit `presolve check` path. The package has no JavaScript source, decorator/runtime behavior, transform, compiler API, or compiler adapter. TypeScript 7.1 remains a future explicit compatibility row.

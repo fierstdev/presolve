@@ -1,0 +1,12 @@
+{
+  "name": "@presolve/framework",
+  "version": "0.1.0-alpha",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "check": "../../../scripts/verify-m3-framework-handoff.sh"
+  }
+}

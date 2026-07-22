@@ -24,6 +24,8 @@ importers:
 
   framework/packages/framework-types: {}
 
+  framework/packages/framework: {}
+
   packages/compiler-wasm: {}
 
   packages/language-service:
