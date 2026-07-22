@@ -133,6 +133,8 @@ Canonical compiler fixtures establish initializer limits, action writes,
 direct/captured events, computed dependency/caching behavior, action-batch
 ordering, and effect capability diagnostics.
 
+**M5-A authority:** [Computed conformance](PHASE_M_M5_COMPUTED_CONFORMANCE.md).
+
 ### M6 — composition conformance families
 
 Add exact frozen component invocation, repeated/keyed instance behavior, Slot
@@ -182,6 +184,6 @@ future metaframework must supply; it does not pre-implement it.
 
 ## Current boundary
 
-M4 is complete. It established the existing compiler artifact publisher as the
-single framework build path and passed Counter's type, artifact, and browser
-proof. M5 may now select one next existing reactive declaration family.
+M4 is complete. M5-A Computed conformance is complete. M5-B may select only
+the existing Effect declaration plus its compiler-backed capability and browser
+proof.

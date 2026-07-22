@@ -16,6 +16,9 @@ declare global {
   /** Declares a compiler-recognized Action without installing an event wrapper. */
   function action(): PresolveMethodDecorator;
 
+  /** Declares a compiler-recognized getter without caching or invalidation behavior. */
+  function computed(): PresolveGetterDecorator;
+
   /**
    * Describes the initializer shape for compiler-recognized State. The
    * compiler, not this declaration, establishes reactive State semantics.
@@ -36,6 +39,12 @@ declare global {
     value: Value,
     context: ClassMethodDecoratorContext<This, Value>
   ) => Value | void;
+
+  /** A standard-decorator-compatible declaration for `@computed()`. */
+  type PresolveGetterDecorator = <This, Value>(
+    value: (this: This) => Value,
+    context: ClassGetterDecoratorContext<This, Value>
+  ) => ((this: This) => Value) | void;
 
   namespace JSX {
     type Element = unknown;

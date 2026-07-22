@@ -58,6 +58,7 @@ rerun of this fixture and every later declaration fixture.
 
 ## Exclusions and next boundary
 
-M2 does not expose Computed, Effect, Context, Slot, or Form declarations; it
-does not add a source transform or invoke a compiler from JavaScript. Its Action
+M2's completed baseline did not expose Computed, Effect, Context, Slot, or Form
+declarations; later conformance slices may add them one at a time. It does not
+add a source transform or invoke a compiler from JavaScript. Its Action
 declaration is type-only and adds no event wrapper or reactive behavior.

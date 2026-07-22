@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: M4 - Canonical Artifact-Publication Counter Proof
-* Working tree: Phase M M4 canonical publication handoff and Counter proof pending its completion commit.
+* Latest completed slice: M5-A - Computed Conformance
+* Working tree: Phase M M5-A Computed declaration, fixture, and verifier pending its completion commit.
 * Date: 2026-07-22
 
 Last completed slice
+
+* Slice: M5-A - Computed Conformance
+* Result: extends the declaration-only type package with the existing `@computed()` getter marker only. The exact production/resume ComputedDiamond example is byte-identical to the framework fixture and to the compiler browser fixture; TypeScript 7.0, the unchanged compiler check, and the browser's single compiler-planned recomputation all pass.
+* Next: M5-B may select Effects from an exact existing compiler capability/runtime fixture. Do not add a framework scheduler, cache, invalidation API, or Effect convenience syntax.
 
 * Slice: M4 - Canonical Artifact-Publication Counter Proof
 * Result: Phase M adopts the existing `presolve build <source> --out <directory>` compiler artifact publisher as its sole build handoff. It is the actual current HTML/runtime/resume generator, so the pre-release “legacy compatibility” label no longer blocks framework conformance. The private handoff remains path-opaque and process-free; Counter uses compiler-recognized State, Action, and direct event binding only.
