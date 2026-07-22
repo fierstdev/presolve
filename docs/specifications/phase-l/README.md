@@ -74,6 +74,8 @@ L12-E-2 activates the pinned-fixture `@presolve/vscode` facade. It imports only 
 
 The [L13--L21 continuation contracts](PHASE_L_L13_L21_CONTINUATION_CONTRACT.md) are the authoritative remaining Phase L slice sequence. They govern public testing, examples, documentation, community readiness, reproducible distribution, launch content, rehearsal, freeze, and post-freeze stewardship without expanding compiler authority.
 
+L18 is governed by the versioned repository-local [launch content contract](../../launch-content-contract.md). It owns content and link verification only; deployment remains external.
+
 The owner-directed [Presolve identity migration contract](../../presolve-identity-migration-contract.md)
 supersedes conflicting retained-identity exceptions. It governs the active
 compiler, runtime, fixture, implementation-path, and inspection-command

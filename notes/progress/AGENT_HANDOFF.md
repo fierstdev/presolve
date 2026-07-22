@@ -1112,11 +1112,11 @@ Architecture decisions made
 * Reason: The existing render-handler edge remains for backend compatibility, while ASM consumers can now trace an event directly from its authored template entity to the resolved method.
 * Tradeoff: Both legacy render-handler and canonical template-event sources point at the same method until the backend-facing graph is migrated.
 
-* Decision: `psc asm --format json` owns an explicit schema-versioned inspection document rather than serializing compiler structs directly.
+* Decision: `presolve explain --inspect --format json` owns an explicit schema-versioned inspection document rather than serializing compiler structs directly.
 * Reason: CLI consumers need a stable, deterministic interface that can evolve independently of Rust data-layout changes.
 * Tradeoff: The document exposes generic entity kinds, owners, provenance, relations, and diagnostics, not every compiler-internal field or backend artifact.
 
-* Decision: `psc asm` accepts explicit source paths and constructs a `CompilationUnit` in compiler path order.
+* Decision: `presolve explain --inspect` accepts explicit source paths and constructs a `CompilationUnit` in compiler path order.
 * Reason: Multi-file semantic inspection must share the compiler's application input boundary rather than independently aggregating file-local outputs.
 * Tradeoff: The command does not discover project files. Multi-file JSON retains the C4-A primary `file` field and adds an ordered `files` field only when more than one input is supplied.
 
@@ -1170,7 +1170,7 @@ Architecture decisions made
 
 * Decision: Text ASM inspection appends deterministic ASM validation diagnostic details only when validation failures exist.
 * Reason: Inspectors can now see every diagnostic class in the text surface while normal source compilation stays compact and compatibility-safe.
-* Tradeoff: Standard source-driven `psc asm` inputs generally have no ASM validation failures; direct formatter coverage exercises this defensive contract without inventing invalid CLI inputs.
+* Tradeoff: Standard source-driven `presolve explain --inspect` inputs generally have no ASM validation failures; direct formatter coverage exercises this defensive contract without inventing invalid CLI inputs.
 
 * Decision: Canonical ASM/frontend consumers use module-qualified semantic IDs, while the existing backend-facing graph retains legacy component-scoped IDs until its runtime contracts are deliberately migrated.
 * Reason: A canonical application model must distinguish semantically equivalent components from different modules, but the established HTML/template runtime protocol does not serialize these IDs and should not be changed implicitly.
@@ -1256,7 +1256,7 @@ Architecture decisions made
 * Reason: The CLI can reuse canonical ASM categories while making the result boundary unambiguous: direct child lists and incoming/outgoing relation lists are filtered without changing the selected entity or its ownership traversal.
 * Tradeoff: C8-C accepts one child-kind and one reference-kind filter. Composite predicates, descendant filtering, diagnostics filtering, line/column selection, and path normalization remain future work.
 
-* Decision: `psc explain` delegates entity inspection to the same canonical ASM inspection runner as `psc asm`.
+* Decision: `presolve explain` delegates entity inspection to the same complete canonical inspection view as `presolve explain --inspect`.
 * Reason: The developer-facing source-summary command can expose compiler semantics without duplicating selection, ordering, filtering, diagnostic, or schema behavior.
 * Tradeoff: Plain `explain` remains a legacy source-summary surface; only explicit entity-selection or entity-filter options activate ASM inspection.
 
@@ -1382,14 +1382,14 @@ Known limitations
 * Item: Semantic IDs, direct ownership, and provenance cover components, state fields, methods, action steps, rendered templates, event handlers, and authored template descendants. Backend HTML/template-manifest nodes still use local `n*` IDs as a compatibility contract.
 * Item: Resolved references cover action-to-state, event-to-method, and exact direct text-binding/dynamic-attribute/conditional/keyed-list-iterable pairs to state or computed entities. Routes, member expressions, calls, computed evaluation, and unresolved reference attempts have no semantic relation records yet.
 * Item: Canonical compiler products now include module-qualified template entities, direct template state dependencies, and direct template event-method dependencies, while `BindingTable` resolves local/relative re-export chains plus named/default/namespace imports. External and namespace re-exports, external package bindings, tsconfig aliases, source remapping, and type semantics are still absent. Legacy backend graph identity remains a compatibility path.
-* Item: `psc asm` accepts explicit source files and exposes generic JSON and text inspection. Text includes compiler and ASM validation diagnostic detail when present. Project discovery, tsconfig resolution, source remapping, typed action payloads, and machine-readable backend plans remain future slices.
+* Item: `presolve explain --inspect` accepts explicit source files and exposes generic JSON and text inspection. Text includes compiler and inspection validation diagnostic detail when present. Project discovery, tsconfig resolution, source remapping, typed action payloads, and machine-readable backend plans remain future slices.
 * Item: Declared state types include canonical primitive classification, optional ASM JSON `declared_type.kind`, and source-provenanced `PSC1016` through `PSC1021` diagnostics for supported initializer and action forms. Other compiler/ASM diagnostics may omit provenance. Arbitrary action expressions, variable flow, manifests, runtime, imported types, non-state annotations, inference, unions, aliases, generics, and general assignment compatibility remain outside current type validation.
 * Item: Browser e2e requires a local Chrome binary or `PRESOLVE_CHROME=/path/to/chrome`.
 * Item: GitHub Actions Chrome e2e repair is locally validated with `CI=true` but not yet confirmed by a new hosted run.
 * Item: Check policy is selected per CLI invocation. Project policy files, presets, and policy discovery are not interpreted yet.
 * Item: Parser diagnostic labels expose only `line`, `column`, `start`, and `end`; parser label messages and rendered source excerpts are not available yet. Compiler provenance in check JSON is optional, and ASM validation diagnostics still have no provenance field.
 * Item: ASM query APIs expose nearest-first parent traversal through the application root, direct and transitive ownership traversal, broad entity kinds, entity/reference provenance lookup, and reference-kind filtering. `asm` and explicit `explain` inspection mode support semantic-ID or source-byte selection plus parent, direct-child, and incoming/outgoing reference navigation, with one typed child and relation filter; composite predicates, descendant/diagnostic filtering, line/column input, path normalization, and source remapping remain future work.
-* Item: `psc asm --format graph` exports a schema-versioned canonical semantic graph with roots, typed nodes, provenance, ownership edges, and resolved reference edges. It intentionally does not discover project files, include diagnostics, expose parser/backend/runtime artifacts, or provide graph filtering, mutation, or alternate serialization formats.
+* Item: `presolve explain --inspect --format graph` exports a schema-versioned canonical semantic graph with roots, typed nodes, provenance, ownership edges, and resolved reference edges. It intentionally does not discover project files, include diagnostics, expose parser/backend/runtime artifacts, or provide graph filtering, mutation, or alternate serialization formats.
 * Item: Canonical ASM ownership now drives template entity lookup, template dependency lowering, and dead-action analysis. Legacy ComponentGraph, TemplateSemanticEntity construction, and SymbolTable records still carry owner fields as compatibility/lowering data; their removal or migration requires a later dedicated frontend/backend compatibility slice.
 * Item: Constant `state(...)` initializers use one compiler-owned expression model. Numeric arithmetic, comparisons, boolean logic, nullish coalescing, and unary `!`, `+`, and `-` evaluate statically. State reads, local variables, calls, coercions, truthiness, control flow, and semantic expression typing remain later Phase B work.
 * Item: Method parameters are compiler-owned identifier declarations with canonical source provenance only. They do not execute, close over values, resolve local/template/action references, or support destructuring, defaults, rest declarations, or semantic type checking.
@@ -1402,17 +1402,15 @@ Known limitations
 
 Exact next step
 
-Phase K is complete and frozen through K21. Phase L is complete through
-L17-B, but L18 is paused for the owner-directed Presolve identity migration.
-The active migration contract supersedes the retained-identity exceptions:
-all active compiler/runtime namespaces, diagnostics, generated marker names,
-fixtures, and implementation paths must move together. The first migration
-slice makes `presolve explain` the sole inspection command (`--inspect` for
-complete inspection; the retired short command exits 6). Compiler/runtime
-diagnostics, generated marker names, fixture bytes, browser globals, browser
-assertions, crate paths, imports, and implementation diagnostic families now use
-the Presolve namespace. Next: run the full identity-migration audit and resume
-L18 only after every active legacy representation is absent.
+Phase K is complete and frozen through K21. Phase L is complete through L18.
+The identity migration is complete for active product representations:
+`presolve explain` is the sole inspection command, and the compiler/runtime,
+fixture, implementation, and launch-content surfaces use the Presolve namespace.
+L18 adds only versioned repository-local launch content, link verification, and
+an explicitly non-functional playground placeholder; deployment remains
+external. Next: L19-A freezes `docs/alpha-support-matrix.md`, citing verifiers
+for every available command, product, editor surface, and package while marking
+all remaining capabilities unavailable or reserved.
 
 Useful commands
 
@@ -1443,4 +1441,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the L11-B strict-reader commit.
+* None after the L18 launch-content commit.

@@ -12,8 +12,8 @@ This is not yet TSX parsing. It proves source ingestion, basic source spans, dec
 
 ## Exit criteria
 
-- `psc explain input/Counter.tsx` prints a stable text explanation.
-- `psc explain input/Counter.tsx --format json` prints schema-shaped JSON.
+- `presolve explain input/Counter.tsx` prints a stable text explanation.
+- `presolve explain input/Counter.tsx --format json` prints schema-shaped JSON.
 - The output includes component decorator, route decorator, class declaration, render method, and diagnostics.
 - The summary code has unit tests.
 

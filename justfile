@@ -1,6 +1,7 @@
 # Repository task recipes. These commands are intentionally simple.
 
 check:
+    ./scripts/verify-l18-launch-content.sh
     ./scripts/verify-l17b-release-dry-run.sh
     ./scripts/verify-l17a-distribution-contract.sh
     ./scripts/verify-l16-community-readiness.sh
