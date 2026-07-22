@@ -1,0 +1,15 @@
+name: Release dry run
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: pnpm/action-setup@v4
+      - run: ./scripts/release-dry-run.sh

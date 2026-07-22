@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L17-A - Distribution Contract
-* Working tree: clean after the private-package distribution inventory; all editor-package boundaries remain product-free.
+* Latest completed slice: L17-B - Fail-Closed Release Dry Run
+* Working tree: clean after the temporary-pack checksum-manifest dry run; all editor-package boundaries remain product-free.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L17-B - Fail-Closed Release Dry Run
+* Result: adds local and CI offline install/check/temporary-pack evidence that emits only a checksum manifest to stdout and deletes temporary tarballs. It has no publish, signing, upload, network, or secret authority and fails on a dirty tree through inherited checks.
+* Next: L18 may add repository-owned launch content only.
 
 * Slice: L17-A - Distribution Contract
 * Result: inventories only existing private package manifests, exports, dependency direction, provenance, and offline package-smoke evidence. It authorizes no publish, signing, upload, or release artifact.
@@ -1399,8 +1403,9 @@ Known limitations
 Exact next step
 
 Phase K is complete and frozen through K21. Phase L is complete through
-L17-A. The distribution contract inventories existing private manifests only and
-authorizes no publication. Next: L17-B fail-closed local/CI dry run only.
+L17-B. The fail-closed release dry run creates only temporary package tarballs,
+emits a checksum manifest, and removes the tarballs. It authorizes no
+publication. Next: L18 repository-owned launch content only.
 
 Useful commands
 

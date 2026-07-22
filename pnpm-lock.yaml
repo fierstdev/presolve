@@ -8,7 +8,15 @@ importers:
 
   .: {}
 
+  examples/components-context-slots: {}
+
   examples/counter: {}
+
+  examples/explicit-workspace: {}
+
+  examples/forms: {}
+
+  examples/production-resume: {}
 
   packages/compiler-wasm: {}
 
@@ -25,6 +33,8 @@ importers:
         version: link:../language-service
 
   packages/runtime: {}
+
+  packages/testing: {}
 
   packages/vscode:
     dependencies:
