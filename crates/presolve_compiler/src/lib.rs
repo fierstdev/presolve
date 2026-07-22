@@ -119,6 +119,7 @@ pub mod runtime_form_registry;
 pub mod semantic_capability;
 pub mod semantic_graph;
 pub mod semantic_id;
+pub mod semantic_package;
 pub mod semantic_provenance;
 pub mod semantic_reference;
 pub mod semantic_type;
