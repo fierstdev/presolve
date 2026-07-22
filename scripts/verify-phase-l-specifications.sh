@@ -20,6 +20,7 @@ readonly -a specifications=(
   PHASE_L_L12_QUERY_SNAPSHOT_AMENDMENT.md
   PHASE_L_L12_LANGUAGE_SERVICE_BINDING_AUDIT.md
   PHASE_L_L12_WASM_BINDING_CONTRACT.md
+  PHASE_L_L13_L21_CONTINUATION_CONTRACT.md
 )
 
 for specification in "${specifications[@]}"; do

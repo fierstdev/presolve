@@ -71,3 +71,5 @@ L12-D-3 freezes exact JSON-RPC response hashes for every mapping, unsupported be
 L12-E is governed by the [VSCode extension contract](PHASE_L_L12_VSCODE_CONTRACT.md). It permits only a product-free extension client over the completed LSP package.
 
 L12-E-2 activates the pinned-fixture `@presolve/vscode` facade. It imports only `@presolve/lsp`, forwards caller-owned product/request values, and has no editor/document capability of its own.
+
+The [L13--L21 continuation contracts](PHASE_L_L13_L21_CONTINUATION_CONTRACT.md) are the authoritative remaining Phase L slice sequence. They govern public testing, examples, documentation, community readiness, reproducible distribution, launch content, rehearsal, freeze, and post-freeze stewardship without expanding compiler authority.

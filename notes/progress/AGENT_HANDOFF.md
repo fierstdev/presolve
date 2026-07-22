@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L12-E-2 - Pinned VSCode Facade
+* Latest completed slice: L13-L21 - Remaining Phase L Continuation Contracts
 * Working tree: L12-C now has a thin WASM-only `@presolve/language-service` wrapper. LSP and extension implementation have not begun.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L13-L21 - Remaining Phase L Continuation Contracts
+* Result: the Phase L owner accepted the authoritative ordered contracts for L15, L14, L13, L16, L17, L18, L19, L20, and L21. They define exact public-surface/release boundaries, evidence, and no-semantics restrictions while preserving all L1--L12 and Phase K contracts.
+* Next: L15-A public test inventory only. It must precede every L14 example, L13 docs, distribution, release, or freeze slice.
 
 * Slice: L12-E-2 - Pinned VSCode Facade
 * Result: adds `@presolve/vscode` as a product-free facade depending exclusively on `@presolve/lsp`. Its pinned extension-shaped fixture proves definition and unsupported behavior through the completed LSP/language-service/WASM chain.

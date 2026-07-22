@@ -1,6 +1,7 @@
 # Repository task recipes. These commands are intentionally simple.
 
 check:
+    ./scripts/verify-l13-l21-continuation-contract.sh
     ./scripts/verify-l12e2-vscode-facade.sh
     ./scripts/verify-l12d2-lsp-adapter.sh
     ./scripts/verify-l12c4-language-service.sh
