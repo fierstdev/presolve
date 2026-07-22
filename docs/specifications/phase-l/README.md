@@ -57,3 +57,5 @@ L12-C-1 is governed by the [compiler-owned WASM language-service binding contrac
 L12-C-2 activates only the crate-private Rust projection shared by the future WASM adapter. It strictly decodes one supplied product before interpreting a canonical request and emits only contract-defined records, errors, or unsupported results; it creates no external host surface.
 
 L12-C-3 activates the compiler-owned `@presolve/compiler-wasm` build boundary. Its generated web artifact exposes only the Rust `query_snapshot_v1` projection, and its smoke test consumes the frozen product without any JavaScript product decoder or compiler path.
+
+L12-C-3-B freezes the generated WASM response matrix by SHA-256 over exact canonical response bytes for every supported projection, its empty result, unsupported behavior, and every defined error category.

@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L12-C-3-A - Compiler-owned WASM Binding Surface
-* Working tree: L12-C now has a compiler-owned WASM build/package boundary over the crate-private Rust projector. The contract-required frozen ABI fixture matrix is still pending; no `@presolve/language-service` wrapper, LSP, or extension implementation has begun.
+* Latest completed slice: L12-C-3-B - WASM Response Fixture Matrix
+* Working tree: L12-C's compiler-owned WASM binding now has its frozen response matrix. No `@presolve/language-service` wrapper, LSP, or extension implementation has begun.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L12-C-3-B - WASM Response Fixture Matrix
+* Result: freezes SHA-256 commitments over full canonical WASM response bytes for position, definition, references, flat symbols, diagnostics, an empty position result, unsupported hover, invalid request/product, and every defined query error. The Node smoke test constructs only contract-defined caller inputs and compares bytes emitted by generated WASM to that matrix.
+* Boundary: the fixture harness reads product IDs only to issue contract-defined source-unit/opaque-ID requests; it does not decode, validate, or project the product. It has no cache, persistence, source/document, compiler, LSP, or editor behavior.
+* Next: L12-C-4 may begin the thin `@presolve/language-service` wrapper, which must retain this WASM byte authority and add no product decoder or analysis.
 
 * Slice: L12-C-3-A - Compiler-owned WASM Binding Surface
 * Result: enables the compiler crate's `cdylib` WASM target and exports exactly one `wasm-bindgen` function, `query_snapshot_v1`, which delegates directly to the crate-private strict-decode-first Rust projector. `@presolve/compiler-wasm` is a generated-artifact package with no handwritten semantic/product code.
