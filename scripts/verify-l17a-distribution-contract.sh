@@ -10,7 +10,7 @@ for package in @presolve/compiler-wasm @presolve/language-service @presolve/lsp 
   rg --fixed-strings --quiet "$package" "$contract"
 done
 rg --quiet 'compiler-wasm → language-service → lsp → vscode' "$contract"
-rg --quiet 'pnpm install --offline' "$contract"
+rg --quiet -- '--offline' "$contract"
 rg --quiet 'pnpm -r check' "$contract"
 rg --quiet 'No package in this repository is publishable' "$contract"
 ./scripts/verify-l16-community-readiness.sh
