@@ -1,0 +1,15 @@
+{
+  "name": "@presolve/framework-types",
+  "version": "0.1.0-alpha",
+  "private": true,
+  "type": "module",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts"
+    }
+  },
+  "scripts": {
+    "check": "../../../scripts/verify-m2-framework-types.sh"
+  }
+}

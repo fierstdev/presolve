@@ -10,6 +10,7 @@ readonly -a active_surfaces=(
   Cargo.toml
   crates
   packages
+  framework
   fixtures
   examples
   e2e

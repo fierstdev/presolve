@@ -18,6 +18,8 @@ importers:
 
   examples/production-resume: {}
 
+  framework/packages/framework-types: {}
+
   packages/compiler-wasm: {}
 
   packages/language-service:

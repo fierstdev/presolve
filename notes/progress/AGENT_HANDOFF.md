@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: M1 - Frozen Authoring Conformance Contract
-* Working tree: Phase M M0/M1 planning authorities pending their completion commit.
+* Latest completed slice: M2 - Isolated Ambient Type Package
+* Working tree: Phase M M2 framework types implementation pending its completion commit.
 * Date: 2026-07-22
 
 Last completed slice
+
+* Slice: M2 - Isolated Ambient Type Package
+* Result: adds private declaration-only `@presolve/framework-types` under the isolated `framework/` workspace. The focused Counter fixture is byte-identical to the canonical example, resolves types through an explicit `tsconfig` entry, and succeeds through the unchanged explicit `presolve check` path. The package has no JavaScript source, decorator/runtime behavior, transform, or compiler adapter.
+* Next: M3 may define and implement only the explicit canonical-command handoff with caller-supplied inputs and opaque published artifacts. Do not start Counter browser/runtime work or add Action/Computed/Effect/Context/Slot/Form declarations.
 
 * Slice: M1 - Frozen Authoring Conformance Contract
 * Result: accepts Phase M as a conformance-first framework plan. It freezes the framework's initial source vocabulary to existing compiler forms: explicit component tags, `state(initializer)`, existing action/computed/effect decorators, compiler Context designators, Slots, and Forms. The M0 constitution prohibits compiler changes, source translation, product decoding, and a second runtime.

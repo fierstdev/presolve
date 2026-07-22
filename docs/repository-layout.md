@@ -15,6 +15,7 @@ architecture.
 | `e2e/` | Active browser-harness documentation. |
 | `examples/` | Active canonical examples. |
 | `fixtures/` | Frozen compiler, runtime, browser, and golden verification fixtures. |
+| `framework/` | Private Phase M framework packages and conformance fixtures; it cannot own compiler or runtime semantics. |
 | `notes/` | The live continuation log and current handoff remain under `notes/progress/`. |
 | `packages/` | Active JavaScript and TypeScript packages. |
 | `rfcs/` | Accepted or active technical RFCs. |

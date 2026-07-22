@@ -73,6 +73,9 @@ and frozen Forms syntax.
 
 ### M2 — isolated ambient type package
 
+**Completed authority:**
+[M2 framework types contract](PHASE_M_M2_FRAMEWORK_TYPES_CONTRACT.md).
+
 Create `framework/packages/framework-types` as a private declaration-only
 package. It provides the ambient TypeScript names needed by the Counter form
 through an explicit `tsconfig` `types` entry. It emits no JavaScript and cannot
@@ -166,6 +169,6 @@ future metaframework must supply; it does not pre-implement it.
 
 ## Next authorized action
 
-M2 only: create the isolated private ambient declaration package and its focused
-Counter type-resolution/conformance fixtures. Stop before M3 until M2's
-declaration-only and unchanged-compiler-input evidence is committed.
+M3 only: define the explicit canonical-command handoff contract and its
+focused request/diagnostic integrity fixtures. Stop before the Counter runtime
+vertical slice until M3's opaque, caller-supplied handoff evidence is committed.
