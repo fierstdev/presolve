@@ -1367,12 +1367,11 @@ Known limitations
 Exact next step
 
 Phase K is complete and frozen through K21. Phase L is complete through
-L12-C. The revised delivery roadmap, L12-A audit, L12-B query-snapshot
-amendment, and L12-C binding audit are authoritative. Implementation is blocked
-until an explicit compiler-owned WASM ABI/native addon selection, or an
-amendment to a Rust-native API, supplies the missing host boundary. No compiler
-invocation, source discovery/reparse, update synthesis, duplicate decoder,
-persistence, LSP, or extension begins before that contract exists.
+L14-B-3. The owner-authorized L13-L21 continuation contract remains the
+authority. Forms is represented solely by an explicit L9 `check` input using
+the existing canonical declaration, field, host, serialization, and submission
+shape; it does not add browser submission or network behavior. Next: L14-B-4,
+the explicit-workspace example from its existing L7 fixture evidence only.
 
 Useful commands
 

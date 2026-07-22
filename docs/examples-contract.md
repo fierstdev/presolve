@@ -8,7 +8,7 @@ semantics, source discovery, or a create command.
 | --- | --- | --- | --- | --- |
 | Counter | `fixtures/0001-source-summary`; `examples/counter` | one listed `Counter.tsx` | existing explicit build/check path | discovery, scaffolding |
 | Components/Context/Slots | `fixtures/0059`, `0062`--`0065`; component/context contracts | listed component source files | frozen component/runtime fixture evidence | inheritance/slot behavior beyond frozen contracts |
-| Forms | forms contract and its core/runtime fixture coverage | listed form source files | existing forms compiler/runtime proof | browser submit/network behavior |
+| Forms | `docs/forms-contract.md`; `crates/ezc_core/src/form_submission_host.rs` | `examples/forms/src/Forms.tsx` | explicit `presolve check` proof | browser submit/network behavior |
 | Explicit workspace | workspace fixtures `chain-v1` and `cycle-v1` | caller-supplied package/edge/source list | `presolve workspace` contract | manifests/dependency discovery |
 | Production/resume | Phase K corpus and resumability contract | explicit compiler input and existing artifact fixtures | existing production/browser evidence | benchmarks, deployment, author-time edits |
 

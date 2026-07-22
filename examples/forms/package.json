@@ -1,0 +1,9 @@
+{
+  "name": "presolve-forms-example",
+  "version": "0.1.0-alpha",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "../../scripts/verify-l14b-forms-example.sh"
+  }
+}
