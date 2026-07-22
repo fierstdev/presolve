@@ -14,3 +14,5 @@
 Compiler fixtures remain in their owning Rust crate and CLI fixtures remain in `crates/ezc_cli`. Package fixtures may consume but never copy, rewrite, or decode them. SHA fixtures are canonical output commitments, not performance baselines. Browser probes require Chrome and are a separate runtime lane.
 
 Deterministic contracts are correctness gates. Browser/runtime is a correctness gate where an existing fixture applies. Examples become a gate only after L14. Observation work is report-only: host time, memory, CPU, or machine identity can never affect a pass/fail result. L15 utilities must delegate to existing commands and cannot recreate compiler semantics.
+
+L15-B activates `@presolve/testing` as a pure helper surface: canonical-byte equality and immutable declared-test metadata. It does not read fixtures, execute commands, invoke a compiler, start a browser, or interpret bytes.

@@ -1,0 +1,12 @@
+{
+  "name": "@presolve/testing",
+  "version": "0.1.0-alpha",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "check": "../../scripts/verify-l15b-testing-package.sh"
+  }
+}

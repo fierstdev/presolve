@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L15-A - Public Test Inventory
+* Latest completed slice: L15-B - Public Testing Utility
 * Working tree: L12-C now has a thin WASM-only `@presolve/language-service` wrapper. LSP and extension implementation have not begun.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L15-B - Public Testing Utility
+* Result: adds `@presolve/testing` with only canonical-byte equality and immutable declared-test metadata. It is deliberately unable to read fixtures, execute commands, access the compiler, start a browser, or establish performance criteria.
+* Next: L15-C reproducibility lane manifest and local reproduction commands only.
 
 * Slice: L15-A - Public Test Inventory
 * Result: maps existing compiler, tooling, CLI, runtime/browser, editor-package, and repository fixtures to public purposes, exact local reproduction, and canonical assertions without adding test semantics.
