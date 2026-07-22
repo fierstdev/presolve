@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L13-B - Executed Public CLI Reference
-* Working tree: clean after the executed L9/L11 CLI reference; all editor-package boundaries remain product-free.
+* Latest completed slice: L13-C - Frozen Contract Map
+* Working tree: clean after the frozen contract map; all editor-package boundaries remain product-free.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L13-C - Frozen Contract Map
+* Result: maps State, Actions, Computed, Context, Components, Slots, Forms, resumability, production/runtime, service/cache/workspace, and L12 editor boundaries to their existing authority documents only. It defines no new semantics.
+* Next: L13-D may validate help, exits, available schemas, package exports, and reserved status from real sources.
 
 * Slice: L13-B - Executed Public CLI Reference
 * Result: documents only accepted L9 explicit-project and L11 strict named-product commands. Every marked command uses an explicit fixture and is executed; the L11 tests construct their required valid products before invoking each reader. Reserved commands remain exit-6 only.
@@ -1383,10 +1387,10 @@ Known limitations
 Exact next step
 
 Phase K is complete and frozen through K21. Phase L is complete through
-L13-B. The public CLI reference contains only accepted L9/L11 adapters, runs
-every marked explicit-input command, and verifies L11 readers with constructed
-valid products. It grants no discovery, scaffold, server, benchmark, telemetry,
-deployment, or editor-write behavior. Next: L13-C contract summary links only.
+L13-C. The frozen contract map links every requested language, runtime,
+platform, and L12 editor boundary to the existing authority without defining
+new behavior. Next: L13-D validates help, exits, schemas, exports, and reserved
+status from real sources.
 
 Useful commands
 
