@@ -10,6 +10,7 @@ reference does not establish.
 
 | Label | Subject | Authority |
 | --- | --- | --- |
+| Reference | accepted L9/L11 command adapters and limitations | [CLI reference](cli-reference.md) |
 | Reference | explicit CLI configuration and build/check boundary | [CLI build/check](cli-build-check.md) |
 | Reference | service, incremental, cache, workspace, and watch boundaries | [platform](compiler-platform-contract.md), [service](compiler-service-contract.md), [workspace](workspace-architecture-contract.md), [watch](watch-mode-contract.md) |
 | Reference | State/Actions/Computed runtime boundary | [runtime contract](runtime-contract.md) |

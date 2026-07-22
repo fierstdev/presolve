@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L13-A - Public Documentation Index
-* Working tree: clean after the public documentation index; all editor-package boundaries remain product-free.
+* Latest completed slice: L13-B - Executed Public CLI Reference
+* Working tree: clean after the executed L9/L11 CLI reference; all editor-package boundaries remain product-free.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L13-B - Executed Public CLI Reference
+* Result: documents only accepted L9 explicit-project and L11 strict named-product commands. Every marked command uses an explicit fixture and is executed; the L11 tests construct their required valid products before invoking each reader. Reserved commands remain exit-6 only.
+* Next: L13-C may summarize frozen contracts by linking them without redefining semantics.
 
 * Slice: L13-A - Public Documentation Index
 * Result: adds the public reference/guide/archive index, compiler-ownership and frozen-version policy, and a marker grammar for executable command snippets. It introduces no command or product behavior.
@@ -1379,10 +1383,10 @@ Known limitations
 Exact next step
 
 Phase K is complete and frozen through K21. Phase L is complete through
-L13-A. Public documentation now distinguishes reference, guide, and archive
-material, states compiler/frozen-version authority, and reserves one exact
-snippet marker grammar. It introduces no command or product behavior. Next:
-L13-B, accepted L9/L11 command documentation with executed marked snippets.
+L13-B. The public CLI reference contains only accepted L9/L11 adapters, runs
+every marked explicit-input command, and verifies L11 readers with constructed
+valid products. It grants no discovery, scaffold, server, benchmark, telemetry,
+deployment, or editor-write behavior. Next: L13-C contract summary links only.
 
 Useful commands
 

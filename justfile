@@ -1,6 +1,7 @@
 # Repository task recipes. These commands are intentionally simple.
 
 check:
+    ./scripts/verify-l13b-public-cli-docs.sh
     ./scripts/verify-l13a-public-docs-index.sh
     ./scripts/verify-l14b-production-resume-example.sh
     ./scripts/verify-l14b-explicit-workspace-example.sh
