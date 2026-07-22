@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L13-C - Frozen Contract Map
-* Working tree: clean after the frozen contract map; all editor-package boundaries remain product-free.
+* Latest completed slice: L13-D - Public Surface Matrix
+* Working tree: clean after the fixture-validated public surface matrix; all editor-package boundaries remain product-free.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L13-D - Public Surface Matrix
+* Result: validates public help, reserved exit-6 status, every available L10 schema, and every package export directly from the CLI, registry, and manifests. It introduces no new public surface.
+* Next: L16 may add repository community readiness material only.
 
 * Slice: L13-C - Frozen Contract Map
 * Result: maps State, Actions, Computed, Context, Components, Slots, Forms, resumability, production/runtime, service/cache/workspace, and L12 editor boundaries to their existing authority documents only. It defines no new semantics.
@@ -1387,10 +1391,7 @@ Known limitations
 Exact next step
 
 Phase K is complete and frozen through K21. Phase L is complete through
-L13-C. The frozen contract map links every requested language, runtime,
-platform, and L12 editor boundary to the existing authority without defining
-new behavior. Next: L13-D validates help, exits, schemas, exports, and reserved
-status from real sources.
+L13-D. The public surface matrix validates help, reserved exits, available L10 schemas, and package exports directly from live local sources. It introduces no new surface. Next: L16 community-readiness repository material only.
 
 Useful commands
 
