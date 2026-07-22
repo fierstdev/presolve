@@ -22,6 +22,7 @@ required_files=(
   scripts/verify-l18-launch-content.sh
   scripts/verify-l19a-alpha-support-matrix.sh
   scripts/verify-l19b-clean-room-rehearsal.sh
+  scripts/run-l19b-clean-room-rehearsal.sh
 )
 
 test -s "$contract"

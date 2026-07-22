@@ -53,8 +53,10 @@ a release artifact or external side effect.
 
 ## Recorded evidence
 
-`./scripts/verify-l19b-clean-room-rehearsal.sh` creates a detached clean
-worktree at `HEAD`, performs the recorded offline package, example, command,
-product, package-metadata, and Phase K artifact checks, and removes the
-worktree—even after a failed check. It is a clean-room replay, not a create,
-publication, signing, hosting, or deployment path.
+`./scripts/run-l19b-clean-room-rehearsal.sh` creates a detached clean worktree
+at `HEAD`, performs the recorded offline package, example, command, product,
+package-metadata, and Phase K artifact checks, and removes the worktree—even
+after a failed check. `./scripts/verify-l19b-clean-room-rehearsal.sh` audits
+this recorded runner and procedure without redoing the expensive replay during
+the inherited check suite. Neither script is a create, publication, signing,
+hosting, or deployment path.
