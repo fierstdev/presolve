@@ -1,6 +1,7 @@
 # Repository task recipes. These commands are intentionally simple.
 
 check:
+    ./scripts/verify-l20-platform-freeze.sh
     ./scripts/verify-l19b-clean-room-rehearsal.sh
     ./scripts/verify-l19a-alpha-support-matrix.sh
     ./scripts/verify-l18-launch-content.sh

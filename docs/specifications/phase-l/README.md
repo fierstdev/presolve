@@ -80,6 +80,8 @@ L19-A is governed by the frozen [alpha support matrix](../../alpha-support-matri
 
 L19-B is governed by the [alpha clean-room rehearsal](../../alpha-rehearsal.md). It uses a fresh detached checkout and existing verifiers only; it does not publish.
 
+L20 is governed by the [platform freeze contract](../../platform-freeze-contract.md). It freezes only evidence-backed alpha support and requires its final verifier, `just check`, and a clean committed tree.
+
 The owner-directed [Presolve identity migration contract](../../presolve-identity-migration-contract.md)
 supersedes conflicting retained-identity exceptions. It governs the active
 compiler, runtime, fixture, implementation-path, and inspection-command
