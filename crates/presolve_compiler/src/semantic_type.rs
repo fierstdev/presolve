@@ -1695,6 +1695,7 @@ fn infer_effect_expression_type(
     let semantic_type = match &node.kind {
         ExpressionNodeKind::Literal(value) => state_initializer_value_type(value),
         ExpressionNodeKind::Boolean(value) => SemanticType::BooleanLiteral(*value),
+        ExpressionNodeKind::Template { .. } => SemanticType::String,
         ExpressionNodeKind::Identifier(_) | ExpressionNodeKind::Call { .. } => {
             SemanticType::Unknown
         }
@@ -2125,6 +2126,7 @@ fn expression_semantic_type(
     match &node.kind {
         ExpressionNodeKind::Literal(value) => state_initializer_value_type(value),
         ExpressionNodeKind::Boolean(value) => SemanticType::BooleanLiteral(*value),
+        ExpressionNodeKind::Template { .. } => SemanticType::String,
         ExpressionNodeKind::Identifier(_)
         | ExpressionNodeKind::Call { .. }
         | ExpressionNodeKind::SemanticPackagePureCall { .. }
@@ -2235,6 +2237,7 @@ fn infer_context_source_expression_type(
     let semantic_type = match &node.kind {
         ExpressionNodeKind::Literal(value) => state_initializer_value_type(value),
         ExpressionNodeKind::Boolean(value) => SemanticType::BooleanLiteral(*value),
+        ExpressionNodeKind::Template { .. } => SemanticType::String,
         ExpressionNodeKind::Identifier(_) | ExpressionNodeKind::Call { .. } => {
             SemanticType::Unknown
         }
@@ -2344,6 +2347,7 @@ fn infer_computed_expression_type(
     let semantic_type = match &node.kind {
         ExpressionNodeKind::Literal(value) => state_initializer_value_type(value),
         ExpressionNodeKind::Boolean(value) => SemanticType::BooleanLiteral(*value),
+        ExpressionNodeKind::Template { .. } => SemanticType::String,
         ExpressionNodeKind::Identifier(_) | ExpressionNodeKind::Call { .. } => {
             SemanticType::Unknown
         }

@@ -1113,6 +1113,21 @@ fn parsed_computed_expression(
     }
 
     match expression {
+        Expression::TemplateLiteral(template) => Some(ParsedComputedExpression {
+            kind: ParsedComputedExpressionKind::Template {
+                quasis: template
+                    .quasis
+                    .iter()
+                    .map(|quasi| quasi.value.cooked.as_ref().map(ToString::to_string))
+                    .collect::<Option<Vec<_>>>()?,
+                expressions: template
+                    .expressions
+                    .iter()
+                    .map(|expression| parsed_computed_expression(expression, source))
+                    .collect::<Option<Vec<_>>>()?,
+            },
+            span: source_span(source, template.span),
+        }),
         Expression::CallExpression(call) => {
             let callee = expression_summary(&call.callee)?;
             let arguments = call

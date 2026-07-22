@@ -257,6 +257,10 @@ pub enum ParsedComputedExpressionKind {
         object: Box<ParsedComputedExpression>,
         property: String,
     },
+    Template {
+        quasis: Vec<String>,
+        expressions: Vec<ParsedComputedExpression>,
+    },
     Call {
         callee: String,
         arguments: Vec<ParsedComputedExpression>,

@@ -3082,6 +3082,7 @@ class PackageComputed extends Component {
   get visibleCount() { return visible(this.count); }
   render() { return <output>Visible count</output>; }
 }
+
 "#,
     )
     .expect("write pure package source");
@@ -3124,6 +3125,63 @@ class PackageComputed extends Component {
     server.stop();
     assert!(
         stdout.contains("PRESOLVE_PURE_PACKAGE_BROWSER_TEST_PASS"),
+        "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn template_interpolations_execute_from_compiler_generated_runtime_programs() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/psc-browser-test/template-interpolation-runtime");
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("clean previous template browser output");
+    }
+    fs::create_dir_all(&out_dir).expect("create template browser output");
+    let source = out_dir.join("TemplateComputed.tsx");
+    fs::write(
+        &source,
+        r#"
+@component("x-template-computed")
+class TemplateComputed extends Component {
+  count = state(2);
+  @computed()
+  get label() { return `Count: ${this.count}!`; }
+  render() { return <output>Count</output>; }
+}
+"#,
+    )
+    .expect("write template source");
+    let output = Command::new(presolve_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            source.to_str().expect("source path"),
+            "--out",
+            out_dir.to_str().expect("output path"),
+        ])
+        .output()
+        .expect("build template runtime fixture");
+    assert!(output.status.success());
+
+    write_template_interpolation_probe_page(&out_dir);
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("create Chrome profile directory");
+    let user_data_dir = format!(
+        "--user-data-dir={}",
+        profile_dir.to_str().expect("Chrome profile path")
+    );
+    let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
+    let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("PRESOLVE_TEMPLATE_INTERPOLATION_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -3514,6 +3572,38 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 </body>"#,
     );
     fs::write(out_dir.join("probe.html"), probe).expect("write pure package probe page");
+}
+
+fn write_template_interpolation_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("read built page");
+    let probe = index.replace(
+        "</body>",
+        r#"<script>
+const fail = (message) => { throw new Error(message); };
+const waitFor = (predicate, label) => new Promise((resolve, reject) => {
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    if (predicate()) { resolve(); return; }
+    if (Date.now() > deadline) { reject(new Error(`Timed out waiting for ${label}`)); return; }
+    setTimeout(tick, 20);
+  };
+  tick();
+});
+(async () => {
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
+  const computed = window.__PRESOLVE__.computed;
+  const label = computed.find((entry) => entry.computed.endsWith("/computed:label"));
+  if (label?.value !== "Count: 2!" || label?.dirty !== false) fail("template interpolation did not execute from compiler artifact");
+  if (window.__PRESOLVE__.diagnostics.length !== 0) fail("template interpolation reported diagnostics");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_TEMPLATE_INTERPOLATION_BROWSER_TEST_PASS</div>");
+})().catch((error) => {
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_TEMPLATE_INTERPOLATION_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  console.error(error);
+});
+</script>
+</body>"#,
+    );
+    fs::write(out_dir.join("probe.html"), probe).expect("write template probe page");
 }
 
 fn write_initial_effect_probe_page(out_dir: &Path) {

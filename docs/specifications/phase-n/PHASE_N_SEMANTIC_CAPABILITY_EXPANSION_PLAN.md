@@ -193,6 +193,14 @@ operation; arbitrary function calls remain unsupported. Start with common
 collection operations (`map`, `filter`, `find`, `some`, `every`, `reduce` under
 bounded accumulator rules), string formatting, and stable key extraction.
 
+#### N2-A — template interpolation
+
+Admit untagged template literals in Computed getters as a complete compiler
+vertical slice. Preserve cooked segments, compiler-lower every interpolation,
+emit a versioned runtime instruction, and prove generated-browser execution.
+Do not treat tagged templates, template factories, or interpolation callbacks as
+equivalent syntax.
+
 ### N3 — State, Actions, Computed, and Effects over real data
 
 Allow State fields to hold structurally serializable records, arrays, optional

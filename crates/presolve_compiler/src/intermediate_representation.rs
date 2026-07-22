@@ -1415,6 +1415,16 @@ impl ExpressionIrLowering<'_> {
             ExpressionNodeKind::Call { .. } => {
                 return None;
             }
+            ExpressionNodeKind::Template {
+                quasis,
+                expressions,
+            } => IrInstructionKind::Template {
+                quasis,
+                expressions: expressions
+                    .iter()
+                    .map(|expression| self.lower_node(expression))
+                    .collect::<Option<Vec<_>>>()?,
+            },
             ExpressionNodeKind::SemanticPackagePureCall {
                 package,
                 version,
@@ -3241,6 +3251,9 @@ fn instruction_operands(kind: &IrInstructionKind) -> Vec<IrOperand> {
         IrInstructionKind::PurePackageCall { arguments, .. } => {
             arguments.iter().cloned().map(IrOperand::Value).collect()
         }
+        IrInstructionKind::Template { expressions, .. } => {
+            expressions.iter().cloned().map(IrOperand::Value).collect()
+        }
         IrInstructionKind::CapabilityAssign { value, .. } => vec![IrOperand::Value(value.clone())],
         IrInstructionKind::InitializeContextSlot { value, .. } => {
             vec![IrOperand::Value(value.clone())]
@@ -3266,6 +3279,7 @@ fn instruction_storages(kind: &IrInstructionKind) -> Vec<&IrStorageId> {
         | IrInstructionKind::LoadComputed { .. }
         | IrInstructionKind::LoadContextSlot { .. }
         | IrInstructionKind::GetMember { .. }
+        | IrInstructionKind::Template { .. }
         | IrInstructionKind::PurePackageCall { .. }
         | IrInstructionKind::CapabilityCall { .. }
         | IrInstructionKind::CapabilityAssign { .. }
@@ -3548,6 +3562,11 @@ pub enum IrInstructionKind {
     GetMember {
         object: IrOperand,
         property: String,
+    },
+    /// Compiler-lowered interpolation with source-retained cooked literal segments.
+    Template {
+        quasis: Vec<String>,
+        expressions: Vec<IrValueId>,
     },
     /// A deterministic pure operation declared by an integrity-checked package contract.
     PurePackageCall {

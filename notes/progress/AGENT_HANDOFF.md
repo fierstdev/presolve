@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N1-A2 - Pure Semantic Package Operation
-* Working tree: clean after the N1-A2 pure-package commit.
+* Latest completed slice: N2-A - Template Interpolation
+* Working tree: clean after the N2-A template-interpolation commit.
 * Date: 2026-07-22
 
 Last completed slice
+
+* Slice: N2-A - Template Interpolation
+* Result: admits untagged template literals only in the existing supported Computed expression boundary. The parser retains cooked segments and interpolation expressions; the compiler derives all dependencies, assigns a serializable string result, lowers canonical `Template` IR, and emits a runtime-computed schema-v5 `template` instruction. The generated runtime validates program shape and interpolates only compiler-produced values. Tagged templates, factories, callbacks, Action/Effect usage, and arbitrary code are not admitted.
+* Verification: `./scripts/verify-n2a-template-interpolation.sh` passes, including focused parser/compiler/IR/artifact/CLI checks and a real-browser computed-cache proof. The browser portion needs loopback-server approval in this environment.
+* Next: N2-B may add the next bounded expression family or a compiler-registered pure helper. Preserve the no-arbitrary-call boundary and keep non-admitted collection operations, package kinds, opaque code, router, SSR, and framework runtime deferred.
 
 * Slice: N1-A2 - Pure Semantic Package Operation
 * Result: admits one end-to-end `pure` package operation: a direct named/default imported `identity` call in a Computed getter. The caller-provided package contract supplies package/version/SHA-256/export/type/runtime/resume metadata plus `pure_operation: "identity"`; the compiler resolves aliases through the N1-A1 binding table, lowers a compiler-owned expression/IR operation, emits the schema-v4 `pure-package-call` runtime instruction with full provenance, and executes that instruction without loading package JavaScript. The explicit `presolve build --package-contract specifier=contract.json` handoff is fail-closed: omitted contracts report `PSBIND1009` before publication.

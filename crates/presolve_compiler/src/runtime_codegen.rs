@@ -1652,6 +1652,28 @@ const RUNTIME_STUB: &str = r#"(() => {
       return true;
     }
 
+    if (instruction.kind === "template") {
+      const quasis = instruction.quasis ?? [];
+      const expressions = instruction.expressions ?? [];
+      if (quasis.length !== expressions.length + 1) {
+        reportDiagnostic(
+          store.diagnostics,
+          "PSR_INVALID_TEMPLATE_PROGRAM",
+          "Compiler artifact contained an invalid template interpolation program",
+          { subject }
+        );
+        values.set(instruction.result, undefined);
+      } else {
+        let value = quasis[0];
+        for (let index = 0; index < expressions.length; index += 1) {
+          value += String(values.get(expressions[index]));
+          value += quasis[index + 1];
+        }
+        values.set(instruction.result, value);
+      }
+      return true;
+    }
+
     if (instruction.kind === "binary") {
       values.set(
         instruction.result,

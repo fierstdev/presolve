@@ -181,6 +181,17 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
                 "runtime-computed schema v4 pure-package-call instruction with package provenance",
                 "runtime_browser::pure_package_contracts_execute_only_the_compiler_lowered_operation_in_a_real_browser",
             ),
+            admitted(
+                "template_interpolation",
+                SemanticCapabilityClass::Bounded,
+                "untagged template literal in a supported @computed() getter",
+                "parser, ExpressionGraph, canonical IR, and runtime-computed artifact",
+                "cooked static segments and compiler-supported interpolation expressions",
+                "compiler-derived union of every interpolation dependency",
+                "serializable string result; no independent resume record",
+                "runtime-computed schema v5 template instruction",
+                "runtime_browser::template_interpolations_execute_from_compiler_generated_runtime_programs",
+            ),
             deferred(
                 "semantic_package_exports",
                 SemanticCapabilityClass::Unsupported,
@@ -304,6 +315,7 @@ mod tests {
                 "advanced_types",
                 "semantic_package_bindings",
                 "semantic_package_pure_identity",
+                "template_interpolation",
                 "semantic_package_exports",
                 "resources",
                 "opaque_typescript"

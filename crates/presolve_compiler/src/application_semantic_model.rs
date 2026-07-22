@@ -2687,6 +2687,11 @@ fn resolve_semantic_package_pure_call(
                 resolve_semantic_package_pure_call(argument, module_path, bindings);
             }
         }
+        ComputedExpressionKind::Template { expressions, .. } => {
+            for expression in expressions {
+                resolve_semantic_package_pure_call(expression, module_path, bindings);
+            }
+        }
         ComputedExpressionKind::MemberAccess { object, .. }
         | ComputedExpressionKind::Unary {
             operand: object, ..
@@ -2719,6 +2724,9 @@ fn contains_semantic_package_pure_call(expression: &ComputedExpression, callee: 
         ComputedExpressionKind::Call { arguments, .. } => arguments
             .iter()
             .any(|argument| contains_semantic_package_pure_call(argument, callee)),
+        ComputedExpressionKind::Template { expressions, .. } => expressions
+            .iter()
+            .any(|expression| contains_semantic_package_pure_call(expression, callee)),
         ComputedExpressionKind::MemberAccess { object, .. }
         | ComputedExpressionKind::Unary {
             operand: object, ..

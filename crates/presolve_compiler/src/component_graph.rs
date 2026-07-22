@@ -532,6 +532,10 @@ pub enum ComputedExpressionKind {
         object: Box<ComputedExpression>,
         property: String,
     },
+    Template {
+        quasis: Vec<String>,
+        expressions: Vec<ComputedExpression>,
+    },
     Call {
         callee: String,
         arguments: Vec<ComputedExpression>,
@@ -3363,6 +3367,16 @@ fn computed_expression_from_parsed(expression: &ParsedComputedExpression) -> Com
                 property: property.clone(),
             }
         }
+        ParsedComputedExpressionKind::Template {
+            quasis,
+            expressions,
+        } => ComputedExpressionKind::Template {
+            quasis: quasis.clone(),
+            expressions: expressions
+                .iter()
+                .map(computed_expression_from_parsed)
+                .collect(),
+        },
         ParsedComputedExpressionKind::Call { callee, arguments } => ComputedExpressionKind::Call {
             callee: callee.clone(),
             arguments: arguments

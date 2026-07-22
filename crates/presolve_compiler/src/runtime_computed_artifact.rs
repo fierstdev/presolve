@@ -8,7 +8,7 @@ use crate::{
     SemanticId, SerializableValue, SerializationCompatibility,
 };
 
-pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 4;
+pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 5;
 
 /// Versioned runtime metadata and executable programs emitted from canonical IR.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -86,6 +86,11 @@ pub enum RuntimeComputedArtifactInstruction {
         result: String,
         object: RuntimeComputedArtifactOperand,
         property: String,
+    },
+    Template {
+        result: String,
+        quasis: Vec<String>,
+        expressions: Vec<String>,
     },
     PurePackageCall {
         result: String,
@@ -386,6 +391,17 @@ pub(crate) fn runtime_instruction(
                 property: property.clone(),
             })
         }
+        IrInstructionKind::Template {
+            quasis,
+            expressions,
+        } => Some(RuntimeComputedArtifactInstruction::Template {
+            result,
+            quasis: quasis.clone(),
+            expressions: expressions
+                .iter()
+                .map(|expression| expression.as_str().to_string())
+                .collect(),
+        }),
         IrInstructionKind::PurePackageCall {
             package,
             version,
@@ -577,7 +593,7 @@ class RuntimeComputedArtifact extends Component {
         let second = runtime_computed_artifact_json(&build_runtime_computed_artifact(&model, &ir));
         assert_eq!(first, second);
         let json: serde_json::Value = serde_json::from_str(&first).expect("artifact JSON");
-        assert_eq!(json["schema_version"], 4);
+        assert_eq!(json["schema_version"], 5);
         assert_eq!(
             json["evaluations"][0]["program"]["instructions"][0]["kind"],
             "load-state"
@@ -660,5 +676,45 @@ class PackageComputed extends Component {
             crate::semantic_package::SemanticPackagePureOperation::Identity
         );
         assert_eq!(arguments.len(), 1);
+    }
+
+    #[test]
+    fn emits_template_interpolation_program_with_cooked_segments() {
+        let parsed = presolve_parser::parse_file(
+            "src/TemplateComputed.tsx",
+            r#"
+@component("x-template-computed")
+class TemplateComputed extends Component {
+  count = state(2);
+  @computed()
+  get label() { return `Count: ${this.count}!`; }
+  render() { return <output>Count</output>; }
+}
+"#,
+        );
+        let model = build_application_semantic_model(&parsed);
+        assert!(model.diagnostics.is_empty(), "{:?}", model.diagnostics);
+        let artifact = build_runtime_computed_artifact(&model, &lower_components_to_ir(&model));
+        let instruction = artifact.evaluations[0]
+            .program
+            .instructions
+            .iter()
+            .find(|instruction| {
+                matches!(
+                    instruction,
+                    RuntimeComputedArtifactInstruction::Template { .. }
+                )
+            })
+            .expect("lowered template instruction");
+        let RuntimeComputedArtifactInstruction::Template {
+            quasis,
+            expressions,
+            ..
+        } = instruction
+        else {
+            unreachable!();
+        };
+        assert_eq!(quasis, &["Count: ".to_string(), "!".to_string()]);
+        assert_eq!(expressions.len(), 1);
     }
 }
