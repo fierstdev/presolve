@@ -4,6 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "echo \"counter example tests not implemented yet\""
+    "test": "../../scripts/verify-l14b-counter-example.sh"
   }
 }

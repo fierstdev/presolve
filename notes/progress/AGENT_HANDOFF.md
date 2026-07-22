@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L14-A - Alpha Example Corpus Contract
+* Latest completed slice: L14-B-1 - Counter Canonical Example
 * Working tree: L12-C now has a thin WASM-only `@presolve/language-service` wrapper. LSP and extension implementation have not begun.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L14-B-1 - Counter Canonical Example
+* Result: Counter now declares canonical `presolve.json` and is checked through the accepted explicit L9 command path with one caller-supplied `.tsx` mapping. No discovery, build output, scaffold, or unsupported behavior is added.
+* Next: L14-B-2 may add Components/Context/Slots only after selecting exact existing fixture sources and explicit command proof.
 
 * Slice: L14-A - Alpha Example Corpus Contract
 * Result: defines the exact five-example alpha corpus and binds each to frozen evidence, explicit input authority, a public proof, and exclusions. The existing counter is not reclassified as proven until L14-B supplies its public fixture.
