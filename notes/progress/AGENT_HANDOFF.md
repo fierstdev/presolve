@@ -11,7 +11,7 @@ Last completed slice
 
 * Slice: L21 - Post-Freeze Stewardship Handoff
 * Result: records alpha versioning, amendment, security/release-authority, deprecation, and next-roadmap intake rules without authorizing implementation. It inherits the passed L20 platform-freeze evidence and requires a clean committed tree.
-* Next: Phase L is complete. Phase M is proposed as explicit deterministic `presolve create` initialization; it remains non-authoritative until the owner accepts its M0 amendment and starter profile.
+* Next: Phase L is complete. Phase M is proposed as Presolve Framework Foundation: a separate ergonomic framework product over frozen compiler products. It remains non-authoritative until the owner accepts M0; the metaframework and `presolve create` are deferred.
 
 * Slice: L20 - Final Platform Freeze
 * Result: freezes the evidence-backed public alpha platform and reserved-capability disposition. `verify-l20-platform-freeze.sh` and the complete inherited `just check` matrix passed from a clean committed tree on 2026-07-22.
