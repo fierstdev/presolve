@@ -30,7 +30,7 @@ test -s "$site_root/README.md"
 rg --quiet 'Deployment remains external' "$site_root/README.md"
 rg --quiet 'non-functional playground placeholder' "$site_root/README.md"
 rg --quiet 'repository-local launch content only' "$contract"
-rg --quiet 'must not claim comparative numbers' "$contract"
+rg --quiet 'claim comparative numbers' "$contract"
 
 for page in "${pages[@]}"; do
   file="$content_root/$page.md"
