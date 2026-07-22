@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: M7 - Forms, Production, and Resume Conformance
-* Working tree: Phase M M7 Form language, declaration fixtures, and verifier pending its completion commit.
+* Latest completed slice: M8 - Compiler-Backed DX and Compatibility
+* Working tree: Phase M M8 explanation/compatibility documentation and verifier pending its completion commit.
 * Date: 2026-07-22
 
 Last completed slice
+
+* Slice: M8 - Compiler-Backed DX and Compatibility
+* Result: records the existing `presolve explain --inspect --format json` product as the only framework explanation surface and maps all examples to their existing compiler/browser conformance sources. The compatibility matrix supports the pinned TypeScript 7.0 native CLI and explicitly defers TypeScript 7.1 pending a full rerun. No framework explain command, parser, source scanner, editor implementation, project discovery, or runtime was added.
+* Verification: the M8 verifier invokes the unchanged canonical CLI inspection on the framework Form source and checks the documented evidence boundary.
+* Next: M9 may freeze Phase M exports, syntax, compiler compatibility, unsupported forms, and the full focused matrix.
 
 * Slice: M7 - Forms, Production, and Resume Conformance
 * Result: adopts compiler-resolved literal local Form designators: `@field("profile")` and `@submit("profile")`. This replaces decorator-time `this.profile`, which cannot be typed honestly because decorators run in class-definition scope. The explicit render host remains `<form form={this.profile}>`. The declaration package has only ambient Form/Field/validation/submit types; it has no Form controller, transport, validation runtime, DOM lookup, artifact decoder, or resume wrapper. The two framework fixtures are the exact sources built by the existing Form submission and Form resume browser tests.

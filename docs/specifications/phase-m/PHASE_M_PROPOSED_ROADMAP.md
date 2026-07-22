@@ -172,6 +172,8 @@ underlying family passes its conformance matrix. The matrix keeps TypeScript
 7.0 and a future TypeScript 7.1 compatibility row separate; 7.1 requires an
 explicit pinned-toolchain conformance rerun before support is declared.
 
+**M8 authority:** [Compiler-backed DX and compatibility](PHASE_M_M8_DX_COMPATIBILITY.md).
+
 ### M9 — framework freeze and metaframework handoff
 
 Freeze private package exports, declaration behavior, handoff grammar,
@@ -195,7 +197,6 @@ future metaframework must supply; it does not pre-implement it.
 
 ## Current boundary
 
-M4 and M5 are complete. M6 is complete. M7 selects compiler-resolved literal
-Form designators for `field` and `submit`, because decorator-time instance
-expressions are not sound TypeScript. Forms, production, and resume conformance
-are complete only after the two targeted compiler/browser matrices pass.
+M4 through M7 are complete. M8 projects compiler-owned explanation, examples,
+and the compatibility matrix without adding a framework source-analysis or
+editor authority.

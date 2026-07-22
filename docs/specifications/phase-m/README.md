@@ -7,8 +7,9 @@ full artifact publisher as the single framework build path and has proven
 Counter through its emitted browser runtime. M5 has proven the existing
 Computed and Effect declaration families, plus Component/Slot composition.
 M6-B makes and proves the required production Context language decision. M7
-adds compiler-owned Forms, production, and resume conformance; the metaframework
-and every reserved command remain unimplemented.
+adds compiler-owned Forms, production, and resume conformance. M8 provides
+compiler-backed DX and compatibility documentation; the metaframework and every
+reserved command remain unimplemented.
 
 * [Phase M conformance-first roadmap](PHASE_M_PROPOSED_ROADMAP.md)
 * [M0 framework constitution](PHASE_M_FRAMEWORK_CONSTITUTION.md)
@@ -21,3 +22,4 @@ and every reserved command remain unimplemented.
 * [M6-A Component and Slot conformance](PHASE_M_M6_COMPONENT_SLOT_CONFORMANCE.md)
 * [M6-B Context language conformance](PHASE_M_M6_CONTEXT_LANGUAGE_CONTRACT.md)
 * [M7 Forms, production, and resume conformance](PHASE_M_M7_FORMS_RESUME_CONFORMANCE.md)
+* [M8 compiler-backed DX and compatibility](PHASE_M_M8_DX_COMPATIBILITY.md)
