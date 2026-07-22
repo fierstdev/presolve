@@ -142,7 +142,9 @@ fn resolve_invocation_target(
                     ComponentInvocationResolutionStatus::Resolved,
                 )
             }
-            ImportBindingTarget::Symbol(_) | ImportBindingTarget::Namespace { .. } => (
+            ImportBindingTarget::Symbol(_)
+            | ImportBindingTarget::Namespace { .. }
+            | ImportBindingTarget::SemanticPackage { .. } => (
                 None,
                 ComponentInvocationResolutionStatus::ResolvedNonComponent,
             ),

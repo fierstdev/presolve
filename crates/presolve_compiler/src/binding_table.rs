@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::compilation_unit::CompilationUnit;
 use crate::module_graph::{ModuleEdgeKind, ModuleGraph, ModuleTarget};
+use crate::semantic_package::{SemanticPackageKind, SemanticPackageResolutionTable};
 use crate::symbol_table::{ModuleSymbol, SymbolKind, SymbolTable};
 
 /// Resolved local exports and relative-module imports.
@@ -41,6 +42,13 @@ pub enum ImportBindingTarget {
         module: PathBuf,
         exports: BTreeMap<String, ModuleSymbol>,
     },
+    SemanticPackage {
+        package: String,
+        version: String,
+        integrity: String,
+        export: String,
+        kind: SemanticPackageKind,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -76,6 +84,21 @@ pub fn build_binding_table(
     symbols: &SymbolTable,
     modules: &ModuleGraph,
 ) -> BindingTable {
+    build_binding_table_with_packages(
+        unit,
+        symbols,
+        modules,
+        &SemanticPackageResolutionTable::default(),
+    )
+}
+
+#[must_use]
+pub fn build_binding_table_with_packages(
+    unit: &CompilationUnit,
+    symbols: &SymbolTable,
+    modules: &ModuleGraph,
+    packages: &SemanticPackageResolutionTable,
+) -> BindingTable {
     let mut tables = unit
         .files()
         .iter()
@@ -102,6 +125,7 @@ pub fn build_binding_table(
         &exports_by_path,
         &mut tables,
         &mut diagnostics,
+        packages,
     );
 
     BindingTable {
@@ -168,10 +192,15 @@ fn resolve_relative_imports(
     exports_by_path: &BTreeMap<PathBuf, BTreeMap<String, ExportBinding>>,
     tables: &mut [ModuleBindingTable],
     diagnostics: &mut Vec<BindingDiagnostic>,
+    packages: &SemanticPackageResolutionTable,
 ) {
     for (file, table) in unit.files().iter().zip(tables.iter_mut()) {
         for import in &file.imports {
             let target = module_target(modules, &file.path, import.span, ModuleEdgeKind::Import);
+            if matches!(target, ModuleTarget::External) {
+                resolve_semantic_package_import(import, packages, table, diagnostics, &file.path);
+                continue;
+            }
             let ModuleTarget::Resolved(target_path) = target else {
                 if matches!(target, ModuleTarget::Unresolved) {
                     diagnostics.push(BindingDiagnostic {
@@ -211,6 +240,57 @@ fn resolve_relative_imports(
                 insert_import(table, diagnostics, binding);
             }
         }
+    }
+}
+
+fn resolve_semantic_package_import(
+    import: &presolve_parser::ParsedImport,
+    packages: &SemanticPackageResolutionTable,
+    table: &mut ModuleBindingTable,
+    diagnostics: &mut Vec<BindingDiagnostic>,
+    module: &Path,
+) {
+    let Some(contract) = packages.contracts.get(&import.source) else {
+        diagnostics.push(BindingDiagnostic {
+            code: "PSBIND1009".into(),
+            module: module.to_path_buf(),
+            name: import.source.clone(),
+            message: format!(
+                "external import `{}` has no semantic package contract",
+                import.source
+            ),
+        });
+        return;
+    };
+    for specifier in &import.specifiers {
+        let Some(export) = contract.exports.get(&specifier.imported) else {
+            diagnostics.push(BindingDiagnostic {
+                code: "PSBIND1010".into(),
+                module: module.to_path_buf(),
+                name: specifier.imported.clone(),
+                message: format!(
+                    "semantic package `{}` does not declare export `{}`",
+                    import.source, specifier.imported
+                ),
+            });
+            continue;
+        };
+        insert_import(
+            table,
+            diagnostics,
+            ImportBinding {
+                local_name: specifier.local.clone(),
+                imported_name: specifier.imported.clone(),
+                source_module: PathBuf::from(&import.source),
+                target: ImportBindingTarget::SemanticPackage {
+                    package: contract.package.clone(),
+                    version: contract.version.clone(),
+                    integrity: contract.integrity.clone(),
+                    export: specifier.imported.clone(),
+                    kind: export.kind.clone(),
+                },
+            },
+        );
     }
 }
 

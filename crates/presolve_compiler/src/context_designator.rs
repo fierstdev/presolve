@@ -33,7 +33,9 @@ pub(crate) fn resolve_context_designator(
             ImportBindingTarget::Symbol(symbol) if symbol.kind == SymbolKind::Component => {
                 Some(symbol.id.clone())
             }
-            ImportBindingTarget::Symbol(_) | ImportBindingTarget::Namespace { .. } => None,
+            ImportBindingTarget::Symbol(_)
+            | ImportBindingTarget::Namespace { .. }
+            | ImportBindingTarget::SemanticPackage { .. } => None,
         });
     let component = local_component.or(imported_component)?;
     contexts
