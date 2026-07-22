@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L12-C-4 - Thin Language-Service Wrapper
+* Latest completed slice: L12-D-1 - LSP Adapter Contract
 * Working tree: L12-C now has a thin WASM-only `@presolve/language-service` wrapper. LSP and extension implementation have not begun.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L12-D-1 - LSP Adapter Contract
+* Result: freezes a stateless, product-only LSP translation boundary over the completed language service. It maps only existing definition, references, flat symbols, diagnostics, and position projection; preserves range/order/errors; and declares stable unsupported behavior and caller-owned cancellation.
+* Next: L12-D-2 may implement only that fixture-backed adapter. L12-E remains unstarted.
 
 * Slice: L12-C-4 - Thin Language-Service Wrapper
 * Result: introduces `@presolve/language-service` as a direct wrapper over `@presolve/compiler-wasm`. It accepts caller-owned product bytes per query, serializes the documented request envelope, and returns the generated WASM response. It retains no product/session state and does not implement product validation, semantic analysis, source access, compiler invocation, caching, or persistence.

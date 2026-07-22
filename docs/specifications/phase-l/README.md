@@ -61,3 +61,5 @@ L12-C-3 activates the compiler-owned `@presolve/compiler-wasm` build boundary. I
 L12-C-3-B freezes the generated WASM response matrix by SHA-256 over exact canonical response bytes for every supported projection, its empty result, unsupported behavior, and every defined error category.
 
 L12-C-4 activates the thin `@presolve/language-service` wrapper. It initializes only the compiler-owned WASM artifact, transfers caller-owned product bytes and canonical request envelopes, and returns the WASM response without a product decoder, compiler path, cache, or source API.
+
+L12-D is governed by the [stateless LSP adapter contract](PHASE_L_L12_LSP_CONTRACT.md). It freezes framing, capability, error, cancellation, and fixture boundaries before any protocol code.
