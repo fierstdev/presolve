@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L14-B-1 - Counter Canonical Example
+* Latest completed slice: L14-B-2 - Components/Context/Slots Canonical Example
 * Working tree: L12-C now has a thin WASM-only `@presolve/language-service` wrapper. LSP and extension implementation have not begun.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L14-B-2 - Components/Context/Slots Canonical Example
+* Result: adds the exact frozen component-composition fixture shape with context provision/consumption, named/default slots, repeated instances, and explicit route as one explicit source/configuration example. Its verifier uses only the public L9 check command and cleans its generated local cache.
+* Next: L14-B-3 may add Forms only from its existing frozen fixture evidence.
 
 * Slice: L14-B-1 - Counter Canonical Example
 * Result: Counter now declares canonical `presolve.json` and is checked through the accepted explicit L9 command path with one caller-supplied `.tsx` mapping. No discovery, build output, scaffold, or unsupported behavior is added.

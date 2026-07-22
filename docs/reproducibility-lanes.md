@@ -8,7 +8,7 @@ records no host-performance result as correctness evidence.
 | deterministic-contracts | committed Rust/CLI/tooling fixtures | `just check` | canonical products, schema, CLI, lifecycle checks | required |
 | browser-runtime | committed runtime fixture plus configured Chrome | `pnpm test:e2e` | browser runtime result | required when browser fixture applies |
 | package-smoke | committed package smoke inputs and local WASM build | `pnpm -r check` | package dependency/smoke boundary | required |
-| documented-examples | Counter explicit config/source; later L14 corpus | `./scripts/verify-l14b-counter-example.sh` | accepted public command output | Counter required; later examples deferred |
+| documented-examples | Counter and Components/Context/Slots explicit config/source; later L14 corpus | L14 example verifiers | accepted public command output | first two required; later examples deferred |
 | observation | declared corpus and host manifest | future report command | noncanonical observation report | never a gate |
 
 The deterministic lane is the complete local reproduction baseline. Browser
