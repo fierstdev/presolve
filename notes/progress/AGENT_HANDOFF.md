@@ -3,15 +3,19 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L21 - Post-Freeze Stewardship Handoff
-* Working tree: Phase L final governance documentation and verifier pending its completion commit.
+* Latest completed slice: M1 - Frozen Authoring Conformance Contract
+* Working tree: Phase M M0/M1 planning authorities pending their completion commit.
 * Date: 2026-07-22
 
 Last completed slice
 
+* Slice: M1 - Frozen Authoring Conformance Contract
+* Result: accepts Phase M as a conformance-first framework plan. It freezes the framework's initial source vocabulary to existing compiler forms: explicit component tags, `state(initializer)`, existing action/computed/effect decorators, compiler Context designators, Slots, and Forms. The M0 constitution prohibits compiler changes, source translation, product decoding, and a second runtime.
+* Next: M2 may create only the private ambient `@presolve/framework-types` package and focused Counter type-resolution/conformance fixtures. Do not start the compiler handoff, runtime integration, or a metaframework feature.
+
 * Slice: L21 - Post-Freeze Stewardship Handoff
 * Result: records alpha versioning, amendment, security/release-authority, deprecation, and next-roadmap intake rules without authorizing implementation. It inherits the passed L20 platform-freeze evidence and requires a clean committed tree.
-* Next: Phase L is complete. Phase M is proposed as Presolve Framework Foundation: a separate ergonomic framework product over frozen compiler products. It remains non-authoritative until the owner accepts M0; the metaframework and `presolve create` are deferred.
+* Next: Phase L is complete. Its owner-accepted Phase M successor begins with the M0/M1 conformance authorities; the metaframework and `presolve create` remain deferred.
 
 * Slice: L20 - Final Platform Freeze
 * Result: freezes the evidence-backed public alpha platform and reserved-capability disposition. `verify-l20-platform-freeze.sh` and the complete inherited `just check` matrix passed from a clean committed tree on 2026-07-22.

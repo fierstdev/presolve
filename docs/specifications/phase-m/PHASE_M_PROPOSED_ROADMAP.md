@@ -1,126 +1,171 @@
-# Proposed Phase M roadmap: Presolve Framework Foundation
+# Phase M roadmap: Presolve Framework Foundation
 
-**Status:** Owner-directed proposal for acceptance; not implementation authority.
+**Status:** M0/M1 owner-accepted; M2 and later remain sequential implementation
+authority only when their preceding slice is complete and committed.
 
 ## Product boundary
 
-Phase M establishes the Presolve Framework as a distinct user-facing product
-layer built on the frozen Presolve Compiler. The framework is not a thin set of
-compiler commands, generated artifacts, or re-exported compiler types. It owns
-an ergonomic application programming model, framework runtime integration,
-developer-facing diagnostics, conventions, examples, and its own compatibility
-contract. The compiler remains the sole authority for language semantics,
-canonical identities, diagnostics, and compiler products.
+Phase M builds a private Presolve Framework around the compiler exactly as it
+is frozen. It is a TypeScript authoring and conformance product, not a new
+language or UI runtime. Its public-facing source vocabulary is the frozen
+compiler vocabulary in the [M1 conformance authoring contract](PHASE_M_CONFORMANCE_AUTHORING_CONTRACT.md).
 
-The future Presolve Metaframework is expressly out of scope. Routing, data
-loading, server rendering, build/dev orchestration, deployment adapters,
-hosting, package installation, and `presolve create` belong to that later
-product layer. `create`, `dev`, `benchmark`, and `doctor` therefore remain
-reserved exit-6 commands throughout Phase M.
+The compiler remains the sole authority for parsing, language semantics,
+semantic and runtime identities, State storage, dependency graphs, action and
+effect scheduling, Context resolution, component and Slot planning, Forms,
+diagnostics, artifacts, resumability, and optimization. Framework code must
+never reinterpret source or replace any of those decisions.
+
+The future Presolve Metaframework remains out of scope. Routing, data loading,
+server rendering, build/dev orchestration, hosting, deployment, installation,
+project discovery, and `presolve create` are deferred. `create`, `dev`,
+`benchmark`, and `doctor` remain reserved exit-6 command families throughout
+Phase M.
+
+## Governing authorities
+
+Authority is applied in this order:
+
+1. Frozen compiler, runtime, Context, Components/Slots, Forms, resumability,
+   production, CLI, and platform contracts.
+2. The [M0 framework constitution](PHASE_M_FRAMEWORK_CONSTITUTION.md).
+3. The [M1 conformance authoring contract](PHASE_M_CONFORMANCE_AUTHORING_CONTRACT.md).
+4. The current implementation slice below.
+
+No Phase M slice may alter frozen compiler source forms, compiler bytes,
+artifact schemas, diagnostics, runtime protocol, or reserved-command status.
+When a desired convenience is not a frozen form, the framework declares it
+unavailable; it does not emulate it.
 
 ## Architectural decisions
 
 | Decision | Phase M direction |
 | --- | --- |
-| Repository topology | Establish an isolated top-level `framework/` area for framework source, package manifests, fixtures, examples, and tests. It cannot change compiler crates or take ownership of existing compiler packages. |
-| Compiler integration | Use only documented canonical compiler products and public package boundaries through a narrow framework adapter. No framework-owned parser, semantic analyzer, product decoder, source discovery, or alternate compiler path. |
-| Programming model | Define framework-owned application/composition APIs that hide raw product plumbing while preserving compiler-established semantics and diagnostics. Syntax or semantics changes require a separate amendment. |
-| Runtime | Provide one framework runtime integration boundary over compiler-produced runtime/resume products. It may add framework lifecycle and composition conventions, never a competing renderer or resume protocol. |
-| Package boundary | Publish no package in Phase M. The framework package is local/private alpha evidence until a later authorized distribution decision. |
-| Metaframework separation | No router, loader, SSR host, dev server, bundler, deployment target, project generator, or package manager behavior. |
-| Compatibility | Freeze a framework compatibility matrix separately from compiler bytes; framework versions cannot silently alter compiler product meanings. |
+| Source language | Preserve the compiler's exact source forms. In particular, component tags remain explicit, State remains `state(initializer)`, and Context/Forms/Slots retain their existing declarations. |
+| Type delivery | Start with private `@presolve/framework-types` ambient declarations selected through `tsconfig` `types`; no application-source aliases, JSX transform, decorator transform, or runtime registration. |
+| Repository topology | Create `framework/` only in M2. It owns framework packages, conformance fixtures, examples, and docs, but cannot change compiler crates or take ownership of existing compiler packages. |
+| Compiler handoff | Invoke only the accepted explicit `presolve` project/configuration path. Inputs stay caller-supplied; there is no source/project discovery, parser, transform, semantic analyzer, product decoder, or alternate compiler route. |
+| Runtime | Reuse emitted compiler runtime/resume products unchanged. No framework state store, renderer, hydration layer, Context lookup, scheduler, or artifact writer exists. |
+| Diagnostics | Preserve canonical diagnostics exactly; framework advice is optional, separate, and non-authoritative. |
+| Package policy | Keep every Phase M package private. Phase M does not reserve or publish a short `presolve` package. |
+| Compatibility | Fail closed on unsupported framework/compiler/CLI/product tuples; framework versions cannot reinterpret compiler products. |
 
 ## Slice sequence
 
-### M0 — framework constitution and acceptance amendment
+### M0 — framework constitution and acceptance
 
-Accept this roadmap, establish `framework/` ownership, define the compiler /
-framework / metaframework boundary, public terminology, compatibility policy,
-and rollback. The amendment names every frozen Phase L representation it may
-consume and confirms no compiler semantics or reserved-command disposition
-changes. No framework implementation is added.
+**Completed authority:**
+[framework constitution](PHASE_M_FRAMEWORK_CONSTITUTION.md).
 
-### M1 — isolated topology and package contract
+It accepts the framework/compiler/metaframework boundary, private package
+direction, opaque explicit-command handoff, compatibility policy, and
+metaframework deferral. It changes no frozen compiler or platform contract.
 
-Create the `framework/` workspace boundary and a private framework package
-contract. Freeze allowed dependencies, exports, generated-artifact policy,
-test roots, examples, and prohibition on imports from compiler internals. The
-slice does not expose a user API or build a runtime.
+### M1 — frozen authoring conformance contract
 
-### M2 — application programming-model contract
+**Completed authority:**
+[conformance authoring contract](PHASE_M_CONFORMANCE_AUTHORING_CONTRACT.md).
 
-Specify the framework's concise author-facing application, composition, state,
-event, context, component, and form API shapes. Map every capability to an
-existing compiler authority and explicitly list unsupported interactions. This
-is a framework API contract, not a new language-semantics contract.
+It maps every initially supported public form to exact compiler syntax and
+records unavailable alternatives. It intentionally keeps component tag strings,
+`state(initializer)`, compiler-owned Context designators, direct slot syntax,
+and frozen Forms syntax.
 
-### M3 — compiler-to-framework adapter
+### M2 — isolated ambient type package
 
-Implement a narrow adapter that accepts only canonical compiler products and
-maps them into framework-owned application descriptors. It is deterministic,
-strictly validates the supported product boundary, retains no source text, and
-cannot invoke an alternate compiler or decoder.
+Create `framework/packages/framework-types` as a private declaration-only
+package. It provides the ambient TypeScript names needed by the Counter form
+through an explicit `tsconfig` `types` entry. It emits no JavaScript and cannot
+install decorators, a JSX runtime, a renderer, a transform, or reactive
+behavior.
 
-### M4 — framework runtime integration
+Proof: type-resolution fixtures for the exact Counter form; an import/output
+audit; and canonical compiler check evidence showing the compiler input and
+result remain unchanged.
 
-Implement the single framework runtime integration boundary that composes the
-existing runtime/resume products into the M2 application model. Define mount,
-update, error, cleanup, and resume handoff rules without changing renderer,
-resume, or compiler protocol bytes.
+### M3 — explicit compiler handoff contract
 
-### M5 — ergonomic primitive implementation
+Define and implement the narrow framework handoff over the accepted explicit
+`presolve` project/configuration boundary. It forwards caller-supplied paths,
+configuration, source membership, target profile, and output root without
+discovery or source interpretation. It returns only command status and opaque
+published artifact locations; it does not decode, synthesize, or rewrite
+compiler products.
 
-Implement the contracted framework primitives for application composition,
-state/action/computed use, context, components/slots, effects, and forms.
-Each primitive has exact compiler-product provenance, diagnostic propagation,
-deterministic fixture output, and an explicit unsupported boundary.
+Proof: request-shape fixtures; no-source-retention/dependency audit; unchanged
+canonical diagnostics; incompatible version/command failure fixtures.
 
-### M6 — framework DX and diagnostics
+### M4 — Counter vertical slice
 
-Add framework-level error presentation, inspection, and local test utilities
-that translate only already-established compiler facts into author-facing
-guidance. No source scanning, editor protocol, dev server, watcher, timing
-gate, or source-map system is activated.
+Prove the exact M1 Counter through M2 types and M3 handoff:
 
-### M7 — framework examples and conformance matrix
+```text
+unchanged author source
+  -> ambient type resolution
+  -> explicit canonical compiler command
+  -> canonical HTML/runtime artifacts
+  -> frozen browser click probe
+```
 
-Create framework-owned examples for composition, state/actions/computed,
-context/slots, effects/forms, and resumability. Each proves the framework API,
-compiler-product provenance, runtime behavior where relevant, and absence of
-metaframework authority.
+The evidence proves the existing compiler action binding updates the exact
+binding without hydration or a framework reactive runtime. Counter does not
+invent `@state()` or optional component identifiers.
 
-### M8 — framework compatibility, docs, and handoff
+### M5 — reactive conformance families
 
-Freeze the framework public surface, support matrix, versioning policy,
-diagnostic/error contract, examples, and migration/rollback rules. Document
-the metaframework handoff requirements: canonical application descriptor,
-routing/data/SSR decisions, dev/build authority, deployment boundary, and
-project-template ownership. `presolve create` remains deferred to that later
-roadmap.
+Add exact frozen State, Action, Computed, and Effect forms one family at a
+time. The framework package remains declarations and opaque handoff only.
+Canonical compiler fixtures establish initializer limits, action writes,
+direct/captured events, computed dependency/caching behavior, action-batch
+ordering, and effect capability diagnostics.
 
-### M9 — Phase M framework freeze
+### M6 — composition conformance families
 
-Run the full M0–M8 matrix plus inherited Phase L evidence. Freeze framework
-fixtures, adapter/runtime contracts, package exports, compatibility table, and
-metaframework exclusions. Completion requires a clean committed tree and no
-change to compiler semantics, compiler bytes, or reserved-command status.
+Add exact frozen component invocation, repeated/keyed instance behavior, Slot
+declarations/content/outlets, and Context declarations/providers/consumers.
+No inputs, props, callback arguments, Context factory, provider getter,
+runtime lookup, Slot forwarding, or framework lifecycle abstraction is added.
+Each family requires its existing compiler and browser evidence where runtime
+execution is already frozen.
+
+### M7 — Forms and resume/production conformance
+
+Expose only the frozen Form, Field, validation, submit, and explicit host
+forms. Then prove the framework uses existing production/resume artifacts
+unchanged, including malformed-artifact failure behavior. It adds neither a
+new Form API nor a resume/runtime wrapper.
+
+### M8 — framework DX, examples, and compatibility
+
+Add a compiler-backed explanation presentation, an error guide, conformance
+examples, and the framework compatibility matrix. All explanation data comes
+from existing command/product surfaces; no JavaScript source scan or new editor
+intelligence is allowed. Examples begin with Counter and advance only after the
+underlying family passes its conformance matrix.
+
+### M9 — framework freeze and metaframework handoff
+
+Freeze private package exports, declaration behavior, handoff grammar,
+supported compiler/CLI/product tuples, examples, diagnostics presentation, and
+the explicit unavailable-authoring list. Run the M0–M8 matrix and inherited
+Phase L gates from a clean tree. The handoff names the missing authority a
+future metaframework must supply; it does not pre-implement it.
 
 ## Evidence matrix
 
 | Concern | Required proof |
 | --- | --- |
-| Layer separation | import/dependency audit proving no compiler internals or metaframework authority |
-| Framework API | contract-to-compiler-authority map and exact unsupported-capability matrix |
-| Adapter integrity | canonical-product fixtures, strict validation, deterministic descriptors, no source retention |
-| Runtime integrity | browser/runtime and resume conformance against frozen compiler products |
-| Ergonomic DX | author-facing diagnostics, examples, and framework-only conformance fixtures |
-| Compatibility | version/support matrix, migration/rollback fixtures, public docs checks |
-| Metaframework deferral | audit for no router, server, bundler, deployment, generator, package manager, or reserved command |
+| Frozen-source conformance | exact source-form fixture and cited compiler authority for each supported family |
+| Type package honesty | type-resolution fixture, declaration-only/output audit, and no fabricated compiler semantics |
+| Compiler handoff | explicit caller inputs, canonical command/diagnostic evidence, no discovery or source interpretation |
+| Runtime integrity | inherited browser/runtime and resume fixtures with no framework renderer, hydration, scheduler, or state store |
+| Product integrity | opaque artifact locations/versions only; no framework decoder, writer, or canonical-byte change |
+| DX integrity | compiler-backed explain/diagnostic presentation with unchanged codes, spans, labels, ordering, and identities |
+| Compatibility | fail-closed framework/compiler/CLI/product matrix and migration/rollback documentation |
+| Metaframework deferral | dependency/source audit for no router, server, bundler, deployment, generator, package manager, or reserved command |
 
-## Acceptance checklist
+## Next authorized action
 
-Before M0 starts, the owner must explicitly accept this framework direction,
-approve the `framework/` topology and package identity, select the initial
-application-model API scope, and approve the compiler/framework compatibility
-boundary. No slice may begin from this proposal alone, and `presolve create`
-remains a metaframework concern until a future accepted roadmap defines it.
+M2 only: create the isolated private ambient declaration package and its focused
+Counter type-resolution/conformance fixtures. Stop before M3 until M2's
+declaration-only and unchanged-compiler-input evidence is committed.
