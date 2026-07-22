@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L14-B-5 - Production/Resume Canonical Example
-* Working tree: clean after the five-example alpha corpus; all editor-package boundaries remain product-free.
+* Latest completed slice: L13-A - Public Documentation Index
+* Working tree: clean after the public documentation index; all editor-package boundaries remain product-free.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L13-A - Public Documentation Index
+* Result: adds the public reference/guide/archive index, compiler-ownership and frozen-version policy, and a marker grammar for executable command snippets. It introduces no command or product behavior.
+* Next: L13-B may document only accepted L9/L11 commands and execute every marked command snippet.
 
 * Slice: L14-B-5 - Production/Resume Canonical Example
 * Result: adds the exact Phase K computed-diamond source and uses the established production build only. The proof asserts the emitted production/resume artifacts and invokes the existing CSP/malformed-boot browser probe; it adds no deployment, benchmark, or author-time edit behavior.
@@ -1375,11 +1379,10 @@ Known limitations
 Exact next step
 
 Phase K is complete and frozen through K21. Phase L is complete through
-L14-B. The five canonical alpha examples are complete and remain bounded to
-explicit inputs and frozen evidence. The production/resume proof emits the
-existing artifacts and reuses the existing production browser test; it does not
-add deployment, benchmarks, or author-time editing. Next: L13-A public
-documentation index and verifier-ready snippet format only.
+L13-A. Public documentation now distinguishes reference, guide, and archive
+material, states compiler/frozen-version authority, and reserves one exact
+snippet marker grammar. It introduces no command or product behavior. Next:
+L13-B, accepted L9/L11 command documentation with executed marked snippets.
 
 Useful commands
 
