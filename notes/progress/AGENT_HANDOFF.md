@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: M5-B - Effect Conformance
-* Working tree: Phase M M5-B Effect declaration, fixture, and verifier pending its completion commit.
+* Latest completed slice: M6-A - Component and Slot Conformance
+* Working tree: Phase M M6-A Component/Slot declaration, fixture, and verifier pending its completion commit.
 * Date: 2026-07-22
 
 Last completed slice
+
+* Slice: M6-A - Component and Slot Conformance
+* Result: adds the existing `SlotContent` and `@slot()` declarations only. The type fixture is byte-identical to the compiler's valid component fixture; TypeScript 7.0, unchanged compiler check, and browser instance/slot-plan proof pass. No children runtime, JSX renderer, forwarding protocol, or ownership lookup was added.
+* Next: M6-B must define a production Context language change or keep Context unavailable. The inherited `Owner.instanceField` designator cannot be typed honestly in TypeScript without a language decision; do not add a suppression or framework shim.
 
 * Slice: M5-B - Effect Conformance
 * Result: adds only the type-level `@effect()` method marker. The exact compiler InitialEffectRuntime fixture type-checks and checks unchanged; its real-browser proof confirms one initial compiler-owned effect run, exact capability lowering order, computed visibility, DOM/storage effects, and no runtime diagnostics.

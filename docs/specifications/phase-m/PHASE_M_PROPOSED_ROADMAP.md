@@ -146,6 +146,8 @@ runtime lookup, Slot forwarding, or framework lifecycle abstraction is added.
 Each family requires its existing compiler and browser evidence where runtime
 execution is already frozen.
 
+**M6-A authority:** [Component and Slot conformance](PHASE_M_M6_COMPONENT_SLOT_CONFORMANCE.md).
+
 ### M7 — Forms and resume/production conformance
 
 Expose only the frozen Form, Field, validation, submit, and explicit host
@@ -186,5 +188,7 @@ future metaframework must supply; it does not pre-implement it.
 
 ## Current boundary
 
-M4 and M5 are complete. M6 may select one existing composition family with its
-compiler-backed type/check/browser proof.
+M4 and M5 are complete. M6-A Component/Slot conformance is complete. M6-B must
+make an explicit production language decision before exposing Context, because
+the inherited `Owner.instanceField` designator is not truthfully TypeScript
+typeable.

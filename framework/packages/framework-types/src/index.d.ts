@@ -22,6 +22,9 @@ declare global {
   /** Declares a compiler-recognized terminal capability method with no hook runtime. */
   function effect(): PresolveMethodDecorator;
 
+  /** Declares a compiler-recognized slot field with no children runtime. */
+  function slot(): PresolveFieldDecorator;
+
   /**
    * Describes the initializer shape for compiler-recognized State. The
    * compiler, not this declaration, establishes reactive State semantics.
@@ -48,6 +51,17 @@ declare global {
     value: (this: This) => Value,
     context: ClassGetterDecoratorContext<This, Value>
   ) => ((this: This) => Value) | void;
+
+  /** A standard-decorator-compatible declaration for compiler field markers. */
+  type PresolveFieldDecorator = <This, Value>(
+    value: undefined,
+    context: ClassFieldDecoratorContext<This, Value>
+  ) => void;
+
+  /** The compiler-owned slot-content marker; it has no framework runtime value. */
+  interface SlotContent {
+    readonly __presolveSlotContentBrand: unique symbol;
+  }
 
   namespace JSX {
     type Element = unknown;

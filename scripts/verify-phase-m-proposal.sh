@@ -9,8 +9,9 @@ readonly m3_contract=docs/specifications/phase-m/PHASE_M_M3_EXPLICIT_HANDOFF_CON
 readonly m4_audit=docs/specifications/phase-m/PHASE_M_M4_PUBLICATION_AUDIT.md
 readonly m5_computed=docs/specifications/phase-m/PHASE_M_M5_COMPUTED_CONFORMANCE.md
 readonly m5_effect=docs/specifications/phase-m/PHASE_M_M5_EFFECT_CONFORMANCE.md
+readonly m6_component_slot=docs/specifications/phase-m/PHASE_M_M6_COMPONENT_SLOT_CONFORMANCE.md
 
-for document in "$roadmap" "$constitution" "$authoring" "$m2_contract" "$m3_contract" "$m4_audit" "$m5_computed" "$m5_effect"; do
+for document in "$roadmap" "$constitution" "$authoring" "$m2_contract" "$m3_contract" "$m4_audit" "$m5_computed" "$m5_effect" "$m6_component_slot"; do
   test -s "$document"
 done
 
@@ -42,5 +43,5 @@ rg --fixed-strings --quiet 'M0/M1 owner-accepted' "$roadmap"
 rg --fixed-strings --quiet 'M2 framework types contract' "$roadmap"
 rg --fixed-strings --quiet 'M3 explicit handoff contract' "$roadmap"
 rg --fixed-strings --quiet 'M4 public artifact-publication audit' "$roadmap"
-rg --fixed-strings --quiet 'M4 and M5 are complete' "$roadmap"
+rg --fixed-strings --quiet 'M6-A Component/Slot conformance is complete' "$roadmap"
 git diff --check
