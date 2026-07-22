@@ -182,6 +182,8 @@ the explicit unavailable-authoring list. Run the M0–M8 matrix and inherited
 Phase L gates from a clean tree. The handoff names the missing authority a
 future metaframework must supply; it does not pre-implement it.
 
+**M9 authority:** [Framework freeze](PHASE_M_M9_FRAMEWORK_FREEZE.md).
+
 ## Evidence matrix
 
 | Concern | Required proof |
@@ -197,6 +199,6 @@ future metaframework must supply; it does not pre-implement it.
 
 ## Current boundary
 
-M4 through M7 are complete. M8 projects compiler-owned explanation, examples,
-and the compatibility matrix without adding a framework source-analysis or
-editor authority.
+M4 through M8 are complete. M9 freezes the private framework surface and the
+M2–M8 focused evidence matrix; future metaframework work requires a separate
+roadmap and may not reinterpret this framework contract.

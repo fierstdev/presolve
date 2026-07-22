@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: M8 - Compiler-Backed DX and Compatibility
-* Working tree: Phase M M8 explanation/compatibility documentation and verifier pending its completion commit.
+* Latest completed slice: M9 - Framework Freeze
+* Working tree: Phase M M9 freeze contract and full focused verifier pending its completion commit.
 * Date: 2026-07-22
 
 Last completed slice
+
+* Slice: M9 - Framework Freeze
+* Result: freezes the private declaration surface, canonical artifact-build handoff, compiler-backed explanation policy, supported source forms, TypeScript 7.0 compatibility, and unavailable features. The M9 verifier is the complete focused M2–M8 evidence matrix. Future metaframework work must obtain separate authority and may not reinterpret compiler artifacts or add compatibility shims.
+* Next: Phase M is complete after the full M9 verifier passes and this handoff is committed. Metaframework work remains a separately authored roadmap.
 
 * Slice: M8 - Compiler-Backed DX and Compatibility
 * Result: records the existing `presolve explain --inspect --format json` product as the only framework explanation surface and maps all examples to their existing compiler/browser conformance sources. The compatibility matrix supports the pinned TypeScript 7.0 native CLI and explicitly defers TypeScript 7.1 pending a full rerun. No framework explain command, parser, source scanner, editor implementation, project discovery, or runtime was added.

@@ -13,8 +13,9 @@ readonly m6_component_slot=docs/specifications/phase-m/PHASE_M_M6_COMPONENT_SLOT
 readonly m6_context=docs/specifications/phase-m/PHASE_M_M6_CONTEXT_LANGUAGE_CONTRACT.md
 readonly m7_forms_resume=docs/specifications/phase-m/PHASE_M_M7_FORMS_RESUME_CONFORMANCE.md
 readonly m8_dx=docs/specifications/phase-m/PHASE_M_M8_DX_COMPATIBILITY.md
+readonly m9_freeze=docs/specifications/phase-m/PHASE_M_M9_FRAMEWORK_FREEZE.md
 
-for document in "$roadmap" "$constitution" "$authoring" "$m2_contract" "$m3_contract" "$m4_audit" "$m5_computed" "$m5_effect" "$m6_component_slot" "$m6_context" "$m7_forms_resume" "$m8_dx"; do
+for document in "$roadmap" "$constitution" "$authoring" "$m2_contract" "$m3_contract" "$m4_audit" "$m5_computed" "$m5_effect" "$m6_component_slot" "$m6_context" "$m7_forms_resume" "$m8_dx" "$m9_freeze"; do
   test -s "$document"
 done
 
@@ -50,4 +51,5 @@ rg --fixed-strings --quiet 'M6-A Component/Slot conformance is complete' "$roadm
 rg --fixed-strings --quiet 'M6-B authority' "$roadmap"
 rg --fixed-strings --quiet 'M7 authority' "$roadmap"
 rg --fixed-strings --quiet 'M8 authority' "$roadmap"
+rg --fixed-strings --quiet 'M9 authority' "$roadmap"
 git diff --check

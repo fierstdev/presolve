@@ -23,3 +23,4 @@ reserved command remain unimplemented.
 * [M6-B Context language conformance](PHASE_M_M6_CONTEXT_LANGUAGE_CONTRACT.md)
 * [M7 Forms, production, and resume conformance](PHASE_M_M7_FORMS_RESUME_CONFORMANCE.md)
 * [M8 compiler-backed DX and compatibility](PHASE_M_M8_DX_COMPATIBILITY.md)
+* [M9 framework freeze](PHASE_M_M9_FRAMEWORK_FREEZE.md)
