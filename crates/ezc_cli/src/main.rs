@@ -75,7 +75,7 @@ fn main() {
                 run_graph(args);
             }
         }
-        "asm" => run_asm(&args),
+        "asm" => l9_command_error("asm", "retired: use presolve explain", 6),
         "check" => {
             if args.iter().any(|argument| argument == "--config") {
                 run_l9_build_or_check("check", &args);
@@ -715,10 +715,14 @@ fn l9_config_and_format(command: &str, args: &[String]) -> (PathBuf, bool) {
 }
 
 fn run_explain(mut args: Vec<String>) {
-    if args
+    let semantic_inspection = args
         .iter()
-        .any(|argument| is_asm_entity_inspection_option(argument))
-    {
+        .any(|argument| argument == "--inspect" || is_asm_entity_inspection_option(argument))
+        || args
+            .windows(2)
+            .any(|pair| pair[0] == "--format" && pair[1] == "graph");
+    if semantic_inspection {
+        args.retain(|argument| argument != "--inspect");
         run_asm_inspection(parse_asm_inputs(&args));
         return;
     }
@@ -766,10 +770,6 @@ fn run_graph(mut args: Vec<String>) {
     let graph = fold_component_graph(&build_component_graph(&parsed));
 
     print_component_graph(&path, &graph);
-}
-
-fn run_asm(args: &[String]) {
-    run_asm_inspection(parse_asm_inputs(args));
 }
 
 fn run_asm_inspection(inputs: AsmInputs) {
@@ -4028,8 +4028,7 @@ fn write_build_artifacts(
 fn print_usage_and_exit() -> ! {
     eprintln!("usage:");
     eprintln!("  presolve explain <file> [--format text|json]");
-    eprintln!("  presolve explain <file> [--entity semantic-id | --source path --offset byte] [--child-kind kind] [--reference-kind kind] [--format text|json]");
-    eprintln!("  presolve asm <file> [--entity semantic-id | --source path --offset byte] [--child-kind kind] [--reference-kind kind] [--format text|json|graph]");
+    eprintln!("  presolve explain <file> [--inspect] [--entity semantic-id | --source path --offset byte] [--child-kind kind] [--reference-kind kind] [--format text|json|graph]");
     eprintln!(
         "  presolve check <file> [file...] [--format text|json] [--category parser|compiler|validation] [--fail-on error|warning|info]"
     );

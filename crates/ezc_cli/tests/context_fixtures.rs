@@ -667,7 +667,7 @@ fn context_fixture_outputs_are_byte_deterministic_across_all_serialized_surfaces
     );
     for args in [
         vec!["check", path, "--format", "json"],
-        vec!["asm", path, "--format", "json"],
+        vec!["explain", "--inspect", path, "--format", "json"],
         vec!["explain", path, "--entity", context_id, "--format", "json"],
     ] {
         let first = run_cli(&args);
@@ -757,7 +757,7 @@ fn phase_g_freezes_schema_versions_runtime_order_and_no_discovery_contract() {
 
     for (args, expected) in [
         (vec!["check", path, "--format", "json"], 6),
-        (vec!["asm", path, "--format", "json"], 12),
+        (vec!["explain", "--inspect", path, "--format", "json"], 12),
     ] {
         let output = run_cli(&args);
         assert!(output.status.success());

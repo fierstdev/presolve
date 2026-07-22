@@ -1403,9 +1403,14 @@ Known limitations
 Exact next step
 
 Phase K is complete and frozen through K21. Phase L is complete through
-L17-B. The fail-closed release dry run creates only temporary package tarballs,
-emits a checksum manifest, and removes the tarballs. It authorizes no
-publication. Next: L18 repository-owned launch content only.
+L17-B, but L18 is paused for the owner-directed Presolve identity migration.
+The active migration contract supersedes the retained-identity exceptions:
+all active compiler/runtime namespaces, diagnostics, generated marker names,
+fixtures, and implementation paths must move together. The first migration
+slice makes `presolve explain` the sole inspection command (`--inspect` for
+complete inspection; the retired short command exits 6). Next: migrate
+canonical compiler/runtime spellings and their exact fixture evidence before
+resuming L18.
 
 Useful commands
 

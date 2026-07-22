@@ -13,6 +13,11 @@ source/document/product state unless explicitly stated; or claim hosting,
 signing, registry publication, or external release authority. Every slice is
 verified, recorded, and committed independently.
 
+Before L18, the owner-directed
+[`Presolve identity migration contract`](../../presolve-identity-migration-contract.md)
+supersedes the former retained-identity exceptions. It is a prerequisite
+representation migration and does not enter the L18 launch-content slice.
+
 The required order is L15, L14, L13, L16, L17, L18, L19, L20, then L21.
 Each later gate is blocked until its predecessor's verifier passes. `just
 check` remains inherited evidence and every new verifier joins it.

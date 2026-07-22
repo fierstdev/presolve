@@ -571,17 +571,33 @@ fn component_outputs_are_byte_deterministic_across_compiler_and_cli_surfaces() {
         assert_eq!(cli_result(&args), cli_result(&args), "{args:?}");
     }
     for args in [
-        vec!["asm", path],
-        vec!["asm", path, "--format", "json"],
-        vec!["asm", path, "--format", "graph"],
-        vec!["asm", path, "--entity", component],
-        vec!["asm", path, "--entity", component, "--format", "json"],
+        vec!["explain", "--inspect", path],
+        vec!["explain", "--inspect", path, "--format", "json"],
+        vec!["explain", "--inspect", path, "--format", "graph"],
+        vec!["explain", "--inspect", path, "--entity", component],
+        vec![
+            "explain",
+            "--inspect",
+            path,
+            "--entity",
+            component,
+            "--format",
+            "json",
+        ],
     ] {
         assert_eq!(cli_output(&args), cli_output(&args), "{args:?}");
     }
     for format in ["text", "json"] {
         let args = [path, "--entity", component, "--format", format];
-        let asm = cli_output(&["asm", args[0], args[1], args[2], args[3], args[4]]);
+        let asm = cli_output(&[
+            "explain",
+            "--inspect",
+            args[0],
+            args[1],
+            args[2],
+            args[3],
+            args[4],
+        ]);
         let explain = cli_output(&["explain", args[0], args[1], args[2], args[3], args[4]]);
         assert_eq!(asm, explain, "ASM/explain {format} parity");
     }
@@ -652,7 +668,11 @@ fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
 
     for (args, expected_status, expected_schema) in [
         (vec!["check", path, "--format", "json"], Some(1), 6),
-        (vec!["asm", path, "--format", "json"], Some(0), 12),
+        (
+            vec!["explain", "--inspect", path, "--format", "json"],
+            Some(0),
+            12,
+        ),
     ] {
         let (status, stdout, stderr) = cli_result(&args);
         assert_eq!(

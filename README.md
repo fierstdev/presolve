@@ -83,13 +83,12 @@ Inspect one canonical semantic entity with its ownership, provenance,
 containment, relations, and overlap-based compiler diagnostics:
 
 ```sh
-presolve asm <file> --entity <semantic-id> [--format text|json]
-presolve asm <file> --source <path> --offset <byte> [--format text|json]
+presolve explain <file> --inspect [--format text|json]
 presolve explain <file> --entity <semantic-id> [--format text|json]
 presolve explain <file> --source <path> --offset <byte> [--format text|json]
 ```
 
-Use `presolve asm <file> --format json` to discover the available semantic IDs.
+Use `presolve explain <file> --inspect --format json` to discover the available semantic IDs.
 The selected-entity document includes the entity itself, direct child IDs,
 nearest-first parent IDs through the application root, descendant count, incoming and outgoing references,
 and related compiler diagnostics. This is the canonical semantic-navigation
@@ -101,10 +100,10 @@ Source selection chooses the uniquely narrowest semantic span covering the
 given byte offset. No match or tied narrowest spans fail explicitly; `--entity`
 cannot be combined with `--source` or `--offset`.
 
-`presolve explain <file>` retains its legacy source-summary output. Supplying
-an entity selector (or an entity filter) activates the same read-only,
-canonical ASM inspection path as `presolve asm`, including its text/JSON
-document, source selection, deterministic filtering, and explicit failures.
+`presolve explain <file>` retains its source-summary output. Supplying
+`--inspect` or an entity selector (or an entity filter) activates the
+read-only canonical semantic-inspection view, including its text/JSON document,
+source selection, deterministic filtering, and explicit failures.
 
 For a computed entity, the inspection record additionally contains the
 compiler-owned computed type, transitive dependencies and dependents,
@@ -122,8 +121,8 @@ version.
 Selected entity inspection supports optional filters:
 
 ```sh
-presolve asm <file> --entity <semantic-id> --child-kind method
-presolve asm <file> --entity <semantic-id> --reference-kind action-state
+presolve explain <file> --entity <semantic-id> --child-kind method
+presolve explain <file> --entity <semantic-id> --reference-kind action-state
 ```
 
 `--child-kind` accepts `component`, `state-field`, `method`, `action`,
@@ -205,7 +204,7 @@ restored, and unsupported getter syntax does not receive partial execution.
 Export the canonical ASM as a stable JSON graph:
 
 ```sh
-presolve asm <file> [file...] --format graph
+presolve explain <file> [file...] --format graph
 ```
 
 The graph schema has a version, ordered application roots, typed semantic nodes

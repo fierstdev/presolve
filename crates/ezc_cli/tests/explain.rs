@@ -93,7 +93,7 @@ fn explain_command_matches_json_fixture() {
 }
 
 #[test]
-fn explain_command_inspects_entities_through_the_canonical_asm_path() {
+fn explain_command_inspects_entities_through_the_canonical_inspection_view() {
     let path = "fixtures/0001-source-summary/input/Counter.tsx";
     let entity_id = "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter";
     let inspection_args = [
@@ -114,16 +114,16 @@ fn explain_command_inspects_entities_through_the_canonical_asm_path() {
         .args(inspection_args)
         .output()
         .expect("failed to inspect an ASM entity through ezc_cli explain");
-    let asm = Command::new(ezc_cli_bin())
+    let inspect = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .arg("asm")
+        .args(["explain", "--inspect"])
         .args(inspection_args)
         .output()
-        .expect("failed to inspect an ASM entity through ezc_cli asm");
+        .expect("failed to inspect an entity through ezc_cli explain --inspect");
 
     assert!(explain.status.success());
-    assert!(asm.status.success());
-    assert_eq!(explain.stdout, asm.stdout);
+    assert!(inspect.status.success());
+    assert_eq!(explain.stdout, inspect.stdout);
 
     let document: serde_json::Value =
         serde_json::from_slice(&explain.stdout).expect("entity inspection JSON");
@@ -135,6 +135,19 @@ fn explain_command_inspects_entities_through_the_canonical_asm_path() {
             "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/method:render"
         ])
     );
+}
+
+#[test]
+fn retired_asm_command_fails_closed_with_the_canonical_replacement() {
+    let output = Command::new(ezc_cli_bin())
+        .current_dir(repo_root())
+        .args(["asm", "fixtures/0001-source-summary/input/Counter.tsx"])
+        .output()
+        .expect("failed to run retired command");
+
+    assert_eq!(output.status.code(), Some(6));
+    assert_eq!(output.stdout, Vec::<u8>::new());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("retired: use presolve explain"));
 }
 
 #[test]
@@ -160,7 +173,11 @@ fn asm_command_reports_text_summary() {
 
     let output = Command::new(ezc_cli_bin())
         .current_dir(&repo_root)
-        .args(["asm", "fixtures/0001-source-summary/input/Counter.tsx"])
+        .args([
+            "explain",
+            "--inspect",
+            "fixtures/0001-source-summary/input/Counter.tsx",
+        ])
         .output()
         .expect("failed to run ezc_cli asm");
 
@@ -181,7 +198,8 @@ fn asm_command_reports_text_summary() {
 fn asm_command_emits_deterministic_json_inspection() {
     let repo_root = repo_root();
     let args = [
-        "asm",
+        "explain",
+        "--inspect",
         "fixtures/0001-source-summary/input/Counter.tsx",
         "--format",
         "json",
@@ -244,7 +262,8 @@ fn k17_invalid_candidates_expose_blocks_without_production_id_fabrication() {
     let output = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
         .args([
-            "asm",
+            "explain",
+            "--inspect",
             "fixtures/0066-component-diagnostics/input/EZC1068.tsx",
             "--format",
             "json",
@@ -288,7 +307,7 @@ fn k17_inspection_static_costs_match_the_emitted_reports() {
     assert!(build.status.success());
     let asm = Command::new(ezc_cli_bin())
         .current_dir(&root)
-        .args(["asm", input, "--format", "json"])
+        .args(["explain", "--inspect", input, "--format", "json"])
         .output()
         .expect("inspect K17 report fixture");
     assert!(asm.status.success());
@@ -329,7 +348,7 @@ fn k18_production_diagnostics_have_full_selected_text_and_check_json_parity() {
     let component = format!("module:{input}/component:x-diagnostic");
     let full = Command::new(ezc_cli_bin())
         .current_dir(&root)
-        .args(["asm", input, "--format", "json"])
+        .args(["explain", "--inspect", input, "--format", "json"])
         .output()
         .expect("full K18 ASM");
     let selected = Command::new(ezc_cli_bin())
@@ -339,7 +358,7 @@ fn k18_production_diagnostics_have_full_selected_text_and_check_json_parity() {
         .expect("selected K18 ASM");
     let text = Command::new(ezc_cli_bin())
         .current_dir(&root)
-        .args(["asm", input])
+        .args(["explain", "--inspect", input])
         .output()
         .expect("text K18 ASM");
     let check = Command::new(ezc_cli_bin())
@@ -383,7 +402,7 @@ fn k19_production_inspection_is_identical_under_reversed_multi_file_input() {
     let inspect = |paths: [&str; 2]| {
         let output = Command::new(ezc_cli_bin())
             .current_dir(&root)
-            .arg("asm")
+            .args(["explain", "--inspect"])
             .args(paths)
             .args(["--format", "json"])
             .output()
@@ -408,7 +427,7 @@ fn k19_production_inspection_is_identical_under_reversed_multi_file_input() {
 fn asm_command_exports_a_deterministic_semantic_graph() {
     let repo_root = repo_root();
     let path = "fixtures/0001-source-summary/input/Counter.tsx";
-    let args = ["asm", path, "--format", "graph"];
+    let args = ["explain", "--inspect", path, "--format", "graph"];
 
     let first = Command::new(ezc_cli_bin())
         .current_dir(&repo_root)
@@ -456,7 +475,15 @@ fn asm_command_exports_a_deterministic_semantic_graph() {
 
     let selected = Command::new(ezc_cli_bin())
         .current_dir(&repo_root)
-        .args(["asm", path, "--format", "graph", "--entity", component_id])
+        .args([
+            "explain",
+            "--inspect",
+            path,
+            "--format",
+            "graph",
+            "--entity",
+            component_id,
+        ])
         .output()
         .expect("failed to reject a selected graph export");
     assert!(!selected.status.success());
@@ -471,11 +498,18 @@ fn asm_command_inspects_a_sorted_multi_file_unit() {
         "fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx",
         "fixtures/0001-source-summary/input/Counter.tsx",
     ];
-    let args = ["asm", input_paths[0], input_paths[1], "--format", "json"];
+    let args = [
+        "explain",
+        "--inspect",
+        input_paths[0],
+        input_paths[1],
+        "--format",
+        "json",
+    ];
 
     let text_output = Command::new(ezc_cli_bin())
         .current_dir(&repo_root)
-        .args(["asm", input_paths[0], input_paths[1]])
+        .args(["explain", "--inspect", input_paths[0], input_paths[1]])
         .output()
         .expect("failed to run multi-file ezc_cli asm");
 
@@ -530,7 +564,15 @@ fn asm_command_inspects_one_semantic_entity() {
         "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/state:count";
     let output = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .args(["asm", path, "--entity", entity_id, "--format", "json"])
+        .args([
+            "explain",
+            "--inspect",
+            path,
+            "--entity",
+            entity_id,
+            "--format",
+            "json",
+        ])
         .output()
         .expect("failed to inspect ASM entity");
 
@@ -557,7 +599,7 @@ fn asm_command_inspects_one_semantic_entity() {
 
     let text_output = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .args(["asm", path, "--entity", entity_id])
+        .args(["explain", "--inspect", path, "--entity", entity_id])
         .output()
         .expect("failed to inspect ASM entity as text");
     assert!(text_output.status.success());
@@ -594,7 +636,7 @@ fn asm_and_explain_inspect_canonical_computed_metadata() {
 
     let asm = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .arg("asm")
+        .args(["explain", "--inspect"])
         .args(inspection_args)
         .output()
         .expect("failed to inspect computed ASM entity");
@@ -606,12 +648,12 @@ fn asm_and_explain_inspect_canonical_computed_metadata() {
         .expect("failed to inspect computed entity through explain");
     let full_asm = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .args(["asm", path, "--format", "json"])
+        .args(["explain", "--inspect", path, "--format", "json"])
         .output()
         .expect("failed to inspect the full computed ASM document");
     let text = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .args(["asm", path, "--entity", &label])
+        .args(["explain", "--inspect", path, "--entity", &label])
         .output()
         .expect("failed to inspect computed ASM entity as text");
 
@@ -672,7 +714,7 @@ fn asm_and_explain_project_one_canonical_effect_inspection_record() {
 
     let asm = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .arg("asm")
+        .args(["explain", "--inspect"])
         .args(args)
         .output()
         .expect("failed to inspect effect through asm");
@@ -684,12 +726,12 @@ fn asm_and_explain_project_one_canonical_effect_inspection_record() {
         .expect("failed to inspect effect through explain");
     let full = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .args(["asm", path, "--format", "json"])
+        .args(["explain", "--inspect", path, "--format", "json"])
         .output()
         .expect("failed to inspect full ASM document");
     let text = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .args(["asm", path, "--entity", &effect])
+        .args(["explain", "--inspect", path, "--entity", &effect])
         .output()
         .expect("failed to inspect effect text");
 
@@ -755,7 +797,8 @@ fn computed_fixture_suite_covers_arithmetic_diamond_and_cycles() {
     let arithmetic = Command::new(ezc_cli_bin())
         .current_dir(&repo_root)
         .args([
-            "asm",
+            "explain",
+            "--inspect",
             arithmetic_path,
             "--entity",
             &total,
@@ -779,7 +822,8 @@ fn computed_fixture_suite_covers_arithmetic_diamond_and_cycles() {
     let diamond = Command::new(ezc_cli_bin())
         .current_dir(&repo_root)
         .args([
-            "asm",
+            "explain",
+            "--inspect",
             diamond_path,
             "--entity",
             &diamond_total,
@@ -874,7 +918,14 @@ fn computed_fixture_suite_covers_multi_file_identity() {
     let beta_path = "fixtures/0051-computed-multi-file/input/BetaComputed.tsx";
     let multi_file = Command::new(ezc_cli_bin())
         .current_dir(&repo_root)
-        .args(["asm", alpha_path, beta_path, "--format", "json"])
+        .args([
+            "explain",
+            "--inspect",
+            alpha_path,
+            beta_path,
+            "--format",
+            "json",
+        ])
         .output()
         .expect("failed to inspect computed multi-file fixture");
     assert!(multi_file.status.success());
@@ -899,7 +950,15 @@ fn asm_entity_inspection_navigates_action_ancestors_children_and_references() {
         "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/action:increment:0";
     let output = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .args(["asm", path, "--entity", action_id, "--format", "json"])
+        .args([
+            "explain",
+            "--inspect",
+            path,
+            "--entity",
+            action_id,
+            "--format",
+            "json",
+        ])
         .output()
         .expect("failed to navigate an ASM action entity");
 
@@ -926,7 +985,8 @@ fn asm_command_rejects_unknown_semantic_entity() {
     let output = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
         .args([
-            "asm",
+            "explain",
+            "--inspect",
             "fixtures/0001-source-summary/input/Counter.tsx",
             "--entity",
             "component:unknown",
@@ -946,7 +1006,15 @@ fn asm_command_inspects_entity_selected_by_source_offset() {
     let output = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
         .args([
-            "asm", path, "--source", path, "--offset", "79", "--format", "json",
+            "explain",
+            "--inspect",
+            path,
+            "--source",
+            path,
+            "--offset",
+            "79",
+            "--format",
+            "json",
         ])
         .output()
         .expect("failed to inspect ASM entity by source offset");
@@ -957,7 +1025,15 @@ fn asm_command_inspects_entity_selected_by_source_offset() {
 
     let no_entity = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .args(["asm", path, "--source", path, "--offset", "100000"])
+        .args([
+            "explain",
+            "--inspect",
+            path,
+            "--source",
+            path,
+            "--offset",
+            "100000",
+        ])
         .output()
         .expect("failed to inspect missing source offset");
     assert!(!no_entity.status.success());
@@ -966,7 +1042,15 @@ fn asm_command_inspects_entity_selected_by_source_offset() {
     let conflicting_selector = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
         .args([
-            "asm", path, "--entity", entity_id, "--source", path, "--offset", "79",
+            "explain",
+            "--inspect",
+            path,
+            "--entity",
+            entity_id,
+            "--source",
+            path,
+            "--offset",
+            "79",
         ])
         .output()
         .expect("failed to inspect conflicting ASM selectors");
@@ -985,7 +1069,8 @@ fn asm_command_filters_selected_entity_children_and_relations() {
     let children = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
         .args([
-            "asm",
+            "explain",
+            "--inspect",
             path,
             "--entity",
             component_id,
@@ -1009,7 +1094,8 @@ fn asm_command_filters_selected_entity_children_and_relations() {
     let relations = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
         .args([
-            "asm",
+            "explain",
+            "--inspect",
             path,
             "--entity",
             state_id,
@@ -1031,7 +1117,7 @@ fn asm_command_filters_selected_entity_children_and_relations() {
 
     let unselected = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .args(["asm", path, "--child-kind", "method"])
+        .args(["explain", "--inspect", path, "--child-kind", "method"])
         .output()
         .expect("failed to reject unselected ASM filters");
     assert!(!unselected.status.success());
@@ -1045,7 +1131,7 @@ fn asm_command_exposes_declared_state_types() {
 
     let output = Command::new(ezc_cli_bin())
         .current_dir(&repo_root)
-        .args(["asm", path, "--format", "json"])
+        .args(["explain", "--inspect", path, "--format", "json"])
         .output()
         .expect("failed to run typed-state ezc_cli asm --format json");
 
@@ -1107,7 +1193,14 @@ fn asm_command_covers_the_semantic_type_system_fixture_across_modules() {
     ];
     let output = Command::new(ezc_cli_bin())
         .current_dir(&root)
-        .args(["asm", paths[0], paths[1], "--format", "json"])
+        .args([
+            "explain",
+            "--inspect",
+            paths[0],
+            paths[1],
+            "--format",
+            "json",
+        ])
         .output()
         .expect("failed to inspect semantic type-system fixture");
     assert!(output.status.success());
@@ -1144,7 +1237,7 @@ fn asm_command_exposes_constant_state_initializers() {
 
     let output = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .args(["asm", path, "--format", "json"])
+        .args(["explain", "--inspect", path, "--format", "json"])
         .output()
         .expect("failed to inspect arithmetic state");
     assert!(output.status.success());
@@ -1168,7 +1261,7 @@ fn asm_command_exposes_constant_comparison_state_initializers() {
 
     let output = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .args(["asm", path, "--format", "json"])
+        .args(["explain", "--inspect", path, "--format", "json"])
         .output()
         .expect("failed to inspect comparison state");
     assert!(output.status.success());
@@ -1193,7 +1286,7 @@ fn asm_command_exposes_constant_logical_state_initializers() {
 
     let output = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .args(["asm", path, "--format", "json"])
+        .args(["explain", "--inspect", path, "--format", "json"])
         .output()
         .expect("failed to inspect logical state");
     assert!(output.status.success());
@@ -1217,7 +1310,7 @@ fn asm_command_exposes_constant_nullish_state_initializers() {
     let path = "fixtures/0035-constant-nullish-state-initializer/input/NullishState.tsx";
     let output = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .args(["asm", path, "--format", "json"])
+        .args(["explain", "--inspect", path, "--format", "json"])
         .output()
         .expect("failed to inspect nullish state");
     assert!(output.status.success());
@@ -1239,7 +1332,7 @@ fn asm_command_exposes_method_local_constants() {
     let path = "fixtures/0037-method-local-constants/input/LocalConstants.tsx";
     let output = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .args(["asm", path, "--format", "json"])
+        .args(["explain", "--inspect", path, "--format", "json"])
         .output()
         .expect("failed to inspect method locals");
     assert!(output.status.success());
@@ -1259,7 +1352,7 @@ fn asm_command_exposes_constrained_method_parameters() {
     let path = "fixtures/0038-constrained-method-parameters/input/MethodParameters.tsx";
     let output = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .args(["asm", path, "--format", "json"])
+        .args(["explain", "--inspect", path, "--format", "json"])
         .output()
         .expect("failed to inspect method parameters");
     assert!(output.status.success());
@@ -1307,7 +1400,7 @@ fn asm_command_resolves_supported_method_local_bindings() {
     let path = "fixtures/0039-method-local-resolution/input/LocalResolution.tsx";
     let output = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .args(["asm", path, "--format", "json"])
+        .args(["explain", "--inspect", path, "--format", "json"])
         .output()
         .expect("failed to inspect local-variable resolution");
     assert!(output.status.success());
@@ -1348,7 +1441,8 @@ fn asm_command_filters_template_computed_references() {
     let output = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
         .args([
-            "asm",
+            "explain",
+            "--inspect",
             path,
             "--entity",
             computed_id,
@@ -1401,7 +1495,7 @@ fn asm_command_inspects_canonical_expression_graph_fixture() {
     let path = "fixtures/0041-canonical-expression-graph/input/ExpressionGraph.tsx";
     let output = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .args(["asm", path, "--format", "json"])
+        .args(["explain", "--inspect", path, "--format", "json"])
         .output()
         .expect("failed to inspect expression graph fixture");
     assert!(output.status.success());
@@ -1424,7 +1518,7 @@ fn asm_command_reports_primitive_declared_state_type_mismatches() {
 
     let output = Command::new(ezc_cli_bin())
         .current_dir(&repo_root)
-        .args(["asm", path, "--format", "json"])
+        .args(["explain", "--inspect", path, "--format", "json"])
         .output()
         .expect("failed to run invalid typed-state ezc_cli asm --format json");
 
@@ -1467,7 +1561,7 @@ fn asm_command_omits_unavailable_diagnostic_provenance() {
 
     let output = Command::new(ezc_cli_bin())
         .current_dir(&repo_root)
-        .args(["asm", path, "--format", "json"])
+        .args(["explain", "--inspect", path, "--format", "json"])
         .output()
         .expect("failed to run semantic-errors ezc_cli asm --format json");
 
@@ -1494,7 +1588,7 @@ fn asm_command_reports_primitive_action_type_mismatches() {
 
     let output = Command::new(ezc_cli_bin())
         .current_dir(&repo_root)
-        .args(["asm", path, "--format", "json"])
+        .args(["explain", "--inspect", path, "--format", "json"])
         .output()
         .expect("failed to run invalid typed-actions ezc_cli asm --format json");
 
@@ -1547,7 +1641,7 @@ fn asm_command_reports_non_boolean_primitive_toggle_actions() {
 
     let output = Command::new(ezc_cli_bin())
         .current_dir(&repo_root)
-        .args(["asm", path, "--format", "json"])
+        .args(["explain", "--inspect", path, "--format", "json"])
         .output()
         .expect("failed to run invalid typed-toggles ezc_cli asm --format json");
 
@@ -1588,7 +1682,7 @@ fn asm_command_reports_non_numeric_primitive_increment_and_decrement_actions() {
 
     let output = Command::new(ezc_cli_bin())
         .current_dir(&repo_root)
-        .args(["asm", path, "--format", "json"])
+        .args(["explain", "--inspect", path, "--format", "json"])
         .output()
         .expect("failed to run invalid typed-numeric-actions ezc_cli asm --format json");
 
@@ -1629,7 +1723,7 @@ fn asm_command_reports_compound_numeric_action_target_and_operand_mismatches() {
 
     let output = Command::new(ezc_cli_bin())
         .current_dir(&repo_root)
-        .args(["asm", path, "--format", "json"])
+        .args(["explain", "--inspect", path, "--format", "json"])
         .output()
         .expect("failed to run invalid typed-compound-actions ezc_cli asm --format json");
 
@@ -1667,7 +1761,7 @@ fn asm_command_text_reports_source_provenanced_compiler_diagnostics() {
 
     let output = Command::new(ezc_cli_bin())
         .current_dir(&repo_root)
-        .args(["asm", path])
+        .args(["explain", "--inspect", path])
         .output()
         .expect("failed to run invalid typed-compound-actions ezc_cli asm");
 
@@ -1866,19 +1960,17 @@ fn context_diagnostics_share_check_full_asm_selected_asm_and_explain_projection(
         ["EZC1060", "EZC1059", "EZC1062", "EZC1081"]
     );
 
-    let full_asm_output = run(&["asm", path, "--format", "json"]);
+    let full_asm_output = run(&["explain", "--inspect", path, "--format", "json"]);
     assert!(full_asm_output.status.success());
     let full_asm = parse(&full_asm_output);
     assert_eq!(full_asm["schema_version"], 12);
     assert_eq!(normalize(&full_asm["diagnostics"]), expected);
 
-    for command in ["asm", "explain"] {
-        let output = run(&[command, "--entity", context_id, path, "--format", "json"]);
-        assert!(output.status.success());
-        let selected = parse(&output);
-        assert_eq!(selected["schema_version"], 12);
-        assert_eq!(normalize(&selected["diagnostics"]), expected);
-    }
+    let selected_output = run(&["explain", "--entity", context_id, path, "--format", "json"]);
+    assert!(selected_output.status.success());
+    let selected = parse(&selected_output);
+    assert_eq!(selected["schema_version"], 12);
+    assert_eq!(normalize(&selected["diagnostics"]), expected);
 }
 
 #[test]
@@ -1950,31 +2042,29 @@ fn component_diagnostics_share_check_full_asm_selected_asm_and_explain_projectio
         diagnostic["component_id"] == component_id && diagnostic["primary_provenance"].is_object()
     }));
 
-    let full_output = run(&["asm", relative, "--format", "json"]);
-    let repeated = run(&["asm", relative, "--format", "json"]);
+    let full_output = run(&["explain", "--inspect", relative, "--format", "json"]);
+    let repeated = run(&["explain", "--inspect", relative, "--format", "json"]);
     assert!(full_output.status.success());
     assert_eq!(full_output.stdout, repeated.stdout);
     let full = parse(&full_output);
     assert_eq!(full["schema_version"], 12);
     assert_eq!(normalize(&full["diagnostics"]), expected);
 
-    for command in ["asm", "explain"] {
-        let output = run(&[
-            command,
-            relative,
-            "--entity",
-            component_id,
-            "--format",
-            "json",
-        ]);
-        assert!(output.status.success());
-        let selected = parse(&output);
-        assert_eq!(selected["schema_version"], 12);
-        assert_eq!(normalize(&selected["diagnostics"]), expected);
-    }
+    let selected_output = run(&[
+        "explain",
+        relative,
+        "--entity",
+        component_id,
+        "--format",
+        "json",
+    ]);
+    assert!(selected_output.status.success());
+    let selected = parse(&selected_output);
+    assert_eq!(selected["schema_version"], 12);
+    assert_eq!(normalize(&selected["diagnostics"]), expected);
 
     let check_text = run(&["check", relative]);
-    let asm_text = run(&["asm", relative]);
+    let asm_text = run(&["explain", "--inspect", relative]);
     let check_text = String::from_utf8(check_text.stdout).unwrap();
     let asm_text = String::from_utf8(asm_text.stdout).unwrap();
     for (code, message) in [
@@ -1991,13 +2081,13 @@ fn effect_fixture_matrix_covers_capabilities_dependencies_and_action_batch_dedup
     let path = "fixtures/0054-effect-fixture-matrix/input/EffectFixtureMatrix.tsx";
     let first = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .args(["asm", path, "--format", "json"])
+        .args(["explain", "--inspect", path, "--format", "json"])
         .output()
         .expect("failed to inspect effect fixture matrix");
     assert!(first.status.success());
     let second = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .args(["asm", path, "--format", "json"])
+        .args(["explain", "--inspect", path, "--format", "json"])
         .output()
         .expect("failed to repeat effect fixture matrix inspection");
     assert_eq!(first.stdout, second.stdout);
@@ -2084,7 +2174,7 @@ fn multi_file_effect_fixture_keeps_module_qualified_effect_identity() {
     let beta = "fixtures/0055-effect-multi-file-identity/input/BetaEffect.tsx";
     let output = Command::new(ezc_cli_bin())
         .current_dir(repo_root())
-        .args(["asm", alpha, beta, "--format", "json"])
+        .args(["explain", "--inspect", alpha, beta, "--format", "json"])
         .output()
         .expect("failed to inspect multi-file effect fixture");
     assert!(output.status.success());
@@ -4446,7 +4536,7 @@ class FormsInspection {
 
     let output = Command::new(ezc_cli_bin())
         .current_dir(&repo_root)
-        .args(["asm", input, "--format", "json"])
+        .args(["explain", "--inspect", input, "--format", "json"])
         .output()
         .expect("failed to inspect Forms ASM");
     assert!(
@@ -4479,7 +4569,7 @@ class FormsInspection {
 
     let graph = Command::new(ezc_cli_bin())
         .current_dir(&repo_root)
-        .args(["asm", input, "--format", "graph"])
+        .args(["explain", "--inspect", input, "--format", "graph"])
         .output()
         .expect("failed to export the Forms semantic graph");
     assert!(graph.status.success());
