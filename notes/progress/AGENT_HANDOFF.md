@@ -3,15 +3,19 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: M9 - Framework Freeze
-* Working tree: Phase M M9 freeze contract and full focused verifier pending its completion commit.
+* Latest completed slice: Phase N - Semantic Capability Expansion Plan
+* Working tree: Phase N planning authority pending its completion commit.
 * Date: 2026-07-22
 
 Last completed slice
 
+* Slice: Phase N - Semantic Capability Expansion Plan
+* Result: creates a planning-only compiler roadmap that expands compiler-native application semantics before introducing an explicit opaque TypeScript boundary. It establishes capability classes and full-path admission, then sequences modules/types, expressions/pure helpers, real-data reactivity, structural templates, typed composition, Resources, richer Forms, semantic freeze, opaque code, and framework adoption.
+* Next: N0 may define the semantic capability registry and admission contract only. Do not implement a source feature, opaque escape hatch, router, SSR, or framework runtime before that contract is accepted.
+
 * Slice: M9 - Framework Freeze
 * Result: freezes the private declaration surface, canonical artifact-build handoff, compiler-backed explanation policy, supported source forms, TypeScript 7.0 compatibility, and unavailable features. The M9 verifier is the complete focused M2–M8 evidence matrix. Future metaframework work must obtain separate authority and may not reinterpret compiler artifacts or add compatibility shims.
-* Next: Phase M is complete after the full M9 verifier passes and this handoff is committed. Metaframework work remains a separately authored roadmap.
+* Next: Phase M is complete and committed. Phase N starts with the separately authored semantic-capability plan.
 
 * Slice: M8 - Compiler-Backed DX and Compatibility
 * Result: records the existing `presolve explain --inspect --format json` product as the only framework explanation surface and maps all examples to their existing compiler/browser conformance sources. The compatibility matrix supports the pinned TypeScript 7.0 native CLI and explicitly defers TypeScript 7.1 pending a full rerun. No framework explain command, parser, source scanner, editor implementation, project discovery, or runtime was added.
