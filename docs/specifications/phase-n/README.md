@@ -8,3 +8,4 @@ numbered slice is accepted.
 * [N0 semantic capability registry contract](PHASE_N_N0_CAPABILITY_REGISTRY_CONTRACT.md)
 * [N1 module bindings contract](PHASE_N_N1_MODULE_BINDINGS_CONTRACT.md)
 * [N1-A semantic package contract](PHASE_N_N1A_SEMANTIC_PACKAGE_CONTRACT.md)
+* [N1-A2 pure package contract](PHASE_N_N1A2_PURE_PACKAGE_CONTRACT.md)

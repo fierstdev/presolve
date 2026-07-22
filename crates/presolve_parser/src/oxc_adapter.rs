@@ -1113,6 +1113,18 @@ fn parsed_computed_expression(
     }
 
     match expression {
+        Expression::CallExpression(call) => {
+            let callee = expression_summary(&call.callee)?;
+            let arguments = call
+                .arguments
+                .iter()
+                .map(|argument| parsed_computed_expression(argument.as_expression()?, source))
+                .collect::<Option<Vec<_>>>()?;
+            Some(ParsedComputedExpression {
+                kind: ParsedComputedExpressionKind::Call { callee, arguments },
+                span: source_span(source, call.span),
+            })
+        }
         Expression::StaticMemberExpression(member) => {
             let property = member.property.name.to_string();
             let kind = if matches!(&member.object, Expression::ThisExpression(_)) {

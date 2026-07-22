@@ -7,8 +7,8 @@ use crate::compilation_unit::CompilationUnit;
 use crate::component_composition::{analyze_component_composition, ComponentCompositionAnalysis};
 use crate::component_graph::{
     build_component_graph_for_module, render_event_handlers, ComponentAction, ComponentDiagnostic,
-    ComponentDiagnosticSeverity, ComponentMethod, ComponentNode, MethodLocalVariable,
-    RenderEventHandler, StateField,
+    ComponentDiagnosticSeverity, ComponentMethod, ComponentNode, ComputedExpression,
+    ComputedExpressionKind, MethodLocalVariable, RenderEventHandler, StateField,
 };
 use crate::component_initialization::{plan_component_initialization, ComponentInitializationPlan};
 use crate::component_instance::{
@@ -1770,9 +1770,22 @@ pub fn build_application_semantic_model_from_component_graph(
 pub fn build_application_semantic_model_for_unit(
     unit: &CompilationUnit,
 ) -> ApplicationSemanticModel {
+    build_application_semantic_model_for_unit_with_packages(
+        unit,
+        &crate::semantic_package::SemanticPackageResolutionTable::default(),
+    )
+}
+
+/// Build the canonical application model with caller-supplied package semantics.
+#[must_use]
+pub fn build_application_semantic_model_for_unit_with_packages(
+    unit: &CompilationUnit,
+    packages: &crate::semantic_package::SemanticPackageResolutionTable,
+) -> ApplicationSemanticModel {
     let symbols = crate::build_symbol_table(unit);
     let modules = crate::build_module_graph(unit);
-    let bindings = crate::build_binding_table(unit, &symbols, &modules);
+    let bindings =
+        crate::binding_table::build_binding_table_with_packages(unit, &symbols, &modules, packages);
     build_application_semantic_model_from_files_with_bindings(unit.files(), Some(&bindings))
 }
 
@@ -1808,6 +1821,16 @@ fn build_application_semantic_model_from_files_with_bindings(
                 .cloned()
                 .map(|alias| (parsed.path.clone(), alias)),
         );
+    }
+
+    if let Some(bindings) = bindings {
+        diagnostics.extend(bindings.diagnostics.iter().map(|diagnostic| {
+            ComponentDiagnostic::error(
+                diagnostic.code.clone(),
+                format!("{}: {}", diagnostic.module.display(), diagnostic.message),
+            )
+        }));
+        resolve_semantic_package_pure_calls(&mut components, bindings);
     }
 
     let component_invocations = collect_component_invocations(
@@ -2532,6 +2555,15 @@ fn classify_computed_values(
             });
         }
         for call in &method.calls {
+            if method
+                .computed_expression
+                .as_ref()
+                .is_some_and(|expression| {
+                    contains_semantic_package_pure_call(expression, &call.callee)
+                })
+            {
+                continue;
+            }
             let kind = computed_call_purity_kind(component, &call.callee);
             violations.push(crate::ComputedPurityViolation {
                 kind,
@@ -2591,6 +2623,115 @@ fn classify_computed_values(
     }
 
     (computed_values, diagnostics)
+}
+
+fn resolve_semantic_package_pure_calls(
+    components: &mut [ComponentNode],
+    bindings: &crate::BindingTable,
+) {
+    for component in components {
+        for method in component
+            .methods
+            .iter_mut()
+            .filter(|method| method.is_computed())
+        {
+            let Some(expression) = method.computed_expression.as_mut() else {
+                continue;
+            };
+            resolve_semantic_package_pure_call(expression, &component.module_path, bindings);
+        }
+    }
+}
+
+fn resolve_semantic_package_pure_call(
+    expression: &mut ComputedExpression,
+    module_path: &Path,
+    bindings: &crate::BindingTable,
+) {
+    match &mut expression.kind {
+        ComputedExpressionKind::Call { callee, arguments } => {
+            for argument in arguments.iter_mut() {
+                resolve_semantic_package_pure_call(argument, module_path, bindings);
+            }
+            let Some(binding) = bindings.resolve_import(module_path, callee) else {
+                return;
+            };
+            let crate::ImportBindingTarget::SemanticPackage {
+                package,
+                version,
+                integrity,
+                export,
+                kind: crate::semantic_package::SemanticPackageKind::Pure,
+                runtime_module,
+                resume_policy,
+                pure_operation: Some(operation),
+                ..
+            } = &binding.target
+            else {
+                return;
+            };
+            expression.kind = ComputedExpressionKind::SemanticPackagePureCall {
+                local_name: callee.clone(),
+                package: package.clone(),
+                version: version.clone(),
+                integrity: integrity.clone(),
+                export: export.clone(),
+                runtime_module: runtime_module.clone(),
+                resume_policy: resume_policy.clone(),
+                operation: *operation,
+                arguments: std::mem::take(arguments),
+            };
+        }
+        ComputedExpressionKind::SemanticPackagePureCall { arguments, .. } => {
+            for argument in arguments {
+                resolve_semantic_package_pure_call(argument, module_path, bindings);
+            }
+        }
+        ComputedExpressionKind::MemberAccess { object, .. }
+        | ComputedExpressionKind::Unary {
+            operand: object, ..
+        } => {
+            resolve_semantic_package_pure_call(object, module_path, bindings);
+        }
+        ComputedExpressionKind::Arithmetic { left, right, .. }
+        | ComputedExpressionKind::Comparison { left, right, .. }
+        | ComputedExpressionKind::Logical { left, right, .. }
+        | ComputedExpressionKind::NullishCoalescing { left, right } => {
+            resolve_semantic_package_pure_call(left, module_path, bindings);
+            resolve_semantic_package_pure_call(right, module_path, bindings);
+        }
+        ComputedExpressionKind::Literal(_) | ComputedExpressionKind::ThisMember(_) => {}
+    }
+}
+
+fn contains_semantic_package_pure_call(expression: &ComputedExpression, callee: &str) -> bool {
+    match &expression.kind {
+        ComputedExpressionKind::SemanticPackagePureCall {
+            local_name,
+            arguments,
+            ..
+        } => {
+            local_name == callee
+                || arguments
+                    .iter()
+                    .any(|argument| contains_semantic_package_pure_call(argument, callee))
+        }
+        ComputedExpressionKind::Call { arguments, .. } => arguments
+            .iter()
+            .any(|argument| contains_semantic_package_pure_call(argument, callee)),
+        ComputedExpressionKind::MemberAccess { object, .. }
+        | ComputedExpressionKind::Unary {
+            operand: object, ..
+        } => contains_semantic_package_pure_call(object, callee),
+        ComputedExpressionKind::Arithmetic { left, right, .. }
+        | ComputedExpressionKind::Comparison { left, right, .. }
+        | ComputedExpressionKind::Logical { left, right, .. }
+        | ComputedExpressionKind::NullishCoalescing { left, right } => {
+            contains_semantic_package_pure_call(left, callee)
+                || contains_semantic_package_pure_call(right, callee)
+        }
+        ComputedExpressionKind::Literal(_) | ComputedExpressionKind::ThisMember(_) => false,
+    }
 }
 
 fn collect_computed_cycle_diagnostics(

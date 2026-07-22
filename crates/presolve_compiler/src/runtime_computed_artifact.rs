@@ -8,7 +8,7 @@ use crate::{
     SemanticId, SerializableValue, SerializationCompatibility,
 };
 
-pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 3;
+pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 4;
 
 /// Versioned runtime metadata and executable programs emitted from canonical IR.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -86,6 +86,17 @@ pub enum RuntimeComputedArtifactInstruction {
         result: String,
         object: RuntimeComputedArtifactOperand,
         property: String,
+    },
+    PurePackageCall {
+        result: String,
+        package: String,
+        version: String,
+        integrity: String,
+        export: String,
+        runtime_module: String,
+        resume_policy: String,
+        operation: crate::semantic_package::SemanticPackagePureOperation,
+        arguments: Vec<String>,
     },
     Binary {
         result: String,
@@ -375,6 +386,29 @@ pub(crate) fn runtime_instruction(
                 property: property.clone(),
             })
         }
+        IrInstructionKind::PurePackageCall {
+            package,
+            version,
+            integrity,
+            export,
+            runtime_module,
+            resume_policy,
+            operation,
+            arguments,
+        } => Some(RuntimeComputedArtifactInstruction::PurePackageCall {
+            result,
+            package: package.clone(),
+            version: version.clone(),
+            integrity: integrity.clone(),
+            export: export.clone(),
+            runtime_module: runtime_module.clone(),
+            resume_policy: resume_policy.clone(),
+            operation: *operation,
+            arguments: arguments
+                .iter()
+                .map(|argument| argument.as_str().to_string())
+                .collect(),
+        }),
         IrInstructionKind::Binary {
             operation,
             left,
@@ -476,6 +510,7 @@ const fn serialization(
 
 #[cfg(test)]
 mod tests {
+    use super::RuntimeComputedArtifactInstruction;
     use crate::{
         build_application_semantic_model, build_runtime_computed_artifact, lower_components_to_ir,
         runtime_computed_artifact_json, RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION,
@@ -542,7 +577,7 @@ class RuntimeComputedArtifact extends Component {
         let second = runtime_computed_artifact_json(&build_runtime_computed_artifact(&model, &ir));
         assert_eq!(first, second);
         let json: serde_json::Value = serde_json::from_str(&first).expect("artifact JSON");
-        assert_eq!(json["schema_version"], 3);
+        assert_eq!(json["schema_version"], 4);
         assert_eq!(
             json["evaluations"][0]["program"]["instructions"][0]["kind"],
             "load-state"
@@ -551,5 +586,79 @@ class RuntimeComputedArtifact extends Component {
             json["evaluations"][1]["program"]["instructions"][0]["kind"],
             "load-computed"
         );
+    }
+
+    #[test]
+    fn emits_compiler_lowered_identity_package_call_with_contract_provenance() {
+        let unit = crate::CompilationUnit::parse_sources([(
+            "src/PackageComputed.tsx",
+            r#"
+import { identity as visible } from "value-kit";
+
+@component("x-package-computed")
+class PackageComputed extends Component {
+  count = state(1);
+
+  @computed()
+  get visibleCount() { return visible(this.count); }
+
+  render() { return <output>Visible count</output>; }
+}
+"#,
+        )]);
+        let contract = crate::semantic_package::parse_semantic_package_contract(
+            r#"{"schema_version":1,"package":"value-kit","version":"1.0.0","integrity":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","exports":{"identity":{"kind":"pure","type_signature":"<T>(T)->T","runtime_module":"dist/identity.js","resume_policy":"input_only","pure_operation":"identity"}}}"#,
+        )
+        .expect("valid package contract");
+        let mut packages = crate::semantic_package::SemanticPackageResolutionTable::default();
+        packages.insert("value-kit".into(), contract).unwrap();
+
+        let model = crate::application_semantic_model::build_application_semantic_model_for_unit_with_packages(&unit, &packages);
+        assert!(
+            model.diagnostics.is_empty(),
+            "package model diagnostics: {:?}",
+            model.diagnostics
+        );
+        assert!(model
+            .diagnostics
+            .iter()
+            .all(|diagnostic| diagnostic.code != "PSC3015"));
+        let ir = lower_components_to_ir(&model);
+        let artifact = build_runtime_computed_artifact(&model, &ir);
+        let instruction = artifact.evaluations[0]
+            .program
+            .instructions
+            .iter()
+            .find(|instruction| {
+                matches!(
+                    instruction,
+                    RuntimeComputedArtifactInstruction::PurePackageCall { .. }
+                )
+            })
+            .expect("lowered pure package call");
+        let RuntimeComputedArtifactInstruction::PurePackageCall {
+            package,
+            version,
+            integrity,
+            export,
+            operation,
+            arguments,
+            ..
+        } = instruction
+        else {
+            unreachable!();
+        };
+        assert_eq!(package, "value-kit");
+        assert_eq!(version, "1.0.0");
+        assert_eq!(
+            integrity,
+            "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        );
+        assert_eq!(export, "identity");
+        assert_eq!(
+            *operation,
+            crate::semantic_package::SemanticPackagePureOperation::Identity
+        );
+        assert_eq!(arguments.len(), 1);
     }
 }

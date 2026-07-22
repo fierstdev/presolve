@@ -1412,6 +1412,31 @@ impl ExpressionIrLowering<'_> {
             ExpressionNodeKind::Identifier(_) => {
                 return None;
             }
+            ExpressionNodeKind::Call { .. } => {
+                return None;
+            }
+            ExpressionNodeKind::SemanticPackagePureCall {
+                package,
+                version,
+                integrity,
+                export,
+                runtime_module,
+                resume_policy,
+                operation,
+                arguments,
+            } => IrInstructionKind::PurePackageCall {
+                package,
+                version,
+                integrity,
+                export,
+                runtime_module,
+                resume_policy,
+                operation,
+                arguments: arguments
+                    .iter()
+                    .map(|argument| self.lower_node(argument))
+                    .collect::<Option<Vec<_>>>()?,
+            },
             ExpressionNodeKind::ThisMember { name } => self.lower_this_member(&name)?,
             ExpressionNodeKind::MemberAccess { object, property } => IrInstructionKind::GetMember {
                 object: IrOperand::Value(self.lower_node(&object)?),
@@ -3213,6 +3238,9 @@ fn instruction_operands(kind: &IrInstructionKind) -> Vec<IrOperand> {
         IrInstructionKind::CapabilityCall { arguments, .. } => {
             arguments.iter().cloned().map(IrOperand::Value).collect()
         }
+        IrInstructionKind::PurePackageCall { arguments, .. } => {
+            arguments.iter().cloned().map(IrOperand::Value).collect()
+        }
         IrInstructionKind::CapabilityAssign { value, .. } => vec![IrOperand::Value(value.clone())],
         IrInstructionKind::InitializeContextSlot { value, .. } => {
             vec![IrOperand::Value(value.clone())]
@@ -3238,6 +3266,7 @@ fn instruction_storages(kind: &IrInstructionKind) -> Vec<&IrStorageId> {
         | IrInstructionKind::LoadComputed { .. }
         | IrInstructionKind::LoadContextSlot { .. }
         | IrInstructionKind::GetMember { .. }
+        | IrInstructionKind::PurePackageCall { .. }
         | IrInstructionKind::CapabilityCall { .. }
         | IrInstructionKind::CapabilityAssign { .. }
         | IrInstructionKind::Binary { .. }
@@ -3519,6 +3548,17 @@ pub enum IrInstructionKind {
     GetMember {
         object: IrOperand,
         property: String,
+    },
+    /// A deterministic pure operation declared by an integrity-checked package contract.
+    PurePackageCall {
+        package: String,
+        version: String,
+        integrity: String,
+        export: String,
+        runtime_module: String,
+        resume_policy: String,
+        operation: crate::semantic_package::SemanticPackagePureOperation,
+        arguments: Vec<IrValueId>,
     },
     StoreStorage {
         storage: IrStorageId,

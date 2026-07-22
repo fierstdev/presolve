@@ -4424,7 +4424,7 @@ fn build_command_writes_compiler_generated_computed_runtime_metadata() {
     let label = format!("{component}/computed:label");
     let visible = format!("{component}/computed:visible");
 
-    assert_eq!(artifact["schema_version"], 3);
+    assert_eq!(artifact["schema_version"], 4);
     assert_eq!(
         artifact["evaluation_order"],
         serde_json::json!([label, visible])
@@ -4445,6 +4445,94 @@ fn build_command_writes_compiler_generated_computed_runtime_metadata() {
                     && evaluation["program"]["instructions"].is_array()
             })
         }));
+}
+
+#[test]
+fn build_accepts_explicit_pure_package_contract_and_publishes_its_provenance() {
+    let root = repo_root();
+    let test_dir = std::env::temp_dir().join("presolve-n1a2-package-build");
+    if test_dir.exists() {
+        std::fs::remove_dir_all(&test_dir).expect("clean previous package build directory");
+    }
+    std::fs::create_dir_all(&test_dir).expect("create package build directory");
+    let source = test_dir.join("PackageComputed.tsx");
+    let contract = test_dir.join("value-kit.contract.json");
+    let out_dir = test_dir.join("dist");
+    std::fs::write(
+        &source,
+        r#"
+import { identity as visible } from "value-kit";
+
+@component("x-package-computed")
+class PackageComputed extends Component {
+  count = state(1);
+  @computed()
+  get visibleCount() { return visible(this.count); }
+  render() { return <output>Visible count</output>; }
+}
+"#,
+    )
+    .expect("write package source");
+    std::fs::write(
+        &contract,
+        r#"{"schema_version":1,"package":"value-kit","version":"1.0.0","integrity":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","exports":{"identity":{"kind":"pure","type_signature":"<T>(T)->T","runtime_module":"dist/identity.js","resume_policy":"input_only","pure_operation":"identity"}}}"#,
+    )
+    .expect("write package contract");
+
+    let uncontracted = Command::new(presolve_cli_bin())
+        .current_dir(&root)
+        .args([
+            "build",
+            source.to_str().expect("source path"),
+            "--out",
+            test_dir.join("uncontracted").to_str().expect("output path"),
+        ])
+        .output()
+        .expect("run uncontracted package build");
+    assert!(!uncontracted.status.success());
+    assert!(String::from_utf8_lossy(&uncontracted.stderr).contains("PSBIND1009"));
+
+    let contract_argument = format!("value-kit={}", contract.display());
+    let output = Command::new(presolve_cli_bin())
+        .current_dir(&root)
+        .args([
+            "build",
+            source.to_str().expect("source path"),
+            "--package-contract",
+            &contract_argument,
+            "--out",
+            out_dir.to_str().expect("output path"),
+        ])
+        .output()
+        .expect("run package build");
+    assert!(
+        output.status.success(),
+        "package build failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let artifact = std::fs::read_to_string(out_dir.join("computed.runtime.json"))
+        .expect("read package computed artifact");
+    let artifact: serde_json::Value = serde_json::from_str(&artifact).expect("artifact JSON");
+    let evaluations = artifact["evaluations"]
+        .as_array()
+        .expect("computed evaluations");
+    assert!(!evaluations.is_empty(), "artifact: {artifact}");
+    let instruction = evaluations.first().expect("package computed evaluation")["program"]
+        ["instructions"]
+        .as_array()
+        .expect("computed instructions")
+        .iter()
+        .find(|instruction| instruction["kind"] == "pure-package-call")
+        .expect("pure package instruction");
+    assert_eq!(artifact["schema_version"], 4);
+    assert_eq!(instruction["kind"], "pure-package-call");
+    assert_eq!(instruction["package"], "value-kit");
+    assert_eq!(
+        instruction["integrity"],
+        "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    );
+
+    std::fs::remove_dir_all(&test_dir).expect("clean package build directory");
 }
 
 #[test]

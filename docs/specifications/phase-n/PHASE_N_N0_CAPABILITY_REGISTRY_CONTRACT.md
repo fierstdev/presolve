@@ -28,9 +28,10 @@ records current compiler-native and bounded families without changing any of
 those existing products.
 
 `semantic_package_exports`, `module_types`, `resources`, and `opaque_typescript`
-are deliberately deferred records. N1-A admits only an integrity-checked
-third-party **binding**; invoking an imported package export remains unsupported
-until N1-A2 supplies its explicit executable semantic contract.
+are deliberately deferred records. N1-A admits an integrity-checked third-party
+**binding** and N1-A2 admits only the separately recorded pure `identity`
+operation; every other imported package export remains unsupported until its own
+explicit executable semantic contract is admitted.
 
 ## Boundaries
 

@@ -257,6 +257,10 @@ pub enum ParsedComputedExpressionKind {
         object: Box<ParsedComputedExpression>,
         property: String,
     },
+    Call {
+        callee: String,
+        arguments: Vec<ParsedComputedExpression>,
+    },
     Arithmetic {
         left: Box<ParsedComputedExpression>,
         right: Box<ParsedComputedExpression>,

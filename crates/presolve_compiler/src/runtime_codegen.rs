@@ -1675,6 +1675,21 @@ const RUNTIME_STUB: &str = r#"(() => {
       return true;
     }
 
+    if (instruction.kind === "pure-package-call") {
+      if (instruction.operation === "identity" && instruction.arguments?.length === 1) {
+        values.set(instruction.result, values.get(instruction.arguments[0]));
+      } else {
+        reportDiagnostic(
+          store.diagnostics,
+          "PSR_INVALID_PURE_PACKAGE_OPERATION",
+          "Compiler artifact contained an unsupported pure package operation",
+          { subject, package: instruction.package, export: instruction.export, operation: instruction.operation }
+        );
+        values.set(instruction.result, undefined);
+      }
+      return true;
+    }
+
     return false;
   }
 

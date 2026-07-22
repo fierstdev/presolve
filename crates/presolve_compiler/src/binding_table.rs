@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 
 use crate::compilation_unit::CompilationUnit;
 use crate::module_graph::{ModuleEdgeKind, ModuleGraph, ModuleTarget};
-use crate::semantic_package::{SemanticPackageKind, SemanticPackageResolutionTable};
+use crate::semantic_package::{
+    SemanticPackageKind, SemanticPackagePureOperation, SemanticPackageResolutionTable,
+};
 use crate::symbol_table::{ModuleSymbol, SymbolKind, SymbolTable};
 
 /// Resolved local exports and relative-module imports.
@@ -51,6 +53,7 @@ pub enum ImportBindingTarget {
         type_signature: String,
         runtime_module: String,
         resume_policy: String,
+        pure_operation: Option<SemanticPackagePureOperation>,
     },
 }
 
@@ -294,6 +297,7 @@ fn resolve_semantic_package_import(
                     type_signature: export.type_signature.clone(),
                     runtime_module: export.runtime_module.clone(),
                     resume_policy: export.resume_policy.clone(),
+                    pure_operation: export.pure_operation,
                 },
             },
         );
@@ -784,6 +788,7 @@ class Second extends Component {
             type_signature,
             runtime_module,
             resume_policy,
+            pure_operation: _,
         } = &bindings
             .resolve_import("src/App.tsx", "format")
             .unwrap()

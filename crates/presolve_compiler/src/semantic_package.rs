@@ -14,6 +14,13 @@ pub enum SemanticPackageKind {
     Component,
 }
 
+/// A closed compiler-lowered operation that a `pure` package export may declare.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticPackagePureOperation {
+    Identity,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SemanticPackageExport {
@@ -21,6 +28,8 @@ pub struct SemanticPackageExport {
     pub type_signature: String,
     pub runtime_module: String,
     pub resume_policy: String,
+    #[serde(default)]
+    pub pure_operation: Option<SemanticPackagePureOperation>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -42,6 +51,7 @@ pub enum SemanticPackageContractError {
     EmptyVersion,
     EmptyExport,
     InvalidExportContract,
+    InvalidPureOperation,
     DuplicateSpecifier,
 }
 
@@ -76,6 +86,13 @@ pub fn parse_semantic_package_contract(
             || export.resume_policy.is_empty()
     }) {
         return Err(SemanticPackageContractError::InvalidExportContract);
+    }
+    if contract
+        .exports
+        .values()
+        .any(|export| export.pure_operation.is_some() && export.kind != SemanticPackageKind::Pure)
+    {
+        return Err(SemanticPackageContractError::InvalidPureOperation);
     }
     Ok(contract)
 }

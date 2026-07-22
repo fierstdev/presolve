@@ -192,7 +192,9 @@ fn constant_expression_diagnostic_code_from_node(
         }
         crate::ExpressionNodeKind::Identifier(_)
         | crate::ExpressionNodeKind::ThisMember { .. }
-        | crate::ExpressionNodeKind::MemberAccess { .. } => {
+        | crate::ExpressionNodeKind::MemberAccess { .. }
+        | crate::ExpressionNodeKind::Call { .. }
+        | crate::ExpressionNodeKind::SemanticPackagePureCall { .. } => {
             unreachable!("constant folding only evaluates state initializer expressions")
         }
         crate::ExpressionNodeKind::Unary { .. } => crate::TypeDiagnosticCode::InvalidUnaryOperator,
@@ -210,7 +212,9 @@ fn constant_expression_kind_name_from_node(kind: &crate::ExpressionNodeKind) -> 
         | crate::ExpressionNodeKind::NullishCoalescing { .. } => "nullish-coalescing",
         crate::ExpressionNodeKind::Identifier(_)
         | crate::ExpressionNodeKind::ThisMember { .. }
-        | crate::ExpressionNodeKind::MemberAccess { .. } => {
+        | crate::ExpressionNodeKind::MemberAccess { .. }
+        | crate::ExpressionNodeKind::Call { .. }
+        | crate::ExpressionNodeKind::SemanticPackagePureCall { .. } => {
             unreachable!("constant folding only evaluates state initializer expressions")
         }
         crate::ExpressionNodeKind::Unary { .. } => "unary",

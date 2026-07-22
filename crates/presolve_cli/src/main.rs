@@ -13,7 +13,8 @@ use presolve_cli::{
 
 use presolve_compiler::tooling_reader::{read_tooling_product_v1, ToolingProductV1};
 use presolve_compiler::{
-    build_application_semantic_model_for_unit, build_component_graph,
+    build_application_semantic_model_for_unit,
+    build_application_semantic_model_for_unit_with_packages, build_component_graph,
     build_context_inspection_registry, build_effect_inspection_registry,
     build_form_inspection_registry, build_production_reachability_graph, build_production_reports,
     build_production_runtime_artifact, build_resume_chunk_graph, build_resume_manifest,
@@ -34,9 +35,9 @@ use presolve_compiler::{
     EffectInspection, EffectInspectionRegistry, ExecutableProgramFingerprint, ImmutableAsmPass,
     ProductionDiagnosticFact, ProductionDiagnosticKind, ProductionProjectedDiagnostic,
     ProductionReportInputs, ProductionRootChunkInput, RenderAttribute, RenderAttributeValue,
-    SemanticEntity, SemanticEntityKind, SemanticId, SemanticOwner, SemanticReferenceKind,
-    SerializableValue, SharedChunkCandidatePlan, SourceProvenance, StateOperation, TemplateChild,
-    TemplateGraph, TemplateSemanticKind,
+    SemanticEntity, SemanticEntityKind, SemanticId, SemanticOwner, SemanticPackageResolutionTable,
+    SemanticReferenceKind, SerializableValue, SharedChunkCandidatePlan, SourceProvenance,
+    StateOperation, TemplateChild, TemplateGraph, TemplateSemanticKind,
 };
 use presolve_parser::{
     parse_file, ParseDiagnostic, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
@@ -2943,7 +2944,21 @@ fn run_build(mut args: Vec<String>) {
 
     let parsed = parse_file(&input_path, &source);
     let unit = CompilationUnit::from_parsed_files(vec![parsed.clone()]);
-    let asm = ConstantFoldingPass.transform(&build_application_semantic_model_for_unit(&unit));
+    let packages = parse_semantic_package_contracts(&args);
+    let asm = ConstantFoldingPass.transform(
+        &build_application_semantic_model_for_unit_with_packages(&unit, &packages),
+    );
+    let package_diagnostics = asm
+        .diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.code.starts_with("PSBIND10"))
+        .collect::<Vec<_>>();
+    if !package_diagnostics.is_empty() {
+        for diagnostic in package_diagnostics {
+            eprintln!("{}: {}", diagnostic.code, diagnostic.message);
+        }
+        process::exit(2);
+    }
     let ir = lower_components_to_ir(&asm);
     let computed_runtime_artifact = build_runtime_computed_artifact(&asm, &ir);
     let computed_runtime_json = runtime_computed_artifact_json(&computed_runtime_artifact);
@@ -3081,6 +3096,46 @@ fn run_build(mut args: Vec<String>) {
     );
 
     print_build_artifact_paths(&out_dir, &resume_chunks);
+}
+
+fn parse_semantic_package_contracts(args: &[String]) -> SemanticPackageResolutionTable {
+    let mut packages = SemanticPackageResolutionTable::default();
+    let mut index = 0;
+    while index < args.len() {
+        if args[index] != "--package-contract" {
+            index += 1;
+            continue;
+        }
+        let Some(specification) = args.get(index + 1) else {
+            eprintln!("--package-contract requires <specifier>=<contract-path>");
+            process::exit(2);
+        };
+        let Some((specifier, contract_path)) = specification.split_once('=') else {
+            eprintln!("--package-contract requires <specifier>=<contract-path>");
+            process::exit(2);
+        };
+        if specifier.is_empty() || contract_path.is_empty() {
+            eprintln!("--package-contract requires non-empty specifier and contract path");
+            process::exit(2);
+        }
+        let source = fs::read_to_string(contract_path).unwrap_or_else(|error| {
+            eprintln!("failed to read semantic package contract {contract_path}: {error}");
+            process::exit(1);
+        });
+        let contract =
+            presolve_compiler::parse_semantic_package_contract(&source).unwrap_or_else(|error| {
+                eprintln!("invalid semantic package contract {contract_path}: {error:?}");
+                process::exit(2);
+            });
+        packages
+            .insert(specifier.to_string(), contract)
+            .unwrap_or_else(|error| {
+                eprintln!("invalid semantic package contract resolution `{specifier}`: {error:?}");
+                process::exit(2);
+            });
+        index += 2;
+    }
+    packages
 }
 
 fn print_build_artifact_paths(out_dir: &Path, resume_chunks: &presolve_compiler::ResumeChunkGraph) {
@@ -3274,6 +3329,13 @@ fn parse_out_dir(args: &[String]) -> PathBuf {
             }
             "--production" => {
                 index += 1;
+            }
+            "--package-contract" => {
+                if args.get(index + 1).is_none() {
+                    eprintln!("missing value for --package-contract");
+                    process::exit(1);
+                }
+                index += 2;
             }
             unknown => {
                 eprintln!("unknown option: {unknown}");
@@ -4074,7 +4136,7 @@ fn print_usage_and_exit() -> ! {
     eprintln!("  presolve template <file>");
     eprintln!("  presolve html <file>");
     eprintln!("  presolve manifest <file>");
-    eprintln!("  presolve build <file> [--out dir] [--production]");
+    eprintln!("  presolve build <file> [--package-contract specifier=contract.json] [--out dir] [--production]");
     eprintln!(
         "  presolve build --config <file> --source <logical=relative-file> [--source ...] [--verify-clean-equivalence] [--format human|json]"
     );

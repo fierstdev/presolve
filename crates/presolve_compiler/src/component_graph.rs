@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -12,6 +12,7 @@ use crate::semantic_id::{
     SemanticOwner, SlotBindingId, SlotDeclarationCandidateId, SlotId,
     SubmissionDeclarationCandidateId, ValidationRuleCandidateId,
 };
+use crate::semantic_package::SemanticPackagePureOperation;
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
 
@@ -38,6 +39,8 @@ pub struct ComponentGraph {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentNode {
     pub id: SemanticId,
+    /// The caller-supplied source module that owns this component declaration.
+    pub module_path: PathBuf,
     pub owner: SemanticOwner,
     pub class_name: String,
     pub element_name: Option<String>,
@@ -528,6 +531,21 @@ pub enum ComputedExpressionKind {
     MemberAccess {
         object: Box<ComputedExpression>,
         property: String,
+    },
+    Call {
+        callee: String,
+        arguments: Vec<ComputedExpression>,
+    },
+    SemanticPackagePureCall {
+        local_name: String,
+        package: String,
+        version: String,
+        integrity: String,
+        export: String,
+        runtime_module: String,
+        resume_policy: String,
+        operation: SemanticPackagePureOperation,
+        arguments: Vec<ComputedExpression>,
     },
     Arithmetic {
         left: Box<ComputedExpression>,
@@ -1442,6 +1460,7 @@ fn build_component_node(
 
     ComponentNode {
         id,
+        module_path: path.to_path_buf(),
         owner: SemanticOwner::Application,
         class_name: class.name.clone(),
         element_name,
@@ -3344,6 +3363,13 @@ fn computed_expression_from_parsed(expression: &ParsedComputedExpression) -> Com
                 property: property.clone(),
             }
         }
+        ParsedComputedExpressionKind::Call { callee, arguments } => ComputedExpressionKind::Call {
+            callee: callee.clone(),
+            arguments: arguments
+                .iter()
+                .map(computed_expression_from_parsed)
+                .collect(),
+        },
         ParsedComputedExpressionKind::Arithmetic {
             left,
             right,

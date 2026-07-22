@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N1-A1 - Semantic Package Bindings
-* Working tree: clean after the N1-A1 semantic package-binding commit.
+* Latest completed slice: N1-A2 - Pure Semantic Package Operation
+* Working tree: clean after the N1-A2 pure-package commit.
 * Date: 2026-07-22
 
 Last completed slice
+
+* Slice: N1-A2 - Pure Semantic Package Operation
+* Result: admits one end-to-end `pure` package operation: a direct named/default imported `identity` call in a Computed getter. The caller-provided package contract supplies package/version/SHA-256/export/type/runtime/resume metadata plus `pure_operation: "identity"`; the compiler resolves aliases through the N1-A1 binding table, lowers a compiler-owned expression/IR operation, emits the schema-v4 `pure-package-call` runtime instruction with full provenance, and executes that instruction without loading package JavaScript. The explicit `presolve build --package-contract specifier=contract.json` handoff is fail-closed: omitted contracts report `PSBIND1009` before publication.
+* Verification: compiler expression/IR/artifact test, CLI positive/negative contract test, and real-browser runtime proof pass. The browser proof needs loopback-server approval in this environment.
+* Next: N2 may grow the compiler's general expression and pure-helper vocabulary. All package operations other than pure `identity`, including package capabilities, Resources, codecs, components, member/callback/dynamic calls, and package source fallback remain deferred.
 
 * Slice: N1-A1 - Semantic Package Bindings
 * Result: admits only integrity-checked third-party import identity. A caller-supplied `SemanticPackageResolutionTable` maps an external specifier to one validated schema-v1 package/version/SHA-256 contract and declared named/default export; the `BindingTable` retains that coordinate plus semantic kind, type signature, runtime module, and resume policy. Missing contracts fail `PSBIND1009`; missing exports fail `PSBIND1010`; duplicate resolutions fail without overwriting the accepted entry. There is no package discovery, lockfile/node_modules read, source inspection, installation, execution, runtime fallback, or package-export lowering.

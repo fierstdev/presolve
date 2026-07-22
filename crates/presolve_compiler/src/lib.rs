@@ -160,13 +160,14 @@ mod wasm_binding;
 
 pub use application_semantic_model::{
     build_application_semantic_model, build_application_semantic_model_for_unit,
+    build_application_semantic_model_for_unit_with_packages,
     build_application_semantic_model_from_component_graph, ApplicationSemanticModel,
     SemanticEntity, SemanticEntityKind,
 };
 pub use asm_validation::{validate_application_semantic_model, AsmValidationDiagnostic};
 pub use binding_table::{
-    build_binding_table, BindingDiagnostic, BindingTable, ExportBinding, ImportBinding,
-    ImportBindingTarget, ModuleBindingTable,
+    build_binding_table, build_binding_table_with_packages, BindingDiagnostic, BindingTable,
+    ExportBinding, ImportBinding, ImportBindingTarget, ModuleBindingTable,
 };
 pub use compilation_unit::CompilationUnit;
 pub use compiler_pass::{
@@ -627,8 +628,8 @@ pub use runtime_computed::{
 pub use runtime_computed_artifact::{
     build_runtime_computed_artifact, runtime_computed_artifact_json, RuntimeComputedArtifact,
     RuntimeComputedArtifactDirtyFlag, RuntimeComputedArtifactEvaluation,
-    RuntimeComputedArtifactInvalidation, RuntimeComputedArtifactSerialization,
-    RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION,
+    RuntimeComputedArtifactInstruction, RuntimeComputedArtifactInvalidation,
+    RuntimeComputedArtifactSerialization, RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION,
 };
 pub use runtime_context::{
     build_runtime_context_registry, validate_runtime_context_registry,
@@ -669,6 +670,11 @@ pub use runtime_form_registry::{
     build_runtime_form_registry, RuntimeFormInstanceRecord, RuntimeFormRecord, RuntimeFormRegistry,
     RUNTIME_FORM_REGISTRY_VERSION,
 };
+pub use semantic_capability::{
+    build_semantic_capability_registry, semantic_capability_registry_json, SemanticCapability,
+    SemanticCapabilityClass, SemanticCapabilityRegistry, SemanticCapabilityStatus,
+    SEMANTIC_CAPABILITY_REGISTRY_SCHEMA_VERSION,
+};
 pub use semantic_graph::{
     build_semantic_graph, semantic_graph_json, SemanticGraph, SemanticGraphConsumer,
     SemanticGraphContext, SemanticGraphEdge, SemanticGraphEdgeKind, SemanticGraphNode,
@@ -688,6 +694,11 @@ pub use semantic_id::{
     SubmissionHostCandidateId, SubmissionHostId, SubmissionPlanId, TemplatePositionId,
     TouchedTrackingPlanId, ValidationDependencyCycleId, ValidationGraphId, ValidationPlanId,
     ValidationRuleCandidateId, ValidationRuleId,
+};
+pub use semantic_package::{
+    parse_semantic_package_contract, SemanticPackageContract, SemanticPackageContractError,
+    SemanticPackageExport, SemanticPackageKind, SemanticPackagePureOperation,
+    SemanticPackageResolutionTable, SEMANTIC_PACKAGE_CONTRACT_SCHEMA_VERSION,
 };
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};

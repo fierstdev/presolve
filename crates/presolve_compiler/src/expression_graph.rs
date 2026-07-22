@@ -35,6 +35,20 @@ pub enum ExpressionNodeKind {
         object: SemanticId,
         property: String,
     },
+    Call {
+        callee: String,
+        arguments: Vec<SemanticId>,
+    },
+    SemanticPackagePureCall {
+        package: String,
+        version: String,
+        integrity: String,
+        export: String,
+        runtime_module: String,
+        resume_policy: String,
+        operation: crate::semantic_package::SemanticPackagePureOperation,
+        arguments: Vec<SemanticId>,
+    },
     Arithmetic {
         left: SemanticId,
         right: SemanticId,
@@ -69,6 +83,10 @@ impl ExpressionNode {
             | ExpressionNodeKind::Identifier(_)
             | ExpressionNodeKind::ThisMember { .. } => Vec::new(),
             ExpressionNodeKind::MemberAccess { object, .. } => vec![object],
+            ExpressionNodeKind::Call { arguments, .. }
+            | ExpressionNodeKind::SemanticPackagePureCall { arguments, .. } => {
+                arguments.iter().collect()
+            }
             ExpressionNodeKind::Arithmetic { left, right, .. }
             | ExpressionNodeKind::Comparison { left, right, .. }
             | ExpressionNodeKind::Logical { left, right, .. }
@@ -392,6 +410,38 @@ impl ExpressionGraph {
                     property: property.clone(),
                 }
             }
+            ComputedExpressionKind::Call { callee, arguments } => ExpressionNodeKind::Call {
+                callee: callee.clone(),
+                arguments: arguments
+                    .iter()
+                    .enumerate()
+                    .map(|(index, argument)| child(self, &format!("{path}.{index}"), argument))
+                    .collect(),
+            },
+            ComputedExpressionKind::SemanticPackagePureCall {
+                local_name: _,
+                package,
+                version,
+                integrity,
+                export,
+                runtime_module,
+                resume_policy,
+                operation,
+                arguments,
+            } => ExpressionNodeKind::SemanticPackagePureCall {
+                package: package.clone(),
+                version: version.clone(),
+                integrity: integrity.clone(),
+                export: export.clone(),
+                runtime_module: runtime_module.clone(),
+                resume_policy: resume_policy.clone(),
+                operation: *operation,
+                arguments: arguments
+                    .iter()
+                    .enumerate()
+                    .map(|(index, argument)| child(self, &format!("{path}.{index}"), argument))
+                    .collect(),
+            },
             ComputedExpressionKind::Arithmetic {
                 left,
                 right,
@@ -526,7 +576,9 @@ impl ExpressionGraph {
             ExpressionNodeKind::Boolean(value) => ConstantExpressionKind::Boolean(*value),
             ExpressionNodeKind::Identifier(_)
             | ExpressionNodeKind::ThisMember { .. }
-            | ExpressionNodeKind::MemberAccess { .. } => {
+            | ExpressionNodeKind::MemberAccess { .. }
+            | ExpressionNodeKind::Call { .. }
+            | ExpressionNodeKind::SemanticPackagePureCall { .. } => {
                 return None;
             }
             ExpressionNodeKind::Arithmetic {
