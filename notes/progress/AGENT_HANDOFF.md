@@ -3,15 +3,19 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N0 - Semantic Capability Registry
-* Working tree: Phase N N0 registry, inspection projection, and verifier pending its completion commit.
+* Latest completed slice: N1 - Module Bindings
+* Working tree: Phase N N1 module capability admission, contract, and verifier pending its completion commit.
 * Date: 2026-07-22
 
 Last completed slice
 
+* Slice: N1 - Module Bindings
+* Result: admits the compiler's existing caller-supplied local/relative named/default/namespace imports, exports, re-exports, and local type declarations as the bounded `module_bindings` capability. The compiler registry retains `advanced_types` and `semantic_packages` as explicit deferrals. No file discovery, package resolution, package source inspection, ASM/artifact/runtime/resume schema change, or new lowering was added.
+* Next: N1-A must define package contract/resolution inputs before compiler-native third-party package use. Do not implement checker-dependent advanced types, a package resolver, source fallback, opaque escape hatch, router, SSR, or framework runtime before its contract is accepted.
+
 * Slice: N0 - Semantic Capability Registry
 * Result: adds the versioned compiler-owned semantic capability registry and `presolve explain --capabilities --format json` projection. It records current admitted Component/State/Action/Computed/Effect/Context/Slot/Form families and deferred module/types, semantic packages, Resources, and opaque TypeScript, with explicit rejection reasons. It does not parse source, alter lowering, change existing schemas, or create a runtime feature.
-* Next: N1 may define only modules, names, and types. N1-A must define package contract/resolution inputs before compiler-native third-party package use. Do not implement a source feature, opaque escape hatch, router, SSR, or framework runtime beyond the accepted N1 contract.
+* Next: N1 completed module-binding admission. N1-A is the prerequisite for compiler-native third-party package use.
 
 * Slice: Phase N - Semantic Capability Expansion Plan
 * Result: creates a planning-only compiler roadmap that expands compiler-native application semantics before introducing an explicit opaque TypeScript boundary. It establishes capability classes and full-path admission, then sequences modules/types, explicit third-party semantic package contracts, expressions/pure helpers, real-data reactivity, structural templates, typed composition, Resources, richer Forms, semantic freeze, opaque code, and framework adoption. Package internals are never inferred: an application-supplied resolution map binds imports to versioned, integrity-checked contracts that declare public semantics.

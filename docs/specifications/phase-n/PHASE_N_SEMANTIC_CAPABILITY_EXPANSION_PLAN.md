@@ -156,6 +156,8 @@ package-policy-dependent imports deterministically. Define a versioned
 TypeScript front-end integration boundary before relying on checker facts not
 present in the current parser model.
 
+**N1 authority:** [module bindings contract](PHASE_N_N1_MODULE_BINDINGS_CONTRACT.md).
+
 ### N1-A — package semantic contracts and explicit resolution
 
 Define the canonical package-resolution input and semantic package-contract
