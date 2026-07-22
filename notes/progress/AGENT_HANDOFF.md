@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L15-C - Reproducibility Lane Manifest
+* Latest completed slice: L14-A - Alpha Example Corpus Contract
 * Working tree: L12-C now has a thin WASM-only `@presolve/language-service` wrapper. LSP and extension implementation have not begun.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L14-A - Alpha Example Corpus Contract
+* Result: defines the exact five-example alpha corpus and binds each to frozen evidence, explicit input authority, a public proof, and exclusions. The existing counter is not reclassified as proven until L14-B supplies its public fixture.
+* Next: L14-B may add canonical examples serially, beginning with Counter only.
 
 * Slice: L15-C - Reproducibility Lane Manifest
 * Result: declares deterministic-contract, browser/runtime, package-smoke, deferred-example, and non-gating observation lanes with their existing local commands and artifacts. Host measurements are expressly non-correctness evidence.

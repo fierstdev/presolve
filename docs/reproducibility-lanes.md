@@ -16,3 +16,6 @@ evidence is separate because its Chrome binary is environment-owned. Package
 smoke runs may create only ignored/generated local build output. The observation
 lane cannot compare elapsed time, CPU, memory, machine identity, or benchmark
 values as a correctness condition.
+
+L14-A is governed by the [alpha example contract](examples-contract.md). The
+example lane stays deferred until each contracted example is proven.
