@@ -67,3 +67,5 @@ L12-D is governed by the [stateless LSP adapter contract](PHASE_L_L12_LSP_CONTRA
 L12-D-2 activates the in-process `@presolve/lsp` dispatcher only. It maps the contracted JSON-RPC methods to language-service operations, preserves returned ordering/ranges/errors, and declines every other method without source or document state.
 
 L12-D-3 freezes exact JSON-RPC response hashes for every mapping, unsupported behavior, invalid framing, and propagated query error.
+
+L12-E is governed by the [VSCode extension contract](PHASE_L_L12_VSCODE_CONTRACT.md). It permits only a product-free extension client over the completed LSP package.

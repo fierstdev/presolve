@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L12-D-3 - LSP Fixture Matrix
+* Latest completed slice: L12-E-1 - VSCode Extension Contract
 * Working tree: L12-C now has a thin WASM-only `@presolve/language-service` wrapper. LSP and extension implementation have not begun.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L12-E-1 - VSCode Extension Contract
+* Result: freezes `@presolve/vscode` as a product-free client that depends exclusively on the completed LSP package. It may render only established LSP results and must not acquire source, compiler, URI/path, cache, persistence, document-model, transport, or edit authority.
+* Next: L12-E-2 may implement only the pinned-fixture-backed extension facade and its dependency-surface audit.
 
 * Slice: L12-D-3 - LSP Fixture Matrix
 * Result: freezes exact JSON-RPC response hashes for all supported mappings, unsupported hover, invalid framing, and an underlying unknown-identity error. The fixture proof exercises the generated WASM through language-service and LSP without any alternative decoder or compiler path.
