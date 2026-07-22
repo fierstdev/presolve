@@ -42,7 +42,7 @@ unavailable; it does not emulate it.
 | Decision | Phase M direction |
 | --- | --- |
 | Source language | Preserve the compiler's exact source forms. In particular, component tags remain explicit, State remains `state(initializer)`, and Context/Forms/Slots retain their existing declarations. |
-| Type delivery | Start with private `@presolve/framework-types` ambient declarations selected through `tsconfig` `types`; no application-source aliases, JSX transform, decorator transform, or runtime registration. |
+| Type delivery | Start with private `@presolve/framework-types` ambient declarations selected through `tsconfig` `types` and the pinned TypeScript 7.0 native CLI; no application-source aliases, JSX transform, decorator transform, compiler API, or runtime registration. |
 | Repository topology | Create `framework/` only in M2. It owns framework packages, conformance fixtures, examples, and docs, but cannot change compiler crates or take ownership of existing compiler packages. |
 | Compiler handoff | Invoke only the accepted explicit `presolve` project/configuration path. Inputs stay caller-supplied; there is no source/project discovery, parser, transform, semantic analyzer, product decoder, or alternate compiler route. |
 | Runtime | Reuse emitted compiler runtime/resume products unchanged. No framework state store, renderer, hydration layer, Context lookup, scheduler, or artifact writer exists. |
@@ -144,7 +144,9 @@ Add a compiler-backed explanation presentation, an error guide, conformance
 examples, and the framework compatibility matrix. All explanation data comes
 from existing command/product surfaces; no JavaScript source scan or new editor
 intelligence is allowed. Examples begin with Counter and advance only after the
-underlying family passes its conformance matrix.
+underlying family passes its conformance matrix. The matrix keeps TypeScript
+7.0 and a future TypeScript 7.1 compatibility row separate; 7.1 requires an
+explicit pinned-toolchain conformance rerun before support is declared.
 
 ### M9 — framework freeze and metaframework handoff
 

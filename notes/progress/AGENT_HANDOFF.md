@@ -10,7 +10,7 @@ Repository state
 Last completed slice
 
 * Slice: M2 - Isolated Ambient Type Package
-* Result: adds private declaration-only `@presolve/framework-types` under the isolated `framework/` workspace. The focused Counter fixture is byte-identical to the canonical example, resolves types through an explicit `tsconfig` entry, and succeeds through the unchanged explicit `presolve check` path. The package has no JavaScript source, decorator/runtime behavior, transform, or compiler adapter.
+* Result: adds private declaration-only `@presolve/framework-types` under the isolated `framework/` workspace. The focused Counter fixture is byte-identical to the canonical example, resolves types through an explicit `tsconfig` entry using the pinned TypeScript 7.0 native CLI, and succeeds through the unchanged explicit `presolve check` path. The package has no JavaScript source, decorator/runtime behavior, transform, compiler API, or compiler adapter. TypeScript 7.1 remains a future explicit compatibility row.
 * Next: M3 may define and implement only the explicit canonical-command handoff with caller-supplied inputs and opaque published artifacts. Do not start Counter browser/runtime work or add Action/Computed/Effect/Context/Slot/Form declarations.
 
 * Slice: M1 - Frozen Authoring Conformance Contract

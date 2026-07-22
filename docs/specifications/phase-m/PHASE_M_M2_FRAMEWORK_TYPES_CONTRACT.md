@@ -17,8 +17,9 @@ class Counter extends Component {
 ```
 
 The fixture source is byte-identical to the existing canonical Counter example.
-It is type-checked with `tsc --project` using an explicit `types` entry, then
-checked through the accepted explicit `presolve check` command path.
+It is type-checked with the repository-pinned TypeScript 7.0 native
+`tsc --project` using an explicit `types` entry, then checked through the
+accepted explicit `presolve check` command path.
 
 ## Package boundary
 
@@ -43,12 +44,16 @@ alias, transform, or rewritten compiler form.
 2. absence of framework runtime or transform vocabulary;
 3. exact byte equality with `examples/counter/src/Counter.tsx`;
 4. TypeScript resolution of `@presolve/framework-types` from the fixture's
-   `types` configuration; and
+   `types` configuration using the pinned TypeScript 7.0 CLI; and
 5. canonical compiler success through the explicit Counter configuration and
    source mapping.
 
 The verifier invokes the M0/M1 plan verifier and `git diff --check`. Repository
 layout and identity audits cover the new `framework/` root.
+
+TypeScript 7.1 is intentionally not accepted through a version range. M8 may
+add it to the framework compatibility matrix only after an explicit pinned-7.1
+rerun of this fixture and every later declaration fixture.
 
 ## Exclusions and next boundary
 

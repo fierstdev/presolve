@@ -76,6 +76,19 @@ The initial framework package is private and does not make an npm publication,
 registry-installation, or package-manager promise. The short package name
 `presolve` is not reserved or exported by Phase M.
 
+## TypeScript toolchain policy
+
+Framework declaration conformance uses the repository-pinned TypeScript 7.0
+native command-line compiler only. Phase M invokes `tsc` as a CLI and never
+uses a TypeScript compiler API, parser, transform, or language-service API.
+This matches TypeScript 7.0's command-line boundary while its new programmatic
+API is deferred to 7.1.
+
+TypeScript 7.1 is a future compatibility input, not an implicit upgrade. The
+framework compatibility matrix may add a 7.1 row only after the pinned compiler
+is installed, every declaration fixture is rerun, and any changed diagnostic or
+configuration behavior is recorded without changing compiler-facing source.
+
 ## Compatibility and evidence
 
 The framework compatibility matrix records, for every supported release:
@@ -85,6 +98,8 @@ The framework compatibility matrix records, for every supported release:
 - compiler and runtime artifact schema versions consumed only opaquely;
 - exact supported authoring-form rows; and
 - fixture and browser evidence.
+
+The matrix records TypeScript 7.0 and later TypeScript 7.1 support separately.
 
 An unsupported compiler version, missing required artifact, unexpected command
 result, or unsupported form is a fail-closed framework result. No fallback

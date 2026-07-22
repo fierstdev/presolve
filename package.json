@@ -11,5 +11,7 @@
     "verify:identity": "./scripts/verify-public-identity.sh",
     "verify:repository-layout": "./scripts/verify-repository-layout.sh"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@typescript/native": "npm:typescript@^7.0.2"
+  }
 }

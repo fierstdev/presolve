@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
 readonly package=framework/packages/framework-types
 readonly fixture=framework/tests/counter-types
 
@@ -30,7 +33,15 @@ if rg --line-number 'jsx-runtime|jsx\(|createElement|Proxy|Map<|Set<|fetch|fs|ch
 fi
 
 cmp -- "$fixture/src/Counter.tsx" examples/counter/src/Counter.tsx
-tsc --project "$fixture/tsconfig.json"
+typescript_version="$(pnpm exec tsc --version)"
+case "$typescript_version" in
+  'Version 7.0.'*) ;;
+  *)
+    echo "M2 requires the pinned TypeScript 7.0 native CLI, found: $typescript_version" >&2
+    exit 1
+    ;;
+esac
+pnpm exec tsc --project "$fixture/tsconfig.json"
 
 cleanup() { rm -rf "$fixture/.presolve"; }
 trap cleanup EXIT
