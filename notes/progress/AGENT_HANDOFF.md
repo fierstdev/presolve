@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L12-D-1 - LSP Adapter Contract
+* Latest completed slice: L12-D-2 - Stateless LSP Dispatcher
 * Working tree: L12-C now has a thin WASM-only `@presolve/language-service` wrapper. LSP and extension implementation have not begun.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L12-D-2 - Stateless LSP Dispatcher
+* Result: adds `@presolve/lsp` as an in-process JSON-RPC dispatcher over the language service. It supports exactly the contracted definition, references, flat symbols, diagnostics, and position mappings, preserves language-service errors, and returns a stable unsupported result for every unadvertised method.
+* Boundary: no network/server transport, document lifecycle, URI/path translation, text input, product decoding, compiler invocation, cache, persistence, or extension dependency exists. The dispatcher accepts product bytes for each call and retains no state.
+* Next: L12-D-3 must add the canonical protocol fixture matrix/capability proof before L12-E can start.
 
 * Slice: L12-D-1 - LSP Adapter Contract
 * Result: freezes a stateless, product-only LSP translation boundary over the completed language service. It maps only existing definition, references, flat symbols, diagnostics, and position projection; preserves range/order/errors; and declares stable unsupported behavior and caller-owned cancellation.

@@ -18,4 +18,10 @@ importers:
         specifier: workspace:*
         version: link:../compiler-wasm
 
+  packages/lsp:
+    dependencies:
+      '@presolve/language-service':
+        specifier: workspace:*
+        version: link:../language-service
+
   packages/runtime: {}

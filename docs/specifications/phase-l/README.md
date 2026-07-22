@@ -63,3 +63,5 @@ L12-C-3-B freezes the generated WASM response matrix by SHA-256 over exact canon
 L12-C-4 activates the thin `@presolve/language-service` wrapper. It initializes only the compiler-owned WASM artifact, transfers caller-owned product bytes and canonical request envelopes, and returns the WASM response without a product decoder, compiler path, cache, or source API.
 
 L12-D is governed by the [stateless LSP adapter contract](PHASE_L_L12_LSP_CONTRACT.md). It freezes framing, capability, error, cancellation, and fixture boundaries before any protocol code.
+
+L12-D-2 activates the in-process `@presolve/lsp` dispatcher only. It maps the contracted JSON-RPC methods to language-service operations, preserves returned ordering/ranges/errors, and declines every other method without source or document state.

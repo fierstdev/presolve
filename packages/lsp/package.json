@@ -1,0 +1,15 @@
+{
+  "name": "@presolve/lsp",
+  "version": "0.1.0-alpha",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "dependencies": {
+    "@presolve/language-service": "workspace:*"
+  },
+  "scripts": {
+    "check": "../../scripts/verify-l12d2-lsp-adapter.sh"
+  }
+}
