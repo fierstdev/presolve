@@ -140,6 +140,8 @@ Freeze the admission checklist and a schema-version policy before changing
 language support. Add a fixture harness that runs positive source, negative
 diagnostic, determinism, artifact, and browser cases for every admitted family.
 
+**N0 authority:** [semantic capability registry contract](PHASE_N_N0_CAPABILITY_REGISTRY_CONTRACT.md).
+
 ### N1 — modules, names, and types
 
 Support the module features needed by real applications: local and relative

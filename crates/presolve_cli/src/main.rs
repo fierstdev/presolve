@@ -27,16 +27,16 @@ use presolve_compiler::{
     production_runtime_artifact_json, project_production_diagnostics, project_resume_diagnostics,
     resume_manifest_json, runtime_component_artifact_json, runtime_computed_artifact_json,
     runtime_context_artifact_json, runtime_cost_report_json, runtime_effect_artifact_json,
-    runtime_forms_artifact_json, semantic_graph_json, semantic_type_text, summarize_source,
-    template_manifest_json, validate_application_semantic_model, ApplicationSemanticModel,
-    AsmValidationDiagnostic, AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass,
-    DeclaredStateTypeKind, EffectInspection, EffectInspectionRegistry,
-    ExecutableProgramFingerprint, ImmutableAsmPass, ProductionDiagnosticFact,
-    ProductionDiagnosticKind, ProductionProjectedDiagnostic, ProductionReportInputs,
-    ProductionRootChunkInput, RenderAttribute, RenderAttributeValue, SemanticEntity,
-    SemanticEntityKind, SemanticId, SemanticOwner, SemanticReferenceKind, SerializableValue,
-    SharedChunkCandidatePlan, SourceProvenance, StateOperation, TemplateChild, TemplateGraph,
-    TemplateSemanticKind,
+    runtime_forms_artifact_json, semantic_capability_registry_json, semantic_graph_json,
+    semantic_type_text, summarize_source, template_manifest_json,
+    validate_application_semantic_model, ApplicationSemanticModel, AsmValidationDiagnostic,
+    AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
+    EffectInspection, EffectInspectionRegistry, ExecutableProgramFingerprint, ImmutableAsmPass,
+    ProductionDiagnosticFact, ProductionDiagnosticKind, ProductionProjectedDiagnostic,
+    ProductionReportInputs, ProductionRootChunkInput, RenderAttribute, RenderAttributeValue,
+    SemanticEntity, SemanticEntityKind, SemanticId, SemanticOwner, SemanticReferenceKind,
+    SerializableValue, SharedChunkCandidatePlan, SourceProvenance, StateOperation, TemplateChild,
+    TemplateGraph, TemplateSemanticKind,
 };
 use presolve_parser::{
     parse_file, ParseDiagnostic, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
@@ -721,6 +721,20 @@ fn l9_config_and_format(command: &str, args: &[String]) -> (PathBuf, bool) {
 }
 
 fn run_explain(mut args: Vec<String>) {
+    if args
+        .first()
+        .is_some_and(|argument| argument == "--capabilities")
+    {
+        args.remove(0);
+        let format = parse_format(&args);
+        if format != "json" {
+            eprintln!("semantic capability inspection supports only --format json");
+            process::exit(1);
+        }
+        print!("{}", semantic_capability_registry_json());
+        return;
+    }
+
     let semantic_inspection = args
         .iter()
         .any(|argument| argument == "--inspect" || is_asm_entity_inspection_option(argument))
@@ -4046,6 +4060,7 @@ fn write_build_artifacts(
 
 fn print_usage_and_exit() -> ! {
     eprintln!("usage:");
+    eprintln!("  presolve explain --capabilities --format json");
     eprintln!("  presolve explain <file> [--format text|json]");
     eprintln!("  presolve explain <file> [--inspect] [--entity semantic-id | --source path --offset byte] [--child-kind kind] [--reference-kind kind] [--format text|json|graph]");
     eprintln!(

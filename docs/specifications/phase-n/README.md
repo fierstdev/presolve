@@ -5,3 +5,4 @@ frozen Phase M framework foundation. It is planning-only until an individual
 numbered slice is accepted.
 
 * [Phase N semantic capability expansion plan](PHASE_N_SEMANTIC_CAPABILITY_EXPANSION_PLAN.md)
+* [N0 semantic capability registry contract](PHASE_N_N0_CAPABILITY_REGISTRY_CONTRACT.md)

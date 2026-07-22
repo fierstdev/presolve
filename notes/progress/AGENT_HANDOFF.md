@@ -3,15 +3,19 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: Phase N - Semantic Capability Expansion Plan
-* Working tree: Phase N planning authority pending its completion commit.
+* Latest completed slice: N0 - Semantic Capability Registry
+* Working tree: Phase N N0 registry, inspection projection, and verifier pending its completion commit.
 * Date: 2026-07-22
 
 Last completed slice
 
+* Slice: N0 - Semantic Capability Registry
+* Result: adds the versioned compiler-owned semantic capability registry and `presolve explain --capabilities --format json` projection. It records current admitted Component/State/Action/Computed/Effect/Context/Slot/Form families and deferred module/types, semantic packages, Resources, and opaque TypeScript, with explicit rejection reasons. It does not parse source, alter lowering, change existing schemas, or create a runtime feature.
+* Next: N1 may define only modules, names, and types. N1-A must define package contract/resolution inputs before compiler-native third-party package use. Do not implement a source feature, opaque escape hatch, router, SSR, or framework runtime beyond the accepted N1 contract.
+
 * Slice: Phase N - Semantic Capability Expansion Plan
 * Result: creates a planning-only compiler roadmap that expands compiler-native application semantics before introducing an explicit opaque TypeScript boundary. It establishes capability classes and full-path admission, then sequences modules/types, explicit third-party semantic package contracts, expressions/pure helpers, real-data reactivity, structural templates, typed composition, Resources, richer Forms, semantic freeze, opaque code, and framework adoption. Package internals are never inferred: an application-supplied resolution map binds imports to versioned, integrity-checked contracts that declare public semantics.
-* Next: N0 may define the semantic capability registry and admission contract only. N1-A must define package contract/resolution inputs before compiler-native third-party package use. Do not implement a source feature, opaque escape hatch, router, SSR, or framework runtime before those contracts are accepted.
+* Next: N0 completed the capability registry and admission contract. N1 may proceed only under a separately accepted module/type contract.
 
 * Slice: M9 - Framework Freeze
 * Result: freezes the private declaration surface, canonical artifact-build handoff, compiler-backed explanation policy, supported source forms, TypeScript 7.0 compatibility, and unavailable features. The M9 verifier is the complete focused M2–M8 evidence matrix. Future metaframework work must obtain separate authority and may not reinterpret compiler artifacts or add compatibility shims.

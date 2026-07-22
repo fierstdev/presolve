@@ -116,6 +116,7 @@ pub mod runtime_effect;
 pub mod runtime_effect_artifact;
 pub mod runtime_form_artifact;
 pub mod runtime_form_registry;
+pub mod semantic_capability;
 pub mod semantic_graph;
 pub mod semantic_id;
 pub mod semantic_provenance;

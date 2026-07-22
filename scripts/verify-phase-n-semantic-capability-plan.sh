@@ -5,7 +5,9 @@ repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
 readonly plan=docs/specifications/phase-n/PHASE_N_SEMANTIC_CAPABILITY_EXPANSION_PLAN.md
+readonly n0_contract=docs/specifications/phase-n/PHASE_N_N0_CAPABILITY_REGISTRY_CONTRACT.md
 test -s "$plan"
+test -s "$n0_contract"
 
 for section in \
   'Objective' \
@@ -33,5 +35,7 @@ for phrase in \
   'Phase N does not promise arbitrary npm packages'; do
   rg --fixed-strings --quiet "$phrase" "$plan"
 done
+
+rg --fixed-strings --quiet 'N0 authority' "$plan"
 
 git diff --check
