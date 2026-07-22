@@ -257,6 +257,14 @@ pub enum ParsedComputedExpressionKind {
         object: Box<ParsedComputedExpression>,
         property: String,
     },
+    /// A statically bounded property or array-element read.
+    ///
+    /// The parser admits only string and non-negative integer literal indices;
+    /// dynamic JavaScript property lookup remains outside the semantic subset.
+    IndexAccess {
+        object: Box<ParsedComputedExpression>,
+        index: Box<ParsedComputedExpression>,
+    },
     Template {
         quasis: Vec<String>,
         expressions: Vec<ParsedComputedExpression>,

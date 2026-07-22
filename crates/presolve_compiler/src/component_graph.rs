@@ -532,6 +532,10 @@ pub enum ComputedExpressionKind {
         object: Box<ComputedExpression>,
         property: String,
     },
+    IndexAccess {
+        object: Box<ComputedExpression>,
+        index: Box<ComputedExpression>,
+    },
     Template {
         quasis: Vec<String>,
         expressions: Vec<ComputedExpression>,
@@ -3365,6 +3369,12 @@ fn computed_expression_from_parsed(expression: &ParsedComputedExpression) -> Com
             ComputedExpressionKind::MemberAccess {
                 object: Box::new(computed_expression_from_parsed(object)),
                 property: property.clone(),
+            }
+        }
+        ParsedComputedExpressionKind::IndexAccess { object, index } => {
+            ComputedExpressionKind::IndexAccess {
+                object: Box::new(computed_expression_from_parsed(object)),
+                index: Box::new(computed_expression_from_parsed(index)),
             }
         }
         ParsedComputedExpressionKind::Template {

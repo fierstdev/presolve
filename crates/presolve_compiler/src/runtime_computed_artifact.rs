@@ -8,7 +8,7 @@ use crate::{
     SemanticId, SerializableValue, SerializationCompatibility,
 };
 
-pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 5;
+pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 6;
 
 /// Versioned runtime metadata and executable programs emitted from canonical IR.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -86,6 +86,11 @@ pub enum RuntimeComputedArtifactInstruction {
         result: String,
         object: RuntimeComputedArtifactOperand,
         property: String,
+    },
+    GetIndex {
+        result: String,
+        object: RuntimeComputedArtifactOperand,
+        index: RuntimeComputedArtifactOperand,
     },
     Template {
         result: String,
@@ -391,6 +396,13 @@ pub(crate) fn runtime_instruction(
                 property: property.clone(),
             })
         }
+        IrInstructionKind::GetIndex { object, index } => {
+            Some(RuntimeComputedArtifactInstruction::GetIndex {
+                result,
+                object: runtime_operand(object),
+                index: runtime_operand(index),
+            })
+        }
         IrInstructionKind::Template {
             quasis,
             expressions,
@@ -593,7 +605,7 @@ class RuntimeComputedArtifact extends Component {
         let second = runtime_computed_artifact_json(&build_runtime_computed_artifact(&model, &ir));
         assert_eq!(first, second);
         let json: serde_json::Value = serde_json::from_str(&first).expect("artifact JSON");
-        assert_eq!(json["schema_version"], 5);
+        assert_eq!(json["schema_version"], 6);
         assert_eq!(
             json["evaluations"][0]["program"]["instructions"][0]["kind"],
             "load-state"
@@ -716,5 +728,47 @@ class TemplateComputed extends Component {
         };
         assert_eq!(quasis, &["Count: ".to_string(), "!".to_string()]);
         assert_eq!(expressions.len(), 1);
+    }
+
+    #[test]
+    fn emits_static_index_access_program_for_tuple_state() {
+        let parsed = presolve_parser::parse_file(
+            "src/IndexedComputed.tsx",
+            r#"
+@component("x-indexed-computed")
+class IndexedComputed extends Component {
+  labels = state(["zero", "one"]);
+  record = state({ label: "object" });
+  @computed()
+  get selected() { return this.labels[1]; }
+  @computed()
+  get title() { return this.record["label"]; }
+  render() { return <output>Indexed</output>; }
+}
+"#,
+        );
+        let model = build_application_semantic_model(&parsed);
+        assert!(model.diagnostics.is_empty(), "{:?}", model.diagnostics);
+        let artifact = build_runtime_computed_artifact(&model, &lower_components_to_ir(&model));
+        let instructions = artifact
+            .evaluations
+            .iter()
+            .flat_map(|evaluation| evaluation.program.instructions.iter())
+            .filter(|instruction| {
+                matches!(
+                    instruction,
+                    RuntimeComputedArtifactInstruction::GetIndex { .. }
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(instructions.len(), 2);
+        let instruction = instructions[0];
+        let RuntimeComputedArtifactInstruction::GetIndex { index, .. } = instruction else {
+            unreachable!();
+        };
+        assert!(matches!(
+            index,
+            super::RuntimeComputedArtifactOperand::Value { .. }
+        ));
     }
 }

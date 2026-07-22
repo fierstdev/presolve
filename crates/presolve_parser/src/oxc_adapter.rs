@@ -1155,6 +1155,26 @@ fn parsed_computed_expression(
                 span: source_span(source, member.span),
             })
         }
+        Expression::ComputedMemberExpression(member) => {
+            let index = parsed_computed_expression(&member.expression, source)?;
+            let supported_index = match &index.kind {
+                ParsedComputedExpressionKind::Literal(ParsedSerializableValue::String(_)) => true,
+                ParsedComputedExpressionKind::Literal(ParsedSerializableValue::Number(value)) => {
+                    value.parse::<u64>().is_ok()
+                }
+                _ => false,
+            };
+            if !supported_index {
+                return None;
+            }
+            Some(ParsedComputedExpression {
+                kind: ParsedComputedExpressionKind::IndexAccess {
+                    object: Box::new(parsed_computed_expression(&member.object, source)?),
+                    index: Box::new(index),
+                },
+                span: source_span(source, member.span),
+            })
+        }
         Expression::BinaryExpression(binary) => {
             let operator = match binary.operator.as_str() {
                 "+" => ParsedComputedExpressionKind::Arithmetic {

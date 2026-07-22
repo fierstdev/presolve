@@ -10,3 +10,4 @@ numbered slice is accepted.
 * [N1-A semantic package contract](PHASE_N_N1A_SEMANTIC_PACKAGE_CONTRACT.md)
 * [N1-A2 pure package contract](PHASE_N_N1A2_PURE_PACKAGE_CONTRACT.md)
 * [N2-A template interpolation contract](PHASE_N_N2A_TEMPLATE_INTERPOLATION_CONTRACT.md)
+* [N2-B static index access contract](PHASE_N_N2B_STATIC_INDEX_ACCESS_CONTRACT.md)

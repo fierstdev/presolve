@@ -1452,6 +1452,10 @@ impl ExpressionIrLowering<'_> {
                 object: IrOperand::Value(self.lower_node(&object)?),
                 property,
             },
+            ExpressionNodeKind::IndexAccess { object, index } => IrInstructionKind::GetIndex {
+                object: IrOperand::Value(self.lower_node(&object)?),
+                index: IrOperand::Value(self.lower_node(&index)?),
+            },
             ExpressionNodeKind::Arithmetic {
                 left,
                 right,
@@ -3244,6 +3248,7 @@ fn instruction_operands(kind: &IrInstructionKind) -> Vec<IrOperand> {
         | IrInstructionKind::Unary { operand: value, .. }
         | IrInstructionKind::Copy { source: value }
         | IrInstructionKind::GetMember { object: value, .. } => vec![value.clone()],
+        IrInstructionKind::GetIndex { object, index } => vec![object.clone(), index.clone()],
         IrInstructionKind::Binary { left, right, .. } => vec![left.clone(), right.clone()],
         IrInstructionKind::CapabilityCall { arguments, .. } => {
             arguments.iter().cloned().map(IrOperand::Value).collect()
@@ -3279,6 +3284,7 @@ fn instruction_storages(kind: &IrInstructionKind) -> Vec<&IrStorageId> {
         | IrInstructionKind::LoadComputed { .. }
         | IrInstructionKind::LoadContextSlot { .. }
         | IrInstructionKind::GetMember { .. }
+        | IrInstructionKind::GetIndex { .. }
         | IrInstructionKind::Template { .. }
         | IrInstructionKind::PurePackageCall { .. }
         | IrInstructionKind::CapabilityCall { .. }
@@ -3563,6 +3569,10 @@ pub enum IrInstructionKind {
         object: IrOperand,
         property: String,
     },
+    GetIndex {
+        object: IrOperand,
+        index: IrOperand,
+    },
     /// Compiler-lowered interpolation with source-retained cooked literal segments.
     Template {
         quasis: Vec<String>,
@@ -3772,6 +3782,10 @@ fn replace_copy_operands(kind: &mut IrInstructionKind, copies: &BTreeMap<IrValue
             operand: source, ..
         }
         | IrInstructionKind::GetMember { object: source, .. } => resolve(source),
+        IrInstructionKind::GetIndex { object, index } => {
+            resolve(object);
+            resolve(index);
+        }
         IrInstructionKind::Binary { left, right, .. } => {
             resolve(left);
             resolve(right);

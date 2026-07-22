@@ -15,7 +15,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const ACTION_MANIFEST_SCHEMA_VERSION = 2;
   const FORMS_MANIFEST_SCHEMA_VERSION = 3;
   const LEGACY_MANIFEST_SCHEMA_VERSION = 1;
-  const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 3;
+  const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 6;
   const SUPPORTED_EFFECT_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = __EZ_COMPONENT_SCHEMA_VERSION__;
@@ -1647,6 +1647,20 @@ const RUNTIME_STUB: &str = r#"(() => {
       const value = object !== null && typeof object === "object"
         && Object.prototype.hasOwnProperty.call(object, instruction.property)
         ? object[instruction.property]
+        : undefined;
+      values.set(instruction.result, value);
+      return true;
+    }
+
+    if (instruction.kind === "get-index") {
+      const object = computedOperandValue(store, values, instruction.object);
+      const index = computedOperandValue(store, values, instruction.index);
+      const key = typeof index === "string" || (typeof index === "number" && Number.isInteger(index) && index >= 0)
+        ? String(index)
+        : null;
+      const value = key !== null && object !== null && typeof object === "object"
+        && Object.prototype.hasOwnProperty.call(object, key)
+        ? object[key]
         : undefined;
       values.set(instruction.result, value);
       return true;
@@ -3856,6 +3870,8 @@ mod tests {
         assert!(runtime.contains("contextSlots: new Map()"));
         assert!(runtime.contains("RUNTIME_VERSION = \"0.0.0\""));
         assert!(runtime.contains("SUPPORTED_SCHEMA_VERSION = 4"));
+        assert!(runtime.contains("SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 6"));
+        assert!(runtime.contains("instruction.kind === \"get-index\""));
         assert!(runtime.contains("presolve-forms-runtime"));
         assert!(runtime.contains("initializeFormsRuntime"));
         assert!(runtime.contains("dispatchFormSubmit"));

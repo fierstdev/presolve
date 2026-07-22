@@ -189,8 +189,19 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
                 "cooked static segments and compiler-supported interpolation expressions",
                 "compiler-derived union of every interpolation dependency",
                 "serializable string result; no independent resume record",
-                "runtime-computed schema v5 template instruction",
+                "runtime-computed schema v5 template instruction, retained in schema v6",
                 "runtime_browser::template_interpolations_execute_from_compiler_generated_runtime_programs",
+            ),
+            admitted(
+                "static_index_access",
+                SemanticCapabilityClass::Bounded,
+                "this.value[non-negative integer literal] or this.value[\"string literal\"] in a supported @computed() getter",
+                "parser, ExpressionGraph, canonical IR, and runtime-computed artifact",
+                "tuple, array, or object read with a literal string or non-negative integer index",
+                "compiler-derived dependency on the indexed object only; the literal index has no reactive dependency",
+                "serializable result when the selected value is serializable; no independent resume record",
+                "runtime-computed schema v6 get-index instruction",
+                "runtime_browser::static_index_accesses_execute_from_compiler_generated_runtime_programs",
             ),
             deferred(
                 "semantic_package_exports",
@@ -316,6 +327,7 @@ mod tests {
                 "semantic_package_bindings",
                 "semantic_package_pure_identity",
                 "template_interpolation",
+                "static_index_access",
                 "semantic_package_exports",
                 "resources",
                 "opaque_typescript"
@@ -327,5 +339,6 @@ mod tests {
             .filter(|capability| capability.status == SemanticCapabilityStatus::Deferred)
             .all(|capability| capability.rejection_reason.is_some()));
         assert!(semantic_capability_registry_json().contains("\"semantic_package_bindings\""));
+        assert!(semantic_capability_registry_json().contains("\"static_index_access\""));
     }
 }

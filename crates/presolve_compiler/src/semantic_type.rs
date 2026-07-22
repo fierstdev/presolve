@@ -1728,6 +1728,10 @@ fn infer_effect_expression_type(
         ExpressionNodeKind::MemberAccess { object, property } => {
             computed_member_access_type(&child_type(object, expression_types), property)
         }
+        ExpressionNodeKind::IndexAccess { object, index } => computed_index_access_type(
+            &child_type(object, expression_types),
+            &child_type(index, expression_types),
+        ),
         ExpressionNodeKind::Arithmetic {
             left,
             right,
@@ -2131,7 +2135,8 @@ fn expression_semantic_type(
         | ExpressionNodeKind::Call { .. }
         | ExpressionNodeKind::SemanticPackagePureCall { .. }
         | ExpressionNodeKind::ThisMember { .. }
-        | ExpressionNodeKind::MemberAccess { .. } => SemanticType::Unknown,
+        | ExpressionNodeKind::MemberAccess { .. }
+        | ExpressionNodeKind::IndexAccess { .. } => SemanticType::Unknown,
         ExpressionNodeKind::Arithmetic {
             left,
             right,
@@ -2269,6 +2274,9 @@ fn infer_context_source_expression_type(
         ExpressionNodeKind::MemberAccess { object, property } => {
             computed_member_access_type(&child(object, inferred), property)
         }
+        ExpressionNodeKind::IndexAccess { object, index } => {
+            computed_index_access_type(&child(object, inferred), &child(index, inferred))
+        }
         ExpressionNodeKind::Arithmetic {
             left,
             right,
@@ -2373,6 +2381,11 @@ fn infer_computed_expression_type(
         ExpressionNodeKind::MemberAccess { object, property } => {
             let object = child_type(object, expression_types, computed_types, visiting);
             computed_member_access_type(&object, property)
+        }
+        ExpressionNodeKind::IndexAccess { object, index } => {
+            let object = child_type(object, expression_types, computed_types, visiting);
+            let index = child_type(index, expression_types, computed_types, visiting);
+            computed_index_access_type(&object, &index)
         }
         ExpressionNodeKind::Arithmetic {
             left,
@@ -2490,6 +2503,26 @@ fn infer_computed_read_type(
 fn computed_member_access_type(semantic_type: &SemanticType, property: &str) -> SemanticType {
     match semantic_type {
         SemanticType::Object(object) => object
+            .properties
+            .get(property)
+            .cloned()
+            .unwrap_or(SemanticType::Unknown),
+        _ => SemanticType::Unknown,
+    }
+}
+
+fn computed_index_access_type(object: &SemanticType, index: &SemanticType) -> SemanticType {
+    match (object, index) {
+        (SemanticType::Tuple(items), SemanticType::NumberLiteral(index)) => index
+            .parse::<usize>()
+            .ok()
+            .and_then(|index| items.get(index))
+            .cloned()
+            .unwrap_or(SemanticType::Unknown),
+        (SemanticType::Array(element), SemanticType::Number | SemanticType::NumberLiteral(_)) => {
+            element.as_ref().clone()
+        }
+        (SemanticType::Object(object), SemanticType::StringLiteral(property)) => object
             .properties
             .get(property)
             .cloned()

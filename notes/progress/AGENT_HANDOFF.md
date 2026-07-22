@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N2-A - Template Interpolation
-* Working tree: clean after the N2-A template-interpolation commit.
+* Latest completed slice: N2-B - Static Index Access
+* Working tree: clean after the N2-B static-index-access commit.
 * Date: 2026-07-22
 
 Last completed slice
+
+* Slice: N2-B - Static Index Access
+* Result: admits bracket reads in a supported Computed getter only when the index is a string literal or non-negative integer literal. The compiler retains `IndexAccess`, derives the object dependency, lowers canonical `GetIndex` IR, publishes a schema-v6 `get-index` runtime-computed instruction, and performs own-property reads without evaluating authored source or traversing prototypes. Dynamic/optional indexing, non-integral or negative keys, writes, Actions, and Effects remain outside the admitted subset.
+* Verification: `./scripts/verify-n2b-static-index-access.sh` passes, including focused compiler/IR/artifact/registry/CLI checks and a real-browser tuple-index proof. The browser portion needs loopback-server approval in this environment.
+* Next: N2-C may select the next complete bounded expression family or compiler-registered pure helper. Preserve the no-arbitrary-call, no-dynamic-key, and compiler-owned-runtime boundaries.
 
 * Slice: N2-A - Template Interpolation
 * Result: admits untagged template literals only in the existing supported Computed expression boundary. The parser retains cooked segments and interpolation expressions; the compiler derives all dependencies, assigns a serializable string result, lowers canonical `Template` IR, and emits a runtime-computed schema-v5 `template` instruction. The generated runtime validates program shape and interpolates only compiler-produced values. Tagged templates, factories, callbacks, Action/Effect usage, and arbitrary code are not admitted.

@@ -2698,6 +2698,10 @@ fn resolve_semantic_package_pure_call(
         } => {
             resolve_semantic_package_pure_call(object, module_path, bindings);
         }
+        ComputedExpressionKind::IndexAccess { object, index } => {
+            resolve_semantic_package_pure_call(object, module_path, bindings);
+            resolve_semantic_package_pure_call(index, module_path, bindings);
+        }
         ComputedExpressionKind::Arithmetic { left, right, .. }
         | ComputedExpressionKind::Comparison { left, right, .. }
         | ComputedExpressionKind::Logical { left, right, .. }
@@ -2731,6 +2735,10 @@ fn contains_semantic_package_pure_call(expression: &ComputedExpression, callee: 
         | ComputedExpressionKind::Unary {
             operand: object, ..
         } => contains_semantic_package_pure_call(object, callee),
+        ComputedExpressionKind::IndexAccess { object, index } => {
+            contains_semantic_package_pure_call(object, callee)
+                || contains_semantic_package_pure_call(index, callee)
+        }
         ComputedExpressionKind::Arithmetic { left, right, .. }
         | ComputedExpressionKind::Comparison { left, right, .. }
         | ComputedExpressionKind::Logical { left, right, .. }

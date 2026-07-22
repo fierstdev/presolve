@@ -31,7 +31,8 @@ activation, package, or resume record.
 
 ## Artifact compatibility
 
-N2-A increments the runtime-computed artifact schema to version `5`. Older
-artifacts fail closed through their existing schema validation. The browser
-proof verifies that `` `Count: ${this.count}!` `` evaluates to `Count: 2!` from
-the generated program with no runtime diagnostic.
+N2-A introduced runtime-computed artifact schema version `5`. N2-B later
+increments that artifact to version `6` while retaining the `template`
+instruction. Older artifacts fail closed through their existing schema
+validation. The browser proof verifies that `` `Count: ${this.count}!` ``
+evaluates to `Count: 2!` from the generated program with no runtime diagnostic.

@@ -201,6 +201,15 @@ emit a versioned runtime instruction, and prove generated-browser execution.
 Do not treat tagged templates, template factories, or interpolation callbacks as
 equivalent syntax.
 
+#### N2-B — static index access
+
+Admit bracket access only when its index is a string literal or non-negative
+integer literal in a supported Computed getter. Lower the object and literal
+index through the canonical expression graph and IR; emit a fail-closed
+runtime instruction that reads own properties only. Dynamic keys, negative or
+non-integral numbers, optional indexing, prototype traversal, and index access
+in Actions or Effects remain outside this admission.
+
 ### N3 — State, Actions, Computed, and Effects over real data
 
 Allow State fields to hold structurally serializable records, arrays, optional

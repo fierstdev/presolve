@@ -35,6 +35,10 @@ pub enum ExpressionNodeKind {
         object: SemanticId,
         property: String,
     },
+    IndexAccess {
+        object: SemanticId,
+        index: SemanticId,
+    },
     Template {
         quasis: Vec<String>,
         expressions: Vec<SemanticId>,
@@ -87,6 +91,7 @@ impl ExpressionNode {
             | ExpressionNodeKind::Identifier(_)
             | ExpressionNodeKind::ThisMember { .. } => Vec::new(),
             ExpressionNodeKind::MemberAccess { object, .. } => vec![object],
+            ExpressionNodeKind::IndexAccess { object, index } => vec![object, index],
             ExpressionNodeKind::Template { expressions, .. } => expressions.iter().collect(),
             ExpressionNodeKind::Call { arguments, .. }
             | ExpressionNodeKind::SemanticPackagePureCall { arguments, .. } => {
@@ -415,6 +420,12 @@ impl ExpressionGraph {
                     property: property.clone(),
                 }
             }
+            ComputedExpressionKind::IndexAccess { object, index } => {
+                ExpressionNodeKind::IndexAccess {
+                    object: child(self, &format!("{path}.0"), object),
+                    index: child(self, &format!("{path}.1"), index),
+                }
+            }
             ComputedExpressionKind::Template {
                 quasis,
                 expressions,
@@ -593,6 +604,7 @@ impl ExpressionGraph {
             ExpressionNodeKind::Identifier(_)
             | ExpressionNodeKind::ThisMember { .. }
             | ExpressionNodeKind::MemberAccess { .. }
+            | ExpressionNodeKind::IndexAccess { .. }
             | ExpressionNodeKind::Template { .. }
             | ExpressionNodeKind::Call { .. }
             | ExpressionNodeKind::SemanticPackagePureCall { .. } => {

@@ -193,6 +193,7 @@ fn constant_expression_diagnostic_code_from_node(
         crate::ExpressionNodeKind::Identifier(_)
         | crate::ExpressionNodeKind::ThisMember { .. }
         | crate::ExpressionNodeKind::MemberAccess { .. }
+        | crate::ExpressionNodeKind::IndexAccess { .. }
         | crate::ExpressionNodeKind::Template { .. }
         | crate::ExpressionNodeKind::Call { .. }
         | crate::ExpressionNodeKind::SemanticPackagePureCall { .. } => {
@@ -214,6 +215,7 @@ fn constant_expression_kind_name_from_node(kind: &crate::ExpressionNodeKind) -> 
         crate::ExpressionNodeKind::Identifier(_)
         | crate::ExpressionNodeKind::ThisMember { .. }
         | crate::ExpressionNodeKind::MemberAccess { .. }
+        | crate::ExpressionNodeKind::IndexAccess { .. }
         | crate::ExpressionNodeKind::Template { .. }
         | crate::ExpressionNodeKind::Call { .. }
         | crate::ExpressionNodeKind::SemanticPackagePureCall { .. } => {
