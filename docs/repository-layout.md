@@ -20,8 +20,10 @@ architecture.
 | `rfcs/` | Accepted or active technical RFCs. |
 | `schemas/` | Active and frozen versioned schemas. |
 | `scripts/` | Maintained repository automation. |
+| `site/` | Versioned repository-local launch content; deployment remains external. |
 
 `LICENSE`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`,
+`SUPPORT.md`,
 `Cargo.toml`, `Cargo.lock`, `package.json`, `pnpm-lock.yaml`,
 `pnpm-workspace.yaml`, `justfile`, `rust-toolchain.toml`, `.gitattributes`,
 `.gitignore`, and `README.md` remain root control files. Optional `tools/`, `benches/`,

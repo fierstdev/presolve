@@ -3,11 +3,11 @@
 set -euo pipefail
 
 readonly -a required_directories=(
-  .github adr crates docs e2e examples fixtures notes packages rfcs schemas scripts
+  .github adr crates docs e2e examples fixtures notes packages rfcs schemas scripts site
 )
 readonly -a required_control_files=(
   Cargo.toml Cargo.lock package.json pnpm-lock.yaml pnpm-workspace.yaml justfile
-  rust-toolchain.toml .gitattributes .gitignore README.md
+  rust-toolchain.toml .gitattributes .gitignore README.md SUPPORT.md
 )
 readonly -a forbidden_directories=(compiler runtime cli)
 
@@ -54,7 +54,7 @@ if git ls-files | rg --line-number '(^|/)(target|node_modules|dist|\.astro|test-
   exit 1
 fi
 
-readonly expected_roots=$'.gitattributes\n.github\n.gitignore\nCHANGELOG.md\nCODE_OF_CONDUCT.md\nCONTRIBUTING.md\nCargo.lock\nCargo.toml\nLICENSE\nREADME.md\nSECURITY.md\nadr\ncrates\ndocs\ne2e\nexamples\nfixtures\njustfile\nnotes\npackage.json\npackages\npnpm-lock.yaml\npnpm-workspace.yaml\nrfcs\nrust-toolchain.toml\nschemas\nscripts'
+readonly expected_roots=$'.gitattributes\n.github\n.gitignore\nCHANGELOG.md\nCODE_OF_CONDUCT.md\nCONTRIBUTING.md\nCargo.lock\nCargo.toml\nLICENSE\nREADME.md\nSECURITY.md\nSUPPORT.md\nadr\ncrates\ndocs\ne2e\nexamples\nfixtures\njustfile\nnotes\npackage.json\npackages\npnpm-lock.yaml\npnpm-workspace.yaml\nrfcs\nrust-toolchain.toml\nschemas\nscripts\nsite'
 actual_roots="$(git ls-files | awk -F/ '{print $1}' | sort -u)"
 if [[ "$actual_roots" != "$expected_roots" ]]; then
   echo 'tracked root ownership differs from docs/repository-layout.md' >&2

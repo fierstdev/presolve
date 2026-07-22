@@ -1402,7 +1402,7 @@ Known limitations
 
 Exact next step
 
-Phase K is complete and frozen through K21. Phase L is complete through L19-A.
+Phase K is complete and frozen through K21. Phase L is complete through L19-B.
 The identity migration is complete for active product representations:
 `presolve explain` is the sole inspection command, and the compiler/runtime,
 fixture, implementation, and launch-content surfaces use the Presolve namespace.
@@ -1410,10 +1410,13 @@ L18 adds only versioned repository-local launch content, link verification, and
 an explicitly non-functional playground placeholder; deployment remains
 external. L19-A freezes the cited verified alpha command/product/editor/package
 matrix and explicit availability, compatibility, terminology, support, and
-rollback boundaries. Next: L19-B adds the clean-room rehearsal from the
-documented manual starter path; it must verify examples, accepted product and
-cache/workspace/watch commands, package metadata, and Phase K artifacts without
-publication.
+rollback boundaries. L19-B replays the documented manual path from a detached
+clean checkout: offline packages, examples, accepted cache/workspace/watch and
+L11 product commands, private package metadata, and frozen Phase K artifact
+inputs. It has no create or publication authority. Next: L20 begins the final
+platform-freeze contract and verifier; it cannot claim Phase L completion until
+its matrix, `just check`, and a clean tree pass with every reserved capability
+explicitly disposed.
 
 Useful commands
 
@@ -1444,4 +1447,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the L19-A alpha-support-matrix commit.
+* None after the L19-B clean-room-rehearsal commit.

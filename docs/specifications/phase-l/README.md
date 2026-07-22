@@ -78,6 +78,8 @@ L18 is governed by the versioned repository-local [launch content contract](../.
 
 L19-A is governed by the frozen [alpha support matrix](../../alpha-support-matrix.md). It maps only already-verified alpha surfaces, support boundaries, and rollback policy.
 
+L19-B is governed by the [alpha clean-room rehearsal](../../alpha-rehearsal.md). It uses a fresh detached checkout and existing verifiers only; it does not publish.
+
 The owner-directed [Presolve identity migration contract](../../presolve-identity-migration-contract.md)
 supersedes conflicting retained-identity exceptions. It governs the active
 compiler, runtime, fixture, implementation-path, and inspection-command
