@@ -104,6 +104,8 @@ canonical diagnostics; incompatible version/command failure fixtures.
 
 ### M4 — Counter vertical slice
 
+**Audit authority:** [M4 public artifact-publication audit](PHASE_M_M4_PUBLICATION_AUDIT.md).
+
 Begin with a public artifact-publication capability audit. L9 build/check
 publishes status and snapshot identities, not static HTML/runtime locations.
 M4 may use only an existing frozen public publication boundary; it must stop if
@@ -179,9 +181,13 @@ future metaframework must supply; it does not pre-implement it.
 | Compatibility | fail-closed framework/compiler/CLI/product matrix and migration/rollback documentation |
 | Metaframework deferral | dependency/source audit for no router, server, bundler, deployment, generator, package manager, or reserved command |
 
-## Next authorized action
+## Current boundary
 
-M4 only: perform the public artifact-publication capability audit. Stop before
-the Counter runtime vertical proof unless an existing frozen public publication
-boundary supplies the required artifacts without a legacy adapter, decoder, or
-new compiler behavior.
+M4's public artifact-publication audit is complete. The accepted L9 command
+publishes status and snapshot identities, while the artifact-emitting legacy
+command is not an accepted platform adapter. Counter browser/runtime proof is
+therefore blocked without a silent framework-boundary expansion.
+
+M5 through M9 are deferred. The only authorized next action is an explicit
+owner decision on the narrowly scoped legacy-publication adapter described in
+the M4 audit; it must not change frozen compiler behavior.
