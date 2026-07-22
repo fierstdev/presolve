@@ -3,15 +3,19 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L14-B-2 - Components/Context/Slots Canonical Example
-* Working tree: L12-C now has a thin WASM-only `@presolve/language-service` wrapper. LSP and extension implementation have not begun.
+* Latest completed slice: L14-B-4 - Explicit Workspace Canonical Example
+* Working tree: clean after the explicit-source workspace proof; all editor-package boundaries remain product-free.
 * Date: 2026-07-21
 
 Last completed slice
 
-* Slice: L14-B-2 - Components/Context/Slots Canonical Example
-* Result: adds the exact frozen component-composition fixture shape with context provision/consumption, named/default slots, repeated instances, and explicit route as one explicit source/configuration example. Its verifier uses only the public L9 check command and cleans its generated local cache.
-* Next: L14-B-3 may add Forms only from its existing frozen fixture evidence.
+* Slice: L14-B-4 - Explicit Workspace Canonical Example
+* Result: adds one exact source mapping from the existing L9-F CLI fixture and invokes only `presolve workspace`. The proof asserts the existing workspace-result schema/status and does not discover packages, manifests, dependencies, or sources.
+* Next: L14-B-5 may add the production/resume example only from existing Phase K artifact and browser evidence.
+
+* Slice: L14-B-3 - Forms Canonical Example
+* Result: adds the frozen declaration-only serialized Form, Field, compiler-owned submit action, and explicit host shape. Its public L9 check verifier cleans its generated local cache and makes no browser-submit or network claim.
+* Next: L14-B-4 may add an explicit workspace example only from existing L7/L9-F fixture evidence.
 
 * Slice: L14-B-1 - Counter Canonical Example
 * Result: Counter now declares canonical `presolve.json` and is checked through the accepted explicit L9 command path with one caller-supplied `.tsx` mapping. No discovery, build output, scaffold, or unsupported behavior is added.
@@ -1367,11 +1371,12 @@ Known limitations
 Exact next step
 
 Phase K is complete and frozen through K21. Phase L is complete through
-L14-B-3. The owner-authorized L13-L21 continuation contract remains the
-authority. Forms is represented solely by an explicit L9 `check` input using
-the existing canonical declaration, field, host, serialization, and submission
-shape; it does not add browser submission or network behavior. Next: L14-B-4,
-the explicit-workspace example from its existing L7 fixture evidence only.
+L14-B-4. The owner-authorized L13-L21 continuation contract remains the
+authority. Explicit workspace uses exactly one caller-supplied L9-F source
+mapping and reports only the established workspace-result schema/status; it
+does not discover packages, manifests, dependencies, or sources. Next:
+L14-B-5, production/resume only from existing Phase K artifacts and browser
+evidence.
 
 Useful commands
 
