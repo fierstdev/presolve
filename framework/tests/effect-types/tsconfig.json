@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "jsx": "preserve",
+    "types": ["@presolve/framework-types"],
+    "typeRoots": ["./type-roots"]
+  },
+  "include": ["src"]
+}

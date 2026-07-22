@@ -19,6 +19,9 @@ declare global {
   /** Declares a compiler-recognized getter without caching or invalidation behavior. */
   function computed(): PresolveGetterDecorator;
 
+  /** Declares a compiler-recognized terminal capability method with no hook runtime. */
+  function effect(): PresolveMethodDecorator;
+
   /**
    * Describes the initializer shape for compiler-recognized State. The
    * compiler, not this declaration, establishes reactive State semantics.

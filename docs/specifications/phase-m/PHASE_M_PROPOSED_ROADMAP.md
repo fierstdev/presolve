@@ -135,6 +135,8 @@ ordering, and effect capability diagnostics.
 
 **M5-A authority:** [Computed conformance](PHASE_M_M5_COMPUTED_CONFORMANCE.md).
 
+**M5-B authority:** [Effect conformance](PHASE_M_M5_EFFECT_CONFORMANCE.md).
+
 ### M6 — composition conformance families
 
 Add exact frozen component invocation, repeated/keyed instance behavior, Slot
@@ -184,6 +186,5 @@ future metaframework must supply; it does not pre-implement it.
 
 ## Current boundary
 
-M4 is complete. M5-A Computed conformance is complete. M5-B may select only
-the existing Effect declaration plus its compiler-backed capability and browser
-proof.
+M4 and M5 are complete. M6 may select one existing composition family with its
+compiler-backed type/check/browser proof.

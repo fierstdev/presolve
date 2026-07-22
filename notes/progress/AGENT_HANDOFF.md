@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: M5-A - Computed Conformance
-* Working tree: Phase M M5-A Computed declaration, fixture, and verifier pending its completion commit.
+* Latest completed slice: M5-B - Effect Conformance
+* Working tree: Phase M M5-B Effect declaration, fixture, and verifier pending its completion commit.
 * Date: 2026-07-22
 
 Last completed slice
+
+* Slice: M5-B - Effect Conformance
+* Result: adds only the type-level `@effect()` method marker. The exact compiler InitialEffectRuntime fixture type-checks and checks unchanged; its real-browser proof confirms one initial compiler-owned effect run, exact capability lowering order, computed visibility, DOM/storage effects, and no runtime diagnostics.
+* Next: M6 may select one existing composition family. Do not add a framework effect scheduler, cleanup API, capability implementation, or hook runtime.
 
 * Slice: M5-A - Computed Conformance
 * Result: extends the declaration-only type package with the existing `@computed()` getter marker only. The exact production/resume ComputedDiamond example is byte-identical to the framework fixture and to the compiler browser fixture; TypeScript 7.0, the unchanged compiler check, and the browser's single compiler-planned recomputation all pass.

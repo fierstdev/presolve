@@ -4,8 +4,8 @@ Phase M is active through M0–M4 implementation. It uses the
 [post-freeze governance](../../post-freeze-governance.md) intake without
 adding a framework execution model. M4 reclassified the compiler's existing
 full artifact publisher as the single framework build path and has proven
-Counter through its emitted browser runtime. M5-A has proven Computed getters
-through the existing compiler browser evidence; M5-B Effects is next. The
+Counter through its emitted browser runtime. M5 has proven the existing
+Computed and Effect declaration families; M6 composition is next. The
 metaframework and every reserved command remain unimplemented.
 
 * [Phase M conformance-first roadmap](PHASE_M_PROPOSED_ROADMAP.md)
@@ -15,3 +15,4 @@ metaframework and every reserved command remain unimplemented.
 * [M3 explicit handoff contract](PHASE_M_M3_EXPLICIT_HANDOFF_CONTRACT.md)
 * [M4 public artifact-publication audit](PHASE_M_M4_PUBLICATION_AUDIT.md)
 * [M5-A Computed conformance](PHASE_M_M5_COMPUTED_CONFORMANCE.md)
+* [M5-B Effect conformance](PHASE_M_M5_EFFECT_CONFORMANCE.md)
