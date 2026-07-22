@@ -2,21 +2,21 @@
   "schemaVersion": 1,
   "establishedBy": "K16",
   "fixtures": [
-    {"name":"static-no-runtime","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":5510,"runtimeRecordCount":11,"staticOperationCount":9,"moduleCount":1},
-    {"name":"single-counter","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":5348,"runtimeRecordCount":11,"staticOperationCount":9,"moduleCount":1},
-    {"name":"multi-binding-counter","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":5653,"runtimeRecordCount":12,"staticOperationCount":9,"moduleCount":1},
-    {"name":"repeated-component-instances","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":24428,"runtimeRecordCount":23,"staticOperationCount":47,"moduleCount":1},
-    {"name":"nested-components-and-slots","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":22702,"runtimeRecordCount":21,"staticOperationCount":20,"moduleCount":1},
-    {"name":"context-provider-consumer","productionExecutableBytes":666,"eagerBytes":136,"artifactBytes":14019,"runtimeRecordCount":31,"staticOperationCount":26,"moduleCount":3},
+    {"name":"static-no-runtime","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":5516,"runtimeRecordCount":11,"staticOperationCount":9,"moduleCount":1},
+    {"name":"single-counter","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":5354,"runtimeRecordCount":11,"staticOperationCount":9,"moduleCount":1},
+    {"name":"multi-binding-counter","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":5665,"runtimeRecordCount":12,"staticOperationCount":9,"moduleCount":1},
+    {"name":"repeated-component-instances","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":24446,"runtimeRecordCount":23,"staticOperationCount":47,"moduleCount":1},
+    {"name":"nested-components-and-slots","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":22708,"runtimeRecordCount":21,"staticOperationCount":20,"moduleCount":1},
+    {"name":"context-provider-consumer","productionExecutableBytes":666,"eagerBytes":136,"artifactBytes":14031,"runtimeRecordCount":31,"staticOperationCount":26,"moduleCount":3},
     {"name":"computed-fan-out","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":9075,"runtimeRecordCount":17,"staticOperationCount":12,"moduleCount":1},
-    {"name":"multiple-effects","productionExecutableBytes":666,"eagerBytes":136,"artifactBytes":13919,"runtimeRecordCount":33,"staticOperationCount":19,"moduleCount":3},
-    {"name":"conditional-structural","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":5509,"runtimeRecordCount":12,"staticOperationCount":9,"moduleCount":1},
-    {"name":"keyed-list-updates","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":6334,"runtimeRecordCount":15,"staticOperationCount":9,"moduleCount":1},
-    {"name":"forms-cross-field-validation","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":8027,"runtimeRecordCount":16,"staticOperationCount":56,"moduleCount":1},
-    {"name":"cold-and-resume-boot","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":5257,"runtimeRecordCount":12,"staticOperationCount":9,"moduleCount":1},
+    {"name":"multiple-effects","productionExecutableBytes":666,"eagerBytes":136,"artifactBytes":13943,"runtimeRecordCount":33,"staticOperationCount":19,"moduleCount":3},
+    {"name":"conditional-structural","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":5521,"runtimeRecordCount":12,"staticOperationCount":9,"moduleCount":1},
+    {"name":"keyed-list-updates","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":6364,"runtimeRecordCount":15,"staticOperationCount":9,"moduleCount":1},
+    {"name":"forms-cross-field-validation","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":8039,"runtimeRecordCount":16,"staticOperationCount":56,"moduleCount":1},
+    {"name":"cold-and-resume-boot","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":5269,"runtimeRecordCount":12,"staticOperationCount":9,"moduleCount":1},
     {"name":"lazy-roots-with-shared-candidates","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":23309,"runtimeRecordCount":26,"staticOperationCount":28,"moduleCount":1,"phaseJExecutableBytes":145794,"phaseJEagerBytes":389},
     {"name":"create-destroy-lifecycle","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":24428,"runtimeRecordCount":23,"staticOperationCount":47,"moduleCount":1,"lifecycleCycles":100},
     {"name":"malformed-packed-artifacts","productionExecutableBytes":0,"eagerBytes":0,"artifactBytes":0,"runtimeRecordCount":0,"staticOperationCount":0,"moduleCount":0},
-    {"name":"large-synthetic-application","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":5522,"runtimeRecordCount":17,"staticOperationCount":4,"moduleCount":1}
+    {"name":"large-synthetic-application","productionExecutableBytes":136,"eagerBytes":136,"artifactBytes":5564,"runtimeRecordCount":17,"staticOperationCount":4,"moduleCount":1}
   ]
 }
