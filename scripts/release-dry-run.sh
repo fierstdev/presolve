@@ -4,7 +4,14 @@ temporary_dir="$(mktemp -d)"
 cleanup() { rm -rf "$temporary_dir"; }
 trap cleanup EXIT
 pnpm install --offline
-pnpm -r check
+# Existing package verifiers resolve repository-root-relative compiler fixtures;
+# execute their root-owned entry points instead of package-local pnpm scripts.
+./scripts/verify-l12c3-wasm-binding.sh
+./scripts/verify-l12c4-language-service.sh
+./scripts/verify-l12d2-lsp-adapter.sh
+./scripts/verify-l12e2-vscode-facade.sh
+./scripts/verify-l15b-testing-package.sh
+pnpm --dir packages/runtime run check
 printf '{"schema":"presolve.release-dry-run","version":1,"packages":['
 first=true
 for package in packages/compiler-wasm packages/language-service packages/lsp packages/runtime packages/testing packages/vscode; do
