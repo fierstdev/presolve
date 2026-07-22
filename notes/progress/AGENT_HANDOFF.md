@@ -3,11 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: L13-D - Public Surface Matrix
-* Working tree: clean after the fixture-validated public surface matrix; all editor-package boundaries remain product-free.
+* Latest completed slice: L16 - Community Readiness
+* Working tree: clean after repository-only community readiness material; all editor-package boundaries remain product-free.
 * Date: 2026-07-21
 
 Last completed slice
+
+* Slice: L16 - Community Readiness
+* Result: adds repository-only license, changelog, contribution, security, conduct, support-boundary, and issue/PR material. The audit checks files, labels, links, credentials, and root ownership; it makes no hosting, publication, private-support, or SLA claim.
+* Next: L17-A may define reproducible distribution facts from existing package manifests only.
 
 * Slice: L13-D - Public Surface Matrix
 * Result: validates public help, reserved exit-6 status, every available L10 schema, and every package export directly from the CLI, registry, and manifests. It introduces no new public surface.
@@ -1391,7 +1395,9 @@ Known limitations
 Exact next step
 
 Phase K is complete and frozen through K21. Phase L is complete through
-L13-D. The public surface matrix validates help, reserved exits, available L10 schemas, and package exports directly from live local sources. It introduces no new surface. Next: L16 community-readiness repository material only.
+L16. Repository-only community readiness is complete, with no hosted-service,
+publication, private-support, or SLA claim. Next: L17-A distribution facts from
+existing package manifests only.
 
 Useful commands
 

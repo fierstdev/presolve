@@ -21,6 +21,7 @@ architecture.
 | `schemas/` | Active and frozen versioned schemas. |
 | `scripts/` | Maintained repository automation. |
 
+`LICENSE`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`,
 `Cargo.toml`, `Cargo.lock`, `package.json`, `pnpm-lock.yaml`,
 `pnpm-workspace.yaml`, `justfile`, `rust-toolchain.toml`, `.gitattributes`,
 `.gitignore`, and `README.md` remain root control files. Optional `tools/`, `benches/`,

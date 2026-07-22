@@ -4,6 +4,14 @@ Presolve is a compiler-centered web authoring system. The compiler is the sole
 semantic authority: tooling, the runtime, and future platform services consume
 immutable compiler products rather than reconstructing source knowledge.
 
+## Community and support
+
+Presolve is MIT licensed. Contribution, support, security, conduct, and
+changelog policies are in [CONTRIBUTING.md](CONTRIBUTING.md),
+[SECURITY.md](SECURITY.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and
+[CHANGELOG.md](CHANGELOG.md). This repository has no hosted service, deployment
+support, private support channel, or SLA.
+
 ## Repository layout
 
 The current active repository boundaries and historical-archive policy are
