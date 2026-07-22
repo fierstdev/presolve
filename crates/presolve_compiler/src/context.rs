@@ -129,21 +129,64 @@ class InvalidContexts extends Component {
 
         let asm = build_application_semantic_model(&parsed);
 
-        assert!(asm.contexts().is_empty());
+        assert_eq!(asm.contexts().len(), 1);
+        assert_eq!(asm.contexts()[0].name, "staticField");
         assert!(asm.components[0].state_fields.is_empty());
         assert_eq!(
             asm.context_declaration_candidates()
                 .invalid_candidates()
                 .len(),
-            5
+            4
         );
         assert_eq!(
             asm.diagnostics
                 .iter()
                 .map(|diagnostic| diagnostic.code.as_str())
                 .collect::<Vec<_>>(),
-            vec!["PSC1052", "PSC1052", "PSC1052", "PSC1052", "PSC1052"]
+            vec!["PSC1052", "PSC1052", "PSC1052", "PSC1052"]
         );
+    }
+
+    #[test]
+    fn accepts_static_contexts_and_qualified_string_designators() {
+        let parsed = presolve_parser::parse_file(
+            "src/Theme.tsx",
+            r#"
+@component("x-theme")
+class Theme extends Component {
+  @context()
+  static mode: string = "light";
+
+  @provide("Theme.mode")
+  providedMode: string = "dark";
+
+  @consume("Theme.mode")
+  consumedMode!: string;
+
+  render() { return <main />; }
+}
+"#,
+        );
+
+        let asm = build_application_semantic_model(&parsed);
+        let component = &asm.components[0];
+
+        assert_eq!(asm.contexts().len(), 1);
+        assert_eq!(component.provider_declarations.len(), 1);
+        assert_eq!(component.consumer_declarations.len(), 1);
+        assert_eq!(
+            component.provider_declarations[0]
+                .context_designator
+                .component_symbol,
+            "Theme"
+        );
+        assert_eq!(
+            component.consumer_declarations[0]
+                .context_designator
+                .context_member,
+            "mode"
+        );
+        assert!(asm.diagnostics.is_empty(), "{:#?}", asm.diagnostics);
     }
 
     #[test]

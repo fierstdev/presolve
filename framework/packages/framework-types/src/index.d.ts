@@ -22,6 +22,22 @@ declare global {
   /** Declares a compiler-recognized terminal capability method with no hook runtime. */
   function effect(): PresolveMethodDecorator;
 
+  /** Declares a compiler-owned static Context identity and optional default value. */
+  function context(): PresolveFieldDecorator;
+
+  /**
+   * A compiler-resolved qualified Context identity. The string is source
+   * syntax, not a runtime lookup key: the compiler validates and resolves it
+   * to the decorated static Context declaration before artifacts are emitted.
+   */
+  type ContextDesignator = `${string}.${string}`;
+
+  /** Declares a compiler-owned Provider bound to a static Context identity. */
+  function provide(contextDesignator: ContextDesignator): PresolveFieldDecorator;
+
+  /** Declares a compiler-owned Consumer bound to a static Context identity. */
+  function consume(contextDesignator: ContextDesignator): PresolveFieldDecorator;
+
   /** Declares a compiler-recognized slot field with no children runtime. */
   function slot(): PresolveFieldDecorator;
 

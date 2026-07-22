@@ -5,10 +5,10 @@ authority only when their preceding slice is complete and committed.
 
 ## Product boundary
 
-Phase M builds a private Presolve Framework around the compiler exactly as it
-is frozen. It is a TypeScript authoring and conformance product, not a new
-language or UI runtime. Its public-facing source vocabulary is the frozen
-compiler vocabulary in the [M1 conformance authoring contract](PHASE_M_CONFORMANCE_AUTHORING_CONTRACT.md).
+Phase M builds a private Presolve Framework around the compiler as its
+authoritative execution model. It is a TypeScript authoring and conformance
+product, not a UI runtime. Its public-facing source vocabulary is the
+compiler-language contract in the [M1 conformance authoring contract](PHASE_M_CONFORMANCE_AUTHORING_CONTRACT.md).
 
 The compiler remains the sole authority for parsing, language semantics,
 semantic and runtime identities, State storage, dependency graphs, action and
@@ -26,22 +26,25 @@ Phase M.
 
 Authority is applied in this order:
 
-1. Frozen compiler, runtime, Context, Components/Slots, Forms, resumability,
+1. Compiler, runtime, Context, Components/Slots, Forms, resumability,
    production, CLI, and platform contracts.
 2. The [M0 framework constitution](PHASE_M_FRAMEWORK_CONSTITUTION.md).
 3. The [M1 conformance authoring contract](PHASE_M_CONFORMANCE_AUTHORING_CONTRACT.md).
 4. The current implementation slice below.
 
-No Phase M slice may alter frozen compiler source forms, compiler bytes,
-artifact schemas, diagnostics, runtime protocol, or reserved-command status.
-When a desired convenience is not a frozen form, the framework declares it
-unavailable; it does not emulate it.
+No Phase M slice may alter compiler bytes, artifact schemas, diagnostics,
+runtime protocol, or reserved-command status merely for framework convenience.
+An active pre-release compiler source form may evolve only under the M0
+production language-evolution rule: compiler-owned implementation, exact
+documentation, declaration conformance, canonical diagnostics, and execution
+evidence, with no shim or fallback syntax. Otherwise, the framework declares a
+desired convenience unavailable rather than emulating it.
 
 ## Architectural decisions
 
 | Decision | Phase M direction |
 | --- | --- |
-| Source language | Preserve the compiler's exact source forms. In particular, component tags remain explicit, State remains `state(initializer)`, and Context/Forms/Slots retain their existing declarations. |
+| Source language | Preserve compiler forms by default. Component tags remain explicit and State remains `state(initializer)`; Context uses the M6-B static declaration plus compiler-resolved qualified designator, a documented production language refinement. |
 | Type delivery | Start with private `@presolve/framework-types` ambient declarations selected through `tsconfig` `types` and the pinned TypeScript 7.0 native CLI; no application-source aliases, JSX transform, decorator transform, compiler API, or runtime registration. |
 | Repository topology | Create `framework/` only in M2. It owns framework packages, conformance fixtures, examples, and docs, but cannot change compiler crates or take ownership of existing compiler packages. |
 | Compiler handoff | Invoke only the accepted explicit `presolve` project/configuration path. Inputs stay caller-supplied; there is no source/project discovery, parser, transform, semantic analyzer, product decoder, or alternate compiler route. |
@@ -139,7 +142,7 @@ ordering, and effect capability diagnostics.
 
 ### M6 — composition conformance families
 
-Add exact frozen component invocation, repeated/keyed instance behavior, Slot
+Add compiler-owned component invocation, repeated/keyed instance behavior, Slot
 declarations/content/outlets, and Context declarations/providers/consumers.
 No inputs, props, callback arguments, Context factory, provider getter,
 runtime lookup, Slot forwarding, or framework lifecycle abstraction is added.
@@ -147,6 +150,8 @@ Each family requires its existing compiler and browser evidence where runtime
 execution is already frozen.
 
 **M6-A authority:** [Component and Slot conformance](PHASE_M_M6_COMPONENT_SLOT_CONFORMANCE.md).
+
+**M6-B authority:** [Context language conformance](PHASE_M_M6_CONTEXT_LANGUAGE_CONTRACT.md).
 
 ### M7 — Forms and resume/production conformance
 
@@ -188,7 +193,7 @@ future metaframework must supply; it does not pre-implement it.
 
 ## Current boundary
 
-M4 and M5 are complete. M6-A Component/Slot conformance is complete. M6-B must
-make an explicit production language decision before exposing Context, because
-the inherited `Owner.instanceField` designator is not truthfully TypeScript
-typeable.
+M4 and M5 are complete. M6-A Component/Slot conformance is complete. M6-B
+selects static Context declarations and compiler-resolved qualified designators
+as the production Context language; Context is complete only after its targeted
+compiler and browser matrix passes.

@@ -5,8 +5,12 @@
 ## Purpose
 
 Phase M establishes a private, conformance-first Presolve Framework. It makes
-the frozen compiler's authoring language usable from TypeScript projects; it
-does not redesign that language or add a framework execution model.
+the compiler's authoring language usable from TypeScript projects and adds no
+framework execution model. Conformance is the default, but an active
+pre-release compiler language may change when an existing form cannot support
+a sound, production-quality TypeScript contract. Such a change must be
+compiler-owned, documented, fixture-backed, and complete; a framework shim or
+compatibility suppression is never an alternative.
 
 The compiler remains the only authority for source interpretation, semantic
 identity, dependency topology, storage, scheduling, diagnostics, generated
@@ -32,8 +36,8 @@ families. Phase M does not change their disposition.
 1. A framework-authored source file is passed unchanged to the canonical
    compiler path. The framework cannot substitute, normalize, generate, or
    lower a different source representation.
-2. Every supported framework form must have one cited frozen compiler form and
-   one conformance fixture. A form without both is unavailable.
+2. Every supported framework form must have one cited compiler-language
+   contract and one conformance fixture. A form without both is unavailable.
 3. The framework reports compiler diagnostics with their original code,
    severity, spans, labels, and canonical identities intact. Optional guidance
    is separate and cannot replace, suppress, reorder, or manufacture a
@@ -47,6 +51,27 @@ families. Phase M does not change their disposition.
 6. TypeScript declarations exist for authoring ergonomics only. They do not
    make a field reactive, register a component, perform Context lookup, or
    establish any runtime authority.
+
+## Production language evolution
+
+The compiler remains the only owner of language grammar and semantics. If
+Phase M identifies an incompatibility between an inherited compiler spelling
+and TypeScript's actual type system, it may change that compiler spelling only
+when all of the following are true:
+
+1. the new spelling is specified as a durable compiler/framework contract;
+2. the compiler parses, validates, diagnoses, and lowers it directly;
+3. the framework forwards the source unchanged and has no fallback spelling;
+4. type declarations express the same source contract without suppression;
+5. compiler, artifact, and browser evidence demonstrate the resulting
+   semantics; and
+6. affected compatibility and unsupported-syntax documentation is updated.
+
+M6-B applies this policy to Context. It replaces the framework-facing inherited
+instance Context declaration and static-member expression designator with a
+static Context declaration and a compiler-resolved qualified string designator.
+The quoted text is compile-time source syntax, never a dynamic key, lookup, or
+framework runtime token.
 
 ## Initial package decision
 
@@ -107,7 +132,7 @@ parser, decoder, runtime, or source conversion is permitted.
 
 ## M0 completion and next boundary
 
-M0 accepts the conformance-first direction and changes no frozen compiler or
-platform contract. M1 is the authoritative authoring conformance map. M2 may
-create only the isolated declaration package and its focused type-resolution
-fixtures.
+M0 accepts the conformance-first direction and framework/runtime boundaries.
+M1 is the authoritative authoring conformance map. Any later language change
+uses the production language-evolution rule above rather than a framework-only
+exception.

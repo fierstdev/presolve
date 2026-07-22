@@ -4,10 +4,12 @@
 
 ## Rule of interpretation
 
-This document exposes only forms already accepted by the frozen compiler. The
-examples are not proposed alternatives, aliases, or syntax sugar. The
-framework must pass them to the compiler unchanged. If a desired spelling is
-absent below, it is unsupported in Phase M.
+This document exposes the compiler-owned forms accepted by Phase M. The
+examples are not framework aliases or syntax sugar: source passes unchanged to
+the compiler. The M6-B Context form is an explicit production compiler-language
+change because the inherited spelling could not be represented honestly in
+TypeScript. If a desired spelling is absent below, it is unsupported in Phase
+M.
 
 Compiler diagnostics, not TypeScript declarations, decide semantic validity.
 Declaration types may teach ordinary TypeScript shapes, but they do not infer
@@ -23,9 +25,9 @@ selection, action batching, or compiler identity.
 | Action | `@action() increment() { this.count += 1; }` | The compiler owns action validation, transactional batching, direct event references, and compiler-supported closures. The framework defines no separate nested-action or async policy and no event wrapper. |
 | Computed | `@computed() get doubled() { return this.count * 2; }` | Getter-only compiler semantics, dependency topology, caching, and invalidation remain unchanged. Authored dependency arrays and manual invalidation are unavailable. |
 | Effect | `@effect() syncTitle() { document.title = this.title; }` | Effects remain compiler-planned terminal capability programs. Cleanup returns, state mutation, action/effect calls, and unrecognized capabilities remain compiler-rejected or unsupported; the framework adds no hook API. |
-| Context declaration | `@context() theme: string = "light";` | A Context is declared on a compiler-recognized component field. `context<T>()`, global Context handles, and string keys are unavailable. |
-| Context provider | `@provide(Theme.theme) providedTheme: string = this.selectedTheme;` | The designator stays the existing static member form. Provider getters/methods, runtime lookup, and framework-owned Context values are unavailable. |
-| Context consumer | `@consume(Theme.theme) theme!: string;` | Compiler-owned binding and instance-qualified selection remain authoritative. Consumer initializers and fallbacks are unavailable. |
+| Context declaration | `@context() static theme: string = "light";` | A Context identity is declared on a compiler-recognized static field. Its literal initializer is optional default metadata, never static State or a runtime value. `context<T>()`, global Context handles, and Context factories are unavailable. |
+| Context provider | `@provide("Theme.theme") providedTheme: string = this.selectedTheme;` | The quoted `Identifier.Identifier` designator is compiler syntax resolved during compilation to the static Context declaration. It is not a dynamic string key. Provider getters/methods, runtime lookup, and framework-owned Context values are unavailable. |
+| Context consumer | `@consume("Theme.theme") theme!: string;` | The same compiler-resolved designator selects a Context. Compiler-owned binding and instance-qualified selection remain authoritative. Consumer initializers and fallbacks are unavailable. |
 | Component use | `<Card />` | PascalCase JSX invocation, compiler component resolution, and compiler-owned instance identity remain unchanged. Props, spreads, callbacks as component arguments, and dynamic component targets are unavailable. |
 | Slots | `@slot() children!: SlotContent;` and `<Card><template slot="header"><h1 /></template></Card>` | Default/named Slot declarations, direct-child template wrappers, and outlets use the frozen component contract. Nested JSX slot sugar, forwarding, fallback, runtime name matching, and dynamic names are unavailable. |
 | Forms | `@form() profile!: Form;`, `@field(this.profile) name = "";`, `@action() @submit(this.profile) save() {}`, and `<form form={this.profile}>` | Forms retain their exact compiler declaration, field, submission, and host forms. Framework aliases, generated hosts, async/network submission, and DOM-derived ownership are unavailable. |
@@ -58,13 +60,14 @@ registration, wrapper, or metadata behavior. `Component`, `SlotContent`, and
 `Form` remain ambient compiler-language names rather than imported application
 symbols.
 
-The frozen Context designator form, for example `Theme.theme`, is a
-compiler-level static designator over an instance declaration. TypeScript
-cannot faithfully derive that relation from an inert property decorator alone.
-Phase M therefore must not add a global index-signature workaround, proxy, or
-source rewrite merely to silence TypeScript. Until a source-preserving,
-compiler-conformant declaration strategy is proven, Context conformance is
-verified by the canonical compiler check and its diagnostic fixtures.
+Context uses a static field to make its identity a real TypeScript static-side
+fact. Providers and Consumers name that fact with the literal
+`"Identifier.Identifier"` designator. The compiler validates each identifier
+segment, resolves the designator to the decorated static Context declaration,
+and emits its canonical diagnostic on malformed or unresolved references. The
+framework declaration type admits only dotted string literals; it does not add
+a global index signature, proxy, source rewrite, Context registry, or runtime
+lookup.
 
 The compiler consumes preserved TSX. The declaration package must not install a
 JSX factory, `jsx-runtime`, DOM renderer, or TypeScript decorator transform.
@@ -93,7 +96,7 @@ than framework shims over the compiler.
 
 ## M1 completion and next boundary
 
-M1 resolves Phase M's source-language question without changing frozen compiler
-syntax or semantics. M2 may implement only the private ambient declaration
-package and prove the Counter type-resolution path; it may not add a source
-transform, runtime package, compiler adapter, or new authoring form.
+M1 resolves Phase M's initial source-language question. M6-B records the
+subsequent production Context language change under the constitution's
+language-evolution rule. Neither authorizes a source transform, framework
+runtime package, or framework-side semantic implementation.

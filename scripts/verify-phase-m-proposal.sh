@@ -10,8 +10,9 @@ readonly m4_audit=docs/specifications/phase-m/PHASE_M_M4_PUBLICATION_AUDIT.md
 readonly m5_computed=docs/specifications/phase-m/PHASE_M_M5_COMPUTED_CONFORMANCE.md
 readonly m5_effect=docs/specifications/phase-m/PHASE_M_M5_EFFECT_CONFORMANCE.md
 readonly m6_component_slot=docs/specifications/phase-m/PHASE_M_M6_COMPONENT_SLOT_CONFORMANCE.md
+readonly m6_context=docs/specifications/phase-m/PHASE_M_M6_CONTEXT_LANGUAGE_CONTRACT.md
 
-for document in "$roadmap" "$constitution" "$authoring" "$m2_contract" "$m3_contract" "$m4_audit" "$m5_computed" "$m5_effect" "$m6_component_slot"; do
+for document in "$roadmap" "$constitution" "$authoring" "$m2_contract" "$m3_contract" "$m4_audit" "$m5_computed" "$m5_effect" "$m6_component_slot" "$m6_context"; do
   test -s "$document"
 done
 
@@ -23,17 +24,17 @@ for slice in M0 M1 M2 M3 M4 M5 M6 M7 M8 M9; do
   rg --fixed-strings --quiet "$slice" "$roadmap"
 done
 
-for phrase in 'conformance-first' 'reserved exit-6' 'Presolve Metaframework' 'state(initializer)' 'does not decode' 'fails closed'; do
+for phrase in 'conformance-first' 'reserved exit-6' 'Presolve Metaframework' 'state(initializer)' 'does not decode' 'fails closed' 'production language-evolution'; do
   rg --fixed-strings --quiet "$phrase" "$roadmap" "$constitution" "$authoring"
 done
 
-for phrase in '@component("x-name")' 'count = state(0)' '@action()' '@computed()' '@effect()' '@context()' '@provide(Theme.theme)' '@consume(Theme.theme)' '@slot()' '@form()'; do
+for phrase in '@component("x-name")' 'count = state(0)' '@action()' '@computed()' '@effect()' '@context()' '@provide("Theme.theme")' '@consume("Theme.theme")' '@slot()' '@form()'; do
   rg --fixed-strings --quiet "$phrase" "$authoring"
 done
 
 for unsupported in \
   '`@state() count = 0`, signals, `.value`, proxies, setters, and framework state storage are unavailable.' \
-  '`context<T>()`, global Context handles, and string keys are unavailable.' \
+  '`context<T>()`, global Context handles, and Context factories are unavailable.' \
   'JSX factory, `jsx-runtime`, DOM renderer, or TypeScript decorator transform.' \
   'than framework shims over the compiler.'; do
   rg --fixed-strings --quiet "$unsupported" "$authoring"
@@ -44,4 +45,5 @@ rg --fixed-strings --quiet 'M2 framework types contract' "$roadmap"
 rg --fixed-strings --quiet 'M3 explicit handoff contract' "$roadmap"
 rg --fixed-strings --quiet 'M4 public artifact-publication audit' "$roadmap"
 rg --fixed-strings --quiet 'M6-A Component/Slot conformance is complete' "$roadmap"
+rg --fixed-strings --quiet 'M6-B authority' "$roadmap"
 git diff --check

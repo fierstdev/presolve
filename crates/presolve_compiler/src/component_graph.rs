@@ -18,7 +18,7 @@ use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
 use presolve_parser::{
     ParsedArithmeticExpression, ParsedArithmeticExpressionKind, ParsedArithmeticOperator,
     ParsedClass, ParsedComparisonOperator, ParsedComputedExpression, ParsedComputedExpressionKind,
-    ParsedConstantExpression, ParsedConstantExpressionKind, ParsedEffectBody,
+    ParsedConstantExpression, ParsedConstantExpressionKind, ParsedDecorator, ParsedEffectBody,
     ParsedEffectExpression, ParsedEffectExpressionKind, ParsedEffectStatementKind,
     ParsedEventHandler, ParsedFile, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild,
     ParsedJsxConditional, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLogicalOperator,
@@ -2500,7 +2500,7 @@ fn context_declaration_candidates_from_class(
                     expected: expected_arity,
                 });
             }
-            if property.is_static {
+            if property.is_static && kind != ContextDeclarationCandidateKind::Context {
                 violations.push(ContextDeclarationViolation::StaticDeclarationUnsupported);
             }
             let has_conflict = property.decorators.iter().any(|other| {
@@ -2535,10 +2535,7 @@ fn context_declaration_candidates_from_class(
             if declared_type.is_none() {
                 violations.push(ContextDeclarationViolation::MissingDeclaredType);
             }
-            let designator = decorator
-                .static_member_argument
-                .as_ref()
-                .map(|value| context_designator_from_parsed(value, path));
+            let designator = context_designator_from_decorator(decorator, path);
             match kind {
                 ContextDeclarationCandidateKind::Context => {
                     if property.initializer.is_some() && property.initializer_literal.is_none() {
@@ -3042,7 +3039,6 @@ fn context_declarations_from_class(
             let declared_type = property.type_annotation.as_ref()?;
 
             (decorator.argument_count == 0
-                && !property.is_static
                 && !property.decorators.iter().any(|decorator| {
                     matches!(
                         decorator.name.as_str(),
@@ -3092,7 +3088,7 @@ fn provider_declarations_from_class(
                 .decorators
                 .iter()
                 .find(|decorator| decorator.name == "provide")?;
-            let designator = decorator.static_member_argument.as_ref()?;
+            let designator = context_designator_from_decorator(decorator, path)?;
             let declared_type = property.type_annotation.as_ref()?;
             let value_expression = property.initializer_expression.as_ref()?;
 
@@ -3107,7 +3103,7 @@ fn provider_declarations_from_class(
             .then(|| ProviderDeclaration {
                 authored_field: id.provider_field(&property.name),
                 name: property.name.clone(),
-                context_designator: context_designator_from_parsed(designator, path),
+                context_designator: designator,
                 declared_type: DeclaredStateType {
                     kind: declared_state_type_kind(&declared_type.text),
                     text: declared_type.text.clone(),
@@ -3135,7 +3131,7 @@ fn consumer_declarations_from_class(
                 .decorators
                 .iter()
                 .find(|decorator| decorator.name == "consume")?;
-            let designator = decorator.static_member_argument.as_ref()?;
+            let designator = context_designator_from_decorator(decorator, path)?;
             let requested_type = property.type_annotation.as_ref()?;
             let has_conflicting_decorator = property.decorators.iter().any(|decorator| {
                 matches!(
@@ -3161,7 +3157,7 @@ fn consumer_declarations_from_class(
                 .then(|| ConsumerDeclaration {
                     authored_field: id.consumer_field(&property.name),
                     name: property.name.clone(),
-                    context_designator: context_designator_from_parsed(designator, path),
+                    context_designator: designator,
                     requested_type: DeclaredStateType {
                         kind: declared_state_type_kind(&requested_type.text),
                         text: requested_type.text.clone(),
@@ -3186,6 +3182,44 @@ fn context_designator_from_parsed(
         component_provenance: SourceProvenance::new(path, designator.object_span),
         member_provenance: SourceProvenance::new(path, designator.member_span),
     }
+}
+
+fn context_designator_from_decorator(
+    decorator: &ParsedDecorator,
+    path: &Path,
+) -> Option<ContextDesignator> {
+    decorator
+        .static_member_argument
+        .as_ref()
+        .map(|value| context_designator_from_parsed(value, path))
+        .or_else(|| {
+            let value = decorator.argument.as_deref()?;
+            let (component_symbol, context_member) = value.split_once('.')?;
+            if component_symbol.is_empty()
+                || context_member.is_empty()
+                || context_member.contains('.')
+                || !context_designator_segment(component_symbol)
+                || !context_designator_segment(context_member)
+            {
+                return None;
+            }
+            let provenance = SourceProvenance::new(path, decorator.argument_spans.first()?.clone());
+            Some(ContextDesignator {
+                component_symbol: component_symbol.to_string(),
+                context_member: context_member.to_string(),
+                provenance: provenance.clone(),
+                component_provenance: provenance.clone(),
+                member_provenance: provenance,
+            })
+        })
+}
+
+fn context_designator_segment(value: &str) -> bool {
+    let mut characters = value.chars();
+    matches!(characters.next(), Some(character) if character == '_' || character == '$' || character.is_ascii_alphabetic())
+        && characters.all(|character| {
+            character == '_' || character == '$' || character.is_ascii_alphanumeric()
+        })
 }
 
 fn arithmetic_expression_from_parsed(
