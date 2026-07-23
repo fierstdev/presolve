@@ -125,6 +125,43 @@ fn dev_once_builds_a_default_project_without_configuration() {
 }
 
 #[test]
+fn default_build_composes_a_conventional_layout_without_framework_wrapping() {
+    let root = project_root("layout");
+    fs::write(
+        root.join("app/layout.tsx"),
+        r#"
+@component() class AppLayout extends Component {
+  @slot() children!: SlotContent;
+  render() { return <main><slot /></main>; }
+}
+"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("app/routes/index.tsx"),
+        r#"@component() class Home extends Component { render() { return <article>Home</article>; } }"#,
+    )
+    .unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("build")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let html = fs::read_to_string(root.join("dist/routes/root/index.html")).unwrap();
+    assert!(html.contains("<main"));
+    assert!(html.contains("<article"));
+    assert!(html.contains("Home"));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn dev_serves_the_compiler_published_page() {
     let root = project_root("server");
     fs::write(

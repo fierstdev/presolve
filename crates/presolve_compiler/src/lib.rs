@@ -169,19 +169,22 @@ pub mod workspace;
 mod wasm_binding;
 
 pub use application_publication::{
-    application_publication_manifest_json_v1, build_application_publication_product_v1,
-    validate_application_publication_request_v1, ApplicationPublicationArtifactV1,
-    ApplicationPublicationErrorV1, ApplicationPublicationManifestV1,
-    ApplicationPublicationProductV1, ApplicationPublicationProfileV1,
-    ApplicationPublicationRequestErrorV1, ApplicationPublicationRequestV1,
-    ApplicationPublicationSourceV1, ValidatedApplicationPublicationRequestV1,
-    APPLICATION_PUBLICATION_COMPILER_CONTRACT_V1, APPLICATION_PUBLICATION_MANIFEST_SCHEMA_VERSION,
+    application_publication_manifest_json_v1, build_application_publication_product_from_asm_v1,
+    build_application_publication_product_v1, validate_application_publication_request_v1,
+    ApplicationPublicationArtifactV1, ApplicationPublicationErrorV1,
+    ApplicationPublicationManifestV1, ApplicationPublicationProductV1,
+    ApplicationPublicationProfileV1, ApplicationPublicationRequestErrorV1,
+    ApplicationPublicationRequestV1, ApplicationPublicationSourceV1,
+    ValidatedApplicationPublicationRequestV1, APPLICATION_PUBLICATION_COMPILER_CONTRACT_V1,
+    APPLICATION_PUBLICATION_MANIFEST_SCHEMA_VERSION,
 };
 pub use application_semantic_model::{
     build_application_semantic_model, build_application_semantic_model_for_unit,
     build_application_semantic_model_for_unit_with_packages,
-    build_application_semantic_model_from_component_graph, ApplicationSemanticModel,
-    SemanticEntity, SemanticEntityKind,
+    build_application_semantic_model_from_component_graph,
+    build_file_route_application_semantic_model_for_route_with_packages,
+    build_file_route_application_semantic_model_for_unit_with_packages, ApplicationSemanticModel,
+    FileRouteApplicationModelErrorV1, SemanticEntity, SemanticEntityKind,
 };
 pub use asm_validation::{validate_application_semantic_model, AsmValidationDiagnostic};
 pub use binding_table::{
@@ -442,6 +445,7 @@ pub use intermediate_representation::{
 };
 pub use layout_composition::{
     build_layout_composition_plan_from_components_v1, build_layout_composition_plan_v1,
+    layout_composition_virtual_invocations_from_provenance_v1,
     layout_composition_virtual_invocations_v1, LayoutCompositionEdgeV1, LayoutCompositionErrorV1,
     LayoutCompositionPlanV1, LayoutCompositionRouteV1,
 };
@@ -660,9 +664,10 @@ pub use resume_schema::{
 };
 pub use route_graph::{
     build_file_route_graph_from_components_v1, build_file_route_graph_v1, build_route_graph,
-    build_static_route_publication_v1, build_validated_file_route_graph_v1,
-    build_validated_route_graph_v1, route_manifest_json_v1, route_manifest_v1, FileRouteGraphV1,
-    FileRouteNodeV1, RouteGraph, RouteGraphError, RouteManifestEntryV1, RouteManifestV1, RouteNode,
+    build_static_route_publication_v1, build_validated_file_route_graph_from_components_v1,
+    build_validated_file_route_graph_v1, build_validated_route_graph_v1, route_manifest_json_v1,
+    route_manifest_v1, FileRouteGraphV1, FileRouteNodeV1, RouteGraph, RouteGraphError,
+    RouteManifestEntryV1, RouteManifestV1, RouteNode,
 };
 pub use runtime_codegen::generate_runtime_stub;
 pub use runtime_component::{
@@ -798,7 +803,8 @@ pub use shared_chunk_candidate::{
 };
 pub use slot::{collect_slot_entities, SlotEntity};
 pub use slot_binding::{
-    collect_slot_bindings, SlotBinding, SlotBindingRegistry, SlotBindingStatus,
+    collect_slot_bindings, collect_slot_bindings_with_virtual_invocations, SlotBinding,
+    SlotBindingRegistry, SlotBindingStatus,
 };
 pub use slot_content::{
     collect_slot_composition, SlotCompositionRegistry, SlotContentFragment,

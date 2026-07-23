@@ -81,7 +81,13 @@ pub struct ApplicationPublicationRequestV1 {
 pub struct ValidatedApplicationPublicationRequestV1 {
     pub request: ApplicationPublicationRequestV1,
     pub unit: CompilationUnit,
+    /// Source-selected page component. This remains the published entry
+    /// identity even when a compiler-owned file-route layout is the rendered
+    /// root.
     pub entry_component: SemanticId,
+    /// Compiler-selected materialization root. Explicit publication defaults
+    /// to `entry_component`; conventional file routes may set an outer layout.
+    pub render_root_component: SemanticId,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -236,6 +242,7 @@ pub fn validate_application_publication_request_v1(
         request,
         unit,
         entry_component: entry_component.clone(),
+        render_root_component: entry_component.clone(),
     })
 }
 
@@ -250,12 +257,27 @@ pub fn validate_application_publication_request_v1(
 pub fn build_application_publication_product_v1(
     validated: ValidatedApplicationPublicationRequestV1,
 ) -> Result<ApplicationPublicationProductV1, ApplicationPublicationErrorV1> {
-    let request = validated.request;
     let asm =
         ConstantFoldingPass.transform(&build_application_semantic_model_for_unit_with_packages(
             &validated.unit,
-            &request.package_contracts,
+            &validated.request.package_contracts,
         ));
+    build_application_publication_product_from_asm_v1(validated, asm)
+}
+
+/// Lowers one validated explicit publication request from an already-built
+/// canonical application model. This is used by compiler-owned file-route
+/// composition; callers cannot supply altered artifacts or a framework model.
+///
+/// # Errors
+///
+/// Returns the same publication diagnostics as the standard model assembly
+/// path when compiler products cannot form a browser publication.
+pub fn build_application_publication_product_from_asm_v1(
+    validated: ValidatedApplicationPublicationRequestV1,
+    asm: crate::ApplicationSemanticModel,
+) -> Result<ApplicationPublicationProductV1, ApplicationPublicationErrorV1> {
+    let request = validated.request;
     if let Some(diagnostic) = asm.diagnostics.iter().find(|diagnostic| {
         diagnostic.code.starts_with("PSBIND10")
             || matches!(diagnostic.code.as_str(), "PSC1128" | "PSC1130" | "PSC1131")
@@ -354,13 +376,13 @@ pub fn build_application_publication_product_v1(
     let production_runtime_json = production_runtime_artifact_json(&production_runtime_artifact);
     let resume_chunks = build_resume_chunk_graph(&asm);
     let html_fragment =
-        generate_ordinary_instance_html_for_component(&asm, &validated.entry_component);
+        generate_ordinary_instance_html_for_component(&asm, &validated.render_root_component);
     let template_manifest = build_template_manifest_from_asm(&asm);
     let template_manifest_json = template_manifest_json(&template_manifest);
     let page_title = asm
         .components
         .iter()
-        .find(|component| component.id == validated.entry_component)
+        .find(|component| component.id == validated.render_root_component)
         .map_or_else(
             || "Presolve App".to_string(),
             |component| component.class_name.clone(),

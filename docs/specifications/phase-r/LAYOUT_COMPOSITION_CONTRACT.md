@@ -16,16 +16,18 @@ layout to the next component through its default Slot.
 
 ## Admission
 
-Each participating layout must have exactly one default `@slot()` outlet.
-Named-only, absent, duplicate, or dynamically forwarded outlets are rejected
+Each participating layout must declare exactly one default `@slot()` field.
+Its template must resolve that Slot through one ordinary outlet for the child
+to materialize; existing canonical Slot diagnostics reject missing, duplicate,
+or invalid outlets. Named-only and duplicate default declarations are rejected
 for automatic composition. The page remains an ordinary component entry and
 does not require generated source or an authored wrapper class.
 
 ## Identity and ownership
 
-The compiler issues deterministic virtual invocation IDs from the route entry,
-layout component, and chain position. These are not source decorator IDs and
-never appear in ordinary framework types.
+The compiler issues deterministic virtual invocation IDs from the layout,
+route page, and chain position. These are not source decorator IDs and never
+appear in ordinary framework types.
 
 Every synthetic child instance has the preceding layout instance as parent.
 The existing instance, template, event, Context, form, slot, action, and resume

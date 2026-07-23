@@ -33,9 +33,10 @@ source-level diagnostic is deferred until the compiler model retains empty
 route modules.
 
 The file-route graph records this ownership chain as compiler semantic data.
-It does not yet prescribe a framework router runtime or silently synthesize
-rendering code; a later route-publication slice must consume the exact chain
-when it defines the page composition artifact.
+Route publication consumes it through compiler-issued default-Slot child edges:
+the outer layout is the materialization root, each following layout/page is
+placed into the preceding layout's declared default Slot, and no generated
+source, wrapper component, or router runtime is introduced.
 
 ## Publication
 
@@ -49,10 +50,11 @@ published artifact path (or canonical trailing-slash redirect), including
 static-over-parameter specificity. A host consumes that result; it does not
 implement matching itself.
 
-Layout chains are present in this manifest but are not yet automatic page
-composition. That requires a separate lowering rule that preserves Slots,
-instance identity, actions, and resume anchors rather than merely nesting
-static HTML.
+Each route is composed independently before its standard compiler artifact
+family is lowered. The manifest's `entry_component_id` remains the page
+identity, while the compiler selects the outer layout as the materialization
+root when a layout chain exists. Runtime, Context, action, Slot, and resume
+products derive from that same composed semantic model.
 
 ## Diagnostics
 

@@ -18,15 +18,21 @@ struct ResumeHtmlMarkers {
     events: BTreeMap<String, String>,
 }
 
-#[derive(Debug)]
-struct SlotProjection<'a> {
-    outlet_entity: crate::SemanticId,
-    caller_instance: ComponentInstanceId,
-    caller_template: &'a TemplateNode,
-    invocation_element: &'a ElementNode,
-    invocation_path: String,
-    content_entities: BTreeSet<crate::SemanticId>,
-    caller_slot_projections: &'a [SlotProjection<'a>],
+#[derive(Debug, Clone)]
+enum SlotProjection<'a> {
+    Authored {
+        outlet_entity: crate::SemanticId,
+        caller_instance: ComponentInstanceId,
+        caller_template: &'a TemplateNode,
+        invocation_element: &'a ElementNode,
+        invocation_path: String,
+        content_entities: BTreeSet<crate::SemanticId>,
+        caller_slot_projections: &'a [SlotProjection<'a>],
+    },
+    DirectLayoutChild {
+        outlet_entity: crate::SemanticId,
+        child_instance: ComponentInstanceId,
+    },
 }
 
 /// Render the planned initial component topology with compiler-precomputed
@@ -155,6 +161,8 @@ fn render_instance(
     component: &crate::SemanticId,
     slot_projections: &[SlotProjection<'_>],
 ) -> String {
+    let mut instance_slot_projections = slot_projections.to_vec();
+    instance_slot_projections.extend(direct_layout_slot_projections(model, instance));
     let Some(template) = templates.get(&component.template()) else {
         return String::new();
     };
@@ -170,7 +178,7 @@ fn render_instance(
             template,
             root,
             "root",
-            slot_projections,
+            &instance_slot_projections,
         );
     }
     template
@@ -188,7 +196,7 @@ fn render_instance(
                 template,
                 fragment,
                 "root",
-                slot_projections,
+                &instance_slot_projections,
             )
         })
 }
@@ -419,7 +427,7 @@ fn render_element(
     if element.tag_name == "slot" {
         if let Some(projection) = slot_projections
             .iter()
-            .find(|projection| projection.outlet_entity == entity)
+            .find(|projection| projection.outlet_entity() == &entity)
         {
             return render_slot_projection(
                 model,
@@ -543,7 +551,7 @@ fn slot_projections_for_invocation<'a>(
             let fragment = model
                 .slot_content_fragments
                 .get(binding.content_fragment.as_ref()?)?;
-            Some(SlotProjection {
+            Some(SlotProjection::Authored {
                 outlet_entity: outlet.template_entity.clone(),
                 caller_instance: caller_instance.clone(),
                 caller_template,
@@ -551,6 +559,35 @@ fn slot_projections_for_invocation<'a>(
                 invocation_path: invocation_path.to_string(),
                 content_entities: fragment.content_template_entities.iter().cloned().collect(),
                 caller_slot_projections,
+            })
+        })
+        .collect()
+}
+
+impl SlotProjection<'_> {
+    fn outlet_entity(&self) -> &crate::SemanticId {
+        match self {
+            Self::Authored { outlet_entity, .. }
+            | Self::DirectLayoutChild { outlet_entity, .. } => outlet_entity,
+        }
+    }
+}
+
+fn direct_layout_slot_projections(
+    model: &ApplicationSemanticModel,
+    instance: &ComponentInstanceId,
+) -> Vec<SlotProjection<'static>> {
+    model
+        .slot_bindings
+        .for_callee(instance)
+        .into_iter()
+        .filter(|binding| binding.status == SlotBindingStatus::Bound)
+        .filter_map(|binding| {
+            let child_instance = binding.direct_child_instance.clone()?;
+            let outlet = model.slot_outlets.get(binding.outlet.as_ref()?)?;
+            Some(SlotProjection::DirectLayoutChild {
+                outlet_entity: outlet.template_entity.clone(),
+                child_instance,
             })
         })
         .collect()
@@ -569,11 +606,39 @@ fn render_slot_projection(
     resume_markers: &ResumeHtmlMarkers,
     projection: &SlotProjection<'_>,
 ) -> String {
+    if let SlotProjection::DirectLayoutChild { child_instance, .. } = projection {
+        let Some(child) = model.component_instance_plan.instances.get(child_instance) else {
+            return String::new();
+        };
+        return render_instance(
+            model,
+            templates,
+            children,
+            targets,
+            bindings,
+            resume_markers,
+            &child.id,
+            &child.component,
+            &[],
+        );
+    }
+    let SlotProjection::Authored {
+        caller_instance,
+        caller_template,
+        invocation_element,
+        invocation_path,
+        content_entities,
+        caller_slot_projections,
+        ..
+    } = projection
+    else {
+        unreachable!("direct layout Slot projection returns above");
+    };
     let mut html = String::new();
-    for (index, child) in projection.invocation_element.children.iter().enumerate() {
-        let path = format!("{}.{}", projection.invocation_path, index);
-        let entity = template_child_entity(&projection.caller_template.id, child, &path);
-        if projection.content_entities.contains(&entity) {
+    for (index, child) in invocation_element.children.iter().enumerate() {
+        let path = format!("{invocation_path}.{index}");
+        let entity = template_child_entity(&caller_template.id, child, &path);
+        if content_entities.contains(&entity) {
             html.push_str(&render_child(
                 model,
                 templates,
@@ -581,11 +646,11 @@ fn render_slot_projection(
                 targets,
                 bindings,
                 resume_markers,
-                &projection.caller_instance,
-                projection.caller_template,
+                caller_instance,
+                caller_template,
                 child,
                 &path,
-                projection.caller_slot_projections,
+                caller_slot_projections,
             ));
             continue;
         }
@@ -597,9 +662,8 @@ fn render_slot_projection(
         }
         for (child_index, wrapped) in wrapper.children.iter().enumerate() {
             let wrapped_path = format!("{path}.{child_index}");
-            let wrapped_entity =
-                template_child_entity(&projection.caller_template.id, wrapped, &wrapped_path);
-            if projection.content_entities.contains(&wrapped_entity) {
+            let wrapped_entity = template_child_entity(&caller_template.id, wrapped, &wrapped_path);
+            if content_entities.contains(&wrapped_entity) {
                 html.push_str(&render_child(
                     model,
                     templates,
@@ -607,11 +671,11 @@ fn render_slot_projection(
                     targets,
                     bindings,
                     resume_markers,
-                    &projection.caller_instance,
-                    projection.caller_template,
+                    caller_instance,
+                    caller_template,
                     wrapped,
                     &wrapped_path,
-                    projection.caller_slot_projections,
+                    caller_slot_projections,
                 ));
             }
         }

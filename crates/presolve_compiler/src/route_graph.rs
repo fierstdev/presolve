@@ -130,8 +130,25 @@ pub fn build_file_route_graph_from_components_v1(
 pub fn build_validated_file_route_graph_v1(
     model: &ApplicationSemanticModel,
 ) -> Result<FileRouteGraphV1, RouteGraphError> {
+    build_validated_file_route_graph_from_components_v1(&model.components)
+}
+
+/// Component-fact variant of [`build_validated_file_route_graph_v1`].
+///
+/// File-route identity and layout ownership are properties of compiler
+/// component facts, not of a completed application artifact. Keeping this
+/// lowering available before instance planning lets a file-route application
+/// assemble its canonical composed topology exactly once.
+///
+/// # Errors
+///
+/// Returns the same stable route diagnostics as the application-model entry
+/// point.
+pub fn build_validated_file_route_graph_from_components_v1(
+    components: &[crate::ComponentNode],
+) -> Result<FileRouteGraphV1, RouteGraphError> {
     let mut layouts = BTreeMap::<Vec<String>, SemanticId>::new();
-    for component in &model.components {
+    for component in components {
         let Some(scope) = file_layout_scope(&component.module_path) else {
             continue;
         };
@@ -160,7 +177,7 @@ pub fn build_validated_file_route_graph_v1(
     }
 
     let mut routes = Vec::new();
-    for component in &model.components {
+    for component in components {
         if file_layout_scope(&component.module_path).is_some() {
             continue;
         }
@@ -581,8 +598,11 @@ mod tests {
         ]));
 
         let graph = build_validated_file_route_graph_v1(&model).unwrap();
+        let component_graph =
+            build_validated_file_route_graph_from_components_v1(&model.components).unwrap();
 
         assert_eq!(graph.routes.len(), 1);
+        assert_eq!(component_graph, graph);
         assert_eq!(graph.routes[0].path, "/blog/:slug");
         assert_eq!(
             graph.routes[0]

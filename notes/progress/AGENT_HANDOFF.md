@@ -3,24 +3,25 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: R3-E - ergonomic multi-route CLI adoption
-* Working tree: R3-E implementation is ready for commit.
+* Latest completed slice: R3-F - compiler-owned layout composition publication
+* Working tree: R3-F implementation is ready for commit.
 * Date: 2026-07-23
 
 Current Phase R slice
 
-* Slice: R3-E - Ergonomic Multi-Route CLI Adoption
-* Result: zero-argument `presolve build` and `presolve dev` now consume the
-  compiler's file-route publication product rather than selecting one hardcoded
-  `index.tsx` entry. Published route families remain exact compiler bytes. The
-  development host delegates page, trailing-slash redirect, parameter, static
-  precedence, and route-local asset lookup to the compiler manifest resolver.
-* Verification: the fresh-project suite proves default package builds, route
-  conflicts, `dev --once`, and live served page behavior through the new route
-  artifact locations.
-* Next: define and lower real layout composition; recorded layout chains must
-  become one compiler-planned component/slot/instance tree before Phase R can
-  claim conventional layouts are usable.
+* Slice: R3-F - Compiler-Owned Layout Composition Publication
+* Result: conventional layouts now lower into compiler-issued virtual child
+  edges before component instance planning. Their direct default-Slot bindings
+  materialize the selected page through the outer layout without JSX wrappers,
+  static HTML concatenation, a router runtime, or a second artifact authority.
+  File-route publication constructs one route-scoped composed semantic model
+  per page and selects its outer layout as the materialization root; the page
+  remains the manifest entry identity.
+* Verification: focused compiler model, file-route publication, and route
+  topology tests prove direct Slot binding and composed HTML. The fresh-project
+  CLI build test proves `app/layout.tsx` surrounds the published page.
+* Next: continue Phase R with R6 server/data handoffs, retaining the compiler
+  as the only source/semantic/artifact authority.
 
 * Slice: R3-F0 - Layout Composition Contract
 * Result: froze the compiler-only automatic layout composition contract. It

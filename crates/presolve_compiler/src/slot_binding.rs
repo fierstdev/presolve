@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::{
     ComponentInstanceId, ComponentInstancePlan, ComponentInvocationEntity, ComponentInvocationId,
     SemanticId, SlotBindingId, SlotContentFragment, SlotContentFragmentId,
-    SlotContentFragmentStatus, SlotContentFragmentViolation, SlotEntity, SlotId, SlotOutlet,
-    SlotOutletId, SlotOutletStatus, SlotOutletViolation, SourceProvenance,
+    SlotContentFragmentStatus, SlotContentFragmentViolation, SlotEntity, SlotId, SlotKind,
+    SlotOutlet, SlotOutletId, SlotOutletStatus, SlotOutletViolation, SourceProvenance,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -97,6 +97,28 @@ pub fn collect_slot_bindings(
     fragments: &BTreeMap<SlotContentFragmentId, SlotContentFragment>,
     outlets: &BTreeMap<SlotOutletId, SlotOutlet>,
 ) -> SlotBindingRegistry {
+    collect_slot_bindings_with_virtual_invocations(
+        plan,
+        invocations,
+        &BTreeMap::new(),
+        slots,
+        fragments,
+        outlets,
+    )
+}
+
+/// Joins authored Slot content and compiler-issued file-route layout children
+/// to their exact planned instances. A layout child is not fabricated JSX: it
+/// occupies the layout's declared default Slot directly.
+#[must_use]
+pub fn collect_slot_bindings_with_virtual_invocations(
+    plan: &ComponentInstancePlan,
+    invocations: &BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
+    virtual_invocations: &BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
+    slots: &BTreeMap<SlotId, SlotEntity>,
+    fragments: &BTreeMap<SlotContentFragmentId, SlotContentFragment>,
+    outlets: &BTreeMap<SlotOutletId, SlotOutlet>,
+) -> SlotBindingRegistry {
     let inputs = BindingInputs {
         slots,
         fragments,
@@ -110,9 +132,22 @@ pub fn collect_slot_bindings(
         else {
             continue;
         };
-        let Some(invocation) = invocations.get(invocation_id) else {
+        let Some(invocation) = invocations
+            .get(invocation_id)
+            .or_else(|| virtual_invocations.get(invocation_id))
+        else {
             continue;
         };
+        if invocation.virtual_layout_composition {
+            collect_virtual_layout_binding(
+                &mut registry,
+                &instance.id,
+                caller_instance,
+                invocation,
+                &inputs,
+            );
+            continue;
+        }
         let caller_component = plan
             .instances
             .get(caller_instance)
@@ -130,7 +165,10 @@ pub fn collect_slot_bindings(
     }
 
     for blocked in plan.blocked.values() {
-        let Some(invocation) = invocations.get(&blocked.invocation) else {
+        let Some(invocation) = invocations
+            .get(&blocked.invocation)
+            .or_else(|| virtual_invocations.get(&blocked.invocation))
+        else {
             continue;
         };
         let caller_component = plan
@@ -150,6 +188,69 @@ pub fn collect_slot_bindings(
     }
 
     registry
+}
+
+fn collect_virtual_layout_binding(
+    registry: &mut SlotBindingRegistry,
+    child_instance: &ComponentInstanceId,
+    layout_instance: &ComponentInstanceId,
+    invocation: &ComponentInvocationEntity,
+    inputs: &BindingInputs<'_>,
+) {
+    let default_slot = inputs
+        .slots
+        .values()
+        .find(|slot| slot.owner == invocation.owner_component && slot.kind == SlotKind::Default);
+    let (slot, outlet_candidates) = default_slot.map_or_else(
+        || (None, Vec::new()),
+        |slot| {
+            let candidates = inputs
+                .outlets
+                .values()
+                .filter(|outlet| outlet.slot.as_ref() == Some(&slot.id))
+                .collect();
+            (Some(slot.id.clone()), candidates)
+        },
+    );
+    let outlet = (outlet_candidates.len() == 1
+        && outlet_candidates[0].status == SlotOutletStatus::Resolved)
+        .then(|| outlet_candidates[0].id.clone());
+    let status = classify_binding(
+        false,
+        Some(&invocation.owner_component),
+        Some(&invocation.owner_component),
+        None,
+        &outlet_candidates,
+        outlet.as_ref(),
+        slot.as_ref(),
+    );
+    // `classify_binding` deliberately treats no authored content as Empty.
+    // The compiler-issued child is the content for a virtual layout edge.
+    let status = if status == SlotBindingStatus::Empty && outlet.is_some() {
+        SlotBindingStatus::Bound
+    } else {
+        status
+    };
+    let id = SlotBindingId::for_instance(
+        layout_instance,
+        &format!("layout-child:{}", child_instance.as_str()),
+    );
+    registry.bindings.insert(
+        id.clone(),
+        SlotBinding {
+            id,
+            caller_instance: layout_instance.clone(),
+            callee_instance: layout_instance.clone(),
+            invocation: invocation.id.clone(),
+            slot,
+            outlet,
+            content_fragment: None,
+            direct_child_instance: Some(child_instance.clone()),
+            content_owner_instance: child_instance.clone(),
+            status,
+            provenance: invocation.provenance.clone(),
+        },
+    );
 }
 
 #[allow(clippy::similar_names, clippy::too_many_arguments)]

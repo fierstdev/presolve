@@ -157,7 +157,7 @@ pub fn plan_file_route_component_instances_v1(
     provenance: &BTreeMap<SemanticId, SourceProvenance>,
 ) -> Result<ComponentInstancePlan, LayoutCompositionErrorV1> {
     let plan = build_layout_composition_plan_from_components_v1(components, graph)?;
-    let virtuals = virtual_invocations_from_provenance(&plan, provenance);
+    let virtuals = layout_composition_virtual_invocations_from_provenance_v1(&plan, provenance);
     Ok(crate::plan_component_instances_with_virtual_invocations(
         components,
         authored_invocations,
@@ -167,7 +167,10 @@ pub fn plan_file_route_component_instances_v1(
     ))
 }
 
-fn virtual_invocations_from_provenance(
+/// Lowers a layout plan to compiler-issued invocation facts while the
+/// application model is still being assembled.
+#[must_use]
+pub fn layout_composition_virtual_invocations_from_provenance_v1(
     plan: &LayoutCompositionPlanV1,
     provenance: &BTreeMap<SemanticId, SourceProvenance>,
 ) -> BTreeMap<ComponentInvocationId, ComponentInvocationEntity> {

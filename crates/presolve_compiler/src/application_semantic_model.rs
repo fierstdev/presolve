@@ -12,8 +12,8 @@ use crate::component_graph::{
 };
 use crate::component_initialization::{plan_component_initialization, ComponentInitializationPlan};
 use crate::component_instance::{
-    plan_component_instances, BlockedComponentInstancePlan, ComponentInstance,
-    ComponentInstancePlan,
+    plan_component_instances, plan_component_instances_with_virtual_invocations,
+    BlockedComponentInstancePlan, ComponentInstance, ComponentInstancePlan,
 };
 use crate::component_instance_scope::{
     build_component_instance_scope_graph, ComponentInstanceScopeGraph,
@@ -77,7 +77,10 @@ use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
 use crate::semantic_type::{EffectStatementTypeRecord, SemanticTypeModel};
 use crate::slot::{collect_slot_entities, SlotEntity};
-use crate::slot_binding::{collect_slot_bindings, SlotBinding, SlotBindingRegistry};
+use crate::slot_binding::{
+    collect_slot_bindings, collect_slot_bindings_with_virtual_invocations, SlotBinding,
+    SlotBindingRegistry,
+};
 use crate::slot_content::{collect_slot_composition, SlotContentFragment, SlotOutlet};
 use crate::template_graph::{build_template_graph, TemplateNode};
 use crate::template_semantics::{
@@ -89,6 +92,14 @@ use crate::{
     plan_effect_execution, validate_effects, Effect, EffectBody, EffectExecutionPlan,
     EffectReactiveAnalysis, EffectStatement, EffectTriggerPlan,
 };
+
+/// Stable failure returned while assembling the compiler-owned semantic model
+/// for a conventional `app/routes` application.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileRouteApplicationModelErrorV1 {
+    pub code: &'static str,
+    pub message: String,
+}
 
 /// Application-level semantic data assembled from the compiler's existing graphs.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1819,6 +1830,53 @@ pub fn build_application_semantic_model_for_unit_with_packages(
     build_application_semantic_model_from_files_with_bindings(unit.files(), Some(&bindings))
 }
 
+/// Builds the canonical application model for a discovered file-route source
+/// set. Conventional layouts are compiler-issued default-Slot composition
+/// edges, so every downstream product observes the same instance topology.
+///
+/// # Errors
+///
+/// Returns stable route or layout composition diagnostics before publication
+/// can materialize an incomplete page.
+pub fn build_file_route_application_semantic_model_for_unit_with_packages(
+    unit: &CompilationUnit,
+    packages: &crate::semantic_package::SemanticPackageResolutionTable,
+) -> Result<ApplicationSemanticModel, FileRouteApplicationModelErrorV1> {
+    let symbols = crate::build_symbol_table(unit);
+    let modules = crate::build_module_graph(unit);
+    let bindings =
+        crate::binding_table::build_binding_table_with_packages(unit, &symbols, &modules, packages);
+    build_application_semantic_model_from_files_with_bindings_mode(
+        unit.files(),
+        Some(&bindings),
+        ApplicationAssemblyMode::FileRoutes,
+    )
+}
+
+/// Builds the canonical composed model for one already-resolved file-route
+/// page. Publication uses this route-scoped entry so shared layouts never
+/// project sibling pages into the same default Slot.
+///
+/// # Errors
+///
+/// Returns stable route/layout diagnostics, including an unknown selected
+/// route component.
+pub fn build_file_route_application_semantic_model_for_route_with_packages(
+    unit: &CompilationUnit,
+    packages: &crate::semantic_package::SemanticPackageResolutionTable,
+    route_component: &SemanticId,
+) -> Result<ApplicationSemanticModel, FileRouteApplicationModelErrorV1> {
+    let symbols = crate::build_symbol_table(unit);
+    let modules = crate::build_module_graph(unit);
+    let bindings =
+        crate::binding_table::build_binding_table_with_packages(unit, &symbols, &modules, packages);
+    build_application_semantic_model_from_files_with_bindings_mode(
+        unit.files(),
+        Some(&bindings),
+        ApplicationAssemblyMode::FileRoute(route_component.clone()),
+    )
+}
+
 fn build_application_semantic_model_from_files(files: &[ParsedFile]) -> ApplicationSemanticModel {
     build_application_semantic_model_from_files_with_bindings(files, None)
 }
@@ -1828,6 +1886,27 @@ fn build_application_semantic_model_from_files_with_bindings(
     files: &[ParsedFile],
     bindings: Option<&crate::BindingTable>,
 ) -> ApplicationSemanticModel {
+    build_application_semantic_model_from_files_with_bindings_mode(
+        files,
+        bindings,
+        ApplicationAssemblyMode::Authored,
+    )
+    .expect("authored application assembly cannot derive file-route diagnostics")
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ApplicationAssemblyMode {
+    Authored,
+    FileRoutes,
+    FileRoute(SemanticId),
+}
+
+#[allow(clippy::too_many_lines)]
+fn build_application_semantic_model_from_files_with_bindings_mode(
+    files: &[ParsedFile],
+    bindings: Option<&crate::BindingTable>,
+    mode: ApplicationAssemblyMode,
+) -> Result<ApplicationSemanticModel, FileRouteApplicationModelErrorV1> {
     let (mut components, mut templates, mut diagnostics, mut references) =
         (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     let (mut provenance, mut template_entities, mut type_aliases) =
@@ -1875,7 +1954,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         &opaque_action_resolutions,
     ));
 
-    let component_invocations = collect_component_invocations(
+    let mut component_invocations = collect_component_invocations(
         &components,
         &templates,
         &template_entities,
@@ -1883,12 +1962,39 @@ fn build_application_semantic_model_from_files_with_bindings(
         bindings,
         &provenance,
     );
-    let component_instance_plan = plan_component_instances(
+    let virtual_invocations = match mode {
+        ApplicationAssemblyMode::Authored => BTreeMap::new(),
+        ApplicationAssemblyMode::FileRoutes | ApplicationAssemblyMode::FileRoute(_) => {
+            let mut graph = crate::build_validated_file_route_graph_from_components_v1(&components)
+                .map_err(|error| FileRouteApplicationModelErrorV1 {
+                    code: error.code,
+                    message: error.message,
+                })?;
+            if let ApplicationAssemblyMode::FileRoute(selected) = &mode {
+                graph.routes.retain(|route| route.component == *selected);
+                if graph.routes.is_empty() {
+                    return Err(FileRouteApplicationModelErrorV1 {
+                        code: "PSROUTE1014_FILE_ROUTE_COMPONENT_UNRESOLVED",
+                        message: format!("component `{selected}` is not a conventional file route"),
+                    });
+                }
+            }
+            let plan = crate::build_layout_composition_plan_from_components_v1(&components, &graph)
+                .map_err(|error| FileRouteApplicationModelErrorV1 {
+                    code: error.code,
+                    message: error.message,
+                })?;
+            crate::layout_composition_virtual_invocations_from_provenance_v1(&plan, &provenance)
+        }
+    };
+    let component_instance_plan = plan_component_instances_with_virtual_invocations(
         &components,
         &component_invocations,
+        &virtual_invocations,
         &template_entities,
         &provenance,
     );
+    component_invocations.extend(virtual_invocations.clone());
     let component_instance_scope = build_component_instance_scope_graph(&component_instance_plan);
     let component_composition = analyze_component_composition(
         &components
@@ -1937,9 +2043,10 @@ fn build_application_semantic_model_from_files_with_bindings(
     let form_field_bindings = form_field_binding_products.bindings;
     let slots = collect_slot_entities(&components);
     let slot_composition = collect_slot_composition(&templates, &component_invocations, &slots);
-    let slot_bindings = collect_slot_bindings(
+    let slot_bindings = collect_slot_bindings_with_virtual_invocations(
         &component_instance_plan,
         &component_invocations,
+        &virtual_invocations,
         &slots,
         &slot_composition.fragments,
         &slot_composition.outlets,
@@ -2323,7 +2430,7 @@ fn build_application_semantic_model_from_files_with_bindings(
     model
         .diagnostics
         .extend(crate::collect_component_diagnostics(&model));
-    model
+    Ok(model)
 }
 
 fn resolve_builtin_pure_calls(components: &mut [ComponentNode]) {
@@ -4469,7 +4576,7 @@ fn collect_ownership(
 mod tests {
     use super::{
         build_application_semantic_model, build_application_semantic_model_for_unit,
-        collect_ownership,
+        build_file_route_application_semantic_model_for_unit_with_packages, collect_ownership,
     };
     use crate::{
         build_component_graph_for_module, build_template_graph, build_template_semantic_entities,
@@ -6247,5 +6354,51 @@ class ExpressionQueries extends Component {
                 .collect::<Vec<_>>(),
             vec![root]
         );
+    }
+
+    #[test]
+    fn file_route_model_composes_layout_default_slots_into_canonical_instances() {
+        let unit = CompilationUnit::parse_sources([
+            (
+                "app/layout.tsx",
+                r#"
+@component()
+class AppLayout extends Component {
+  @slot() children!: SlotContent;
+  render() { return <main><slot /></main>; }
+}
+"#,
+            ),
+            (
+                "app/routes/index.tsx",
+                r#"
+@component()
+class Home extends Component {
+  render() { return <article>Home</article>; }
+}
+"#,
+            ),
+        ]);
+        let asm = build_file_route_application_semantic_model_for_unit_with_packages(
+            &unit,
+            &crate::SemanticPackageResolutionTable::default(),
+        )
+        .expect("valid conventional layout");
+
+        assert_eq!(asm.component_instance_plan.roots.len(), 1);
+        let binding = asm
+            .slot_bindings
+            .bindings
+            .values()
+            .find(|binding| binding.direct_child_instance.is_some())
+            .expect("compiler-issued layout Slot binding");
+        assert_eq!(binding.status, crate::SlotBindingStatus::Bound);
+        assert!(binding.content_fragment.is_none());
+        assert!(crate::validate_application_semantic_model(&asm).is_empty());
+
+        let html = crate::generate_ordinary_instance_html(&asm);
+        assert!(html.contains("<main"));
+        assert!(html.contains("<article"));
+        assert!(html.contains("Home"));
     }
 }

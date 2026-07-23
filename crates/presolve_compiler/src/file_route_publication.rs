@@ -7,12 +7,14 @@ use std::path::PathBuf;
 use serde::Serialize;
 
 use crate::{
-    build_application_publication_product_v1,
-    build_application_semantic_model_for_unit_with_packages, build_layout_composition_plan_v1,
-    build_validated_file_route_graph_v1, validate_application_publication_request_v1,
-    ApplicationPublicationArtifactV1, ApplicationPublicationErrorV1,
-    ApplicationPublicationProfileV1, ApplicationPublicationRequestErrorV1,
-    ApplicationPublicationRequestV1, ApplicationPublicationSourceV1, CompilationUnit,
+    build_application_publication_product_from_asm_v1,
+    build_application_semantic_model_for_unit_with_packages,
+    build_file_route_application_semantic_model_for_route_with_packages,
+    build_layout_composition_plan_v1, build_validated_file_route_graph_v1,
+    validate_application_publication_request_v1, ApplicationPublicationArtifactV1,
+    ApplicationPublicationErrorV1, ApplicationPublicationProfileV1,
+    ApplicationPublicationRequestErrorV1, ApplicationPublicationRequestV1,
+    ApplicationPublicationSourceV1, CompilationUnit, ConstantFoldingPass, ImmutableAsmPass,
     SemanticPackageResolutionTable, SemanticPackageRuntimeModuleTable,
 };
 
@@ -123,7 +125,7 @@ pub fn build_file_route_publication_v1(
                     code: "PSROUTE2003_ROUTE_COMPONENT_MODULE_MISSING",
                     message: route.component.to_string(),
                 })?;
-        let product = build_application_publication_product_v1(
+        let mut validated =
             validate_application_publication_request_v1(ApplicationPublicationRequestV1 {
                 configuration: request.configuration.clone(),
                 sources: request.sources.clone(),
@@ -133,9 +135,25 @@ pub fn build_file_route_publication_v1(
                 profile: request.profile,
                 output_root: request.output_root.clone(),
             })
-            .map_err(application_request_error)?,
-        )
-        .map_err(application_product_error)?;
+            .map_err(application_request_error)?;
+        let composed = ConstantFoldingPass.transform(
+            &build_file_route_application_semantic_model_for_route_with_packages(
+                &unit,
+                &request.package_contracts,
+                &route.component,
+            )
+            .map_err(|error| FileRoutePublicationErrorV1 {
+                code: error.code,
+                message: error.message,
+            })?,
+        );
+        validated.render_root_component = route
+            .layouts
+            .first()
+            .cloned()
+            .unwrap_or_else(|| route.component.clone());
+        let product = build_application_publication_product_from_asm_v1(validated, composed)
+            .map_err(application_product_error)?;
         let artifact_root = file_route_artifact_root_v1(&route.path);
         for (path, bytes) in product.artifacts {
             let path = PathBuf::from(&artifact_root).join(path);
@@ -337,6 +355,41 @@ mod tests {
         assert!(product
             .artifacts
             .contains_key(&PathBuf::from("file-routes.manifest.json")));
+    }
+
+    #[test]
+    fn publishes_a_route_through_its_compiler_composed_layout_root() {
+        let product = build_file_route_publication_v1(FileRoutePublicationRequestV1 {
+            configuration: crate::platform::WorkspaceConfiguration::default(),
+            sources: vec![
+                ApplicationPublicationSourceV1 {
+                    logical_path: "app/layout.tsx".into(),
+                    source: r#"
+@component() class AppLayout extends Component {
+  @slot() children!: SlotContent;
+  render() { return <main><slot /></main>; }
+}
+"#
+                    .into(),
+                },
+                ApplicationPublicationSourceV1 {
+                    logical_path: "app/routes/index.tsx".into(),
+                    source: r#"@component() class Home extends Component { render() { return <article>Home</article>; } }"#.into(),
+                },
+            ],
+            package_contracts: SemanticPackageResolutionTable::default(),
+            package_runtime_modules: SemanticPackageRuntimeModuleTable::default(),
+            profile: ApplicationPublicationProfileV1::Development,
+            output_root: "dist".into(),
+        })
+        .expect("valid route layout publication");
+
+        let html =
+            String::from_utf8(product.artifacts[&PathBuf::from("routes/root/index.html")].clone())
+                .unwrap();
+        assert!(html.contains("<main"));
+        assert!(html.contains("<article"));
+        assert!(html.contains("Home"));
     }
 
     #[test]
