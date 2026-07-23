@@ -3,7 +3,9 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    ApplicationSemanticModel, ComponentInvocationId, FileRouteGraphV1, SemanticId, SlotKind,
+    ApplicationSemanticModel, ComponentInvocationEntity, ComponentInvocationId,
+    ComponentInvocationResolutionStatus, FileRouteGraphV1, SemanticId, SlotKind,
+    TemplatePositionId,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -105,6 +107,38 @@ pub fn build_layout_composition_plan_v1(
     Ok(LayoutCompositionPlanV1 { routes })
 }
 
+/// Converts compiler-issued layout edges into the same resolved invocation
+/// facts consumed by component instance planning. No authored JSX or source
+/// content fragment is fabricated.
+#[must_use]
+pub fn layout_composition_virtual_invocations_v1(
+    model: &ApplicationSemanticModel,
+    plan: &LayoutCompositionPlanV1,
+) -> BTreeMap<ComponentInvocationId, ComponentInvocationEntity> {
+    plan.routes
+        .iter()
+        .flat_map(|route| route.edges.iter())
+        .filter_map(|edge| {
+            let provenance = model.provenance.get(&edge.caller)?.clone();
+            let template_entity = edge.caller.template();
+            Some((
+                edge.invocation.clone(),
+                ComponentInvocationEntity {
+                    id: edge.invocation.clone(),
+                    owner_component: edge.caller.clone(),
+                    target_component: Some(edge.callee.clone()),
+                    authored_symbol: "<presolve-layout-child>".into(),
+                    template_entity: template_entity.clone(),
+                    source_position: TemplatePositionId::for_template_entity(&template_entity),
+                    status: ComponentInvocationResolutionStatus::Resolved,
+                    provenance,
+                    virtual_layout_composition: true,
+                },
+            ))
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -132,5 +166,10 @@ mod tests {
         assert_eq!(plan.routes[0].edges.len(), 1);
         assert_eq!(plan.routes[0].edges[0].caller, plan.routes[0].layouts[0]);
         assert_eq!(plan.routes[0].edges[0].callee, plan.routes[0].page);
+        let virtuals = layout_composition_virtual_invocations_v1(&model, &plan);
+        assert_eq!(virtuals.len(), 1);
+        assert!(virtuals
+            .values()
+            .all(|invocation| invocation.virtual_layout_composition));
     }
 }
