@@ -1634,21 +1634,14 @@ Known limitations
 
 Exact next step
 
-Phase M is frozen through M10 and Phase N through N10. Phase O is active as
-the separately authorized metaframework/application-product phase. O0 freezes
-the `@presolve/application` boundary: caller-owned invocation projection only,
-with no source reading, compiler semantics, artifact decoding, or runtime.
-O1 supplies exact single-entry `presolve build` projection including explicit
-semantic-package contracts/runtime mappings. O2 supplies only immutable
-projection of existing explicit `workspace` and `watch --once` products; it
-creates no watcher, dev server, HMR, discovery, or source-analysis path. O3
-adds a schema-v1 command envelope that selects those projectors and preserves
-executor results unchanged. Phase P is frozen through P5. It supplies one
+Phase M is frozen through M10, Phase N through N10, Phase P through P5, and
+Phase O through O6. Phase P supplies one
 canonical explicit multi-source application-publication request/product,
 digest-bound schema-v1 manifest, atomic output pointer CLI, and thin
-`@presolve/application` command projection. The next work requires a new
-separately authorized product contract; Phase O must not infer routing, SSR,
-deployment, source discovery, or a framework runtime from this completion.
+`@presolve/application` command projection. Phase O's O5/O6 intake makes
+routing/server and deployment/distribution successor-contract work; neither is
+implemented or implied. The next work requires a new separately authorized
+product contract.
 
 Useful commands
 
@@ -1679,4 +1672,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* P5 Phase P compatibility freeze; commit pending.
+* Phase O completion intake/freeze; commit pending.

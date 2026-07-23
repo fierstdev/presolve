@@ -15,3 +15,5 @@ compiler amendment for canonical multi-source artifact publication.
 * [O2 explicit workspace development handoff](PHASE_O_O2_EXPLICIT_WORKSPACE_DEVELOPMENT_HANDOFF.md)
 * [O3 application command envelope](PHASE_O_O3_APPLICATION_COMMAND_ENVELOPE.md)
 * [O4 multi-source application publication adoption](PHASE_O_O4_MULTI_SOURCE_APPLICATION_PUBLICATION_ADOPTION.md)
+* [O5 routing and server intake](PHASE_O_O5_ROUTING_SERVER_INTAKE.md)
+* [O6 deployment and distribution intake](PHASE_O_O6_DEPLOYMENT_DISTRIBUTION_INTAKE.md)
