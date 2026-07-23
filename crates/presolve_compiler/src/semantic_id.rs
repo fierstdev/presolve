@@ -609,6 +609,15 @@ impl SemanticId {
         self.child("component-invocation", target)
     }
 
+    /// Compiler-issued identity for one automatic file-route layout edge.
+    #[must_use]
+    pub fn layout_composition_invocation(&self, route: &Self, position: usize) -> Self {
+        self.child(
+            "layout-composition",
+            &format!("{}:{position}", route.as_str()),
+        )
+    }
+
     #[must_use]
     pub fn template_position(&self) -> Self {
         self.child("template-position", "authored")
@@ -1296,6 +1305,17 @@ impl ComponentInvocationId {
     #[must_use]
     pub fn for_template_entity(template_entity: &SemanticId, target: &str) -> Self {
         Self(template_entity.component_invocation(target))
+    }
+
+    /// Builds a virtual compiler-only invocation ID for automatic file-route
+    /// layout composition. It is intentionally distinct from authored JSX.
+    #[must_use]
+    pub fn for_layout_composition(
+        layout: &SemanticId,
+        route_component: &SemanticId,
+        position: usize,
+    ) -> Self {
+        Self(layout.layout_composition_invocation(route_component, position))
     }
 
     #[must_use]
