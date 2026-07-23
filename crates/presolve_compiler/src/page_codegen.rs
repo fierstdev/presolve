@@ -2,7 +2,7 @@ use crate::{
     runtime_component_artifact_json, runtime_computed_artifact_json, runtime_context_artifact_json,
     runtime_effect_artifact_json, runtime_forms_artifact_json, template_manifest_json,
     ResumeManifest, RuntimeComponentArtifact, RuntimeComputedArtifact, RuntimeContextArtifact,
-    RuntimeEffectArtifact, RuntimeFormsArtifact, TemplateManifest,
+    RuntimeEffectArtifact, RuntimeFormsArtifact, RuntimeResourceArtifact, TemplateManifest,
 };
 
 #[must_use]
@@ -158,6 +158,40 @@ pub fn generate_standalone_page_with_resume_runtime(
         Some(components),
         Some(forms),
         Some(resume),
+    )
+}
+
+/// Generates the full runtime page with a Resource artifact embedded before
+/// the runtime boot script. The caller must supply the host-bound artifact.
+#[must_use]
+#[allow(clippy::too_many_arguments)]
+pub fn generate_standalone_page_with_resume_runtime_and_resources(
+    title: &str,
+    body_html: &str,
+    manifest: &TemplateManifest,
+    computed: &RuntimeComputedArtifact,
+    context: &RuntimeContextArtifact,
+    effects: &RuntimeEffectArtifact,
+    components: &RuntimeComponentArtifact,
+    forms: &RuntimeFormsArtifact,
+    resume: &ResumeManifest,
+    resources: &RuntimeResourceArtifact,
+) -> String {
+    let page = generate_standalone_page_with_resume_runtime(
+        title, body_html, manifest, computed, context, effects, components, forms, resume,
+    );
+    let mut resource_script =
+        "    <script type=\"application/json\" id=\"presolve-resources-runtime\">\n".to_string();
+    for line in crate::runtime_resource_artifact_json(resources).lines() {
+        resource_script.push_str("      ");
+        resource_script.push_str(&escape_script_json_line(line));
+        resource_script.push('\n');
+    }
+    resource_script.push_str("    </script>\n");
+    page.replacen(
+        "    <script src=\"./runtime.js\" defer></script>",
+        &(resource_script + "    <script src=\"./runtime.js\" defer></script>"),
+        1,
     )
 }
 

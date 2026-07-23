@@ -440,6 +440,7 @@ pub use page_codegen::{
     generate_standalone_page_with_component_runtime_and_forms,
     generate_standalone_page_with_computed_runtime, generate_standalone_page_with_context_runtime,
     generate_standalone_page_with_effect_runtime, generate_standalone_page_with_resume_runtime,
+    generate_standalone_page_with_resume_runtime_and_resources,
 };
 pub use production_audit::{
     ProductionRuntimeAuthority, PRODUCTION_RUNTIME_AUTHORITIES,
