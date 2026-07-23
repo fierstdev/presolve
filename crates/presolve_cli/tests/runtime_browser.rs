@@ -3670,7 +3670,7 @@ class StructuredActionLocal extends Component {
     this.profile = next;
     this.status = "Done";
   }
-  render() { return <button onClick={this.promote}>{this.status}</button>; }
+  render() { return <button onClick={this.promote} onKeydown={this.promote}>{this.status}</button>; }
 }
 "#,
     )
@@ -3696,7 +3696,7 @@ class StructuredActionLocal extends Component {
     let index = fs::read_to_string(out.join("index.html")).expect("index");
     let probe = index.replace(
         "</body>",
-        r#"<script>(async()=>{const end=Date.now()+3000;while(document.documentElement.dataset.presolveRuntime!=="ready"){if(Date.now()>end)throw new Error("runtime");await new Promise(r=>setTimeout(r,20));}const b=document.querySelector("button");b.click();await new Promise(r=>setTimeout(r,25));if(b.textContent.trim()!=="Done")throw new Error(b.textContent);document.body.insertAdjacentHTML("beforeend","<div>PRESOLVE_STRUCTURED_ACTION_LOCAL_BROWSER_TEST_PASS</div>")})().catch(e=>document.body.textContent=e.message)</script></body>"#,
+        r#"<script>(async()=>{const end=Date.now()+3000;while(document.documentElement.dataset.presolveRuntime!=="ready"){if(Date.now()>end)throw new Error("runtime");await new Promise(r=>setTimeout(r,20));}const b=document.querySelector("button");b.dispatchEvent(new KeyboardEvent("keydown",{bubbles:true}));await new Promise(r=>setTimeout(r,25));if(b.textContent.trim()!=="Done")throw new Error(b.textContent);document.body.insertAdjacentHTML("beforeend","<div>PRESOLVE_STRUCTURED_ACTION_LOCAL_BROWSER_TEST_PASS</div>")})().catch(e=>document.body.textContent=e.message)</script></body>"#,
     );
     fs::write(out.join("probe.html"), probe).expect("probe");
     let server = StaticServer::start(out.clone());

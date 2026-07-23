@@ -22,5 +22,6 @@ numbered slice is accepted.
 * [N3-E structured serializable Action locals contract](PHASE_N_N3E_STRUCTURED_ACTION_LOCALS_CONTRACT.md)
 * [N4-A keyed structural list contract](PHASE_N_N4A_KEYED_STRUCTURAL_LIST_CONTRACT.md)
 * [N4-B JSX HTML attribute alias contract](PHASE_N_N4B_JSX_HTML_ATTRIBUTE_ALIAS_CONTRACT.md)
+* [N4-C keyboard Action event contract](PHASE_N_N4C_KEYBOARD_ACTION_EVENT_CONTRACT.md)
 * [N6 Resource foundation contract](PHASE_N_N6_RESOURCE_FOUNDATION_CONTRACT.md)
 * [N6-B Resource endpoint contract](PHASE_N_N6B_RESOURCE_ENDPOINT_CONTRACT.md)

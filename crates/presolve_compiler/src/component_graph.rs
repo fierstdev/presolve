@@ -3760,7 +3760,7 @@ fn collect_render_event_diagnostics(
     diagnostics: &mut Vec<ComponentDiagnostic>,
 ) {
     for event_handler in render_event_handlers(render) {
-        if event_handler.event != "click" {
+        if !matches!(event_handler.event.as_str(), "click" | "keydown") {
             diagnostics.push(ComponentDiagnostic {
                 severity: ComponentDiagnosticSeverity::Error,
                 effect_id: None,
