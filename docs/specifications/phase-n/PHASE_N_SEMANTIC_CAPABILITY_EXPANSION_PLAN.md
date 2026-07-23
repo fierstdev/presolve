@@ -233,6 +233,12 @@ outside the language.
 
 ### N3 — State, Actions, Computed, and Effects over real data
 
+N3-A admits recursively serializable record/array State and complete-field
+Action replacement only. It does not authorize nested writes, alias mutation,
+spread updates, collection callbacks, event payload projection, locals, early
+returns, or async Actions; each requires its own compiler/lowering/runtime
+contract.
+
 Allow State fields to hold structurally serializable records, arrays, optional
 values, and discriminated unions. Add compiler-recognized immutable updates,
 safe indexed updates, and bounded collection operations. Define alias and

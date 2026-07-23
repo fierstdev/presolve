@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N2-E - Compiler-Registered Math.abs
-* Working tree: clean after the N2-E builtin-math-abs commit.
+* Latest completed slice: N3-A - Serializable State Replacement
+* Working tree: clean after the N3-A serializable-state-replacement commit.
 * Date: 2026-07-22
 
 Last completed slice
+
+* Slice: N3-A - Serializable State Replacement
+* Result: formally admits recursively serializable record/array State and whole-field Action assignment only. A generated-browser proof verifies that a record Action operand replaces component-instance State atomically and preserves nested arrays. Existing structural resume codecs remain the serialization authority. Nested writes, aliases, spreads, and collection callbacks remain deferred.
+* Verification: `./scripts/verify-n3a-serializable-state-replacement.sh` plus the isolated real-browser replay pass.
+* Next: N3-B needs a complete typed Action payload/body-lowering contract; raw DOM events and inert manifest metadata are not acceptable substitutes.
 
 * Slice: N2-E - Compiler-Registered Math.abs
 * Result: admits only exact `Math.abs(value)` in supported Computed getters. The compiler recognizes the exact callee and arity, records `BuiltinPureOperation::MathAbs`, derives operand dependencies, lowers canonical unary `Abs` IR, emits schema-v9 metadata, and evaluates the generated operation without package code or generic calls.
