@@ -1,11 +1,7 @@
 # Phase O: Application Productization
 
-**Status:** archived complete through O4.
-
-Phase O is intentionally closed after delivering its explicit application
-product boundary. O5 and O6 are retained only as future product-intake notes;
-they are not incomplete Phase O obligations and require separately authorized
-roadmaps and compiler/runtime contracts.
+**Status:** O0–O4 complete. O4 consumes the Phase P P3 canonical multi-source
+artifact-publication product without adding metaframework artifact authority.
 
 ## Objective
 
@@ -67,20 +63,21 @@ publish application artifacts. Phase O must not paper over that mismatch. This
 slice is implemented only after the separately versioned Phase P compiler
 publication contract provides a multi-source artifact product.
 
-### Future intake — routing and server product
+### O5 — routing and server product intake
 
 Routing, layouts, request-time rendering, loaders, server actions, sessions,
 and middleware require their own compiler/runtime contracts. They are not Phase
 O conveniences and cannot be inferred from static application artifacts.
 
-### Future intake — deployment and public distribution
+### O6 — deployment and public distribution intake
 
 Package publication, environment-variable policy, deployment targets, asset
 hosting, secrets, observability, and adapter contracts require separate product
 authority. No provider integration is implied by O1–O3.
 
-## Archived completion boundary
+## Completion boundary
 
-Phase O is frozen as an explicit application orchestration and publication
-projection product through O4. It does not claim routing, multi-page request
-handling, SSR, deployment, or public distribution readiness.
+Phase O may be frozen after O1–O3 only as an explicit single-entry application
+orchestration product. It must not claim general multi-page, SSR, or deployed
+application readiness until the blocked/missing compiler and platform contracts
+above are resolved.
