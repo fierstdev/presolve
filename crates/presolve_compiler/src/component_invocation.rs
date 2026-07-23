@@ -19,6 +19,8 @@ pub struct ComponentInvocationEntity {
     pub source_position: TemplatePositionId,
     pub status: ComponentInvocationResolutionStatus,
     pub provenance: SourceProvenance,
+    /// `true` only for compiler-issued file-route layout composition edges.
+    pub virtual_layout_composition: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -86,6 +88,7 @@ pub fn collect_component_invocations(
                     source_position,
                     status,
                     provenance,
+                    virtual_layout_composition: false,
                 },
             ))
         })
