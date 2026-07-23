@@ -10,3 +10,4 @@ an invocation projector only.
 * [P2 canonical application publication product](PHASE_P_P2_CANONICAL_APPLICATION_PRODUCT.md)
 * [P3 atomic application CLI](PHASE_P_P3_ATOMIC_APPLICATION_CLI.md)
 * [P4 application-product adoption](PHASE_P_P4_APPLICATION_PRODUCT_ADOPTION.md)
+* [P5 compatibility freeze](PHASE_P_P5_COMPATIBILITY_FREEZE.md)
