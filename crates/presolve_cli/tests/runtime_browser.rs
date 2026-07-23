@@ -3424,6 +3424,63 @@ class AbsComputed extends Component {
 }
 
 #[test]
+fn serializable_record_state_replacement_executes_from_compiler_generated_runtime() {
+    let _guard = browser_test_guard();
+    let root = repo_root();
+    let out = root.join("target/psc-browser-test/record-state-replacement");
+    if out.exists() {
+        fs::remove_dir_all(&out).expect("clean record output");
+    }
+    fs::create_dir_all(&out).expect("create record output");
+    let source = out.join("RecordState.tsx");
+    fs::write(
+        &source,
+        r#"
+@component("x-record-state")
+class RecordState extends Component {
+  profile = state({ name: "before", roles: ["reader"] });
+  @action() replace() { this.profile = { name: "after", roles: ["writer", "admin"] }; }
+  render() { return <button onClick={this.replace}>Replace</button>; }
+}
+"#,
+    )
+    .expect("write record source");
+    let build = Command::new(presolve_cli_bin())
+        .current_dir(&root)
+        .args([
+            "build",
+            source.to_str().expect("source"),
+            "--out",
+            out.to_str().expect("out"),
+        ])
+        .output()
+        .expect("build record");
+    assert!(
+        build.status.success(),
+        "{}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let index = fs::read_to_string(out.join("index.html")).expect("read record page");
+    let probe = index.replace("</body>", r#"<script>(async()=>{const end=Date.now()+3000;while(document.documentElement.dataset.presolveRuntime!=="ready"){if(Date.now()>end)throw new Error("runtime");await new Promise(r=>setTimeout(r,20));}const action=window.__PRESOLVE__.manifest.components[0].actions[0];if(action.operation!=="assign"||action.operand?.name!=="after")throw new Error("record operand");document.querySelector("button").click();await new Promise(r=>setTimeout(r,20));const state=window.__PRESOLVE__.components[0].state.profile;if(state?.name!=="after"||state.roles?.length!==2)throw new Error("record state");document.body.insertAdjacentHTML("beforeend","<div>PRESOLVE_RECORD_STATE_BROWSER_TEST_PASS</div>");})().catch(e=>document.body.insertAdjacentHTML("beforeend",`<div>PRESOLVE_RECORD_STATE_BROWSER_TEST_FAIL:${e.message}</div>`));</script></body>"#);
+    fs::write(out.join("probe.html"), probe).expect("write record probe");
+    let server = StaticServer::start(out.clone());
+    let profile = out.join("chrome-profile");
+    fs::create_dir_all(&profile).expect("profile");
+    let output = run_chrome_probe(
+        chrome_bin().expect("Chrome"),
+        &format!("--user-data-dir={}", profile.display()),
+        &format!("http://127.0.0.1:{}/probe.html", server.port),
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("PRESOLVE_RECORD_STATE_BROWSER_TEST_PASS"),
+        "{}",
+        stdout
+    );
+}
+
+#[test]
 fn initial_effects_execute_once_from_compiler_generated_runtime_programs() {
     let _guard = browser_test_guard();
     let repo_root = repo_root();

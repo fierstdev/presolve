@@ -14,3 +14,4 @@ numbered slice is accepted.
 * [N2-C boolean computed conditional contract](PHASE_N_N2C_BOOLEAN_CONDITIONAL_CONTRACT.md)
 * [N2-D optional member access contract](PHASE_N_N2D_OPTIONAL_MEMBER_ACCESS_CONTRACT.md)
 * [N2-E compiler-registered Math.abs contract](PHASE_N_N2E_BUILTIN_MATH_ABS_CONTRACT.md)
+* [N3-A serializable State replacement contract](PHASE_N_N3A_SERIALIZABLE_STATE_REPLACEMENT_CONTRACT.md)

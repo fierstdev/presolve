@@ -72,6 +72,17 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
                 "examples/counter/src/Counter.tsx",
             ),
             admitted(
+                "serializable_state_replacement",
+                SemanticCapabilityClass::Bounded,
+                "field = state(recordOrArray); @action() { this.field = serializableRecordOrArray; }",
+                "component-instance State storage, Action plan, runtime field write, and resume codec",
+                "recursively serializable record or array literal at the whole-field boundary",
+                "Action-owned field replacement; no nested mutable alias or untracked write",
+                "existing State resume codec carries the complete replacement value",
+                "existing action manifest assign operand and State runtime slot",
+                "runtime_browser::serializable_record_state_replacement_executes_from_compiler_generated_runtime",
+            ),
+            admitted(
                 "action",
                 SemanticCapabilityClass::Bounded,
                 "@action() method()",
@@ -338,6 +349,7 @@ mod tests {
             vec![
                 "component",
                 "state",
+                "serializable_state_replacement",
                 "action",
                 "computed",
                 "effect",
