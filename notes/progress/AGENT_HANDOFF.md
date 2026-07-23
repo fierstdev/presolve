@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: N6-C14 - Compiler-Owned Resource Read Projections
-* Working tree: N6-C14 implementation is ready for focused final verification and commit.
+* Working tree: N7-B nested Form field-path contract is authored; implementation has not admitted its source form yet.
 * Date: 2026-07-23
 
 Last completed slice
@@ -13,6 +13,11 @@ Last completed slice
 * Result: direct terminal same-owner `@computed()` Resource `.data`, `.error`, and `.state` projections now resolve to exact declaration identities, type as nullable data/error or lifecycle text, lower to `LoadResource`, and publish schema-v12 `load-resource` programs plus declaration-keyed invalidations. Activation records exist before the initial Computed pass; terminal endpoint states recompute only compiler-selected dependents and update ordinary bindings. Raw, optional, indexed, and chained Resource reads remain rejected. Resume fails closed with `ResourceComputedReadUnsupported` and canonically cold-boots until an explicit Resource snapshot codec exists.
 * Verification: compiler reference/IR/artifact proof, generated-runtime contract checks, compiler/CLI checks, and the real-browser Resource endpoint/binding proof. Final command outputs and commit follow this handoff update.
 * Next: N6-C15 may define a versioned Resource snapshot codec only if it can preserve endpoint integrity, lifecycle generation, and exact per-instance identity; otherwise select another Phase N semantic family.
+
+* Slice: N7-B - Nested Form Field-Path Contract
+* Result: authored the compiler-owned extension contract for a static second `@field()` path argument. It preserves canonical leaf Field IDs and slots, applies only to compiler-generated submission projection, rejects dynamic/indexed/prefix-colliding paths, and requires a Forms artifact/version plus exact leaf-slot resume proof before source admission.
+* Verification: contract is linked from the Phase N index and is consistent with the frozen Forms ownership/runtime boundary.
+* Next: add parser retention for the second static decorator argument, validate canonical `FormFieldPath` records, and keep two-argument source rejected until Form runtime, serialization, artifact, and resume products land together.
 
 * Slice: N2-G - Compiler-Registered Math Rounding
 * Result: exact one-argument `Math.floor`, `Math.ceil`, and `Math.round` in supported Computed getters now resolve to compiler-registered unary operations, retain their operand dependencies, lower to canonical `Floor`/`Ceil`/`Round` IR, and execute only from schema-v11 computed-runtime instructions. No generic Math dispatch, overload, callback, alias, or authored JavaScript execution is admitted.
