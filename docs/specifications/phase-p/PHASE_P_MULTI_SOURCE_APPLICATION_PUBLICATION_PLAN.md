@@ -1,6 +1,6 @@
 # Phase P: Multi-source application publication
 
-**Status:** P2 complete; P3 requires the P0-P2 contracts.
+**Status:** P3 complete; P4 requires the P0-P3 contracts.
 
 ## Objective
 

@@ -35,9 +35,12 @@ snapshot ID, entry semantic identity, profile, and exact artifact path/digest
 inventory.
 
 Publication uses a sibling staging directory. The compiler validates every
-artifact and manifest before atomically replacing the caller output root. A
-failure leaves the prior output untouched and removes only its own staging
-directory. Neither CLI nor metaframework may hand-merge artifact files.
+artifact and manifest before publication. P3 represents the caller output root
+as a Presolve-owned symbolic publication pointer and atomically replaces that
+pointer with one to a newly validated immutable sibling release. A failure
+leaves the prior output untouched and removes only its own staging directory.
+An existing non-pointer directory fails closed; neither CLI nor metaframework
+may hand-merge artifact files or copy partial output into it.
 
 ## CLI and framework boundary
 

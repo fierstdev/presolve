@@ -4,8 +4,11 @@
 //! publication. It establishes one compiler-owned request/entry authority for
 //! the later publication product.
 
+#![allow(clippy::too_many_lines)]
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
+use std::fmt::Write as _;
 use std::path::{Component, PathBuf};
 
 use serde::Serialize;
@@ -134,6 +137,11 @@ pub struct ApplicationPublicationProductV1 {
 }
 
 #[must_use]
+/// Serializes the exact schema-v1 publication manifest.
+///
+/// # Panics
+///
+/// Panics only if the compiler-owned manifest model cannot serialize.
 pub fn application_publication_manifest_json_v1(
     manifest: &ApplicationPublicationManifestV1,
 ) -> String {
@@ -142,8 +150,12 @@ pub fn application_publication_manifest_json_v1(
         + "\n"
 }
 
-/// Validates only caller-owned request identity and explicit entry selection.
-/// Artifact generation is intentionally deferred to P2.
+/// Validates caller-owned request identity and explicit entry selection.
+///
+/// # Errors
+///
+/// Returns a stable `PSAPP100x` error when the workspace configuration, exact
+/// source set, logical entry, or rendered application root is invalid.
 pub fn validate_application_publication_request_v1(
     request: ApplicationPublicationRequestV1,
 ) -> Result<ValidatedApplicationPublicationRequestV1, ApplicationPublicationRequestErrorV1> {
@@ -230,6 +242,11 @@ pub fn validate_application_publication_request_v1(
 /// Lowers one validated, explicit complete workspace into its exact artifact
 /// inventory. This is the only multi-source publication derivation authority;
 /// command and framework layers may publish these bytes but may not alter them.
+///
+/// # Errors
+///
+/// Returns a stable `PSAPP200x` error when package mappings or compiler
+/// generated runtime/production products cannot form a browser publication.
 pub fn build_application_publication_product_v1(
     validated: ValidatedApplicationPublicationRequestV1,
 ) -> Result<ApplicationPublicationProductV1, ApplicationPublicationErrorV1> {
@@ -563,11 +580,13 @@ fn application_workspace_snapshot_id_v1(request: &ApplicationPublicationRequestV
     let mut sources = request.sources.iter().collect::<Vec<_>>();
     sources.sort_by(|left, right| left.logical_path.cmp(&right.logical_path));
     for source in sources {
-        canonical.push_str(&format!(
+        write!(
+            canonical,
             "path={}\nsource={}\n",
             source.logical_path.display(),
             source.source
-        ));
+        )
+        .expect("writing a workspace snapshot into a String cannot fail");
     }
     format!("application-workspace:{}", Digest::sha256(canonical))
 }

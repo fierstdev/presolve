@@ -5,15 +5,17 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use presolve_cli::{
+    load_explicit_project_envelope_v1, load_explicit_source_inputs_v1,
     parse_explicit_source_spec_v1, run_explicit_build_or_check_v1, run_explicit_watch_once_v1,
     run_explicit_workspace_v1, run_project_cache_operation_v1, CliCacheOperationV1,
 };
 
 use presolve_compiler::tooling_reader::{read_tooling_product_v1, ToolingProductV1};
 use presolve_compiler::{
-    build_application_semantic_model_for_unit,
+    build_application_publication_product_v1, build_application_semantic_model_for_unit,
     build_application_semantic_model_for_unit_with_packages, build_component_graph,
     build_context_inspection_registry, build_effect_inspection_registry,
     build_form_inspection_registry, build_production_reachability_graph, build_production_reports,
@@ -33,13 +35,16 @@ use presolve_compiler::{
     runtime_forms_artifact_json, runtime_opaque_artifact_json, runtime_resource_artifact_json,
     semantic_capability_matrix_text, semantic_capability_migration_text,
     semantic_capability_registry_json, semantic_graph_json, semantic_type_text, summarize_source,
-    template_manifest_json, validate_application_semantic_model, validate_runtime_opaque_artifact,
-    validate_runtime_resource_artifact, ApplicationSemanticModel, AsmValidationDiagnostic,
-    AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
-    EffectInspection, EffectInspectionRegistry, ExecutableProgramFingerprint, ImmutableAsmPass,
-    ProductionDiagnosticFact, ProductionDiagnosticKind, ProductionProjectedDiagnostic,
-    ProductionReportInputs, ProductionRootChunkInput, RenderAttribute, RenderAttributeValue,
-    SemanticEntity, SemanticEntityKind, SemanticId, SemanticOwner, SemanticPackageResolutionTable,
+    template_manifest_json, validate_application_publication_request_v1,
+    validate_application_semantic_model, validate_runtime_opaque_artifact,
+    validate_runtime_resource_artifact, ApplicationPublicationProfileV1,
+    ApplicationPublicationRequestV1, ApplicationPublicationSourceV1, ApplicationSemanticModel,
+    AsmValidationDiagnostic, AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass,
+    DeclaredStateTypeKind, EffectInspection, EffectInspectionRegistry,
+    ExecutableProgramFingerprint, ImmutableAsmPass, ProductionDiagnosticFact,
+    ProductionDiagnosticKind, ProductionProjectedDiagnostic, ProductionReportInputs,
+    ProductionRootChunkInput, RenderAttribute, RenderAttributeValue, SemanticEntity,
+    SemanticEntityKind, SemanticId, SemanticOwner, SemanticPackageResolutionTable,
     SemanticPackageRuntimeModuleKey, SemanticPackageRuntimeModuleTable, SemanticReferenceKind,
     SerializableValue, SharedChunkCandidatePlan, SourceProvenance, StateOperation, TemplateChild,
     TemplateGraph, TemplateSemanticKind,
@@ -49,9 +54,11 @@ use presolve_parser::{
     ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxNode, ParsedMethod, SourceSpan,
 };
 use serde::Serialize;
+use sha2::{Digest as _, Sha256};
 
 const ASM_INSPECTION_SCHEMA_VERSION: u32 = 12;
 const CHECK_JSON_SCHEMA_VERSION: u32 = 6;
+static NEXT_APPLICATION_PUBLICATION_STAGE: AtomicU64 = AtomicU64::new(1);
 
 fn supports_asm_inspection_schema(version: u32) -> bool {
     version == ASM_INSPECTION_SCHEMA_VERSION
@@ -99,6 +106,7 @@ fn main() {
                 run_build(args);
             }
         }
+        "application" => run_application_command(args),
         "cache" => run_l9_cache(&args),
         "clean" => run_l9_clean(&args),
         "workspace" => run_l9_workspace(&args),
@@ -3195,6 +3203,336 @@ fn run_build(mut args: Vec<String>) {
     );
 }
 
+fn run_application_command(args: Vec<String>) {
+    let Some((subcommand, options)) = args.split_first() else {
+        eprintln!("usage: presolve application build --config <path> --source <logical=relative> [--source ...] --entry <logical> --out <directory> [--package-contract specifier=contract.json] [--package-runtime specifier=runtime-location] [--production]");
+        process::exit(1);
+    };
+    if subcommand != "build" {
+        eprintln!("PSAPP3001_UNSUPPORTED_APPLICATION_COMMAND: application supports only `build`");
+        process::exit(2);
+    }
+    let parsed = parse_application_build_options(options);
+    let project_root = parsed
+        .configuration_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let envelope = load_explicit_project_envelope_v1(project_root, &parsed.configuration_path)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    let sources = load_explicit_source_inputs_v1(&envelope.project_root, &parsed.source_specs)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    validate_application_output_root(&parsed.output_root);
+    let packages = parse_semantic_package_contracts(options);
+    let runtime_modules = parse_semantic_package_runtime_modules(options, &packages);
+    let request = ApplicationPublicationRequestV1 {
+        configuration: envelope.configuration,
+        sources: sources
+            .into_iter()
+            .map(|source| ApplicationPublicationSourceV1 {
+                logical_path: PathBuf::from(source.logical_path),
+                source: source.content,
+            })
+            .collect(),
+        entry_path: parsed.entry_path,
+        package_contracts: packages,
+        package_runtime_modules: runtime_modules,
+        profile: parsed.profile,
+        output_root: parsed.output_root.clone(),
+    };
+    let validated = validate_application_publication_request_v1(request)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    let product = build_application_publication_product_v1(validated)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    publish_application_product(&parsed.output_root, &product)
+        .unwrap_or_else(|error| application_cli_error("PSAPP3008_PUBLICATION_FAILED", &error));
+    for path in product.artifacts.keys() {
+        println!("Wrote {}", parsed.output_root.join(path).display());
+    }
+}
+
+struct ApplicationBuildOptions {
+    configuration_path: PathBuf,
+    source_specs: Vec<presolve_cli::CliExplicitSourceSpecV1>,
+    entry_path: PathBuf,
+    output_root: PathBuf,
+    profile: ApplicationPublicationProfileV1,
+}
+
+fn parse_application_build_options(args: &[String]) -> ApplicationBuildOptions {
+    let mut configuration_path = None;
+    let mut source_specs = Vec::new();
+    let mut entry_path = None;
+    let mut output_root = None;
+    let mut profile = ApplicationPublicationProfileV1::Development;
+    let mut index = 0;
+    while index < args.len() {
+        let option = &args[index];
+        match option.as_str() {
+            "--config" => {
+                let Some(value) = args.get(index + 1) else {
+                    application_cli_error("PSAPP3002_INVALID_ARGUMENT", "--config requires a path");
+                };
+                if configuration_path.replace(PathBuf::from(value)).is_some() {
+                    application_cli_error(
+                        "PSAPP3002_INVALID_ARGUMENT",
+                        "--config may appear only once",
+                    );
+                }
+                index += 2;
+            }
+            "--source" => {
+                let Some(value) = args.get(index + 1) else {
+                    application_cli_error(
+                        "PSAPP3002_INVALID_ARGUMENT",
+                        "--source requires logical=relative-path",
+                    );
+                };
+                source_specs.push(
+                    parse_explicit_source_spec_v1(value)
+                        .unwrap_or_else(|error| application_cli_error(error.code, &error.message)),
+                );
+                index += 2;
+            }
+            "--entry" => {
+                let Some(value) = args.get(index + 1) else {
+                    application_cli_error(
+                        "PSAPP3002_INVALID_ARGUMENT",
+                        "--entry requires a logical path",
+                    );
+                };
+                if entry_path.replace(PathBuf::from(value)).is_some() {
+                    application_cli_error(
+                        "PSAPP3002_INVALID_ARGUMENT",
+                        "--entry may appear only once",
+                    );
+                }
+                index += 2;
+            }
+            "--out" => {
+                let Some(value) = args.get(index + 1) else {
+                    application_cli_error(
+                        "PSAPP3002_INVALID_ARGUMENT",
+                        "--out requires a directory path",
+                    );
+                };
+                if output_root.replace(PathBuf::from(value)).is_some() {
+                    application_cli_error(
+                        "PSAPP3002_INVALID_ARGUMENT",
+                        "--out may appear only once",
+                    );
+                }
+                index += 2;
+            }
+            "--production" => {
+                profile = ApplicationPublicationProfileV1::Production;
+                index += 1;
+            }
+            "--package-contract" | "--package-runtime" => {
+                if args.get(index + 1).is_none() {
+                    application_cli_error(
+                        "PSAPP3002_INVALID_ARGUMENT",
+                        &format!("{option} requires a value"),
+                    );
+                }
+                index += 2;
+            }
+            _ => application_cli_error(
+                "PSAPP3002_INVALID_ARGUMENT",
+                &format!("unknown application build option `{option}`"),
+            ),
+        }
+    }
+    ApplicationBuildOptions {
+        configuration_path: configuration_path.unwrap_or_else(|| {
+            application_cli_error("PSAPP3002_INVALID_ARGUMENT", "--config is required")
+        }),
+        source_specs,
+        entry_path: entry_path.unwrap_or_else(|| {
+            application_cli_error("PSAPP3002_INVALID_ARGUMENT", "--entry is required")
+        }),
+        output_root: output_root.unwrap_or_else(|| {
+            application_cli_error("PSAPP3002_INVALID_ARGUMENT", "--out is required")
+        }),
+        profile,
+    }
+}
+
+fn application_cli_error(code: &str, message: &str) -> ! {
+    eprintln!("{code}: {message}");
+    process::exit(2);
+}
+
+fn validate_application_output_root(output_root: &Path) {
+    let Some(parent) = output_root.parent() else {
+        application_cli_error(
+            "PSAPP3003_INVALID_OUTPUT_ROOT",
+            "--out must have a caller-owned parent directory",
+        );
+    };
+    if output_root.file_name().is_none() || output_root.as_os_str().is_empty() {
+        application_cli_error(
+            "PSAPP3003_INVALID_OUTPUT_ROOT",
+            "--out must name a non-empty output root",
+        );
+    }
+    if let Err(error) = fs::create_dir_all(parent) {
+        application_cli_error(
+            "PSAPP3003_INVALID_OUTPUT_ROOT",
+            &format!(
+                "failed to prepare output parent {}: {error}",
+                parent.display()
+            ),
+        );
+    }
+    if let Ok(metadata) = fs::symlink_metadata(output_root) {
+        if !metadata.file_type().is_symlink() {
+            application_cli_error(
+                "PSAPP3004_OUTPUT_ROOT_NOT_PUBLICATION_POINTER",
+                "--out already exists and is not a Presolve application publication pointer",
+            );
+        }
+    }
+}
+
+fn publish_application_product(
+    output_root: &Path,
+    product: &presolve_compiler::ApplicationPublicationProductV1,
+) -> Result<(), String> {
+    let stage = create_application_publication_stage(output_root)?;
+    let publication = (|| {
+        for (relative_path, bytes) in &product.artifacts {
+            validate_publication_relative_path(relative_path)?;
+            let path = stage.join(relative_path);
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+            }
+            fs::write(path, bytes).map_err(|error| error.to_string())?;
+        }
+        validate_staged_application_product(&stage, product)?;
+        let pointer = stage.with_extension(format!(
+            "publish-{}",
+            NEXT_APPLICATION_PUBLICATION_STAGE.fetch_add(1, Ordering::Relaxed)
+        ));
+        create_application_publication_pointer(
+            stage
+                .file_name()
+                .ok_or_else(|| "stage path has no file name".to_string())?,
+            &pointer,
+        )?;
+        fs::rename(&pointer, output_root).map_err(|error| {
+            let _ = fs::remove_file(&pointer);
+            format!(
+                "failed to atomically replace {}: {error}",
+                output_root.display()
+            )
+        })?;
+        Ok(())
+    })();
+    if publication.is_err() {
+        let _ = fs::remove_dir_all(&stage);
+    }
+    publication
+}
+
+fn create_application_publication_stage(output_root: &Path) -> Result<PathBuf, String> {
+    let parent = output_root
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let name = output_root
+        .file_name()
+        .ok_or_else(|| "output root has no file name".to_string())?
+        .to_string_lossy();
+    for _ in 0..64 {
+        let id = NEXT_APPLICATION_PUBLICATION_STAGE.fetch_add(1, Ordering::Relaxed);
+        let stage = parent.join(format!(".{name}.presolve-release-{}-{id}", process::id()));
+        match fs::create_dir(&stage) {
+            Ok(()) => return Ok(stage),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => {
+                return Err(format!(
+                    "failed to create publication staging directory: {error}"
+                ))
+            }
+        }
+    }
+    Err("failed to allocate a unique publication staging directory".into())
+}
+
+fn validate_publication_relative_path(path: &Path) -> Result<(), String> {
+    if path.as_os_str().is_empty()
+        || path.is_absolute()
+        || path.components().any(|component| {
+            matches!(
+                component,
+                std::path::Component::ParentDir
+                    | std::path::Component::RootDir
+                    | std::path::Component::Prefix(_)
+            )
+        })
+    {
+        return Err(format!(
+            "compiler product contains an invalid artifact path {}",
+            path.display()
+        ));
+    }
+    Ok(())
+}
+
+fn validate_staged_application_product(
+    stage: &Path,
+    product: &presolve_compiler::ApplicationPublicationProductV1,
+) -> Result<(), String> {
+    let manifest_path = Path::new("application.manifest.json");
+    let manifest_bytes = fs::read(stage.join(manifest_path)).map_err(|error| error.to_string())?;
+    let expected_manifest =
+        presolve_compiler::application_publication_manifest_json_v1(&product.manifest);
+    if manifest_bytes != expected_manifest.as_bytes() {
+        return Err("staged application manifest differs from the compiler product".into());
+    }
+    if product.manifest.artifacts.len() + 1 != product.artifacts.len() {
+        return Err("compiler product manifest inventory is incomplete".into());
+    }
+    for artifact in &product.manifest.artifacts {
+        let path = PathBuf::from(&artifact.path);
+        validate_publication_relative_path(&path)?;
+        let bytes = fs::read(stage.join(&path)).map_err(|error| error.to_string())?;
+        let digest = format!("sha256:{:x}", Sha256::digest(bytes));
+        if digest != artifact.digest {
+            return Err(format!(
+                "staged artifact digest mismatch for {}",
+                artifact.path
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn create_application_publication_pointer(
+    target: &std::ffi::OsStr,
+    pointer: &Path,
+) -> Result<(), String> {
+    std::os::unix::fs::symlink(target, pointer).map_err(|error| error.to_string())
+}
+
+#[cfg(windows)]
+fn create_application_publication_pointer(
+    target: &std::ffi::OsStr,
+    pointer: &Path,
+) -> Result<(), String> {
+    std::os::windows::fs::symlink_dir(target, pointer).map_err(|error| error.to_string())
+}
+
+#[cfg(not(any(unix, windows)))]
+fn create_application_publication_pointer(
+    _target: &std::ffi::OsStr,
+    _pointer: &Path,
+) -> Result<(), String> {
+    Err("atomic application publication pointers are unsupported on this platform".into())
+}
+
 fn parse_semantic_package_contracts(args: &[String]) -> SemanticPackageResolutionTable {
     let mut packages = SemanticPackageResolutionTable::default();
     let mut index = 0;
@@ -4309,6 +4647,7 @@ fn print_usage_and_exit() -> ! {
     eprintln!("  presolve html <file>");
     eprintln!("  presolve manifest <file>");
     eprintln!("  presolve build <file> [--package-contract specifier=contract.json] [--package-runtime specifier=runtime-location] [--out dir] [--production]");
+    eprintln!("  presolve application build --config <file> --source <logical=relative-file> [--source ...] --entry <logical> --out <publication-pointer> [--package-contract specifier=contract.json] [--package-runtime specifier=runtime-location] [--production]");
     eprintln!(
         "  presolve build --config <file> --source <logical=relative-file> [--source ...] [--verify-clean-equivalence] [--format human|json]"
     );
