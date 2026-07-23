@@ -19,6 +19,11 @@ done
 ./scripts/verify-m10a-resource-conformance.sh
 ./scripts/verify-m10b-capability-conformance.sh
 ./scripts/verify-n8a-capability-matrix.sh
+for fixture in framework/tests/forms-types framework/tests/forms-resume-types; do
+  if test -d "$fixture/.presolve"; then
+    find "$fixture/.presolve" -depth -delete
+  fi
+done
 cargo fmt --all --check
 git diff --check
 git diff --quiet
