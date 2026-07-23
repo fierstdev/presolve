@@ -1,0 +1,12 @@
+{
+  "name": "presolve",
+  "version": "0.1.0-alpha",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    }
+  }
+}
