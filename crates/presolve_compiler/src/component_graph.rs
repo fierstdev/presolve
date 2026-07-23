@@ -1376,7 +1376,7 @@ fn build_component_graph_with_identity(
     let mut provenance = BTreeMap::new();
 
     for class in &parsed.classes {
-        let element_name = decorator_argument(class, "component");
+        let element_name = component_element_name(class);
         let id = if module_qualified_identity {
             SemanticId::component_in_module(&parsed.path, element_name.as_deref(), &class.name)
         } else {
@@ -1448,7 +1448,7 @@ fn build_component_node(
     shadowed_validation_intrinsics: BTreeSet<String>,
     diagnostics: &mut Vec<ComponentDiagnostic>,
 ) -> ComponentNode {
-    let element_name = decorator_argument(class, "component");
+    let element_name = component_element_name(class);
     let route_path = decorator_argument(class, "route");
 
     if element_name.is_none() {
@@ -4304,6 +4304,29 @@ fn decorator_argument(class: &ParsedClass, name: &str) -> Option<String> {
         .iter()
         .find(|decorator| decorator.name == name)
         .and_then(|decorator| decorator.argument.clone())
+}
+
+/// Returns the explicit component identity or the stable compiler-derived
+/// identity for the ergonomic `@component()` declaration form.
+fn component_element_name(class: &ParsedClass) -> Option<String> {
+    let decorator = class
+        .decorators
+        .iter()
+        .find(|decorator| decorator.name == "component")?;
+    decorator.argument.clone().or_else(|| {
+        (decorator.is_invoked && decorator.argument_count == 0).then(|| {
+            let mut slug = String::new();
+            for (index, character) in class.name.chars().enumerate() {
+                if character.is_ascii_uppercase() && index > 0 {
+                    slug.push('-');
+                }
+                if character.is_ascii_alphanumeric() {
+                    slug.push(character.to_ascii_lowercase());
+                }
+            }
+            format!("presolve-{slug}")
+        })
+    })
 }
 
 fn render_child_from_parsed(
