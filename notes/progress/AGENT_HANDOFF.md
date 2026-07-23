@@ -3,11 +3,24 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: R3-D - compiler multi-route publication product
-* Working tree: R3-D implementation is ready for commit.
+* Latest completed slice: R3-E - ergonomic multi-route CLI adoption
+* Working tree: R3-E implementation is ready for commit.
 * Date: 2026-07-23
 
 Current Phase R slice
+
+* Slice: R3-E - Ergonomic Multi-Route CLI Adoption
+* Result: zero-argument `presolve build` and `presolve dev` now consume the
+  compiler's file-route publication product rather than selecting one hardcoded
+  `index.tsx` entry. Published route families remain exact compiler bytes. The
+  development host delegates page, trailing-slash redirect, parameter, static
+  precedence, and route-local asset lookup to the compiler manifest resolver.
+* Verification: the fresh-project suite proves default package builds, route
+  conflicts, `dev --once`, and live served page behavior through the new route
+  artifact locations.
+* Next: define and lower real layout composition; recorded layout chains must
+  become one compiler-planned component/slot/instance tree before Phase R can
+  claim conventional layouts are usable.
 
 * Slice: R3-D - Compiler Multi-Route Publication Product
 * Result: added a compiler-owned `FileRoutePublicationRequestV1`/product that

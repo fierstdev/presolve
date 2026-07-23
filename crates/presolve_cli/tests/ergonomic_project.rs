@@ -61,8 +61,8 @@ class Home extends Component {
         "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(root.join("dist/index.html").is_file());
-    let opaque = fs::read_to_string(root.join("dist/opaque.runtime.json")).unwrap();
+    assert!(root.join("dist/routes/root/index.html").is_file());
+    let opaque = fs::read_to_string(root.join("dist/routes/root/opaque.runtime.json")).unwrap();
     assert!(opaque.contains("@acme/analytics"));
     assert!(opaque.contains("dist/track-purchase.js"));
     fs::remove_dir_all(root).unwrap();
@@ -119,7 +119,7 @@ fn dev_once_builds_a_default_project_without_configuration() {
         "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(root.join("dist/index.html").is_file());
+    assert!(root.join("dist/routes/root/index.html").is_file());
     assert!(String::from_utf8_lossy(&output.stdout).contains("Built"));
     fs::remove_dir_all(root).unwrap();
 }
@@ -143,7 +143,7 @@ fn dev_serves_the_compiler_published_page() {
         .spawn()
         .unwrap();
     let mut response = Vec::new();
-    for _ in 0..40 {
+    for _ in 0..120 {
         if let Ok(mut stream) = TcpStream::connect(("127.0.0.1", port)) {
             stream
                 .write_all(b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")

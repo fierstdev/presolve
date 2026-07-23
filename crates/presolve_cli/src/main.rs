@@ -4,7 +4,7 @@ use std::fmt::Write as _;
 use std::fs;
 use std::io::{self, Read as _, Write as _};
 use std::net::{TcpListener, TcpStream};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::process;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -19,7 +19,8 @@ use presolve_compiler::{
     build_application_publication_product_v1, build_application_semantic_model_for_unit,
     build_application_semantic_model_for_unit_with_packages, build_component_graph,
     build_context_inspection_registry, build_effect_inspection_registry,
-    build_form_inspection_registry, build_production_reachability_graph, build_production_reports,
+    build_file_route_publication_v1, build_form_inspection_registry,
+    build_production_reachability_graph, build_production_reports,
     build_production_runtime_artifact, build_resume_chunk_graph, build_resume_manifest,
     build_runtime_component_artifact, build_runtime_computed_artifact,
     build_runtime_context_artifact, build_runtime_effect_artifact, build_runtime_forms_artifact,
@@ -33,24 +34,26 @@ use presolve_compiler::{
     generate_standalone_page_with_resume_runtime_and_resources, generate_static_html,
     lower_components_to_ir, optimization_report_json, optimize_context_ir, optimize_effect_ir,
     production_runtime_artifact_json, project_production_diagnostics, project_resume_diagnostics,
-    resume_manifest_json, runtime_component_artifact_json, runtime_computed_artifact_json,
-    runtime_context_artifact_json, runtime_cost_report_json, runtime_effect_artifact_json,
-    runtime_forms_artifact_json, runtime_opaque_artifact_json, runtime_resource_artifact_json,
-    semantic_capability_matrix_text, semantic_capability_migration_text,
-    semantic_capability_registry_json, semantic_graph_json, semantic_type_text, summarize_source,
-    template_manifest_json, validate_application_publication_request_v1,
-    validate_application_semantic_model, validate_runtime_opaque_artifact,
-    validate_runtime_resource_artifact, ApplicationPublicationProfileV1,
-    ApplicationPublicationRequestV1, ApplicationPublicationSourceV1, ApplicationSemanticModel,
-    AsmValidationDiagnostic, AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass,
-    DeclaredStateTypeKind, EffectInspection, EffectInspectionRegistry,
-    ExecutableProgramFingerprint, ImmutableAsmPass, ProductionDiagnosticFact,
-    ProductionDiagnosticKind, ProductionProjectedDiagnostic, ProductionReportInputs,
-    ProductionRootChunkInput, RenderAttribute, RenderAttributeValue, SemanticEntity,
-    SemanticEntityKind, SemanticId, SemanticOwner, SemanticPackageResolutionTable,
-    SemanticPackageRuntimeModuleKey, SemanticPackageRuntimeModuleTable, SemanticReferenceKind,
-    SerializableValue, SharedChunkCandidatePlan, SourceProvenance, StateOperation, TemplateChild,
-    TemplateGraph, TemplateSemanticKind,
+    resolve_file_route_request_v1, resume_manifest_json, runtime_component_artifact_json,
+    runtime_computed_artifact_json, runtime_context_artifact_json, runtime_cost_report_json,
+    runtime_effect_artifact_json, runtime_forms_artifact_json, runtime_opaque_artifact_json,
+    runtime_resource_artifact_json, semantic_capability_matrix_text,
+    semantic_capability_migration_text, semantic_capability_registry_json, semantic_graph_json,
+    semantic_type_text, summarize_source, template_manifest_json,
+    validate_application_publication_request_v1, validate_application_semantic_model,
+    validate_runtime_opaque_artifact, validate_runtime_resource_artifact,
+    ApplicationPublicationProfileV1, ApplicationPublicationRequestV1,
+    ApplicationPublicationSourceV1, ApplicationSemanticModel, AsmValidationDiagnostic,
+    AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
+    EffectInspection, EffectInspectionRegistry, ExecutableProgramFingerprint,
+    FileRoutePublicationManifestV1, FileRoutePublicationRequestV1, FileRouteRequestTargetV1,
+    ImmutableAsmPass, ProductionDiagnosticFact, ProductionDiagnosticKind,
+    ProductionProjectedDiagnostic, ProductionReportInputs, ProductionRootChunkInput,
+    RenderAttribute, RenderAttributeValue, SemanticEntity, SemanticEntityKind, SemanticId,
+    SemanticOwner, SemanticPackageResolutionTable, SemanticPackageRuntimeModuleKey,
+    SemanticPackageRuntimeModuleTable, SemanticReferenceKind, SerializableValue,
+    SharedChunkCandidatePlan, SourceProvenance, StateOperation, TemplateChild, TemplateGraph,
+    TemplateSemanticKind,
 };
 use presolve_parser::{
     parse_file, ParseDiagnostic, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
@@ -130,20 +133,12 @@ fn main() {
     }
 }
 
-fn run_ergonomic_build(root: &Path, profile: ApplicationPublicationProfileV1) {
+fn run_ergonomic_build(
+    root: &Path,
+    profile: ApplicationPublicationProfileV1,
+) -> FileRoutePublicationManifestV1 {
     let project = discover_project_v1(root)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
-    let entry_path = PathBuf::from("app/routes/index.tsx");
-    if !project
-        .sources
-        .iter()
-        .any(|source| source.logical_path == entry_path)
-    {
-        application_cli_error(
-            "PSDISC1005_DEFAULT_ENTRY_MISSING",
-            "expected app/routes/index.tsx; use `presolve application build` for a non-default entry",
-        );
-    }
     let output_root = project.root.join("dist");
     validate_application_output_root(&output_root);
     let discovery_unit = CompilationUnit::parse_sources(
@@ -154,13 +149,7 @@ fn run_ergonomic_build(root: &Path, profile: ApplicationPublicationProfileV1) {
     );
     let (package_contracts, package_runtime_modules) =
         discover_imported_package_tables(&project.root, &discovery_unit);
-    let model = build_application_semantic_model_for_unit_with_packages(
-        &discovery_unit,
-        &package_contracts,
-    );
-    presolve_compiler::build_validated_file_route_graph_v1(&model)
-        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
-    let request = ApplicationPublicationRequestV1 {
+    let request = FileRoutePublicationRequestV1 {
         configuration: presolve_compiler::platform::WorkspaceConfiguration::default(),
         sources: project
             .sources
@@ -170,19 +159,17 @@ fn run_ergonomic_build(root: &Path, profile: ApplicationPublicationProfileV1) {
                 source: source.source,
             })
             .collect(),
-        entry_path,
         package_contracts,
         package_runtime_modules,
         profile,
         output_root: output_root.clone(),
     };
-    let validated = validate_application_publication_request_v1(request)
+    let product = build_file_route_publication_v1(request)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
-    let product = build_application_publication_product_v1(validated)
-        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
-    publish_application_product(&output_root, &product)
-        .unwrap_or_else(|error| application_cli_error("PSAPP3008_PUBLICATION_FAILED", &error));
+    publish_file_route_product(&output_root, &product)
+        .unwrap_or_else(|error| application_cli_error("PSROUTE3008_PUBLICATION_FAILED", &error));
     println!("Built {}", output_root.display());
+    product.manifest
 }
 
 fn run_ergonomic_dev(args: &[String]) {
@@ -210,14 +197,19 @@ fn run_ergonomic_dev(args: &[String]) {
             ),
         }
     }
-    run_ergonomic_build(Path::new("."), ApplicationPublicationProfileV1::Development);
+    let manifest =
+        run_ergonomic_build(Path::new("."), ApplicationPublicationProfileV1::Development);
     if once {
         return;
     }
-    serve_ergonomic_development_output(&Path::new(".").join("dist"), port);
+    serve_ergonomic_development_output(&Path::new(".").join("dist"), port, manifest);
 }
 
-fn serve_ergonomic_development_output(output_root: &Path, port: u16) -> ! {
+fn serve_ergonomic_development_output(
+    output_root: &Path,
+    port: u16,
+    manifest: FileRoutePublicationManifestV1,
+) -> ! {
     let listener = TcpListener::bind(("127.0.0.1", port)).unwrap_or_else(|error| {
         application_cli_error(
             "PSDEV1002_LISTEN_FAILED",
@@ -230,14 +222,18 @@ fn serve_ergonomic_development_output(output_root: &Path, port: u16) -> ! {
     println!("Presolve dev ready at http://{address}");
     for connection in listener.incoming() {
         match connection {
-            Ok(stream) => serve_ergonomic_development_connection(stream, output_root),
+            Ok(stream) => serve_ergonomic_development_connection(stream, output_root, &manifest),
             Err(error) => eprintln!("PSDEV1003_CONNECTION_FAILED: {error}"),
         }
     }
     unreachable!("a TcpListener incoming iterator never completes")
 }
 
-fn serve_ergonomic_development_connection(mut stream: TcpStream, output_root: &Path) {
+fn serve_ergonomic_development_connection(
+    mut stream: TcpStream,
+    output_root: &Path,
+    manifest: &FileRoutePublicationManifestV1,
+) {
     let mut request = [0_u8; 16 * 1024];
     let Ok(length) = stream.read(&mut request) else {
         return;
@@ -257,15 +253,17 @@ fn serve_ergonomic_development_connection(mut stream: TcpStream, output_root: &P
         return;
     };
     let path = target.split('?').next().unwrap_or(target);
-    let relative = if path == "/" {
-        PathBuf::from("index.html")
-    } else {
-        PathBuf::from(path.trim_start_matches('/'))
-    };
-    if !is_safe_development_asset_path(&relative) {
+    let Some(target) = resolve_file_route_request_v1(manifest, path) else {
         write_development_response(&mut stream, "404 Not Found", "text/plain", b"Not found\n");
         return;
-    }
+    };
+    let relative = match target {
+        FileRouteRequestTargetV1::Redirect { location } => {
+            write_development_redirect(&mut stream, &location);
+            return;
+        }
+        FileRouteRequestTargetV1::Artifact { path } => path,
+    };
     match fs::read(output_root.join(&relative)) {
         Ok(bytes) => write_development_response(
             &mut stream,
@@ -279,11 +277,11 @@ fn serve_ergonomic_development_connection(mut stream: TcpStream, output_root: &P
     }
 }
 
-fn is_safe_development_asset_path(path: &Path) -> bool {
-    !path.as_os_str().is_empty()
-        && path
-            .components()
-            .all(|component| matches!(component, Component::Normal(_)))
+fn write_development_redirect(stream: &mut TcpStream, location: &str) {
+    let _ = write!(
+        stream,
+        "HTTP/1.1 308 Permanent Redirect\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+    );
 }
 
 fn development_content_type(path: &Path) -> &'static str {
@@ -3755,6 +3753,63 @@ fn publish_application_product(
         )?;
         fs::rename(&pointer, output_root).map_err(|error| {
             let _ = fs::remove_file(&pointer);
+            format!(
+                "failed to atomically replace {}: {error}",
+                output_root.display()
+            )
+        })?;
+        Ok(())
+    })();
+    if publication.is_err() {
+        let _ = fs::remove_dir_all(&stage);
+    }
+    publication
+}
+
+fn publish_file_route_product(
+    output_root: &Path,
+    product: &presolve_compiler::FileRoutePublicationProductV1,
+) -> Result<(), String> {
+    let stage = create_application_publication_stage(output_root)?;
+    let publication = (|| {
+        for (relative_path, bytes) in &product.artifacts {
+            validate_publication_relative_path(relative_path)?;
+            let path = stage.join(relative_path);
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+            }
+            fs::write(path, bytes).map_err(|error| error.to_string())?;
+        }
+        let manifest_path = Path::new("file-routes.manifest.json");
+        let manifest = fs::read(stage.join(manifest_path)).map_err(|error| error.to_string())?;
+        if manifest
+            != presolve_compiler::file_route_publication_manifest_json_v1(&product.manifest)
+                .as_bytes()
+        {
+            return Err("staged file-route manifest differs from the compiler product".into());
+        }
+        for artifact in &product.manifest.artifacts {
+            let path = PathBuf::from(&artifact.path);
+            validate_publication_relative_path(&path)?;
+            let bytes = fs::read(stage.join(&path)).map_err(|error| error.to_string())?;
+            if format!("sha256:{:x}", Sha256::digest(bytes)) != artifact.digest {
+                return Err(format!(
+                    "staged artifact digest mismatch for {}",
+                    artifact.path
+                ));
+            }
+        }
+        let pointer = stage.with_extension(format!(
+            "publish-{}",
+            NEXT_APPLICATION_PUBLICATION_STAGE.fetch_add(1, Ordering::Relaxed)
+        ));
+        create_application_publication_pointer(
+            stage
+                .file_name()
+                .ok_or_else(|| "stage path has no file name".to_string())?,
+            &pointer,
+        )?;
+        fs::rename(&pointer, output_root).map_err(|error| {
             format!(
                 "failed to atomically replace {}: {error}",
                 output_root.display()
