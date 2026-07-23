@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N3-E - Structured Serializable Action Locals
-* Working tree: clean after the N3-E structured-action-locals commit.
-* Date: 2026-07-22
+* Latest completed slice: N6-C3 - Resource Artifact Projection
+* Working tree: clean after the N6-C3 resource-artifact commit.
+* Date: 2026-07-23
 
 Last completed slice
+
+* Slice: N6-C1 through N6-C3 - Resource Endpoint Resolution, Declaration Projection, and Artifact
+* Result: a retained `@resource("localEndpoint")` source fact resolves only through an integrity-checked semantic-package resource export. A field typed `Resource<Data, Error>` then projects canonical declaration and per-planned-instance idle activation identities. The deterministic internal Resource artifact retains endpoint coordinates, boundary, type, policies, and lifecycle state. `PSC1046` still rejects every Resource source declaration: no endpoint invocation, transport, runtime module load, cancellation delivery, snapshot, or resume behavior has been admitted.
+* Verification: `verify-n6c1-resource-endpoint-resolution.sh`, `verify-n6c2-resource-declaration-projection.sh`, and `verify-n6c3-resource-artifact.sh` pass their focused compiler/registry/artifact/format/diff checks.
+* Next: N6-C4 must define and prove compiler-owned activation scheduling, endpoint transport, cancellation, snapshot/resume, and a real browser execution path before the source rejection or registry status can change.
 
 * Slice: N3-E - Structured Serializable Action Locals
 * Result: admits one literal `const` local in an `@action()` method when it replaces a primitive-compatible complete State field. The compiler substitutes the known literal into the existing Action operation, so generated runtime performs no authored local execution or capture.
