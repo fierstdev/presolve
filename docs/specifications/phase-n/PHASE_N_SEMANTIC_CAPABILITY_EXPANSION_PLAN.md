@@ -284,6 +284,11 @@ data/error declaration products, and a generation-scoped lifecycle state
 machine. It intentionally does not yet admit Resource source syntax or a
 runtime artifact.
 
+N6-B is complete: integrity-checked semantic-package `resource` exports now
+require a closed endpoint contract that states execution boundary,
+cancellation, and reload/snapshot resume policy. It intentionally stops before
+application source selects an endpoint or a package module is loaded.
+
 Introduce a compiler-owned Resource declaration with explicit key, input
 dependencies, loading/success/error state, cancellation, retry, invalidation,
 serialization, and resume rules. Resources may invoke only registered

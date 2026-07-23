@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N6-A - Resource Identity and Lifecycle Foundation
-* Working tree: clean after the N6-A resource-foundation commit.
+* Latest completed slice: N6-B - Resource Package Endpoint Contract
+* Working tree: clean after the N6-B resource-endpoint-contract commit.
 * Date: 2026-07-22
 
 Last completed slice
+
+* Slice: N6-B - Resource Package Endpoint Contract
+* Result: makes the existing semantic-package `resource` kind an integrity-checked endpoint declaration with explicit `client`/`server`/`shared` boundary, required abort cancellation, and reload/snapshot resume vocabulary. It is still not callable from application source and cannot load package code.
+* Verification: `./scripts/verify-n6b-resource-endpoint-contract.sh` passes focused package parsing/validation, registry, compiler check, formatting, and diff checks.
+* Next: N6-C must select one such endpoint from a compiler-recognized Resource declaration and lower it into the activation/artifact/resume path.
 
 * Slice: N6-A - Resource Identity and Lifecycle Foundation
 * Result: adds a compiler-owned `ResourceDeclaration` with separate stable declaration and component-instance activation identities, serializable data/error validation, explicit boundary/policy metadata, and a generation-scoped lifecycle transition model. The public `resources` capability remains deferred: no `@resource`, Promise/fetch shortcut, endpoint execution, cache, artifact, or resume codec has been admitted.

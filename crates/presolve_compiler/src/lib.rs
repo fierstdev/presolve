@@ -703,7 +703,9 @@ pub use semantic_id::{
 pub use semantic_package::{
     parse_semantic_package_contract, SemanticPackageContract, SemanticPackageContractError,
     SemanticPackageExport, SemanticPackageKind, SemanticPackagePureOperation,
-    SemanticPackageResolutionTable, SEMANTIC_PACKAGE_CONTRACT_SCHEMA_VERSION,
+    SemanticPackageResolutionTable, SemanticPackageResourceCancellation,
+    SemanticPackageResourceEndpoint, SemanticPackageResourceExecutionBoundary,
+    SemanticPackageResourceResumePolicy, SEMANTIC_PACKAGE_CONTRACT_SCHEMA_VERSION,
 };
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};

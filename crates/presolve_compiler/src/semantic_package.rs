@@ -21,6 +21,42 @@ pub enum SemanticPackagePureOperation {
     Identity,
 }
 
+/// Execution side declared by a third-party Resource endpoint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticPackageResourceExecutionBoundary {
+    Client,
+    Server,
+    Shared,
+}
+
+/// How the generated Resource activation may cancel an endpoint invocation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticPackageResourceCancellation {
+    Abort,
+}
+
+/// How an endpoint's completed result participates in a resumed application.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticPackageResourceResumePolicy {
+    Reload,
+    Snapshot,
+}
+
+/// Closed semantic contract for an executable Resource package export.
+///
+/// The compiler still does not execute or inspect package implementation. This
+/// metadata is the prerequisite for later Resource source lowering.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SemanticPackageResourceEndpoint {
+    pub execution_boundary: SemanticPackageResourceExecutionBoundary,
+    pub cancellation: SemanticPackageResourceCancellation,
+    pub resume: SemanticPackageResourceResumePolicy,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SemanticPackageExport {
@@ -30,6 +66,8 @@ pub struct SemanticPackageExport {
     pub resume_policy: String,
     #[serde(default)]
     pub pure_operation: Option<SemanticPackagePureOperation>,
+    #[serde(default)]
+    pub resource_endpoint: Option<SemanticPackageResourceEndpoint>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -52,6 +90,7 @@ pub enum SemanticPackageContractError {
     EmptyExport,
     InvalidExportContract,
     InvalidPureOperation,
+    InvalidResourceEndpoint,
     DuplicateSpecifier,
 }
 
@@ -93,6 +132,11 @@ pub fn parse_semantic_package_contract(
         .any(|export| export.pure_operation.is_some() && export.kind != SemanticPackageKind::Pure)
     {
         return Err(SemanticPackageContractError::InvalidPureOperation);
+    }
+    if contract.exports.values().any(|export| {
+        (export.kind == SemanticPackageKind::Resource) != export.resource_endpoint.is_some()
+    }) {
+        return Err(SemanticPackageContractError::InvalidResourceEndpoint);
     }
     Ok(contract)
 }
@@ -154,5 +198,29 @@ mod tests {
             Err(SemanticPackageContractError::DuplicateSpecifier)
         );
         assert_eq!(table.contract("date-kit").unwrap().version, "1.2.3");
+    }
+
+    #[test]
+    fn resource_exports_require_a_closed_endpoint_contract() {
+        let missing_endpoint = parse_semantic_package_contract(
+            r#"{"schema_version":1,"package":"profile-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadProfile":{"kind":"resource","type_signature":"(ProfileKey) -> Resource<Profile, ProfileError>","runtime_module":"dist/load-profile.js","resume_policy":"snapshot"}}}"#,
+        );
+        assert_eq!(
+            missing_endpoint,
+            Err(SemanticPackageContractError::InvalidResourceEndpoint)
+        );
+
+        let contract = parse_semantic_package_contract(
+            r#"{"schema_version":1,"package":"profile-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadProfile":{"kind":"resource","type_signature":"(ProfileKey) -> Resource<Profile, ProfileError>","runtime_module":"dist/load-profile.js","resume_policy":"snapshot","resource_endpoint":{"execution_boundary":"shared","cancellation":"abort","resume":"snapshot"}}}}"#,
+        )
+        .expect("resource endpoint contract");
+        assert_eq!(
+            contract.exports["loadProfile"].resource_endpoint,
+            Some(SemanticPackageResourceEndpoint {
+                execution_boundary: SemanticPackageResourceExecutionBoundary::Shared,
+                cancellation: SemanticPackageResourceCancellation::Abort,
+                resume: SemanticPackageResourceResumePolicy::Snapshot,
+            })
+        );
     }
 }
