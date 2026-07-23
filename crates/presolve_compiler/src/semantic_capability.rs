@@ -61,6 +61,17 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
                 "fixtures/0062-component-declarations/input/ValidComponents.tsx",
             ),
             admitted(
+                "component_invocation",
+                SemanticCapabilityClass::Bounded,
+                "resolved JSX component invocation with compiler-supported inputs and Slots",
+                "component invocation, composition, instance, ownership, and lifecycle products",
+                "statically resolved component target with compiler-supported composition grammar",
+                "compiler-owned invocation topology, caller/callee ownership, and instance identity",
+                "component instances, Slots, and Context bindings use existing resume identities",
+                "component runtime and resume artifacts",
+                "component_fixtures::component_composition_fixture_covers_topology_slots_caller_ownership_and_blocking",
+            ),
+            admitted(
                 "state",
                 SemanticCapabilityClass::Bounded,
                 "field = state(serializableInitializer)",
@@ -436,6 +447,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![
                 "component",
+                "component_invocation",
                 "state",
                 "serializable_state_replacement",
                 "static_action_parameters",
