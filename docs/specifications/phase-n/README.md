@@ -26,3 +26,4 @@ numbered slice is accepted.
 * [N5-A component invocation contract](PHASE_N_N5A_COMPONENT_INVOCATION_CONTRACT.md)
 * [N6 Resource foundation contract](PHASE_N_N6_RESOURCE_FOUNDATION_CONTRACT.md)
 * [N6-B Resource endpoint contract](PHASE_N_N6B_RESOURCE_ENDPOINT_CONTRACT.md)
+* [N6-C Resource source and activation design](PHASE_N_N6C_RESOURCE_SOURCE_ACTIVATION_DESIGN.md)
