@@ -1634,21 +1634,17 @@ Known limitations
 
 Exact next step
 
-Phase K is complete and frozen through K21. Phase L is complete through L19-B.
-The identity migration is complete for active product representations:
-`presolve explain` is the sole inspection command, and the compiler/runtime,
-fixture, implementation, and launch-content surfaces use the Presolve namespace.
-L18 adds only versioned repository-local launch content, link verification, and
-an explicitly non-functional playground placeholder; deployment remains
-external. L19-A freezes the cited verified alpha command/product/editor/package
-matrix and explicit availability, compatibility, terminology, support, and
-rollback boundaries. L19-B replays the documented manual path from a detached
-clean checkout: offline packages, examples, accepted cache/workspace/watch and
-L11 product commands, private package metadata, and frozen Phase K artifact
-inputs. It has no create or publication authority. Next: L20 begins the final
-platform-freeze contract and verifier; it cannot claim Phase L completion until
-its matrix, `just check`, and a clean tree pass with every reserved capability
-explicitly disposed.
+Phase M is frozen through M9 and Phase N is frozen through N10. M10 is the
+current, declaration-only framework conformance amendment: it may expose a
+Phase N source form only after the compiler capability registry admits it and
+the unchanged canonical compiler path is proven. M10-A adds `@resource(...)`
+and `Resource<Data, Error>` with readonly `data`, `error`, and lifecycle-state
+projections; it adds no Resource runtime, package resolver, or mapping
+discovery. The fixture type-checks under TypeScript 7.0 and builds only through
+the explicit compiler package-contract/runtime-mapping inputs. Next: M10-B
+must classify every frozen Phase N capability as existing framework syntax,
+required declaration conformance, compiler/build-only input, or intentionally
+unavailable before any metaframework work begins.
 
 Useful commands
 
@@ -1679,4 +1675,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None after the L19-B clean-room-rehearsal commit.
+* M10-A Resource declaration/type conformance; commit pending.

@@ -1,6 +1,7 @@
 # Phase M specifications
 
-Phase M is active through M0–M4 implementation. It uses the
+Phase M froze through M9, then opened M10 as a strictly conformance-only
+amendment for already-admitted Phase N language forms. It uses the
 [post-freeze governance](../../post-freeze-governance.md) intake without
 adding a framework execution model. M4 reclassified the compiler's existing
 full artifact publisher as the single framework build path and has proven
@@ -24,3 +25,4 @@ reserved command remain unimplemented.
 * [M7 Forms, production, and resume conformance](PHASE_M_M7_FORMS_RESUME_CONFORMANCE.md)
 * [M8 compiler-backed DX and compatibility](PHASE_M_M8_DX_COMPATIBILITY.md)
 * [M9 framework freeze](PHASE_M_M9_FRAMEWORK_FREEZE.md)
+* [M10 Phase N framework adoption](PHASE_M_M10_FRAMEWORK_ADOPTION.md)

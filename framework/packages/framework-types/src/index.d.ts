@@ -23,6 +23,28 @@ declare global {
    */
   function opaque(packageSpecifier: string, exportName: string): PresolveMethodDecorator;
 
+  /**
+   * Declares one component-owned Resource activation. The endpoint designator
+   * is compiler syntax resolved through an exact semantic-package contract;
+   * this declaration does not fetch, cache, subscribe to, or cancel anything.
+   */
+  function resource(endpointDesignator: string): PresolveFieldDecorator;
+
+  /** The exact lifecycle vocabulary of a compiler-owned Resource activation. */
+  type ResourceState = "idle" | "pending" | "ready" | "failed" | "cancelled";
+
+  /**
+   * A compiler-owned Resource projection. Its readonly shape describes only
+   * the currently admitted Computed projections; it is not a Promise, store,
+   * signal, mutable record, or framework cache.
+   */
+  interface Resource<Data, Error> {
+    readonly data: Data | null;
+    readonly error: Error | null;
+    readonly state: ResourceState;
+    readonly __presolveResourceBrand: unique symbol;
+  }
+
   /** Declares a compiler-recognized getter without caching or invalidation behavior. */
   function computed(): PresolveGetterDecorator;
 

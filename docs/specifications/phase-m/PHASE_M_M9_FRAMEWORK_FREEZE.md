@@ -2,6 +2,11 @@
 
 **Status:** M9 freeze authority.
 
+**Amendment:** M10 may add declaration-only coverage for a form only after the
+Phase N capability registry admits it and a focused conformance contract proves
+the unchanged canonical compiler path. M10 adds no compatibility behavior or
+framework execution authority.
+
 ## Frozen framework surface
 
 Phase M freezes the private `@presolve/framework-types` declaration surface,
