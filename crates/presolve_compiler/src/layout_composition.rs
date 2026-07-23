@@ -3,9 +3,9 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    ApplicationSemanticModel, ComponentInvocationEntity, ComponentInvocationId,
-    ComponentInvocationResolutionStatus, FileRouteGraphV1, SemanticId, SlotKind,
-    TemplatePositionId,
+    ApplicationSemanticModel, ComponentInstancePlan, ComponentInvocationEntity,
+    ComponentInvocationId, ComponentInvocationResolutionStatus, ComponentNode, FileRouteGraphV1,
+    SemanticId, SlotKind, SourceProvenance, TemplatePositionId, TemplateSemanticEntity,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -128,6 +128,54 @@ pub fn layout_composition_virtual_invocations_v1(
         .flat_map(|route| route.edges.iter())
         .filter_map(|edge| {
             let provenance = model.provenance.get(&edge.caller)?.clone();
+            let template_entity = edge.caller.template();
+            Some((
+                edge.invocation.clone(),
+                ComponentInvocationEntity {
+                    id: edge.invocation.clone(),
+                    owner_component: edge.caller.clone(),
+                    target_component: Some(edge.callee.clone()),
+                    authored_symbol: "<presolve-layout-child>".into(),
+                    template_entity: template_entity.clone(),
+                    source_position: TemplatePositionId::for_template_entity(&template_entity),
+                    status: ComponentInvocationResolutionStatus::Resolved,
+                    provenance,
+                    virtual_layout_composition: true,
+                },
+            ))
+        })
+        .collect()
+}
+
+/// Produces the canonical composed instance topology for a file-route source
+/// set. Generic application-model builders retain authored-only planning.
+pub fn plan_file_route_component_instances_v1(
+    components: &[ComponentNode],
+    graph: &FileRouteGraphV1,
+    authored_invocations: &BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
+    template_entities: &[TemplateSemanticEntity],
+    provenance: &BTreeMap<SemanticId, SourceProvenance>,
+) -> Result<ComponentInstancePlan, LayoutCompositionErrorV1> {
+    let plan = build_layout_composition_plan_from_components_v1(components, graph)?;
+    let virtuals = virtual_invocations_from_provenance(&plan, provenance);
+    Ok(crate::plan_component_instances_with_virtual_invocations(
+        components,
+        authored_invocations,
+        &virtuals,
+        template_entities,
+        provenance,
+    ))
+}
+
+fn virtual_invocations_from_provenance(
+    plan: &LayoutCompositionPlanV1,
+    provenance: &BTreeMap<SemanticId, SourceProvenance>,
+) -> BTreeMap<ComponentInvocationId, ComponentInvocationEntity> {
+    plan.routes
+        .iter()
+        .flat_map(|route| route.edges.iter())
+        .filter_map(|edge| {
+            let provenance = provenance.get(&edge.caller)?.clone();
             let template_entity = edge.caller.template();
             Some((
                 edge.invocation.clone(),
