@@ -3,8 +3,8 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N6-C14 - Compiler-Owned Resource Read Projections
-* Working tree: N7-B Forms artifact path projection is ready for focused verification and commit; two-argument `@field()` remains rejected.
+* Latest completed slice: N7-B-D - Nested Form Field-Path Admission
+* Working tree: clean after N7-B nested Form Field-path admission.
 * Date: 2026-07-23
 
 Last completed slice
@@ -33,6 +33,11 @@ Last completed slice
 * Result: `forms.runtime.json` schema v2 now publishes an exact nonempty compiler-issued path for each Field, and the generated runtime validates its segment grammar and uniqueness before activation. Existing root Fields project one path segment.
 * Verification: focused Forms artifact/runtime-codegen tests plus compiler and CLI checks pass.
 * Next: add compiler collision diagnostics and compiler-owned nested JSON serialization, then admit arity-two Fields only when browser and resume proof pass.
+
+* Slice: N7-B-D - Nested Form Field-Path Admission
+* Result: `@field("form", "address.street")` is now a typed, compiler-admitted static serialization path. Compiler candidates reject invalid paths and exact/prefix collisions; canonical leaf `FieldId`, controls, validation, reset, and resume slots are unchanged. `forms.runtime.json` v2 carries the exact segments, generated runtime validates them before activation, emits nested JSON from compiler records, and emits dotted scalar keys. The browser fixture proves controlled nested JSON submission and malformed path artifacts fail closed. Resume now proves a nested-path leaf restores through the unchanged slot contract. This slice also corrects the generated resume bootstrap call so its diagnostics argument is no longer displaced by the Resource artifact.
+* Verification: focused field/serialization/artifact/runtime-codegen tests, Forms TypeScript declaration fixtures, compiler/CLI checks, generated-browser submission and malformed-artifact proof, and generated-browser resume proof.
+* Next: select the next N7 semantic family only with a complete compiler-owned contract; arrays, dynamic paths, object mutation, and custom names remain excluded.
 
 * Slice: N2-G - Compiler-Registered Math Rounding
 * Result: exact one-argument `Math.floor`, `Math.ceil`, and `Math.round` in supported Computed getters now resolve to compiler-registered unary operations, retain their operand dependencies, lower to canonical `Floor`/`Ceil`/`Round` IR, and execute only from schema-v11 computed-runtime instructions. No generic Math dispatch, overload, callback, alias, or authored JavaScript execution is admitted.

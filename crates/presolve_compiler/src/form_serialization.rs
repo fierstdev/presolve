@@ -145,7 +145,7 @@ pub fn collect_serialization_products(
                     .into_iter()
                     .map(|field| SerializedFieldPlan {
                         field: field.id.clone(),
-                        key: field.name.clone(),
+                        key: field.path.join("."),
                         declaration_order: field.declaration_order,
                         conversion,
                         initial_value: field.initial_value.clone(),

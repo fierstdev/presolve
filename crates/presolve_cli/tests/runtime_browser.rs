@@ -537,12 +537,13 @@ fn explicit_form_hosts_submit_only_through_compiler_emitted_records() {
         String::from_utf8_lossy(&output.stderr)
     );
     write_form_submission_probe_page(&out_dir);
+    write_malformed_form_path_probe_page(&out_dir);
     let server = StaticServer::start(out_dir.clone());
     let chrome = chrome_bin().expect("headless Chrome was not found");
-    let profile_dir = out_dir.join("chrome-profile");
+    let profile_dir = out_dir.join(format!("chrome-profile-{}", std::process::id()));
     fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile");
     let output = run_chrome_probe(
-        chrome,
+        chrome.clone(),
         &format!("--user-data-dir={}", profile_dir.display()),
         &format!("http://127.0.0.1:{}/probe.html", server.port),
     );
@@ -554,6 +555,29 @@ fn explicit_form_hosts_submit_only_through_compiler_emitted_records() {
         output.status,
         stdout,
         String::from_utf8_lossy(&output.stderr)
+    );
+
+    let malformed_server = StaticServer::start(out_dir.clone());
+    let malformed_profile_dir =
+        out_dir.join(format!("malformed-chrome-profile-{}", std::process::id()));
+    fs::create_dir_all(&malformed_profile_dir)
+        .expect("failed to create malformed Forms Chrome profile");
+    let malformed = run_chrome_probe(
+        chrome,
+        &format!("--user-data-dir={}", malformed_profile_dir.display()),
+        &format!(
+            "http://127.0.0.1:{}/malformed-path.html",
+            malformed_server.port
+        ),
+    );
+    let malformed_stdout = String::from_utf8_lossy(&malformed.stdout);
+    malformed_server.stop();
+    assert!(
+        malformed_stdout.contains("PRESOLVE_FORM_PATH_ARTIFACT_REJECTION_PASS"),
+        "malformed Form path probe did not fail closed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        malformed.status,
+        malformed_stdout,
+        String::from_utf8_lossy(&malformed.stderr)
     );
 }
 
@@ -2028,10 +2052,16 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => { const d
   const forms = JSON.parse(document.getElementById("presolve-forms-runtime").textContent);
   const manifest = JSON.parse(document.getElementById("presolve-template-manifest").textContent);
   if (forms.hosts.length !== 1 || manifest.form_hosts.length !== 1) fail("exact host records were absent");
+  if (JSON.stringify(forms.forms[0].fields.map((field) => field.path)) !== JSON.stringify([["address", "street"], ["address", "city"]])) fail("nested Field paths were not emitted exactly");
+  const [street, city] = document.querySelectorAll("input");
+  street.value = "South Congress"; street.dispatchEvent(new Event("input", { bubbles: true }));
+  city.value = "Austin"; city.dispatchEvent(new Event("input", { bubbles: true }));
   const host = document.querySelector("form");
   const event = new Event("submit", { bubbles: true, cancelable: true });
   host.dispatchEvent(event);
   await waitFor(() => window.__PRESOLVE__.components[0].state.submitted === 1, "submit action");
+  const instance = window.__PRESOLVE__.store.formInstances.values().next().value;
+  if (JSON.stringify(instance.serialized) !== JSON.stringify({ address: { street: "South Congress", city: "Austin" } })) fail("JSON serialization did not use compiler-issued nested paths");
   if (!event.defaultPrevented) fail("compiler host policy did not prevent default");
   if (window.__PRESOLVE__.forms[0].submission !== "Completed") fail("submission did not complete");
   if (window.__PRESOLVE__.diagnostics.length !== 0) fail("runtime reported Forms diagnostics");
@@ -2040,6 +2070,29 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => { const d
 </script>
 </body>"#);
     fs::write(out_dir.join("probe.html"), probe).expect("failed to write Forms probe page");
+}
+
+fn write_malformed_form_path_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
+    let probe = index.replace("</body>", r#"<script>
+const artifact = document.getElementById("presolve-forms-runtime");
+const forms = JSON.parse(artifact.textContent);
+forms.forms[0].fields[0].path = ["address"];
+forms.forms[0].fields[1].path = ["address", "street"];
+artifact.textContent = JSON.stringify(forms);
+</script><script>
+const fail = (message) => { throw new Error(message); };
+const waitFor = (predicate, label) => new Promise((resolve, reject) => { const deadline = Date.now() + 3000; const tick = () => predicate() ? resolve() : Date.now() > deadline ? reject(new Error(`Timed out waiting for ${label}`)) : setTimeout(tick, 20); tick(); });
+(async () => {
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "error", "artifact rejection");
+  const diagnostics = window.__PRESOLVE__?.diagnostics ?? [];
+  if (!diagnostics.some((diagnostic) => diagnostic.code === "PSR_INVALID_FORMS_ARTIFACT" && diagnostic.fatal === true)) fail("malformed nested path did not fail closed");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_FORM_PATH_ARTIFACT_REJECTION_PASS</div>");
+})().catch((error) => { document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_FORM_PATH_ARTIFACT_REJECTION_FAIL: ${error.message}</div>`); console.error(error); });
+</script>
+</body>"#);
+    fs::write(out_dir.join("malformed-path.html"), probe)
+        .expect("failed to write malformed Forms path probe");
 }
 
 #[test]

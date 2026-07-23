@@ -61,8 +61,12 @@ declare global {
    */
   type FormDesignator = string;
 
-  /** Declares a compiler-owned Field attached to the named local Form. */
-  function field(form: FormDesignator): PresolveFieldDecorator;
+  /**
+   * Declares a compiler-owned Field attached to the named local Form. An
+   * optional static path changes only the compiler-issued serialization path;
+   * it never creates a runtime object controller or dynamic lookup.
+   */
+  function field(form: FormDesignator, path?: string): PresolveFieldDecorator;
 
   /** A compiler-owned validation-rule expression marker. */
   interface ValidationRule {

@@ -395,6 +395,7 @@ pub enum FormFieldDeclarationViolation {
     InvalidTarget { actual: AuthoredDeclarationKind },
     InvalidDecoratorInvocation,
     InvalidDecoratorArity { actual: usize, expected: usize },
+    InvalidPath,
     DuplicateFieldDecorator,
     InvalidFormDesignator,
     UnresolvedForm,
@@ -407,6 +408,7 @@ pub enum FormFieldDeclarationViolation {
     InitializerTypeMismatch,
     NonSerializableType,
     DuplicateName,
+    ConflictingPath,
     ConflictingSemanticDecorator,
     InheritedDeclaration,
     UnsupportedFieldName,
@@ -1920,11 +1922,14 @@ fn form_field_declaration_candidates_from_class(
             if !decorator.is_invoked {
                 violations.push(FormFieldDeclarationViolation::InvalidDecoratorInvocation);
             }
-            if decorator.argument_count != 1 {
+            if !(1..=2).contains(&decorator.argument_count) {
                 violations.push(FormFieldDeclarationViolation::InvalidDecoratorArity {
                     actual: decorator.argument_count,
                     expected: 1,
                 });
+            }
+            if decorator.argument_count == 2 && nested_path_segments.is_none() {
+                violations.push(FormFieldDeclarationViolation::InvalidPath);
             }
             if field_decorator_count != 1 {
                 violations.push(FormFieldDeclarationViolation::DuplicateFieldDecorator);
@@ -2496,7 +2501,8 @@ fn form_field_declaration_violation_rank(violation: &FormFieldDeclarationViolati
         | FormFieldDeclarationViolation::UnsupportedFieldName => 1,
         FormFieldDeclarationViolation::InvalidDecoratorInvocation
         | FormFieldDeclarationViolation::InvalidDecoratorArity { .. }
-        | FormFieldDeclarationViolation::DuplicateFieldDecorator => 2,
+        | FormFieldDeclarationViolation::DuplicateFieldDecorator
+        | FormFieldDeclarationViolation::InvalidPath => 2,
         FormFieldDeclarationViolation::InvalidFormDesignator
         | FormFieldDeclarationViolation::UnresolvedForm
         | FormFieldDeclarationViolation::InvalidForm
@@ -2507,7 +2513,8 @@ fn form_field_declaration_violation_rank(violation: &FormFieldDeclarationViolati
         | FormFieldDeclarationViolation::InitializerTypeMismatch
         | FormFieldDeclarationViolation::NonSerializableType => 5,
         FormFieldDeclarationViolation::ConflictingSemanticDecorator => 6,
-        FormFieldDeclarationViolation::DuplicateName => 7,
+        FormFieldDeclarationViolation::DuplicateName
+        | FormFieldDeclarationViolation::ConflictingPath => 7,
     }
 }
 

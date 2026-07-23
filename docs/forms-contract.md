@@ -7,9 +7,15 @@ reconstruct Form semantics from browser state.
 ## Syntax and identity
 
 `@form()` declares one component-owned `Form`; `@field("form")` declares a
-Form-owned Field; `field={this.field}` binds one supported intrinsic control.
+Form-owned Field; `@field("form", "address.street")` additionally gives that
+same leaf Field a compiler-owned nested serialization path; and
+`field={this.field}` binds one supported intrinsic control.
 Validation, tracking, submission, serialization, reset, instances, slots, IR,
-runtime registry, and artifacts all consume those canonical IDs. The only
+runtime registry, and artifacts all consume those canonical IDs. The optional
+Field path is a bounded static identifier path, unique per Form with no prefix
+collisions. It affects only compiler-owned submission projection: JSON uses
+nested plain objects and scalar formats use dotted keys. Leaf identity,
+controls, validation, reset, and resume slots remain unchanged. The only
 submit host syntax is `<form form={this.form}>`. Its `form` attribute is a
 compiler-only bridge and is never ordinary emitted HTML. `@submit("form")`
 names the same local Form with compile-time source syntax; it is not a runtime
@@ -53,5 +59,5 @@ Nested or inherited Forms, dynamic Fields/registration, uncontrolled or custom
 controls, files, checkbox groups, custom/async/server validation, validation
 messages/localization, submit parameters, async/network submission, automatic
 success reset, authored reset controls, DOM-derived ownership, dynamic formats,
-custom serialized names, multipart files, and live Form restoration are not
-supported. Phase J has not begun.
+dynamic/indexed Field paths, custom serialized names, multipart files, and
+live Form restoration are not supported. Phase J has not begun.

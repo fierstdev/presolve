@@ -13,7 +13,8 @@ forms:
 - static `@context()` with `@provide("Owner.member")` and
   `@consume("Owner.member")`;
 - `@slot()` and compiler Component/Slot JSX forms;
-- `@form()`, `@field("form")`, validation/serialization, `@submit("form")`,
+- `@form()`, `@field("form")`, optional static `@field("form", "a.b")`
+  serialization paths, validation/serialization, `@submit("form")`,
   and `<form form={this.form}>`.
 
 Decorators remain TypeScript declarations only. Compiler compilation, identity,

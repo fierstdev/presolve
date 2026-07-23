@@ -410,6 +410,29 @@ pub fn validate_runtime_forms_artifact(
             diagnostics.push(format!("unknown Form for instance {}", instance.id));
         }
     }
+    for form in &artifact.forms {
+        let paths = form
+            .fields
+            .iter()
+            .map(|field| &field.path)
+            .collect::<Vec<_>>();
+        if paths.iter().any(|path| {
+            !(1..=16).contains(&path.len())
+                || path
+                    .iter()
+                    .any(|segment| !is_canonical_form_field_path_segment(segment))
+        }) {
+            diagnostics.push(format!("invalid Form Field path for {}", form.id));
+        }
+        if paths.iter().enumerate().any(|(index, path)| {
+            paths
+                .iter()
+                .skip(index + 1)
+                .any(|other| form_field_paths_conflict(path, other))
+        }) {
+            diagnostics.push(format!("conflicting Form Field path for {}", form.id));
+        }
+    }
     for host in &artifact.hosts {
         if !instances.contains(host.form_instance.as_str())
             || !forms.contains(host.form.as_str())
@@ -422,6 +445,17 @@ pub fn validate_runtime_forms_artifact(
         is_valid: diagnostics.is_empty(),
         diagnostics,
     }
+}
+
+fn is_canonical_form_field_path_segment(segment: &str) -> bool {
+    let mut characters = segment.chars();
+    matches!(characters.next(), Some(character) if character == '_' || character.is_ascii_alphabetic())
+        && characters.all(|character| character == '_' || character.is_ascii_alphanumeric())
+}
+
+fn form_field_paths_conflict(left: &[String], right: &[String]) -> bool {
+    (left.len() <= right.len() && left.iter().zip(right).all(|(left, right)| left == right))
+        || (right.len() <= left.len() && right.iter().zip(left).all(|(left, right)| left == right))
 }
 
 #[must_use]
@@ -478,6 +512,25 @@ mod tests {
         assert_eq!(artifact.instances.len(), 1);
         assert!(super::validate_runtime_forms_artifact(&artifact).is_valid);
         assert!(super::runtime_forms_artifact_json(&artifact).contains("field-binding"));
+    }
+
+    #[test]
+    fn rejects_noncanonical_and_prefix_conflicting_field_paths() {
+        let parsed = presolve_parser::parse_file(
+            "src/X.tsx",
+            r#"@component("x")class X{@form()form!:Form;@field(this.form)value="";render(){return <input field={this.value}/>;}}"#,
+        );
+        let asm = crate::build_application_semantic_model(&parsed);
+        let mut artifact = super::build_runtime_forms_artifact(&asm);
+        let field = artifact.forms[0].fields[0].clone();
+        artifact.forms[0].fields[0].path = vec!["invalid-path".to_string()];
+        assert!(!super::validate_runtime_forms_artifact(&artifact).is_valid);
+
+        artifact.forms[0].fields[0].path = vec!["address".to_string()];
+        let mut nested = field;
+        nested.path = vec!["address".to_string(), "street".to_string()];
+        artifact.forms[0].fields.push(nested);
+        assert!(!super::validate_runtime_forms_artifact(&artifact).is_valid);
     }
 
     #[test]

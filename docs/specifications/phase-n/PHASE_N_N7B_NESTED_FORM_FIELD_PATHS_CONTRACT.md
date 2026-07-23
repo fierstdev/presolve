@@ -1,5 +1,7 @@
 # Phase N N7-B nested Form field-path contract
 
+**Status:** admitted compiler capability.
+
 N7-B extends the frozen declaration-level Form model without introducing
 object-proxy forms, DOM-derived ownership, or a generic path interpreter.
 It admits a finite, compiler-validated static path as the serialized key of a
@@ -83,8 +85,8 @@ object mutation. Those require their own identity and update contracts.
 
 ## Required proof
 
-Implementation must prove positive root and nested paths, each submission
-format, duplicate and prefix-collision diagnostics, malformed artifact
-rejection, repeated component-instance isolation, deterministic artifacts,
-resume restoration of leaf slots, and a generated-browser controlled-control
-submission proof.
+The implementation proves positive root and nested paths, path-aware JSON
+submission in a generated browser, prefix-collision diagnostics, malformed
+artifact rejection, deterministic artifacts, and resume restoration of the
+unchanged leaf slots. Existing Forms instance-isolation and scalar-format plan
+coverage remains the authority for repeated instances and dotted scalar keys.

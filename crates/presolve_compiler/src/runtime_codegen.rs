@@ -658,8 +658,8 @@ const RUNTIME_STUB: &str = r#"(() => {
           throw new PresolveBootError("PSR_INVALID_FORMS_ARTIFACT");
         }
         const path = field.path.join(".");
-        if (paths.has(path)) {
-          reportDiagnostic(diagnostics, "PSR_INVALID_FORMS_ARTIFACT", "Form Field paths were not unique", { form: form.id, path }, true);
+        if ([...paths].some((other) => path === other || path.startsWith(`${other}.`) || other.startsWith(`${path}.`))) {
+          reportDiagnostic(diagnostics, "PSR_INVALID_FORMS_ARTIFACT", "Form Field paths conflicted", { form: form.id, path }, true);
           throw new PresolveBootError("PSR_INVALID_FORMS_ARTIFACT");
         }
         paths.add(path);
@@ -2979,9 +2979,9 @@ const RUNTIME_STUB: &str = r#"(() => {
       return;
     }
     record.formInstance.submission = "Submitting";
-    // Serialization is deliberately compiler-record driven: field values come
-    // from the instance store, never DOM scanning or a form-element snapshot.
-    record.formInstance.serialized = [...record.formInstance.fields.entries()].map(([field, state]) => ({ field, value: state.value }));
+    // Serialization is deliberately compiler-record driven: field values and
+    // path shape come from the compiler artifact, never DOM scanning.
+    record.formInstance.serialized = serializeFormInstance(record.formInstance);
     executeActions(store, component, record.host.action_batch, action.actions, {
       component_instance_id: record.bridge.component_instance_id,
       trigger_target_id: record.bridge.instance_target_id,
@@ -2989,6 +2989,26 @@ const RUNTIME_STUB: &str = r#"(() => {
       action_batch_id: record.host.action_batch
     });
     record.formInstance.submission = "Completed";
+  }
+
+  function serializeFormInstance(formInstance) {
+    const definition = formInstance.definition;
+    const fields = new Map((definition.fields ?? []).map((field) => [field.id, field]));
+    if (definition.serialization?.format === "Json") {
+      const result = {};
+      for (const [fieldId, state] of formInstance.fields.entries()) {
+        const path = fields.get(fieldId)?.path;
+        if (!Array.isArray(path) || path.length === 0) continue;
+        let target = result;
+        for (const segment of path.slice(0, -1)) target = target[segment] ??= {};
+        target[path[path.length - 1]] = state.value;
+      }
+      return result;
+    }
+    return [...formInstance.fields.entries()].map(([field, state]) => ({
+      key: fields.get(field)?.path?.join(".") ?? field,
+      value: state.value
+    }));
   }
 
   function dispatchFormEvent(store, event, blur) {
@@ -3994,7 +4014,6 @@ const RUNTIME_STUB: &str = r#"(() => {
           effectArtifact,
           componentArtifact,
           formsArtifact,
-          resourcesArtifact,
           diagnostics
         ),
         coldBoot: () => initializeRuntime(

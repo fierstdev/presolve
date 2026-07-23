@@ -86,6 +86,7 @@ pub fn collect_form_field_products(
     }
 
     mark_duplicate_names(&mut candidates);
+    mark_conflicting_paths(&mut candidates);
 
     let mut fields = BTreeMap::new();
     let mut authored_orders = BTreeMap::<FormId, usize>::new();
@@ -339,6 +340,54 @@ fn mark_duplicate_names(candidates: &mut [FormFieldDeclarationCandidate]) {
     }
 }
 
+/// A JSON Field path is a compiler-owned shape, not a bag of author strings.
+/// Therefore a leaf may neither duplicate another leaf nor become an object
+/// prefix of another leaf in the same Form. Invalid candidates are excluded:
+/// their primary error is more useful and they have no executable path.
+fn mark_conflicting_paths(candidates: &mut [FormFieldDeclarationCandidate]) {
+    let mut groups = BTreeMap::<(FormId, Vec<String>), Vec<usize>>::new();
+    for (index, candidate) in candidates.iter().enumerate() {
+        if !candidate.is_valid() {
+            continue;
+        }
+        if let (Some(form), Some(name)) = (&candidate.resolved_form, &candidate.authored_name) {
+            let path = candidate
+                .nested_path_segments
+                .clone()
+                .unwrap_or_else(|| vec![name.clone()]);
+            groups.entry((form.clone(), path)).or_default().push(index);
+        }
+    }
+    let entries = groups.into_iter().collect::<Vec<_>>();
+    let mut conflicting = BTreeSet::new();
+    for (_, candidates) in &entries {
+        if candidates.len() > 1 {
+            conflicting.extend(candidates.iter().copied());
+        }
+    }
+    for (left_index, ((left_form, left_path), left_candidates)) in entries.iter().enumerate() {
+        for (right_form, right_path, right_candidates) in entries
+            .iter()
+            .skip(left_index + 1)
+            .map(|((form, path), indexes)| (form, path, indexes))
+        {
+            if left_form != right_form || !paths_conflict(left_path, right_path) {
+                continue;
+            }
+            conflicting.extend(left_candidates.iter().copied());
+            conflicting.extend(right_candidates.iter().copied());
+        }
+    }
+    for index in conflicting {
+        candidates[index].add_violation(FormFieldDeclarationViolation::ConflictingPath);
+    }
+}
+
+fn paths_conflict(left: &[String], right: &[String]) -> bool {
+    (left.len() <= right.len() && left.iter().zip(right).all(|(left, right)| left == right))
+        || (right.len() <= left.len() && right.iter().zip(left).all(|(left, right)| left == right))
+}
+
 fn candidate_source_order(
     left: &FormFieldDeclarationCandidate,
     right: &FormFieldDeclarationCandidate,
@@ -493,6 +542,80 @@ class Account {
     }
 
     #[test]
+    fn lowers_nested_paths_and_rejects_exact_or_prefix_conflicts() {
+        let valid = presolve_parser::parse_file(
+            "src/Profile.tsx",
+            r#"
+@component("profile") class Profile {
+  @form() profile!: Form;
+  @field(this.profile, "address.street") street = "South Congress";
+  @field(this.profile, "address.city") city = "Austin";
+  render() { return <main />; }
+}
+"#,
+        );
+        let valid = build_application_semantic_model(&valid);
+        assert_eq!(valid.form_fields().len(), 2);
+        assert!(valid
+            .form_fields()
+            .iter()
+            .any(|field| field.name == "street" && field.path == ["address", "street"]));
+        assert!(valid
+            .form_fields()
+            .iter()
+            .any(|field| field.name == "city" && field.path == ["address", "city"]));
+        let form = FormId::for_owner(&valid.components[0].id, "profile");
+        assert_eq!(
+            valid.serialization.plans[&crate::SerializationPlanId::for_form(&form)]
+                .fields
+                .iter()
+                .map(|field| field.key.as_str())
+                .collect::<Vec<_>>(),
+            vec!["address.street", "address.city"]
+        );
+
+        let conflicting = presolve_parser::parse_file(
+            "src/Conflicting.tsx",
+            r#"
+@component("conflicting") class Conflicting {
+  @form() profile!: Form;
+  @field(this.profile, "address") address = "flat";
+  @field(this.profile, "address.street") street = "nested";
+  render() { return <main />; }
+}
+"#,
+        );
+        let conflicting = build_application_semantic_model(&conflicting);
+        assert!(conflicting.form_fields().is_empty());
+        assert!(conflicting
+            .form_field_declaration_candidates()
+            .iter()
+            .all(|candidate| candidate
+                .violations
+                .contains(&FormFieldDeclarationViolation::ConflictingPath)));
+
+        let duplicate = presolve_parser::parse_file(
+            "src/Duplicate.tsx",
+            r#"
+@component("duplicate") class Duplicate {
+  @form() profile!: Form;
+  @field(this.profile, "address.street") primary = "one";
+  @field(this.profile, "address.street") secondary = "two";
+  render() { return <main />; }
+}
+"#,
+        );
+        let duplicate = build_application_semantic_model(&duplicate);
+        assert!(duplicate.form_fields().is_empty());
+        assert!(duplicate
+            .form_field_declaration_candidates()
+            .iter()
+            .all(|candidate| candidate
+                .violations
+                .contains(&FormFieldDeclarationViolation::ConflictingPath)));
+    }
+
+    #[test]
     #[allow(clippy::too_many_lines)]
     fn retains_invalid_decorators_targets_designators_and_owning_forms_without_field_ids() {
         let source = r#"
@@ -516,7 +639,7 @@ class Profile extends BaseEditor {
   normalProperty = {};
   @field validBare = "";
   @field() zero = "";
-  @field(this.validForm, "x") many = "";
+  @field(this.validForm, "invalid-path") many = "";
   @field("validForm") stringArg = "";
   @field(validForm) identifierArg = "";
   @field(this.forms.validForm) chain = "";
@@ -568,6 +691,9 @@ class Profile extends BaseEditor {
         assert!(candidates.iter().any(|candidate| candidate
             .violations
             .contains(&FormFieldDeclarationViolation::InvalidDecoratorInvocation)));
+        assert!(candidates.iter().any(|candidate| candidate
+            .violations
+            .contains(&FormFieldDeclarationViolation::InvalidPath)));
         assert!(candidates
             .iter()
             .any(|candidate| candidate.violations.contains(

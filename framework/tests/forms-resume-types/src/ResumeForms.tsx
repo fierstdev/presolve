@@ -1,6 +1,6 @@
 @component("resume-forms") class ResumeForms {
   @form() @serialize("json") profile!: Form;
-  @validate(required()) @field("profile") name = "";
+  @validate(required()) @field("profile", "identity.name") name = "";
   submitted = state(0);
 
   @action() @submit("profile")
