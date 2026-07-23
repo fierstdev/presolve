@@ -1741,6 +1741,9 @@ fn infer_effect_expression_type(
         ExpressionNodeKind::BuiltinPureCall {
             operation:
                 crate::component_graph::BuiltinPureOperation::MathAbs
+                | crate::component_graph::BuiltinPureOperation::MathFloor
+                | crate::component_graph::BuiltinPureOperation::MathCeil
+                | crate::component_graph::BuiltinPureOperation::MathRound
                 | crate::component_graph::BuiltinPureOperation::MathMin
                 | crate::component_graph::BuiltinPureOperation::MathMax,
             ..
@@ -2307,6 +2310,9 @@ fn infer_context_source_expression_type(
         ExpressionNodeKind::BuiltinPureCall {
             operation:
                 crate::component_graph::BuiltinPureOperation::MathAbs
+                | crate::component_graph::BuiltinPureOperation::MathFloor
+                | crate::component_graph::BuiltinPureOperation::MathCeil
+                | crate::component_graph::BuiltinPureOperation::MathRound
                 | crate::component_graph::BuiltinPureOperation::MathMin
                 | crate::component_graph::BuiltinPureOperation::MathMax,
             ..
@@ -2432,6 +2438,9 @@ fn infer_computed_expression_type(
         ExpressionNodeKind::BuiltinPureCall {
             operation:
                 crate::component_graph::BuiltinPureOperation::MathAbs
+                | crate::component_graph::BuiltinPureOperation::MathFloor
+                | crate::component_graph::BuiltinPureOperation::MathCeil
+                | crate::component_graph::BuiltinPureOperation::MathRound
                 | crate::component_graph::BuiltinPureOperation::MathMin
                 | crate::component_graph::BuiltinPureOperation::MathMax,
             ..

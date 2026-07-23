@@ -2330,6 +2330,9 @@ fn resolve_builtin_pure_call(expression: &mut ComputedExpression) {
             }
             let operation = match (callee.as_str(), arguments.len()) {
                 ("Math.abs", 1) => Some(crate::component_graph::BuiltinPureOperation::MathAbs),
+                ("Math.floor", 1) => Some(crate::component_graph::BuiltinPureOperation::MathFloor),
+                ("Math.ceil", 1) => Some(crate::component_graph::BuiltinPureOperation::MathCeil),
+                ("Math.round", 1) => Some(crate::component_graph::BuiltinPureOperation::MathRound),
                 ("Math.min", 2) => Some(crate::component_graph::BuiltinPureOperation::MathMin),
                 ("Math.max", 2) => Some(crate::component_graph::BuiltinPureOperation::MathMax),
                 _ => None,
@@ -2973,6 +2976,15 @@ fn resolve_semantic_package_pure_call(
             let Some(binding) = bindings.resolve_import(module_path, callee) else {
                 let operation = match (callee.as_str(), arguments.len()) {
                     ("Math.abs", 1) => Some(crate::component_graph::BuiltinPureOperation::MathAbs),
+                    ("Math.floor", 1) => {
+                        Some(crate::component_graph::BuiltinPureOperation::MathFloor)
+                    }
+                    ("Math.ceil", 1) => {
+                        Some(crate::component_graph::BuiltinPureOperation::MathCeil)
+                    }
+                    ("Math.round", 1) => {
+                        Some(crate::component_graph::BuiltinPureOperation::MathRound)
+                    }
                     ("Math.min", 2) => Some(crate::component_graph::BuiltinPureOperation::MathMin),
                     ("Math.max", 2) => Some(crate::component_graph::BuiltinPureOperation::MathMax),
                     _ => None,
@@ -3113,6 +3125,9 @@ fn contains_builtin_pure_call(expression: &ComputedExpression, callee: &str) -> 
         } => {
             let operation_callee = match operation {
                 crate::component_graph::BuiltinPureOperation::MathAbs => "Math.abs",
+                crate::component_graph::BuiltinPureOperation::MathFloor => "Math.floor",
+                crate::component_graph::BuiltinPureOperation::MathCeil => "Math.ceil",
+                crate::component_graph::BuiltinPureOperation::MathRound => "Math.round",
                 crate::component_graph::BuiltinPureOperation::MathMin => "Math.min",
                 crate::component_graph::BuiltinPureOperation::MathMax => "Math.max",
             };

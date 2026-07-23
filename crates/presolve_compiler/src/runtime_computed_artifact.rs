@@ -8,7 +8,7 @@ use crate::{
     SemanticId, SerializableValue, SerializationCompatibility,
 };
 
-pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 10;
+pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 11;
 
 /// Versioned runtime metadata and executable programs emitted from canonical IR.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -156,6 +156,9 @@ pub enum RuntimeComputedArtifactUnaryOperation {
     Identity,
     Negate,
     Abs,
+    Floor,
+    Ceil,
+    Round,
 }
 
 /// Compiler-provided dirty state for one emitted computed evaluation.
@@ -546,6 +549,9 @@ const fn unary_operation(operation: IrUnaryOperation) -> RuntimeComputedArtifact
         IrUnaryOperation::Identity => RuntimeComputedArtifactUnaryOperation::Identity,
         IrUnaryOperation::Negate => RuntimeComputedArtifactUnaryOperation::Negate,
         IrUnaryOperation::Abs => RuntimeComputedArtifactUnaryOperation::Abs,
+        IrUnaryOperation::Floor => RuntimeComputedArtifactUnaryOperation::Floor,
+        IrUnaryOperation::Ceil => RuntimeComputedArtifactUnaryOperation::Ceil,
+        IrUnaryOperation::Round => RuntimeComputedArtifactUnaryOperation::Round,
     }
 }
 
@@ -631,7 +637,7 @@ class RuntimeComputedArtifact extends Component {
         let second = runtime_computed_artifact_json(&build_runtime_computed_artifact(&model, &ir));
         assert_eq!(first, second);
         let json: serde_json::Value = serde_json::from_str(&first).expect("artifact JSON");
-        assert_eq!(json["schema_version"], 10);
+        assert_eq!(json["schema_version"], 11);
         assert_eq!(
             json["evaluations"][0]["program"]["instructions"][0]["kind"],
             "load-state"
@@ -911,6 +917,38 @@ class AbsComputed extends Component {
                     }
                 )
             }));
+    }
+
+    #[test]
+    fn emits_compiler_registered_math_rounding_as_unary_programs() {
+        let parsed = presolve_parser::parse_file(
+            "src/RoundingComputed.tsx",
+            r#"
+@component("x-rounding-computed")
+class RoundingComputed extends Component {
+  value = state(-1.5);
+  @computed() get floorValue() { return Math.floor(this.value); }
+  @computed() get ceilValue() { return Math.ceil(this.value); }
+  @computed() get roundValue() { return Math.round(this.value); }
+  render() { return <output>Rounding</output>; }
+}
+"#,
+        );
+        let model = build_application_semantic_model(&parsed);
+        assert!(model.diagnostics.is_empty(), "{:?}", model.diagnostics);
+        let artifact = build_runtime_computed_artifact(&model, &lower_components_to_ir(&model));
+        let operations = artifact
+            .evaluations
+            .iter()
+            .flat_map(|evaluation| evaluation.program.instructions.iter())
+            .filter_map(|instruction| match instruction {
+                RuntimeComputedArtifactInstruction::Unary { operation, .. } => Some(*operation),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert!(operations.contains(&super::RuntimeComputedArtifactUnaryOperation::Floor));
+        assert!(operations.contains(&super::RuntimeComputedArtifactUnaryOperation::Ceil));
+        assert!(operations.contains(&super::RuntimeComputedArtifactUnaryOperation::Round));
     }
 
     #[test]

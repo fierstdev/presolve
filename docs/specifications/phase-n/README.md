@@ -15,6 +15,7 @@ numbered slice is accepted.
 * [N2-D optional member access contract](PHASE_N_N2D_OPTIONAL_MEMBER_ACCESS_CONTRACT.md)
 * [N2-E compiler-registered Math.abs contract](PHASE_N_N2E_BUILTIN_MATH_ABS_CONTRACT.md)
 * [N2-F compiler-registered Math.min and Math.max contract](PHASE_N_N2F_BUILTIN_MATH_MIN_MAX_CONTRACT.md)
+* [N2-G compiler-registered Math rounding contract](PHASE_N_N2G_BUILTIN_MATH_ROUNDING_CONTRACT.md)
 * [N3-A serializable State replacement contract](PHASE_N_N3A_SERIALIZABLE_STATE_REPLACEMENT_CONTRACT.md)
 * [N3-B static Action parameters contract](PHASE_N_N3B_STATIC_ACTION_PARAMETERS_CONTRACT.md)
 * [N3-C Action parameter State-type contract](PHASE_N_N3C_ACTION_PARAMETER_STATE_TYPE_CONTRACT.md)

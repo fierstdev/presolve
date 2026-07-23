@@ -346,6 +346,17 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
                 "runtime-computed schema v10 binary min/max operations",
                 "runtime_browser::registered_math_min_max_execute_from_compiler_generated_runtime_programs",
             ),
+            admitted(
+                "builtin_math_rounding",
+                SemanticCapabilityClass::Bounded,
+                "Math.floor(value), Math.ceil(value), or Math.round(value) in a supported @computed() getter",
+                "compiler-registered BuiltinPureOperation, canonical unary IR, and runtime-computed artifact",
+                "exactly one compiler-supported numeric operand",
+                "inherits the operand's compiler-derived dependency set",
+                "serializable numeric result; no package or independent resume record",
+                "runtime-computed schema v11 unary floor/ceil/round operations",
+                "runtime_browser::registered_math_rounding_executes_from_compiler_generated_runtime_programs",
+            ),
             deferred(
                 "semantic_package_exports",
                 SemanticCapabilityClass::Unsupported,
@@ -484,6 +495,7 @@ mod tests {
                 "boolean_computed_conditional",
                 "builtin_math_abs",
                 "builtin_math_min_max",
+                "builtin_math_rounding",
                 "semantic_package_exports",
                 "resources",
                 "opaque_typescript"

@@ -1664,6 +1664,9 @@ const RUNTIME_STUB: &str = r#"(() => {
       case "identity": return +value;
       case "negate": return -value;
       case "abs": return typeof value === "number" ? Math.abs(value) : undefined;
+      case "floor": return typeof value === "number" ? Math.floor(value) : undefined;
+      case "ceil": return typeof value === "number" ? Math.ceil(value) : undefined;
+      case "round": return typeof value === "number" ? Math.round(value) : undefined;
       default: return undefined;
     }
   }

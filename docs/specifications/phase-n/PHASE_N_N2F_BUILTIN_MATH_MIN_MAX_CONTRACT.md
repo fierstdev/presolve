@@ -13,11 +13,11 @@ instructions. The generated runtime applies only those compiler-emitted
 instructions and returns `undefined` for a malformed non-numeric runtime
 operand; it never evaluates the authored call.
 
-This advances `computed.runtime.json` to schema version `10`. Schema v10 is
-exact-match: a runtime accepting v10 accepts the pre-existing binary
-instructions plus `min` and `max`, and rejects every other schema version.
+N2-F introduced `computed.runtime.json` schema version `10`. N2-G advances the
+current schema to v11 while retaining the canonical `min` and `max`
+instructions.
 
 The browser fixture proves initial computed values `-2` and `5` from compiler
 generated artifacts. Arbitrary methods, `Math.min(...values)`, `Math.max` with
-more or fewer operands, `Math.round`, date helpers, and collection callbacks
-remain outside this slice.
+more or fewer operands, date helpers, and collection callbacks remain outside
+this slice.

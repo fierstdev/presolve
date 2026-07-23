@@ -607,6 +607,9 @@ pub enum ComputedExpressionKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BuiltinPureOperation {
     MathAbs,
+    MathFloor,
+    MathCeil,
+    MathRound,
     MathMin,
     MathMax,
 }

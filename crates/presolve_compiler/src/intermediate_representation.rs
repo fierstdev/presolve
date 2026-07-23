@@ -1419,12 +1419,32 @@ impl ExpressionIrLowering<'_> {
                 operation,
                 arguments,
             } => match operation {
-                crate::component_graph::BuiltinPureOperation::MathAbs => {
+                crate::component_graph::BuiltinPureOperation::MathAbs
+                | crate::component_graph::BuiltinPureOperation::MathFloor
+                | crate::component_graph::BuiltinPureOperation::MathCeil
+                | crate::component_graph::BuiltinPureOperation::MathRound => {
                     let [argument] = arguments.as_slice() else {
                         return None;
                     };
                     IrInstructionKind::Unary {
-                        operation: IrUnaryOperation::Abs,
+                        operation: match operation {
+                            crate::component_graph::BuiltinPureOperation::MathAbs => {
+                                IrUnaryOperation::Abs
+                            }
+                            crate::component_graph::BuiltinPureOperation::MathFloor => {
+                                IrUnaryOperation::Floor
+                            }
+                            crate::component_graph::BuiltinPureOperation::MathCeil => {
+                                IrUnaryOperation::Ceil
+                            }
+                            crate::component_graph::BuiltinPureOperation::MathRound => {
+                                IrUnaryOperation::Round
+                            }
+                            crate::component_graph::BuiltinPureOperation::MathMin
+                            | crate::component_graph::BuiltinPureOperation::MathMax => {
+                                unreachable!()
+                            }
+                        },
                         operand: IrOperand::Value(self.lower_node(argument)?),
                     }
                 }
@@ -1441,7 +1461,12 @@ impl ExpressionIrLowering<'_> {
                             crate::component_graph::BuiltinPureOperation::MathMax => {
                                 IrBinaryOperation::Max
                             }
-                            crate::component_graph::BuiltinPureOperation::MathAbs => unreachable!(),
+                            crate::component_graph::BuiltinPureOperation::MathAbs
+                            | crate::component_graph::BuiltinPureOperation::MathFloor
+                            | crate::component_graph::BuiltinPureOperation::MathCeil
+                            | crate::component_graph::BuiltinPureOperation::MathRound => {
+                                unreachable!()
+                            }
                         },
                         left: IrOperand::Value(self.lower_node(left)?),
                         right: IrOperand::Value(self.lower_node(right)?),
@@ -3966,6 +3991,9 @@ pub enum IrUnaryOperation {
     Identity,
     Negate,
     Abs,
+    Floor,
+    Ceil,
+    Round,
 }
 
 #[cfg(test)]

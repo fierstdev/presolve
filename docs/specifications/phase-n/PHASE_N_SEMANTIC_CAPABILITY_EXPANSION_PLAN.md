@@ -238,6 +238,12 @@ Admit exact two-operand `Math.min` and `Math.max` as compiler-owned binary
 operations. Both operands must satisfy the numeric expression boundary; rest
 arguments and generic `Math` dispatch remain unsupported.
 
+#### N2-G — compiler-registered numeric rounding
+
+Admit exact unary `Math.floor`, `Math.ceil`, and `Math.round` only through the
+same numeric Computed boundary, canonical unary IR, and versioned generated
+runtime instruction. All other Math calls remain outside the language.
+
 ### N3 — State, Actions, Computed, and Effects over real data
 
 N3-A admits recursively serializable record/array State and complete-field

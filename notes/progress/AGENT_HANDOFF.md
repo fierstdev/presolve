@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N6-C13 - Resource Source Publication
-* Working tree: clean after the N6-C13 resource-source-publication commit.
+* Latest completed slice: N2-G - Compiler-Registered Math Rounding
+* Working tree: clean after the N2-G compiler-registered-math-rounding commit.
 * Date: 2026-07-23
 
 Last completed slice
+
+* Slice: N2-G - Compiler-Registered Math Rounding
+* Result: exact one-argument `Math.floor`, `Math.ceil`, and `Math.round` in supported Computed getters now resolve to compiler-registered unary operations, retain their operand dependencies, lower to canonical `Floor`/`Ceil`/`Round` IR, and execute only from schema-v11 computed-runtime instructions. No generic Math dispatch, overload, callback, alias, or authored JavaScript execution is admitted.
+* Verification: `verify-n2g-builtin-math-rounding.sh` passes compiler lowering, capability registry, real-browser generated-runtime proof, compiler/CLI checks, formatting, and diff checks.
+* Next: N6-C14 remains the next Resource family: define result/error reads, compiler-derived dependencies, invalidation, and lifecycle/resume behavior before Resource fields enter Computed or render.
 
 * Slice: N6-C1 through N6-C13 - Resource Resolution, Activation, and Source Publication
 * Result: a resolved `@resource("localEndpoint") field!: Resource<Data, Error>` now resolves only through an integrity-checked semantic-package resource export and, with an exact `--package-runtime` mapping, publishes schema-v1 `resources.runtime.json` plus identical embedded page bytes. The generated browser runtime validates that artifact, imports only the contract-declared module/export, supplies an abort signal, records the activation lifecycle, and cancels at `pagehide`. Missing runtime locations fail `PSRES1001`; malformed generated artifacts fail `PSRES1002`; server-only endpoints fail browser publication with `PSRES1003`. This is activation-only: Resource result/error reads, inputs, retry/invalidation, component-destruction cancellation, snapshot, and resume remain deferred.
