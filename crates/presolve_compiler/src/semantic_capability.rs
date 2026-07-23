@@ -217,7 +217,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
             admitted(
                 "typed_aria_bindings",
                 SemanticCapabilityClass::Bounded,
-                "dynamic aria-invalid/aria-busy/aria-expanded/aria-pressed boolean or aria-label/aria-describedby/aria-live string JSX attribute",
+                "dynamic role plus aria-label/aria-describedby/aria-errormessage/aria-controls/aria-current/aria-live string or aria-invalid/aria-busy/aria-expanded/aria-pressed/aria-hidden boolean JSX attribute",
                 "template attribute binding, semantic type assignment, ordinary runtime binding, and DOM attribute update",
                 "exact compiler-known boolean or string contract for the admitted ARIA name",
                 "the attribute expression uses the existing compiler-derived State/Computed dependency path",

@@ -58,21 +58,27 @@ pub fn dom_binding_contract(name: &str) -> Option<DomBindingContract> {
             kind: DomBindingKind::Attribute,
             semantic_type: SemanticType::String,
         }),
-        "aria-label" | "aria-describedby" | "aria-live" => Some(DomBindingContract {
+        "role" | "aria-label" | "aria-describedby" | "aria-errormessage" | "aria-controls"
+        | "aria-current" | "aria-live" => Some(DomBindingContract {
             name: match name {
+                "role" => "role",
                 "aria-label" => "aria-label",
                 "aria-describedby" => "aria-describedby",
+                "aria-errormessage" => "aria-errormessage",
+                "aria-controls" => "aria-controls",
+                "aria-current" => "aria-current",
                 _ => "aria-live",
             },
             kind: DomBindingKind::Attribute,
             semantic_type: SemanticType::String,
         }),
-        "aria-invalid" | "aria-busy" | "aria-expanded" | "aria-pressed" => {
+        "aria-invalid" | "aria-busy" | "aria-expanded" | "aria-pressed" | "aria-hidden" => {
             Some(DomBindingContract {
                 name: match name {
                     "aria-invalid" => "aria-invalid",
                     "aria-busy" => "aria-busy",
                     "aria-expanded" => "aria-expanded",
+                    "aria-hidden" => "aria-hidden",
                     _ => "aria-pressed",
                 },
                 kind: DomBindingKind::Attribute,
@@ -2979,16 +2985,34 @@ mod tests {
 
     #[test]
     fn defines_typed_accessibility_attribute_bindings() {
-        assert_eq!(
-            dom_binding_contract("aria-invalid").unwrap().semantic_type,
-            SemanticType::Boolean
-        );
-        assert_eq!(
-            dom_binding_contract("aria-describedby")
-                .unwrap()
-                .semantic_type,
-            SemanticType::String
-        );
+        for name in [
+            "role",
+            "aria-label",
+            "aria-describedby",
+            "aria-errormessage",
+            "aria-controls",
+            "aria-current",
+            "aria-live",
+        ] {
+            assert_eq!(
+                dom_binding_contract(name).unwrap().semantic_type,
+                SemanticType::String,
+                "{name} must retain its compiler-owned string contract"
+            );
+        }
+        for name in [
+            "aria-invalid",
+            "aria-busy",
+            "aria-expanded",
+            "aria-pressed",
+            "aria-hidden",
+        ] {
+            assert_eq!(
+                dom_binding_contract(name).unwrap().semantic_type,
+                SemanticType::Boolean,
+                "{name} must retain its compiler-owned boolean contract"
+            );
+        }
         assert!(dom_binding_contract("aria-owns").is_none());
     }
 
