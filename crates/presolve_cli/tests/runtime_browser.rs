@@ -122,7 +122,7 @@ fn component_runtime_consumes_only_compiler_plans_in_a_real_browser() {
 
     let server = StaticServer::start(out_dir.clone());
     let chrome = chrome_bin().expect("headless Chrome was not found");
-    let profile_dir = out_dir.join("chrome-profile");
+    let profile_dir = out_dir.join(format!("chrome-profile-{}", std::process::id()));
     fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile dir");
     let user_data_dir = format!(
         "--user-data-dir={}",
@@ -142,6 +142,78 @@ fn component_runtime_consumes_only_compiler_plans_in_a_real_browser() {
         stdout
             .get(stdout.len().saturating_sub(4_000)..)
             .unwrap_or(&stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn host_bound_resource_endpoint_activates_in_a_real_browser() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/psc-browser-test/resource-runtime");
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean Resource browser output");
+    }
+    let output = Command::new(presolve_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0065-component-runtime/input/RuntimeComponents.tsx",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("Resource browser output path was not UTF-8"),
+        ])
+        .output()
+        .expect("failed to build Resource browser fixture");
+    assert!(
+        output.status.success(),
+        "Resource fixture build failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    fs::write(
+        out_dir.join("resource-endpoint.js"),
+        "export async function loadProfile({ signal, inputs }) { if (signal.aborted || Object.keys(inputs).length !== 0) throw new Error('invalid-input'); return { name: 'Ada' }; }\n",
+    )
+    .expect("failed to write deterministic Resource endpoint module");
+    let index =
+        fs::read_to_string(out_dir.join("index.html")).expect("failed to read Resource page");
+    let artifact = r#"<script type="application/json" id="presolve-resources-runtime">{"schema_version":1,"declarations":[{"id":"component:x-runtime/resource:profile","owner_component":"component:x-runtime","key":"profile","data_type":"string","error_type":"string","execution_boundary":"Shared","input_dependencies":[],"retry_policy":"ExplicitOnly","invalidation_policy":"ExplicitOnly","endpoint":{"package":"profile-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","export":"loadProfile","type_signature":"() -> Resource<string, string>","runtime_module":"dist/load-profile.js","runtime_location":"./resource-endpoint.js","resume_policy":"snapshot","cancellation":"Abort"}}],"activations":[{"id":"root:component:x-runtime/resource-activation:component:x-runtime/resource:profile","declaration":"component:x-runtime/resource:profile","component_instance":"root:component:x-runtime","state":"idle"}]}</script>"#;
+    let probe = index.replace(
+        "</body>",
+        &(artifact.to_string()
+            + r#"<script>
+const deadline = Date.now() + 4000;
+const wait = setInterval(() => {
+  const runtime = window.__PRESOLVE__;
+  const resource = runtime?.resources?.find((record) => record.id.includes("resource:profile"));
+  if (resource?.state === "ready") {
+    clearInterval(wait);
+    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_RESOURCE_BROWSER_TEST_PASS</div>");
+  } else if (Date.now() > deadline) {
+    clearInterval(wait);
+    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_RESOURCE_BROWSER_TEST_FAIL</div>");
+  }
+}, 20);
+</script></body>"#),
+    );
+    fs::write(out_dir.join("probe.html"), probe).expect("failed to write Resource probe");
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join(format!("chrome-profile-{}", std::process::id()));
+    fs::create_dir_all(&profile_dir).expect("failed to create Resource Chrome profile");
+    let user_data_dir = format!("--user-data-dir={}", profile_dir.display());
+    let output = run_chrome_probe(
+        chrome,
+        &user_data_dir,
+        &format!("http://127.0.0.1:{}/probe.html", server.port),
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("PRESOLVE_RESOURCE_BROWSER_TEST_PASS"),
+        "Resource browser probe failed\nstdout:\n{}\nstderr:\n{}",
+        stdout,
         String::from_utf8_lossy(&output.stderr)
     );
 }
