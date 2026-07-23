@@ -1942,6 +1942,26 @@ class ActionLocalRecord extends Component {
     }
 
     #[test]
+    fn component_graph_retains_non_executable_resource_declaration_facts() {
+        let parsed = presolve_parser::parse_file(
+            "ResourceFact.tsx",
+            r#"
+@component("x-resource-fact")
+class ResourceFact extends Component {
+  @resource("profile") profile!: string;
+  render() { return <div>Profile</div>; }
+}
+"#,
+        );
+        let graph = build_component_graph(&parsed);
+        let facts = &graph.components[0].resource_declaration_candidates;
+        assert_eq!(facts.len(), 1);
+        assert_eq!(facts[0].field, "profile");
+        assert!(facts[0].decorator_invoked);
+        assert_eq!(facts[0].decorator_argument_count, 1);
+    }
+
+    #[test]
     fn component_graph_reports_duplicate_event_errors() {
         let parsed = presolve_parser::ParsedFile {
             path: "DuplicateEvent.tsx".into(),

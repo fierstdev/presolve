@@ -62,6 +62,9 @@ pub struct ComponentNode {
     /// Normalized source facts retained for every recognized `@form`
     /// declaration, including targets without canonical Form identity inputs.
     pub form_declaration_candidates: Vec<FormDeclarationCandidate>,
+    /// Source-faithful Resource declarations retained before endpoint resolution
+    /// and activation lowering.
+    pub resource_declaration_candidates: Vec<AuthoredResourceDeclarationFact>,
     /// Normalized I3 candidates. Canonical Form resolution, type assignment,
     /// duplicate grouping, and `FieldId` construction occur during ASM
     /// assembly over existing immutable authorities.
@@ -139,6 +142,16 @@ pub struct AuthoredSerializationDeclarationFact {
     pub format: Option<String>,
     pub provenance: SourceProvenance,
     pub decorator_provenance: SourceProvenance,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthoredResourceDeclarationFact {
+    pub owner_component: SemanticId,
+    pub field: String,
+    pub decorator_invoked: bool,
+    pub decorator_argument_count: usize,
+    pub declared_type: Option<DeclaredStateType>,
+    pub provenance: SourceProvenance,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1430,6 +1443,8 @@ fn build_component_node(
         &id,
         builtin_types,
     );
+    let resource_declaration_candidates =
+        resource_declaration_candidates_from_class(class, path, &id);
     let form_field_declaration_candidates =
         form_field_declaration_candidates_from_class(class, path, element_name.is_some(), &id);
     let validation_rule_declaration_facts =
@@ -1509,6 +1524,7 @@ fn build_component_node(
         context_declaration_candidates,
         slot_declaration_candidates,
         form_declaration_candidates,
+        resource_declaration_candidates,
         form_field_declaration_candidates,
         validation_rule_declaration_facts,
         submission_declaration_facts,
@@ -3100,6 +3116,37 @@ fn state_fields_from_class(class: &ParsedClass, path: &Path, id: &SemanticId) ->
                     }
                 }),
             }
+        })
+        .collect()
+}
+
+fn resource_declaration_candidates_from_class(
+    class: &ParsedClass,
+    path: &Path,
+    component_id: &SemanticId,
+) -> Vec<AuthoredResourceDeclarationFact> {
+    class
+        .properties
+        .iter()
+        .filter_map(|property| {
+            let decorator = property
+                .decorators
+                .iter()
+                .find(|decorator| decorator.name == "resource")?;
+            Some(AuthoredResourceDeclarationFact {
+                owner_component: component_id.clone(),
+                field: property.name.clone(),
+                decorator_invoked: decorator.is_invoked,
+                decorator_argument_count: decorator.argument_count,
+                declared_type: property.type_annotation.as_ref().map(|annotation| {
+                    DeclaredStateType {
+                        text: annotation.text.clone(),
+                        provenance: SourceProvenance::new(path, annotation.span),
+                        kind: declared_state_type_kind(&annotation.text),
+                    }
+                }),
+                provenance: SourceProvenance::new(path, property.span),
+            })
         })
         .collect()
 }
