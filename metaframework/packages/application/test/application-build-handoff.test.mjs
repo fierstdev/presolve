@@ -8,9 +8,17 @@ import {
   createApplicationWorkspaceInvocation,
   invokeApplicationBuild,
   invokeApplicationPublication,
+  createRouteGraphInvocation,
+  createStaticRequestInvocation,
   invokeApplicationCommand,
   invokeApplicationDevelopment,
 } from "../src/index.js";
+
+test("projects compiler-owned metaframework route and static request commands", () => {
+  const input = { configurationPath: "presolve.json", sources: ["src/App.tsx=src/App.tsx"] };
+  assert.deepEqual(createRouteGraphInvocation(input).arguments, ["route", "graph", "--config", "presolve.json", "--source", "src/App.tsx=src/App.tsx"]);
+  assert.deepEqual(createStaticRequestInvocation(input).arguments, ["route", "request", "--config", "presolve.json", "--source", "src/App.tsx=src/App.tsx"]);
+});
 
 test("projects one explicit application entry and lexically ordered package mappings", () => {
   const invocation = createApplicationBuildInvocation({

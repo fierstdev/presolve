@@ -7,6 +7,11 @@ export {
   invokeApplicationPublication,
 } from "./application-publication-handoff.js";
 export {
+  createRouteGraphInvocation,
+  createStaticRequestInvocation,
+  invokeMetaframework,
+} from "./metaframework-handoff.js";
+export {
   createApplicationWatchOnceInvocation,
   createApplicationWorkspaceInvocation,
   invokeApplicationDevelopment,
