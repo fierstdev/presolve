@@ -3,16 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N3-D - Serializable Action Locals
-* Working tree: clean after the N3-D serializable-action-locals commit.
+* Latest completed slice: N3-E - Structured Serializable Action Locals
+* Working tree: clean after the N3-E structured-action-locals commit.
 * Date: 2026-07-22
 
 Last completed slice
 
-* Slice: N3-D - Serializable Action Locals
+* Slice: N3-E - Structured Serializable Action Locals
 * Result: admits one literal `const` local in an `@action()` method when it replaces a primitive-compatible complete State field. The compiler substitutes the known literal into the existing Action operation, so generated runtime performs no authored local execution or capture.
 * Verification: `./scripts/verify-n3d-serializable-action-locals.sh` passes compiler lowering/registry tests, the focused Chrome browser proof, compiler check, formatting, and diff checks.
-* Next: N3-E may select one further real-data operation with a complete compiler-owned alias/type/lowering/runtime contract; do not broaden arbitrary Action bodies.
+* Next: N3-F may select another real-data operation only with a complete compiler-owned contract.
 
 * Slice: N4-B - JSX HTML Attribute Aliases
 * Result: compiler template lowering canonically maps only `className` to `class` and `htmlFor` to `for`, before semantic type checks, static HTML, manifests, and ordinary runtime binding artifacts. Framework JSX transforms, runtime aliases, spreads, style objects, and unbounded class helpers were not introduced.

@@ -3878,9 +3878,7 @@ fn collect_action_parameter_assignment_diagnostics(
                         ),
                     ));
                 }
-                let state_kind = state_field_primitive_kind(class, &update.field);
-                let local_kind = serializable_primitive_kind(&local.value);
-                if local_kind.is_none() || state_kind.is_none() || local_kind != state_kind {
+                if !serializable_local_matches_state_field(class, &update.field, &local.value) {
                     diagnostics.push(ComponentDiagnostic::error(
                         "PSC1045",
                         format!(
@@ -3971,6 +3969,66 @@ fn serializable_primitive_kind(value: &ParsedSerializableValue) -> Option<Declar
         ParsedSerializableValue::String(_) => Some(DeclaredStateTypeKind::String),
         ParsedSerializableValue::Boolean(_) => Some(DeclaredStateTypeKind::Boolean),
         ParsedSerializableValue::Array(_) | ParsedSerializableValue::Object(_) => None,
+    }
+}
+
+fn serializable_local_matches_state_field(
+    class: &ParsedClass,
+    field_name: &str,
+    local_value: &ParsedSerializableValue,
+) -> bool {
+    let Some(property) = class.properties.iter().find(|property| {
+        property.name == field_name && property.initializer.as_deref() == Some("state(...)")
+    }) else {
+        return false;
+    };
+    if let Some(kind) = property
+        .state_type_annotation
+        .as_ref()
+        .and_then(|annotation| declared_state_type_kind(annotation.text.trim()))
+    {
+        return serializable_primitive_kind(local_value) == Some(kind);
+    }
+    property
+        .state_initial_value
+        .as_ref()
+        .is_some_and(|initial_value| {
+            serializable_values_have_compatible_shape(initial_value, local_value)
+        })
+}
+
+fn serializable_values_have_compatible_shape(
+    left: &ParsedSerializableValue,
+    right: &ParsedSerializableValue,
+) -> bool {
+    match (left, right) {
+        (ParsedSerializableValue::Null, ParsedSerializableValue::Null)
+        | (ParsedSerializableValue::Number(_), ParsedSerializableValue::Number(_))
+        | (ParsedSerializableValue::String(_), ParsedSerializableValue::String(_))
+        | (ParsedSerializableValue::Boolean(_), ParsedSerializableValue::Boolean(_)) => true,
+        (ParsedSerializableValue::Array(left), ParsedSerializableValue::Array(right)) => {
+            match (left.first(), right.first()) {
+                (None, None) => true,
+                (Some(left_first), Some(right_first)) => {
+                    left.iter()
+                        .all(|value| serializable_values_have_compatible_shape(left_first, value))
+                        && right.iter().all(|value| {
+                            serializable_values_have_compatible_shape(right_first, value)
+                        })
+                        && serializable_values_have_compatible_shape(left_first, right_first)
+                }
+                _ => false,
+            }
+        }
+        (ParsedSerializableValue::Object(left), ParsedSerializableValue::Object(right)) => {
+            left.len() == right.len()
+                && left.iter().all(|(key, left_value)| {
+                    right.get(key).is_some_and(|right_value| {
+                        serializable_values_have_compatible_shape(left_value, right_value)
+                    })
+                })
+        }
+        _ => false,
     }
 }
 

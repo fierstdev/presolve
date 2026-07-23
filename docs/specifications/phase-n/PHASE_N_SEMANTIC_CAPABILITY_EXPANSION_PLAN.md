@@ -271,6 +271,13 @@ replacement. Resolve it during compiler lowering to the existing literal
 Action operation. State reads, computed initializers, closures, control flow,
 and local aliases remain unsupported.
 
+#### N3-E — structured serializable Action locals
+
+Extend the compiler-resolved local form to record and homogeneous-array
+literals only when their recursive shape matches the complete State initializer.
+Lower the literal directly to the existing complete-field Action operand; no
+runtime aliasing or structural checker fallback is admitted.
+
 Allow State fields to hold structurally serializable records, arrays, optional
 values, and discriminated unions. Add compiler-recognized immutable updates,
 safe indexed updates, and bounded collection operations. Define alias and

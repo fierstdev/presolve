@@ -1914,6 +1914,34 @@ class ActionLocal extends Component {
     }
 
     #[test]
+    fn component_graph_lowers_structured_serializable_action_local_to_state_assignment() {
+        let source = r#"
+@component("x-action-local-record")
+class ActionLocalRecord extends Component {
+  profile = state({ name: "Ready", roles: ["reader"] });
+
+  @action() promote() {
+    const next = { name: "Locked", roles: ["writer", "admin"] };
+    this.profile = next;
+  }
+
+  render() {
+    return <button onClick={this.promote}>Promote</button>;
+  }
+}
+"#;
+
+        let parsed = presolve_parser::parse_file("ActionLocalRecord.tsx", source);
+        let graph = build_component_graph(&parsed);
+
+        assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+        assert!(matches!(
+            graph.components[0].actions[0].operation,
+            StateOperation::Assign(SerializableValue::Object(_))
+        ));
+    }
+
+    #[test]
     fn component_graph_reports_duplicate_event_errors() {
         let parsed = presolve_parser::ParsedFile {
             path: "DuplicateEvent.tsx".into(),

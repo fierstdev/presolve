@@ -3649,6 +3649,74 @@ class RecordState extends Component {
 }
 
 #[test]
+fn structured_serializable_action_local_executes_from_compiler_generated_runtime() {
+    let _guard = browser_test_guard();
+    let root = repo_root();
+    let out = root.join("target/psc-browser-test/structured-action-local");
+    if out.exists() {
+        fs::remove_dir_all(&out).expect("clean structured Action-local output");
+    }
+    fs::create_dir_all(&out).expect("create structured Action-local output");
+    let source = out.join("StructuredActionLocal.tsx");
+    fs::write(
+        &source,
+        r#"
+@component("x-structured-action-local")
+class StructuredActionLocal extends Component {
+  profile = state({ name: "Ready", roles: ["reader"] });
+  status = state("Ready");
+  @action() promote() {
+    const next = { name: "Locked", roles: ["writer", "admin"] };
+    this.profile = next;
+    this.status = "Done";
+  }
+  render() { return <button onClick={this.promote}>{this.status}</button>; }
+}
+"#,
+    )
+    .expect("write structured Action-local source");
+    let build = Command::new(presolve_cli_bin())
+        .current_dir(&root)
+        .args([
+            "build",
+            source.to_str().expect("source"),
+            "--out",
+            out.to_str().expect("out"),
+        ])
+        .output()
+        .expect("build structured Action-local source");
+    assert!(
+        build.status.success(),
+        "{}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let manifest = fs::read_to_string(out.join("template.manifest.json")).expect("manifest");
+    assert!(manifest.contains("\"profile\""));
+    assert!(manifest.contains("\"writer\""));
+    let index = fs::read_to_string(out.join("index.html")).expect("index");
+    let probe = index.replace(
+        "</body>",
+        r#"<script>(async()=>{const end=Date.now()+3000;while(document.documentElement.dataset.presolveRuntime!=="ready"){if(Date.now()>end)throw new Error("runtime");await new Promise(r=>setTimeout(r,20));}const b=document.querySelector("button");b.click();await new Promise(r=>setTimeout(r,25));if(b.textContent.trim()!=="Done")throw new Error(b.textContent);document.body.insertAdjacentHTML("beforeend","<div>PRESOLVE_STRUCTURED_ACTION_LOCAL_BROWSER_TEST_PASS</div>")})().catch(e=>document.body.textContent=e.message)</script></body>"#,
+    );
+    fs::write(out.join("probe.html"), probe).expect("probe");
+    let server = StaticServer::start(out.clone());
+    let profile = out.join("chrome-profile");
+    fs::create_dir_all(&profile).expect("profile");
+    let output = run_chrome_probe(
+        chrome_bin().expect("Chrome"),
+        &format!("--user-data-dir={}", profile.display()),
+        &format!("http://127.0.0.1:{}/probe.html", server.port),
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("PRESOLVE_STRUCTURED_ACTION_LOCAL_BROWSER_TEST_PASS"),
+        "{}",
+        stdout
+    );
+}
+
+#[test]
 fn initial_effects_execute_once_from_compiler_generated_runtime_programs() {
     let _guard = browser_test_guard();
     let repo_root = repo_root();
