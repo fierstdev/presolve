@@ -631,6 +631,11 @@ pub use resume_schema::{
     ResumeSchemaIntegrityCode, ResumeSchemaIntegrityDiagnostic, ResumeSchemaRegistry,
     ResumeSlotSchema, ResumeValueCodec, RESUME_SCHEMA_REGISTRY_VERSION,
 };
+pub use route_graph::{
+    build_route_graph, build_static_route_publication_v1, build_validated_route_graph_v1,
+    route_manifest_json_v1, route_manifest_v1, RouteGraph, RouteGraphError, RouteManifestEntryV1,
+    RouteManifestV1, RouteNode,
+};
 pub use runtime_codegen::generate_runtime_stub;
 pub use runtime_component::{
     build_runtime_component_registry, RuntimeComponentContextBindingRecord,
