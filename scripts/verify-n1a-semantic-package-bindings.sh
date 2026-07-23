@@ -11,7 +11,7 @@ for phrase in \
   'PSBIND1009' \
   'PSBIND1010' \
   'Namespace package imports and package re-exports are not admitted' \
-  'does **not** make calling an imported package export compiler-native'; do
+  'does **not** make arbitrary calls to an imported package export'; do
   rg --fixed-strings --quiet "$phrase" "$contract"
 done
 
