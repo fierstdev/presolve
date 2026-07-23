@@ -1674,4 +1674,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* M10-C aggregate freeze/audit repair; commit pending.
+* None; M10 and N10 are frozen and cleanly verified.
