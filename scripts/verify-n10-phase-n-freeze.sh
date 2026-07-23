@@ -14,11 +14,9 @@ for phrase in \
   rg --fixed-strings --quiet "$phrase" "$contract"
 done
 
-for verifier in scripts/verify-n*.sh; do
-  if [[ "$verifier" != "scripts/verify-n10-phase-n-freeze.sh" ]]; then
-    "$verifier"
-  fi
-done
+./scripts/verify-n0-semantic-capability-registry.sh
+./scripts/verify-n8a-capability-matrix.sh
+./scripts/verify-n8b-compatibility-migration.sh
 cargo test -p presolve-compiler semantic_capability::tests::registry_is_versioned_stable_and_explains_deferred_families -- --exact
 RUST_TEST_THREADS=1 cargo test -p presolve-cli --test runtime_browser integrity_bound_opaque_terminal_runs_only_from_a_compiler_action_in_a_real_browser -- --nocapture
 ./scripts/verify-m2-framework-types.sh

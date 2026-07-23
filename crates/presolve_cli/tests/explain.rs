@@ -113,7 +113,8 @@ fn capability_registry_has_deterministic_json_human_and_migration_projections() 
         .is_some_and(|capabilities| capabilities
             .iter()
             .any(|capability| capability["id"] == "opaque_typescript"
-                && capability["status"] == "deferred")));
+                && capability["status"] == "admitted"
+                && capability["class"] == "opaque")));
 
     let human = Command::new(presolve_cli_bin())
         .current_dir(&repo_root)
@@ -131,7 +132,12 @@ fn capability_registry_has_deterministic_json_human_and_migration_projections() 
         human.matches("\nresources | bounded | admitted |").count(),
         1
     );
-    assert!(human.contains("  rejection: N9 must define opaque isolation\n"));
+    assert_eq!(
+        human
+            .matches("\nopaque_typescript | opaque | admitted |")
+            .count(),
+        1
+    );
 
     let migration = Command::new(presolve_cli_bin())
         .current_dir(&repo_root)
@@ -145,8 +151,7 @@ fn capability_registry_has_deterministic_json_human_and_migration_projections() 
     );
     let migration = String::from_utf8(migration.stdout).expect("migration guide UTF-8");
     assert!(migration.starts_with("Presolve semantic compatibility guide (registry schema v1)\n\n"));
-    assert_eq!(migration.matches("- opaque_typescript:").count(), 1);
-    assert!(migration.contains("- opaque_typescript | opaque | N9 must define opaque isolation\n"));
+    assert!(!migration.contains("- opaque_typescript:"));
     assert!(!migration.contains("- resources:"));
 }
 

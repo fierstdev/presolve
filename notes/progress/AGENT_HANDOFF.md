@@ -84,6 +84,11 @@ Last completed slice
 * Verification: the framework TypeScript 7.0 fixture, focused compiler/browser proofs, and N10 gate are ready; run the complete aggregate gate before marking Phase N frozen.
 * Next: run and record the N10 aggregate matrix, then freeze the active compatibility/migration projections and Phase N support boundary.
 
+* Slice: N10-B - Active Capability Projection Freeze
+* Result: the N8 matrix/migration tests and verifier scripts now consume the registry state directly: admitted opaque terminals appear once in the human matrix and never in the deferred migration catalog. The obsolete deferred-only N0 verifier assertion was removed so the clean aggregate gate can replay current compiler truth.
+* Verification: focused CLI registry projection test, formatting, and diff checks pass.
+* Next: commit N10-B, replay the clean aggregate freeze matrix, and record its outcome before declaring Phase N frozen.
+
 * Slice: N2-G - Compiler-Registered Math Rounding
 * Result: exact one-argument `Math.floor`, `Math.ceil`, and `Math.round` in supported Computed getters now resolve to compiler-registered unary operations, retain their operand dependencies, lower to canonical `Floor`/`Ceil`/`Round` IR, and execute only from schema-v11 computed-runtime instructions. No generic Math dispatch, overload, callback, alias, or authored JavaScript execution is admitted.
 * Verification: `verify-n2g-builtin-math-rounding.sh` passes compiler lowering, capability registry, real-browser generated-runtime proof, compiler/CLI checks, formatting, and diff checks.

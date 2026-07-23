@@ -10,6 +10,9 @@ test -s "$contract"
 cargo test -q -p presolve-compiler semantic_capability::tests::registry_is_versioned_stable_and_explains_deferred_families --lib
 cargo test -q -p presolve-cli --test explain capability_registry_has_deterministic_json_human_and_migration_projections -- --exact
 cargo run -q -p presolve-cli -- explain --capabilities --format migration | rg --fixed-strings --quiet 'Rejected syntax catalog'
-cargo run -q -p presolve-cli -- explain --capabilities --format migration | rg --fixed-strings --quiet 'opaque_typescript | opaque | N9 must define opaque isolation'
+if cargo run -q -p presolve-cli -- explain --capabilities --format migration | rg --fixed-strings --quiet 'opaque_typescript:'; then
+  echo 'admitted opaque terminal must not remain in the deferred migration catalog' >&2
+  exit 1
+fi
 cargo fmt --all --check
 git diff --check

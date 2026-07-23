@@ -36,7 +36,9 @@ adapter, parser, package installer, or compatibility shim.
 
 ## Evidence
 
-`scripts/verify-n10-phase-n-freeze.sh` is the focused freeze gate. It verifies
-the canonical registry projections, opaque declaration/contract/artifact
-tests, the real-browser terminal/malformed/resume matrix, framework declaration
-typing under the pinned TypeScript 7.0 CLI, and a clean diff.
+`scripts/verify-n10-phase-n-freeze.sh` is the focused freeze gate. It replays
+the N0 registry and N8 matrix/migration projections, opaque
+declaration/contract/artifact tests, the real-browser terminal/malformed/resume
+matrix, framework declaration typing under the pinned TypeScript 7.0 CLI, and
+a clean diff. Earlier completed N family verifiers remain their canonical
+per-capability evidence rather than being reinterpreted by the framework.

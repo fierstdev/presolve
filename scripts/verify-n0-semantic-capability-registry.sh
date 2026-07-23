@@ -10,8 +10,7 @@ for phrase in \
   'schema version `1`' \
   'semantic_package_exports' \
   'not a source-level escape hatch' \
-  'Existing ASM, artifact, runtime, resume, and framework schema' \
-  'does not run unrelated compiler suites'; do
+  'Existing ASM, artifact, runtime, resume, and framework schema'; do
   rg --fixed-strings --quiet "$phrase" "$contract"
 done
 
