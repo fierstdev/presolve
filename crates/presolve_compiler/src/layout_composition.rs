@@ -2,7 +2,9 @@
 
 use std::collections::BTreeMap;
 
-use crate::{ApplicationSemanticModel, FileRouteGraphV1, SemanticId, SlotKind};
+use crate::{
+    ApplicationSemanticModel, ComponentInvocationId, FileRouteGraphV1, SemanticId, SlotKind,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LayoutCompositionPlanV1 {
@@ -15,6 +17,17 @@ pub struct LayoutCompositionRouteV1 {
     pub page: SemanticId,
     /// Ordered outermost to nearest layout.
     pub layouts: Vec<SemanticId>,
+    pub edges: Vec<LayoutCompositionEdgeV1>,
+}
+
+/// One compiler-issued default-Slot child edge. It is deliberately not an
+/// authored JSX invocation and carries no source-content fragment.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LayoutCompositionEdgeV1 {
+    pub invocation: ComponentInvocationId,
+    pub caller: SemanticId,
+    pub callee: SemanticId,
+    pub position: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -66,10 +79,27 @@ pub fn build_layout_composition_plan_v1(
                 }
             }
         }
+        let mut chain = route.layouts.clone();
+        chain.push(route.component.clone());
+        let edges = chain
+            .windows(2)
+            .enumerate()
+            .map(|(position, pair)| LayoutCompositionEdgeV1 {
+                invocation: ComponentInvocationId::for_layout_composition(
+                    &pair[0],
+                    &route.component,
+                    position,
+                ),
+                caller: pair[0].clone(),
+                callee: pair[1].clone(),
+                position,
+            })
+            .collect();
         routes.push(LayoutCompositionRouteV1 {
             path: route.path.clone(),
             page: route.component.clone(),
             layouts: route.layouts.clone(),
+            edges,
         });
     }
     Ok(LayoutCompositionPlanV1 { routes })
@@ -99,5 +129,8 @@ mod tests {
         let graph = build_validated_file_route_graph_v1(&model).unwrap();
         let plan = build_layout_composition_plan_v1(&model, &graph).unwrap();
         assert_eq!(plan.routes[0].layouts.len(), 1);
+        assert_eq!(plan.routes[0].edges.len(), 1);
+        assert_eq!(plan.routes[0].edges[0].caller, plan.routes[0].layouts[0]);
+        assert_eq!(plan.routes[0].edges[0].callee, plan.routes[0].page);
     }
 }
