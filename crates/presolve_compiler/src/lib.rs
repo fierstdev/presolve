@@ -225,9 +225,9 @@ pub use component_initialization::{
     SlotBindingBatch,
 };
 pub use component_instance::{
-    plan_component_instances, BlockedComponentInstancePlan, BlockedComponentInstanceReason,
-    ComponentBuildRoot, ComponentBuildRootKind, ComponentInstance, ComponentInstancePlan,
-    ComponentInstanceStatus,
+    plan_component_instances, plan_component_instances_with_virtual_invocations,
+    BlockedComponentInstancePlan, BlockedComponentInstanceReason, ComponentBuildRoot,
+    ComponentBuildRootKind, ComponentInstance, ComponentInstancePlan, ComponentInstanceStatus,
 };
 pub use component_instance_scope::{
     build_component_instance_scope_graph, validate_component_instance_scope_graph,

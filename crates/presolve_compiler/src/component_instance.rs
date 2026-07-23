@@ -78,7 +78,28 @@ pub fn plan_component_instances(
     template_entities: &[TemplateSemanticEntity],
     provenance: &BTreeMap<SemanticId, SourceProvenance>,
 ) -> ComponentInstancePlan {
-    let roots = collect_build_roots(components, invocations, provenance);
+    plan_component_instances_with_virtual_invocations(
+        components,
+        invocations,
+        &BTreeMap::new(),
+        template_entities,
+        provenance,
+    )
+}
+
+/// Plans authored and compiler-issued virtual component edges through one
+/// instance topology. Virtual edges are admitted only by file-route lowering.
+#[must_use]
+pub fn plan_component_instances_with_virtual_invocations(
+    components: &[ComponentNode],
+    invocations: &BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
+    virtual_invocations: &BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
+    template_entities: &[TemplateSemanticEntity],
+    provenance: &BTreeMap<SemanticId, SourceProvenance>,
+) -> ComponentInstancePlan {
+    let mut all_invocations = invocations.clone();
+    all_invocations.extend(virtual_invocations.clone());
+    let roots = collect_build_roots(components, &all_invocations, provenance);
     let mut plan = ComponentInstancePlan {
         roots,
         instances: BTreeMap::new(),
@@ -108,7 +129,7 @@ pub fn plan_component_instances(
             1,
             std::slice::from_ref(&root.component),
             components,
-            invocations,
+            &all_invocations,
             template_entities,
             &mut plan,
         );
