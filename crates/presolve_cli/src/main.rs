@@ -23,11 +23,11 @@ use presolve_compiler::{
     build_runtime_component_artifact, build_runtime_computed_artifact,
     build_runtime_context_artifact, build_runtime_effect_artifact, build_runtime_forms_artifact,
     build_runtime_opaque_artifact_with_modules, build_runtime_resource_artifact_with_modules,
-    build_semantic_graph, build_template_graph, build_template_manifest_from_asm,
-    build_validated_route_graph_v1, embed_opaque_runtime_artifact, emit_production_modules,
-    explain_json, explain_text, extract_production_chunk_graph, fold_component_graph,
-    generate_ordinary_instance_html, generate_runtime_stub,
-    generate_standalone_page_with_resume_runtime,
+    build_semantic_graph, build_static_request_handoff_v1, build_template_graph,
+    build_template_manifest_from_asm, build_validated_route_graph_v1,
+    embed_opaque_runtime_artifact, emit_production_modules, explain_json, explain_text,
+    extract_production_chunk_graph, fold_component_graph, generate_ordinary_instance_html,
+    generate_runtime_stub, generate_standalone_page_with_resume_runtime,
     generate_standalone_page_with_resume_runtime_and_resources, generate_static_html,
     lower_components_to_ir, optimization_report_json, optimize_context_ir, optimize_effect_ir,
     production_runtime_artifact_json, project_production_diagnostics, project_resume_diagnostics,
@@ -3257,13 +3257,13 @@ fn run_route_command(args: Vec<String>) {
     let Some((subcommand, options)) = args.split_first() else {
         application_cli_error(
             "PSROUTE3001_UNSUPPORTED_ROUTE_COMMAND",
-            "route supports only `graph`",
+            "route supports only `graph` or `request`",
         );
     };
-    if subcommand != "graph" {
+    if subcommand != "graph" && subcommand != "request" {
         application_cli_error(
             "PSROUTE3001_UNSUPPORTED_ROUTE_COMMAND",
-            "route supports only `graph`",
+            "route supports only `graph` or `request`",
         );
     }
     let mut config = None;
@@ -3334,10 +3334,17 @@ fn run_route_command(args: Vec<String>) {
     let model = build_application_semantic_model_for_unit_with_packages(&unit, &packages);
     let graph = build_validated_route_graph_v1(&model)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
-    print!(
-        "{}",
-        presolve_compiler::route_manifest_json_v1(&presolve_compiler::route_manifest_v1(&graph))
-    );
+    let manifest = presolve_compiler::route_manifest_v1(&graph);
+    if subcommand == "graph" {
+        print!("{}", presolve_compiler::route_manifest_json_v1(&manifest));
+    } else {
+        print!(
+            "{}",
+            presolve_compiler::static_request_handoff_json_v1(&build_static_request_handoff_v1(
+                &manifest
+            ))
+        );
+    }
 }
 
 struct ApplicationBuildOptions {
@@ -4738,6 +4745,7 @@ fn print_usage_and_exit() -> ! {
     eprintln!("  presolve build <file> [--package-contract specifier=contract.json] [--package-runtime specifier=runtime-location] [--out dir] [--production]");
     eprintln!("  presolve application build --config <file> --source <logical=relative-file> [--source ...] --entry <logical> --out <publication-pointer> [--package-contract specifier=contract.json] [--package-runtime specifier=runtime-location] [--production]");
     eprintln!("  presolve route graph --config <file> --source <logical=relative-file> [--source ...] [--package-contract specifier=contract.json] [--package-runtime specifier=runtime-location]");
+    eprintln!("  presolve route request --config <file> --source <logical=relative-file> [--source ...] [--package-contract specifier=contract.json] [--package-runtime specifier=runtime-location]");
     eprintln!(
         "  presolve build --config <file> --source <logical=relative-file> [--source ...] [--verify-clean-equivalence] [--format human|json]"
     );
