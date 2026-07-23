@@ -1643,11 +1643,11 @@ semantic-package contracts/runtime mappings. O2 supplies only immutable
 projection of existing explicit `workspace` and `watch --once` products; it
 creates no watcher, dev server, HMR, discovery, or source-analysis path. O3
 adds a schema-v1 command envelope that selects those projectors and preserves
-executor results unchanged. O4 is delegated to active Phase P. P0 freezes the
-compiler-owned multi-source publication request, explicit entry identity,
-manifest, atomic staging, and compatibility boundary. P1 must add the typed
-compiler request and validate its explicit entry before artifact lowering or
-metaframework adoption begins.
+executor results unchanged. O4 is delegated to active Phase P. P0-P2 now
+freeze the compiler-owned multi-source request, explicit entry identity,
+canonical artifact inventory, and manifest. P3 must add the explicit atomic
+CLI publication command; it may not change compiler lowering or introduce
+framework artifact handling.
 
 Useful commands
 
@@ -1678,4 +1678,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* P1 application publication request and explicit-entry validation; commit pending.
+* P2 canonical application publication product and manifest; commit pending.

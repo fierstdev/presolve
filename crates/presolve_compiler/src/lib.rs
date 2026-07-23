@@ -165,8 +165,13 @@ pub mod workspace;
 mod wasm_binding;
 
 pub use application_publication::{
-    validate_application_publication_request_v1, ApplicationPublicationRequestErrorV1,
-    ApplicationPublicationRequestV1, ValidatedApplicationPublicationRequestV1,
+    application_publication_manifest_json_v1, build_application_publication_product_v1,
+    validate_application_publication_request_v1, ApplicationPublicationArtifactV1,
+    ApplicationPublicationErrorV1, ApplicationPublicationManifestV1,
+    ApplicationPublicationProductV1, ApplicationPublicationProfileV1,
+    ApplicationPublicationRequestErrorV1, ApplicationPublicationRequestV1,
+    ApplicationPublicationSourceV1, ValidatedApplicationPublicationRequestV1,
+    APPLICATION_PUBLICATION_COMPILER_CONTRACT_V1, APPLICATION_PUBLICATION_MANIFEST_SCHEMA_VERSION,
 };
 pub use application_semantic_model::{
     build_application_semantic_model, build_application_semantic_model_for_unit,

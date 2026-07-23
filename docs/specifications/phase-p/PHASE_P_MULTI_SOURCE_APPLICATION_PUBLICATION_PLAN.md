@@ -1,6 +1,6 @@
 # Phase P: Multi-source application publication
 
-**Status:** P0 active; later slices require the P0 contract.
+**Status:** P2 complete; P3 requires the P0-P2 contracts.
 
 ## Objective
 
