@@ -355,6 +355,10 @@ lifecycle validator that rejects malformed records rather than recovering.
 Endpoint transport, cancellation delivery, result serialization, resume, and
 browser execution remain required before source admission.
 
+N6-C5 is complete: source diagnostics distinguish an endpoint-resolution
+problem from a correctly resolved package endpoint that is blocked only on the
+remaining execution-lowering work. The compiler still rejects the source.
+
 Introduce a compiler-owned Resource declaration with explicit key, input
 dependencies, loading/success/error state, cancellation, retry, invalidation,
 serialization, and resume rules. Resources may invoke only registered

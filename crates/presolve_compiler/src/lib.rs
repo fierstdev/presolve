@@ -2034,6 +2034,11 @@ class Profile extends Component {
             .diagnostics
             .iter()
             .any(|diagnostic| diagnostic.code == "PSC1046"));
+        assert!(model.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == "PSC1128"
+                && diagnostic.message.contains("profile-service@1.2.3")
+                && diagnostic.provenance.is_some()
+        }));
     }
 
     #[test]

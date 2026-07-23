@@ -1857,6 +1857,9 @@ fn build_application_semantic_model_from_files_with_bindings(
 
     let resource_endpoint_resolutions =
         collect_resource_endpoint_resolutions(&components, bindings);
+    diagnostics.extend(collect_resource_lowering_diagnostics(
+        &resource_endpoint_resolutions,
+    ));
 
     let component_invocations = collect_component_invocations(
         &components,
@@ -2898,6 +2901,41 @@ fn collect_resource_declarations(
         }
     }
     declarations
+}
+
+fn collect_resource_lowering_diagnostics(
+    resolutions: &[crate::ResourceEndpointResolution],
+) -> Vec<ComponentDiagnostic> {
+    resolutions
+        .iter()
+        .map(|resolution| {
+            let message = match &resolution.outcome {
+                crate::ResourceEndpointResolutionOutcome::MissingDesignator => format!(
+                    "resource declaration `{}` requires one imported semantic-package resource endpoint designator",
+                    resolution.field
+                ),
+                crate::ResourceEndpointResolutionOutcome::UnboundDesignator { designator } => format!(
+                    "resource declaration `{}` designator `{designator}` does not resolve to an imported semantic-package endpoint",
+                    resolution.field
+                ),
+                crate::ResourceEndpointResolutionOutcome::NonSemanticPackageBinding { designator } => format!(
+                    "resource declaration `{}` designator `{designator}` must bind a semantic-package resource export",
+                    resolution.field
+                ),
+                crate::ResourceEndpointResolutionOutcome::NonResourceBinding { designator, kind } => format!(
+                    "resource declaration `{}` designator `{designator}` resolves to package kind {kind:?}, not resource",
+                    resolution.field
+                ),
+                crate::ResourceEndpointResolutionOutcome::Resolved(endpoint) => format!(
+                    "resource declaration `{}` resolves {}@{} export `{}`, but Resource endpoint execution is not lowered yet",
+                    resolution.field, endpoint.package, endpoint.version, endpoint.export
+                ),
+            };
+            let mut diagnostic = ComponentDiagnostic::error("PSC1128", message);
+            diagnostic.provenance = Some(resolution.provenance.clone());
+            diagnostic
+        })
+        .collect()
 }
 
 fn collect_resource_activations(

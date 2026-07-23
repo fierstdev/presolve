@@ -31,3 +31,4 @@ numbered slice is accepted.
 * [N6-C2 Resource declaration projection contract](PHASE_N_N6C2_RESOURCE_DECLARATION_PROJECTION_CONTRACT.md)
 * [N6-C3 Resource artifact contract](PHASE_N_N6C3_RESOURCE_ARTIFACT_CONTRACT.md)
 * [N6-C4 Resource artifact validation contract](PHASE_N_N6C4_RESOURCE_ARTIFACT_VALIDATION_CONTRACT.md)
+* [N6-C5 Resource source diagnostic contract](PHASE_N_N6C5_RESOURCE_SOURCE_DIAGNOSTIC_CONTRACT.md)
