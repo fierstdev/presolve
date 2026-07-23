@@ -1634,16 +1634,16 @@ Known limitations
 
 Exact next step
 
-Phase M is frozen through M9 and Phase N is frozen through N10. M10 is the
-current, declaration-only framework conformance amendment: it may expose a
-Phase N source form only after the compiler capability registry admits it and
-the unchanged canonical compiler path is proven. M10-A adds `@resource(...)`
-and `Resource<Data, Error>` with readonly `data`, `error`, and lifecycle-state
-projections; it adds no Resource runtime, package resolver, or mapping
-discovery. M10-B classifies every frozen registry entry and adds exact
-TypeScript typing for the admitted JSX aliases, accessibility attributes, and
-keyboard Action binding. Next: M10-C must freeze the aggregate M9/M10
-declaration and conformance evidence before any metaframework work begins.
+Phase M is frozen through M10 and Phase N through N10. M10-A adds
+`@resource(...)` and `Resource<Data, Error>` with readonly `data`, `error`,
+and lifecycle-state projections; M10-B classifies every registry entry and
+types only the admitted JSX aliases, accessibility attributes, and
+zero-argument Action event bindings. M10-C replays the M9 framework matrix,
+both M10 conformance families, and the canonical Phase N capability projection.
+No framework runtime, parser, JSX transform, DOM vocabulary, package resolver,
+artifact reader, or compatibility shim exists. Next: a metaframework phase
+requires separate authority for project/build orchestration and must preserve
+this compiler/framework boundary.
 
 Useful commands
 
@@ -1674,4 +1674,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* M10-B Phase N JSX/capability classification conformance; commit pending.
+* M10-C framework adoption freeze; commit pending.

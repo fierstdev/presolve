@@ -1,7 +1,7 @@
 # Phase M specifications
 
-Phase M froze through M9, then opened M10 as a strictly conformance-only
-amendment for already-admitted Phase N language forms. It uses the
+Phase M is frozen through M10. M10 is a strictly conformance-only amendment
+for already-admitted Phase N language forms. It uses the
 [post-freeze governance](../../post-freeze-governance.md) intake without
 adding a framework execution model. M4 reclassified the compiler's existing
 full artifact publisher as the single framework build path and has proven

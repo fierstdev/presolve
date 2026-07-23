@@ -1,7 +1,6 @@
 # Phase M M10 framework adoption
 
-**Status:** M10-A Resource and M10-B JSX/capability classification conformance
-are complete. Remaining M10 work is aggregate freeze evidence only.
+**Status:** frozen by M10-C aggregate verification.
 
 ## Authority and boundary
 
@@ -101,3 +100,25 @@ capability has exactly this documented framework disposition, TypeScript 7.0
 accepts the exact aliases/ARIA/keyboard source, and the unchanged compiler
 check succeeds. It adds no JSX transform, DOM renderer, event dispatcher, or
 framework validation pass.
+
+## M10-C — amendment freeze
+
+M10-C freezes the only framework additions induced by Phase N:
+
+- declaration-only `@resource(...)`, `Resource<Data, Error>`, and
+  `ResourceState`;
+- declaration-only `@opaque(...)` terminal notation admitted by N10; and
+- bounded intrinsic JSX attribute typing for the admitted aliases, ARIA names,
+  and zero-argument Action events.
+
+Every other registry capability is either existing TypeScript/framework syntax,
+an explicit compiler build input, or intentionally unavailable as recorded
+above. No M10 declaration is a fallback when compiler validation rejects
+source.
+
+`scripts/verify-m10-framework-freeze.sh` replays the frozen M9 matrix, M10-A
+Resource type/build/browser proof, M10-B registry/type/compiler proof, and the
+canonical Phase N capability-matrix projection. It also requires a clean diff.
+The next product phase must obtain separate authority for metaframework
+orchestration; it may not add a framework runtime or reinterpret this frozen
+compiler/framework boundary.

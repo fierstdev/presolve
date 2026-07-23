@@ -18,7 +18,7 @@ rg --fixed-strings --quiet 'function resource(endpointDesignator: string)' "$pac
 rg --fixed-strings --quiet 'interface Resource<Data, Error>' "$package"
 rg --fixed-strings --quiet 'type ResourceState = "idle" | "pending" | "ready" | "failed" | "cancelled"' "$package"
 rg --fixed-strings --quiet 'N6-C14 currently permits direct Resource projections only in a same-owner' "$contract"
-rg --fixed-strings --quiet 'not a framework Resource runtime' "$contract"
+rg --fixed-strings --quiet 'not introduce a framework Resource runtime.' "$contract"
 
 typescript_version="$(pnpm exec tsc --version)"
 if [[ ! "$typescript_version" =~ (^|$'\n')Version\ 7\.0\.[0-9]+($|$'\n') ]]; then
