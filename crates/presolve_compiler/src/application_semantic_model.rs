@@ -100,6 +100,9 @@ pub struct ApplicationSemanticModel {
     pub providers: BTreeMap<ProviderId, ProviderEntity>,
     pub consumers: BTreeMap<ConsumerId, ConsumerEntity>,
     pub forms: BTreeMap<FormId, FormEntity>,
+    /// Integrity-checked package endpoint selections retained before Resource
+    /// declaration and activation lowering becomes executable.
+    pub resource_endpoint_resolutions: Vec<crate::ResourceEndpointResolution>,
     pub form_field_declaration_candidates: Vec<crate::FormFieldDeclarationCandidate>,
     pub form_fields: BTreeMap<FieldId, FormFieldEntity>,
     pub form_field_binding_candidates: Vec<FormFieldBindingCandidate>,
@@ -1339,6 +1342,8 @@ pub fn build_application_semantic_model_from_component_graph(
         ExpressionGraph::from_components(&component_graph.components, &component_graph.provenance);
     let contexts = collect_context_entities(&component_graph.components, &expression_graph);
     let forms = collect_form_entities(&component_graph.components);
+    let resource_endpoint_resolutions =
+        collect_resource_endpoint_resolutions(&component_graph.components, None);
     let base_semantic_types = SemanticTypeModel::from_components(
         &component_graph.components,
         &component_graph.provenance,
@@ -1688,6 +1693,7 @@ pub fn build_application_semantic_model_from_component_graph(
         providers,
         consumers,
         forms,
+        resource_endpoint_resolutions,
         form_field_declaration_candidates,
         form_fields,
         form_field_binding_candidates,
@@ -1834,6 +1840,9 @@ fn build_application_semantic_model_from_files_with_bindings(
         }));
         resolve_semantic_package_pure_calls(&mut components, bindings);
     }
+
+    let resource_endpoint_resolutions =
+        collect_resource_endpoint_resolutions(&components, bindings);
 
     let component_invocations = collect_component_invocations(
         &components,
@@ -2193,6 +2202,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         providers,
         consumers,
         forms,
+        resource_endpoint_resolutions,
         form_field_declaration_candidates,
         form_fields,
         form_field_binding_candidates,
@@ -2718,6 +2728,90 @@ fn resolve_semantic_package_pure_calls(
             resolve_semantic_package_pure_call(expression, &component.module_path, bindings);
         }
     }
+}
+
+fn collect_resource_endpoint_resolutions(
+    components: &[ComponentNode],
+    bindings: Option<&crate::BindingTable>,
+) -> Vec<crate::ResourceEndpointResolution> {
+    let mut resolutions = Vec::new();
+    for component in components {
+        for resource in &component.resource_declaration_candidates {
+            let outcome = match resource.endpoint_designator.as_deref() {
+                None => crate::ResourceEndpointResolutionOutcome::MissingDesignator,
+                Some(designator) => {
+                    let Some(bindings) = bindings else {
+                        resolutions.push(crate::ResourceEndpointResolution {
+                            owner_component: resource.owner_component.clone(),
+                            field: resource.field.clone(),
+                            endpoint_designator: resource.endpoint_designator.clone(),
+                            outcome: crate::ResourceEndpointResolutionOutcome::UnboundDesignator {
+                                designator: designator.to_string(),
+                            },
+                            provenance: resource.provenance.clone(),
+                        });
+                        continue;
+                    };
+                    let Some(binding) = bindings.resolve_import(&component.module_path, designator)
+                    else {
+                        resolutions.push(crate::ResourceEndpointResolution {
+                            owner_component: resource.owner_component.clone(),
+                            field: resource.field.clone(),
+                            endpoint_designator: resource.endpoint_designator.clone(),
+                            outcome: crate::ResourceEndpointResolutionOutcome::UnboundDesignator {
+                                designator: designator.to_string(),
+                            },
+                            provenance: resource.provenance.clone(),
+                        });
+                        continue;
+                    };
+                    match &binding.target {
+                        crate::ImportBindingTarget::SemanticPackage {
+                            package,
+                            version,
+                            integrity,
+                            export,
+                            kind: crate::SemanticPackageKind::Resource,
+                            type_signature,
+                            runtime_module,
+                            resume_policy,
+                            resource_endpoint: Some(endpoint),
+                            ..
+                        } => crate::ResourceEndpointResolutionOutcome::Resolved(
+                            crate::ResourceEndpointBinding {
+                                local_name: binding.local_name.clone(),
+                                package: package.clone(),
+                                version: version.clone(),
+                                integrity: integrity.clone(),
+                                export: export.clone(),
+                                type_signature: type_signature.clone(),
+                                runtime_module: runtime_module.clone(),
+                                resume_policy: resume_policy.clone(),
+                                endpoint: endpoint.clone(),
+                            },
+                        ),
+                        crate::ImportBindingTarget::SemanticPackage { kind, .. } => {
+                            crate::ResourceEndpointResolutionOutcome::NonResourceBinding {
+                                designator: designator.to_string(),
+                                kind: kind.clone(),
+                            }
+                        }
+                        _ => crate::ResourceEndpointResolutionOutcome::NonSemanticPackageBinding {
+                            designator: designator.to_string(),
+                        },
+                    }
+                }
+            };
+            resolutions.push(crate::ResourceEndpointResolution {
+                owner_component: resource.owner_component.clone(),
+                field: resource.field.clone(),
+                endpoint_designator: resource.endpoint_designator.clone(),
+                outcome,
+                provenance: resource.provenance.clone(),
+            });
+        }
+    }
+    resolutions
 }
 
 fn resolve_semantic_package_pure_call(

@@ -5,6 +5,7 @@ use crate::compilation_unit::CompilationUnit;
 use crate::module_graph::{ModuleEdgeKind, ModuleGraph, ModuleTarget};
 use crate::semantic_package::{
     SemanticPackageKind, SemanticPackagePureOperation, SemanticPackageResolutionTable,
+    SemanticPackageResourceEndpoint,
 };
 use crate::symbol_table::{ModuleSymbol, SymbolKind, SymbolTable};
 
@@ -54,6 +55,7 @@ pub enum ImportBindingTarget {
         runtime_module: String,
         resume_policy: String,
         pure_operation: Option<SemanticPackagePureOperation>,
+        resource_endpoint: Option<SemanticPackageResourceEndpoint>,
     },
 }
 
@@ -298,6 +300,7 @@ fn resolve_semantic_package_import(
                     runtime_module: export.runtime_module.clone(),
                     resume_policy: export.resume_policy.clone(),
                     pure_operation: export.pure_operation,
+                    resource_endpoint: export.resource_endpoint.clone(),
                 },
             },
         );
@@ -789,6 +792,7 @@ class Second extends Component {
             runtime_module,
             resume_policy,
             pure_operation: _,
+            resource_endpoint: _,
         } = &bindings
             .resolve_import("src/App.tsx", "format")
             .unwrap()

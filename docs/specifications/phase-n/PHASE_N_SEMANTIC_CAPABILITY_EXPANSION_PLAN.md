@@ -331,6 +331,13 @@ require a closed endpoint contract that states execution boundary,
 cancellation, and reload/snapshot resume policy. It intentionally stops before
 application source selects an endpoint or a package module is loaded.
 
+N6-C1 is complete: a retained `@resource("localEndpoint")` fact can select an
+exact imported resource endpoint through that integrity-checked package table.
+The compiler retains the selected package identity and endpoint metadata as a
+non-executable resolution product and continues to reject the source with
+`PSC1046`; no declaration, activation, artifact, runtime, cancellation, or
+resume behavior is implied.
+
 Introduce a compiler-owned Resource declaration with explicit key, input
 dependencies, loading/success/error state, cancellation, retry, invalidation,
 serialization, and resume rules. Resources may invoke only registered

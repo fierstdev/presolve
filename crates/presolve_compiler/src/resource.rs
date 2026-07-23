@@ -5,6 +5,53 @@ use crate::{
     ResourceExecutionBoundary, ResourceId, SemanticId, SemanticType, SerializationCompatibility,
     SourceProvenance,
 };
+use crate::{SemanticPackageKind, SemanticPackageResourceEndpoint};
+
+/// A source Resource declaration's compiler-owned attempt to select an
+/// integrity-checked semantic-package endpoint.
+///
+/// This is intentionally not a ResourceDeclaration. It records package
+/// resolution before activation, artifact, cancellation, and resume lowering
+/// exist, so source syntax remains non-executable until the full N6 contract
+/// can be emitted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResourceEndpointResolution {
+    pub owner_component: SemanticId,
+    pub field: String,
+    pub endpoint_designator: Option<String>,
+    pub outcome: ResourceEndpointResolutionOutcome,
+    pub provenance: SourceProvenance,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ResourceEndpointResolutionOutcome {
+    MissingDesignator,
+    UnboundDesignator {
+        designator: String,
+    },
+    NonSemanticPackageBinding {
+        designator: String,
+    },
+    NonResourceBinding {
+        designator: String,
+        kind: SemanticPackageKind,
+    },
+    Resolved(ResourceEndpointBinding),
+}
+
+/// The exact endpoint metadata selected by a resolved Resource source fact.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResourceEndpointBinding {
+    pub local_name: String,
+    pub package: String,
+    pub version: String,
+    pub integrity: String,
+    pub export: String,
+    pub type_signature: String,
+    pub runtime_module: String,
+    pub resume_policy: String,
+    pub endpoint: SemanticPackageResourceEndpoint,
+}
 
 /// Compiler-owned declaration for a Resource operation.
 ///

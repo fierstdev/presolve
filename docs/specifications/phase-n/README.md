@@ -27,3 +27,4 @@ numbered slice is accepted.
 * [N6 Resource foundation contract](PHASE_N_N6_RESOURCE_FOUNDATION_CONTRACT.md)
 * [N6-B Resource endpoint contract](PHASE_N_N6B_RESOURCE_ENDPOINT_CONTRACT.md)
 * [N6-C Resource source and activation design](PHASE_N_N6C_RESOURCE_SOURCE_ACTIVATION_DESIGN.md)
+* [N6-C1 Resource endpoint resolution contract](PHASE_N_N6C1_RESOURCE_ENDPOINT_RESOLUTION_CONTRACT.md)

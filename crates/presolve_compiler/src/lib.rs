@@ -523,7 +523,8 @@ pub use production_validation::{
 };
 pub use provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
 pub use resource::{
-    ResourceActivation, ResourceDeclaration, ResourceDeclarationError, ResourceInvalidationPolicy,
+    ResourceActivation, ResourceDeclaration, ResourceDeclarationError, ResourceEndpointBinding,
+    ResourceEndpointResolution, ResourceEndpointResolutionOutcome, ResourceInvalidationPolicy,
     ResourceLifecycleError, ResourceLifecycleEvent, ResourceLifecycleState, ResourceRetryPolicy,
 };
 pub use resume_activation::{
@@ -1961,6 +1962,50 @@ class ResourceFact extends Component {
         assert_eq!(facts[0].decorator_argument_count, 1);
         assert_eq!(facts[0].endpoint_designator.as_deref(), Some("profile"));
         assert!(graph
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "PSC1046"));
+    }
+
+    #[test]
+    fn resolves_resource_source_designator_through_integrity_checked_package_contract() {
+        let unit = CompilationUnit::parse_sources([(
+            "src/Profile.tsx",
+            r#"
+import { loadProfile } from "profile-service";
+
+@component("x-profile")
+class Profile extends Component {
+  @resource("loadProfile") profile!: string;
+  render() { return <div>Profile</div>; }
+}
+"#,
+        )]);
+        let contract = parse_semantic_package_contract(
+            r#"{"schema_version":1,"package":"profile-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadProfile":{"kind":"resource","type_signature":"(ProfileKey) -> Resource<Profile, ProfileError>","runtime_module":"dist/load-profile.js","resume_policy":"snapshot","resource_endpoint":{"execution_boundary":"shared","cancellation":"abort","resume":"snapshot"}}}}"#,
+        )
+        .expect("resource contract");
+        let mut packages = SemanticPackageResolutionTable::default();
+        packages
+            .insert("profile-service".into(), contract)
+            .expect("unique package contract");
+
+        let model = build_application_semantic_model_for_unit_with_packages(&unit, &packages);
+        assert_eq!(model.resource_endpoint_resolutions.len(), 1);
+        let ResourceEndpointResolutionOutcome::Resolved(endpoint) =
+            &model.resource_endpoint_resolutions[0].outcome
+        else {
+            panic!("expected resolved resource endpoint");
+        };
+        assert_eq!(endpoint.local_name, "loadProfile");
+        assert_eq!(endpoint.package, "profile-service");
+        assert_eq!(endpoint.version, "1.2.3");
+        assert_eq!(endpoint.export, "loadProfile");
+        assert_eq!(
+            endpoint.endpoint.execution_boundary,
+            SemanticPackageResourceExecutionBoundary::Shared
+        );
+        assert!(model
             .diagnostics
             .iter()
             .any(|diagnostic| diagnostic.code == "PSC1046"));
