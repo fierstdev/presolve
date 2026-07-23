@@ -70,8 +70,8 @@ use crate::provider::{collect_provider_entities, DuplicateProviderDeclaration, P
 use crate::runtime_form_registry::{build_runtime_form_registry, RuntimeFormRegistry};
 use crate::semantic_id::{
     ComponentInvocationId, ConsumerId, ContextId, FieldBindingId, FieldId, FormId, ProviderId,
-    SemanticId, SemanticOwner, SlotBindingId, SlotContentFragmentId, SlotId, SlotOutletId,
-    ValidationRuleId,
+    ResourceActivationId, ResourceId, SemanticId, SemanticOwner, SlotBindingId,
+    SlotContentFragmentId, SlotId, SlotOutletId, ValidationRuleId,
 };
 use crate::semantic_provenance::SourceProvenance;
 use crate::semantic_reference::{SemanticReference, SemanticReferenceKind};
@@ -103,6 +103,10 @@ pub struct ApplicationSemanticModel {
     /// Integrity-checked package endpoint selections retained before Resource
     /// declaration and activation lowering becomes executable.
     pub resource_endpoint_resolutions: Vec<crate::ResourceEndpointResolution>,
+    /// Validated internal declaration products. Their source remains rejected
+    /// until N6 emits activation/runtime/resume products.
+    pub resource_declarations: BTreeMap<ResourceId, crate::ResourceDeclaration>,
+    pub resource_activations: BTreeMap<ResourceActivationId, crate::ResourceActivation>,
     pub form_field_declaration_candidates: Vec<crate::FormFieldDeclarationCandidate>,
     pub form_fields: BTreeMap<FieldId, FormFieldEntity>,
     pub form_field_binding_candidates: Vec<FormFieldBindingCandidate>,
@@ -1348,6 +1352,14 @@ pub fn build_application_semantic_model_from_component_graph(
         &component_graph.components,
         &component_graph.provenance,
     );
+    let resource_declarations = collect_resource_declarations(
+        &component_graph.components,
+        &resource_endpoint_resolutions,
+        &base_semantic_types,
+        None,
+    );
+    let resource_activations =
+        collect_resource_activations(&resource_declarations, &component_instance_plan);
     let form_field_products = collect_form_field_products(
         &component_graph.components,
         &forms,
@@ -1694,6 +1706,8 @@ pub fn build_application_semantic_model_from_component_graph(
         consumers,
         forms,
         resource_endpoint_resolutions,
+        resource_declarations,
+        resource_activations,
         form_field_declaration_candidates,
         form_fields,
         form_field_binding_candidates,
@@ -1883,6 +1897,14 @@ fn build_application_semantic_model_from_files_with_bindings(
         &type_aliases,
         bindings,
     );
+    let resource_declarations = collect_resource_declarations(
+        &components,
+        &resource_endpoint_resolutions,
+        &base_semantic_types,
+        bindings,
+    );
+    let resource_activations =
+        collect_resource_activations(&resource_declarations, &component_instance_plan);
     let form_field_products =
         collect_form_field_products(&components, &forms, &base_semantic_types, bindings);
     let form_field_declaration_candidates = form_field_products.candidates;
@@ -2203,6 +2225,8 @@ fn build_application_semantic_model_from_files_with_bindings(
         consumers,
         forms,
         resource_endpoint_resolutions,
+        resource_declarations,
+        resource_activations,
         form_field_declaration_candidates,
         form_fields,
         form_field_binding_candidates,
@@ -2812,6 +2836,85 @@ fn collect_resource_endpoint_resolutions(
         }
     }
     resolutions
+}
+
+fn collect_resource_declarations(
+    components: &[ComponentNode],
+    resolutions: &[crate::ResourceEndpointResolution],
+    semantic_types: &SemanticTypeModel,
+    bindings: Option<&crate::BindingTable>,
+) -> BTreeMap<ResourceId, crate::ResourceDeclaration> {
+    let mut declarations = BTreeMap::new();
+    for component in components {
+        for resource in &component.resource_declaration_candidates {
+            let Some(resolution) = resolutions.iter().find(|resolution| {
+                resolution.owner_component == resource.owner_component
+                    && resolution.field == resource.field
+            }) else {
+                continue;
+            };
+            let crate::ResourceEndpointResolutionOutcome::Resolved(endpoint) = &resolution.outcome
+            else {
+                continue;
+            };
+            let Some(declared_type) = resource.declared_type.as_ref() else {
+                continue;
+            };
+            let Some(resolved_type) = semantic_types.resolve_declared_type(declared_type, bindings)
+            else {
+                continue;
+            };
+            let crate::SemanticType::Resource(resource_type) = resolved_type.semantic_type else {
+                continue;
+            };
+            let execution_boundary = match endpoint.endpoint.execution_boundary {
+                crate::SemanticPackageResourceExecutionBoundary::Client => {
+                    crate::ResourceExecutionBoundary::Client
+                }
+                crate::SemanticPackageResourceExecutionBoundary::Server => {
+                    crate::ResourceExecutionBoundary::Server
+                }
+                crate::SemanticPackageResourceExecutionBoundary::Shared => {
+                    crate::ResourceExecutionBoundary::Shared
+                }
+            };
+            let key = format!("{}:{}", component.id.as_str(), resource.field);
+            let declaration = crate::ResourceDeclaration::new(
+                resource.owner_component.clone(),
+                resource.field.clone(),
+                key,
+                *resource_type.data,
+                *resource_type.error,
+                execution_boundary,
+                BTreeSet::new(),
+                crate::ResourceRetryPolicy::ExplicitOnly,
+                crate::ResourceInvalidationPolicy::ExplicitOnly,
+                resource.provenance.clone(),
+            );
+            let Ok(declaration) = declaration else {
+                continue;
+            };
+            declarations.insert(declaration.id.clone(), declaration);
+        }
+    }
+    declarations
+}
+
+fn collect_resource_activations(
+    declarations: &BTreeMap<ResourceId, crate::ResourceDeclaration>,
+    instances: &ComponentInstancePlan,
+) -> BTreeMap<ResourceActivationId, crate::ResourceActivation> {
+    let mut activations = BTreeMap::new();
+    for instance in instances.instances.values() {
+        for declaration in declarations
+            .values()
+            .filter(|declaration| declaration.owner_component == instance.component)
+        {
+            let activation = declaration.activation_for(instance.id.clone());
+            activations.insert(activation.id.clone(), activation);
+        }
+    }
+    activations
 }
 
 fn resolve_semantic_package_pure_call(

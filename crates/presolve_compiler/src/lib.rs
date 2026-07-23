@@ -1976,7 +1976,7 @@ import { loadProfile } from "profile-service";
 
 @component("x-profile")
 class Profile extends Component {
-  @resource("loadProfile") profile!: string;
+  @resource("loadProfile") profile!: Resource<string, string>;
   render() { return <div>Profile</div>; }
 }
 "#,
@@ -2005,6 +2005,24 @@ class Profile extends Component {
             endpoint.endpoint.execution_boundary,
             SemanticPackageResourceExecutionBoundary::Shared
         );
+        assert_eq!(model.resource_declarations.len(), 1);
+        let declaration = model
+            .resource_declarations
+            .values()
+            .next()
+            .expect("resource declaration");
+        assert_eq!(declaration.name, "profile");
+        assert_eq!(declaration.data_type, SemanticType::String);
+        assert_eq!(declaration.error_type, SemanticType::String);
+        assert_eq!(
+            declaration.execution_boundary,
+            ResourceExecutionBoundary::Shared
+        );
+        assert_eq!(model.resource_activations.len(), 1);
+        assert!(model.resource_activations.values().all(|activation| {
+            activation.declaration == declaration.id
+                && activation.state == ResourceLifecycleState::Idle
+        }));
         assert!(model
             .diagnostics
             .iter()

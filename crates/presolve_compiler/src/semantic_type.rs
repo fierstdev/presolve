@@ -2772,6 +2772,23 @@ fn semantic_type_from_annotation(text: &str) -> Option<SemanticType> {
     if text.starts_with('{') && text.ends_with('}') {
         return object_type(text);
     }
+    if let Some(arguments) = text
+        .strip_prefix("Resource<")
+        .and_then(|value| value.strip_suffix('>'))
+    {
+        let arguments = split_top_level(arguments, ',');
+        if arguments.len() == 2 {
+            return Some(SemanticType::Resource(ResourceType {
+                data: Box::new(semantic_type_from_annotation(arguments[0])?),
+                error: Box::new(semantic_type_from_annotation(arguments[1])?),
+                pending: true,
+                serializable: true,
+                // The selected semantic-package endpoint is the authority for
+                // the actual execution boundary during Resource lowering.
+                execution_boundary: ResourceExecutionBoundary::Shared,
+            }));
+        }
+    }
 
     match text {
         "string" => Some(SemanticType::String),

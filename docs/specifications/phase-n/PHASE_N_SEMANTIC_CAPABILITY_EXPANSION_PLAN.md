@@ -338,6 +338,12 @@ non-executable resolution product and continues to reject the source with
 `PSC1046`; no declaration, activation, artifact, runtime, cancellation, or
 resume behavior is implied.
 
+N6-C2 is complete: a resolved field typed as `Resource<Data, Error>` projects
+the existing canonical declaration and per-planned-instance idle activation
+products with endpoint-derived execution boundary. Source remains rejected and
+there is still no activation schedule, endpoint transport, artifact, runtime,
+cancellation, or resume product.
+
 Introduce a compiler-owned Resource declaration with explicit key, input
 dependencies, loading/success/error state, cancellation, retry, invalidation,
 serialization, and resume rules. Resources may invoke only registered
