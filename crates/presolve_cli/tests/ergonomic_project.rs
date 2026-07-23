@@ -63,3 +63,34 @@ class Home extends Component {
     assert!(opaque.contains("dist/track-purchase.js"));
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn default_check_reports_file_route_pattern_conflicts() {
+    let root = project_root("route-conflict");
+    fs::create_dir_all(root.join("app/routes/posts")).unwrap();
+    fs::write(
+        root.join("app/routes/index.tsx"),
+        r#"@component() class Home extends Component { render() { return <main />; } }"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("app/routes/posts/[id].tsx"),
+        r#"@component() class ById extends Component { render() { return <article />; } }"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("app/routes/posts/[slug].tsx"),
+        r#"@component() class BySlug extends Component { render() { return <article />; } }"#,
+    )
+    .unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("check")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("PSROUTE1013_FILE_ROUTE_CONFLICT"));
+    fs::remove_dir_all(root).unwrap();
+}

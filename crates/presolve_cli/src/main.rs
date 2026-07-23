@@ -150,18 +150,14 @@ fn run_ergonomic_build(root: &Path) {
             .iter()
             .map(|source| (source.logical_path.clone(), source.source.as_str())),
     );
-    let package_specifiers = discovery_unit
-        .files()
-        .iter()
-        .flat_map(|file| file.imports.iter().map(|import| import.source.as_str()))
-        .filter(|source| !source.starts_with('.') && !source.starts_with('/'))
-        .map(str::to_owned)
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect::<Vec<_>>();
     let (package_contracts, package_runtime_modules) =
-        discover_semantic_packages_v1(&project.root, &package_specifiers)
-            .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+        discover_imported_package_tables(&project.root, &discovery_unit);
+    let model = build_application_semantic_model_for_unit_with_packages(
+        &discovery_unit,
+        &package_contracts,
+    );
+    presolve_compiler::build_validated_file_route_graph_v1(&model)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
     let request = ApplicationPublicationRequestV1 {
         configuration: presolve_compiler::platform::WorkspaceConfiguration::default(),
         sources: project
@@ -196,7 +192,10 @@ fn run_ergonomic_check(root: &Path) {
             .iter()
             .map(|source| (source.logical_path.clone(), source.source.as_str())),
     );
-    let asm = build_application_semantic_model_for_unit(&unit);
+    let (package_contracts, _) = discover_imported_package_tables(&project.root, &unit);
+    let asm = build_application_semantic_model_for_unit_with_packages(&unit, &package_contracts);
+    presolve_compiler::build_validated_file_route_graph_v1(&asm)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
     let diagnostics = asm
         .diagnostics
         .iter()
@@ -212,6 +211,26 @@ fn run_ergonomic_check(root: &Path) {
         eprintln!("{}: {}", diagnostic.code, diagnostic.message);
     }
     process::exit(2);
+}
+
+fn discover_imported_package_tables(
+    root: &Path,
+    unit: &CompilationUnit,
+) -> (
+    SemanticPackageResolutionTable,
+    SemanticPackageRuntimeModuleTable,
+) {
+    let package_specifiers = unit
+        .files()
+        .iter()
+        .flat_map(|file| file.imports.iter().map(|import| import.source.as_str()))
+        .filter(|source| !source.starts_with('.') && !source.starts_with('/'))
+        .map(str::to_owned)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    discover_semantic_packages_v1(root, &package_specifiers)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message))
 }
 
 fn run_l9_version(args: &[String]) {

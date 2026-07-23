@@ -3,11 +3,26 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: R5-A - ergonomic semantic-package discovery
-* Working tree: R5-A implementation is ready for commit.
+* Latest completed slice: R3-B - compiler-owned file-route topology
+* Working tree: R3-B implementation is ready for commit.
 * Date: 2026-07-23
 
 Current Phase R slice
+
+* Slice: R3-B - File-Route Layout and Conflict Topology
+* Result: compiler-owned `app/routes` analysis now produces a distinct,
+  validated file-route graph. It derives conventional root/nested layout chains
+  without changing the frozen explicit static-route product or introducing a
+  router runtime. Parameter names normalize to request-match shape, so dynamic
+  route aliases fail deterministically. Ergonomic `presolve build` and
+  `presolve check` validate this topology before compiler publication/check
+  proceeds.
+* Verification: focused compiler route-graph tests prove nested layout order
+  and parameter-shape conflict rejection. A CLI default-project test proves
+  route conflicts fail with `PSROUTE1013_FILE_ROUTE_CONFLICT`.
+* Next: finish R3 by defining the compiler-owned multi-page file-route
+  publication/composition product, then resume R4 simple development and
+  deployment commands.
 
 * Slice: R5-A - Ergonomic Semantic Package Discovery
 * Result: zero-argument `presolve build` now gathers bare package imports from

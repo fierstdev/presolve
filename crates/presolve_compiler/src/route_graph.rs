@@ -18,6 +18,24 @@ pub struct RouteNode {
     pub component: SemanticId,
 }
 
+/// Compiler-derived route topology for the ergonomic `app/routes` convention.
+///
+/// This is intentionally distinct from the frozen explicit static-route
+/// product. It records layout ownership before a later publication product
+/// decides how a route page is emitted; it does not introduce a router runtime.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileRouteGraphV1 {
+    pub routes: Vec<FileRouteNodeV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileRouteNodeV1 {
+    pub path: String,
+    pub component: SemanticId,
+    /// Ordered from the application shell to the nearest route layout.
+    pub layouts: Vec<SemanticId>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RouteGraphError {
     pub code: &'static str,
@@ -74,6 +92,89 @@ pub fn build_file_route_graph_v1(model: &ApplicationSemanticModel) -> RouteGraph
             })
             .collect(),
     }
+}
+
+/// Builds and validates the complete `app/routes` topology, including
+/// conventional `layout.tsx` files. A layout file must declare exactly one
+/// component and cannot also claim a route through `@route()`.
+///
+/// # Errors
+///
+/// Returns stable diagnostics for ambiguous layouts and route patterns. Dynamic
+/// parameter names are intentionally not identity: `/posts/:id` and
+/// `/posts/:slug` conflict because they match the same requests.
+pub fn build_validated_file_route_graph_v1(
+    model: &ApplicationSemanticModel,
+) -> Result<FileRouteGraphV1, RouteGraphError> {
+    let mut layouts = BTreeMap::<Vec<String>, SemanticId>::new();
+    for component in &model.components {
+        let Some(scope) = file_layout_scope(&component.module_path) else {
+            continue;
+        };
+        let scope = normalize_route_scope(scope);
+        if component.route_path.is_some() {
+            return Err(RouteGraphError {
+                code: "PSROUTE1010_LAYOUT_CANNOT_DECLARE_ROUTE",
+                message: format!(
+                    "layout component `{}` must not declare @route()",
+                    component.id
+                ),
+            });
+        }
+        if layouts
+            .insert(scope.clone(), component.id.clone())
+            .is_some()
+        {
+            return Err(RouteGraphError {
+                code: "PSROUTE1011_LAYOUT_COMPONENT_AMBIGUOUS",
+                message: format!(
+                    "layout scope `{}` must declare exactly one component",
+                    route_scope_display(&scope)
+                ),
+            });
+        }
+    }
+
+    let mut routes = Vec::new();
+    for component in &model.components {
+        if file_layout_scope(&component.module_path).is_some() {
+            continue;
+        }
+        let Some(file_path) = file_route_path(&component.module_path) else {
+            continue;
+        };
+        let path = component.route_path.clone().unwrap_or(file_path);
+        if !is_file_route_path(&path) {
+            return Err(RouteGraphError {
+                code: "PSROUTE1012_INVALID_FILE_ROUTE_PATH",
+                message: format!("route path `{path}` is not a supported file-route path"),
+            });
+        }
+        let layouts = layout_chain_for_route(&path, &layouts);
+        routes.push(FileRouteNodeV1 {
+            path,
+            component: component.id.clone(),
+            layouts,
+        });
+    }
+    routes.sort_by(|left, right| {
+        route_match_shape(&left.path)
+            .cmp(&route_match_shape(&right.path))
+            .then_with(|| left.path.cmp(&right.path))
+            .then_with(|| left.component.cmp(&right.component))
+    });
+    for pair in routes.windows(2) {
+        if route_match_shape(&pair[0].path) == route_match_shape(&pair[1].path) {
+            return Err(RouteGraphError {
+                code: "PSROUTE1013_FILE_ROUTE_CONFLICT",
+                message: format!(
+                    "routes `{}` and `{}` match the same request path",
+                    pair[0].path, pair[1].path
+                ),
+            });
+        }
+    }
+    Ok(FileRouteGraphV1 { routes })
 }
 
 /// Produces the deterministic static route product accepted by Phase Q Q1.
@@ -262,6 +363,24 @@ fn is_static_route_path(path: &str) -> bool {
         && path.split('/').all(|segment| !segment.contains(".."))
 }
 
+fn is_file_route_path(path: &str) -> bool {
+    path.starts_with('/')
+        && !path.contains("//")
+        && path.split('/').all(|segment| {
+            segment.is_empty()
+                || (segment.starts_with(':')
+                    && segment.len() > 1
+                    && segment[1..]
+                        .chars()
+                        .all(|character| character.is_ascii_alphanumeric() || character == '_'))
+                || (segment != "."
+                    && segment != ".."
+                    && !segment.contains('*')
+                    && !segment.contains('{')
+                    && !segment.contains('}'))
+        })
+}
+
 fn file_route_path(path: &std::path::Path) -> Option<String> {
     let values = path
         .components()
@@ -292,6 +411,69 @@ fn file_route_path(path: &std::path::Path) -> Option<String> {
     })
 }
 
+fn file_layout_scope(path: &std::path::Path) -> Option<Vec<String>> {
+    let values = path
+        .components()
+        .map(|component| component.as_os_str().to_str())
+        .collect::<Option<Vec<_>>>()?;
+    let filename = values.last()?;
+    if !matches!(*filename, "layout.ts" | "layout.tsx") {
+        return None;
+    }
+    match values.as_slice() {
+        ["app", _] => Some(Vec::new()),
+        ["app", "routes", rest @ .., _] => {
+            rest.iter().map(|segment| route_segment(segment)).collect()
+        }
+        _ => None,
+    }
+}
+
+fn layout_chain_for_route(
+    path: &str,
+    layouts: &BTreeMap<Vec<String>, SemanticId>,
+) -> Vec<SemanticId> {
+    let segments = path
+        .trim_matches('/')
+        .split('/')
+        .filter(|segment| !segment.is_empty())
+        .map(route_match_segment)
+        .collect::<Vec<_>>();
+    (0..=segments.len())
+        .filter_map(|length| layouts.get(&segments[..length]).cloned())
+        .collect()
+}
+
+fn route_match_shape(path: &str) -> String {
+    path.split('/')
+        .map(route_match_segment)
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+fn route_match_segment(segment: &str) -> String {
+    if segment.starts_with(':') {
+        ":".into()
+    } else {
+        segment.into()
+    }
+}
+
+fn normalize_route_scope(scope: Vec<String>) -> Vec<String> {
+    scope
+        .into_iter()
+        .map(|segment| route_match_segment(&segment))
+        .collect()
+}
+
+fn route_scope_display(scope: &[String]) -> String {
+    if scope.is_empty() {
+        "/".into()
+    } else {
+        format!("/{}", scope.join("/"))
+    }
+}
+
 fn route_segment(segment: &str) -> Option<String> {
     if let Some(parameter) = segment
         .strip_prefix('[')
@@ -312,7 +494,10 @@ fn route_segment(segment: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::build_application_semantic_model;
+    use crate::{
+        build_application_semantic_model, build_application_semantic_model_for_unit,
+        CompilationUnit,
+    };
     use presolve_parser::parse_file;
 
     #[test]
@@ -351,6 +536,61 @@ mod tests {
         assert_eq!(
             build_file_route_graph_v1(&model).routes[0].path,
             "/blog/:slug"
+        );
+    }
+
+    #[test]
+    fn derives_nested_layout_chains_for_file_routes() {
+        let model = build_application_semantic_model_for_unit(&CompilationUnit::parse_sources([
+            (
+                "app/layout.tsx",
+                r#"@component() class AppLayout extends Component { render() { return <main />; } }"#,
+            ),
+            (
+                "app/routes/blog/layout.tsx",
+                r#"@component() class BlogLayout extends Component { render() { return <section />; } }"#,
+            ),
+            (
+                "app/routes/blog/[slug].tsx",
+                r#"@component() class Post extends Component { render() { return <article />; } }"#,
+            ),
+        ]));
+
+        let graph = build_validated_file_route_graph_v1(&model).unwrap();
+
+        assert_eq!(graph.routes.len(), 1);
+        assert_eq!(graph.routes[0].path, "/blog/:slug");
+        assert_eq!(
+            graph.routes[0]
+                .layouts
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>(),
+            vec![
+                "module:app/layout.tsx/component:presolve-app-layout",
+                "module:app/routes/blog/layout.tsx/component:presolve-blog-layout"
+            ]
+        );
+    }
+
+    #[test]
+    fn rejects_file_routes_that_differ_only_by_parameter_name() {
+        let model = build_application_semantic_model_for_unit(&CompilationUnit::parse_sources([
+            (
+                "app/routes/blog/[id].tsx",
+                r#"@component() class ById extends Component { render() { return <article />; } }"#,
+            ),
+            (
+                "app/routes/blog/[slug].tsx",
+                r#"@component() class BySlug extends Component { render() { return <article />; } }"#,
+            ),
+        ]));
+
+        assert_eq!(
+            build_validated_file_route_graph_v1(&model)
+                .unwrap_err()
+                .code,
+            "PSROUTE1013_FILE_ROUTE_CONFLICT"
         );
     }
 }
