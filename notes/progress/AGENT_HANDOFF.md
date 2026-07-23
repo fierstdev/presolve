@@ -3,11 +3,25 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: R3-B - compiler-owned file-route topology
-* Working tree: R3-B implementation is ready for commit.
+* Latest completed slice: R4-A - ergonomic development host
+* Working tree: R4-A implementation is ready for commit.
 * Date: 2026-07-23
 
 Current Phase R slice
+
+* Slice: R4-A - Ergonomic Development Host
+* Result: `presolve dev` now builds a discovered project through the same
+  compiler-owned development publication path and serves only the resulting
+  immutable release over loopback HTTP. `--port` selects a loopback port and
+  `--once` supports non-serving editor/CI integration. The host rejects path
+  traversal and has no source parser, renderer, router, artifact merger, or
+  framework runtime.
+* Verification: default-project `dev --once` and live HTTP fixture prove the
+  canonical published page is served. Existing package and route conflict
+  fixture coverage remains green.
+* Next: extend development ergonomics with a compiler-owned incremental watch
+  contract, then complete multi-page file-route publication/composition and
+  deploy/scaffold surfaces.
 
 * Slice: R3-B - File-Route Layout and Conflict Topology
 * Result: compiler-owned `app/routes` analysis now produces a distinct,

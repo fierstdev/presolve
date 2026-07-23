@@ -2,8 +2,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fmt::Write as _;
 use std::fs;
-use std::io;
-use std::path::{Path, PathBuf};
+use std::io::{self, Read as _, Write as _};
+use std::net::{TcpListener, TcpStream};
+use std::path::{Component, Path, PathBuf};
 use std::process;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -78,7 +79,7 @@ fn main() {
     match command.as_str() {
         "version" => run_l9_version(&args),
         "help" | "--help" | "-h" => print_l9_usage(),
-        "create" | "dev" | "benchmark" | "doctor" => l9_reserved_command(&command),
+        "create" | "benchmark" | "doctor" => l9_reserved_command(&command),
         "explain" => run_explain(args),
         "parse" => run_parse(args),
         "graph" => {
@@ -105,13 +106,14 @@ fn main() {
         "manifest" => run_manifest(args),
         "build" => {
             if args.is_empty() {
-                run_ergonomic_build(Path::new("."));
+                run_ergonomic_build(Path::new("."), ApplicationPublicationProfileV1::Production);
             } else if args.iter().any(|argument| argument == "--config") {
                 run_l9_build_or_check("build", &args);
             } else {
                 run_build(args);
             }
         }
+        "dev" => run_ergonomic_dev(&args),
         "application" => run_application_command(args),
         "route" => run_route_command(args),
         "cache" => run_l9_cache(&args),
@@ -128,7 +130,7 @@ fn main() {
     }
 }
 
-fn run_ergonomic_build(root: &Path) {
+fn run_ergonomic_build(root: &Path, profile: ApplicationPublicationProfileV1) {
     let project = discover_project_v1(root)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
     let entry_path = PathBuf::from("app/routes/index.tsx");
@@ -171,7 +173,7 @@ fn run_ergonomic_build(root: &Path) {
         entry_path,
         package_contracts,
         package_runtime_modules,
-        profile: ApplicationPublicationProfileV1::Production,
+        profile,
         output_root: output_root.clone(),
     };
     let validated = validate_application_publication_request_v1(request)
@@ -181,6 +183,131 @@ fn run_ergonomic_build(root: &Path) {
     publish_application_product(&output_root, &product)
         .unwrap_or_else(|error| application_cli_error("PSAPP3008_PUBLICATION_FAILED", &error));
     println!("Built {}", output_root.display());
+}
+
+fn run_ergonomic_dev(args: &[String]) {
+    let mut port = 3000_u16;
+    let mut once = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--once" => {
+                once = true;
+                index += 1;
+            }
+            "--port" => {
+                let Some(value) = args.get(index + 1) else {
+                    application_cli_error("PSDEV1001_INVALID_ARGUMENT", "--port requires a number");
+                };
+                port = value.parse::<u16>().unwrap_or_else(|_| {
+                    application_cli_error("PSDEV1001_INVALID_ARGUMENT", "--port must be a u16")
+                });
+                index += 2;
+            }
+            option => application_cli_error(
+                "PSDEV1001_INVALID_ARGUMENT",
+                &format!("unknown dev option `{option}`"),
+            ),
+        }
+    }
+    run_ergonomic_build(Path::new("."), ApplicationPublicationProfileV1::Development);
+    if once {
+        return;
+    }
+    serve_ergonomic_development_output(&Path::new(".").join("dist"), port);
+}
+
+fn serve_ergonomic_development_output(output_root: &Path, port: u16) -> ! {
+    let listener = TcpListener::bind(("127.0.0.1", port)).unwrap_or_else(|error| {
+        application_cli_error(
+            "PSDEV1002_LISTEN_FAILED",
+            &format!("failed to bind 127.0.0.1:{port}: {error}"),
+        )
+    });
+    let address = listener
+        .local_addr()
+        .expect("bound listener has an address");
+    println!("Presolve dev ready at http://{address}");
+    for connection in listener.incoming() {
+        match connection {
+            Ok(stream) => serve_ergonomic_development_connection(stream, output_root),
+            Err(error) => eprintln!("PSDEV1003_CONNECTION_FAILED: {error}"),
+        }
+    }
+    unreachable!("a TcpListener incoming iterator never completes")
+}
+
+fn serve_ergonomic_development_connection(mut stream: TcpStream, output_root: &Path) {
+    let mut request = [0_u8; 16 * 1024];
+    let Ok(length) = stream.read(&mut request) else {
+        return;
+    };
+    let request = String::from_utf8_lossy(&request[..length]);
+    let Some(target) = request
+        .lines()
+        .next()
+        .and_then(|line| line.split_whitespace().nth(1))
+    else {
+        write_development_response(
+            &mut stream,
+            "400 Bad Request",
+            "text/plain",
+            b"Bad request\n",
+        );
+        return;
+    };
+    let path = target.split('?').next().unwrap_or(target);
+    let relative = if path == "/" {
+        PathBuf::from("index.html")
+    } else {
+        PathBuf::from(path.trim_start_matches('/'))
+    };
+    if !is_safe_development_asset_path(&relative) {
+        write_development_response(&mut stream, "404 Not Found", "text/plain", b"Not found\n");
+        return;
+    }
+    match fs::read(output_root.join(&relative)) {
+        Ok(bytes) => write_development_response(
+            &mut stream,
+            "200 OK",
+            development_content_type(&relative),
+            &bytes,
+        ),
+        Err(_) => {
+            write_development_response(&mut stream, "404 Not Found", "text/plain", b"Not found\n")
+        }
+    }
+}
+
+fn is_safe_development_asset_path(path: &Path) -> bool {
+    !path.as_os_str().is_empty()
+        && path
+            .components()
+            .all(|component| matches!(component, Component::Normal(_)))
+}
+
+fn development_content_type(path: &Path) -> &'static str {
+    match path.extension().and_then(|extension| extension.to_str()) {
+        Some("html") => "text/html; charset=utf-8",
+        Some("js") => "text/javascript; charset=utf-8",
+        Some("json") => "application/json; charset=utf-8",
+        Some("css") => "text/css; charset=utf-8",
+        _ => "application/octet-stream",
+    }
+}
+
+fn write_development_response(
+    stream: &mut TcpStream,
+    status: &str,
+    content_type: &str,
+    body: &[u8],
+) {
+    let _ = write!(
+        stream,
+        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        body.len()
+    );
+    let _ = stream.write_all(body);
 }
 
 fn run_ergonomic_check(root: &Path) {
