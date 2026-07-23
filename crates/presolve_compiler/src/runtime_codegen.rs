@@ -1562,6 +1562,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       initialEffectRuns: [],
       completedActionEffectRuns: [],
       effectSubscriptions: new Map(),
+      resources: new Map(),
       activeActionBatch: null
     };
   }
@@ -3660,7 +3661,44 @@ const RUNTIME_STUB: &str = r#"(() => {
     };
   }
 
-  function initializeRuntime(manifest, computedArtifact, contextArtifact, effectArtifact, componentArtifact, formsArtifact, diagnostics) {
+  async function initializeResourcesRuntime(store, resourcesArtifact, diagnostics) {
+    if (resourcesArtifact === null) return;
+    const declarations = new Map(resourcesArtifact.declarations.map((declaration) => [declaration.id, declaration]));
+    for (const activation of resourcesArtifact.activations) {
+      const declaration = declarations.get(activation.declaration);
+      if (declaration === undefined) throw new PresolveBootError("PSR_INVALID_RESOURCES_ARTIFACT");
+      if (!["Client", "Shared"].includes(declaration.execution_boundary)) {
+        reportDiagnostic(diagnostics, "PSR_RESOURCE_SERVER_UNAVAILABLE", "A server-only Resource cannot activate in the browser runtime", { activation, declaration }, true);
+        throw new PresolveBootError("PSR_RESOURCE_SERVER_UNAVAILABLE");
+      }
+      const controller = new AbortController();
+      const record = { activation, declaration, controller, state: "pending", generation: 1, data: null, error: null };
+      store.resources.set(activation.id, record);
+      try {
+        const module = await import(declaration.endpoint.runtime_location);
+        const endpoint = module[declaration.endpoint.export];
+        if (typeof endpoint !== "function") throw new Error("endpoint-export-missing");
+        const result = await endpoint({ signal: controller.signal, inputs: Object.freeze({}) });
+        if (controller.signal.aborted) {
+          record.state = "cancelled";
+        } else {
+          JSON.stringify(result);
+          record.state = "ready";
+          record.data = result;
+        }
+      } catch (error) {
+        if (controller.signal.aborted) {
+          record.state = "cancelled";
+        } else {
+          record.state = "failed";
+          record.error = error instanceof Error ? error.message : String(error);
+          reportDiagnostic(diagnostics, "PSR_RESOURCE_ENDPOINT_FAILURE", "A compiler-authorized Resource endpoint failed", { activation: activation.id, error: record.error });
+        }
+      }
+    }
+  }
+
+  async function initializeRuntime(manifest, computedArtifact, contextArtifact, effectArtifact, componentArtifact, formsArtifact, resourcesArtifact, diagnostics) {
     const bindingAnchors = collectBindingAnchors();
     const conditionalAnchors = collectConditionalAnchors();
     const listAnchors = collectListAnchors();
@@ -3769,6 +3807,8 @@ const RUNTIME_STUB: &str = r#"(() => {
 
     initializeFormsRuntime(store, formsArtifact, manifest, elementsByNode, diagnostics);
 
+    await initializeResourcesRuntime(store, resourcesArtifact, diagnostics);
+
     executeInitialEffects(store);
 
     if (manifest.schema_version === SUPPORTED_SCHEMA_VERSION) {
@@ -3800,6 +3840,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         aggregate_valid: instance.aggregate_valid,
         submission: instance.submission
       })),
+      resources: [...store.resources.entries()].map(([id, resource]) => ({ id, state: resource.state, generation: resource.generation })),
       slot_binding_runs: [...store.slotBindings.keys()],
       component_failures: []
     });
@@ -3838,6 +3879,7 @@ const RUNTIME_STUB: &str = r#"(() => {
           effectArtifact,
           componentArtifact,
           formsArtifact,
+          resourcesArtifact,
           diagnostics
         ),
         coldBoot: () => initializeRuntime(
@@ -3847,6 +3889,7 @@ const RUNTIME_STUB: &str = r#"(() => {
           effectArtifact,
           componentArtifact,
           formsArtifact,
+          resourcesArtifact,
           diagnostics
         )
       });
@@ -3958,6 +4001,8 @@ mod tests {
         assert!(runtime.contains("presolve-forms-runtime"));
         assert!(runtime.contains("presolve-resources-runtime"));
         assert!(runtime.contains("validateResourcesArtifact"));
+        assert!(runtime.contains("initializeResourcesRuntime"));
+        assert!(runtime.contains("AbortController"));
         assert!(runtime.contains("initializeFormsRuntime"));
         assert!(runtime.contains("dispatchFormSubmit"));
         assert!(runtime.contains("form_hosts"));
