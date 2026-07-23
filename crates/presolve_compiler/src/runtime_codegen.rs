@@ -8,6 +8,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const COMPONENT_ARTIFACT_ELEMENT_ID = "presolve-component-runtime";
   const FORMS_ARTIFACT_ELEMENT_ID = "presolve-forms-runtime";
   const RESOURCES_ARTIFACT_ELEMENT_ID = "presolve-resources-runtime";
+  const OPAQUE_ARTIFACT_ELEMENT_ID = "presolve-opaque-runtime";
   const RESUME_MANIFEST_ELEMENT_ID = "presolve-resume-runtime";
   const RESUME_SNAPSHOT_ELEMENT_ID = "presolve-resume-snapshot";
   const PRODUCTION_RUNTIME_ELEMENT_ID = "presolve-production-runtime";
@@ -23,6 +24,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_RESOURCES_ARTIFACT_SCHEMA_VERSION = 1;
+  const SUPPORTED_OPAQUE_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_RESUME_MANIFEST_SCHEMA_VERSION = 6;
   const SUPPORTED_RESUME_SNAPSHOT_SCHEMA_VERSION = 1;
   const SUPPORTED_RESUME_RUNTIME_PROTOCOL_VERSION = 1;
@@ -467,7 +469,8 @@ const RUNTIME_STUB: &str = r#"(() => {
     );
   }
 
-  function validateManifestActionBindings(manifest, diagnostics) {
+  function validateManifestActionBindings(manifest, opaqueArtifact, diagnostics) {
+    const opaqueMethods = new Set((opaqueArtifact?.activations ?? []).map((activation) => activation.method));
     for (const component of manifest.components ?? []) {
       const actionsByMethod = new Map();
 
@@ -510,7 +513,8 @@ const RUNTIME_STUB: &str = r#"(() => {
           );
           throw new PresolveBootError("PSR_INVALID_ACTION_BINDING");
         }
-        if (actionsByMethod.get(event.method_id) !== event.action_batch_id) {
+        if (actionsByMethod.get(event.method_id) !== event.action_batch_id
+          && !opaqueMethods.has(event.method_id)) {
           reportDiagnostic(
             diagnostics,
             "PSR_INVALID_ACTION_BINDING",
@@ -524,7 +528,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
-  function validateManifestSchema(manifest, effectArtifact, componentArtifact, diagnostics) {
+  function validateManifestSchema(manifest, effectArtifact, componentArtifact, opaqueArtifact, diagnostics) {
     if (
       manifest?.schema_version !== SUPPORTED_SCHEMA_VERSION &&
       manifest?.schema_version !== FORMS_MANIFEST_SCHEMA_VERSION &&
@@ -574,7 +578,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
 
     if (manifest.schema_version >= ACTION_MANIFEST_SCHEMA_VERSION) {
-      validateManifestActionBindings(manifest, diagnostics);
+      validateManifestActionBindings(manifest, opaqueArtifact, diagnostics);
     }
   }
 
@@ -601,6 +605,45 @@ const RUNTIME_STUB: &str = r#"(() => {
     try { return JSON.parse(element.textContent ?? ""); } catch (error) {
       reportDiagnostic(diagnostics, "PSR_INVALID_RESOURCES_ARTIFACT", "Resource runtime metadata JSON could not be parsed", { message: error instanceof Error ? error.message : String(error) }, true);
       throw new PresolveBootError("PSR_INVALID_RESOURCES_ARTIFACT");
+    }
+  }
+
+  function readOpaqueArtifact(diagnostics) {
+    const element = document.getElementById(OPAQUE_ARTIFACT_ELEMENT_ID);
+    if (element === null) return null;
+    if (!(element instanceof HTMLScriptElement)) {
+      reportDiagnostic(diagnostics, "PSR_INVALID_OPAQUE_ARTIFACT", "Opaque terminal metadata was not stored in a script element", { artifactElementId: OPAQUE_ARTIFACT_ELEMENT_ID }, true);
+      throw new PresolveBootError("PSR_INVALID_OPAQUE_ARTIFACT");
+    }
+    try { return JSON.parse(element.textContent ?? ""); } catch (error) {
+      reportDiagnostic(diagnostics, "PSR_INVALID_OPAQUE_ARTIFACT", "Opaque terminal metadata JSON could not be parsed", { message: error instanceof Error ? error.message : String(error) }, true);
+      throw new PresolveBootError("PSR_INVALID_OPAQUE_ARTIFACT");
+    }
+  }
+
+  function validateOpaqueArtifact(opaqueArtifact, diagnostics) {
+    if (opaqueArtifact === null) return;
+    if (opaqueArtifact.schema_version !== SUPPORTED_OPAQUE_ARTIFACT_SCHEMA_VERSION
+      || !Array.isArray(opaqueArtifact.activations)) {
+      reportDiagnostic(diagnostics, "PSR_UNSUPPORTED_OPAQUE_ARTIFACT_SCHEMA", "Opaque terminal metadata did not match the compiler artifact contract", { schema_version: opaqueArtifact.schema_version }, true);
+      throw new PresolveBootError("PSR_UNSUPPORTED_OPAQUE_ARTIFACT_SCHEMA");
+    }
+    const ids = new Set();
+    const methods = new Set();
+    for (const activation of opaqueArtifact.activations) {
+      if (typeof activation?.id !== "string" || ids.has(activation.id)
+        || typeof activation?.method !== "string" || methods.has(activation.method)
+        || typeof activation?.owner_component !== "string"
+        || typeof activation?.package !== "string" || typeof activation?.version !== "string"
+        || typeof activation?.integrity !== "string" || typeof activation?.export !== "string"
+        || typeof activation?.runtime_module !== "string" || typeof activation?.runtime_location !== "string"
+        || activation?.type_signature !== "() -> void"
+        || activation?.execution_boundary !== "client" || activation?.resume_policy !== "cold_fallback") {
+        reportDiagnostic(diagnostics, "PSR_INVALID_OPAQUE_ARTIFACT", "Opaque terminal activation did not retain one exact callable client boundary", { activation }, true);
+        throw new PresolveBootError("PSR_INVALID_OPAQUE_ARTIFACT");
+      }
+      ids.add(activation.id);
+      methods.add(activation.method);
     }
   }
 
@@ -1520,7 +1563,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     return nextInstances;
   }
 
-  function createRuntimeStore(elementsByNode, diagnostics, computedArtifact, contextArtifact, effectArtifact, componentArtifact) {
+  function createRuntimeStore(elementsByNode, diagnostics, computedArtifact, contextArtifact, effectArtifact, componentArtifact, opaqueArtifact) {
     const computedEvaluations = new Map();
     const storageValues = new Map();
     const storageByComponentField = new Map();
@@ -1558,6 +1601,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       bindingsByStateSlot: new Map(),
       bindingsByInstanceComputed: new Map(),
       actionsByMethod: new Map(),
+      opaqueTerminalsByMethod: new Map((opaqueArtifact?.activations ?? []).map((activation) => [activation.method, activation])),
+      opaqueActivations: [],
       eventsByType: new Map(),
       elementsByNode,
       diagnostics,
@@ -2270,7 +2315,10 @@ const RUNTIME_STUB: &str = r#"(() => {
       return;
     }
 
-    const actionRecord = store.actionsByMethod.get(event.method_id);
+    const actionRecord = store.actionsByMethod.get(event.method_id)
+      ?? (store.opaqueTerminalsByMethod.has(event.method_id)
+        ? { action_batch_id: event.action_batch_id, actions: [] }
+        : undefined);
 
     if (
       actionRecord === undefined ||
@@ -2299,6 +2347,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
     eventsByNode.set(event.node, {
       component,
+      method_id: event.method_id,
       action_batch_id: event.action_batch_id,
       actions: actionRecord.actions,
       arguments: Array.isArray(event.arguments) ? event.arguments : []
@@ -2559,11 +2608,31 @@ const RUNTIME_STUB: &str = r#"(() => {
       executeComputedUpdateBatches(store);
       executeContextUpdates(store, actionBatchId);
       executeCompletedActionEffects(store, actionBatchId);
+      const methodId = executionContext?.method_id;
+      if (typeof methodId === "string") executeOpaqueTerminal(store, methodId);
     } finally {
       store.activeActionBatch = null;
       store.activeExecutionContext = null;
       refreshComputedDebugState(store);
     }
+  }
+
+  function executeOpaqueTerminal(store, methodId) {
+    const terminal = store.opaqueTerminalsByMethod.get(methodId);
+    if (terminal === undefined) return;
+    const evidence = { activation: terminal.id, method: methodId, status: "loading" };
+    store.opaqueActivations.push(evidence);
+    import(new URL(terminal.runtime_location, document.baseURI).href)
+      .then((module) => {
+        const callable = module?.[terminal.export];
+        if (typeof callable !== "function") throw new Error("declared export is not callable");
+        return callable();
+      })
+      .then(() => { evidence.status = "complete"; })
+      .catch((error) => {
+        evidence.status = "failed";
+        reportDiagnostic(store.diagnostics, "PSR_OPAQUE_TERMINAL_FAILURE", "A compiler-authorized opaque terminal failed", { activation: terminal.id, message: error instanceof Error ? error.message : String(error) });
+      });
   }
 
   function registerComponentEvents(store, component) {
@@ -2605,7 +2674,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       return;
     }
 
-    executeActions(store, record.component, record.action_batch_id, record.actions, { arguments: record.arguments });
+    executeActions(store, record.component, record.action_batch_id, record.actions, { arguments: record.arguments, method_id: record.method_id });
   }
 
   function installDelegatedEventListeners(store) {
@@ -2862,7 +2931,10 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (targetId === null) return;
     const record = store.ordinaryEventsByTargetAndType.get(ordinaryEventKey(targetId, event.type));
     if (record === undefined) return;
-    const actionRecord = store.actionsByMethod.get(record.handler_method_id);
+    const actionRecord = store.actionsByMethod.get(record.handler_method_id)
+      ?? (store.opaqueTerminalsByMethod.has(record.handler_method_id)
+        ? { action_batch_id: record.action_batch_id, actions: [] }
+        : undefined);
     const component = store.components.get(record.component_instance_id);
     if (actionRecord === undefined || component === undefined || actionRecord.action_batch_id !== record.action_batch_id) {
       throw new PresolveBootError("PSR_INVALID_ORDINARY_EVENT");
@@ -2872,6 +2944,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       trigger_target_id: record.instance_target_id,
       declaration_event_id: record.declaration_event_id,
       action_batch_id: record.action_batch_id,
+      method_id: record.handler_method_id,
       arguments: Array.isArray(record.arguments) ? record.arguments : []
     };
     executeActions(store, component, record.action_batch_id, actionRecord.actions, context);
@@ -3831,12 +3904,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     }));
   }
 
-  async function initializeRuntime(manifest, computedArtifact, contextArtifact, effectArtifact, componentArtifact, formsArtifact, resourcesArtifact, diagnostics) {
+  async function initializeRuntime(manifest, computedArtifact, contextArtifact, effectArtifact, componentArtifact, formsArtifact, resourcesArtifact, opaqueArtifact, diagnostics) {
     const bindingAnchors = collectBindingAnchors();
     const conditionalAnchors = collectConditionalAnchors();
     const listAnchors = collectListAnchors();
     const elementsByNode = collectElementAnchors();
-    const store = createRuntimeStore(elementsByNode, diagnostics, computedArtifact, contextArtifact, effectArtifact, componentArtifact);
+    const store = createRuntimeStore(elementsByNode, diagnostics, computedArtifact, contextArtifact, effectArtifact, componentArtifact, opaqueArtifact);
     store.componentArtifact = componentArtifact;
     store.componentInstances = new Map((componentArtifact?.instances ?? []).map((instance) => [instance.instance, { ...instance, status: "created" }]));
     store.slotBindings = new Map((componentArtifact?.slot_binding_programs ?? []).map((binding) => [binding.binding, binding]));
@@ -3976,6 +4049,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         submission: instance.submission
       })),
       resources: [...store.resources.entries()].map(([id, resource]) => ({ id, state: resource.state, generation: resource.generation })),
+      opaque_terminals: [...store.opaqueActivations],
       slot_binding_runs: [...store.slotBindings.keys()],
       component_failures: []
     });
@@ -3996,7 +4070,9 @@ const RUNTIME_STUB: &str = r#"(() => {
       validateEffectArtifactSchema(effectArtifact, diagnostics);
       const componentArtifact = readComponentArtifact(diagnostics);
       validateComponentArtifactSchema(componentArtifact, diagnostics);
-      validateManifestSchema(manifest, effectArtifact, componentArtifact, diagnostics);
+      const opaqueArtifact = readOpaqueArtifact(diagnostics);
+      validateOpaqueArtifact(opaqueArtifact, diagnostics);
+      validateManifestSchema(manifest, effectArtifact, componentArtifact, opaqueArtifact, diagnostics);
       const formsArtifact = readFormsArtifact(diagnostics);
       validateFormsArtifact(formsArtifact, manifest, diagnostics);
       const resourcesArtifact = readResourcesArtifact(diagnostics);
@@ -4004,18 +4080,23 @@ const RUNTIME_STUB: &str = r#"(() => {
 
       const result = await bootstrapResume({
         diagnostics,
-        resumeBoot: ({ manifest: resumeManifest, snapshot, registry }) => restoreResumeRuntimeThroughForms(
-          resumeManifest,
-          snapshot,
-          registry,
-          manifest,
-          computedArtifact,
-          contextArtifact,
-          effectArtifact,
-          componentArtifact,
-          formsArtifact,
-          diagnostics
-        ),
+        resumeBoot: ({ manifest: resumeManifest, snapshot, registry }) => {
+          if ((opaqueArtifact?.activations ?? []).length > 0) {
+            throw new ResumeBootError("OpaqueTerminalColdFallback");
+          }
+          return restoreResumeRuntimeThroughForms(
+            resumeManifest,
+            snapshot,
+            registry,
+            manifest,
+            computedArtifact,
+            contextArtifact,
+            effectArtifact,
+            componentArtifact,
+            formsArtifact,
+            diagnostics
+          );
+        },
         coldBoot: () => initializeRuntime(
           manifest,
           computedArtifact,
@@ -4024,6 +4105,7 @@ const RUNTIME_STUB: &str = r#"(() => {
           componentArtifact,
           formsArtifact,
           resourcesArtifact,
+          opaqueArtifact,
           diagnostics
         )
       });
@@ -4136,6 +4218,11 @@ mod tests {
         assert!(runtime.contains("instruction.kind === \"get-index\""));
         assert!(runtime.contains("presolve-forms-runtime"));
         assert!(runtime.contains("presolve-resources-runtime"));
+        assert!(runtime.contains("presolve-opaque-runtime"));
+        assert!(runtime.contains("validateOpaqueArtifact"));
+        assert!(runtime.contains("executeOpaqueTerminal"));
+        assert!(runtime.contains("PSR_OPAQUE_TERMINAL_FAILURE"));
+        assert!(runtime.contains("OpaqueTerminalColdFallback"));
         assert!(runtime.contains("validateResourcesArtifact"));
         assert!(runtime.contains("initializeResourcesRuntime"));
         assert!(runtime.contains("AbortController"));

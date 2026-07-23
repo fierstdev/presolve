@@ -67,6 +67,13 @@ by the exact existing semantic-package runtime-module table. N9-E publishes
 that exact artifact as `opaque.runtime.json` and embeds it before `runtime.js`.
 Generated execution and resume consumption remain subsequent slices.
 
+N9-F consumes the embedded artifact only after strict runtime validation. A
+delegated compiler event carries its exact method identity to the matching
+terminal; the runtime imports only its emitted exact module location, verifies
+the declared export is callable, and invokes it with no arguments. Failure is
+diagnostic-only and opaque terminals force the normal resume path to cold
+fallback before restoration. Browser evidence is still required for admission.
+
 Malformed, duplicate, mismatched, non-client, missing-export, non-callable,
 or integrity-unbound records fail closed. An opaque declaration must match an
 actual imported opaque semantic-package export; a pure/resource/nonsemantic
