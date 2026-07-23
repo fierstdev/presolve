@@ -119,6 +119,7 @@ source.
 `scripts/verify-m10-framework-freeze.sh` replays the frozen M9 matrix, M10-A
 Resource type/build/browser proof, M10-B registry/type/compiler proof, and the
 canonical Phase N capability-matrix projection. It also requires a clean diff.
+It rejects untracked generated files as well as tracked changes.
 The aggregate completed successfully from a clean committed tree.
 The next product phase must obtain separate authority for metaframework
 orchestration; it may not add a framework runtime or reinterpret this frozen

@@ -38,10 +38,15 @@ cargo test -q -p presolve-compiler \
   retains_invalid_decorators_targets_designators_and_owning_forms_without_field_ids --lib
 cargo test -q -p presolve-parser \
   retains_normalized_form_field_designators_targets_values_and_provenance --lib
-for fixture in "$forms_fixture" "$resume_fixture"; do
-  rm -rf "$fixture/.presolve"
-done
-trap 'rm -rf "$forms_fixture/.presolve" "$resume_fixture/.presolve"' EXIT
+cleanup() {
+  for fixture in "$forms_fixture" "$resume_fixture"; do
+    if test -d "$fixture/.presolve"; then
+      find "$fixture/.presolve" -depth -delete
+    fi
+  done
+}
+cleanup
+trap cleanup EXIT
 cargo run -q -p presolve-cli -- check \
   --config "$forms_fixture/presolve.json" \
   --source forms.tsx=src/FormHost.tsx \

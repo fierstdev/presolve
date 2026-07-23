@@ -22,3 +22,4 @@ done
 cargo fmt --all --check
 git diff --check
 git diff --quiet
+test -z "$(git status --porcelain)"
