@@ -1886,6 +1886,34 @@ class Parameterized extends Component {
     }
 
     #[test]
+    fn component_graph_lowers_serializable_action_local_to_state_assignment() {
+        let source = r#"
+@component("x-action-local")
+class ActionLocal extends Component {
+  label = state("Ready");
+
+  @action() lock() {
+    const next = "Locked";
+    this.label = next;
+  }
+
+  render() {
+    return <button onClick={this.lock}>{this.label}</button>;
+  }
+}
+"#;
+
+        let parsed = presolve_parser::parse_file("ActionLocal.tsx", source);
+        let graph = build_component_graph(&parsed);
+
+        assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+        assert!(matches!(
+            graph.components[0].actions[0].operation,
+            StateOperation::Assign(SerializableValue::String(ref value)) if value == "Locked"
+        ));
+    }
+
+    #[test]
     fn component_graph_reports_duplicate_event_errors() {
         let parsed = presolve_parser::ParsedFile {
             path: "DuplicateEvent.tsx".into(),

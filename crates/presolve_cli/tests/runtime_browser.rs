@@ -3499,6 +3499,7 @@ class ParameterizedAction extends Component {
   @action() setLabel(value: string) { this.label = value; }
   render() { return <button onClick={() => this.setLabel("Locked")}>{this.label}</button>; }
 }
+
 "#,
     )
     .expect("write parameter source");
@@ -3530,6 +3531,61 @@ class ParameterizedAction extends Component {
     server.stop();
     assert!(
         stdout.contains("PRESOLVE_STATIC_ACTION_PARAMETER_BROWSER_TEST_PASS"),
+        "{}",
+        stdout
+    );
+}
+
+#[test]
+fn serializable_action_local_updates_state_from_compiler_generated_runtime() {
+    let _guard = browser_test_guard();
+    let root = repo_root();
+    let out = root.join("target/psc-browser-test/serializable-action-local");
+    if out.exists() {
+        fs::remove_dir_all(&out).expect("clean action-local output");
+    }
+    fs::create_dir_all(&out).expect("create action-local output");
+    let source = out.join("ActionLocal.tsx");
+    fs::write(
+        &source,
+        r#"
+@component("x-action-local")
+class ActionLocal extends Component {
+  label = state("Ready");
+  @action() lock() { const next = "Locked"; this.label = next; }
+  render() { return <button onClick={this.lock}>{this.label}</button>; }
+}
+"#,
+    )
+    .expect("write action-local source");
+    let build = Command::new(presolve_cli_bin())
+        .current_dir(&root)
+        .args([
+            "build",
+            source.to_str().expect("source"),
+            "--out",
+            out.to_str().expect("out"),
+        ])
+        .output()
+        .expect("build action-local source");
+    assert!(
+        build.status.success(),
+        "{}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    write_serializable_action_local_probe_page(&out);
+    let server = StaticServer::start(out.clone());
+    let profile = out.join("chrome-profile");
+    fs::create_dir_all(&profile).expect("profile");
+    let output = run_chrome_probe(
+        chrome_bin().expect("Chrome"),
+        &format!("--user-data-dir={}", profile.display()),
+        &format!("http://127.0.0.1:{}/probe.html", server.port),
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("PRESOLVE_SERIALIZABLE_ACTION_LOCAL_BROWSER_TEST_PASS"),
         "{}",
         stdout
     );
@@ -4111,6 +4167,14 @@ if (button.textContent !== "Locked" || window.__PRESOLVE__.components[0].state.l
 document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_STATIC_ACTION_PARAMETER_BROWSER_TEST_PASS</div>"); })().catch((error) => { document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_STATIC_ACTION_PARAMETER_BROWSER_TEST_FAIL: ${error.message}</div>`); });
 </script></body>"#);
     fs::write(out_dir.join("probe.html"), probe).expect("write parameter probe");
+}
+
+fn write_serializable_action_local_probe_page(out_dir: &Path) {
+    fs::write(
+        out_dir.join("probe.html"),
+        r#"<!doctype html><html><body><script src="runtime.js"></script><script>(async () => { const button = document.querySelector("button"); if (!button || button.textContent.trim() !== "Ready") throw new Error("initial"); button.click(); await new Promise((resolve) => setTimeout(resolve, 25)); if (button.textContent.trim() !== "Locked") throw new Error(`updated:${button.textContent}`); document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_SERIALIZABLE_ACTION_LOCAL_BROWSER_TEST_PASS</div>"); })().catch((error) => { document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_SERIALIZABLE_ACTION_LOCAL_BROWSER_TEST_FAIL: ${error.message}</div>`); });</script></body></html>"#,
+    )
+    .expect("write action-local probe");
 }
 
 fn write_initial_effect_probe_page(out_dir: &Path) {

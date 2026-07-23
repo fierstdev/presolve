@@ -1453,7 +1453,7 @@ fn build_component_node(
                     id: id.action(&method.name, index),
                     owner: SemanticOwner::entity(id.method(&method.name)),
                     method: method.name.clone(),
-                    operation: state_operation_from_parsed(&update.operation),
+                    operation: state_operation_from_parsed_in_method(&update.operation, method),
                     field: update.field.clone(),
                 })
         })
@@ -3860,6 +3860,37 @@ fn collect_action_parameter_assignment_diagnostics(
             let ParsedStateOperation::AssignParameter(parameter_name) = &update.operation else {
                 continue;
             };
+            if let Some(local) = method
+                .local_variables
+                .iter()
+                .find(|local| local.name == *parameter_name)
+            {
+                if !method
+                    .decorators
+                    .iter()
+                    .any(|decorator| decorator.name == "action" && decorator.is_invoked)
+                {
+                    diagnostics.push(ComponentDiagnostic::error(
+                        "PSC1045",
+                        format!(
+                            "serializable local `{parameter_name}` assigned to state in method `{}` of class `{}` requires @action()",
+                            method.name, class.name,
+                        ),
+                    ));
+                }
+                let state_kind = state_field_primitive_kind(class, &update.field);
+                let local_kind = serializable_primitive_kind(&local.value);
+                if local_kind.is_none() || state_kind.is_none() || local_kind != state_kind {
+                    diagnostics.push(ComponentDiagnostic::error(
+                        "PSC1045",
+                        format!(
+                            "serializable local `{parameter_name}` in method `{}` of class `{}` is not primitively compatible with State field `{}`",
+                            method.name, class.name, update.field,
+                        ),
+                    ));
+                }
+                continue;
+            }
             let Some(parameter) = method
                 .parameters
                 .iter()
@@ -3973,6 +4004,23 @@ fn state_operation_from_parsed(operation: &ParsedStateOperation) -> StateOperati
             StateOperation::AssignParameter(parameter.clone())
         }
         ParsedStateOperation::Toggle => StateOperation::Toggle,
+    }
+}
+
+fn state_operation_from_parsed_in_method(
+    operation: &ParsedStateOperation,
+    method: &ParsedMethod,
+) -> StateOperation {
+    match operation {
+        ParsedStateOperation::AssignParameter(name) => method
+            .local_variables
+            .iter()
+            .find(|local| local.name == *name)
+            .map_or_else(
+                || state_operation_from_parsed(operation),
+                |local| StateOperation::Assign(serializable_value_from_parsed(&local.value)),
+            ),
+        _ => state_operation_from_parsed(operation),
     }
 }
 

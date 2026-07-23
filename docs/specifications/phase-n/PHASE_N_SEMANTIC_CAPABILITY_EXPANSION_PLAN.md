@@ -263,6 +263,14 @@ primitive initializer; unresolved structural/generic TypeScript types do not
 establish compatibility. This is compiler validation only and must not create a
 checker-owned runtime authority or dynamic fallback.
 
+#### N3-D — serializable Action locals
+
+Admit one Action-local declaration only when its initializer is an exact
+serializable literal and its use is a complete primitive-compatible State
+replacement. Resolve it during compiler lowering to the existing literal
+Action operation. State reads, computed initializers, closures, control flow,
+and local aliases remain unsupported.
+
 Allow State fields to hold structurally serializable records, arrays, optional
 values, and discriminated unions. Add compiler-recognized immutable updates,
 safe indexed updates, and bounded collection operations. Define alias and

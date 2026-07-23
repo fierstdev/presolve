@@ -3,16 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N3-C - Action Parameter State Types
-* Working tree: clean after the N3-C action-parameter-state-types commit.
+* Latest completed slice: N3-D - Serializable Action Locals
+* Working tree: clean after the N3-D serializable-action-locals commit.
 * Date: 2026-07-22
 
 Last completed slice
 
-* Slice: N3-C - Action Parameter State Types
-* Result: validates the N3-B parameter-to-State operation before artifact emission. The Action parameter and target State field must have the same compiler-known primitive kind, declared directly or inferred from the State initializer; `PSC1044` rejects mismatch or an unprovable structural boundary. No checker runtime, new artifact field, or dynamic fallback was added.
-* Verification: `./scripts/verify-n3c-action-parameter-state-types.sh` passes the typed-negative compiler/registry proof, compiler check, formatting, and diff checks.
-* Next: N3-D may select one further real-data operation with a complete compiler-owned alias/type/lowering/runtime contract; do not broaden arbitrary Action bodies.
+* Slice: N3-D - Serializable Action Locals
+* Result: admits one literal `const` local in an `@action()` method when it replaces a primitive-compatible complete State field. The compiler substitutes the known literal into the existing Action operation, so generated runtime performs no authored local execution or capture.
+* Verification: `./scripts/verify-n3d-serializable-action-locals.sh` passes compiler lowering/registry tests, the focused Chrome browser proof, compiler check, formatting, and diff checks.
+* Next: N3-E may select one further real-data operation with a complete compiler-owned alias/type/lowering/runtime contract; do not broaden arbitrary Action bodies.
 
 * Slice: N4-B - JSX HTML Attribute Aliases
 * Result: compiler template lowering canonically maps only `className` to `class` and `htmlFor` to `for`, before semantic type checks, static HTML, manifests, and ordinary runtime binding artifacts. Framework JSX transforms, runtime aliases, spreads, style objects, and unbounded class helpers were not introduced.
