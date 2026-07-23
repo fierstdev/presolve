@@ -1,6 +1,7 @@
 # Phase O: Application Productization
 
-**Status:** active. O0 and O1 are implementation authorities.
+**Status:** O0–O3 complete. O4 is blocked on a missing canonical compiler
+multi-source artifact-publication product.
 
 ## Objective
 

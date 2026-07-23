@@ -1641,9 +1641,11 @@ with no source reading, compiler semantics, artifact decoding, or runtime.
 O1 supplies exact single-entry `presolve build` projection including explicit
 semantic-package contracts/runtime mappings. O2 supplies only immutable
 projection of existing explicit `workspace` and `watch --once` products; it
-creates no watcher, dev server, HMR, discovery, or source-analysis path. Next:
-O3 may define request/result presentation only. O4 is blocked: current
-multi-source workspace products do not publish application artifacts.
+creates no watcher, dev server, HMR, discovery, or source-analysis path. O3
+adds a schema-v1 command envelope that selects those projectors and preserves
+executor results unchanged. O4 is blocked: current multi-source workspace
+products do not publish application artifacts. A future compiler contract—not
+a metaframework shim—is required before Phase O can proceed.
 
 Useful commands
 
@@ -1674,4 +1676,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* O2 explicit workspace/watch-once handoff; commit pending.
+* O3 application command envelope; commit pending.

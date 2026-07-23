@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   createApplicationBuildInvocation,
+  createApplicationCommandInvocation,
   createApplicationWatchOnceInvocation,
   createApplicationWorkspaceInvocation,
   invokeApplicationBuild,
+  invokeApplicationCommand,
   invokeApplicationDevelopment,
 } from "../src/index.js";
 
@@ -90,5 +92,27 @@ test("rejects unsupported development handoff options", () => {
   assert.throws(
     () => createApplicationWatchOnceInvocation({ configurationPath: "presolve.json", sources: ["app.tsx=src/App.tsx"], verifyCleanEquivalence: true }),
     /only supported for workspace/,
+  );
+});
+
+test("selects a versioned command envelope without decoding executor output", () => {
+  const request = {
+    schemaVersion: 1,
+    command: "build",
+    input: { entryPath: "src/App.tsx", outputDirectory: "dist" },
+  };
+  assert.deepEqual(createApplicationCommandInvocation(request), {
+    executable: "presolve",
+    arguments: ["build", "src/App.tsx", "--out", "dist"],
+  });
+  const result = Object.freeze({ stdout: new Uint8Array([1]) });
+  assert.equal(invokeApplicationCommand(request, () => result), result);
+  assert.throws(
+    () => createApplicationCommandInvocation({ ...request, schemaVersion: 2 }),
+    /schemaVersion must be 1/,
+  );
+  assert.throws(
+    () => createApplicationCommandInvocation({ ...request, command: "dev" }),
+    /command must be build, workspace, or watch-once/,
   );
 });

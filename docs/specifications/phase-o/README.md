@@ -10,3 +10,4 @@ introduce a framework runtime.
 * [O0 application product constitution](PHASE_O_O0_APPLICATION_PRODUCT_CONSTITUTION.md)
 * [O1 explicit application build handoff](PHASE_O_O1_EXPLICIT_APPLICATION_BUILD_HANDOFF.md)
 * [O2 explicit workspace development handoff](PHASE_O_O2_EXPLICIT_WORKSPACE_DEVELOPMENT_HANDOFF.md)
+* [O3 application command envelope](PHASE_O_O3_APPLICATION_COMMAND_ENVELOPE.md)

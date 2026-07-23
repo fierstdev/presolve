@@ -7,3 +7,8 @@ export {
   createApplicationWorkspaceInvocation,
   invokeApplicationDevelopment,
 } from "./workspace-development-handoff.js";
+export {
+  APPLICATION_COMMAND_SCHEMA_VERSION,
+  createApplicationCommandInvocation,
+  invokeApplicationCommand,
+} from "./application-command-envelope.js";
