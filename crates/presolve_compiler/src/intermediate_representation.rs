@@ -9,7 +9,7 @@ use crate::{
     ComputedPurity, ComputedValue, ConsumerId, ContextConsumerAvailabilityStatus,
     ContextEvaluationBatchId, ContextSourcePlanStatus, ContextValueSourceId, Effect,
     EffectCompatibility, EffectStatementKind, EffectValidation, ExpressionNode, ExpressionNodeKind,
-    SemanticId, SemanticReference, SemanticReferenceKind, SemanticType, SemanticTypeId,
+    ResourceId, SemanticId, SemanticReference, SemanticReferenceKind, SemanticType, SemanticTypeId,
     SerializableValue, SourceProvenance, EFFECT_CAPABILITY_REGISTRY,
 };
 
@@ -604,6 +604,7 @@ pub fn build_reactive_graph(
     components: &[ComponentNode],
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
     effects: &BTreeMap<SemanticId, Effect>,
+    resource_declarations: &BTreeMap<ResourceId, crate::ResourceDeclaration>,
     references: &[SemanticReference],
     provenance: &BTreeMap<SemanticId, SourceProvenance>,
 ) -> IrReactiveGraph {
@@ -623,6 +624,17 @@ pub fn build_reactive_graph(
                 },
             );
         }
+    }
+    for resource in resource_declarations.values() {
+        let id = resource.id.as_str().to_string();
+        nodes.insert(
+            id.clone(),
+            IrReactiveNode {
+                id,
+                kind: IrReactiveNodeKind::Resource,
+                provenance: resource.provenance.clone(),
+            },
+        );
     }
     for computed in computed_values.values() {
         let id = computed.id.as_str().to_string();
@@ -656,6 +668,7 @@ pub fn build_reactive_graph(
             reference.kind,
             SemanticReferenceKind::ComputedState
                 | SemanticReferenceKind::ComputedComputed
+                | SemanticReferenceKind::ComputedResource
                 | SemanticReferenceKind::EffectState
                 | SemanticReferenceKind::EffectComputed
         )
@@ -702,6 +715,7 @@ pub struct IrReactiveNode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IrReactiveNodeKind {
     State,
+    Resource,
     Computed,
     Effect,
     Action,
@@ -1580,6 +1594,13 @@ impl ExpressionIrLowering<'_> {
                     .computed_values
                     .get(&self.component.id.computed(name))
                     .map(|computed| computed.id.clone())
+            })
+            .or_else(|| {
+                let resource = ResourceId::for_owner(&self.component.id, name);
+                self.model
+                    .resource_declarations
+                    .contains_key(&resource)
+                    .then_some(resource.as_semantic_id().clone())
             })?;
         let has_reference = self.model.references.iter().any(|reference| {
             reference.source == *self.reference_owner && reference.target == target
@@ -1601,6 +1622,15 @@ impl ExpressionIrLowering<'_> {
                 storage: IrStorageId::for_semantic_origin(&target),
             })
         } else {
+            if self
+                .model
+                .resource_declarations
+                .contains_key(&ResourceId::for_owner(&self.component.id, name))
+            {
+                return Some(IrInstructionKind::LoadResource {
+                    declaration: target,
+                });
+            }
             if self
                 .executable_computed
                 .is_some_and(|computed| !computed.contains(&target))
@@ -3347,7 +3377,8 @@ fn instruction_operands(kind: &IrInstructionKind) -> Vec<IrOperand> {
         | IrInstructionKind::InitializeStorage { .. }
         | IrInstructionKind::LoadStorage { .. }
         | IrInstructionKind::LoadContextSlot { .. }
-        | IrInstructionKind::LoadComputed { .. } => Vec::new(),
+        | IrInstructionKind::LoadComputed { .. }
+        | IrInstructionKind::LoadResource { .. } => Vec::new(),
     }
 }
 
@@ -3361,6 +3392,7 @@ fn instruction_storages(kind: &IrInstructionKind) -> Vec<&IrStorageId> {
         | IrInstructionKind::Copy { .. }
         | IrInstructionKind::InitializeContextSlot { .. }
         | IrInstructionKind::LoadComputed { .. }
+        | IrInstructionKind::LoadResource { .. }
         | IrInstructionKind::LoadContextSlot { .. }
         | IrInstructionKind::GetMember { .. }
         | IrInstructionKind::GetIndex { .. }
@@ -3644,6 +3676,12 @@ pub enum IrInstructionKind {
     },
     LoadComputed {
         computed: SemanticId,
+    },
+    /// Direct load of one compiler-selected Resource declaration record. The
+    /// generated runtime resolves the concrete activation from the current
+    /// component instance; there is no authored dynamic Resource lookup.
+    LoadResource {
+        declaration: SemanticId,
     },
     GetMember {
         object: IrOperand,

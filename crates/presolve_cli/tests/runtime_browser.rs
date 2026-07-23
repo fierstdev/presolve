@@ -165,7 +165,8 @@ import { loadProfile } from "profile-service";
 @component("x-profile")
 class Profile extends Component {
   @resource("loadProfile") profile!: Resource<string, string>;
-  render() { return <main>Loading profile</main>; }
+  @computed() get profileName(): string | null { return this.profile.data; }
+  render() { return <main>{this.profileName}</main>; }
 }
 "#,
     )
@@ -231,7 +232,7 @@ const deadline = Date.now() + 4000;
 const wait = setInterval(() => {
   const runtime = window.__PRESOLVE__;
   const resource = runtime?.resources?.find((record) => record.id.includes("resource:profile"));
-  if (resource?.state === "ready") {
+  if (resource?.state === "ready" && document.querySelector("main")?.textContent === "Ada") {
     clearInterval(wait);
     document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_RESOURCE_BROWSER_TEST_PASS</div>");
   } else if (Date.now() > deadline) {

@@ -2589,6 +2589,10 @@ fn infer_computed_read_type(
         .or_else(|| {
             let target = component.id.computed(name);
             computed_values.contains_key(&target).then_some(target)
+        })
+        .or_else(|| {
+            let target = component.id.resource(name);
+            assignments.contains_key(&target).then_some(target)
         });
     let Some(target) = target else {
         return SemanticType::Unknown;
@@ -2626,6 +2630,18 @@ fn computed_member_access_type(semantic_type: &SemanticType, property: &str) -> 
             .get(property)
             .cloned()
             .unwrap_or(SemanticType::Unknown),
+        SemanticType::Resource(resource) => match property {
+            "data" => normalize_semantic_type(SemanticType::Union(vec![
+                resource.data.as_ref().clone(),
+                SemanticType::Null,
+            ])),
+            "error" => normalize_semantic_type(SemanticType::Union(vec![
+                resource.error.as_ref().clone(),
+                SemanticType::Null,
+            ])),
+            "state" => SemanticType::String,
+            _ => SemanticType::Unknown,
+        },
         _ => SemanticType::Unknown,
     }
 }

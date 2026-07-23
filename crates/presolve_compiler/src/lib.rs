@@ -638,7 +638,8 @@ pub use runtime_computed_artifact::{
     build_runtime_computed_artifact, runtime_computed_artifact_json, RuntimeComputedArtifact,
     RuntimeComputedArtifactDirtyFlag, RuntimeComputedArtifactEvaluation,
     RuntimeComputedArtifactInstruction, RuntimeComputedArtifactInvalidation,
-    RuntimeComputedArtifactSerialization, RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION,
+    RuntimeComputedArtifactResourceInvalidation, RuntimeComputedArtifactSerialization,
+    RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION,
 };
 pub use runtime_context::{
     build_runtime_context_registry, validate_runtime_context_registry,
@@ -2052,6 +2053,103 @@ class Profile extends Component {
                 if resource.data.as_ref() == &SemanticType::String
                     && resource.error.as_ref() == &SemanticType::String
         ));
+    }
+
+    #[test]
+    fn lowers_direct_computed_resource_data_projection_with_exact_declaration_identity() {
+        let unit = CompilationUnit::parse_sources([(
+            "src/Profile.tsx",
+            r#"
+import { loadProfile } from "profile-service";
+
+@component("x-profile")
+class Profile extends Component {
+  @resource("loadProfile") profile!: Resource<string, string>;
+  @computed() get profileName(): string | null { return this.profile.data; }
+  render() { return <div>{this.profileName}</div>; }
+}
+"#,
+        )]);
+        let contract = parse_semantic_package_contract(
+            r#"{"schema_version":1,"package":"profile-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadProfile":{"kind":"resource","type_signature":"(ProfileKey) -> Resource<Profile, ProfileError>","runtime_module":"dist/load-profile.js","resume_policy":"snapshot","resource_endpoint":{"execution_boundary":"shared","cancellation":"abort","resume":"snapshot"}}}}"#,
+        )
+        .expect("resource contract");
+        let mut packages = SemanticPackageResolutionTable::default();
+        packages
+            .insert("profile-service".into(), contract)
+            .expect("unique package contract");
+
+        let model = build_application_semantic_model_for_unit_with_packages(&unit, &packages);
+        assert!(model.diagnostics.is_empty(), "{:?}", model.diagnostics);
+        let declaration = model
+            .resource_declarations
+            .values()
+            .next()
+            .expect("resource declaration");
+        let computed = model.components[0].id.computed("profileName");
+        assert!(model.references.iter().any(|reference| {
+            reference.kind == SemanticReferenceKind::ComputedResource
+                && reference.source == computed
+                && reference.target == *declaration.id.as_semantic_id()
+        }));
+        assert_eq!(
+            model.semantic_types.computed_values[&computed].semantic_type,
+            SemanticType::Union(vec![SemanticType::Null, SemanticType::String])
+        );
+
+        let ir = lower_components_to_ir(&model);
+        assert!(ir
+            .modules
+            .iter()
+            .flat_map(|module| &module.functions)
+            .any(|function| {
+                function
+                    .blocks
+                    .iter()
+                    .flat_map(|block| &block.instructions)
+                    .any(|instruction| {
+                        matches!(
+                            &instruction.kind,
+                            IrInstructionKind::LoadResource { declaration: loaded }
+                                if loaded == declaration.id.as_semantic_id()
+                        )
+                    })
+            }));
+        let artifact = build_runtime_computed_artifact(&model, &ir);
+        assert!(artifact.resource_invalidations.iter().any(|invalidation| {
+            invalidation.declaration == declaration.id.as_str()
+                && invalidation.dependents == vec![computed.to_string()]
+        }));
+        assert!(artifact.evaluations.iter().any(|evaluation| {
+            evaluation.computed == computed.as_str()
+                && evaluation.program.instructions.iter().any(|instruction| {
+                    matches!(
+                        instruction,
+                        RuntimeComputedArtifactInstruction::LoadResource { declaration: loaded, .. }
+                            if loaded == declaration.id.as_str()
+                    )
+                })
+        }));
+
+        let chained_unit = CompilationUnit::parse_sources([(
+            "src/ChainedProfile.tsx",
+            r#"
+import { loadProfile } from "profile-service";
+
+@component("x-chained-profile")
+class ChainedProfile extends Component {
+  @resource("loadProfile") profile!: Resource<string, string>;
+  @computed() get invalid() { return this.profile.data.length; }
+  render() { return <div>Profile</div>; }
+}
+"#,
+        )]);
+        let chained =
+            build_application_semantic_model_for_unit_with_packages(&chained_unit, &packages);
+        assert!(chained.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == ComputedDiagnosticCode::UnsupportedBody.as_str()
+                && diagnostic.message.contains("may only directly project")
+        }));
     }
 
     #[test]

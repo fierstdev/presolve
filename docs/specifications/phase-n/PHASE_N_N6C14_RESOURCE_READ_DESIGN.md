@@ -1,4 +1,4 @@
-# Phase N N6-C14 resource read design
+# Phase N N6-C14 resource read contract
 
 N6-C14 makes a Resource result visible only as a compiler-owned expression
 source. It does not expose a framework signal, Promise, cache, mutable record,
@@ -82,9 +82,17 @@ generation handling, and a cold/snapshot restoration policy. This is stricter
 than silently re-fetching after a resume because the package contract's
 snapshot vocabulary is not yet an executable codec.
 
-## Required proof
+## Implemented proof
 
-Completion needs positive and negative compiler fixtures, exact IR and runtime
-artifact assertions, repeated-instance identity proof, malformed activation
-failure, terminal state invalidation proof, a generated-page browser proof that
-updates a real binding after endpoint resolution, and resume rejection proof.
+The compiler test asserts the exact `ComputedResource` reference,
+`LoadResource` instruction, projection type, runtime `load-resource`
+instruction, and declaration-keyed invalidation record. The generated browser
+fixture resolves a package endpoint and observes the resulting Computed value
+in a real `<main>` binding. The runtime rejects a resume attempt containing a
+`load-resource` Computed program with `ResourceComputedReadUnsupported` and
+falls back to canonical cold activation.
+
+The compiler rejects raw, optional, indexed, and chained Resource accesses;
+only one terminal direct projection is admitted. Repeated-instance isolation,
+malformed Resource-artifact rejection, and cold activation continue to use the
+existing N6-C13 compiler-issued activation identities and validation.

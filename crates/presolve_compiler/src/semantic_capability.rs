@@ -354,7 +354,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
                 "exactly one compiler-supported numeric operand",
                 "inherits the operand's compiler-derived dependency set",
                 "serializable numeric result; no package or independent resume record",
-                "runtime-computed schema v11 unary floor/ceil/round operations",
+                "runtime-computed schema v12, including unary floor/ceil/round operations",
                 "runtime_browser::registered_math_rounding_executes_from_compiler_generated_runtime_programs",
             ),
             deferred(
@@ -374,9 +374,9 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
                 "@resource(\"importedEndpoint\") field!: Resource<Data, Error>",
                 "integrity-checked semantic-package endpoint, Resource declaration and activation identity, browser runtime artifact, and generated runtime",
                 "one exactly imported semantic-package resource endpoint, Resource<Data, Error> field type, exact host-supplied runtime module location, and client or shared execution boundary",
-                "one compiler-owned cold activation per planned component instance; source reads, inputs, invalidation, and retry remain deferred",
-                "activation starts cold; completion and cancellation are runtime lifecycle records, while snapshot/resume and source value reads remain deferred",
-                "runtime resource schema v1, embedded page artifact, and exact runtime module coordinate",
+                "one compiler-owned cold activation per planned component instance; direct same-owner @computed() .data/.error/.state reads and terminal invalidation are admitted, while inputs and retry remain deferred",
+                "activation starts cold; terminal values invalidate compiler-derived Computeds. Resume fails closed for a Resource-reading Computed until an explicit Resource snapshot codec is admitted",
+                "runtime resource schema v1 plus runtime-computed schema v12, embedded page artifacts, and exact runtime module coordinate",
                 "runtime_browser::host_bound_resource_endpoint_activates_in_a_real_browser",
             ),
             deferred(

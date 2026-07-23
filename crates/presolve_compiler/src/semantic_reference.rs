@@ -15,6 +15,9 @@ pub enum SemanticReferenceKind {
     ActionState,
     ComputedState,
     ComputedComputed,
+    /// A direct, compiler-recognized projection from one Computed value onto
+    /// the lifecycle record of an exact Resource declaration.
+    ComputedResource,
     EffectState,
     EffectComputed,
     ProvidesContext,

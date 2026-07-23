@@ -16,7 +16,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const ACTION_MANIFEST_SCHEMA_VERSION = 2;
   const FORMS_MANIFEST_SCHEMA_VERSION = 3;
   const LEGACY_MANIFEST_SCHEMA_VERSION = 1;
-  const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 10;
+  const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 12;
   const SUPPORTED_EFFECT_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = __EZ_COMPONENT_SCHEMA_VERSION__;
@@ -1510,6 +1510,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     const storageByComponentField = new Map();
     const instanceQualifiedState = componentArtifact?.schema_version === SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION;
     const invalidationsByStorage = new Map();
+    const resourceInvalidationsByDeclaration = new Map();
     const computedDirty = new Map();
 
     if (!instanceQualifiedState) {
@@ -1526,6 +1527,10 @@ const RUNTIME_STUB: &str = r#"(() => {
       invalidationsByStorage.set(invalidation.storage, invalidation.dependents ?? []);
     }
 
+    for (const invalidation of computedArtifact?.resource_invalidations ?? []) {
+      resourceInvalidationsByDeclaration.set(invalidation.declaration, invalidation.dependents ?? []);
+    }
+
     for (const evaluation of computedArtifact?.evaluations ?? []) {
       computedEvaluations.set(evaluation.computed, evaluation);
       computedDirty.set(evaluation.computed, evaluation.dirty_flag?.initial_value === true);
@@ -1535,6 +1540,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       components: new Map(),
       bindingsByField: new Map(),
       bindingsByStateSlot: new Map(),
+      bindingsByInstanceComputed: new Map(),
       actionsByMethod: new Map(),
       eventsByType: new Map(),
       elementsByNode,
@@ -1558,11 +1564,13 @@ const RUNTIME_STUB: &str = r#"(() => {
       stateSlotsByInstanceStorage: new Map(),
       instanceQualifiedState,
       invalidationsByStorage,
+      resourceInvalidationsByDeclaration,
       computedUpdateRuns: 0,
       initialEffectRuns: [],
       completedActionEffectRuns: [],
       effectSubscriptions: new Map(),
       resources: new Map(),
+      resourceActivationsByInstanceDeclaration: new Map(),
       activeActionBatch: null
     };
   }
@@ -1610,6 +1618,27 @@ const RUNTIME_STUB: &str = r#"(() => {
       : store.computedCaches.get(slot.cache_slot_id);
   }
 
+  function computedValueForInstance(store, componentInstanceId, computed) {
+    const slot = store.computedSlotsByInstanceComputed.get(`${componentInstanceId}|${computed}`);
+    if (slot === undefined) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    return store.computedCaches.get(slot.cache_slot_id);
+  }
+
+  function notifyComputed(store, computed, value) {
+    const componentInstanceId = store.activeExecutionContext?.component_instance_id;
+    if (componentInstanceId === undefined) return;
+    for (const updateBinding of store.bindingsByInstanceComputed.get(`${componentInstanceId}|${computed}`) ?? []) {
+      updateBinding(value);
+    }
+  }
+
+  function registerComputedBinding(store, componentInstanceId, computed, updateBinding) {
+    const key = `${componentInstanceId}|${computed}`;
+    const bindings = store.bindingsByInstanceComputed.get(key) ?? [];
+    bindings.push(updateBinding);
+    store.bindingsByInstanceComputed.set(key, bindings);
+  }
+
   function storeComputedValue(store, evaluation, value) {
     const slot = computedSlotForExecution(store, evaluation.computed);
     if (slot === undefined) {
@@ -1618,6 +1647,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     } else {
       store.computedCaches.set(slot.cache_slot_id, value);
     }
+    notifyComputed(store, evaluation.computed, value);
   }
 
   function computedOperandValue(store, values, operand) {
@@ -1694,6 +1724,26 @@ const RUNTIME_STUB: &str = r#"(() => {
       } else {
         values.set(instruction.result, computedValue(store, instruction.computed));
       }
+      return true;
+    }
+
+    if (instruction.kind === "load-resource") {
+      const componentInstanceId = store.activeExecutionContext?.component_instance_id;
+      const activationId = typeof componentInstanceId === "string"
+        ? store.resourceActivationsByInstanceDeclaration.get(`${componentInstanceId}\u001f${instruction.declaration}`)
+        : undefined;
+      const resource = activationId === undefined ? undefined : store.resources.get(activationId);
+      if (resource === undefined) {
+        reportDiagnostic(
+          store.diagnostics,
+          "PSR_RESOURCE_ACTIVATION_MISSING",
+          "Computed Resource projection lacked exactly one compiler-selected activation",
+          { subject, component_instance_id: componentInstanceId, declaration: instruction.declaration },
+          true
+        );
+        throw new PresolveBootError("PSR_RESOURCE_ACTIVATION_MISSING");
+      }
+      values.set(instruction.result, { data: resource.data, error: resource.error, state: resource.state });
       return true;
     }
 
@@ -2072,6 +2122,19 @@ const RUNTIME_STUB: &str = r#"(() => {
 
     if (executed) {
       store.computedUpdateRuns += 1;
+    }
+  }
+
+  function invalidateResourceComputeds(store, activation) {
+    const priorExecutionContext = store.activeExecutionContext;
+    store.activeExecutionContext = { component_instance_id: activation.component_instance };
+    try {
+      for (const computed of store.resourceInvalidationsByDeclaration.get(activation.declaration) ?? []) {
+        setComputedDirty(store, computed, true);
+      }
+      executeComputedUpdateBatches(store);
+    } finally {
+      store.activeExecutionContext = priorExecutionContext;
     }
   }
 
@@ -2617,9 +2680,16 @@ const RUNTIME_STUB: &str = r#"(() => {
     const storageId = artifactBinding.state_storage_ids?.length === 1
       ? artifactBinding.state_storage_ids[0]
       : null;
-    if (component === undefined || field === null || storageId === null) throw new PresolveBootError("PSR_INVALID_ORDINARY_BINDING");
+    const computedId = artifactBinding.computed_ids?.length === 1
+      ? artifactBinding.computed_ids[0]
+      : null;
+    if (component === undefined || field === null || (storageId === null) === (computedId === null)) {
+      throw new PresolveBootError("PSR_INVALID_ORDINARY_BINDING");
+    }
     const target = store.templateTargetsById.get(binding.instance_target_id);
-    const slot = stateSlotForInstanceStorage(store, binding.component_instance_id, storageId);
+    const slot = storageId === null
+      ? null
+      : stateSlotForInstanceStorage(store, binding.component_instance_id, storageId);
     let update = null;
     if (binding.kind === "text") {
       const text = ordinaryTextBindingNode(binding.instance_binding_id);
@@ -2642,6 +2712,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         };
       }
     } else if (binding.kind === "list" && target?.kind === "list") {
+      if (slot === null) throw new PresolveBootError("PSR_INVALID_ORDINARY_BINDING");
       const nodes = (component.manifest.template?.nodes ?? []).filter(
         (node) => node.kind === "list" && node.iterable === binding.expression
       );
@@ -2669,8 +2740,13 @@ const RUNTIME_STUB: &str = r#"(() => {
       }
     }
     if (update === null) throw new PresolveBootError("PSR_INVALID_ORDINARY_BINDING");
-    update(store.storageValues.get(slot.slot_id));
-    registerBinding(store, component, field, update, storageId);
+    if (slot !== null) {
+      update(store.storageValues.get(slot.slot_id));
+      registerBinding(store, component, field, update, storageId);
+    } else {
+      update(computedValueForInstance(store, binding.component_instance_id, computedId));
+      registerComputedBinding(store, binding.component_instance_id, computedId, update);
+    }
   }
 
   function initializeOrdinaryInstanceRuntime(store, manifest, componentArtifact) {
@@ -3571,6 +3647,11 @@ const RUNTIME_STUB: &str = r#"(() => {
     formsArtifact,
     diagnostics
   ) {
+    if ((computedArtifact?.evaluations ?? []).some((evaluation) =>
+      (evaluation.program?.instructions ?? []).some((instruction) => instruction.kind === "load-resource")
+    )) {
+      throw new ResumeBootError("ResourceComputedReadUnsupported");
+    }
     const store = allocateResumeStateComputedStore(
       registry,
       manifest,
@@ -3670,6 +3751,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       for (const resource of store.resources.values()) resource.controller.abort();
     }, { once: true });
     const declarations = new Map(resourcesArtifact.declarations.map((declaration) => [declaration.id, declaration]));
+    const records = [];
     for (const activation of resourcesArtifact.activations) {
       const declaration = declarations.get(activation.declaration);
       if (declaration === undefined) throw new PresolveBootError("PSR_INVALID_RESOURCES_ARTIFACT");
@@ -3679,13 +3761,21 @@ const RUNTIME_STUB: &str = r#"(() => {
       }
       const controller = new AbortController();
       const record = { activation, declaration, controller, state: "pending", generation: 1, data: null, error: null };
+      const activationKey = `${activation.component_instance}\u001f${activation.declaration}`;
+      if (store.resources.has(activation.id) || store.resourceActivationsByInstanceDeclaration.has(activationKey)) {
+        throw new PresolveBootError("PSR_INVALID_RESOURCES_ARTIFACT");
+      }
       store.resources.set(activation.id, record);
+      store.resourceActivationsByInstanceDeclaration.set(activationKey, activation.id);
+      records.push(record);
+    }
+    await Promise.all(records.map(async (record) => {
       try {
-        const module = await import(declaration.endpoint.runtime_location);
-        const endpoint = module[declaration.endpoint.export];
+        const module = await import(record.declaration.endpoint.runtime_location);
+        const endpoint = module[record.declaration.endpoint.export];
         if (typeof endpoint !== "function") throw new Error("endpoint-export-missing");
-        const result = await endpoint({ signal: controller.signal, inputs: Object.freeze({}) });
-        if (controller.signal.aborted) {
+        const result = await endpoint({ signal: record.controller.signal, inputs: Object.freeze({}) });
+        if (record.controller.signal.aborted) {
           record.state = "cancelled";
         } else {
           JSON.stringify(result);
@@ -3693,15 +3783,16 @@ const RUNTIME_STUB: &str = r#"(() => {
           record.data = result;
         }
       } catch (error) {
-        if (controller.signal.aborted) {
+        if (record.controller.signal.aborted) {
           record.state = "cancelled";
         } else {
           record.state = "failed";
           record.error = error instanceof Error ? error.message : String(error);
-          reportDiagnostic(diagnostics, "PSR_RESOURCE_ENDPOINT_FAILURE", "A compiler-authorized Resource endpoint failed", { activation: activation.id, error: record.error });
+          reportDiagnostic(diagnostics, "PSR_RESOURCE_ENDPOINT_FAILURE", "A compiler-authorized Resource endpoint failed", { activation: record.activation.id, error: record.error });
         }
       }
-    }
+      invalidateResourceComputeds(store, record.activation);
+    }));
   }
 
   async function initializeRuntime(manifest, computedArtifact, contextArtifact, effectArtifact, componentArtifact, formsArtifact, resourcesArtifact, diagnostics) {
@@ -3739,6 +3830,8 @@ const RUNTIME_STUB: &str = r#"(() => {
         anchor
       );
     }
+
+    const resourceInitialization = initializeResourcesRuntime(store, resourcesArtifact, diagnostics);
 
     if (manifest.schema_version === SUPPORTED_SCHEMA_VERSION) {
       const definitions = new Map((manifest.components ?? []).map((component) => [component.component_id, component]));
@@ -3813,7 +3906,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
     initializeFormsRuntime(store, formsArtifact, manifest, elementsByNode, diagnostics);
 
-    await initializeResourcesRuntime(store, resourcesArtifact, diagnostics);
+    await resourceInitialization;
 
     executeInitialEffects(store);
 
@@ -4000,7 +4093,9 @@ mod tests {
         assert!(runtime.contains("contextSlots: new Map()"));
         assert!(runtime.contains("RUNTIME_VERSION = \"0.0.0\""));
         assert!(runtime.contains("SUPPORTED_SCHEMA_VERSION = 5"));
-        assert!(runtime.contains("SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 10"));
+        assert!(runtime.contains("SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 12"));
+        assert!(runtime.contains("instruction.kind === \"load-resource\""));
+        assert!(runtime.contains("resourceInvalidationsByDeclaration"));
         assert!(runtime.contains("case \"abs\""));
         assert!(runtime.contains("instruction.kind === \"select\""));
         assert!(runtime.contains("instruction.kind === \"get-index\""));
@@ -4035,6 +4130,7 @@ mod tests {
         assert!(runtime.contains("async function activateBoundary"));
         assert!(runtime.contains("function decodeResumeValue"));
         assert!(runtime.contains("function restoreResumeRuntimeThroughForms"));
+        assert!(runtime.contains("ResourceComputedReadUnsupported"));
         assert!(runtime.contains("executeResumeComputedRecomputation"));
         assert!(runtime.contains("function executeResumeContextBindings"));
         assert!(runtime.contains("function restoreResumeComponentsSlotsAndStructure"));

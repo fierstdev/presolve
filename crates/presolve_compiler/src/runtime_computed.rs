@@ -130,6 +130,7 @@ fn computed_dependencies(
                 reference.kind,
                 crate::SemanticReferenceKind::ComputedState
                     | crate::SemanticReferenceKind::ComputedComputed
+                    | crate::SemanticReferenceKind::ComputedResource
             )
         })
         .map(|reference| reference.target.clone())

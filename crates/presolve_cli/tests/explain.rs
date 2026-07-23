@@ -4424,7 +4424,7 @@ fn build_command_writes_compiler_generated_computed_runtime_metadata() {
     let label = format!("{component}/computed:label");
     let visible = format!("{component}/computed:visible");
 
-    assert_eq!(artifact["schema_version"], 11);
+    assert_eq!(artifact["schema_version"], 12);
     assert_eq!(
         artifact["evaluation_order"],
         serde_json::json!([label, visible])
@@ -4524,7 +4524,7 @@ class PackageComputed extends Component {
         .iter()
         .find(|instruction| instruction["kind"] == "pure-package-call")
         .expect("pure package instruction");
-    assert_eq!(artifact["schema_version"], 11);
+    assert_eq!(artifact["schema_version"], 12);
     assert_eq!(instruction["kind"], "pure-package-call");
     assert_eq!(instruction["package"], "value-kit");
     assert_eq!(

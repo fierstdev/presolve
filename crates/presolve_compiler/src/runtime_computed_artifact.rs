@@ -8,7 +8,7 @@ use crate::{
     SemanticId, SerializableValue, SerializationCompatibility,
 };
 
-pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 11;
+pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 12;
 
 /// Versioned runtime metadata and executable programs emitted from canonical IR.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -16,6 +16,7 @@ pub struct RuntimeComputedArtifact {
     pub schema_version: u32,
     pub state: Vec<RuntimeComputedArtifactState>,
     pub invalidations: Vec<RuntimeComputedArtifactInvalidation>,
+    pub resource_invalidations: Vec<RuntimeComputedArtifactResourceInvalidation>,
     pub evaluations: Vec<RuntimeComputedArtifactEvaluation>,
     pub evaluation_order: Vec<String>,
     pub update_batches: Vec<Vec<String>>,
@@ -34,6 +35,15 @@ pub struct RuntimeComputedArtifactState {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RuntimeComputedArtifactInvalidation {
     pub storage: String,
+    pub dependents: Vec<String>,
+}
+
+/// Compiler-generated transitive computed invalidations for one exact Resource
+/// declaration. The browser runtime still resolves its activation through the
+/// active component instance; this artifact never exposes a dynamic lookup.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RuntimeComputedArtifactResourceInvalidation {
+    pub declaration: String,
     pub dependents: Vec<String>,
 }
 
@@ -81,6 +91,10 @@ pub enum RuntimeComputedArtifactInstruction {
     LoadComputed {
         result: String,
         computed: String,
+    },
+    LoadResource {
+        result: String,
+        declaration: String,
     },
     GetMember {
         result: String,
@@ -198,6 +212,7 @@ pub fn build_runtime_computed_artifact(
     RuntimeComputedArtifact {
         schema_version: RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION,
         invalidations: runtime_invalidations(model, &state, &emitted),
+        resource_invalidations: runtime_resource_invalidations(model, &emitted),
         state,
         evaluations,
         evaluation_order: planned_evaluations(model, &available, &emitted),
@@ -301,6 +316,26 @@ fn runtime_invalidations(
         .collect()
 }
 
+fn runtime_resource_invalidations(
+    model: &ApplicationSemanticModel,
+    emitted: &BTreeSet<String>,
+) -> Vec<RuntimeComputedArtifactResourceInvalidation> {
+    model
+        .resource_declarations
+        .values()
+        .map(|resource| RuntimeComputedArtifactResourceInvalidation {
+            declaration: resource.id.as_str().to_string(),
+            dependents: model
+                .reactive_transitive_analysis
+                .dependents_of(resource.id.as_str())
+                .iter()
+                .filter(|computed| emitted.contains(computed.as_str()))
+                .cloned()
+                .collect(),
+        })
+        .collect()
+}
+
 fn planned_evaluations(
     model: &ApplicationSemanticModel,
     available: &BTreeSet<String>,
@@ -400,6 +435,12 @@ pub(crate) fn runtime_instruction(
             Some(RuntimeComputedArtifactInstruction::LoadComputed {
                 result,
                 computed: computed.as_str().to_string(),
+            })
+        }
+        IrInstructionKind::LoadResource { declaration } => {
+            Some(RuntimeComputedArtifactInstruction::LoadResource {
+                result,
+                declaration: declaration.as_str().to_string(),
             })
         }
         IrInstructionKind::GetMember {
@@ -637,7 +678,7 @@ class RuntimeComputedArtifact extends Component {
         let second = runtime_computed_artifact_json(&build_runtime_computed_artifact(&model, &ir));
         assert_eq!(first, second);
         let json: serde_json::Value = serde_json::from_str(&first).expect("artifact JSON");
-        assert_eq!(json["schema_version"], 11);
+        assert_eq!(json["schema_version"], 12);
         assert_eq!(
             json["evaluations"][0]["program"]["instructions"][0]["kind"],
             "load-state"

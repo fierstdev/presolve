@@ -270,6 +270,7 @@ mod tests {
                 schema_version: 3,
                 state: Vec::new(),
                 invalidations: Vec::new(),
+                resource_invalidations: Vec::new(),
                 evaluations: Vec::new(),
                 evaluation_order: Vec::new(),
                 update_batches: Vec::new(),

@@ -3772,6 +3772,19 @@ fn collect_render_binding_diagnostics(
         .properties
         .iter()
         .map(|property| property.name.as_str())
+        .chain(
+            class
+                .methods
+                .iter()
+                .filter(|method| {
+                    method.is_getter
+                        && method
+                            .decorators
+                            .iter()
+                            .any(|decorator| decorator.name == "computed")
+                })
+                .map(|method| method.name.as_str()),
+        )
         .collect::<Vec<_>>();
 
     for binding in &render.bindings {

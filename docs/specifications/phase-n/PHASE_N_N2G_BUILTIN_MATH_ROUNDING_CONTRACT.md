@@ -12,8 +12,9 @@ operations, derives their existing operand dependencies, lowers `Floor`,
 The generated runtime checks that its operand is numeric and invokes only the
 declared primitive; it never evaluates authored source.
 
-This advances `computed.runtime.json` to schema version `11`. Schema v11 is
-exact-match: it carries all pre-existing computed instructions plus the three
-rounding operations and rejects every other schema version.
+N2-G introduced `computed.runtime.json` schema version `11`. N6-C14 later
+advances the artifact to schema version `12` for compiler-owned Resource read
+instructions and invalidation records; the rounding instruction contract is
+retained unchanged.
 
 Verification is `scripts/verify-n2g-builtin-math-rounding.sh`.

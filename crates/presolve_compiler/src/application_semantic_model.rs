@@ -1463,6 +1463,7 @@ pub fn build_application_semantic_model_from_component_graph(
     references.extend(build_computed_references(
         &component_graph.components,
         &computed_values,
+        &resource_declarations,
         &expression_graph,
     ));
     references.extend(build_effect_references(
@@ -1586,6 +1587,7 @@ pub fn build_application_semantic_model_from_component_graph(
         &component_graph.components,
         &computed_values,
         &effects,
+        &resource_declarations,
         &references,
         &provenance,
     );
@@ -1663,6 +1665,7 @@ pub fn build_application_semantic_model_from_component_graph(
         &mut diagnostics,
         &component_graph.components,
         &computed_values,
+        &resource_declarations,
         &expression_graph,
         &semantic_types,
         &reactive_cycle_analysis,
@@ -1997,6 +2000,7 @@ fn build_application_semantic_model_from_files_with_bindings(
     references.extend(build_computed_references(
         &components,
         &computed_values,
+        &resource_declarations,
         &expression_graph,
     ));
     references.extend(build_effect_references(
@@ -2114,6 +2118,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         &components,
         &computed_values,
         &effects,
+        &resource_declarations,
         &references,
         &provenance,
     );
@@ -2185,6 +2190,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         &mut diagnostics,
         &components,
         &computed_values,
+        &resource_declarations,
         &expression_graph,
         &semantic_types,
         &reactive_cycle_analysis,
@@ -2583,6 +2589,7 @@ fn extend_computed_diagnostics(
     diagnostics: &mut Vec<ComponentDiagnostic>,
     components: &[ComponentNode],
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    resource_declarations: &BTreeMap<ResourceId, crate::ResourceDeclaration>,
     expression_graph: &ExpressionGraph,
     semantic_types: &SemanticTypeModel,
     reactive_cycle_analysis: &IrReactiveCycleAnalysis,
@@ -2595,6 +2602,7 @@ fn extend_computed_diagnostics(
     diagnostics.extend(collect_computed_semantic_diagnostics(
         components,
         computed_values,
+        resource_declarations,
         expression_graph,
         semantic_types,
         provenance,
@@ -3212,6 +3220,7 @@ fn collect_computed_cycle_diagnostics(
 fn collect_computed_semantic_diagnostics(
     components: &[ComponentNode],
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    resource_declarations: &BTreeMap<ResourceId, crate::ResourceDeclaration>,
     expression_graph: &ExpressionGraph,
     semantic_types: &SemanticTypeModel,
     provenance: &BTreeMap<SemanticId, SourceProvenance>,
@@ -3220,6 +3229,7 @@ fn collect_computed_semantic_diagnostics(
     diagnostics.extend(collect_computed_body_and_read_diagnostics(
         components,
         computed_values,
+        resource_declarations,
         expression_graph,
     ));
     diagnostics.extend(collect_computed_type_diagnostics(
@@ -3364,6 +3374,7 @@ fn collect_invalid_computed_declaration_diagnostics(
 fn collect_computed_body_and_read_diagnostics(
     components: &[ComponentNode],
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    resource_declarations: &BTreeMap<ResourceId, crate::ResourceDeclaration>,
     expression_graph: &ExpressionGraph,
 ) -> Vec<ComponentDiagnostic> {
     let mut diagnostics = Vec::new();
@@ -3415,9 +3426,21 @@ fn collect_computed_body_and_read_diagnostics(
                 .nodes_for(&computed.id)
                 .into_iter()
                 .filter_map(|node| {
-                    unresolved_computed_read_diagnostic(component, computed_values, computed, node)
+                    unresolved_computed_read_diagnostic(
+                        component,
+                        computed_values,
+                        resource_declarations,
+                        computed,
+                        node,
+                    )
                 }),
         );
+        diagnostics.extend(computed_resource_projection_diagnostics(
+            component,
+            computed,
+            resource_declarations,
+            expression_graph,
+        ));
     }
 
     diagnostics
@@ -3426,6 +3449,7 @@ fn collect_computed_body_and_read_diagnostics(
 fn unresolved_computed_read_diagnostic(
     component: &ComponentNode,
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    resource_declarations: &BTreeMap<ResourceId, crate::ResourceDeclaration>,
     computed: &ComputedValue,
     node: &ExpressionNode,
 ) -> Option<ComponentDiagnostic> {
@@ -3436,7 +3460,8 @@ fn unresolved_computed_read_diagnostic(
         .state_fields
         .iter()
         .any(|field| field.name == *name)
-        || computed_values.contains_key(&component.id.computed(name));
+        || computed_values.contains_key(&component.id.computed(name))
+        || resource_declarations.contains_key(&ResourceId::for_owner(&component.id, name));
     (!resolved).then(|| ComponentDiagnostic {
         severity: ComponentDiagnosticSeverity::Error,
         effect_id: None,
@@ -3461,6 +3486,79 @@ fn unresolved_computed_read_diagnostic(
         ),
         provenance: Some(node.provenance.clone()),
     })
+}
+
+fn computed_resource_projection_diagnostics(
+    component: &ComponentNode,
+    computed: &ComputedValue,
+    resource_declarations: &BTreeMap<ResourceId, crate::ResourceDeclaration>,
+    expression_graph: &ExpressionGraph,
+) -> Vec<ComponentDiagnostic> {
+    let nodes = expression_graph.nodes_for(&computed.id);
+    nodes
+        .iter()
+        .filter_map(|node| {
+            let ExpressionNodeKind::ThisMember { name } = &node.kind else {
+                return None;
+            };
+            resource_declarations
+                .contains_key(&ResourceId::for_owner(&component.id, name))
+                .then_some((node, name))
+        })
+        .filter(|(node, _)| {
+            !nodes.iter().any(|candidate| {
+                is_direct_resource_projection(candidate, &nodes)
+                    && matches!(
+                        &candidate.kind,
+                        ExpressionNodeKind::MemberAccess { object, .. } if object == &node.id
+                    )
+            })
+        })
+        .map(|(node, name)| ComponentDiagnostic {
+            severity: ComponentDiagnosticSeverity::Error,
+            effect_id: None,
+            statement_id: None,
+            context_declaration_candidate_id: None,
+            context_id: None,
+            provider_id: None,
+            consumer_id: None,
+            slot_id: None,
+            invocation_id: None,
+            component_instance_id: None,
+            slot_binding_id: None,
+            structural_region_id: None,
+            component_id: None,
+            provider_instance_id: None,
+            consumer_instance_id: None,
+            secondary_labels: Vec::new(),
+            code: ComputedDiagnosticCode::UnsupportedBody.as_str().to_string(),
+            message: format!(
+                "computed getter `{}` may only directly project `this.{name}.data`, `this.{name}.error`, or `this.{name}.state`",
+                computed.name
+            ),
+            provenance: Some(node.provenance.clone()),
+        })
+        .collect()
+}
+
+fn is_direct_resource_projection(node: &ExpressionNode, nodes: &[&ExpressionNode]) -> bool {
+    let ExpressionNodeKind::MemberAccess {
+        property,
+        optional: false,
+        ..
+    } = &node.kind
+    else {
+        return false;
+    };
+    matches!(property.as_str(), "data" | "error" | "state")
+        && !nodes.iter().any(|candidate| {
+            matches!(
+                &candidate.kind,
+                ExpressionNodeKind::MemberAccess { object, .. }
+                    | ExpressionNodeKind::IndexAccess { object, .. }
+                    if object == &node.id
+            )
+        })
 }
 
 fn collect_computed_type_diagnostics(
@@ -3571,6 +3669,7 @@ fn build_computed_reactive_products(
     components: &[ComponentNode],
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
     effects: &BTreeMap<SemanticId, Effect>,
+    resource_declarations: &BTreeMap<ResourceId, crate::ResourceDeclaration>,
     references: &[SemanticReference],
     provenance: &BTreeMap<SemanticId, SourceProvenance>,
 ) -> (
@@ -3579,8 +3678,14 @@ fn build_computed_reactive_products(
     IrReactiveCycleAnalysis,
     IrComputedEvaluationPlan,
 ) {
-    let graph =
-        crate::build_reactive_graph(components, computed_values, effects, references, provenance);
+    let graph = crate::build_reactive_graph(
+        components,
+        computed_values,
+        effects,
+        resource_declarations,
+        references,
+        provenance,
+    );
     let transitive_analysis = crate::analyze_reactive_transitive_graph(&graph);
     let cycle_analysis = crate::analyze_reactive_cycles(&graph);
     let evaluation_plan = crate::plan_computed_evaluation(&graph);
@@ -3698,6 +3803,7 @@ fn computed_call_purity_kind(
 fn build_computed_references(
     components: &[ComponentNode],
     computed_values: &BTreeMap<SemanticId, ComputedValue>,
+    resource_declarations: &BTreeMap<ResourceId, crate::ResourceDeclaration>,
     expression_graph: &ExpressionGraph,
 ) -> Vec<SemanticReference> {
     let mut references = BTreeMap::new();
@@ -3713,7 +3819,17 @@ fn build_computed_references(
             continue;
         };
 
-        for node in expression_graph.nodes_for(&computed.id) {
+        let nodes = expression_graph.nodes_for(&computed.id);
+        let direct_resource_projection_objects = nodes
+            .iter()
+            .filter(|node| is_direct_resource_projection(node, &nodes))
+            .filter_map(|node| match &node.kind {
+                crate::ExpressionNodeKind::MemberAccess { object, .. } => Some(object.clone()),
+                _ => None,
+            })
+            .collect::<BTreeSet<_>>();
+
+        for node in nodes {
             let crate::ExpressionNodeKind::ThisMember { name } = &node.kind else {
                 continue;
             };
@@ -3734,6 +3850,17 @@ fn build_computed_references(
                     source: computed.id.clone(),
                     target: target.id.clone(),
                     provenance: computed.provenance.clone(),
+                }
+            } else if direct_resource_projection_objects.contains(&node.id) {
+                let target = ResourceId::for_owner(&component.id, name);
+                let Some(declaration) = resource_declarations.get(&target) else {
+                    continue;
+                };
+                SemanticReference {
+                    kind: SemanticReferenceKind::ComputedResource,
+                    source: computed.id.clone(),
+                    target: declaration.id.as_semantic_id().clone(),
+                    provenance: node.provenance.clone(),
                 }
             } else {
                 continue;
