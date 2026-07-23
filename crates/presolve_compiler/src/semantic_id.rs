@@ -252,6 +252,19 @@ pub struct ComponentInstanceId(SemanticId);
 #[serde(transparent)]
 pub struct ComponentStructuralRegionId(SemanticId);
 
+/// Stable identity for one compiler-owned Resource declaration.
+///
+/// A Resource declaration describes the application-level operation. Its
+/// per-component-instance activation has a distinct identity.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ResourceId(SemanticId);
+
+/// Stable identity for one component-instance-qualified Resource activation.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ResourceActivationId(SemanticId);
+
 /// Stable identity for an authored Context-family declaration candidate.
 ///
 /// Candidates are source-qualified compiler facts.  They intentionally do not
@@ -366,6 +379,11 @@ impl SemanticId {
     #[must_use]
     pub fn form(&self, name: &str) -> Self {
         self.child("form", name)
+    }
+
+    #[must_use]
+    pub fn resource(&self, name: &str) -> Self {
+        self.child("resource", name)
     }
 
     #[must_use]
@@ -710,6 +728,44 @@ impl FormId {
     #[must_use]
     pub fn for_owner(owner: &SemanticId, name: &str) -> Self {
         Self(owner.form(name))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl ResourceId {
+    #[must_use]
+    pub fn for_owner(owner: &SemanticId, name: &str) -> Self {
+        Self(owner.resource(name))
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl ResourceActivationId {
+    #[must_use]
+    pub fn for_component_instance(instance: &ComponentInstanceId, resource: &ResourceId) -> Self {
+        Self(
+            instance
+                .as_semantic_id()
+                .child("resource-activation", resource.as_str()),
+        )
     }
 
     #[must_use]

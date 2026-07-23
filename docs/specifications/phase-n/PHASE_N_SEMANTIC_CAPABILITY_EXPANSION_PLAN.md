@@ -1,7 +1,8 @@
 # Phase N: Semantic Capability Expansion
 
-**Status:** Planning authority. No implementation is authorized by this plan
-until a numbered Phase N slice is accepted.
+**Status:** Active implementation authority. The semantic capability registry
+is the current source of truth for each family; only individually completed
+slices are admitted.
 
 ## Objective
 
@@ -276,6 +277,12 @@ Every passed value must have a compiler-known owner, type, serializability, and
 reactivity classification.
 
 ### N6 — Resources and asynchronous application state
+
+N6-A is complete: the compiler has separate stable identities for a Resource
+declaration and each component-instance activation, validated serializable
+data/error declaration products, and a generation-scoped lifecycle state
+machine. It intentionally does not yet admit Resource source syntax or a
+runtime artifact.
 
 Introduce a compiler-owned Resource declaration with explicit key, input
 dependencies, loading/success/error state, cancellation, retry, invalidation,

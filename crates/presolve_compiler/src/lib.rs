@@ -89,6 +89,7 @@ pub mod production_runtime_artifact;
 pub mod production_scheduler;
 pub mod production_validation;
 pub mod provider;
+pub mod resource;
 pub mod resume_activation;
 pub mod resume_anchor;
 pub mod resume_boot;
@@ -521,6 +522,10 @@ pub use production_validation::{
     ProductionValidationPhase, ProductionValidationResult,
 };
 pub use provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
+pub use resource::{
+    ResourceActivation, ResourceDeclaration, ResourceDeclarationError, ResourceInvalidationPolicy,
+    ResourceLifecycleError, ResourceLifecycleEvent, ResourceLifecycleState, ResourceRetryPolicy,
+};
 pub use resume_activation::{
     build_resume_activation_plan, validate_resume_activation_plan, ResumeActivationBlock,
     ResumeActivationBlockReason, ResumeActivationIntegrityCode,
@@ -688,12 +693,12 @@ pub use semantic_id::{
     FieldTrackingId, FormDeclarationCandidateId, FormFieldBindingCandidateId,
     FormFieldDeclarationCandidateId, FormFieldDirtySlotId, FormFieldTouchedSlotId,
     FormFieldValidationSlotId, FormFieldValueSlotId, FormId, FormInstanceId, FormOwnershipGraphId,
-    FormSubmissionStateSlotId, FormValidationAggregateSlotId, ProviderId, ResetPlanId, SemanticId,
-    SemanticOwner, SerializationPlanId, SlotBindingId, SlotContentFragmentId,
-    SlotDeclarationCandidateId, SlotId, SlotOutletId, SubmissionDeclarationCandidateId,
-    SubmissionHostCandidateId, SubmissionHostId, SubmissionPlanId, TemplatePositionId,
-    TouchedTrackingPlanId, ValidationDependencyCycleId, ValidationGraphId, ValidationPlanId,
-    ValidationRuleCandidateId, ValidationRuleId,
+    FormSubmissionStateSlotId, FormValidationAggregateSlotId, ProviderId, ResetPlanId,
+    ResourceActivationId, ResourceId, SemanticId, SemanticOwner, SerializationPlanId,
+    SlotBindingId, SlotContentFragmentId, SlotDeclarationCandidateId, SlotId, SlotOutletId,
+    SubmissionDeclarationCandidateId, SubmissionHostCandidateId, SubmissionHostId,
+    SubmissionPlanId, TemplatePositionId, TouchedTrackingPlanId, ValidationDependencyCycleId,
+    ValidationGraphId, ValidationPlanId, ValidationRuleCandidateId, ValidationRuleId,
 };
 pub use semantic_package::{
     parse_semantic_package_contract, SemanticPackageContract, SemanticPackageContractError,

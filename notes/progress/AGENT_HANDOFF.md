@@ -3,11 +3,21 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N3-A - Serializable State Replacement
-* Working tree: clean after the N3-A serializable-state-replacement commit.
+* Latest completed slice: N6-A - Resource Identity and Lifecycle Foundation
+* Working tree: clean after the N6-A resource-foundation commit.
 * Date: 2026-07-22
 
 Last completed slice
+
+* Slice: N6-A - Resource Identity and Lifecycle Foundation
+* Result: adds a compiler-owned `ResourceDeclaration` with separate stable declaration and component-instance activation identities, serializable data/error validation, explicit boundary/policy metadata, and a generation-scoped lifecycle transition model. The public `resources` capability remains deferred: no `@resource`, Promise/fetch shortcut, endpoint execution, cache, artifact, or resume codec has been admitted.
+* Verification: `./scripts/verify-n6a-resource-foundation.sh` passes (three focused lifecycle/identity/type tests, capability registry, compiler check, format, and diff checks).
+* Next: N6-B must define one registered service/capability endpoint source form and lower it through activation, cancellation, artifact, and resume products. It must not expose Resource syntax early.
+
+* Slice: N4-A - Keyed Structural List Conformance
+* Result: records the existing compiler-owned keyed repeated-instance semantics as an admitted capability with DOM-position identity explicitly prohibited. The isolated browser proof covers both primitive and object-member keys through compiler-generated reconciliation.
+* Verification: registry/contract verifier plus `runtime_browser::keyed_lists_reconcile_in_a_real_browser` pass.
+* Next: N4-B may expand one structural/DOM semantic family only through complete identity and lifecycle products.
 
 * Slice: N3-A - Serializable State Replacement
 * Result: formally admits recursively serializable record/array State and whole-field Action assignment only. A generated-browser proof verifies that a record Action operand replaces component-instance State atomically and preserves nested arrays. Existing structural resume codecs remain the serialization authority. Nested writes, aliases, spreads, and collection callbacks remain deferred.
