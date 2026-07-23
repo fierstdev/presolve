@@ -45,3 +45,4 @@ numbered slice is accepted.
 * [N7-B Nested Form field paths](PHASE_N_N7B_NESTED_FORM_FIELD_PATHS_CONTRACT.md)
 * [N7-A Typed ARIA binding contract](PHASE_N_N7A_TYPED_ARIA_BINDING_CONTRACT.md)
 * [N8-A Capability matrix contract](PHASE_N_N8A_CAPABILITY_MATRIX_CONTRACT.md)
+* [N8-B Compatibility and migration contract](PHASE_N_N8B_COMPATIBILITY_MIGRATION_CONTRACT.md)

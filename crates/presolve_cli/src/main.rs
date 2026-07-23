@@ -30,11 +30,12 @@ use presolve_compiler::{
     resume_manifest_json, runtime_component_artifact_json, runtime_computed_artifact_json,
     runtime_context_artifact_json, runtime_cost_report_json, runtime_effect_artifact_json,
     runtime_forms_artifact_json, runtime_resource_artifact_json, semantic_capability_matrix_text,
-    semantic_capability_registry_json, semantic_graph_json, semantic_type_text, summarize_source,
-    template_manifest_json, validate_application_semantic_model,
-    validate_runtime_resource_artifact, ApplicationSemanticModel, AsmValidationDiagnostic,
-    AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
-    EffectInspection, EffectInspectionRegistry, ExecutableProgramFingerprint, ImmutableAsmPass,
+    semantic_capability_migration_text, semantic_capability_registry_json, semantic_graph_json,
+    semantic_type_text, summarize_source, template_manifest_json,
+    validate_application_semantic_model, validate_runtime_resource_artifact,
+    ApplicationSemanticModel, AsmValidationDiagnostic, AttributeValue, CompilationUnit,
+    ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind, EffectInspection,
+    EffectInspectionRegistry, ExecutableProgramFingerprint, ImmutableAsmPass,
     ProductionDiagnosticFact, ProductionDiagnosticKind, ProductionProjectedDiagnostic,
     ProductionReportInputs, ProductionRootChunkInput, RenderAttribute, RenderAttributeValue,
     SemanticEntity, SemanticEntityKind, SemanticId, SemanticOwner, SemanticPackageResolutionTable,
@@ -734,8 +735,9 @@ fn run_explain(mut args: Vec<String>) {
         match format.as_str() {
             "json" => print!("{}", semantic_capability_registry_json()),
             "human" => print!("{}", semantic_capability_matrix_text()),
+            "migration" => print!("{}", semantic_capability_migration_text()),
             _ => {
-                eprintln!("semantic capability inspection supports only --format human or json");
+                eprintln!("semantic capability inspection supports only --format human, json, or migration");
                 process::exit(1);
             }
         }
@@ -4251,7 +4253,7 @@ fn write_build_artifacts(
 
 fn print_usage_and_exit() -> ! {
     eprintln!("usage:");
-    eprintln!("  presolve explain --capabilities --format human|json");
+    eprintln!("  presolve explain --capabilities --format human|json|migration");
     eprintln!("  presolve explain <file> [--format text|json]");
     eprintln!("  presolve explain <file> [--inspect] [--entity semantic-id | --source path --offset byte] [--child-kind kind] [--reference-kind kind] [--format text|json|graph]");
     eprintln!(

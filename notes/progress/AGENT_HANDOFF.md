@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: N7-B-D - Nested Form Field-Path Admission
-* Working tree: N8-A capability matrix is ready for final verification and commit.
+* Working tree: N8-B compatibility and migration guidance is ready for final verification and commit.
 * Date: 2026-07-23
 
 Last completed slice
@@ -43,6 +43,11 @@ Last completed slice
 * Result: `presolve explain --capabilities --format human` now renders a deterministic Markdown-compatible matrix directly from the versioned compiler registry. JSON remains the schema-bearing automation product. The matrix lists every source form, class, status, proof fixture, and deferred rejection reason without inspecting application source or duplicating registry data in the framework or CLI.
 * Verification: focused compiler registry rendering and CLI human/JSON projection tests plus `scripts/verify-n8a-capability-matrix.sh`.
 * Next: N8-B should define compatibility/migration and rejected-syntax products from the same registry; do not hand-maintain a divergent framework feature inventory.
+
+* Slice: N8-B - Compatibility and Migration Guidance
+* Result: `presolve explain --capabilities --format migration` now generates a deterministic compatibility policy, deferred-capability migration guide, and rejected-syntax catalog from the same semantic capability registry used by JSON and the human matrix. It lists only deferred records with their compiler-issued reasons, adds no source rewriter or legacy compatibility path, and makes clear that opaque TypeScript remains unavailable before N9.
+* Verification: focused compiler registry/migration rendering and CLI projection test plus both N8 verifier scripts.
+* Next: write and implement the N9 opaque boundary only as a terminal compiler activation boundary with explicit typed inputs, runtime integrity, lifecycle, error, and resume policy.
 
 * Slice: N2-G - Compiler-Registered Math Rounding
 * Result: exact one-argument `Math.floor`, `Math.ceil`, and `Math.round` in supported Computed getters now resolve to compiler-registered unary operations, retain their operand dependencies, lower to canonical `Floor`/`Ceil`/`Round` IR, and execute only from schema-v11 computed-runtime instructions. No generic Math dispatch, overload, callback, alias, or authored JavaScript execution is admitted.

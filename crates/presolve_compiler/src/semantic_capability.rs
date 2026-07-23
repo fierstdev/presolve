@@ -439,6 +439,53 @@ pub fn semantic_capability_matrix_text() -> String {
     output
 }
 
+/// Deterministic compatibility and migration guidance for the current
+/// registry. Deferred records are explained, never translated or relaxed.
+#[must_use]
+pub fn semantic_capability_migration_text() -> String {
+    let registry = build_semantic_capability_registry();
+    let deferred = registry
+        .capabilities
+        .iter()
+        .filter(|capability| capability.status == SemanticCapabilityStatus::Deferred)
+        .collect::<Vec<_>>();
+    let mut output = format!(
+        "Presolve semantic compatibility guide (registry schema v{})\n\n",
+        registry.schema_version
+    );
+    output.push_str("Compatibility policy\n\n");
+    output.push_str("- The registry is the exact compiler capability boundary.\n");
+    output.push_str("- Admitted records are supported only under their listed compiler rules.\n");
+    output.push_str("- Deferred records have no compatibility fallback, source rewrite, or opaque escape hatch.\n\n");
+    output.push_str("Migration guide\n\n");
+    for capability in &deferred {
+        writeln!(
+            output,
+            "- {}: {}\n  reason: {}",
+            capability.id,
+            capability.source_form,
+            capability
+                .rejection_reason
+                .expect("deferred capability has a rejection reason")
+        )
+        .expect("writing capability migration guide cannot fail");
+    }
+    output.push_str("\nRejected syntax catalog\n\n");
+    for capability in deferred {
+        writeln!(
+            output,
+            "- {} | {} | {}",
+            capability.id,
+            capability_class_text(capability.class),
+            capability
+                .rejection_reason
+                .expect("deferred capability has a rejection reason")
+        )
+        .expect("writing rejected syntax catalog cannot fail");
+    }
+    output
+}
+
 fn capability_class_text(class: SemanticCapabilityClass) -> &'static str {
     match class {
         SemanticCapabilityClass::Native => "native",
@@ -571,6 +618,16 @@ mod tests {
         );
         assert!(matrix.contains("advanced_types | unsupported | deferred |"));
         assert!(matrix.contains("  rejection: N1-B must define advanced type semantics\n"));
+        let migration = semantic_capability_migration_text();
+        assert_eq!(migration, semantic_capability_migration_text());
+        assert!(
+            migration.starts_with("Presolve semantic compatibility guide (registry schema v1)\n\n")
+        );
+        assert_eq!(migration.matches("- opaque_typescript:").count(), 1);
+        assert!(
+            migration.contains("- opaque_typescript | opaque | N9 must define opaque isolation\n")
+        );
+        assert!(!migration.contains("- resources:"));
         assert!(registry.capabilities.iter().any(|capability| {
             capability.id == "resources"
                 && capability.status == SemanticCapabilityStatus::Admitted

@@ -689,8 +689,8 @@ pub use runtime_resource_artifact::{
 };
 pub use semantic_capability::{
     build_semantic_capability_registry, semantic_capability_matrix_text,
-    semantic_capability_registry_json, SemanticCapability, SemanticCapabilityClass,
-    SemanticCapabilityRegistry, SemanticCapabilityStatus,
+    semantic_capability_migration_text, semantic_capability_registry_json, SemanticCapability,
+    SemanticCapabilityClass, SemanticCapabilityRegistry, SemanticCapabilityStatus,
     SEMANTIC_CAPABILITY_REGISTRY_SCHEMA_VERSION,
 };
 pub use semantic_graph::{

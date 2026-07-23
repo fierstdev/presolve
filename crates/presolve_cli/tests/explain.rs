@@ -93,7 +93,7 @@ fn explain_command_matches_json_fixture() {
 }
 
 #[test]
-fn capability_registry_has_deterministic_json_and_human_projections() {
+fn capability_registry_has_deterministic_json_human_and_migration_projections() {
     let repo_root = repo_root();
     let json = Command::new(presolve_cli_bin())
         .current_dir(&repo_root)
@@ -132,6 +132,22 @@ fn capability_registry_has_deterministic_json_and_human_projections() {
         1
     );
     assert!(human.contains("  rejection: N9 must define opaque isolation\n"));
+
+    let migration = Command::new(presolve_cli_bin())
+        .current_dir(&repo_root)
+        .args(["explain", "--capabilities", "--format", "migration"])
+        .output()
+        .expect("failed to inspect capability migration guide");
+    assert!(
+        migration.status.success(),
+        "capability migration inspection failed: {}",
+        String::from_utf8_lossy(&migration.stderr)
+    );
+    let migration = String::from_utf8(migration.stdout).expect("migration guide UTF-8");
+    assert!(migration.starts_with("Presolve semantic compatibility guide (registry schema v1)\n\n"));
+    assert_eq!(migration.matches("- opaque_typescript:").count(), 1);
+    assert!(migration.contains("- opaque_typescript | opaque | N9 must define opaque isolation\n"));
+    assert!(!migration.contains("- resources:"));
 }
 
 #[test]
