@@ -1678,4 +1678,5 @@ Useful commands
 
 Changed but uncommitted files
 
-* P0 multi-source application publication constitution; commit pending.
+* P0 multi-source application publication constitution is committed. Next: P1
+  typed compiler request and deterministic explicit-entry validation only.
