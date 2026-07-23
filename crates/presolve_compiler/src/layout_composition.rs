@@ -44,8 +44,16 @@ pub fn build_layout_composition_plan_v1(
     model: &ApplicationSemanticModel,
     graph: &FileRouteGraphV1,
 ) -> Result<LayoutCompositionPlanV1, LayoutCompositionErrorV1> {
-    let components = model
-        .components
+    build_layout_composition_plan_from_components_v1(&model.components, graph)
+}
+
+/// Component-fact variant used while assembling a file-route application
+/// model, before instance/runtime products exist.
+pub fn build_layout_composition_plan_from_components_v1(
+    component_nodes: &[crate::ComponentNode],
+    graph: &FileRouteGraphV1,
+) -> Result<LayoutCompositionPlanV1, LayoutCompositionErrorV1> {
+    let components = component_nodes
         .iter()
         .map(|component| (component.id.clone(), component))
         .collect::<BTreeMap<_, _>>();

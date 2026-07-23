@@ -441,9 +441,9 @@ pub use intermediate_representation::{
     OptimizedIrContextSourceEvaluation,
 };
 pub use layout_composition::{
-    build_layout_composition_plan_v1, layout_composition_virtual_invocations_v1,
-    LayoutCompositionEdgeV1, LayoutCompositionErrorV1, LayoutCompositionPlanV1,
-    LayoutCompositionRouteV1,
+    build_layout_composition_plan_from_components_v1, build_layout_composition_plan_v1,
+    layout_composition_virtual_invocations_v1, LayoutCompositionEdgeV1, LayoutCompositionErrorV1,
+    LayoutCompositionPlanV1, LayoutCompositionRouteV1,
 };
 pub use metaframework_handoff::{
     build_deployable_release_manifest_v1, build_static_request_handoff_v1,
