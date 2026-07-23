@@ -9,7 +9,7 @@ test -s "$contract"
 for phrase in \
   'untagged template literals' \
   'cooked literal segments' \
-  'canonical `Template` IR instruction' \
+  'constructs one `Template` expression node' \
   'introduced runtime-computed artifact schema version `5`' \
   'never evaluates authored JavaScript source'; do
   rg --fixed-strings --quiet "$phrase" "$contract"
