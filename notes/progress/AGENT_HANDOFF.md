@@ -1643,9 +1643,11 @@ semantic-package contracts/runtime mappings. O2 supplies only immutable
 projection of existing explicit `workspace` and `watch --once` products; it
 creates no watcher, dev server, HMR, discovery, or source-analysis path. O3
 adds a schema-v1 command envelope that selects those projectors and preserves
-executor results unchanged. O4 is blocked: current multi-source workspace
-products do not publish application artifacts. A future compiler contract—not
-a metaframework shim—is required before Phase O can proceed.
+executor results unchanged. O4 is delegated to active Phase P. P0 freezes the
+compiler-owned multi-source publication request, explicit entry identity,
+manifest, atomic staging, and compatibility boundary. P1 must add the typed
+compiler request and validate its explicit entry before artifact lowering or
+metaframework adoption begins.
 
 Useful commands
 
@@ -1676,4 +1678,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* O3 application command envelope; commit pending.
+* P0 multi-source application publication constitution; commit pending.

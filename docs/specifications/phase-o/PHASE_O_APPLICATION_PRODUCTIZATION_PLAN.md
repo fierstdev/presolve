@@ -1,7 +1,7 @@
 # Phase O: Application Productization
 
-**Status:** O0–O3 complete. O4 is blocked on a missing canonical compiler
-multi-source artifact-publication product.
+**Status:** O0–O3 complete. O4 is delegated to the Phase P compiler amendment
+for a canonical multi-source artifact-publication product.
 
 ## Objective
 
@@ -60,8 +60,8 @@ decode artifact bytes or replace compiler errors.
 The current public artifact publisher accepts one entry source while the L9
 workspace product accepts explicit multi-source configuration but does not
 publish application artifacts. Phase O must not paper over that mismatch. This
-slice is blocked unless a future separately versioned compiler publication
-contract provides a multi-source artifact product.
+slice is implemented only after the separately versioned Phase P compiler
+publication contract provides a multi-source artifact product.
 
 ### O5 — routing and server product intake
 
