@@ -74,6 +74,12 @@ the declared export is callable, and invokes it with no arguments. Failure is
 diagnostic-only and opaque terminals force the normal resume path to cold
 fallback before restoration. Browser evidence is still required for admission.
 
+N9-G supplies the positive browser proof: missing exact runtime mapping fails
+the build, while a host-bound module is imported only after the authored
+compiler Action event and its declared terminal export is called. Malformed,
+non-callable, and snapshot resume fallback cases remain required negative
+evidence before registry admission.
+
 Malformed, duplicate, mismatched, non-client, missing-export, non-callable,
 or integrity-unbound records fail closed. An opaque declaration must match an
 actual imported opaque semantic-package export; a pure/resource/nonsemantic

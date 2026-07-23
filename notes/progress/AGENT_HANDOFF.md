@@ -3,8 +3,8 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N9-F - Opaque terminal generated runtime
-* Working tree: N9-F is ready for final verification and commit.
+* Latest completed slice: N9-G - Opaque terminal browser activation
+* Working tree: N9-G is ready for final verification and commit.
 * Date: 2026-07-23
 
 Last completed slice
@@ -73,6 +73,11 @@ Last completed slice
 * Result: generated runtime parses and validates only schema-v1 opaque artifacts, associates a terminal with the event's compiler-owned method ID, dynamically imports only the exact emitted module location, verifies the declared export is callable, and invokes it with no arguments. Failures become `PSR_OPAQUE_TERMINAL_FAILURE` diagnostics without a State/Form/Context write path. Opaque terminals force resume restoration to `OpaqueTerminalColdFallback` before any restore execution.
 * Verification: focused generated-runtime contract test plus compiler/CLI checks and formatting pass.
 * Next: add real-browser end-to-end fixture evidence for module invocation, non-callable failure, malformed-artifact rejection, and cold fallback; then admit the registry record and complete N10 freeze evidence.
+
+* Slice: N9-G - Opaque Terminal Browser Activation
+* Result: a generated browser fixture proves an opaque terminal build rejects a missing exact runtime mapping (`PSOPA1001`), publishes `opaque.runtime.json` only with a package contract/mapping, and dynamically invokes the declared third-party export exactly after its compiler-owned button action.
+* Verification: focused serialized real-Chrome browser fixture passes in 6.42 seconds, plus compiler/CLI checks and formatting.
+* Next: add browser fail-closed evidence for malformed/non-callable records and snapshot-triggered cold resume fallback, then admit the registry record and complete N10 freeze evidence.
 
 * Slice: N2-G - Compiler-Registered Math Rounding
 * Result: exact one-argument `Math.floor`, `Math.ceil`, and `Math.round` in supported Computed getters now resolve to compiler-registered unary operations, retain their operand dependencies, lower to canonical `Floor`/`Ceil`/`Round` IR, and execute only from schema-v11 computed-runtime instructions. No generic Math dispatch, overload, callback, alias, or authored JavaScript execution is admitted.

@@ -264,6 +264,115 @@ const wait = setInterval(() => {
 }
 
 #[test]
+fn integrity_bound_opaque_terminal_runs_only_from_a_compiler_action_in_a_real_browser() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/psc-browser-test/opaque-terminal-runtime");
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean opaque terminal browser output");
+    }
+    fs::create_dir_all(&out_dir).expect("failed to create opaque terminal browser output");
+    let source = out_dir.join("Checkout.tsx");
+    let contract = out_dir.join("analytics.contract.json");
+    fs::write(
+        &source,
+        r#"
+import { trackPurchase } from "@acme/analytics";
+@component("x-checkout")
+class Checkout extends Component {
+  @action() @opaque("@acme/analytics", "trackPurchase") track(): void {}
+  render() { return <button onClick={this.track}>Buy</button>; }
+}
+"#,
+    )
+    .expect("failed to write opaque terminal source");
+    fs::write(
+        &contract,
+        r#"{"schema_version":1,"package":"@acme/analytics","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"trackPurchase":{"kind":"opaque","type_signature":"() -> void","runtime_module":"dist/track.js","resume_policy":"cold_fallback","opaque_terminal":{"execution_boundary":"client","resume":"cold_fallback"}}}}"#,
+    )
+    .expect("failed to write opaque terminal contract");
+
+    let missing_mapping = Command::new(presolve_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            source.to_str().expect("opaque source path UTF-8"),
+            "--package-contract",
+            &format!("@acme/analytics={}", contract.display()),
+            "--out",
+            out_dir.to_str().expect("opaque output path UTF-8"),
+        ])
+        .output()
+        .expect("failed to run opaque build without runtime mapping");
+    assert!(!missing_mapping.status.success());
+    assert!(String::from_utf8_lossy(&missing_mapping.stderr).contains("PSOPA1001"));
+
+    let output = Command::new(presolve_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            source.to_str().expect("opaque source path UTF-8"),
+            "--package-contract",
+            &format!("@acme/analytics={}", contract.display()),
+            "--package-runtime",
+            "@acme/analytics=./analytics.js",
+            "--out",
+            out_dir.to_str().expect("opaque output path UTF-8"),
+        ])
+        .output()
+        .expect("failed to build opaque browser fixture");
+    assert!(
+        output.status.success(),
+        "opaque fixture build failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    fs::write(
+        out_dir.join("analytics.js"),
+        "export function trackPurchase() { window.__PRESOLVE_OPAQUE_TRACKED__ = (window.__PRESOLVE_OPAQUE_TRACKED__ ?? 0) + 1; }\n",
+    )
+    .expect("failed to write opaque terminal module");
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("opaque terminal page");
+    assert!(index.contains("presolve-opaque-runtime"));
+    assert!(fs::read_to_string(out_dir.join("opaque.runtime.json"))
+        .expect("opaque artifact")
+        .contains("trackPurchase"));
+    let probe = index.replace(
+        "</body>",
+        r#"<script>
+const deadline = Date.now() + 4000;
+document.querySelector("button")?.click();
+const wait = setInterval(() => {
+  if (window.__PRESOLVE_OPAQUE_TRACKED__ === 1) {
+    clearInterval(wait);
+    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_OPAQUE_BROWSER_TEST_PASS</div>");
+  } else if (Date.now() > deadline) {
+    clearInterval(wait);
+    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_OPAQUE_BROWSER_TEST_FAIL</div>");
+  }
+}, 20);
+</script></body>"#,
+    );
+    fs::write(out_dir.join("probe.html"), probe).expect("failed to write opaque probe");
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join(format!("chrome-profile-{}", std::process::id()));
+    fs::create_dir_all(&profile_dir).expect("failed to create opaque Chrome profile");
+    let output = run_chrome_probe(
+        chrome,
+        &format!("--user-data-dir={}", profile_dir.display()),
+        &format!("http://127.0.0.1:{}/probe.html", server.port),
+    );
+    server.stop();
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains("PRESOLVE_OPAQUE_BROWSER_TEST_PASS"),
+        "opaque browser probe failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn phase_k_production_artifact_runs_under_csp_and_rejects_malformed_boot_in_a_real_browser() {
     let _guard = browser_test_guard();
     let repo_root = repo_root();
