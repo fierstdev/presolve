@@ -1634,14 +1634,14 @@ Known limitations
 
 Exact next step
 
-Phase M is frozen through M10, Phase N through N10, Phase P through P5, and
-Phase O through O6. Phase P supplies one
+Phase M is frozen through M10, Phase N through N10, Phase P through P5, Phase
+O through O6, and Phase Q through Q5. Phase P supplies one
 canonical explicit multi-source application-publication request/product,
 digest-bound schema-v1 manifest, atomic output pointer CLI, and thin
-`@presolve/application` command projection. Phase O's O5/O6 intake makes
-routing/server and deployment/distribution successor-contract work; neither is
-implemented or implied. The next work requires a new separately authorized
-product contract.
+`@presolve/application` command projection. Phase Q adds compiler-owned static
+route topology, request ownership, and provider-neutral release handoffs
+without a second runtime. Dynamic routing, SSR/server behavior, and provider
+deployment require separate successor contracts.
 
 Useful commands
 
