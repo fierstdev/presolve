@@ -14,6 +14,7 @@ numbered slice is accepted.
 * [N2-C boolean computed conditional contract](PHASE_N_N2C_BOOLEAN_CONDITIONAL_CONTRACT.md)
 * [N2-D optional member access contract](PHASE_N_N2D_OPTIONAL_MEMBER_ACCESS_CONTRACT.md)
 * [N2-E compiler-registered Math.abs contract](PHASE_N_N2E_BUILTIN_MATH_ABS_CONTRACT.md)
+* [N2-F compiler-registered Math.min and Math.max contract](PHASE_N_N2F_BUILTIN_MATH_MIN_MAX_CONTRACT.md)
 * [N3-A serializable State replacement contract](PHASE_N_N3A_SERIALIZABLE_STATE_REPLACEMENT_CONTRACT.md)
 * [N4-A keyed structural list contract](PHASE_N_N4A_KEYED_STRUCTURAL_LIST_CONTRACT.md)
 * [N4-B JSX HTML attribute alias contract](PHASE_N_N4B_JSX_HTML_ATTRIBUTE_ALIAS_CONTRACT.md)

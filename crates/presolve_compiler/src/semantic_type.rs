@@ -1712,7 +1712,10 @@ fn infer_effect_expression_type(
             child_type(argument, expression_types)
         }),
         ExpressionNodeKind::BuiltinPureCall {
-            operation: crate::component_graph::BuiltinPureOperation::MathAbs,
+            operation:
+                crate::component_graph::BuiltinPureOperation::MathAbs
+                | crate::component_graph::BuiltinPureOperation::MathMin
+                | crate::component_graph::BuiltinPureOperation::MathMax,
             ..
         } => SemanticType::Number,
         ExpressionNodeKind::ThisMember { name } => effects
@@ -2275,7 +2278,10 @@ fn infer_context_source_expression_type(
             .first()
             .map_or(SemanticType::Unknown, |argument| child(argument, inferred)),
         ExpressionNodeKind::BuiltinPureCall {
-            operation: crate::component_graph::BuiltinPureOperation::MathAbs,
+            operation:
+                crate::component_graph::BuiltinPureOperation::MathAbs
+                | crate::component_graph::BuiltinPureOperation::MathMin
+                | crate::component_graph::BuiltinPureOperation::MathMax,
             ..
         } => SemanticType::Number,
         ExpressionNodeKind::ThisMember { name } => owners
@@ -2397,7 +2403,10 @@ fn infer_computed_expression_type(
             child_type(argument, expression_types, computed_types, visiting)
         }),
         ExpressionNodeKind::BuiltinPureCall {
-            operation: crate::component_graph::BuiltinPureOperation::MathAbs,
+            operation:
+                crate::component_graph::BuiltinPureOperation::MathAbs
+                | crate::component_graph::BuiltinPureOperation::MathMin
+                | crate::component_graph::BuiltinPureOperation::MathMax,
             ..
         } => SemanticType::Number,
         ExpressionNodeKind::ThisMember { name } => infer_computed_read_type(

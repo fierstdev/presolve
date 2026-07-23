@@ -1823,6 +1823,8 @@ fn build_application_semantic_model_from_files_with_bindings(
         );
     }
 
+    resolve_builtin_pure_calls(&mut components);
+
     if let Some(bindings) = bindings {
         diagnostics.extend(bindings.diagnostics.iter().map(|diagnostic| {
             ComponentDiagnostic::error(
@@ -2269,6 +2271,80 @@ fn build_application_semantic_model_from_files_with_bindings(
     model
 }
 
+fn resolve_builtin_pure_calls(components: &mut [ComponentNode]) {
+    for component in components {
+        for method in component
+            .methods
+            .iter_mut()
+            .filter(|method| method.is_computed())
+        {
+            if let Some(expression) = method.computed_expression.as_mut() {
+                resolve_builtin_pure_call(expression);
+            }
+        }
+    }
+}
+
+fn resolve_builtin_pure_call(expression: &mut ComputedExpression) {
+    match &mut expression.kind {
+        ComputedExpressionKind::Call { callee, arguments } => {
+            for argument in arguments.iter_mut() {
+                resolve_builtin_pure_call(argument);
+            }
+            let operation = match (callee.as_str(), arguments.len()) {
+                ("Math.abs", 1) => Some(crate::component_graph::BuiltinPureOperation::MathAbs),
+                ("Math.min", 2) => Some(crate::component_graph::BuiltinPureOperation::MathMin),
+                ("Math.max", 2) => Some(crate::component_graph::BuiltinPureOperation::MathMax),
+                _ => None,
+            };
+            if let Some(operation) = operation {
+                expression.kind = ComputedExpressionKind::BuiltinPureCall {
+                    operation,
+                    arguments: std::mem::take(arguments),
+                };
+            }
+        }
+        ComputedExpressionKind::BuiltinPureCall { arguments, .. }
+        | ComputedExpressionKind::SemanticPackagePureCall { arguments, .. } => {
+            for argument in arguments {
+                resolve_builtin_pure_call(argument);
+            }
+        }
+        ComputedExpressionKind::Template { expressions, .. } => {
+            for expression in expressions {
+                resolve_builtin_pure_call(expression);
+            }
+        }
+        ComputedExpressionKind::MemberAccess { object, .. }
+        | ComputedExpressionKind::Unary {
+            operand: object, ..
+        } => {
+            resolve_builtin_pure_call(object);
+        }
+        ComputedExpressionKind::IndexAccess { object, index } => {
+            resolve_builtin_pure_call(object);
+            resolve_builtin_pure_call(index);
+        }
+        ComputedExpressionKind::Conditional {
+            condition,
+            when_true,
+            when_false,
+        } => {
+            resolve_builtin_pure_call(condition);
+            resolve_builtin_pure_call(when_true);
+            resolve_builtin_pure_call(when_false);
+        }
+        ComputedExpressionKind::Arithmetic { left, right, .. }
+        | ComputedExpressionKind::Comparison { left, right, .. }
+        | ComputedExpressionKind::Logical { left, right, .. }
+        | ComputedExpressionKind::NullishCoalescing { left, right } => {
+            resolve_builtin_pure_call(left);
+            resolve_builtin_pure_call(right);
+        }
+        ComputedExpressionKind::Literal(_) | ComputedExpressionKind::ThisMember(_) => {}
+    }
+}
+
 fn components_with_resolved_form_field_candidates(
     components: &[ComponentNode],
     candidates: &[crate::FormFieldDeclarationCandidate],
@@ -2560,6 +2636,7 @@ fn classify_computed_values(
                 .as_ref()
                 .is_some_and(|expression| {
                     contains_semantic_package_pure_call(expression, &call.callee)
+                        || contains_builtin_pure_call(expression, &call.callee)
                 })
             {
                 continue;
@@ -2654,9 +2731,15 @@ fn resolve_semantic_package_pure_call(
                 resolve_semantic_package_pure_call(argument, module_path, bindings);
             }
             let Some(binding) = bindings.resolve_import(module_path, callee) else {
-                if callee == "Math.abs" && arguments.len() == 1 {
+                let operation = match (callee.as_str(), arguments.len()) {
+                    ("Math.abs", 1) => Some(crate::component_graph::BuiltinPureOperation::MathAbs),
+                    ("Math.min", 2) => Some(crate::component_graph::BuiltinPureOperation::MathMin),
+                    ("Math.max", 2) => Some(crate::component_graph::BuiltinPureOperation::MathMax),
+                    _ => None,
+                };
+                if let Some(operation) = operation {
                     expression.kind = ComputedExpressionKind::BuiltinPureCall {
-                        operation: crate::component_graph::BuiltinPureOperation::MathAbs,
+                        operation,
                         arguments: std::mem::take(arguments),
                     };
                 }
@@ -2777,6 +2860,55 @@ fn contains_semantic_package_pure_call(expression: &ComputedExpression, callee: 
         | ComputedExpressionKind::NullishCoalescing { left, right } => {
             contains_semantic_package_pure_call(left, callee)
                 || contains_semantic_package_pure_call(right, callee)
+        }
+        ComputedExpressionKind::Literal(_) | ComputedExpressionKind::ThisMember(_) => false,
+    }
+}
+
+fn contains_builtin_pure_call(expression: &ComputedExpression, callee: &str) -> bool {
+    match &expression.kind {
+        ComputedExpressionKind::BuiltinPureCall {
+            operation,
+            arguments,
+        } => {
+            let operation_callee = match operation {
+                crate::component_graph::BuiltinPureOperation::MathAbs => "Math.abs",
+                crate::component_graph::BuiltinPureOperation::MathMin => "Math.min",
+                crate::component_graph::BuiltinPureOperation::MathMax => "Math.max",
+            };
+            operation_callee == callee
+                || arguments
+                    .iter()
+                    .any(|argument| contains_builtin_pure_call(argument, callee))
+        }
+        ComputedExpressionKind::Call { arguments, .. }
+        | ComputedExpressionKind::SemanticPackagePureCall { arguments, .. } => arguments
+            .iter()
+            .any(|argument| contains_builtin_pure_call(argument, callee)),
+        ComputedExpressionKind::Template { expressions, .. } => expressions
+            .iter()
+            .any(|expression| contains_builtin_pure_call(expression, callee)),
+        ComputedExpressionKind::MemberAccess { object, .. }
+        | ComputedExpressionKind::Unary {
+            operand: object, ..
+        } => contains_builtin_pure_call(object, callee),
+        ComputedExpressionKind::IndexAccess { object, index } => {
+            contains_builtin_pure_call(object, callee) || contains_builtin_pure_call(index, callee)
+        }
+        ComputedExpressionKind::Conditional {
+            condition,
+            when_true,
+            when_false,
+        } => {
+            contains_builtin_pure_call(condition, callee)
+                || contains_builtin_pure_call(when_true, callee)
+                || contains_builtin_pure_call(when_false, callee)
+        }
+        ComputedExpressionKind::Arithmetic { left, right, .. }
+        | ComputedExpressionKind::Comparison { left, right, .. }
+        | ComputedExpressionKind::Logical { left, right, .. }
+        | ComputedExpressionKind::NullishCoalescing { left, right } => {
+            contains_builtin_pure_call(left, callee) || contains_builtin_pure_call(right, callee)
         }
         ComputedExpressionKind::Literal(_) | ComputedExpressionKind::ThisMember(_) => false,
     }

@@ -15,7 +15,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const ACTION_MANIFEST_SCHEMA_VERSION = 2;
   const FORMS_MANIFEST_SCHEMA_VERSION = 3;
   const LEGACY_MANIFEST_SCHEMA_VERSION = 1;
-  const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 9;
+  const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 10;
   const SUPPORTED_EFFECT_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = __EZ_COMPONENT_SCHEMA_VERSION__;
@@ -1603,6 +1603,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       case "and": return left && right;
       case "or": return left || right;
       case "nullish-coalesce": return left ?? right;
+      case "min": return typeof left === "number" && typeof right === "number" ? Math.min(left, right) : undefined;
+      case "max": return typeof left === "number" && typeof right === "number" ? Math.max(left, right) : undefined;
       default: return undefined;
     }
   }
@@ -3880,7 +3882,7 @@ mod tests {
         assert!(runtime.contains("contextSlots: new Map()"));
         assert!(runtime.contains("RUNTIME_VERSION = \"0.0.0\""));
         assert!(runtime.contains("SUPPORTED_SCHEMA_VERSION = 4"));
-        assert!(runtime.contains("SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 9"));
+        assert!(runtime.contains("SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 10"));
         assert!(runtime.contains("case \"abs\""));
         assert!(runtime.contains("instruction.kind === \"select\""));
         assert!(runtime.contains("instruction.kind === \"get-index\""));

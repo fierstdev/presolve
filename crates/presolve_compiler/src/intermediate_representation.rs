@@ -1418,19 +1418,36 @@ impl ExpressionIrLowering<'_> {
             ExpressionNodeKind::BuiltinPureCall {
                 operation,
                 arguments,
-            } => {
-                let [argument] = arguments.as_slice() else {
-                    return None;
-                };
-                IrInstructionKind::Unary {
-                    operation: match operation {
-                        crate::component_graph::BuiltinPureOperation::MathAbs => {
-                            IrUnaryOperation::Abs
-                        }
-                    },
-                    operand: IrOperand::Value(self.lower_node(argument)?),
+            } => match operation {
+                crate::component_graph::BuiltinPureOperation::MathAbs => {
+                    let [argument] = arguments.as_slice() else {
+                        return None;
+                    };
+                    IrInstructionKind::Unary {
+                        operation: IrUnaryOperation::Abs,
+                        operand: IrOperand::Value(self.lower_node(argument)?),
+                    }
                 }
-            }
+                crate::component_graph::BuiltinPureOperation::MathMin
+                | crate::component_graph::BuiltinPureOperation::MathMax => {
+                    let [left, right] = arguments.as_slice() else {
+                        return None;
+                    };
+                    IrInstructionKind::Binary {
+                        operation: match operation {
+                            crate::component_graph::BuiltinPureOperation::MathMin => {
+                                IrBinaryOperation::Min
+                            }
+                            crate::component_graph::BuiltinPureOperation::MathMax => {
+                                IrBinaryOperation::Max
+                            }
+                            crate::component_graph::BuiltinPureOperation::MathAbs => unreachable!(),
+                        },
+                        left: IrOperand::Value(self.lower_node(left)?),
+                        right: IrOperand::Value(self.lower_node(right)?),
+                    }
+                }
+            },
             ExpressionNodeKind::Template {
                 quasis,
                 expressions,
@@ -2252,6 +2269,8 @@ fn evaluate_numeric_binary(
         IrBinaryOperation::Multiply => left * right,
         IrBinaryOperation::Divide if right != 0.0 => left / right,
         IrBinaryOperation::Remainder if right != 0.0 => left % right,
+        IrBinaryOperation::Min => left.min(right),
+        IrBinaryOperation::Max => left.max(right),
         _ => return None,
     };
     Some(format_number(value))
@@ -3936,6 +3955,8 @@ pub enum IrBinaryOperation {
     And,
     Or,
     NullishCoalesce,
+    Min,
+    Max,
 }
 
 /// A unary operation with value-producing IR semantics.

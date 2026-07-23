@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N4-B - JSX HTML Attribute Aliases
-* Working tree: clean after the N4-B JSX attribute alias commit.
+* Latest completed slice: N2-F - Compiler-Registered Math.min/Math.max
+* Working tree: clean after the N2-F math-min-max commit.
 * Date: 2026-07-22
 
 Last completed slice
+
+* Slice: N2-F - Compiler-Registered Math.min/Math.max
+* Result: admits exact two-operand `Math.min` and `Math.max` only in supported Computed getters. Builtins resolve without package input, derive both operand dependencies, lower canonical binary Min/Max IR, publish runtime-computed schema v10, and execute from generated runtime programs. Generic Math calls, rest arguments, callbacks, and package code remain excluded.
+* Verification: focused compiler artifact/registry/CLI/browser/format/diff verifier passes.
+* Next: N3-B must select a complete Action or State real-data operation; do not broaden arbitrary Action bodies.
 
 * Slice: N4-B - JSX HTML Attribute Aliases
 * Result: compiler template lowering canonically maps only `className` to `class` and `htmlFor` to `for`, before semantic type checks, static HTML, manifests, and ordinary runtime binding artifacts. Framework JSX transforms, runtime aliases, spreads, style objects, and unbounded class helpers were not introduced.

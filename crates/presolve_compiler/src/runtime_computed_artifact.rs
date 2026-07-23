@@ -8,7 +8,7 @@ use crate::{
     SemanticId, SerializableValue, SerializationCompatibility,
 };
 
-pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 9;
+pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 10;
 
 /// Versioned runtime metadata and executable programs emitted from canonical IR.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -145,6 +145,8 @@ pub enum RuntimeComputedArtifactBinaryOperation {
     And,
     Or,
     NullishCoalesce,
+    Min,
+    Max,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -533,6 +535,8 @@ const fn binary_operation(operation: IrBinaryOperation) -> RuntimeComputedArtifa
         IrBinaryOperation::NullishCoalesce => {
             RuntimeComputedArtifactBinaryOperation::NullishCoalesce
         }
+        IrBinaryOperation::Min => RuntimeComputedArtifactBinaryOperation::Min,
+        IrBinaryOperation::Max => RuntimeComputedArtifactBinaryOperation::Max,
     }
 }
 
@@ -627,7 +631,7 @@ class RuntimeComputedArtifact extends Component {
         let second = runtime_computed_artifact_json(&build_runtime_computed_artifact(&model, &ir));
         assert_eq!(first, second);
         let json: serde_json::Value = serde_json::from_str(&first).expect("artifact JSON");
-        assert_eq!(json["schema_version"], 9);
+        assert_eq!(json["schema_version"], 10);
         assert_eq!(
             json["evaluations"][0]["program"]["instructions"][0]["kind"],
             "load-state"
@@ -907,5 +911,38 @@ class AbsComputed extends Component {
                     }
                 )
             }));
+    }
+
+    #[test]
+    fn emits_compiler_registered_math_min_and_max_as_binary_programs() {
+        let parsed = presolve_parser::parse_file(
+            "src/MinMaxComputed.tsx",
+            r#"
+@component("x-min-max-computed")
+class MinMaxComputed extends Component {
+  left = state(-2);
+  right = state(5);
+  @computed()
+  get minimum() { return Math.min(this.left, this.right); }
+  @computed()
+  get maximum() { return Math.max(this.left, this.right); }
+  render() { return <output>MinMax</output>; }
+}
+"#,
+        );
+        let model = build_application_semantic_model(&parsed);
+        assert!(model.diagnostics.is_empty(), "{:?}", model.diagnostics);
+        let artifact = build_runtime_computed_artifact(&model, &lower_components_to_ir(&model));
+        let operations = artifact
+            .evaluations
+            .iter()
+            .flat_map(|evaluation| evaluation.program.instructions.iter())
+            .filter_map(|instruction| match instruction {
+                RuntimeComputedArtifactInstruction::Binary { operation, .. } => Some(*operation),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert!(operations.contains(&super::RuntimeComputedArtifactBinaryOperation::Min));
+        assert!(operations.contains(&super::RuntimeComputedArtifactBinaryOperation::Max));
     }
 }

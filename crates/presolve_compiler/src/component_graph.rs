@@ -593,6 +593,8 @@ pub enum ComputedExpressionKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BuiltinPureOperation {
     MathAbs,
+    MathMin,
+    MathMax,
 }
 
 /// Ordered source syntax retained from one `@effect()` body before semantic resolution.

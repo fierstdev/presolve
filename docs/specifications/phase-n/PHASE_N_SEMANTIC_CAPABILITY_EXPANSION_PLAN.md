@@ -232,6 +232,12 @@ Computed getter. It has one numeric operand, compiler-derived dependencies,
 unary IR lowering, and a versioned runtime operation; generic calls remain
 outside the language.
 
+#### N2-F — compiler-registered numeric bounds
+
+Admit exact two-operand `Math.min` and `Math.max` as compiler-owned binary
+operations. Both operands must satisfy the numeric expression boundary; rest
+arguments and generic `Math` dispatch remain unsupported.
+
 ### N3 — State, Actions, Computed, and Effects over real data
 
 N3-A admits recursively serializable record/array State and complete-field

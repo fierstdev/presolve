@@ -258,6 +258,17 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
                 "runtime-computed schema v9 unary abs operation",
                 "runtime_browser::registered_math_abs_executes_from_compiler_generated_runtime_programs",
             ),
+            admitted(
+                "builtin_math_min_max",
+                SemanticCapabilityClass::Bounded,
+                "Math.min(left, right) or Math.max(left, right) in a supported @computed() getter",
+                "compiler-registered BuiltinPureOperation, canonical binary IR, and runtime-computed artifact",
+                "exactly two compiler-supported numeric operands",
+                "union of the compiler-derived dependencies of both operands",
+                "serializable numeric result; no package or independent resume record",
+                "runtime-computed schema v10 binary min/max operations",
+                "runtime_browser::registered_math_min_max_execute_from_compiler_generated_runtime_programs",
+            ),
             deferred(
                 "semantic_package_exports",
                 SemanticCapabilityClass::Unsupported,
@@ -388,6 +399,7 @@ mod tests {
                 "static_index_access",
                 "boolean_computed_conditional",
                 "builtin_math_abs",
+                "builtin_math_min_max",
                 "semantic_package_exports",
                 "resources",
                 "opaque_typescript"

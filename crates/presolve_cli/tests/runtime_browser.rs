@@ -3387,6 +3387,7 @@ class AbsComputed extends Component {
   get magnitude() { return Math.abs(this.count); }
   render() { return <output>Abs</output>; }
 }
+
 "#,
     )
     .expect("write abs source");
@@ -3418,6 +3419,62 @@ class AbsComputed extends Component {
     server.stop();
     assert!(
         stdout.contains("PRESOLVE_MATH_ABS_BROWSER_TEST_PASS"),
+        "{}",
+        stdout
+    );
+}
+
+#[test]
+fn registered_math_min_max_execute_from_compiler_generated_runtime_programs() {
+    let _guard = browser_test_guard();
+    let root = repo_root();
+    let out = root.join("target/psc-browser-test/math-min-max-runtime");
+    if out.exists() {
+        fs::remove_dir_all(&out).expect("clean min max output");
+    }
+    fs::create_dir_all(&out).expect("create min max output");
+    let source = out.join("MinMaxComputed.tsx");
+    fs::write(
+        &source,
+        r#"
+@component("x-min-max-computed")
+class MinMaxComputed extends Component {
+  left = state(-2); right = state(5);
+  @computed() get minimum() { return Math.min(this.left, this.right); }
+  @computed() get maximum() { return Math.max(this.left, this.right); }
+  render() { return <output>MinMax</output>; }
+}
+"#,
+    )
+    .expect("write min max source");
+    let build = Command::new(presolve_cli_bin())
+        .current_dir(&root)
+        .args([
+            "build",
+            source.to_str().expect("source"),
+            "--out",
+            out.to_str().expect("out"),
+        ])
+        .output()
+        .expect("build min max");
+    assert!(
+        build.status.success(),
+        "{}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    write_math_min_max_probe_page(&out);
+    let server = StaticServer::start(out.clone());
+    let profile = out.join("chrome-profile");
+    fs::create_dir_all(&profile).expect("profile");
+    let output = run_chrome_probe(
+        chrome_bin().expect("Chrome"),
+        &format!("--user-data-dir={}", profile.display()),
+        &format!("http://127.0.0.1:{}/probe.html", server.port),
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("PRESOLVE_MATH_MIN_MAX_BROWSER_TEST_PASS"),
         "{}",
         stdout
     );
@@ -3974,6 +4031,18 @@ if (value?.value !== 2 || value?.dirty !== false || window.__PRESOLVE__.diagnost
 document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_MATH_ABS_BROWSER_TEST_PASS</div>"); })().catch((error) => { document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_MATH_ABS_BROWSER_TEST_FAIL: ${error.message}</div>`); });
 </script></body>"#);
     fs::write(out_dir.join("probe.html"), probe).expect("write abs probe");
+}
+
+fn write_math_min_max_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("read min max page");
+    let probe = index.replace("</body>", r#"<script>
+(async () => { const end = Date.now() + 3000; while (document.documentElement.dataset.presolveRuntime !== "ready") { if (Date.now() > end) throw new Error("runtime not ready"); await new Promise((r) => setTimeout(r, 20)); }
+const minimum = window.__PRESOLVE__.computed.find((entry) => entry.computed.endsWith("/computed:minimum"));
+const maximum = window.__PRESOLVE__.computed.find((entry) => entry.computed.endsWith("/computed:maximum"));
+if (minimum?.value !== -2 || maximum?.value !== 5 || minimum?.dirty !== false || maximum?.dirty !== false || window.__PRESOLVE__.diagnostics.length !== 0) throw new Error("Math.min/Math.max did not execute");
+document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_MATH_MIN_MAX_BROWSER_TEST_PASS</div>"); })().catch((error) => { document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_MATH_MIN_MAX_BROWSER_TEST_FAIL: ${error.message}</div>`); });
+</script></body>"#);
+    fs::write(out_dir.join("probe.html"), probe).expect("write min max probe");
 }
 
 fn write_initial_effect_probe_page(out_dir: &Path) {
