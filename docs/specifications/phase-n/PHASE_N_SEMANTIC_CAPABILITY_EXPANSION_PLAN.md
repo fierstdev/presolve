@@ -366,6 +366,15 @@ endpoint. The generated page and runtime do not consume that artifact yet;
 their publication and boot contracts must be extended together with endpoint
 activation, cancellation, result decoding, resume, and browser evidence.
 
+N6-C8 through N6-C13 are complete: the canonical page embeds a host-bound
+Resource artifact, the runtime validates and activates only client/shared
+endpoints, page teardown aborts each activation, and `presolve build` consumes
+the explicit runtime mapping to publish the artifact. A resolved
+`@resource("importedEndpoint") field!: Resource<Data, Error>` now admits one
+activation-only browser source path. Result/error source reads, resource
+inputs, retry/invalidation, component-destruction cancellation, and
+snapshot/resume are still deferred.
+
 Introduce a compiler-owned Resource declaration with explicit key, input
 dependencies, loading/success/error state, cancellation, retry, invalidation,
 serialization, and resume rules. Resources may invoke only registered

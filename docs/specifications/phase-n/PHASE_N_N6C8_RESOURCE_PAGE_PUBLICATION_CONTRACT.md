@@ -6,8 +6,9 @@ the artifact as escaped JSON in `presolve-resources-runtime` immediately before
 `runtime.js`, preserving the existing artifact ordering and boot script.
 
 The existing page generator remains unchanged for applications without a
-Resource artifact. The CLI does not select this path yet, because Resource
-source remains rejected and the runtime has not installed a Resource artifact
-validator or endpoint executor.
+Resource artifact. N6-C13 selects this path only after source endpoint
+resolution, explicit package runtime mapping, and artifact validation succeed.
+The runtime independently validates the embedded artifact before it imports an
+endpoint.
 
 Verification is `scripts/verify-n6c8-resource-page-publication.sh`.

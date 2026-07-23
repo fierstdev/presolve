@@ -20,19 +20,21 @@ use presolve_compiler::{
     build_production_runtime_artifact, build_resume_chunk_graph, build_resume_manifest,
     build_runtime_component_artifact, build_runtime_computed_artifact,
     build_runtime_context_artifact, build_runtime_effect_artifact, build_runtime_forms_artifact,
-    build_semantic_graph, build_template_graph, build_template_manifest_from_asm,
-    emit_production_modules, explain_json, explain_text, extract_production_chunk_graph,
-    fold_component_graph, generate_ordinary_instance_html, generate_runtime_stub,
-    generate_standalone_page_with_resume_runtime, generate_static_html, lower_components_to_ir,
-    optimization_report_json, optimize_context_ir, optimize_effect_ir,
+    build_runtime_resource_artifact_with_modules, build_semantic_graph, build_template_graph,
+    build_template_manifest_from_asm, emit_production_modules, explain_json, explain_text,
+    extract_production_chunk_graph, fold_component_graph, generate_ordinary_instance_html,
+    generate_runtime_stub, generate_standalone_page_with_resume_runtime,
+    generate_standalone_page_with_resume_runtime_and_resources, generate_static_html,
+    lower_components_to_ir, optimization_report_json, optimize_context_ir, optimize_effect_ir,
     production_runtime_artifact_json, project_production_diagnostics, project_resume_diagnostics,
     resume_manifest_json, runtime_component_artifact_json, runtime_computed_artifact_json,
     runtime_context_artifact_json, runtime_cost_report_json, runtime_effect_artifact_json,
-    runtime_forms_artifact_json, semantic_capability_registry_json, semantic_graph_json,
-    semantic_type_text, summarize_source, template_manifest_json,
-    validate_application_semantic_model, ApplicationSemanticModel, AsmValidationDiagnostic,
-    AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
-    EffectInspection, EffectInspectionRegistry, ExecutableProgramFingerprint, ImmutableAsmPass,
+    runtime_forms_artifact_json, runtime_resource_artifact_json, semantic_capability_registry_json,
+    semantic_graph_json, semantic_type_text, summarize_source, template_manifest_json,
+    validate_application_semantic_model, validate_runtime_resource_artifact,
+    ApplicationSemanticModel, AsmValidationDiagnostic, AttributeValue, CompilationUnit,
+    ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind, EffectInspection,
+    EffectInspectionRegistry, ExecutableProgramFingerprint, ImmutableAsmPass,
     ProductionDiagnosticFact, ProductionDiagnosticKind, ProductionProjectedDiagnostic,
     ProductionReportInputs, ProductionRootChunkInput, RenderAttribute, RenderAttributeValue,
     SemanticEntity, SemanticEntityKind, SemanticId, SemanticOwner, SemanticPackageResolutionTable,
@@ -2946,14 +2948,16 @@ fn run_build(mut args: Vec<String>) {
     let parsed = parse_file(&input_path, &source);
     let unit = CompilationUnit::from_parsed_files(vec![parsed.clone()]);
     let packages = parse_semantic_package_contracts(&args);
-    let _resource_runtime_modules = parse_semantic_package_runtime_modules(&args, &packages);
+    let resource_runtime_modules = parse_semantic_package_runtime_modules(&args, &packages);
     let asm = ConstantFoldingPass.transform(
         &build_application_semantic_model_for_unit_with_packages(&unit, &packages),
     );
     let package_diagnostics = asm
         .diagnostics
         .iter()
-        .filter(|diagnostic| diagnostic.code.starts_with("PSBIND10"))
+        .filter(|diagnostic| {
+            diagnostic.code.starts_with("PSBIND10") || diagnostic.code == "PSC1128"
+        })
         .collect::<Vec<_>>();
     if !package_diagnostics.is_empty() {
         for diagnostic in package_diagnostics {
@@ -2961,6 +2965,35 @@ fn run_build(mut args: Vec<String>) {
         }
         process::exit(2);
     }
+    let resource_runtime_artifact = if asm.resource_declarations.is_empty() {
+        None
+    } else {
+        let artifact =
+            build_runtime_resource_artifact_with_modules(&asm, &resource_runtime_modules)
+                .unwrap_or_else(|error| {
+                    eprintln!(
+                        "PSRES1001: resource runtime module mapping is incomplete: {error:?}"
+                    );
+                    process::exit(2);
+                });
+        let validation = validate_runtime_resource_artifact(&artifact);
+        if !validation.is_empty() {
+            eprintln!("PSRES1002: generated resource artifact is invalid: {validation:?}");
+            process::exit(2);
+        }
+        if let Some(declaration) = artifact
+            .declarations
+            .iter()
+            .find(|declaration| declaration.execution_boundary == "Server")
+        {
+            eprintln!(
+                "PSRES1003: resource `{}` uses a server endpoint and cannot be published in a browser build",
+                declaration.id
+            );
+            process::exit(2);
+        }
+        Some(artifact)
+    };
     let ir = lower_components_to_ir(&asm);
     let computed_runtime_artifact = build_runtime_computed_artifact(&asm, &ir);
     let computed_runtime_json = runtime_computed_artifact_json(&computed_runtime_artifact);
@@ -2977,6 +3010,9 @@ fn run_build(mut args: Vec<String>) {
     let forms_runtime_json = runtime_forms_artifact_json(&forms_runtime_artifact);
     let resume_runtime_artifact = build_resume_manifest(&asm);
     let resume_runtime_json = resume_manifest_json(&resume_runtime_artifact);
+    let resource_runtime_json = resource_runtime_artifact
+        .as_ref()
+        .map(runtime_resource_artifact_json);
     let (production_chunk_graph, _) = extract_production_chunk_graph(
         &SharedChunkCandidatePlan {
             candidates: Vec::new(),
@@ -3007,6 +3043,22 @@ fn run_build(mut args: Vec<String>) {
         &forms_runtime_artifact,
         &resume_runtime_artifact,
     );
+    let page_html = resource_runtime_artifact
+        .as_ref()
+        .map_or(page_html, |resources| {
+            generate_standalone_page_with_resume_runtime_and_resources(
+                &page_title,
+                &html_fragment,
+                &manifest,
+                &computed_runtime_artifact,
+                &context_runtime_artifact,
+                &effect_runtime_artifact,
+                &component_runtime_artifact,
+                &forms_runtime_artifact,
+                &resume_runtime_artifact,
+                resources,
+            )
+        });
     let page_html = production_mode_page_html(
         page_html,
         args.iter().any(|argument| argument == "--production"),
@@ -3024,7 +3076,9 @@ fn run_build(mut args: Vec<String>) {
         &forms_runtime_json,
         &resume_runtime_json,
         &runtime_js,
-    ]);
+    ]) + resource_runtime_json.as_ref().map_or(0, |json| {
+        u64::try_from(json.len()).expect("resource artifact byte count exceeds u64")
+    });
     let production_bytes = byte_count(
         std::iter::once(&production_runtime_json).chain(
             std::iter::once(&production_layout.eager)
@@ -3077,6 +3131,7 @@ fn run_build(mut args: Vec<String>) {
         &component_runtime_json,
         &forms_runtime_json,
         &resume_runtime_json,
+        resource_runtime_json.as_deref(),
         &production_runtime_json,
         &optimization_report_json,
         &runtime_cost_report_json,
@@ -3097,7 +3152,7 @@ fn run_build(mut args: Vec<String>) {
         &production_chunk_graph,
     );
 
-    print_build_artifact_paths(&out_dir, &resume_chunks);
+    print_build_artifact_paths(&out_dir, &resume_chunks, resource_runtime_json.is_some());
 }
 
 fn parse_semantic_package_contracts(args: &[String]) -> SemanticPackageResolutionTable {
@@ -3185,7 +3240,11 @@ fn parse_semantic_package_runtime_modules(
     modules
 }
 
-fn print_build_artifact_paths(out_dir: &Path, resume_chunks: &presolve_compiler::ResumeChunkGraph) {
+fn print_build_artifact_paths(
+    out_dir: &Path,
+    resume_chunks: &presolve_compiler::ResumeChunkGraph,
+    includes_resources: bool,
+) {
     for artifact in [
         "index.html",
         "template.manifest.json",
@@ -3201,6 +3260,9 @@ fn print_build_artifact_paths(out_dir: &Path, resume_chunks: &presolve_compiler:
         "runtime.js",
     ] {
         println!("Wrote {}", out_dir.join(artifact).display());
+    }
+    if includes_resources {
+        println!("Wrote {}", out_dir.join("resources.runtime.json").display());
     }
     for chunk in &resume_chunks.chunks {
         println!(
@@ -3380,6 +3442,13 @@ fn parse_out_dir(args: &[String]) -> PathBuf {
             "--package-contract" => {
                 if args.get(index + 1).is_none() {
                     eprintln!("missing value for --package-contract");
+                    process::exit(1);
+                }
+                index += 2;
+            }
+            "--package-runtime" => {
+                if args.get(index + 1).is_none() {
+                    eprintln!("missing value for --package-runtime");
                     process::exit(1);
                 }
                 index += 2;
@@ -4121,6 +4190,7 @@ fn write_build_artifacts(
     component_runtime_json: &str,
     forms_runtime_json: &str,
     resume_runtime_json: &str,
+    resource_runtime_json: Option<&str>,
     production_runtime_json: &str,
     optimization_report_json: &str,
     runtime_cost_report_json: &str,
@@ -4152,6 +4222,12 @@ fn write_build_artifacts(
     )?;
     fs::write(out_dir.join("forms.runtime.json"), forms_runtime_json)?;
     fs::write(out_dir.join("resume.runtime.json"), resume_runtime_json)?;
+    if let Some(resource_runtime_json) = resource_runtime_json {
+        fs::write(
+            out_dir.join("resources.runtime.json"),
+            resource_runtime_json,
+        )?;
+    }
     fs::write(
         out_dir.join("production.runtime.json"),
         production_runtime_json,
@@ -4184,7 +4260,7 @@ fn print_usage_and_exit() -> ! {
     eprintln!("  presolve template <file>");
     eprintln!("  presolve html <file>");
     eprintln!("  presolve manifest <file>");
-    eprintln!("  presolve build <file> [--package-contract specifier=contract.json] [--out dir] [--production]");
+    eprintln!("  presolve build <file> [--package-contract specifier=contract.json] [--package-runtime specifier=runtime-location] [--out dir] [--production]");
     eprintln!(
         "  presolve build --config <file> --source <logical=relative-file> [--source ...] [--verify-clean-equivalence] [--format human|json]"
     );

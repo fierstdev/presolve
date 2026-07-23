@@ -100,11 +100,11 @@ pub struct ApplicationSemanticModel {
     pub providers: BTreeMap<ProviderId, ProviderEntity>,
     pub consumers: BTreeMap<ConsumerId, ConsumerEntity>,
     pub forms: BTreeMap<FormId, FormEntity>,
-    /// Integrity-checked package endpoint selections retained before Resource
-    /// declaration and activation lowering becomes executable.
+    /// Integrity-checked package endpoint selections for Resource declaration
+    /// and activation lowering.
     pub resource_endpoint_resolutions: Vec<crate::ResourceEndpointResolution>,
-    /// Validated internal declaration products. Their source remains rejected
-    /// until N6 emits activation/runtime/resume products.
+    /// Validated Resource declaration products projected into the canonical
+    /// runtime activation artifact when a host supplies exact module locations.
     pub resource_declarations: BTreeMap<ResourceId, crate::ResourceDeclaration>,
     pub resource_activations: BTreeMap<ResourceActivationId, crate::ResourceActivation>,
     pub form_field_declaration_candidates: Vec<crate::FormFieldDeclarationCandidate>,
@@ -2908,6 +2908,12 @@ fn collect_resource_lowering_diagnostics(
 ) -> Vec<ComponentDiagnostic> {
     resolutions
         .iter()
+        .filter(|resolution| {
+            !matches!(
+                resolution.outcome,
+                crate::ResourceEndpointResolutionOutcome::Resolved(_)
+            )
+        })
         .map(|resolution| {
             let message = match &resolution.outcome {
                 crate::ResourceEndpointResolutionOutcome::MissingDesignator => format!(
@@ -2926,9 +2932,8 @@ fn collect_resource_lowering_diagnostics(
                     "resource declaration `{}` designator `{designator}` resolves to package kind {kind:?}, not resource",
                     resolution.field
                 ),
-                crate::ResourceEndpointResolutionOutcome::Resolved(endpoint) => format!(
-                    "resource declaration `{}` resolves {}@{} export `{}`, but Resource endpoint execution is not lowered yet",
-                    resolution.field, endpoint.package, endpoint.version, endpoint.export
+                crate::ResourceEndpointResolutionOutcome::Resolved(_) => unreachable!(
+                    "resolved resource endpoints are valid N6-C13 lowering inputs"
                 ),
             };
             let mut diagnostic = ComponentDiagnostic::error("PSC1128", message);

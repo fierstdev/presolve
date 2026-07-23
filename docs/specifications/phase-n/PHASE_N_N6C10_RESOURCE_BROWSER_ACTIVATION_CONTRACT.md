@@ -9,7 +9,8 @@ compiler-runtime diagnostics. Results must be JSON-serializable.
 
 `Server` declarations fail closed in the browser. There is no generic fetch,
 implicit package lookup, arbitrary input evaluation, State mutation, render
-dependency, cache, snapshot, or resume integration yet. Resource source stays
-rejected until those remaining products and browser fixtures are complete.
+dependency, cache, snapshot, or resume integration yet. N6-C13 supplies the
+validated source-to-artifact publication path; the remaining capabilities need
+their own semantic contracts.
 
 Verification is `scripts/verify-n6c10-resource-browser-activation.sh`.

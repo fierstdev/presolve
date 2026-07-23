@@ -357,16 +357,16 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
                 "no package-kind IR or artifact provenance has been admitted",
                 "N1-A2 must admit each package kind through full-path lowering",
             ),
-            deferred(
+            admitted(
                 "resources",
-                SemanticCapabilityClass::Unsupported,
-                "compiler-owned Resource declaration",
-                "N6-A declaration/lifecycle products, N6-B registered endpoint contract, and N6-C source endpoint resolution",
-                "source facts may resolve an endpoint and project internal declaration/activation identities, but no executable Resource lowering exists",
-                "no executable async dependency or cancellation plan yet",
-                "no Resource resume policy",
-                "no Resource runtime artifact",
-                "N6-C deliberately preserves source rejection until runtime admission",
+                SemanticCapabilityClass::Bounded,
+                "@resource(\"importedEndpoint\") field!: Resource<Data, Error>",
+                "integrity-checked semantic-package endpoint, Resource declaration and activation identity, browser runtime artifact, and generated runtime",
+                "one exactly imported semantic-package resource endpoint, Resource<Data, Error> field type, exact host-supplied runtime module location, and client or shared execution boundary",
+                "one compiler-owned cold activation per planned component instance; source reads, inputs, invalidation, and retry remain deferred",
+                "activation starts cold; completion and cancellation are runtime lifecycle records, while snapshot/resume and source value reads remain deferred",
+                "runtime resource schema v1, embedded page artifact, and exact runtime module coordinate",
+                "runtime_browser::host_bound_resource_endpoint_activates_in_a_real_browser",
             ),
             deferred(
                 "opaque_typescript",
@@ -496,5 +496,10 @@ mod tests {
             .all(|capability| capability.rejection_reason.is_some()));
         assert!(semantic_capability_registry_json().contains("\"semantic_package_bindings\""));
         assert!(semantic_capability_registry_json().contains("\"static_index_access\""));
+        assert!(registry.capabilities.iter().any(|capability| {
+            capability.id == "resources"
+                && capability.status == SemanticCapabilityStatus::Admitted
+                && capability.class == SemanticCapabilityClass::Bounded
+        }));
     }
 }

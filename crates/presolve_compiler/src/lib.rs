@@ -1957,7 +1957,7 @@ class ActionLocalRecord extends Component {
     }
 
     #[test]
-    fn component_graph_retains_non_executable_resource_declaration_facts() {
+    fn component_graph_retains_resource_declaration_facts_before_package_resolution() {
         let parsed = presolve_parser::parse_file(
             "ResourceFact.tsx",
             r#"
@@ -1975,10 +1975,7 @@ class ResourceFact extends Component {
         assert!(facts[0].decorator_invoked);
         assert_eq!(facts[0].decorator_argument_count, 1);
         assert_eq!(facts[0].endpoint_designator.as_deref(), Some("profile"));
-        assert!(graph
-            .diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.code == "PSC1046"));
+        assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
     }
 
     #[test]
@@ -2037,15 +2034,14 @@ class Profile extends Component {
             activation.declaration == declaration.id
                 && activation.state == ResourceLifecycleState::Idle
         }));
-        assert!(model
-            .diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.code == "PSC1046"));
-        assert!(model.diagnostics.iter().any(|diagnostic| {
-            diagnostic.code == "PSC1128"
-                && diagnostic.message.contains("profile-service@1.2.3")
-                && diagnostic.provenance.is_some()
-        }));
+        assert!(
+            model
+                .diagnostics
+                .iter()
+                .all(|diagnostic| { diagnostic.code != "PSC1046" && diagnostic.code != "PSC1128" }),
+            "{:?}",
+            model.diagnostics
+        );
     }
 
     #[test]

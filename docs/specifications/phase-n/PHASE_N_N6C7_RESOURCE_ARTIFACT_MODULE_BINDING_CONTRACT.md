@@ -8,9 +8,11 @@ build error; it cannot become an implicit package lookup.
 
 The original internal artifact remains intentionally location-free for compiler
 analysis and malformed-artifact testing. Only this host-bound variant may be
-passed to the future generated Resource runtime.
+passed to the generated Resource runtime.
 
-This does not execute a Resource or remove `PSC1046`. Endpoint module loading,
-cancellation, result decoding, resume, and browser proof remain required.
+N6-C13 selects this builder from the canonical CLI once source resolution and
+an explicit runtime mapping both succeed. Endpoint module loading and
+page-teardown cancellation are admitted there; result decoding, source reads,
+resume, and input invalidation remain required future work.
 
 Verification is `scripts/verify-n6c7-resource-artifact-module-binding.sh`.

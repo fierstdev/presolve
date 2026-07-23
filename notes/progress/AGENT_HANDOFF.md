@@ -3,16 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N6-C7 - Resource Artifact Module Binding
-* Working tree: clean after the N6-C7 resource-artifact-module-binding commit.
+* Latest completed slice: N6-C13 - Resource Source Publication
+* Working tree: clean after the N6-C13 resource-source-publication commit.
 * Date: 2026-07-23
 
 Last completed slice
 
-* Slice: N6-C1 through N6-C7 - Resource Resolution, Artifact, Diagnostics, and Runtime-Module ABI
-* Result: a retained `@resource("localEndpoint")` source fact resolves only through an integrity-checked semantic-package resource export. A field typed `Resource<Data, Error>` projects canonical declaration and per-planned-instance idle activation identities. The internal artifact fails closed on malformed identity/lifecycle records; the executable-facing variant additionally requires an exact host-supplied package/version/integrity/runtime-module location. `PSC1128` explains resolution boundaries; `PSC1046` still rejects source.
-* Verification: `verify-n6c1-resource-endpoint-resolution.sh` through `verify-n6c7-resource-artifact-module-binding.sh` pass their focused checks.
-* Next: N6-C4 must define and prove compiler-owned activation scheduling, endpoint transport, cancellation, snapshot/resume, and a real browser execution path before the source rejection or registry status can change.
+* Slice: N6-C1 through N6-C13 - Resource Resolution, Activation, and Source Publication
+* Result: a resolved `@resource("localEndpoint") field!: Resource<Data, Error>` now resolves only through an integrity-checked semantic-package resource export and, with an exact `--package-runtime` mapping, publishes schema-v1 `resources.runtime.json` plus identical embedded page bytes. The generated browser runtime validates that artifact, imports only the contract-declared module/export, supplies an abort signal, records the activation lifecycle, and cancels at `pagehide`. Missing runtime locations fail `PSRES1001`; malformed generated artifacts fail `PSRES1002`; server-only endpoints fail browser publication with `PSRES1003`. This is activation-only: Resource result/error reads, inputs, retry/invalidation, component-destruction cancellation, snapshot, and resume remain deferred.
+* Verification: `verify-n6c1-resource-endpoint-resolution.sh` through `verify-n6c13-resource-source-publication.sh` pass their focused checks, including an unchanged-CLI source-to-real-browser execution proof.
+* Next: N6-C14 must define compiler-owned Resource result/error reads, dependencies, and the complete lifecycle/resume rules before a Resource field may participate in render or Computed semantics.
 
 * Slice: N3-E - Structured Serializable Action Locals
 * Result: admits one literal `const` local in an `@action()` method when it replaces a primitive-compatible complete State field. The compiler substitutes the known literal into the existing Action operation, so generated runtime performs no authored local execution or capture.

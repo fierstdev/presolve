@@ -154,11 +154,52 @@ fn host_bound_resource_endpoint_activates_in_a_real_browser() {
     if out_dir.exists() {
         fs::remove_dir_all(&out_dir).expect("failed to clean Resource browser output");
     }
+    fs::create_dir_all(&out_dir).expect("failed to create Resource browser output");
+    let source = out_dir.join("Profile.tsx");
+    let contract = out_dir.join("profile-service.contract.json");
+    fs::write(
+        &source,
+        r#"
+import { loadProfile } from "profile-service";
+
+@component("x-profile")
+class Profile extends Component {
+  @resource("loadProfile") profile!: Resource<string, string>;
+  render() { return <main>Loading profile</main>; }
+}
+"#,
+    )
+    .expect("failed to write Resource source");
+    fs::write(
+        &contract,
+        r#"{"schema_version":1,"package":"profile-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadProfile":{"kind":"resource","type_signature":"() -> Resource<string, string>","runtime_module":"dist/load-profile.js","resume_policy":"snapshot","resource_endpoint":{"execution_boundary":"shared","cancellation":"abort","resume":"snapshot"}}}}"#,
+    )
+    .expect("failed to write Resource package contract");
+    let missing_mapping = Command::new(presolve_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            source.to_str().expect("Resource source path was not UTF-8"),
+            "--package-contract",
+            &format!("profile-service={}", contract.display()),
+            "--out",
+            out_dir
+                .to_str()
+                .expect("Resource browser output path was not UTF-8"),
+        ])
+        .output()
+        .expect("failed to run Resource build without runtime mapping");
+    assert!(!missing_mapping.status.success());
+    assert!(String::from_utf8_lossy(&missing_mapping.stderr).contains("PSRES1001"));
     let output = Command::new(presolve_cli_bin())
         .current_dir(&repo_root)
         .args([
             "build",
-            "fixtures/0065-component-runtime/input/RuntimeComponents.tsx",
+            source.to_str().expect("Resource source path was not UTF-8"),
+            "--package-contract",
+            &format!("profile-service={}", contract.display()),
+            "--package-runtime",
+            "profile-service=./resource-endpoint.js",
             "--out",
             out_dir
                 .to_str()
@@ -178,11 +219,14 @@ fn host_bound_resource_endpoint_activates_in_a_real_browser() {
     .expect("failed to write deterministic Resource endpoint module");
     let index =
         fs::read_to_string(out_dir.join("index.html")).expect("failed to read Resource page");
-    let artifact = r#"<script type="application/json" id="presolve-resources-runtime">{"schema_version":1,"declarations":[{"id":"component:x-runtime/resource:profile","owner_component":"component:x-runtime","key":"profile","data_type":"string","error_type":"string","execution_boundary":"Shared","input_dependencies":[],"retry_policy":"ExplicitOnly","invalidation_policy":"ExplicitOnly","endpoint":{"package":"profile-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","export":"loadProfile","type_signature":"() -> Resource<string, string>","runtime_module":"dist/load-profile.js","runtime_location":"./resource-endpoint.js","resume_policy":"snapshot","cancellation":"Abort"}}],"activations":[{"id":"root:component:x-runtime/resource-activation:component:x-runtime/resource:profile","declaration":"component:x-runtime/resource:profile","component_instance":"root:component:x-runtime","state":"idle"}]}</script>"#;
+    let artifact = fs::read_to_string(out_dir.join("resources.runtime.json"))
+        .expect("Resource build did not publish its artifact");
+    assert!(index.contains("presolve-resources-runtime"));
+    assert!(index.contains("./resource-endpoint.js"));
+    assert!(artifact.contains("profile-service"));
     let probe = index.replace(
         "</body>",
-        &(artifact.to_string()
-            + r#"<script>
+        r#"<script>
 const deadline = Date.now() + 4000;
 const wait = setInterval(() => {
   const runtime = window.__PRESOLVE__;
@@ -195,7 +239,7 @@ const wait = setInterval(() => {
     document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_RESOURCE_BROWSER_TEST_FAIL</div>");
   }
 }, 20);
-</script></body>"#),
+</script></body>"#,
     );
     fs::write(out_dir.join("probe.html"), probe).expect("failed to write Resource probe");
     let server = StaticServer::start(out_dir.clone());

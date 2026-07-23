@@ -1446,15 +1446,6 @@ fn build_component_node(
     );
     let resource_declaration_candidates =
         resource_declaration_candidates_from_class(class, path, &id);
-    for resource in &resource_declaration_candidates {
-        diagnostics.push(ComponentDiagnostic::error(
-            "PSC1046",
-            format!(
-                "resource declaration {} in class {} has no resolved semantic-package endpoint yet",
-                resource.field, class.name
-            ),
-        ));
-    }
     let form_field_declaration_candidates =
         form_field_declaration_candidates_from_class(class, path, element_name.is_some(), &id);
     let validation_rule_declaration_facts =

@@ -1,7 +1,8 @@
 //! N6-C3 deterministic Resource declaration and activation artifact.
 //!
-//! This is a projection of already-resolved compiler products. It deliberately
-//! has no endpoint transport or executable runtime behavior.
+//! This is a projection of already-resolved compiler products. Its
+//! execution-facing form contains the exact host-provided runtime module
+//! location consumed by the generated browser runtime.
 
 use std::collections::BTreeSet;
 
