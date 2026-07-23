@@ -4,6 +4,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::platform::Digest;
+use crate::{
+    parse_semantic_package_contract, SemanticPackageResolutionTable,
+    SemanticPackageRuntimeModuleKey, SemanticPackageRuntimeModuleTable,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiscoveredProjectSourceV1 {
@@ -21,6 +25,70 @@ pub struct DiscoveredProjectV1 {
 pub struct ProjectDiscoveryErrorV1 {
     pub code: &'static str,
     pub message: String,
+}
+
+/// Resolves published `presolve.contract.json` metadata from a declared npm
+/// package. Package source stays opaque; only verified contract/runtime paths
+/// become compiler inputs.
+pub fn discover_semantic_packages_v1(
+    root: &Path,
+    specifiers: &[String],
+) -> Result<
+    (
+        SemanticPackageResolutionTable,
+        SemanticPackageRuntimeModuleTable,
+    ),
+    ProjectDiscoveryErrorV1,
+> {
+    let mut contracts = SemanticPackageResolutionTable::default();
+    let mut modules = SemanticPackageRuntimeModuleTable::default();
+    for specifier in specifiers {
+        let package_root = root.join("node_modules").join(specifier);
+        let contract_path = package_root.join("presolve.contract.json");
+        if !contract_path.is_file() {
+            continue;
+        }
+        let source =
+            fs::read_to_string(&contract_path).map_err(|error| ProjectDiscoveryErrorV1 {
+                code: "PSDISC1010_PACKAGE_CONTRACT_READ_FAILED",
+                message: error.to_string(),
+            })?;
+        let contract =
+            parse_semantic_package_contract(&source).map_err(|error| ProjectDiscoveryErrorV1 {
+                code: "PSDISC1011_PACKAGE_CONTRACT_INVALID",
+                message: format!("{error:?}"),
+            })?;
+        for export in contract.exports.values() {
+            let location = package_root.join(&export.runtime_module);
+            if !location.is_file() {
+                return Err(ProjectDiscoveryErrorV1 {
+                    code: "PSDISC1012_PACKAGE_RUNTIME_MISSING",
+                    message: location.display().to_string(),
+                });
+            }
+            modules
+                .insert(
+                    SemanticPackageRuntimeModuleKey {
+                        package: contract.package.clone(),
+                        version: contract.version.clone(),
+                        integrity: contract.integrity.clone(),
+                        runtime_module: export.runtime_module.clone(),
+                    },
+                    location.to_string_lossy().into_owned(),
+                )
+                .map_err(|error| ProjectDiscoveryErrorV1 {
+                    code: "PSDISC1013_PACKAGE_RUNTIME_INVALID",
+                    message: format!("{error:?}"),
+                })?;
+        }
+        contracts
+            .insert(specifier.clone(), contract)
+            .map_err(|error| ProjectDiscoveryErrorV1 {
+                code: "PSDISC1011_PACKAGE_CONTRACT_INVALID",
+                message: format!("{error:?}"),
+            })?;
+    }
+    Ok((contracts, modules))
 }
 
 /// Discovers the default `app/` root, falling back to `src/`, in deterministic path order.

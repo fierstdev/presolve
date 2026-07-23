@@ -546,7 +546,8 @@ pub use production_validation::{
     ProductionValidationPhase, ProductionValidationResult,
 };
 pub use project_discovery::{
-    discover_project_v1, DiscoveredProjectSourceV1, DiscoveredProjectV1, ProjectDiscoveryErrorV1,
+    discover_project_v1, discover_semantic_packages_v1, DiscoveredProjectSourceV1,
+    DiscoveredProjectV1, ProjectDiscoveryErrorV1,
 };
 pub use provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
 pub use resource::{
