@@ -3,15 +3,15 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N6-C5 - Resource Source Diagnostics
-* Working tree: clean after the N6-C5 resource-source-diagnostics commit.
+* Latest completed slice: N6-C7 - Resource Artifact Module Binding
+* Working tree: clean after the N6-C7 resource-artifact-module-binding commit.
 * Date: 2026-07-23
 
 Last completed slice
 
-* Slice: N6-C1 through N6-C5 - Resource Endpoint Resolution, Declaration Projection, Artifact, Validation, and Diagnostics
-* Result: a retained `@resource("localEndpoint")` source fact resolves only through an integrity-checked semantic-package resource export. A field typed `Resource<Data, Error>` then projects canonical declaration and per-planned-instance idle activation identities. The deterministic internal Resource artifact retains endpoint coordinates, boundary, type, policies, and lifecycle state and fails closed on malformed schema/identity/endpoint/lifecycle linkage. `PSC1128` explains whether source failed package resolution or reached a correctly resolved endpoint still blocked on execution lowering; `PSC1046` still rejects every Resource source declaration.
-* Verification: `verify-n6c1-resource-endpoint-resolution.sh` through `verify-n6c5-resource-source-diagnostics.sh` pass their focused compiler/registry/artifact/format/diff checks.
+* Slice: N6-C1 through N6-C7 - Resource Resolution, Artifact, Diagnostics, and Runtime-Module ABI
+* Result: a retained `@resource("localEndpoint")` source fact resolves only through an integrity-checked semantic-package resource export. A field typed `Resource<Data, Error>` projects canonical declaration and per-planned-instance idle activation identities. The internal artifact fails closed on malformed identity/lifecycle records; the executable-facing variant additionally requires an exact host-supplied package/version/integrity/runtime-module location. `PSC1128` explains resolution boundaries; `PSC1046` still rejects source.
+* Verification: `verify-n6c1-resource-endpoint-resolution.sh` through `verify-n6c7-resource-artifact-module-binding.sh` pass their focused checks.
 * Next: N6-C4 must define and prove compiler-owned activation scheduling, endpoint transport, cancellation, snapshot/resume, and a real browser execution path before the source rejection or registry status can change.
 
 * Slice: N3-E - Structured Serializable Action Locals

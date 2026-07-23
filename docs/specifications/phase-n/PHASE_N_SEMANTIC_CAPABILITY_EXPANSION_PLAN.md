@@ -359,6 +359,13 @@ N6-C5 is complete: source diagnostics distinguish an endpoint-resolution
 problem from a correctly resolved package endpoint that is blocked only on the
 remaining execution-lowering work. The compiler still rejects the source.
 
+N6-C6 and N6-C7 are complete: an application host supplies runtime-module
+locations only through an exact package/version/integrity/module table, and an
+execution-facing Resource artifact fails closed without one location for every
+endpoint. The generated page and runtime do not consume that artifact yet;
+their publication and boot contracts must be extended together with endpoint
+activation, cancellation, result decoding, resume, and browser evidence.
+
 Introduce a compiler-owned Resource declaration with explicit key, input
 dependencies, loading/success/error state, cancellation, retry, invalidation,
 serialization, and resume rules. Resources may invoke only registered
