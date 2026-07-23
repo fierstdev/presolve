@@ -16,6 +16,10 @@ pub struct FormFieldEntity {
     pub owner_component: SemanticId,
     pub authored_field: SemanticId,
     pub name: String,
+    /// Compiler-issued serialized leaf path. Current one-argument Fields use
+    /// their name as a single root segment; N7-B will admit retained nested
+    /// segments only with the complete artifact/runtime contract.
+    pub path: Vec<String>,
     pub semantic_type: SemanticType,
     pub type_assignment: SemanticTypeAssignment,
     pub initial_value: SerializableValue,
@@ -149,6 +153,10 @@ fn lower_valid_candidate(
             .declaration_field
             .clone()
             .expect("valid Form Field candidate has authored field identity"),
+        path: candidate
+            .nested_path_segments
+            .clone()
+            .unwrap_or_else(|| vec![name.clone()]),
         name,
         semantic_type,
         type_assignment: type_assignment.clone(),
@@ -481,7 +489,7 @@ class Account {
         assert!(first
             .form_fields
             .values()
-            .all(|field| field.name == "address"));
+            .all(|field| field.name == "address" && field.path == ["address"]));
     }
 
     #[test]
