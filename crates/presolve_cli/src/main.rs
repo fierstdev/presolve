@@ -24,9 +24,10 @@ use presolve_compiler::{
     build_runtime_context_artifact, build_runtime_effect_artifact, build_runtime_forms_artifact,
     build_runtime_opaque_artifact_with_modules, build_runtime_resource_artifact_with_modules,
     build_semantic_graph, build_template_graph, build_template_manifest_from_asm,
-    embed_opaque_runtime_artifact, emit_production_modules, explain_json, explain_text,
-    extract_production_chunk_graph, fold_component_graph, generate_ordinary_instance_html,
-    generate_runtime_stub, generate_standalone_page_with_resume_runtime,
+    build_validated_route_graph_v1, embed_opaque_runtime_artifact, emit_production_modules,
+    explain_json, explain_text, extract_production_chunk_graph, fold_component_graph,
+    generate_ordinary_instance_html, generate_runtime_stub,
+    generate_standalone_page_with_resume_runtime,
     generate_standalone_page_with_resume_runtime_and_resources, generate_static_html,
     lower_components_to_ir, optimization_report_json, optimize_context_ir, optimize_effect_ir,
     production_runtime_artifact_json, project_production_diagnostics, project_resume_diagnostics,
@@ -107,6 +108,7 @@ fn main() {
             }
         }
         "application" => run_application_command(args),
+        "route" => run_route_command(args),
         "cache" => run_l9_cache(&args),
         "clean" => run_l9_clean(&args),
         "workspace" => run_l9_workspace(&args),
@@ -3251,6 +3253,93 @@ fn run_application_command(args: Vec<String>) {
     }
 }
 
+fn run_route_command(args: Vec<String>) {
+    let Some((subcommand, options)) = args.split_first() else {
+        application_cli_error(
+            "PSROUTE3001_UNSUPPORTED_ROUTE_COMMAND",
+            "route supports only `graph`",
+        );
+    };
+    if subcommand != "graph" {
+        application_cli_error(
+            "PSROUTE3001_UNSUPPORTED_ROUTE_COMMAND",
+            "route supports only `graph`",
+        );
+    }
+    let mut config = None;
+    let mut sources = Vec::new();
+    let mut index = 0;
+    while index < options.len() {
+        match options[index].as_str() {
+            "--config" => {
+                let Some(value) = options.get(index + 1) else {
+                    application_cli_error(
+                        "PSROUTE3002_INVALID_ARGUMENT",
+                        "--config requires a path",
+                    );
+                };
+                if config.replace(PathBuf::from(value)).is_some() {
+                    application_cli_error(
+                        "PSROUTE3002_INVALID_ARGUMENT",
+                        "--config may appear only once",
+                    );
+                }
+                index += 2;
+            }
+            "--source" => {
+                let Some(value) = options.get(index + 1) else {
+                    application_cli_error(
+                        "PSROUTE3002_INVALID_ARGUMENT",
+                        "--source requires logical=relative-path",
+                    );
+                };
+                sources.push(
+                    parse_explicit_source_spec_v1(value)
+                        .unwrap_or_else(|error| application_cli_error(error.code, &error.message)),
+                );
+                index += 2;
+            }
+            "--package-contract" | "--package-runtime" => {
+                if options.get(index + 1).is_none() {
+                    application_cli_error(
+                        "PSROUTE3002_INVALID_ARGUMENT",
+                        "package mapping requires a value",
+                    );
+                }
+                index += 2;
+            }
+            value => application_cli_error(
+                "PSROUTE3002_INVALID_ARGUMENT",
+                &format!("unknown route graph option `{value}`"),
+            ),
+        }
+    }
+    let config = config.unwrap_or_else(|| {
+        application_cli_error("PSROUTE3002_INVALID_ARGUMENT", "--config is required")
+    });
+    let root = config
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let envelope = load_explicit_project_envelope_v1(root, &config)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    let sources = load_explicit_source_inputs_v1(&envelope.project_root, &sources)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    let packages = parse_semantic_package_contracts(options);
+    let unit = CompilationUnit::parse_sources(
+        sources
+            .iter()
+            .map(|source| (PathBuf::from(&source.logical_path), source.content.as_str())),
+    );
+    let model = build_application_semantic_model_for_unit_with_packages(&unit, &packages);
+    let graph = build_validated_route_graph_v1(&model)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    print!(
+        "{}",
+        presolve_compiler::route_manifest_json_v1(&presolve_compiler::route_manifest_v1(&graph))
+    );
+}
+
 struct ApplicationBuildOptions {
     configuration_path: PathBuf,
     source_specs: Vec<presolve_cli::CliExplicitSourceSpecV1>,
@@ -4648,6 +4737,7 @@ fn print_usage_and_exit() -> ! {
     eprintln!("  presolve manifest <file>");
     eprintln!("  presolve build <file> [--package-contract specifier=contract.json] [--package-runtime specifier=runtime-location] [--out dir] [--production]");
     eprintln!("  presolve application build --config <file> --source <logical=relative-file> [--source ...] --entry <logical> --out <publication-pointer> [--package-contract specifier=contract.json] [--package-runtime specifier=runtime-location] [--production]");
+    eprintln!("  presolve route graph --config <file> --source <logical=relative-file> [--source ...] [--package-contract specifier=contract.json] [--package-runtime specifier=runtime-location]");
     eprintln!(
         "  presolve build --config <file> --source <logical=relative-file> [--source ...] [--verify-clean-equivalence] [--format human|json]"
     );
