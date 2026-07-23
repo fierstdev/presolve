@@ -1524,7 +1524,7 @@ pub fn build_application_semantic_model_from_component_graph(
     let form_tracking =
         collect_form_tracking_products(&forms, &form_fields, &form_field_bindings, &form_ownership);
     let semantic_types = finalize_semantic_types(
-        base_semantic_types,
+        base_semantic_types.with_resource_types(&resource_declarations),
         &component_graph.components,
         &contexts,
         &forms,
@@ -2057,7 +2057,7 @@ fn build_application_semantic_model_from_files_with_bindings(
     let form_tracking =
         collect_form_tracking_products(&forms, &form_fields, &form_field_bindings, &form_ownership);
     let semantic_types = finalize_semantic_types(
-        base_semantic_types,
+        base_semantic_types.with_resource_types(&resource_declarations),
         &components,
         &contexts,
         &forms,

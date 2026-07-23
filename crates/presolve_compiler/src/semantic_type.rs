@@ -805,6 +805,36 @@ impl SemanticTypeModel {
         self
     }
 
+    /// Attaches compiler-issued Resource declaration types after endpoint
+    /// resolution has established their exact data, error, and boundary facts.
+    #[must_use]
+    pub fn with_resource_types(
+        mut self,
+        resources: &BTreeMap<crate::ResourceId, crate::ResourceDeclaration>,
+    ) -> Self {
+        for resource in resources.values() {
+            let subject = resource.id.as_semantic_id().clone();
+            self.assignments.insert(
+                subject.clone(),
+                SemanticTypeAssignment {
+                    id: SemanticTypeId::for_subject(&subject),
+                    subject: subject.clone(),
+                    semantic_type: SemanticType::Resource(ResourceType {
+                        data: Box::new(resource.data_type.clone()),
+                        error: Box::new(resource.error_type.clone()),
+                        pending: true,
+                        serializable: true,
+                        execution_boundary: resource.execution_boundary,
+                    }),
+                    origin: subject,
+                    status: SemanticTypeStatus::Declared,
+                    provenance: resource.provenance.clone(),
+                },
+            );
+        }
+        self
+    }
+
     /// Attaches the exact nominal H1 `SlotContent` type to canonical Slot
     /// entities. Alias and structural compatibility are intentionally absent.
     #[must_use]

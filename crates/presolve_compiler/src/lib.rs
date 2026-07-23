@@ -2042,6 +2042,16 @@ class Profile extends Component {
             "{:?}",
             model.diagnostics
         );
+        assert!(matches!(
+            model
+                .semantic_types
+                .assignments
+                .get(declaration.id.as_semantic_id())
+                .map(|assignment| &assignment.semantic_type),
+            Some(SemanticType::Resource(resource))
+                if resource.data.as_ref() == &SemanticType::String
+                    && resource.error.as_ref() == &SemanticType::String
+        ));
     }
 
     #[test]

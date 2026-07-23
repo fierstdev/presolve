@@ -4,6 +4,12 @@ N6-C14 makes a Resource result visible only as a compiler-owned expression
 source. It does not expose a framework signal, Promise, cache, mutable record,
 or arbitrary resource callback.
 
+N6-C14-A is complete: after endpoint resolution, every valid
+`ResourceDeclaration` has one semantic-type assignment under its canonical
+`ResourceId`. The assignment carries the resolved data, error, serialization,
+and execution-boundary facts and is the sole type authority for later
+projection lowering. It does not yet admit a source read.
+
 ## Admitted source form
 
 Within a `@computed()` getter owned by the same component that declares the

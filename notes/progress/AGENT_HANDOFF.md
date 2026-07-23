@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N2-G - Compiler-Registered Math Rounding
-* Working tree: clean after the N2-G compiler-registered-math-rounding commit.
+* Latest completed slice: N6-C14-A - Resource Semantic Type Subjects
+* Working tree: clean after the N6-C14-A resource-semantic-type-subjects commit.
 * Date: 2026-07-23
 
 Last completed slice
+
+* Slice: N6-C14-A - Resource Semantic Type Subjects
+* Result: every resolved Resource declaration now owns a stable semantic-type assignment under its canonical Resource ID, carrying exact data/error/boundary facts from the declaration product. This is a prerequisite only; source projections, Resource IR, invalidation, runtime reads, and resume handling are still absent.
+* Verification: focused package-resolution model test now asserts the canonical Resource semantic type, plus compiler check, formatting, and diff checks.
+* Next: N6-C14-B must lower only direct same-owner Computed `.data`/`.error`/`.state` projections to an explicit Resource IR load and derive their exact dependencies.
 
 * Slice: N2-G - Compiler-Registered Math Rounding
 * Result: exact one-argument `Math.floor`, `Math.ceil`, and `Math.round` in supported Computed getters now resolve to compiler-registered unary operations, retain their operand dependencies, lower to canonical `Floor`/`Ceil`/`Round` IR, and execute only from schema-v11 computed-runtime instructions. No generic Math dispatch, overload, callback, alias, or authored JavaScript execution is admitted.
