@@ -21,7 +21,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = __EZ_COMPONENT_SCHEMA_VERSION__;
   const LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2;
-  const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 1;
+  const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_RESOURCES_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_RESUME_MANIFEST_SCHEMA_VERSION = 6;
   const SUPPORTED_RESUME_SNAPSHOT_SCHEMA_VERSION = 1;
@@ -648,6 +648,22 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (formsArtifact.schema_version !== SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION || !Array.isArray(formsArtifact.forms) || !Array.isArray(formsArtifact.instances) || !Array.isArray(formsArtifact.hosts)) {
       reportDiagnostic(diagnostics, "PSR_UNSUPPORTED_FORMS_ARTIFACT_SCHEMA", "Forms runtime metadata did not match the compiler artifact contract", { schema_version: formsArtifact.schema_version }, true);
       throw new PresolveBootError("PSR_UNSUPPORTED_FORMS_ARTIFACT_SCHEMA");
+    }
+    for (const form of formsArtifact.forms) {
+      const paths = new Set();
+      for (const field of form?.fields ?? []) {
+        if (!Array.isArray(field?.path) || field.path.length === 0 || field.path.length > 16
+          || !field.path.every((segment) => typeof segment === "string" && /^[A-Za-z_][A-Za-z0-9_]*$/.test(segment))) {
+          reportDiagnostic(diagnostics, "PSR_INVALID_FORMS_ARTIFACT", "Form Field path was not compiler-canonical", { field }, true);
+          throw new PresolveBootError("PSR_INVALID_FORMS_ARTIFACT");
+        }
+        const path = field.path.join(".");
+        if (paths.has(path)) {
+          reportDiagnostic(diagnostics, "PSR_INVALID_FORMS_ARTIFACT", "Form Field paths were not unique", { form: form.id, path }, true);
+          throw new PresolveBootError("PSR_INVALID_FORMS_ARTIFACT");
+        }
+        paths.add(path);
+      }
     }
     const hasForms = formsArtifact.forms.length > 0 || formsArtifact.instances.length > 0;
     if (hasForms && manifest.schema_version < 3) {

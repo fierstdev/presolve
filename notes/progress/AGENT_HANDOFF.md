@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: N6-C14 - Compiler-Owned Resource Read Projections
-* Working tree: N7-B static Form path candidate retention is ready for focused verification and commit; two-argument `@field()` remains rejected.
+* Working tree: N7-B Forms artifact path projection is ready for focused verification and commit; two-argument `@field()` remains rejected.
 * Date: 2026-07-23
 
 Last completed slice
@@ -28,6 +28,11 @@ Last completed slice
 * Result: a second static `@field()` argument is normalized to bounded identifier-only path segments and retained on the Form Field candidate. It has no lowering authority and existing one-argument arity diagnostics remain the admission gate.
 * Verification: compiler check plus focused parser static-argument retention test pass.
 * Next: add canonical path diagnostics and collision analysis, then atomically admit paths only with Form entity, artifact, serialization, runtime, and resume changes.
+
+* Slice: N7-B-C - Path-Aware Forms Artifact
+* Result: `forms.runtime.json` schema v2 now publishes an exact nonempty compiler-issued path for each Field, and the generated runtime validates its segment grammar and uniqueness before activation. Existing root Fields project one path segment.
+* Verification: focused Forms artifact/runtime-codegen tests plus compiler and CLI checks pass.
+* Next: add compiler collision diagnostics and compiler-owned nested JSON serialization, then admit arity-two Fields only when browser and resume proof pass.
 
 * Slice: N2-G - Compiler-Registered Math Rounding
 * Result: exact one-argument `Math.floor`, `Math.ceil`, and `Math.round` in supported Computed getters now resolve to compiler-registered unary operations, retain their operand dependencies, lower to canonical `Floor`/`Ceil`/`Round` IR, and execute only from schema-v11 computed-runtime instructions. No generic Math dispatch, overload, callback, alias, or authored JavaScript execution is admitted.

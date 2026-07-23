@@ -42,7 +42,7 @@ with typed Forms edges. ASM inspection v9 exposes the shared canonical Forms
 projection. Check JSON v5 projects `PSC1084` through `PSC1095` only from
 retained compiler facts. Template manifest v4 and component artifact v3 extend
 the existing Forms bridge with reciprocal `TemplateInstanceTargetId` and
-`ComponentInstanceId` records; `forms.runtime.json` remains v1 and retains
+`ComponentInstanceId` records; `forms.runtime.json` is v2 and retains
 Phase I ownership. Form control/host dispatch uses that ordinary target marker
 directly and does not create a Form-only ownership path. Resume manifest
 remains v5.

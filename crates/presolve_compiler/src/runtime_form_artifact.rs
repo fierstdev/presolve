@@ -12,7 +12,7 @@ use crate::{
     RUNTIME_FORM_REGISTRY_VERSION,
 };
 
-pub const RUNTIME_FORM_ARTIFACT_SCHEMA_VERSION: u32 = 1;
+pub const RUNTIME_FORM_ARTIFACT_SCHEMA_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RuntimeFormsArtifact {
@@ -44,6 +44,8 @@ pub struct RuntimeFormsArtifactField {
     pub id: String,
     /// Non-authoritative authored name for developer tooling only.
     pub debug_name: String,
+    /// Exact compiler-issued serialized leaf path.
+    pub path: Vec<String>,
     pub semantic_type: String,
     pub initial_value: crate::SerializableValue,
 }
@@ -173,6 +175,7 @@ pub fn build_runtime_forms_artifact(model: &ApplicationSemanticModel) -> Runtime
                 .map(|field| RuntimeFormsArtifactField {
                     id: field.id.to_string(),
                     debug_name: field.name.clone(),
+                    path: field.path.clone(),
                     semantic_type: semantic_type_text(&field.semantic_type),
                     initial_value: field.initial_value.clone(),
                 })
@@ -462,14 +465,14 @@ fn field_programs(
 #[cfg(test)]
 mod tests {
     #[test]
-    fn emits_schema_v1_with_only_canonical_execution_references() {
+    fn emits_schema_v2_with_only_canonical_execution_references_and_field_paths() {
         let parsed = presolve_parser::parse_file(
             "src/X.tsx",
             r#"@component("x")class X{@form()form!:Form;@field(this.form)value="";render(){return <input field={this.value}/>;}}"#,
         );
         let asm = crate::build_application_semantic_model(&parsed);
         let artifact = super::build_runtime_forms_artifact(&asm);
-        assert_eq!(artifact.schema_version, 1);
+        assert_eq!(artifact.schema_version, 2);
         assert_eq!(artifact.registry_version, 1);
         assert_eq!(artifact.forms.len(), 1);
         assert_eq!(artifact.instances.len(), 1);
