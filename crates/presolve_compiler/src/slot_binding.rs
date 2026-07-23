@@ -29,6 +29,9 @@ pub struct SlotBinding {
     pub slot: Option<SlotId>,
     pub outlet: Option<SlotOutletId>,
     pub content_fragment: Option<SlotContentFragmentId>,
+    /// Compiler-issued child instance for automatic file-route layout
+    /// composition. Authored Slot content continues to use `content_fragment`.
+    pub direct_child_instance: Option<ComponentInstanceId>,
     pub content_owner_instance: ComponentInstanceId,
     pub status: SlotBindingStatus,
     pub provenance: SourceProvenance,
@@ -220,6 +223,7 @@ fn collect_for_instance(
                 slot,
                 outlet,
                 content_fragment: fragment.map(|fragment| fragment.id.clone()),
+                direct_child_instance: None,
                 content_owner_instance: caller_instance.clone(),
                 status,
                 provenance: invocation.provenance.clone(),
