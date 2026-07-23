@@ -1040,6 +1040,31 @@ class TypedAttributes extends Component {
     }
 
     #[test]
+    fn rejects_string_binding_for_boolean_aria_attribute() {
+        let parsed = presolve_parser::parse_file(
+            "src/InvalidAriaBinding.tsx",
+            r#"
+@component("x-invalid-aria")
+class InvalidAria extends Component {
+  label = state("invalid");
+  render() { return <button aria-invalid={this.label}>Save</button>; }
+}
+"#,
+        );
+        let folded = ConstantFoldingPass.transform(&build_application_semantic_model(&parsed));
+        let diagnostics = folded
+            .diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.code == "PSC1028")
+            .collect::<Vec<_>>();
+        assert_eq!(diagnostics.len(), 1);
+        assert!(diagnostics[0]
+            .message
+            .contains("attribute binding `aria-invalid`"));
+        assert!(diagnostics[0].message.contains("requires boolean"));
+    }
+
+    #[test]
     fn requires_boolean_canonical_template_conditions() {
         let parsed = presolve_parser::parse_file(
             "src/TypedConditions.tsx",
