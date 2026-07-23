@@ -370,6 +370,86 @@ const wait = setInterval(() => {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
+
+    let resume_manifest: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(out_dir.join("resume.runtime.json")).expect("opaque resume manifest"),
+    )
+    .expect("opaque resume manifest JSON");
+    let snapshot = resume_bootstrap_snapshot(&resume_manifest);
+    let resume_probe = resume_bootstrap_probe_page(
+        &index,
+        &format!(
+            "window.__PRESOLVE_RESUME_SNAPSHOT__ = {};",
+            serde_json::to_string(&snapshot).expect("opaque snapshot JSON")
+        ),
+        r#"
+if (runtime.resume?.mode !== "cold" || runtime.resume?.failure !== "OpaqueTerminalColdFallback") {
+  fail("opaque terminal did not force cold resume fallback: " + JSON.stringify(runtime.resume));
+}
+if (runtime.resume_registry !== null) fail("opaque cold fallback retained a resume registry");"#,
+        "PRESOLVE_OPAQUE_RESUME_FALLBACK_BROWSER_TEST_PASS",
+    );
+    fs::write(out_dir.join("resume-fallback-probe.html"), resume_probe)
+        .expect("failed to write opaque resume fallback probe");
+    let server = StaticServer::start(out_dir.clone());
+    let profile_dir = out_dir.join(format!("resume-chrome-profile-{}", std::process::id()));
+    fs::create_dir_all(&profile_dir).expect("failed to create opaque resume Chrome profile");
+    let output = run_chrome_probe(
+        chrome_bin().expect("headless Chrome was not found"),
+        &format!("--user-data-dir={}", profile_dir.display()),
+        &format!(
+            "http://127.0.0.1:{}/resume-fallback-probe.html",
+            server.port
+        ),
+    );
+    server.stop();
+    assert!(
+        String::from_utf8_lossy(&output.stdout)
+            .contains("PRESOLVE_OPAQUE_RESUME_FALLBACK_BROWSER_TEST_PASS"),
+        "opaque resume fallback probe failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let malformed = index
+        .replace("() -> void", "(input: string) -> void")
+        .replace(
+            "</body>",
+            r#"<script>
+const deadline = Date.now() + 4000;
+const wait = setInterval(() => {
+  const diagnostics = window.__PRESOLVE__?.diagnostics ?? [];
+  if (document.documentElement.dataset.presolveRuntime === "error"
+      && diagnostics.some((diagnostic) => diagnostic.code === "PSR_INVALID_OPAQUE_ARTIFACT")) {
+    clearInterval(wait);
+    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_OPAQUE_MALFORMED_BROWSER_TEST_PASS</div>");
+  } else if (Date.now() > deadline) {
+    clearInterval(wait);
+    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_OPAQUE_MALFORMED_BROWSER_TEST_FAIL</div>");
+  }
+}, 20);
+</script></body>"#,
+        );
+    fs::write(out_dir.join("malformed-probe.html"), malformed)
+        .expect("failed to write malformed opaque probe");
+    let server = StaticServer::start(out_dir.clone());
+    let profile_dir = out_dir.join(format!("malformed-chrome-profile-{}", std::process::id()));
+    fs::create_dir_all(&profile_dir).expect("failed to create malformed opaque Chrome profile");
+    let output = run_chrome_probe(
+        chrome_bin().expect("headless Chrome was not found"),
+        &format!("--user-data-dir={}", profile_dir.display()),
+        &format!("http://127.0.0.1:{}/malformed-probe.html", server.port),
+    );
+    server.stop();
+    assert!(
+        String::from_utf8_lossy(&output.stdout)
+            .contains("PRESOLVE_OPAQUE_MALFORMED_BROWSER_TEST_PASS"),
+        "malformed opaque browser probe failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 #[test]

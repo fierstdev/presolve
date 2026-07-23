@@ -381,16 +381,16 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
                 "runtime resource schema v1 plus runtime-computed schema v12, embedded page artifacts, and exact runtime module coordinate",
                 "runtime_browser::host_bound_resource_endpoint_activates_in_a_real_browser",
             ),
-            deferred(
+            admitted(
                 "opaque_typescript",
                 SemanticCapabilityClass::Opaque,
-                "explicit opaque boundary",
-                "N9 compiler-recorded opaque activation boundary",
-                "no opaque input/output contract yet",
-                "opaque code cannot participate in inferred dependencies",
-                "opaque resume is unavailable by default",
-                "no opaque artifact contract",
-                "N9 must define opaque isolation",
+                "@action() @opaque(\"package\", \"export\") method(): void {}",
+                "compiler-issued opaque terminal activation attached to one Action method",
+                "empty synchronous zero-parameter Action; exact imported opaque semantic-package export with () -> void client terminal contract",
+                "terminal after the compiler-owned Action batch; no State, Form, Context, Resource, or render dependency access",
+                "opaque terminals force cold resume fallback; no opaque snapshot codec exists",
+                "opaque.runtime.json schema v1, embedded page metadata, and exact integrity-bound runtime module coordinate",
+                "runtime_browser::integrity_bound_opaque_terminal_runs_only_from_a_compiler_action_in_a_real_browser",
             ),
         ],
     }
@@ -623,15 +623,17 @@ mod tests {
         assert!(
             migration.starts_with("Presolve semantic compatibility guide (registry schema v1)\n\n")
         );
-        assert_eq!(migration.matches("- opaque_typescript:").count(), 1);
-        assert!(
-            migration.contains("- opaque_typescript | opaque | N9 must define opaque isolation\n")
-        );
+        assert!(!migration.contains("- opaque_typescript:"));
         assert!(!migration.contains("- resources:"));
         assert!(registry.capabilities.iter().any(|capability| {
             capability.id == "resources"
                 && capability.status == SemanticCapabilityStatus::Admitted
                 && capability.class == SemanticCapabilityClass::Bounded
+        }));
+        assert!(registry.capabilities.iter().any(|capability| {
+            capability.id == "opaque_typescript"
+                && capability.status == SemanticCapabilityStatus::Admitted
+                && capability.class == SemanticCapabilityClass::Opaque
         }));
     }
 }

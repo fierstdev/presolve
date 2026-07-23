@@ -76,9 +76,11 @@ fallback before restoration. Browser evidence is still required for admission.
 
 N9-G supplies the positive browser proof: missing exact runtime mapping fails
 the build, while a host-bound module is imported only after the authored
-compiler Action event and its declared terminal export is called. Malformed,
-non-callable, and snapshot resume fallback cases remain required negative
-evidence before registry admission.
+compiler Action event and its declared terminal export is called. The same
+fixture proves malformed artifacts fail before package code runs and a valid
+resume snapshot selects `OpaqueTerminalColdFallback`. N9 is admitted in the
+compiler-owned semantic capability registry; only this no-input client terminal
+form is supported.
 
 Malformed, duplicate, mismatched, non-client, missing-export, non-callable,
 or integrity-unbound records fail closed. An opaque declaration must match an
