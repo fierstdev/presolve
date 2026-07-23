@@ -8,12 +8,12 @@ use serde::Serialize;
 
 use crate::{
     build_application_publication_product_v1,
-    build_application_semantic_model_for_unit_with_packages, build_validated_file_route_graph_v1,
-    validate_application_publication_request_v1, ApplicationPublicationArtifactV1,
-    ApplicationPublicationErrorV1, ApplicationPublicationProfileV1,
-    ApplicationPublicationRequestErrorV1, ApplicationPublicationRequestV1,
-    ApplicationPublicationSourceV1, CompilationUnit, SemanticPackageResolutionTable,
-    SemanticPackageRuntimeModuleTable,
+    build_application_semantic_model_for_unit_with_packages, build_layout_composition_plan_v1,
+    build_validated_file_route_graph_v1, validate_application_publication_request_v1,
+    ApplicationPublicationArtifactV1, ApplicationPublicationErrorV1,
+    ApplicationPublicationProfileV1, ApplicationPublicationRequestErrorV1,
+    ApplicationPublicationRequestV1, ApplicationPublicationSourceV1, CompilationUnit,
+    SemanticPackageResolutionTable, SemanticPackageRuntimeModuleTable,
 };
 
 pub const FILE_ROUTE_PUBLICATION_MANIFEST_SCHEMA_VERSION: u32 = 1;
@@ -95,6 +95,12 @@ pub fn build_file_route_publication_v1(
     let model =
         build_application_semantic_model_for_unit_with_packages(&unit, &request.package_contracts);
     let graph = build_validated_file_route_graph_v1(&model).map_err(route_error)?;
+    build_layout_composition_plan_v1(&model, &graph).map_err(|error| {
+        FileRoutePublicationErrorV1 {
+            code: error.code,
+            message: error.message,
+        }
+    })?;
     if graph.routes.is_empty() {
         return Err(FileRoutePublicationErrorV1 {
             code: "PSROUTE2002_FILE_ROUTE_SET_EMPTY",

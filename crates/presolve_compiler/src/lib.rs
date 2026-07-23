@@ -65,6 +65,7 @@ pub mod instance_context;
 pub mod intermediate_representation;
 #[cfg(any(test, all(feature = "wasm", target_arch = "wasm32")))]
 mod language_service;
+pub mod layout_composition;
 pub mod layout_graph;
 pub mod lazy_action_chunks;
 pub mod metaframework_handoff;
@@ -438,6 +439,10 @@ pub use intermediate_representation::{
     IrStorageId, IrTemplateEntrypoint, IrUnaryOperation, IrUpdateScheduler, IrUse, IrUseDefinition,
     IrValidationDiagnostic, IrValue, IrValueDefinition, IrValueId, OptimizedContextIrReport,
     OptimizedIrContextSourceEvaluation,
+};
+pub use layout_composition::{
+    build_layout_composition_plan_v1, LayoutCompositionErrorV1, LayoutCompositionPlanV1,
+    LayoutCompositionRouteV1,
 };
 pub use metaframework_handoff::{
     build_deployable_release_manifest_v1, build_static_request_handoff_v1,
