@@ -416,6 +416,7 @@ fn parse_decorator(
             Some(ParsedDecorator {
                 name: callee.name.to_string(),
                 is_invoked: true,
+                arguments: call.arguments.iter().map(argument_string_value).collect(),
                 argument: call.arguments.first().and_then(argument_string_value),
                 argument_count: call.arguments.len(),
                 argument_spans: call
@@ -441,6 +442,7 @@ fn parse_decorator(
         Expression::Identifier(identifier) => Some(ParsedDecorator {
             name: identifier.name.to_string(),
             is_invoked: false,
+            arguments: Vec::new(),
             argument: None,
             argument_count: 0,
             argument_spans: Vec::new(),

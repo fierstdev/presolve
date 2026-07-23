@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: N6-C14 - Compiler-Owned Resource Read Projections
-* Working tree: N7-B nested Form field-path contract is authored; implementation has not admitted its source form yet.
+* Working tree: N7-B parser retention is ready for focused verification and commit; two-argument `@field()` remains rejected.
 * Date: 2026-07-23
 
 Last completed slice
@@ -18,6 +18,11 @@ Last completed slice
 * Result: authored the compiler-owned extension contract for a static second `@field()` path argument. It preserves canonical leaf Field IDs and slots, applies only to compiler-generated submission projection, rejects dynamic/indexed/prefix-colliding paths, and requires a Forms artifact/version plus exact leaf-slot resume proof before source admission.
 * Verification: contract is linked from the Phase N index and is consistent with the frozen Forms ownership/runtime boundary.
 * Next: add parser retention for the second static decorator argument, validate canonical `FormFieldPath` records, and keep two-argument source rejected until Form runtime, serialization, artifact, and resume products land together.
+
+* Slice: N7-B-A - Static Decorator Argument Retention
+* Result: `ParsedDecorator` now retains the static-string value (or non-static absence) for every authored argument while preserving the existing first-argument field. No consumer has opted into a multi-argument semantic contract, so current field lowering still rejects `@field()` arity two.
+* Verification: focused parser retention test and compiler check pass.
+* Next: introduce a canonical, non-admitted `FormFieldPath` candidate fact and exact path diagnostics before changing Form entity or artifact schemas.
 
 * Slice: N2-G - Compiler-Registered Math Rounding
 * Result: exact one-argument `Math.floor`, `Math.ceil`, and `Math.round` in supported Computed getters now resolve to compiler-registered unary operations, retain their operand dependencies, lower to canonical `Floor`/`Ceil`/`Round` IR, and execute only from schema-v11 computed-runtime instructions. No generic Math dispatch, overload, callback, alias, or authored JavaScript execution is admitted.

@@ -84,6 +84,10 @@ pub struct ParsedClassHeritage {
 pub struct ParsedDecorator {
     pub name: String,
     pub is_invoked: bool,
+    /// Source-normalized static-string values for every decorator argument.
+    /// Existing compiler consumers continue to use `argument` for their
+    /// one-argument contracts; multi-argument semantics must opt in explicitly.
+    pub arguments: Vec<Option<String>>,
     pub argument: Option<String>,
     pub argument_count: usize,
     pub argument_spans: Vec<SourceSpan>,

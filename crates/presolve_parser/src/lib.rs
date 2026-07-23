@@ -363,6 +363,28 @@ class ProfileEditor {
     }
 
     #[test]
+    fn retains_every_static_decorator_argument_without_admitting_its_semantics() {
+        let parsed = parse_file(
+            "src/NestedField.tsx",
+            r#"@component("x-nested") class NestedField {
+  @field("profile", "address.street") street = "";
+  render() { return <div />; }
+}"#,
+        );
+        let decorator = &parsed.classes[0].properties[0].decorators[0];
+        assert_eq!(decorator.name, "field");
+        assert_eq!(decorator.argument_count, 2);
+        assert_eq!(
+            decorator.arguments,
+            vec![
+                Some("profile".to_string()),
+                Some("address.street".to_string())
+            ]
+        );
+        assert_eq!(decorator.argument, Some("profile".to_string()));
+    }
+
+    #[test]
     fn retains_normalized_form_control_attribute_facts() {
         let source = r#"
 @component("profile-editor")

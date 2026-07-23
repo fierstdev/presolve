@@ -2169,6 +2169,7 @@ class ChainedProfile extends Component {
                 decorators: vec![presolve_parser::ParsedDecorator {
                     name: "component".to_string(),
                     is_invoked: true,
+                    arguments: vec![Some("x-duplicate-event".to_string())],
                     argument: Some("x-duplicate-event".to_string()),
                     argument_count: 1,
                     argument_spans: vec![test_span()],
