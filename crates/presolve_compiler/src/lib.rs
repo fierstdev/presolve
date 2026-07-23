@@ -688,8 +688,9 @@ pub use runtime_resource_artifact::{
     RuntimeResourceArtifactValidationError, RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION,
 };
 pub use semantic_capability::{
-    build_semantic_capability_registry, semantic_capability_registry_json, SemanticCapability,
-    SemanticCapabilityClass, SemanticCapabilityRegistry, SemanticCapabilityStatus,
+    build_semantic_capability_registry, semantic_capability_matrix_text,
+    semantic_capability_registry_json, SemanticCapability, SemanticCapabilityClass,
+    SemanticCapabilityRegistry, SemanticCapabilityStatus,
     SEMANTIC_CAPABILITY_REGISTRY_SCHEMA_VERSION,
 };
 pub use semantic_graph::{

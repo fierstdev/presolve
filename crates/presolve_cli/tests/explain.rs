@@ -93,6 +93,48 @@ fn explain_command_matches_json_fixture() {
 }
 
 #[test]
+fn capability_registry_has_deterministic_json_and_human_projections() {
+    let repo_root = repo_root();
+    let json = Command::new(presolve_cli_bin())
+        .current_dir(&repo_root)
+        .args(["explain", "--capabilities", "--format", "json"])
+        .output()
+        .expect("failed to inspect capability registry as JSON");
+    assert!(
+        json.status.success(),
+        "capability JSON inspection failed: {}",
+        String::from_utf8_lossy(&json.stderr)
+    );
+    let json: serde_json::Value =
+        serde_json::from_slice(&json.stdout).expect("capability inspection JSON");
+    assert_eq!(json["schema_version"], 1);
+    assert!(json["capabilities"]
+        .as_array()
+        .is_some_and(|capabilities| capabilities
+            .iter()
+            .any(|capability| capability["id"] == "opaque_typescript"
+                && capability["status"] == "deferred")));
+
+    let human = Command::new(presolve_cli_bin())
+        .current_dir(&repo_root)
+        .args(["explain", "--capabilities", "--format", "human"])
+        .output()
+        .expect("failed to inspect capability registry as human matrix");
+    assert!(
+        human.status.success(),
+        "capability human inspection failed: {}",
+        String::from_utf8_lossy(&human.stderr)
+    );
+    let human = String::from_utf8(human.stdout).expect("capability matrix UTF-8");
+    assert!(human.starts_with("Presolve semantic capability matrix (schema v1)\n\n"));
+    assert_eq!(
+        human.matches("\nresources | bounded | admitted |").count(),
+        1
+    );
+    assert!(human.contains("  rejection: N9 must define opaque isolation\n"));
+}
+
+#[test]
 fn explain_command_inspects_entities_through_the_canonical_inspection_view() {
     let path = "fixtures/0001-source-summary/input/Counter.tsx";
     let entity_id = "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter";

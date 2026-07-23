@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: N7-B-D - Nested Form Field-Path Admission
-* Working tree: clean after N7-B nested Form Field-path admission.
+* Working tree: N8-A capability matrix is ready for final verification and commit.
 * Date: 2026-07-23
 
 Last completed slice
@@ -38,6 +38,11 @@ Last completed slice
 * Result: `@field("form", "address.street")` is now a typed, compiler-admitted static serialization path. Compiler candidates reject invalid paths and exact/prefix collisions; canonical leaf `FieldId`, controls, validation, reset, and resume slots are unchanged. `forms.runtime.json` v2 carries the exact segments, generated runtime validates them before activation, emits nested JSON from compiler records, and emits dotted scalar keys. The browser fixture proves controlled nested JSON submission and malformed path artifacts fail closed. Resume now proves a nested-path leaf restores through the unchanged slot contract. This slice also corrects the generated resume bootstrap call so its diagnostics argument is no longer displaced by the Resource artifact.
 * Verification: focused field/serialization/artifact/runtime-codegen tests, Forms TypeScript declaration fixtures, compiler/CLI checks, generated-browser submission and malformed-artifact proof, and generated-browser resume proof.
 * Next: select the next N7 semantic family only with a complete compiler-owned contract; arrays, dynamic paths, object mutation, and custom names remain excluded.
+
+* Slice: N8-A - Capability Matrix
+* Result: `presolve explain --capabilities --format human` now renders a deterministic Markdown-compatible matrix directly from the versioned compiler registry. JSON remains the schema-bearing automation product. The matrix lists every source form, class, status, proof fixture, and deferred rejection reason without inspecting application source or duplicating registry data in the framework or CLI.
+* Verification: focused compiler registry rendering and CLI human/JSON projection tests plus `scripts/verify-n8a-capability-matrix.sh`.
+* Next: N8-B should define compatibility/migration and rejected-syntax products from the same registry; do not hand-maintain a divergent framework feature inventory.
 
 * Slice: N2-G - Compiler-Registered Math Rounding
 * Result: exact one-argument `Math.floor`, `Math.ceil`, and `Math.round` in supported Computed getters now resolve to compiler-registered unary operations, retain their operand dependencies, lower to canonical `Floor`/`Ceil`/`Round` IR, and execute only from schema-v11 computed-runtime instructions. No generic Math dispatch, overload, callback, alias, or authored JavaScript execution is admitted.

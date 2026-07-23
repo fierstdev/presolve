@@ -1,3 +1,5 @@
+use std::fmt::Write as _;
+
 use serde::Serialize;
 
 pub const SEMANTIC_CAPABILITY_REGISTRY_SCHEMA_VERSION: u32 = 1;
@@ -401,6 +403,58 @@ pub fn semantic_capability_registry_json() -> String {
         + "\n"
 }
 
+/// Deterministic human projection of the same registry used for JSON
+/// inspection. It is intentionally a view, not a second capability list or a
+/// schema-bearing product.
+#[must_use]
+pub fn semantic_capability_matrix_text() -> String {
+    let registry = build_semantic_capability_registry();
+    let mut output = format!(
+        "Presolve semantic capability matrix (schema v{})\n\n",
+        registry.schema_version
+    );
+    output.push_str("id | class | status | source form | proof fixture\n");
+    output.push_str("--- | --- | --- | --- | ---\n");
+    for capability in registry.capabilities {
+        let proof_fixture = if capability.proof_fixture.is_empty() {
+            "-"
+        } else {
+            capability.proof_fixture
+        };
+        writeln!(
+            output,
+            "{} | {} | {} | {} | {}",
+            capability.id,
+            capability_class_text(capability.class),
+            capability_status_text(capability.status),
+            capability.source_form,
+            proof_fixture
+        )
+        .expect("writing capability matrix cannot fail");
+        if let Some(reason) = capability.rejection_reason {
+            writeln!(output, "  rejection: {reason}")
+                .expect("writing capability matrix cannot fail");
+        }
+    }
+    output
+}
+
+fn capability_class_text(class: SemanticCapabilityClass) -> &'static str {
+    match class {
+        SemanticCapabilityClass::Native => "native",
+        SemanticCapabilityClass::Bounded => "bounded",
+        SemanticCapabilityClass::Opaque => "opaque",
+        SemanticCapabilityClass::Unsupported => "unsupported",
+    }
+}
+
+fn capability_status_text(status: SemanticCapabilityStatus) -> &'static str {
+    match status {
+        SemanticCapabilityStatus::Admitted => "admitted",
+        SemanticCapabilityStatus::Deferred => "deferred",
+    }
+}
+
 fn admitted(
     id: &'static str,
     class: SemanticCapabilityClass,
@@ -508,6 +562,15 @@ mod tests {
             .all(|capability| capability.rejection_reason.is_some()));
         assert!(semantic_capability_registry_json().contains("\"semantic_package_bindings\""));
         assert!(semantic_capability_registry_json().contains("\"static_index_access\""));
+        let matrix = semantic_capability_matrix_text();
+        assert_eq!(matrix, semantic_capability_matrix_text());
+        assert!(matrix.starts_with("Presolve semantic capability matrix (schema v1)\n\n"));
+        assert_eq!(
+            matrix.matches("\ncomponent | native | admitted |").count(),
+            1
+        );
+        assert!(matrix.contains("advanced_types | unsupported | deferred |"));
+        assert!(matrix.contains("  rejection: N1-B must define advanced type semantics\n"));
         assert!(registry.capabilities.iter().any(|capability| {
             capability.id == "resources"
                 && capability.status == SemanticCapabilityStatus::Admitted

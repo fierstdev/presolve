@@ -29,12 +29,12 @@ use presolve_compiler::{
     production_runtime_artifact_json, project_production_diagnostics, project_resume_diagnostics,
     resume_manifest_json, runtime_component_artifact_json, runtime_computed_artifact_json,
     runtime_context_artifact_json, runtime_cost_report_json, runtime_effect_artifact_json,
-    runtime_forms_artifact_json, runtime_resource_artifact_json, semantic_capability_registry_json,
-    semantic_graph_json, semantic_type_text, summarize_source, template_manifest_json,
-    validate_application_semantic_model, validate_runtime_resource_artifact,
-    ApplicationSemanticModel, AsmValidationDiagnostic, AttributeValue, CompilationUnit,
-    ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind, EffectInspection,
-    EffectInspectionRegistry, ExecutableProgramFingerprint, ImmutableAsmPass,
+    runtime_forms_artifact_json, runtime_resource_artifact_json, semantic_capability_matrix_text,
+    semantic_capability_registry_json, semantic_graph_json, semantic_type_text, summarize_source,
+    template_manifest_json, validate_application_semantic_model,
+    validate_runtime_resource_artifact, ApplicationSemanticModel, AsmValidationDiagnostic,
+    AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
+    EffectInspection, EffectInspectionRegistry, ExecutableProgramFingerprint, ImmutableAsmPass,
     ProductionDiagnosticFact, ProductionDiagnosticKind, ProductionProjectedDiagnostic,
     ProductionReportInputs, ProductionRootChunkInput, RenderAttribute, RenderAttributeValue,
     SemanticEntity, SemanticEntityKind, SemanticId, SemanticOwner, SemanticPackageResolutionTable,
@@ -731,11 +731,14 @@ fn run_explain(mut args: Vec<String>) {
     {
         args.remove(0);
         let format = parse_format(&args);
-        if format != "json" {
-            eprintln!("semantic capability inspection supports only --format json");
-            process::exit(1);
+        match format.as_str() {
+            "json" => print!("{}", semantic_capability_registry_json()),
+            "human" => print!("{}", semantic_capability_matrix_text()),
+            _ => {
+                eprintln!("semantic capability inspection supports only --format human or json");
+                process::exit(1);
+            }
         }
-        print!("{}", semantic_capability_registry_json());
         return;
     }
 
@@ -4248,7 +4251,7 @@ fn write_build_artifacts(
 
 fn print_usage_and_exit() -> ! {
     eprintln!("usage:");
-    eprintln!("  presolve explain --capabilities --format json");
+    eprintln!("  presolve explain --capabilities --format human|json");
     eprintln!("  presolve explain <file> [--format text|json]");
     eprintln!("  presolve explain <file> [--inspect] [--entity semantic-id | --source path --offset byte] [--child-kind kind] [--reference-kind kind] [--format text|json|graph]");
     eprintln!(
