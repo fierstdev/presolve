@@ -1674,4 +1674,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* M10-C framework adoption freeze; commit pending.
+* M10-C aggregate freeze/audit repair; commit pending.

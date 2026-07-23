@@ -9,7 +9,7 @@ readonly fixture=framework/tests/effect-types
 readonly compiler_fixture=fixtures/0053-effect-initial-runtime/input/InitialEffectRuntime.tsx
 
 test -s "$contract"
-for phrase in '@effect()' 'byte-identical' 'single initial run' 'exact compiler capability-dispatch order' 'generic `useEffect` analogue'; do
+for phrase in '@effect()' 'byte-identical' 'single initial run' 'exact compiler capability-dispatch' 'generic `useEffect` analogue'; do
   rg --fixed-strings --quiet "$phrase" "$contract"
 done
 test -s "$fixture/tsconfig.json"

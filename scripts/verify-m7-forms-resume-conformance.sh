@@ -13,7 +13,7 @@ for phrase in \
   'production compiler-language refinement' \
   '@field("profile")' \
   '@submit("profile")' \
-  'exact sources built by the existing real-browser probes' \
+  'The two framework fixtures are the exact sources built by the existing' \
   'No framework-side artifact decoding'; do
   rg --fixed-strings --quiet "$phrase" "$contract"
 done
@@ -27,7 +27,7 @@ test -s "$resume_fixture/src/ResumeForms.tsx"
 rg --fixed-strings --quiet 'interface Form' framework/packages/framework-types/src/index.d.ts
 rg --fixed-strings --quiet 'type FormDesignator = string' framework/packages/framework-types/src/index.d.ts
 rg --fixed-strings --quiet 'function form()' framework/packages/framework-types/src/index.d.ts
-rg --fixed-strings --quiet 'function field(form: FormDesignator)' framework/packages/framework-types/src/index.d.ts
+rg --fixed-strings --quiet 'function field(form: FormDesignator, path?: string)' framework/packages/framework-types/src/index.d.ts
 rg --fixed-strings --quiet 'function submit(form: FormDesignator)' framework/packages/framework-types/src/index.d.ts
 
 CI=true pnpm exec tsc --project "$forms_fixture/tsconfig.json"

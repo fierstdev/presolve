@@ -26,7 +26,8 @@ declare global {
   /**
    * Declares one component-owned Resource activation. The endpoint designator
    * is compiler syntax resolved through an exact semantic-package contract;
-   * this declaration does not fetch, cache, subscribe to, or cancel anything.
+   * this declaration does not perform network I/O, cache, subscribe to, or
+   * cancel anything.
    */
   function resource(endpointDesignator: string): PresolveFieldDecorator;
 

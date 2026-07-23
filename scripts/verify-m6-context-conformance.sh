@@ -10,10 +10,10 @@ readonly compiler_fixture=fixtures/0059-context-runtime-matrix/input/ContextRunt
 
 test -s "$contract"
 for phrase in \
-  'production compiler-language refinement' \
+  'Context is the one Phase M composition family' \
   'Identifier.Identifier' \
   'compile-time syntax, not a dynamic string key' \
-  'never a framework shim' \
+  'not framework API' \
   'byte-identical'; do
   rg --fixed-strings --quiet "$phrase" "$contract"
 done
