@@ -35,6 +35,7 @@ pub struct RouteManifestEntryV1 {
     pub path: String,
     pub component_id: String,
     pub artifact_root: String,
+    pub parent_path: Option<String>,
 }
 
 #[must_use]
@@ -100,6 +101,7 @@ pub fn route_manifest_v1(graph: &RouteGraph) -> RouteManifestV1 {
                 path: route.path.clone(),
                 component_id: route.component.to_string(),
                 artifact_root: route_artifact_root(&route.path),
+                parent_path: route_parent_path(&route.path),
             })
             .collect(),
     }
@@ -157,6 +159,7 @@ pub fn build_static_route_publication_v1(
             path: route.path.clone(),
             component_id: route.component.to_string(),
             artifact_root: root,
+            parent_path: route_parent_path(&route.path),
         });
     }
     routes.sort_by(|left, right| left.path.cmp(&right.path));
@@ -208,6 +211,18 @@ fn route_artifact_root(path: &str) -> String {
         return "routes/root".into();
     }
     format!("routes/{}", path.trim_matches('/').replace('/', "__"))
+}
+fn route_parent_path(path: &str) -> Option<String> {
+    if path == "/" {
+        return None;
+    }
+    let trimmed = path.trim_matches('/');
+    let parent = trimmed.rsplit_once('/').map_or("", |(parent, _)| parent);
+    Some(if parent.is_empty() {
+        "/".into()
+    } else {
+        format!("/{parent}")
+    })
 }
 
 #[must_use]

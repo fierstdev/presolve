@@ -8,3 +8,4 @@ deployment protocol.
 * [Phase Q metaframework plan](PHASE_Q_METAFRAMEWORK_PLAN.md)
 * [Q0 metaframework constitution](PHASE_Q_Q0_METAFRAMEWORK_CONSTITUTION.md)
 * [Q1 static route graph](PHASE_Q_Q1_STATIC_ROUTE_GRAPH.md)
+* [Q2 navigation topology](PHASE_Q_Q2_NAVIGATION_TOPOLOGY.md)
