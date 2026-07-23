@@ -94,7 +94,7 @@ Last completed slice
 * Verification: `./scripts/verify-n10-phase-n-freeze.sh` passes from a clean tree; the browser portion completed in 7.65 seconds.
 * Next: no Phase N source/runtime extension is authorized without a new numbered compiler contract and a corresponding registry/artifact/runtime/proof amendment.
 
-* Audit: post-freeze replay found stale N1/N1-A verifier wording, not a compiler regression. N1-A now records the closed N9 `opaque` export kind while retaining its generic package-call rejection; the audit continues before the freeze record is reaffirmed.
+* Audit: post-freeze replay found stale N1/N1-A/N2-A/N3-D verifier wording, not compiler regressions. Those checks now describe the current contracts, and every individual N0–N8 verifier passes cleanly. N10 has been restored to replay the complete matrix before the freeze record is reaffirmed.
 
 * Slice: N2-G - Compiler-Registered Math Rounding
 * Result: exact one-argument `Math.floor`, `Math.ceil`, and `Math.round` in supported Computed getters now resolve to compiler-registered unary operations, retain their operand dependencies, lower to canonical `Floor`/`Ceil`/`Round` IR, and execute only from schema-v11 computed-runtime instructions. No generic Math dispatch, overload, callback, alias, or authored JavaScript execution is admitted.
