@@ -41,4 +41,5 @@ numbered slice is accepted.
 * [N6-C11 Resource CLI runtime mapping contract](PHASE_N_N6C11_RESOURCE_CLI_RUNTIME_MAPPING_CONTRACT.md)
 * [N6-C12 Resource cancellation lifecycle contract](PHASE_N_N6C12_RESOURCE_CANCELLATION_LIFECYCLE_CONTRACT.md)
 * [N6-C13 Resource source publication contract](PHASE_N_N6C13_RESOURCE_SOURCE_PUBLICATION_CONTRACT.md)
+* [N6-C14 Resource read design](PHASE_N_N6C14_RESOURCE_READ_DESIGN.md)
 * [N7-A Typed ARIA binding contract](PHASE_N_N7A_TYPED_ARIA_BINDING_CONTRACT.md)
