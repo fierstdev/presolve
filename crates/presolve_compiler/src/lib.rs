@@ -66,6 +66,7 @@ pub mod intermediate_representation;
 mod language_service;
 pub mod layout_graph;
 pub mod lazy_action_chunks;
+pub mod metaframework_handoff;
 pub mod model;
 pub mod module_graph;
 pub mod opaque;
@@ -428,6 +429,11 @@ pub use intermediate_representation::{
     IrStorageId, IrTemplateEntrypoint, IrUnaryOperation, IrUpdateScheduler, IrUse, IrUseDefinition,
     IrValidationDiagnostic, IrValue, IrValueDefinition, IrValueId, OptimizedContextIrReport,
     OptimizedIrContextSourceEvaluation,
+};
+pub use metaframework_handoff::{
+    build_deployable_release_manifest_v1, build_static_request_handoff_v1,
+    deployable_release_manifest_json_v1, static_request_handoff_json_v1, DeployableArtifactV1,
+    DeployableReleaseManifestV1, StaticRequestHandoffV1, StaticRequestRouteV1,
 };
 pub use model::{
     ClassSummary, DecoratorSummary, Diagnostic, RenderMethodSummary, Severity, SourceSummary, Span,
