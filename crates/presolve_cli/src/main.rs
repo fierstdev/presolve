@@ -91,7 +91,9 @@ fn main() {
         }
         "asm" => l9_command_error("asm", "retired: use presolve explain", 6),
         "check" => {
-            if args.iter().any(|argument| argument == "--config") {
+            if args.is_empty() {
+                run_ergonomic_check(Path::new("."));
+            } else if args.iter().any(|argument| argument == "--config") {
                 run_l9_build_or_check("check", &args);
             } else {
                 run_check(&args);
@@ -164,6 +166,33 @@ fn run_ergonomic_build(root: &Path) {
     publish_application_product(&output_root, &product)
         .unwrap_or_else(|error| application_cli_error("PSAPP3008_PUBLICATION_FAILED", &error));
     println!("Built {}", output_root.display());
+}
+
+fn run_ergonomic_check(root: &Path) {
+    let project = discover_project_v1(root)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    let unit = CompilationUnit::parse_sources(
+        project
+            .sources
+            .iter()
+            .map(|source| (source.logical_path.clone(), source.source.as_str())),
+    );
+    let asm = build_application_semantic_model_for_unit(&unit);
+    let diagnostics = asm
+        .diagnostics
+        .iter()
+        .filter(|diagnostic| {
+            diagnostic.code.starts_with("PSC") || diagnostic.code.starts_with("PSBIND")
+        })
+        .collect::<Vec<_>>();
+    if diagnostics.is_empty() {
+        println!("Checked {} source file(s)", unit.files().len());
+        return;
+    }
+    for diagnostic in diagnostics {
+        eprintln!("{}: {}", diagnostic.code, diagnostic.message);
+    }
+    process::exit(2);
 }
 
 fn run_l9_version(args: &[String]) {
