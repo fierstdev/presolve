@@ -1639,9 +1639,11 @@ the separately authorized metaframework/application-product phase. O0 freezes
 the `@presolve/application` boundary: caller-owned invocation projection only,
 with no source reading, compiler semantics, artifact decoding, or runtime.
 O1 supplies exact single-entry `presolve build` projection including explicit
-semantic-package contracts/runtime mappings. Next: O2 may expose only the
-existing explicit workspace and `watch --once` products; it may not create a
-watcher, dev server, HMR, discovery, or source-analysis path.
+semantic-package contracts/runtime mappings. O2 supplies only immutable
+projection of existing explicit `workspace` and `watch --once` products; it
+creates no watcher, dev server, HMR, discovery, or source-analysis path. Next:
+O3 may define request/result presentation only. O4 is blocked: current
+multi-source workspace products do not publish application artifacts.
 
 Useful commands
 
@@ -1672,4 +1674,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* O0/O1 application product constitution and build handoff; commit pending.
+* O2 explicit workspace/watch-once handoff; commit pending.

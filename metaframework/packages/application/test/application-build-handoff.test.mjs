@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createApplicationBuildInvocation, invokeApplicationBuild } from "../src/index.js";
+import {
+  createApplicationBuildInvocation,
+  createApplicationWatchOnceInvocation,
+  createApplicationWorkspaceInvocation,
+  invokeApplicationBuild,
+  invokeApplicationDevelopment,
+} from "../src/index.js";
 
 test("projects one explicit application entry and lexically ordered package mappings", () => {
   const invocation = createApplicationBuildInvocation({
@@ -55,5 +61,34 @@ test("rejects malformed caller-owned requests", () => {
   assert.throws(
     () => createApplicationBuildInvocation({ entryPath: "src/App.tsx", outputDirectory: "dist", production: "yes" }),
     /production must be a boolean when provided/,
+  );
+});
+
+test("projects only the existing explicit workspace and watch-once commands", () => {
+  const request = {
+    configurationPath: "presolve.json",
+    sources: ["app.tsx=src/App.tsx", "theme.ts=src/theme.ts"],
+    format: "json",
+  };
+  assert.deepEqual(createApplicationWorkspaceInvocation({ ...request, verifyCleanEquivalence: true }), {
+    executable: "presolve",
+    arguments: ["workspace", "--config", "presolve.json", "--source", "app.tsx=src/App.tsx", "--source", "theme.ts=src/theme.ts", "--format", "json", "--verify-clean-equivalence"],
+  });
+  assert.deepEqual(createApplicationWatchOnceInvocation(request), {
+    executable: "presolve",
+    arguments: ["watch", "--once", "--config", "presolve.json", "--source", "app.tsx=src/App.tsx", "--source", "theme.ts=src/theme.ts", "--format", "json"],
+  });
+  const result = Object.freeze({ outcome: "unchanged" });
+  assert.equal(invokeApplicationDevelopment(request, createApplicationWatchOnceInvocation, () => result), result);
+});
+
+test("rejects unsupported development handoff options", () => {
+  assert.throws(
+    () => createApplicationWorkspaceInvocation({ configurationPath: "presolve.json", sources: [] }),
+    /sources must be a non-empty array/,
+  );
+  assert.throws(
+    () => createApplicationWatchOnceInvocation({ configurationPath: "presolve.json", sources: ["app.tsx=src/App.tsx"], verifyCleanEquivalence: true }),
+    /only supported for workspace/,
   );
 });

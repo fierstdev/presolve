@@ -9,3 +9,4 @@ introduce a framework runtime.
 * [Phase O application productization plan](PHASE_O_APPLICATION_PRODUCTIZATION_PLAN.md)
 * [O0 application product constitution](PHASE_O_O0_APPLICATION_PRODUCT_CONSTITUTION.md)
 * [O1 explicit application build handoff](PHASE_O_O1_EXPLICIT_APPLICATION_BUILD_HANDOFF.md)
+* [O2 explicit workspace development handoff](PHASE_O_O2_EXPLICIT_WORKSPACE_DEVELOPMENT_HANDOFF.md)
