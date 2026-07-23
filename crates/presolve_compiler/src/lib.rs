@@ -118,6 +118,7 @@ pub mod runtime_effect;
 pub mod runtime_effect_artifact;
 pub mod runtime_form_artifact;
 pub mod runtime_form_registry;
+pub mod runtime_opaque_artifact;
 pub mod runtime_resource_artifact;
 pub mod semantic_capability;
 pub mod semantic_graph;
@@ -681,6 +682,12 @@ pub use runtime_form_artifact::{
 pub use runtime_form_registry::{
     build_runtime_form_registry, RuntimeFormInstanceRecord, RuntimeFormRecord, RuntimeFormRegistry,
     RUNTIME_FORM_REGISTRY_VERSION,
+};
+pub use runtime_opaque_artifact::{
+    build_runtime_opaque_artifact, build_runtime_opaque_artifact_with_modules,
+    runtime_opaque_artifact_json, validate_runtime_opaque_artifact, RuntimeOpaqueArtifact,
+    RuntimeOpaqueArtifactActivation, RuntimeOpaqueArtifactBuildError,
+    RuntimeOpaqueArtifactValidationError, RUNTIME_OPAQUE_ARTIFACT_SCHEMA_VERSION,
 };
 pub use runtime_resource_artifact::{
     build_runtime_resource_artifact, build_runtime_resource_artifact_with_modules,

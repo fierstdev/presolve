@@ -60,6 +60,12 @@ signature, and `resume: "cold-fallback"`. Template/event artifacts reference
 the existing Action batch, not arbitrary source code. Inspection and every
 runtime diagnostic label the activation `opaque`.
 
+N9-D implements the semantic artifact projection as `RuntimeOpaqueArtifact`
+schema v1. It contains resolved activation, owner, method, package coordinate,
+module/export, and closed terminal contract; runtime location is populated only
+by the exact existing semantic-package runtime-module table. CLI publication,
+generated execution, and resume consumption remain subsequent slices.
+
 Malformed, duplicate, mismatched, non-client, missing-export, non-callable,
 or integrity-unbound records fail closed. An opaque declaration must match an
 actual imported opaque semantic-package export; a pure/resource/nonsemantic
