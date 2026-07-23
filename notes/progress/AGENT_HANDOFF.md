@@ -4,7 +4,7 @@ Repository state
 
 * Branch: main
 * Latest completed slice: N6-C14 - Compiler-Owned Resource Read Projections
-* Working tree: N7-B parser retention is ready for focused verification and commit; two-argument `@field()` remains rejected.
+* Working tree: N7-B static Form path candidate retention is ready for focused verification and commit; two-argument `@field()` remains rejected.
 * Date: 2026-07-23
 
 Last completed slice
@@ -23,6 +23,11 @@ Last completed slice
 * Result: `ParsedDecorator` now retains the static-string value (or non-static absence) for every authored argument while preserving the existing first-argument field. No consumer has opted into a multi-argument semantic contract, so current field lowering still rejects `@field()` arity two.
 * Verification: focused parser retention test and compiler check pass.
 * Next: introduce a canonical, non-admitted `FormFieldPath` candidate fact and exact path diagnostics before changing Form entity or artifact schemas.
+
+* Slice: N7-B-B - Static Form Path Candidate Facts
+* Result: a second static `@field()` argument is normalized to bounded identifier-only path segments and retained on the Form Field candidate. It has no lowering authority and existing one-argument arity diagnostics remain the admission gate.
+* Verification: compiler check plus focused parser static-argument retention test pass.
+* Next: add canonical path diagnostics and collision analysis, then atomically admit paths only with Form entity, artifact, serialization, runtime, and resume changes.
 
 * Slice: N2-G - Compiler-Registered Math Rounding
 * Result: exact one-argument `Math.floor`, `Math.ceil`, and `Math.round` in supported Computed getters now resolve to compiler-registered unary operations, retain their operand dependencies, lower to canonical `Floor`/`Ceil`/`Round` IR, and execute only from schema-v11 computed-runtime instructions. No generic Math dispatch, overload, callback, alias, or authored JavaScript execution is admitted.

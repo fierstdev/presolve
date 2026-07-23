@@ -425,6 +425,9 @@ pub struct FormFieldDeclarationCandidate {
     pub decorator_invoked: bool,
     pub decorator_argument_count: usize,
     pub decorator_argument_provenance: Vec<SourceProvenance>,
+    /// Retained N7-B syntax fact. It has no lowering authority until the
+    /// complete Form artifact/runtime/resume contract admits arity two.
+    pub nested_path_segments: Option<Vec<String>>,
     pub form_designator: Option<FormDesignatorFact>,
     pub unsupported_form_designator: Option<UnsupportedFormDesignatorFact>,
     pub resolved_form: Option<FormId>,
@@ -1902,6 +1905,11 @@ fn form_field_declaration_candidates_from_class(
             conflicting_decorators.dedup();
             let (form_designator, unsupported_form_designator) =
                 normalized_form_designator(decorator, path);
+            let nested_path_segments = decorator
+                .arguments
+                .get(1)
+                .and_then(Option::as_deref)
+                .and_then(parse_static_form_field_path);
             let mut violations = Vec::new();
             if owner.is_none() {
                 violations.push(FormFieldDeclarationViolation::InvalidOwner);
@@ -1959,6 +1967,7 @@ fn form_field_declaration_candidates_from_class(
                     .copied()
                     .map(|span| SourceProvenance::new(path, span))
                     .collect(),
+                nested_path_segments,
                 form_designator,
                 unsupported_form_designator,
                 resolved_form: None,
@@ -2375,6 +2384,11 @@ fn retain_non_property_form_field_candidates(
                 .copied()
                 .map(|argument| SourceProvenance::new(path, argument))
                 .collect(),
+            nested_path_segments: decorator
+                .arguments
+                .get(1)
+                .and_then(Option::as_deref)
+                .and_then(parse_static_form_field_path),
             form_designator,
             unsupported_form_designator,
             resolved_form: None,
@@ -2455,6 +2469,17 @@ fn form_designator_name_is_valid(name: &str) -> bool {
         && characters.all(|character| {
             character == '_' || character == '$' || character.is_ascii_alphanumeric()
         })
+}
+
+fn parse_static_form_field_path(path: &str) -> Option<Vec<String>> {
+    let segments = path.split('.').map(str::to_string).collect::<Vec<_>>();
+    ((1..=16).contains(&segments.len())
+        && segments.iter().all(|segment| {
+            let mut characters = segment.chars();
+            matches!(characters.next(), Some(character) if character == '_' || character.is_ascii_alphabetic())
+                && characters.all(|character| character == '_' || character.is_ascii_alphanumeric())
+        }))
+        .then_some(segments)
 }
 
 fn canonicalize_form_field_violations(violations: &mut Vec<FormFieldDeclarationViolation>) {
