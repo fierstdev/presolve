@@ -344,6 +344,12 @@ products with endpoint-derived execution boundary. Source remains rejected and
 there is still no activation schedule, endpoint transport, artifact, runtime,
 cancellation, or resume product.
 
+N6-C3 is complete: the internal declarations and activations serialize into a
+deterministic, fail-closed Resource artifact that retains endpoint identity and
+lifecycle state. It is not yet published or executable, so source remains
+rejected and no transport, cancellation delivery, snapshot, or resume behavior
+is implied.
+
 Introduce a compiler-owned Resource declaration with explicit key, input
 dependencies, loading/success/error state, cancellation, retry, invalidation,
 serialization, and resume rules. Resources may invoke only registered

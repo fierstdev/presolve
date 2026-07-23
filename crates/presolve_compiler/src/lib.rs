@@ -117,6 +117,7 @@ pub mod runtime_effect;
 pub mod runtime_effect_artifact;
 pub mod runtime_form_artifact;
 pub mod runtime_form_registry;
+pub mod runtime_resource_artifact;
 pub mod semantic_capability;
 pub mod semantic_graph;
 pub mod semantic_id;
@@ -675,6 +676,11 @@ pub use runtime_form_artifact::{
 pub use runtime_form_registry::{
     build_runtime_form_registry, RuntimeFormInstanceRecord, RuntimeFormRecord, RuntimeFormRegistry,
     RUNTIME_FORM_REGISTRY_VERSION,
+};
+pub use runtime_resource_artifact::{
+    build_runtime_resource_artifact, runtime_resource_artifact_json, RuntimeResourceArtifact,
+    RuntimeResourceArtifactActivation, RuntimeResourceArtifactDeclaration,
+    RuntimeResourceArtifactEndpoint, RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION,
 };
 pub use semantic_capability::{
     build_semantic_capability_registry, semantic_capability_registry_json, SemanticCapability,
