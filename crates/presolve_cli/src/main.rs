@@ -24,7 +24,7 @@ use presolve_compiler::{
     build_runtime_context_artifact, build_runtime_effect_artifact, build_runtime_forms_artifact,
     build_runtime_opaque_artifact_with_modules, build_runtime_resource_artifact_with_modules,
     build_semantic_graph, build_static_request_handoff_v1, build_template_graph,
-    build_template_manifest_from_asm, build_validated_route_graph_v1,
+    build_template_manifest_from_asm, build_validated_route_graph_v1, discover_project_v1,
     embed_opaque_runtime_artifact, emit_production_modules, explain_json, explain_text,
     extract_production_chunk_graph, fold_component_graph, generate_ordinary_instance_html,
     generate_runtime_stub, generate_standalone_page_with_resume_runtime,
@@ -101,7 +101,9 @@ fn main() {
         "html" => run_html(args),
         "manifest" => run_manifest(args),
         "build" => {
-            if args.iter().any(|argument| argument == "--config") {
+            if args.is_empty() {
+                run_ergonomic_build(Path::new("."));
+            } else if args.iter().any(|argument| argument == "--config") {
                 run_l9_build_or_check("build", &args);
             } else {
                 run_build(args);
@@ -121,6 +123,47 @@ fn main() {
             print_usage_and_exit();
         }
     }
+}
+
+fn run_ergonomic_build(root: &Path) {
+    let project = discover_project_v1(root)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    let entry_path = PathBuf::from("app/routes/index.tsx");
+    if !project
+        .sources
+        .iter()
+        .any(|source| source.logical_path == entry_path)
+    {
+        application_cli_error(
+            "PSDISC1005_DEFAULT_ENTRY_MISSING",
+            "expected app/routes/index.tsx; use `presolve application build` for a non-default entry",
+        );
+    }
+    let output_root = project.root.join("dist");
+    validate_application_output_root(&output_root);
+    let request = ApplicationPublicationRequestV1 {
+        configuration: presolve_compiler::platform::WorkspaceConfiguration::default(),
+        sources: project
+            .sources
+            .into_iter()
+            .map(|source| ApplicationPublicationSourceV1 {
+                logical_path: source.logical_path,
+                source: source.source,
+            })
+            .collect(),
+        entry_path,
+        package_contracts: SemanticPackageResolutionTable::default(),
+        package_runtime_modules: SemanticPackageRuntimeModuleTable::default(),
+        profile: ApplicationPublicationProfileV1::Production,
+        output_root: output_root.clone(),
+    };
+    let validated = validate_application_publication_request_v1(request)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    let product = build_application_publication_product_v1(validated)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    publish_application_product(&output_root, &product)
+        .unwrap_or_else(|error| application_cli_error("PSAPP3008_PUBLICATION_FAILED", &error));
+    println!("Built {}", output_root.display());
 }
 
 fn run_l9_version(args: &[String]) {
