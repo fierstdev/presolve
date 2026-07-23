@@ -36,8 +36,9 @@ use presolve_compiler::{
     ProductionDiagnosticFact, ProductionDiagnosticKind, ProductionProjectedDiagnostic,
     ProductionReportInputs, ProductionRootChunkInput, RenderAttribute, RenderAttributeValue,
     SemanticEntity, SemanticEntityKind, SemanticId, SemanticOwner, SemanticPackageResolutionTable,
-    SemanticReferenceKind, SerializableValue, SharedChunkCandidatePlan, SourceProvenance,
-    StateOperation, TemplateChild, TemplateGraph, TemplateSemanticKind,
+    SemanticPackageRuntimeModuleKey, SemanticPackageRuntimeModuleTable, SemanticReferenceKind,
+    SerializableValue, SharedChunkCandidatePlan, SourceProvenance, StateOperation, TemplateChild,
+    TemplateGraph, TemplateSemanticKind,
 };
 use presolve_parser::{
     parse_file, ParseDiagnostic, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
@@ -2945,6 +2946,7 @@ fn run_build(mut args: Vec<String>) {
     let parsed = parse_file(&input_path, &source);
     let unit = CompilationUnit::from_parsed_files(vec![parsed.clone()]);
     let packages = parse_semantic_package_contracts(&args);
+    let _resource_runtime_modules = parse_semantic_package_runtime_modules(&args, &packages);
     let asm = ConstantFoldingPass.transform(
         &build_application_semantic_model_for_unit_with_packages(&unit, &packages),
     );
@@ -3136,6 +3138,51 @@ fn parse_semantic_package_contracts(args: &[String]) -> SemanticPackageResolutio
         index += 2;
     }
     packages
+}
+
+fn parse_semantic_package_runtime_modules(
+    args: &[String],
+    packages: &SemanticPackageResolutionTable,
+) -> SemanticPackageRuntimeModuleTable {
+    let mut modules = SemanticPackageRuntimeModuleTable::default();
+    let mut index = 0;
+    while index < args.len() {
+        if args[index] != "--package-runtime" {
+            index += 1;
+            continue;
+        }
+        let Some(specification) = args.get(index + 1) else {
+            eprintln!("--package-runtime requires <specifier>=<runtime-location>");
+            process::exit(2);
+        };
+        let Some((specifier, location)) = specification.split_once('=') else {
+            eprintln!("--package-runtime requires <specifier>=<runtime-location>");
+            process::exit(2);
+        };
+        let Some(contract) = packages.contract(specifier) else {
+            eprintln!("--package-runtime requires a matching --package-contract for `{specifier}`");
+            process::exit(2);
+        };
+        for export in contract.exports.values() {
+            let key = SemanticPackageRuntimeModuleKey {
+                package: contract.package.clone(),
+                version: contract.version.clone(),
+                integrity: contract.integrity.clone(),
+                runtime_module: export.runtime_module.clone(),
+            };
+            if modules.contains(&key) {
+                continue;
+            }
+            modules
+                .insert(key, location.to_string())
+                .unwrap_or_else(|error| {
+                    eprintln!("invalid --package-runtime for `{specifier}`: {error:?}");
+                    process::exit(2);
+                });
+        }
+        index += 2;
+    }
+    modules
 }
 
 fn print_build_artifact_paths(out_dir: &Path, resume_chunks: &presolve_compiler::ResumeChunkGraph) {

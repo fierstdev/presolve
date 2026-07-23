@@ -37,3 +37,4 @@ numbered slice is accepted.
 * [N6-C8 Resource page publication contract](PHASE_N_N6C8_RESOURCE_PAGE_PUBLICATION_CONTRACT.md)
 * [N6-C9 Resource runtime validation contract](PHASE_N_N6C9_RESOURCE_RUNTIME_VALIDATION_CONTRACT.md)
 * [N6-C10 Resource browser activation contract](PHASE_N_N6C10_RESOURCE_BROWSER_ACTIVATION_CONTRACT.md)
+* [N6-C11 Resource CLI runtime mapping contract](PHASE_N_N6C11_RESOURCE_CLI_RUNTIME_MAPPING_CONTRACT.md)

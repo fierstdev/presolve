@@ -47,6 +47,11 @@ impl SemanticPackageRuntimeModuleTable {
         self.modules.get(key).map(String::as_str)
     }
 
+    #[must_use]
+    pub fn contains(&self, key: &SemanticPackageRuntimeModuleKey) -> bool {
+        self.modules.contains_key(key)
+    }
+
     pub fn resolve_contract_module(
         &self,
         contract: &SemanticPackageContract,
