@@ -19,6 +19,12 @@ invalid configuration/source set/entry, unsupported package mapping, generated
 artifact mismatch, or a pre-existing non-pointer output root. The legacy
 single-source `presolve build <source>` contract remains unchanged.
 
+The selected `--entry` is the sole ordinary HTML materialization root. Complete
+workspace analysis remains available to compiler products, but unrelated
+top-level components cannot appear in that entry page. This clarification is a
+production-correctness amendment to the v1 contract and requires no schema
+migration.
+
 The v1 product does not provide source discovery, inferred entries, manifest
 migration, JavaScript artifact merging, a server, routing, SSR, or a framework
 runtime. Any future extension requires a separately versioned request,

@@ -26,8 +26,8 @@ use crate::{
     build_runtime_context_artifact, build_runtime_effect_artifact, build_runtime_forms_artifact,
     build_runtime_opaque_artifact_with_modules, build_runtime_resource_artifact_with_modules,
     build_template_manifest_from_asm, embed_opaque_runtime_artifact, emit_production_modules,
-    extract_production_chunk_graph, generate_ordinary_instance_html, generate_runtime_stub,
-    generate_standalone_page_with_resume_runtime,
+    extract_production_chunk_graph, generate_ordinary_instance_html_for_component,
+    generate_runtime_stub, generate_standalone_page_with_resume_runtime,
     generate_standalone_page_with_resume_runtime_and_resources, lower_components_to_ir,
     optimization_report_json, optimize_context_ir, optimize_effect_ir,
     production_runtime_artifact_json, resume_manifest_json, runtime_component_artifact_json,
@@ -353,7 +353,8 @@ pub fn build_application_publication_product_v1(
             })?;
     let production_runtime_json = production_runtime_artifact_json(&production_runtime_artifact);
     let resume_chunks = build_resume_chunk_graph(&asm);
-    let html_fragment = generate_ordinary_instance_html(&asm);
+    let html_fragment =
+        generate_ordinary_instance_html_for_component(&asm, &validated.entry_component);
     let template_manifest = build_template_manifest_from_asm(&asm);
     let template_manifest_json = template_manifest_json(&template_manifest);
     let page_title = asm
@@ -751,5 +752,32 @@ mod tests {
                 .unwrap();
             assert_eq!(artifact.digest, Digest::sha256(bytes).to_string());
         }
+    }
+
+    #[test]
+    fn materializes_only_the_selected_entry_tree_from_a_multi_component_workspace() {
+        let request = request(
+            vec![
+                (
+                    "src/Home.tsx",
+                    r#"@component("x-home") class Home extends Component { render() { return <main>Home</main>; } }"#,
+                ),
+                (
+                    "src/About.tsx",
+                    r#"@component("x-about") class About extends Component { render() { return <main>About</main>; } }"#,
+                ),
+            ],
+            "src/Home.tsx",
+        );
+
+        let product = build_application_publication_product_v1(
+            validate_application_publication_request_v1(request).unwrap(),
+        )
+        .unwrap();
+        let page =
+            String::from_utf8(product.artifacts[&PathBuf::from("index.html")].clone()).unwrap();
+
+        assert!(page.contains(">Home</main>"));
+        assert!(!page.contains(">About</main>"));
     }
 }

@@ -3,11 +3,25 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: R4-A - ergonomic development host
-* Working tree: R4-A implementation is ready for commit.
+* Latest completed slice: R3-C - entry-scoped publication materialization
+* Working tree: R3-C implementation is ready for commit.
 * Date: 2026-07-23
 
 Current Phase R slice
+
+* Slice: R3-C - Entry-Scoped Publication Materialization
+* Result: corrected the canonical Phase P application publication interpretation
+  so the selected compiler entry is the only top-level ordinary HTML tree that
+  may materialize. Complete-workspace metadata remains available for compiler
+  validation, but unrelated components cannot leak into a published page.
+  This is a production-correctness amendment to the frozen v1 behavior, not a
+  request/manifest schema change.
+* Verification: focused ordinary HTML and application-publication tests prove
+  entry-only materialization while preserving all existing P2/P3 publication
+  tests.
+* Next: build the compiler-owned multi-page file-route publication product on
+  top of this correct entry boundary; layout-chain composition remains a
+  separate lowering requirement.
 
 * Slice: R4-A - Ergonomic Development Host
 * Result: `presolve dev` now builds a discovered project through the same

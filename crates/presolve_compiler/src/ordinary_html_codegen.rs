@@ -33,6 +33,24 @@ struct SlotProjection<'a> {
 /// ordinary instance and J10 resume markers.
 #[must_use]
 pub fn generate_ordinary_instance_html(model: &ApplicationSemanticModel) -> String {
+    generate_ordinary_instance_html_for_roots(model, None)
+}
+
+/// Renders only the planned ordinary instance tree rooted at one compiler
+/// selected component. Application publication uses this entry-scoped form so
+/// unrelated top-level components cannot leak into an entry page.
+#[must_use]
+pub fn generate_ordinary_instance_html_for_component(
+    model: &ApplicationSemanticModel,
+    root_component: &crate::SemanticId,
+) -> String {
+    generate_ordinary_instance_html_for_roots(model, Some(root_component))
+}
+
+fn generate_ordinary_instance_html_for_roots(
+    model: &ApplicationSemanticModel,
+    root_component: Option<&crate::SemanticId>,
+) -> String {
     let registry = build_ordinary_template_instance_registry(model);
     let resume = build_resume_anchor_plan(model);
     let mut resume_markers = ResumeHtmlMarkers::default();
@@ -103,6 +121,7 @@ pub fn generate_ordinary_instance_html(model: &ApplicationSemanticModel) -> Stri
         .filter(|instance| {
             instance.parent_instance.is_none()
                 && instance.status == ComponentInstanceStatus::Planned
+                && root_component.is_none_or(|component| instance.component == *component)
         })
         .map(|instance| {
             render_instance(
@@ -651,7 +670,7 @@ fn escape_text(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::generate_ordinary_instance_html;
+    use super::{generate_ordinary_instance_html, generate_ordinary_instance_html_for_component};
     use crate::{
         build_application_semantic_model, build_resume_anchor_plan, validate_resume_marker_html,
     };
@@ -704,5 +723,26 @@ mod tests {
             validate_resume_marker_html(&resume, &html).is_empty(),
             "caller-owned Slot content must carry every required resume marker"
         );
+    }
+
+    #[test]
+    fn renders_only_the_selected_entry_component_tree() {
+        let model = build_application_semantic_model(&presolve_parser::parse_file(
+            "src/Entries.tsx",
+            r#"
+@component("x-home") class Home { render() { return <main>Home</main>; } }
+@component("x-about") class About { render() { return <main>About</main>; } }
+"#,
+        ));
+        let home = model
+            .components
+            .iter()
+            .find(|component| component.class_name == "Home")
+            .unwrap();
+
+        let html = generate_ordinary_instance_html_for_component(&model, &home.id);
+
+        assert!(html.contains("Home"));
+        assert!(!html.contains("About"));
     }
 }

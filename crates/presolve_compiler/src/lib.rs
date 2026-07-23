@@ -443,7 +443,9 @@ pub use module_graph::{
     build_module_graph, ModuleEdge, ModuleEdgeKind, ModuleGraph, ModuleNode, ModuleTarget,
 };
 pub use opaque::{OpaqueActionResolution, OpaqueActionResolutionOutcome, OpaqueTerminalBinding};
-pub use ordinary_html_codegen::generate_ordinary_instance_html;
+pub use ordinary_html_codegen::{
+    generate_ordinary_instance_html, generate_ordinary_instance_html_for_component,
+};
 pub use ordinary_template_instance::{
     build_ordinary_template_instance_registry, validate_ordinary_template_instance_registry,
     OrdinaryTemplateBindingKind, OrdinaryTemplateInstanceBindingRecord,

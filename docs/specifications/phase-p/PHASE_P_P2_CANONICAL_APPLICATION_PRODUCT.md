@@ -38,6 +38,13 @@ Production publication includes the canonical `production/` module layout;
 development publication does not. Both profiles retain the same compiler
 generated runtime/resume artifact family and never select an entry implicitly.
 
+The selected entry is also the sole ordinary HTML materialization root. Other
+top-level components in the complete workspace remain compiler semantic inputs
+and may appear in compiler metadata needed for whole-workspace validation, but
+they must not render into the selected entry page. This is a Phase R
+production-correctness amendment to the frozen v1 interpretation; it changes
+neither the request nor manifest schema.
+
 ## Host boundary
 
 This product has no filesystem side effect. P3 alone may stage exactly these
