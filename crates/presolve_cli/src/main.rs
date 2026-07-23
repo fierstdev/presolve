@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fmt::Write as _;
 use std::fs;
@@ -25,9 +25,10 @@ use presolve_compiler::{
     build_runtime_opaque_artifact_with_modules, build_runtime_resource_artifact_with_modules,
     build_semantic_graph, build_static_request_handoff_v1, build_template_graph,
     build_template_manifest_from_asm, build_validated_route_graph_v1, discover_project_v1,
-    embed_opaque_runtime_artifact, emit_production_modules, explain_json, explain_text,
-    extract_production_chunk_graph, fold_component_graph, generate_ordinary_instance_html,
-    generate_runtime_stub, generate_standalone_page_with_resume_runtime,
+    discover_semantic_packages_v1, embed_opaque_runtime_artifact, emit_production_modules,
+    explain_json, explain_text, extract_production_chunk_graph, fold_component_graph,
+    generate_ordinary_instance_html, generate_runtime_stub,
+    generate_standalone_page_with_resume_runtime,
     generate_standalone_page_with_resume_runtime_and_resources, generate_static_html,
     lower_components_to_ir, optimization_report_json, optimize_context_ir, optimize_effect_ir,
     production_runtime_artifact_json, project_production_diagnostics, project_resume_diagnostics,
@@ -143,6 +144,24 @@ fn run_ergonomic_build(root: &Path) {
     }
     let output_root = project.root.join("dist");
     validate_application_output_root(&output_root);
+    let discovery_unit = CompilationUnit::parse_sources(
+        project
+            .sources
+            .iter()
+            .map(|source| (source.logical_path.clone(), source.source.as_str())),
+    );
+    let package_specifiers = discovery_unit
+        .files()
+        .iter()
+        .flat_map(|file| file.imports.iter().map(|import| import.source.as_str()))
+        .filter(|source| !source.starts_with('.') && !source.starts_with('/'))
+        .map(str::to_owned)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let (package_contracts, package_runtime_modules) =
+        discover_semantic_packages_v1(&project.root, &package_specifiers)
+            .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
     let request = ApplicationPublicationRequestV1 {
         configuration: presolve_compiler::platform::WorkspaceConfiguration::default(),
         sources: project
@@ -154,8 +173,8 @@ fn run_ergonomic_build(root: &Path) {
             })
             .collect(),
         entry_path,
-        package_contracts: SemanticPackageResolutionTable::default(),
-        package_runtime_modules: SemanticPackageRuntimeModuleTable::default(),
+        package_contracts,
+        package_runtime_modules,
         profile: ApplicationPublicationProfileV1::Production,
         output_root: output_root.clone(),
     };

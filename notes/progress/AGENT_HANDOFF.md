@@ -3,11 +3,31 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N10-C - Phase N frozen
-* Working tree: N10-C freeze record is ready for commit.
+* Latest completed slice: R5-A - ergonomic semantic-package discovery
+* Working tree: R5-A implementation is ready for commit.
 * Date: 2026-07-23
 
-Last completed slice
+Current Phase R slice
+
+* Slice: R5-A - Ergonomic Semantic Package Discovery
+* Result: zero-argument `presolve build` now gathers bare package imports from
+  compiler-parsed discovered application sources and resolves only published
+  `node_modules/<specifier>/presolve.contract.json` metadata through the
+  compiler-owned semantic-package tables. Contracts must declare the exact
+  imported package and every runtime-module location must be a contained,
+  existing relative path. Invalid specifiers are never treated as filesystem
+  paths. The normal publication path remains the Phase P compiler request and
+  artifact product; no JavaScript package resolver, source interpreter, or
+  framework-side artifact adaptation was added.
+* Verification: focused compiler project-discovery tests prove deterministic
+  source discovery, scoped package resolution, and runtime-path containment.
+  The CLI fresh-project integration test proves `presolve build` discovers an
+  imported opaque package contract and publishes its canonical opaque runtime
+  artifact.
+* Next: continue R0-R3 with canonical layout convention and route conflict
+  diagnostics before advancing the simple development/deployment commands.
+
+Historical completed slices
 
 * Slice: N6-C14 - Compiler-Owned Resource Read Projections
 * Result: direct terminal same-owner `@computed()` Resource `.data`, `.error`, and `.state` projections now resolve to exact declaration identities, type as nullable data/error or lifecycle text, lower to `LoadResource`, and publish schema-v12 `load-resource` programs plus declaration-keyed invalidations. Activation records exist before the initial Computed pass; terminal endpoint states recompute only compiler-selected dependents and update ordinary bindings. Raw, optional, indexed, and chained Resource reads remain rejected. Resume fails closed with `ResourceComputedReadUnsupported` and canonically cold-boots until an explicit Resource snapshot codec exists.

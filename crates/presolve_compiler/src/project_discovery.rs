@@ -1,7 +1,7 @@
 //! Deterministic ergonomic project discovery for Phase R.
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use crate::platform::Digest;
 use crate::{
@@ -43,6 +43,9 @@ pub fn discover_semantic_packages_v1(
     let mut contracts = SemanticPackageResolutionTable::default();
     let mut modules = SemanticPackageRuntimeModuleTable::default();
     for specifier in specifiers {
+        if !is_npm_package_specifier(specifier) {
+            continue;
+        }
         let package_root = root.join("node_modules").join(specifier);
         let contract_path = package_root.join("presolve.contract.json");
         if !contract_path.is_file() {
@@ -58,7 +61,19 @@ pub fn discover_semantic_packages_v1(
                 code: "PSDISC1011_PACKAGE_CONTRACT_INVALID",
                 message: format!("{error:?}"),
             })?;
+        if contract.package != *specifier {
+            return Err(ProjectDiscoveryErrorV1 {
+                code: "PSDISC1014_PACKAGE_SPECIFIER_MISMATCH",
+                message: format!("{} declares package {}", specifier, contract.package),
+            });
+        }
         for export in contract.exports.values() {
+            if !is_contained_runtime_module_path(&export.runtime_module) {
+                return Err(ProjectDiscoveryErrorV1 {
+                    code: "PSDISC1015_PACKAGE_RUNTIME_PATH_INVALID",
+                    message: format!("{}: {}", specifier, export.runtime_module),
+                });
+            }
             let location = package_root.join(&export.runtime_module);
             if !location.is_file() {
                 return Err(ProjectDiscoveryErrorV1 {
@@ -89,6 +104,40 @@ pub fn discover_semantic_packages_v1(
             })?;
     }
     Ok((contracts, modules))
+}
+
+fn is_npm_package_specifier(specifier: &str) -> bool {
+    let segments = specifier.split('/').collect::<Vec<_>>();
+    match segments.as_slice() {
+        [name] => valid_package_name_segment(name, false),
+        [scope, name] => {
+            valid_package_name_segment(scope, true) && valid_package_name_segment(name, false)
+        }
+        _ => false,
+    }
+}
+
+fn valid_package_name_segment(value: &str, scoped: bool) -> bool {
+    let value = if scoped {
+        let Some(value) = value.strip_prefix('@') else {
+            return false;
+        };
+        value
+    } else {
+        value
+    };
+    !value.is_empty()
+        && value.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.')
+        })
+}
+
+fn is_contained_runtime_module_path(value: &str) -> bool {
+    let path = Path::new(value);
+    !path.is_absolute()
+        && path
+            .components()
+            .all(|component| matches!(component, Component::Normal(_)))
 }
 
 /// Discovers the default `app/` root, falling back to `src/`, in deterministic path order.
@@ -172,4 +221,108 @@ fn collect_sources(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    use super::{discover_project_v1, discover_semantic_packages_v1};
+    use crate::SemanticPackageRuntimeModuleKey;
+
+    static NEXT_TEMPORARY_PROJECT: AtomicU64 = AtomicU64::new(1);
+
+    fn temporary_project_root(label: &str) -> PathBuf {
+        let sequence = NEXT_TEMPORARY_PROJECT.fetch_add(1, Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!(
+            "presolve-project-discovery-{label}-{}-{sequence}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        root
+    }
+
+    #[test]
+    fn discovers_app_sources_in_deterministic_logical_path_order() {
+        let root = temporary_project_root("sources");
+        fs::create_dir_all(root.join("app/routes/blog")).unwrap();
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::write(root.join("app/routes/index.tsx"), "export class Home {}\n").unwrap();
+        fs::write(
+            root.join("app/routes/blog/post.tsx"),
+            "export class Post {}\n",
+        )
+        .unwrap();
+        fs::write(root.join("src/ignored.tsx"), "export class Ignored {}\n").unwrap();
+
+        let discovered = discover_project_v1(&root).unwrap();
+
+        assert_eq!(
+            discovered
+                .sources
+                .iter()
+                .map(|source| source.logical_path.to_string_lossy().into_owned())
+                .collect::<Vec<_>>(),
+            vec!["app/routes/blog/post.tsx", "app/routes/index.tsx"]
+        );
+        assert_eq!(
+            discovered.source_root,
+            std::fs::canonicalize(root.join("app")).unwrap()
+        );
+        assert!(!discovered.fingerprint.is_empty());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn resolves_only_exactly_named_contained_package_runtime_modules() {
+        let root = temporary_project_root("packages");
+        let package_root = root.join("node_modules/@acme/analytics");
+        fs::create_dir_all(package_root.join("dist")).unwrap();
+        fs::write(
+            package_root.join("dist/track.js"),
+            "export function track() {}\n",
+        )
+        .unwrap();
+        fs::write(
+            package_root.join("presolve.contract.json"),
+            r#"{"schema_version":1,"package":"@acme/analytics","version":"1.0.0","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"track":{"kind":"opaque","type_signature":"() -> void","runtime_module":"dist/track.js","resume_policy":"cold_fallback","opaque_terminal":{"execution_boundary":"client","resume":"cold_fallback"}}}}"#,
+        )
+        .unwrap();
+
+        let specifier = "@acme/analytics".to_string();
+        let (contracts, modules) =
+            discover_semantic_packages_v1(&root, &[specifier.clone()]).unwrap();
+
+        let contract = contracts.contract(&specifier).unwrap();
+        assert_eq!(contract.package, specifier);
+        assert_eq!(
+            modules.resolve(&SemanticPackageRuntimeModuleKey {
+                package: "@acme/analytics".into(),
+                version: "1.0.0".into(),
+                integrity: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+                runtime_module: "dist/track.js".into(),
+            }),
+            Some(package_root.join("dist/track.js").to_string_lossy().as_ref())
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rejects_contract_runtime_paths_that_escape_the_declared_package() {
+        let root = temporary_project_root("escape");
+        let package_root = root.join("node_modules/date-kit");
+        fs::create_dir_all(&package_root).unwrap();
+        fs::write(
+            package_root.join("presolve.contract.json"),
+            r#"{"schema_version":1,"package":"date-kit","version":"1.0.0","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"format":{"kind":"pure","type_signature":"(Date) -> string","runtime_module":"../outside.js","resume_policy":"input_only"}}}"#,
+        )
+        .unwrap();
+
+        let error = discover_semantic_packages_v1(&root, &["date-kit".into()]).unwrap_err();
+
+        assert_eq!(error.code, "PSDISC1015_PACKAGE_RUNTIME_PATH_INVALID");
+        fs::remove_dir_all(root).unwrap();
+    }
 }
