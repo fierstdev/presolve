@@ -46,3 +46,4 @@ numbered slice is accepted.
 * [N7-A Typed ARIA binding contract](PHASE_N_N7A_TYPED_ARIA_BINDING_CONTRACT.md)
 * [N8-A Capability matrix contract](PHASE_N_N8A_CAPABILITY_MATRIX_CONTRACT.md)
 * [N8-B Compatibility and migration contract](PHASE_N_N8B_COMPATIBILITY_MIGRATION_CONTRACT.md)
+* [N9 Opaque terminal Action contract](PHASE_N_N9_OPAQUE_TERMINAL_ACTION_CONTRACT.md)
