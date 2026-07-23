@@ -4,6 +4,7 @@
 //! spans, obvious declarations, and diagnostics. That gives the project a stable
 //! place to learn compiler fundamentals before choosing a real parser backend.
 
+pub mod application_publication;
 pub mod application_semantic_model;
 pub mod asm_validation;
 pub mod binding_table;
@@ -163,6 +164,10 @@ pub mod workspace;
 #[cfg(all(feature = "wasm", target_arch = "wasm32"))]
 mod wasm_binding;
 
+pub use application_publication::{
+    validate_application_publication_request_v1, ApplicationPublicationRequestErrorV1,
+    ApplicationPublicationRequestV1, ValidatedApplicationPublicationRequestV1,
+};
 pub use application_semantic_model::{
     build_application_semantic_model, build_application_semantic_model_for_unit,
     build_application_semantic_model_for_unit_with_packages,
