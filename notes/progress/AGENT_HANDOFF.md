@@ -3,8 +3,8 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N10-A - Phase N freeze and framework adoption
-* Working tree: N10-A is ready for final verification and commit.
+* Latest completed slice: N10-C - Phase N frozen
+* Working tree: N10-C freeze record is ready for commit.
 * Date: 2026-07-23
 
 Last completed slice
@@ -88,6 +88,11 @@ Last completed slice
 * Result: the N8 matrix/migration tests and verifier scripts now consume the registry state directly: admitted opaque terminals appear once in the human matrix and never in the deferred migration catalog. The obsolete deferred-only N0 verifier assertion was removed so the clean aggregate gate can replay current compiler truth.
 * Verification: focused CLI registry projection test, formatting, and diff checks pass.
 * Next: commit N10-B, replay the clean aggregate freeze matrix, and record its outcome before declaring Phase N frozen.
+
+* Slice: N10-C - Phase N Aggregate Freeze
+* Result: the clean N10 aggregate gate passes N0 registry, N8 matrix/migration, N9 opaque browser activation/malformed/cold-resume fallback, TypeScript 7.0 framework declaration, formatting, and clean-diff evidence. Phase N is frozen: the registry schema-v1 projections, admitted source forms, package terminal contract, artifact/runtime protocols, and framework conformance boundary are authoritative.
+* Verification: `./scripts/verify-n10-phase-n-freeze.sh` passes from a clean tree; the browser portion completed in 7.65 seconds.
+* Next: no Phase N source/runtime extension is authorized without a new numbered compiler contract and a corresponding registry/artifact/runtime/proof amendment.
 
 * Slice: N2-G - Compiler-Registered Math Rounding
 * Result: exact one-argument `Math.floor`, `Math.ceil`, and `Math.round` in supported Computed getters now resolve to compiler-registered unary operations, retain their operand dependencies, lower to canonical `Floor`/`Ceil`/`Round` IR, and execute only from schema-v11 computed-runtime instructions. No generic Math dispatch, overload, callback, alias, or authored JavaScript execution is admitted.

@@ -445,6 +445,11 @@ policy. Only then may the Presolve Framework expose the admitted Phase N forms
 through declarations and examples. Framework adoption is a conformance phase;
 it must not reimplement any new semantic family.
 
+**Completed:** N10-C freezes the registry schema-v1 projections, the exact
+admitted opaque terminal boundary, current artifact/runtime protocols, the
+pinned TypeScript 7.0 declaration surface, and the focused clean-tree
+verification matrix in `PHASE_N_N10_FREEZE_AND_FRAMEWORK_ADOPTION.md`.
+
 ## Required proof per capability
 
 Every Phase N admission requires positive/negative source fixtures, exact

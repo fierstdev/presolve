@@ -1,6 +1,6 @@
 # Phase N N10 freeze and framework adoption
 
-**Status:** freeze authority.
+**Status:** frozen by N10-C aggregate verification.
 
 Phase N freezes the compiler-owned semantic capability registry schema v1 and
 its JSON, human matrix, and migration projections. Admitted entries are the
