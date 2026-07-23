@@ -1640,11 +1640,10 @@ Phase N source form only after the compiler capability registry admits it and
 the unchanged canonical compiler path is proven. M10-A adds `@resource(...)`
 and `Resource<Data, Error>` with readonly `data`, `error`, and lifecycle-state
 projections; it adds no Resource runtime, package resolver, or mapping
-discovery. The fixture type-checks under TypeScript 7.0 and builds only through
-the explicit compiler package-contract/runtime-mapping inputs. Next: M10-B
-must classify every frozen Phase N capability as existing framework syntax,
-required declaration conformance, compiler/build-only input, or intentionally
-unavailable before any metaframework work begins.
+discovery. M10-B classifies every frozen registry entry and adds exact
+TypeScript typing for the admitted JSX aliases, accessibility attributes, and
+keyboard Action binding. Next: M10-C must freeze the aggregate M9/M10
+declaration and conformance evidence before any metaframework work begins.
 
 Useful commands
 
@@ -1675,4 +1674,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* M10-A Resource declaration/type conformance; commit pending.
+* M10-B Phase N JSX/capability classification conformance; commit pending.

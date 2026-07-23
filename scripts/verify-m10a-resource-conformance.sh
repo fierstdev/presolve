@@ -27,7 +27,12 @@ if [[ ! "$typescript_version" =~ (^|$'\n')Version\ 7\.0\.[0-9]+($|$'\n') ]]; the
 fi
 pnpm exec tsc --project "$fixture/tsconfig.json"
 
-cleanup() { rm -rf "$fixture/.presolve"; }
+cleanup() {
+  if test -d "$fixture/.presolve"; then
+    find "$fixture/.presolve" -depth -delete
+  fi
+}
+cleanup
 trap cleanup EXIT
 cargo run -q -p presolve-cli -- build "$fixture/src/Profile.tsx" \
   --package-contract "profile-service=$fixture/profile-service.contract.json" \

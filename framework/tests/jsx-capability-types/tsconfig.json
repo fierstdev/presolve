@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "jsx": "preserve",
+    "typeRoots": ["type-roots"],
+    "types": ["@presolve/framework-types"]
+  },
+  "files": ["src/AccessibilityPanel.tsx"]
+}

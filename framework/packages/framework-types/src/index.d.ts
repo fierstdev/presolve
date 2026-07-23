@@ -149,13 +149,46 @@ declare global {
     readonly __presolveSlotContentBrand: unique symbol;
   }
 
+  /** A compiler-recognized, zero-argument Action event binding. */
+  type PresolveActionEventHandler = () => unknown;
+
+  /**
+   * The bounded intrinsic attributes with a currently admitted compiler type
+   * contract. The index signature deliberately leaves all remaining JSX
+   * attribute admission to the compiler rather than creating a parallel DOM
+   * vocabulary in the framework.
+   */
+  interface PresolveIntrinsicAttributes {
+    class?: string;
+    className?: string;
+    for?: string;
+    htmlFor?: string;
+    role?: string;
+    "aria-label"?: string;
+    "aria-describedby"?: string;
+    "aria-errormessage"?: string;
+    "aria-controls"?: string;
+    "aria-current"?: string;
+    "aria-live"?: string;
+    "aria-invalid"?: boolean;
+    "aria-busy"?: boolean;
+    "aria-expanded"?: boolean;
+    "aria-pressed"?: boolean;
+    "aria-hidden"?: boolean;
+    onClick?: PresolveActionEventHandler;
+    onKeydown?: PresolveActionEventHandler;
+    form?: Form;
+    field?: unknown;
+    key?: string | number;
+    slot?: string;
+    [attributeName: string]: unknown;
+  }
+
   namespace JSX {
     type Element = unknown;
 
     interface IntrinsicElements {
-      [elementName: string]: {
-        [attributeName: string]: unknown;
-      };
+      [elementName: string]: PresolveIntrinsicAttributes;
     }
   }
 }
