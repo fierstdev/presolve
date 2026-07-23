@@ -44,6 +44,7 @@ pub mod effect_inspection;
 pub mod effect_resume;
 pub mod explain;
 pub mod expression_graph;
+pub mod file_route_publication;
 pub mod form;
 pub mod form_binding;
 pub mod form_diagnostics;
@@ -334,6 +335,13 @@ pub use effect_resume::{
 };
 pub use explain::{explain_json, explain_text};
 pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
+pub use file_route_publication::{
+    build_file_route_publication_v1, file_route_artifact_root_v1,
+    file_route_publication_manifest_json_v1, resolve_file_route_request_v1,
+    FileRoutePublicationErrorV1, FileRoutePublicationManifestV1, FileRoutePublicationProductV1,
+    FileRoutePublicationRequestV1, FileRoutePublicationRouteV1, FileRouteRequestTargetV1,
+    FILE_ROUTE_PUBLICATION_COMPILER_CONTRACT_V1, FILE_ROUTE_PUBLICATION_MANIFEST_SCHEMA_VERSION,
+};
 pub use form::{collect_form_entities, FormEntity};
 pub use form_binding::{
     collect_form_field_binding_products, FormControlChannel, FormControlCompatibility,

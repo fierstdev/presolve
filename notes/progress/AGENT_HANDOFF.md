@@ -3,11 +3,25 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: R3-C - entry-scoped publication materialization
-* Working tree: R3-C implementation is ready for commit.
+* Latest completed slice: R3-D - compiler multi-route publication product
+* Working tree: R3-D implementation is ready for commit.
 * Date: 2026-07-23
 
 Current Phase R slice
+
+* Slice: R3-D - Compiler Multi-Route Publication Product
+* Result: added a compiler-owned `FileRoutePublicationRequestV1`/product that
+  lowers every validated discovered page through the existing entry-scoped
+  publication path, namespaces exact artifacts per route, and emits a digest
+  inventory with route/layout ownership. The compiler additionally owns route
+  request resolution, including trailing-slash redirects, dynamic parameters,
+  static precedence, and contained asset paths.
+* Verification: focused compiler fixtures prove distinct page outputs and
+  request-to-artifact resolution. The CLI has not yet adopted this product;
+  that is the immediate next slice.
+* Next: replace the current one-entry ergonomic build/dev path with this exact
+  compiler product and request resolver, then define layout composition rather
+  than treating the recorded chain as rendered output.
 
 * Slice: R3-C - Entry-Scoped Publication Materialization
 * Result: corrected the canonical Phase P application publication interpretation
