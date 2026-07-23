@@ -58,6 +58,27 @@ pub fn dom_binding_contract(name: &str) -> Option<DomBindingContract> {
             kind: DomBindingKind::Attribute,
             semantic_type: SemanticType::String,
         }),
+        "aria-label" | "aria-describedby" | "aria-live" => Some(DomBindingContract {
+            name: match name {
+                "aria-label" => "aria-label",
+                "aria-describedby" => "aria-describedby",
+                _ => "aria-live",
+            },
+            kind: DomBindingKind::Attribute,
+            semantic_type: SemanticType::String,
+        }),
+        "aria-invalid" | "aria-busy" | "aria-expanded" | "aria-pressed" => {
+            Some(DomBindingContract {
+                name: match name {
+                    "aria-invalid" => "aria-invalid",
+                    "aria-busy" => "aria-busy",
+                    "aria-expanded" => "aria-expanded",
+                    _ => "aria-pressed",
+                },
+                kind: DomBindingKind::Attribute,
+                semantic_type: SemanticType::Boolean,
+            })
+        }
         "value" => Some(DomBindingContract {
             name: "value",
             kind: DomBindingKind::Property,
@@ -2945,16 +2966,31 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::{
-        boundary_compatibility, is_assignable, normalize_semantic_type, operator_result_type,
-        serialization_compatibility, BoundaryCompatibility, ExecutionBoundary, ObjectType,
-        ResourceExecutionBoundary, ResourceType, SemanticOperator, SemanticType,
-        SemanticTypeAssignment, SemanticTypeId, SemanticTypeStatus, SerializationCompatibility,
-        TypeDiagnosticCode, TypeDiagnosticFamily,
+        boundary_compatibility, dom_binding_contract, is_assignable, normalize_semantic_type,
+        operator_result_type, serialization_compatibility, BoundaryCompatibility,
+        ExecutionBoundary, ObjectType, ResourceExecutionBoundary, ResourceType, SemanticOperator,
+        SemanticType, SemanticTypeAssignment, SemanticTypeId, SemanticTypeStatus,
+        SerializationCompatibility, TypeDiagnosticCode, TypeDiagnosticFamily,
     };
     use crate::{
         component_graph::UnaryOperator, ArithmeticOperator, ComparisonOperator, LogicalOperator,
         SemanticId, SourceProvenance,
     };
+
+    #[test]
+    fn defines_typed_accessibility_attribute_bindings() {
+        assert_eq!(
+            dom_binding_contract("aria-invalid").unwrap().semantic_type,
+            SemanticType::Boolean
+        );
+        assert_eq!(
+            dom_binding_contract("aria-describedby")
+                .unwrap()
+                .semantic_type,
+            SemanticType::String
+        );
+        assert!(dom_binding_contract("aria-owns").is_none());
+    }
 
     #[test]
     fn represents_core_compiler_owned_type_forms() {

@@ -378,6 +378,10 @@ silently creating server actions, routing loaders, or a generic client runtime.
 
 ### N7 — production-grade forms and browser integration
 
+N7-A is complete: bounded compiler-owned dynamic ARIA bindings now carry exact
+boolean or string type contracts through the existing template/runtime
+attribute path. This adds no DOM-discovery or accessibility runtime authority.
+
 Build on the frozen Form model with nested value paths, richer native control
 sets, reusable compiler-defined validators, field arrays with stable identity,
 focus/selection capabilities where statically anchored, and explicit

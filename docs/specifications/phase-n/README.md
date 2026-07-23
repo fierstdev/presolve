@@ -39,3 +39,4 @@ numbered slice is accepted.
 * [N6-C10 Resource browser activation contract](PHASE_N_N6C10_RESOURCE_BROWSER_ACTIVATION_CONTRACT.md)
 * [N6-C11 Resource CLI runtime mapping contract](PHASE_N_N6C11_RESOURCE_CLI_RUNTIME_MAPPING_CONTRACT.md)
 * [N6-C12 Resource cancellation lifecycle contract](PHASE_N_N6C12_RESOURCE_CANCELLATION_LIFECYCLE_CONTRACT.md)
+* [N7-A Typed ARIA binding contract](PHASE_N_N7A_TYPED_ARIA_BINDING_CONTRACT.md)
