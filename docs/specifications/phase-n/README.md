@@ -16,3 +16,4 @@ numbered slice is accepted.
 * [N2-E compiler-registered Math.abs contract](PHASE_N_N2E_BUILTIN_MATH_ABS_CONTRACT.md)
 * [N3-A serializable State replacement contract](PHASE_N_N3A_SERIALIZABLE_STATE_REPLACEMENT_CONTRACT.md)
 * [N4-A keyed structural list contract](PHASE_N_N4A_KEYED_STRUCTURAL_LIST_CONTRACT.md)
+* [N6 Resource foundation contract](PHASE_N_N6_RESOURCE_FOUNDATION_CONTRACT.md)
