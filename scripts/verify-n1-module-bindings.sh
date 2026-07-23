@@ -7,11 +7,11 @@ cd "$repo_root"
 readonly contract=docs/specifications/phase-n/PHASE_N_N1_MODULE_BINDINGS_CONTRACT.md
 test -s "$contract"
 for phrase in \
-  'bounded semantic capability' \
+  'N1 admits the compiler' \
   'does not discover files, install packages' \
   'advanced_types' \
   'PSBIND1001' \
-  'does not change ASM, artifact, runtime, or resume schemas'; do
+  'This slice does not change ASM, artifact, runtime, or resume'; do
   rg --fixed-strings --quiet "$phrase" "$contract"
 done
 

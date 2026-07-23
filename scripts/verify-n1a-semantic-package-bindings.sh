@@ -7,7 +7,7 @@ cd "$repo_root"
 readonly contract=docs/specifications/phase-n/PHASE_N_N1A_SEMANTIC_PACKAGE_CONTRACT.md
 test -s "$contract"
 for phrase in \
-  'does not inspect package source' \
+  'N1-A admits **semantic package bindings**' \
   'PSBIND1009' \
   'PSBIND1010' \
   'Namespace package imports and package re-exports are not admitted' \

@@ -24,10 +24,11 @@ in N1-A.
 * one or more non-empty export names, each with a semantic `kind`, non-empty
   `type_signature`, `runtime_module`, and `resume_policy`.
 
-The supported declared kinds are `pure`, `capability`, `resource`, `codec`, and
-`component`. They describe the public export only; the declaration never grants
-hidden State mutation, dynamic dependency discovery, DOM ownership, hydration,
-or resumability.
+The supported declared kinds are `pure`, `capability`, `resource`, `codec`,
+`component`, and `opaque`. They describe the public export only; the
+declaration never grants hidden State mutation, dynamic dependency discovery,
+DOM ownership, hydration, or resumability. The `opaque` kind has its own closed
+N9 terminal contract and cannot be used as a general package call.
 
 The table rejects duplicate specifiers without replacing the original
 resolution. Unknown schema fields, unsupported schema versions, incomplete
@@ -49,11 +50,12 @@ reports `PSBIND1009` for every external import.
 
 ## Deliberate next boundary
 
-N1-A does **not** make calling an imported package export compiler-native.
-Binding a `pure`, `capability`, `resource`, `codec`, or `component` symbol is
-not proof of its expression, lifecycle, serialization, runtime, or resume
-semantics. N1-A2 must admit each usable semantic kind through the full compiler
-path: source use, type/boundary validation, dependency/lifecycle analysis, IR,
-artifact/runtime/resume representation, canonical diagnostics, and browser
-evidence. Until then, executable package use remains rejected rather than
-silently becoming generic JavaScript.
+N1-A does **not** make arbitrary calls to an imported package export
+compiler-native. Binding a `pure`, `capability`, `resource`, `codec`, or
+`component` symbol is not proof of its expression, lifecycle, serialization,
+runtime, or resume semantics. N1-A2 must admit each usable semantic kind
+through the full compiler path: source use, type/boundary validation,
+dependency/lifecycle analysis, IR, artifact/runtime/resume representation,
+canonical diagnostics, and browser evidence. N9 separately admits only its
+closed no-input `opaque` terminal Action; all other executable package use
+remains rejected rather than silently becoming generic JavaScript.
