@@ -54,6 +54,28 @@ pub fn build_route_graph(model: &ApplicationSemanticModel) -> RouteGraph {
     }
 }
 
+/// Builds the ergonomic route graph: explicit `@route()` wins, otherwise an
+/// `app/routes/**/*.tsx` component derives its path from its module path.
+#[must_use]
+pub fn build_file_route_graph_v1(model: &ApplicationSemanticModel) -> RouteGraph {
+    RouteGraph {
+        routes: model
+            .components
+            .iter()
+            .filter_map(|component| {
+                component
+                    .route_path
+                    .clone()
+                    .or_else(|| file_route_path(&component.module_path))
+                    .map(|path| RouteNode {
+                        path,
+                        component: component.id.clone(),
+                    })
+            })
+            .collect(),
+    }
+}
+
 /// Produces the deterministic static route product accepted by Phase Q Q1.
 ///
 /// # Errors
@@ -240,6 +262,30 @@ fn is_static_route_path(path: &str) -> bool {
         && path.split('/').all(|segment| !segment.contains(".."))
 }
 
+fn file_route_path(path: &std::path::Path) -> Option<String> {
+    let values = path
+        .components()
+        .map(|component| component.as_os_str().to_str())
+        .collect::<Option<Vec<_>>>()?;
+    let index = values.iter().position(|value| *value == "routes")?;
+    if values.get(index.checked_sub(1)?)? != &"app" {
+        return None;
+    }
+    let mut segments = values[index + 1..].to_vec();
+    let filename = segments.pop()?;
+    let stem = filename
+        .strip_suffix(".tsx")
+        .or_else(|| filename.strip_suffix(".ts"))?;
+    if stem != "index" {
+        segments.push(stem);
+    }
+    Some(if segments.is_empty() {
+        "/".into()
+    } else {
+        format!("/{}", segments.join("/"))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -260,5 +306,16 @@ mod tests {
             vec!["/", "/about"]
         );
         assert!(route_manifest_json_v1(&route_manifest_v1(&graph)).contains("schema_version"));
+    }
+
+    #[test]
+    fn derives_file_routes_and_keeps_explicit_route_override() {
+        let source =
+            r#"@component() class Home extends Component { render() { return <main />; } }"#;
+        let model = build_application_semantic_model(&parse_file("app/routes/index.tsx", source));
+        assert_eq!(build_file_route_graph_v1(&model).routes[0].path, "/");
+        let source = r#"@route("/welcome") @component() class Home extends Component { render() { return <main />; } }"#;
+        let model = build_application_semantic_model(&parse_file("app/routes/index.tsx", source));
+        assert_eq!(build_file_route_graph_v1(&model).routes[0].path, "/welcome");
     }
 }
