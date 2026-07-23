@@ -246,6 +246,15 @@ spread updates, collection callbacks, event payload projection, locals, early
 returns, or async Actions; each requires its own compiler/lowering/runtime
 contract.
 
+#### N3-B — static Action parameters
+
+Admit a declared primitive Action parameter only when an exact compiler-known
+event callback supplies serializable literal arguments and the Action assigns
+that parameter to a complete State field. The compiler must carry the argument
+list through the ordinary-instance plan, manifest, runtime artifact, and one
+completed Action batch. Browser payload projection, dynamic captures, object
+parameters, and arbitrary callback execution remain separate capabilities.
+
 Allow State fields to hold structurally serializable records, arrays, optional
 values, and discriminated unions. Add compiler-recognized immutable updates,
 safe indexed updates, and bounded collection operations. Define alias and

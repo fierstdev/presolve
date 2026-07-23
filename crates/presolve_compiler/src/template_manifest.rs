@@ -12,7 +12,7 @@ use crate::{
     ApplicationSemanticModel, IrStorageId, OrdinaryTemplateBindingKind, OrdinaryTemplateTargetKind,
 };
 
-pub const TEMPLATE_MANIFEST_SCHEMA_VERSION: u32 = 4;
+pub const TEMPLATE_MANIFEST_SCHEMA_VERSION: u32 = 5;
 const LEGACY_TEMPLATE_MANIFEST_SCHEMA_VERSION: u32 = 1;
 const ACTION_TEMPLATE_MANIFEST_SCHEMA_VERSION: u32 = 2;
 
@@ -84,6 +84,8 @@ pub struct ManifestOrdinaryEvent {
     pub event_type: String,
     pub handler_method_id: String,
     pub action_batch_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub arguments: Vec<SerializableValue>,
     pub program_id: String,
 }
 
@@ -186,6 +188,8 @@ pub struct ManifestEvent {
     pub kind: Option<ManifestEventKind>,
     pub event: String,
     pub handler: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub arguments: Vec<SerializableValue>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub method_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -229,6 +233,9 @@ pub enum ManifestOperation {
 
     #[serde(rename = "assign")]
     Assign,
+
+    #[serde(rename = "assign_parameter")]
+    AssignParameter,
 
     #[serde(rename = "toggle")]
     Toggle,
@@ -323,6 +330,7 @@ pub fn build_template_manifest_from_asm(model: &ApplicationSemanticModel) -> Tem
                 event_type: event.event_type.clone(),
                 handler_method_id: event.handler_method_id.to_string(),
                 action_batch_id: event.action_batch_id.as_ref().map(ToString::to_string),
+                arguments: event.arguments.clone(),
                 program_id: event.existing_event_program_identity.to_string(),
             })
             .collect(),
@@ -707,7 +715,20 @@ fn manifest_actions(component: &ComponentNode) -> Vec<ManifestAction> {
             operation: manifest_operation(&action.operation),
             field: action.field.clone(),
             storage_id: None,
-            operand: manifest_operand(&action.operation),
+            operand: match &action.operation {
+                StateOperation::AssignParameter(parameter) => component
+                    .methods
+                    .iter()
+                    .find(|method| method.name == action.method)
+                    .and_then(|method| {
+                        method
+                            .parameters
+                            .iter()
+                            .position(|item| item.name == *parameter)
+                    })
+                    .map(|index| SerializableValue::Number(index.to_string())),
+                _ => manifest_operand(&action.operation),
+            },
         })
         .collect()
 }
@@ -719,6 +740,7 @@ fn manifest_operation(operation: &StateOperation) -> ManifestOperation {
         StateOperation::AddAssign(_) => ManifestOperation::AddAssign,
         StateOperation::SubtractAssign(_) => ManifestOperation::SubtractAssign,
         StateOperation::Assign(_) => ManifestOperation::Assign,
+        StateOperation::AssignParameter(_) => ManifestOperation::AssignParameter,
         StateOperation::Toggle => ManifestOperation::Toggle,
     }
 }
@@ -729,6 +751,7 @@ fn manifest_operand(operation: &StateOperation) -> Option<SerializableValue> {
         StateOperation::AddAssign(value)
         | StateOperation::SubtractAssign(value)
         | StateOperation::Assign(value) => Some(value.clone()),
+        StateOperation::AssignParameter(_) => None,
     }
 }
 
@@ -744,12 +767,17 @@ fn collect_element(
 
     for attribute in &element.attributes {
         match &attribute.value {
-            AttributeValue::EventHandler { event, handler } => {
+            AttributeValue::EventHandler {
+                event,
+                handler,
+                arguments,
+            } => {
                 events.push(ManifestEvent {
                     node: element.id.0.clone(),
                     kind: None,
                     event: event.clone(),
                     handler: handler.clone(),
+                    arguments: arguments.clone(),
                     method_id: None,
                     action_batch_id: None,
                 });

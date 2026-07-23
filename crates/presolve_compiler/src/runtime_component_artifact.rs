@@ -8,7 +8,7 @@ use crate::{
     RuntimeComponentRegistry, SerializationCompatibility,
 };
 
-pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 3;
+pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 4;
 
 /// Public H14 compiler artifact. All executable references are canonical IDs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -98,6 +98,8 @@ pub struct SerializedOrdinaryTemplateEvent {
     pub event_type: String,
     pub handler_method_id: String,
     pub action_batch_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub arguments: Vec<crate::component_graph::SerializableValue>,
     pub program_id: String,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -218,6 +220,7 @@ pub fn build_runtime_component_artifact(
             event_type: event.event_type.clone(),
             handler_method_id: event.handler_method_id.to_string(),
             action_batch_id: event.action_batch_id.as_ref().map(ToString::to_string),
+            arguments: event.arguments.clone(),
             program_id: event.existing_event_program_identity.to_string(),
         })
         .collect();

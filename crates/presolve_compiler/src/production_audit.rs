@@ -168,8 +168,8 @@ mod tests {
     #[test]
     fn k20_preserves_every_frozen_schema_and_phase_k_v1_product() {
         assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 6);
-        assert_eq!(TEMPLATE_MANIFEST_SCHEMA_VERSION, 4);
-        assert_eq!(RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION, 3);
+        assert_eq!(TEMPLATE_MANIFEST_SCHEMA_VERSION, 5);
+        assert_eq!(RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION, 4);
         assert_eq!(RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, 2);
         assert_eq!(RUNTIME_FORM_ARTIFACT_SCHEMA_VERSION, 1);
         assert_eq!(RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION, 1);

@@ -1779,6 +1779,87 @@ class Counter extends Component {
     }
 
     #[test]
+    fn component_graph_validates_static_action_parameter_bindings() {
+        let source = r#"
+@component("x-parameterized")
+class Parameterized extends Component {
+  label = state("Ready");
+
+  @action() setLabel(value: string) {
+    this.label = value;
+  }
+
+  render() {
+    return <button onClick={() => this.setLabel(1)}>{this.label}</button>;
+  }
+}
+"#;
+
+        let parsed = presolve_parser::parse_file("Parameterized.tsx", source);
+        let graph = build_component_graph(&parsed);
+        let codes = graph
+            .diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.code.as_str())
+            .collect::<Vec<_>>();
+
+        assert!(codes.contains(&"PSC1043"));
+        assert!(!codes.contains(&"PSC1041"));
+        assert!(!codes.contains(&"PSC1042"));
+    }
+
+    #[test]
+    fn component_graph_rejects_unbound_action_parameters() {
+        let source = r#"
+@component("x-parameterized")
+class Parameterized extends Component {
+  label = state("Ready");
+
+  @action() setLabel(value: string) {
+    this.label = value;
+  }
+
+  render() {
+    return <button onClick={this.setLabel}>{this.label}</button>;
+  }
+}
+"#;
+
+        let parsed = presolve_parser::parse_file("UnboundParameterized.tsx", source);
+        let graph = build_component_graph(&parsed);
+
+        assert!(graph
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "PSC1042"));
+    }
+
+    #[test]
+    fn component_graph_requires_action_decorator_for_parameter_state_assignment() {
+        let source = r#"
+@component("x-parameterized")
+class Parameterized extends Component {
+  label = state("Ready");
+
+  setLabel(value: string) {
+    this.label = value;
+  }
+
+  render() {
+    return <button onClick={() => this.setLabel("Locked")}>{this.label}</button>;
+  }
+}
+"#;
+
+        let parsed = presolve_parser::parse_file("UndecoratedParameterized.tsx", source);
+        let graph = build_component_graph(&parsed);
+
+        assert!(graph.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == "PSC1041" && diagnostic.message.contains("requires @action()")
+        }));
+    }
+
+    #[test]
     fn component_graph_reports_duplicate_event_errors() {
         let parsed = presolve_parser::ParsedFile {
             path: "DuplicateEvent.tsx".into(),
@@ -1822,11 +1903,13 @@ class Counter extends Component {
                                 presolve_parser::ParsedEventHandler {
                                     event: "click".to_string(),
                                     handler: "this.render".to_string(),
+                                    arguments: Vec::new(),
                                     span: test_span(),
                                 },
                                 presolve_parser::ParsedEventHandler {
                                     event: "click".to_string(),
                                     handler: "this.render".to_string(),
+                                    arguments: Vec::new(),
                                     span: test_span(),
                                 },
                             ],
@@ -2561,6 +2644,7 @@ class BadAttrs extends Component {
             AttributeValue::EventHandler {
                 event: "click".to_string(),
                 handler: "this.increment".to_string(),
+                arguments: Vec::new(),
             }
         );
 
@@ -3182,6 +3266,7 @@ class Beta extends Component {
                 kind: None,
                 event: "click".to_string(),
                 handler: "this.increment".to_string(),
+                arguments: Vec::new(),
                 method_id: None,
                 action_batch_id: None,
             }]

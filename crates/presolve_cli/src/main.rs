@@ -3687,6 +3687,7 @@ fn format_state_operation(operation: &StateOperation) -> &'static str {
         StateOperation::AddAssign(_) => "add-assign",
         StateOperation::SubtractAssign(_) => "subtract-assign",
         StateOperation::Assign(_) => "assign",
+        StateOperation::AssignParameter(_) => "assign-parameter",
         StateOperation::Toggle => "toggle",
     }
 }
@@ -4027,7 +4028,7 @@ fn format_attribute_value(value: &AttributeValue) -> String {
             id.0,
             format_serializable_value(initial_value.as_ref())
         ),
-        AttributeValue::EventHandler { event, handler } => {
+        AttributeValue::EventHandler { event, handler, .. } => {
             format!("event-handler({event} -> {handler})")
         }
         AttributeValue::BindingList(bindings) => format!("bindings({})", bindings.join(", ")),

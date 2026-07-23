@@ -11,7 +11,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const RESUME_SNAPSHOT_ELEMENT_ID = "presolve-resume-snapshot";
   const PRODUCTION_RUNTIME_ELEMENT_ID = "presolve-production-runtime";
   const RUNTIME_VERSION = "0.0.0";
-  const SUPPORTED_SCHEMA_VERSION = 4;
+  const SUPPORTED_SCHEMA_VERSION = 5;
   const ACTION_MANIFEST_SCHEMA_VERSION = 2;
   const FORMS_MANIFEST_SCHEMA_VERSION = 3;
   const LEGACY_MANIFEST_SCHEMA_VERSION = 1;
@@ -2166,10 +2166,11 @@ const RUNTIME_STUB: &str = r#"(() => {
       return;
     }
 
-      eventsByNode.set(event.node, {
-        component,
+    eventsByNode.set(event.node, {
+      component,
       action_batch_id: event.action_batch_id,
-      actions: actionRecord.actions
+      actions: actionRecord.actions,
+      arguments: Array.isArray(event.arguments) ? event.arguments : []
     });
     store.eventsByType.set(event.event, eventsByNode);
   }
@@ -2342,13 +2343,14 @@ const RUNTIME_STUB: &str = r#"(() => {
     return null;
   }
 
-  function executeAction(store, component, action) {
+  function executeAction(store, component, action, executionContext = null) {
     if (
       action.operation !== "increment" &&
       action.operation !== "decrement" &&
       action.operation !== "add_assign" &&
       action.operation !== "subtract_assign" &&
       action.operation !== "assign" &&
+      action.operation !== "assign_parameter" &&
       action.operation !== "toggle"
     ) {
       reportDiagnostic(
@@ -2382,6 +2384,17 @@ const RUNTIME_STUB: &str = r#"(() => {
       return;
     }
 
+    if (action.operation === "assign_parameter") {
+      const parameterIndex = Number(action.operand);
+      const value = executionContext?.arguments?.[parameterIndex];
+      if (value === undefined || !Number.isInteger(parameterIndex)) {
+        reportDiagnostic(store.diagnostics, "PSR_INVALID_STATE_OPERATION", "Action parameter assignment had no compiler-projected argument", action);
+        return;
+      }
+      writeField(store, component, action.field, value, action.storage_id);
+      return;
+    }
+
     const current = Number(readField(store, component, action.field, action.storage_id));
 
     if (Number.isNaN(current)) {
@@ -2409,7 +2422,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
     try {
       for (const action of actions) {
-        executeAction(store, component, action);
+        executeAction(store, component, action, executionContext);
       }
 
       executeComputedUpdateBatches(store);
@@ -2461,7 +2474,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       return;
     }
 
-    executeActions(store, record.component, record.action_batch_id, record.actions);
+    executeActions(store, record.component, record.action_batch_id, record.actions, { arguments: record.arguments });
   }
 
   function installDelegatedEventListeners(store) {
@@ -2642,7 +2655,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     for (const event of manifest.ordinary_events ?? []) {
       const key = ordinaryEventKey(event.instance_target_id, event.event_type);
       const artifactEvent = artifactEvents.get(key);
-      if (artifactEvent === undefined || artifactEvent.component_instance_id !== event.component_instance_id || store.ordinaryEventsByTargetAndType.has(key)) {
+      if (
+        artifactEvent === undefined
+        || artifactEvent.component_instance_id !== event.component_instance_id
+        || JSON.stringify(artifactEvent.arguments ?? []) !== JSON.stringify(event.arguments ?? [])
+        || store.ordinaryEventsByTargetAndType.has(key)
+      ) {
         throw new PresolveBootError("PSR_INVALID_ORDINARY_EVENT");
       }
       store.ordinaryEventsByTargetAndType.set(key, event);
@@ -2709,7 +2727,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       component_instance_id: record.component_instance_id,
       trigger_target_id: record.instance_target_id,
       declaration_event_id: record.declaration_event_id,
-      action_batch_id: record.action_batch_id
+      action_batch_id: record.action_batch_id,
+      arguments: Array.isArray(record.arguments) ? record.arguments : []
     };
     executeActions(store, component, record.action_batch_id, actionRecord.actions, context);
   }
@@ -3881,7 +3900,7 @@ mod tests {
         assert!(runtime.contains("executeContextUpdates(store, actionBatchId)"));
         assert!(runtime.contains("contextSlots: new Map()"));
         assert!(runtime.contains("RUNTIME_VERSION = \"0.0.0\""));
-        assert!(runtime.contains("SUPPORTED_SCHEMA_VERSION = 4"));
+        assert!(runtime.contains("SUPPORTED_SCHEMA_VERSION = 5"));
         assert!(runtime.contains("SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 10"));
         assert!(runtime.contains("case \"abs\""));
         assert!(runtime.contains("instruction.kind === \"select\""));

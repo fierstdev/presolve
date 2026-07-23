@@ -467,6 +467,7 @@ pub enum ParsedStateOperation {
     AddAssign(ParsedSerializableValue),
     SubtractAssign(ParsedSerializableValue),
     Assign(ParsedSerializableValue),
+    AssignParameter(String),
     Toggle,
 }
 
@@ -551,6 +552,7 @@ pub enum ParsedJsxAttributeValue {
 pub struct ParsedEventHandler {
     pub event: String,
     pub handler: String,
+    pub arguments: Vec<ParsedSerializableValue>,
     pub span: SourceSpan,
 }
 

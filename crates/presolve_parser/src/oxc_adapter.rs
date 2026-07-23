@@ -1376,7 +1376,14 @@ fn parsed_assignment_state_update(
         "=" if toggled_this_field(&assignment.right).as_deref() == Some(field.as_str()) => {
             ParsedStateOperation::Toggle
         }
-        "=" => ParsedStateOperation::Assign(serializable_value_from_expression(&assignment.right)?),
+        "=" => match &assignment.right {
+            Expression::Identifier(identifier) => {
+                ParsedStateOperation::AssignParameter(identifier.name.to_string())
+            }
+            expression => {
+                ParsedStateOperation::Assign(serializable_value_from_expression(expression)?)
+            }
+        },
         _ => return None,
     };
 
@@ -2259,11 +2266,12 @@ fn jsx_event_handler(attribute: &JSXAttributeItem<'_>, source: &str) -> Option<P
         return None;
     };
 
-    let handler = jsx_expression_event_handler_ref(&container.expression)?;
+    let (handler, arguments) = jsx_expression_event_handler_ref(&container.expression)?;
 
     Some(ParsedEventHandler {
         event,
         handler,
+        arguments,
         span: source_span(source, attribute.span),
     })
 }
@@ -2282,12 +2290,16 @@ fn jsx_event_type(attribute_name: &str) -> Option<String> {
     Some(format!("{first}{rest}"))
 }
 
-fn jsx_expression_event_handler_ref(expression: &JSXExpression<'_>) -> Option<String> {
+fn jsx_expression_event_handler_ref(
+    expression: &JSXExpression<'_>,
+) -> Option<(String, Vec<ParsedSerializableValue>)> {
     let expression = expression.as_expression()?;
     expression_event_handler_ref(expression)
 }
 
-fn expression_event_handler_ref(expression: &Expression<'_>) -> Option<String> {
+fn expression_event_handler_ref(
+    expression: &Expression<'_>,
+) -> Option<(String, Vec<ParsedSerializableValue>)> {
     match expression {
         Expression::ArrowFunctionExpression(arrow) => {
             for statement in &arrow.body.statements {
@@ -2300,7 +2312,16 @@ fn expression_event_handler_ref(expression: &Expression<'_>) -> Option<String> {
 
             None
         }
-        Expression::CallExpression(call) => expression_summary(&call.callee),
+        Expression::CallExpression(call) => Some((
+            expression_summary(&call.callee)?,
+            call.arguments
+                .iter()
+                .map(|argument| serializable_value_from_expression(argument.as_expression()?))
+                .collect::<Option<Vec<_>>>()?,
+        )),
+        Expression::StaticMemberExpression(_) => {
+            Some((expression_summary(expression)?, Vec::new()))
+        }
         _ => None,
     }
 }

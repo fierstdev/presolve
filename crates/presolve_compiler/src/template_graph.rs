@@ -76,6 +76,7 @@ pub enum AttributeValue {
     EventHandler {
         event: String,
         handler: String,
+        arguments: Vec<SerializableValue>,
     },
     BindingList(Vec<String>),
 }
@@ -363,6 +364,7 @@ fn template_attributes(
             value: AttributeValue::EventHandler {
                 event: event_handler.event.clone(),
                 handler: event_handler.handler.clone(),
+                arguments: event_handler.arguments.clone(),
             },
             span: Some(event_handler.span),
         });

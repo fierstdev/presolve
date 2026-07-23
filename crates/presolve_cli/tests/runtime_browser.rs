@@ -3481,6 +3481,61 @@ class MinMaxComputed extends Component {
 }
 
 #[test]
+fn static_callback_argument_updates_state_through_compiler_action_parameter() {
+    let _guard = browser_test_guard();
+    let root = repo_root();
+    let out = root.join("target/psc-browser-test/static-action-parameter");
+    if out.exists() {
+        fs::remove_dir_all(&out).expect("clean parameter output");
+    }
+    fs::create_dir_all(&out).expect("create parameter output");
+    let source = out.join("ParameterizedAction.tsx");
+    fs::write(
+        &source,
+        r#"
+@component("x-parameterized-action")
+class ParameterizedAction extends Component {
+  label = state("Ready");
+  @action() setLabel(value: string) { this.label = value; }
+  render() { return <button onClick={() => this.setLabel("Locked")}>{this.label}</button>; }
+}
+"#,
+    )
+    .expect("write parameter source");
+    let build = Command::new(presolve_cli_bin())
+        .current_dir(&root)
+        .args([
+            "build",
+            source.to_str().expect("source"),
+            "--out",
+            out.to_str().expect("out"),
+        ])
+        .output()
+        .expect("build parameter source");
+    assert!(
+        build.status.success(),
+        "{}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    write_static_action_parameter_probe_page(&out);
+    let server = StaticServer::start(out.clone());
+    let profile = out.join("chrome-profile");
+    fs::create_dir_all(&profile).expect("profile");
+    let output = run_chrome_probe(
+        chrome_bin().expect("Chrome"),
+        &format!("--user-data-dir={}", profile.display()),
+        &format!("http://127.0.0.1:{}/probe.html", server.port),
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("PRESOLVE_STATIC_ACTION_PARAMETER_BROWSER_TEST_PASS"),
+        "{}",
+        stdout
+    );
+}
+
+#[test]
 fn serializable_record_state_replacement_executes_from_compiler_generated_runtime() {
     let _guard = browser_test_guard();
     let root = repo_root();
@@ -4043,6 +4098,19 @@ if (minimum?.value !== -2 || maximum?.value !== 5 || minimum?.dirty !== false ||
 document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_MATH_MIN_MAX_BROWSER_TEST_PASS</div>"); })().catch((error) => { document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_MATH_MIN_MAX_BROWSER_TEST_FAIL: ${error.message}</div>`); });
 </script></body>"#);
     fs::write(out_dir.join("probe.html"), probe).expect("write min max probe");
+}
+
+fn write_static_action_parameter_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("read parameter page");
+    let probe = index.replace("</body>", r#"<script>
+(async () => { const end = Date.now() + 3000; while (document.documentElement.dataset.presolveRuntime !== "ready") { if (Date.now() > end) throw new Error("runtime not ready"); await new Promise((r) => setTimeout(r, 20)); }
+const button = document.querySelector("button"); if (button?.textContent !== "Ready") throw new Error("initial state missing");
+const event = window.__PRESOLVE__.manifest.components[0].template.events[0]; if (event.arguments?.[0] !== "Locked") throw new Error("callback argument missing from manifest");
+button.click(); await new Promise((r) => setTimeout(r, 20));
+if (button.textContent !== "Locked" || window.__PRESOLVE__.components[0].state.label !== "Locked" || window.__PRESOLVE__.diagnostics.length !== 0) throw new Error("parameter action did not commit");
+document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_STATIC_ACTION_PARAMETER_BROWSER_TEST_PASS</div>"); })().catch((error) => { document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_STATIC_ACTION_PARAMETER_BROWSER_TEST_FAIL: ${error.message}</div>`); });
+</script></body>"#);
+    fs::write(out_dir.join("probe.html"), probe).expect("write parameter probe");
 }
 
 fn write_initial_effect_probe_page(out_dir: &Path) {

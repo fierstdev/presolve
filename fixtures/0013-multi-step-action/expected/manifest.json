@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "components": [
     {
       "component_id": "module:fixtures/0013-multi-step-action/input/BatchActionCounter.tsx/component:x-batch-action-counter",

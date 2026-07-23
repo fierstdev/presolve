@@ -1139,6 +1139,7 @@ pub enum StateOperation {
     AddAssign(SerializableValue),
     SubtractAssign(SerializableValue),
     Assign(SerializableValue),
+    AssignParameter(String),
     Toggle,
 }
 
@@ -1219,6 +1220,7 @@ pub struct RenderEventHandler {
     pub owner: SemanticOwner,
     pub event: String,
     pub handler: String,
+    pub arguments: Vec<SerializableValue>,
     pub span: SourceSpan,
 }
 
@@ -1469,6 +1471,8 @@ fn build_component_node(
             format!("class `{}` is missing render()", class.name),
         ));
     }
+
+    collect_action_parameter_assignment_diagnostics(class, diagnostics);
 
     if let Some(render) = &render {
         collect_render_binding_diagnostics(class, render, diagnostics);
@@ -3755,12 +3759,6 @@ fn collect_render_event_diagnostics(
     render: &RenderModel,
     diagnostics: &mut Vec<ComponentDiagnostic>,
 ) {
-    let method_names = class
-        .methods
-        .iter()
-        .map(|method| method.name.as_str())
-        .collect::<Vec<_>>();
-
     for event_handler in render_event_handlers(render) {
         if event_handler.event != "click" {
             diagnostics.push(ComponentDiagnostic {
@@ -3790,7 +3788,40 @@ fn collect_render_event_diagnostics(
         }
 
         if let Some(name) = this_member_name(&event_handler.handler) {
-            if !method_names.contains(&name) {
+            if let Some(method) = class.methods.iter().find(|method| method.name == name) {
+                if method.parameters.len() != event_handler.arguments.len() {
+                    diagnostics.push(ComponentDiagnostic::error(
+                        "PSC1042",
+                        format!(
+                            "event handler `{}` supplies {} static argument(s), but method `{name}` in class `{}` declares {} parameter(s)",
+                            event_handler.handler,
+                            event_handler.arguments.len(),
+                            class.name,
+                            method.parameters.len(),
+                        ),
+                    ));
+                } else {
+                    for (argument, parameter) in
+                        event_handler.arguments.iter().zip(&method.parameters)
+                    {
+                        if !static_argument_matches_annotation(
+                            argument,
+                            parameter
+                                .type_annotation
+                                .as_ref()
+                                .map(|annotation| annotation.text.as_str()),
+                        ) {
+                            diagnostics.push(ComponentDiagnostic::error(
+                                "PSC1043",
+                                format!(
+                                    "event handler `{}` supplies an incompatible static argument for parameter `{}` of method `{name}` in class `{}`",
+                                    event_handler.handler, parameter.name, class.name,
+                                ),
+                            ));
+                        }
+                    }
+                }
+            } else {
                 diagnostics.push(ComponentDiagnostic {
                     severity: ComponentDiagnosticSeverity::Error,
                     effect_id: None,
@@ -3820,6 +3851,68 @@ fn collect_render_event_diagnostics(
     }
 }
 
+fn collect_action_parameter_assignment_diagnostics(
+    class: &ParsedClass,
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+) {
+    for method in &class.methods {
+        for update in &method.state_updates {
+            let ParsedStateOperation::AssignParameter(parameter_name) = &update.operation else {
+                continue;
+            };
+            let Some(parameter) = method
+                .parameters
+                .iter()
+                .find(|parameter| parameter.name == *parameter_name)
+            else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSC1041",
+                    format!(
+                        "state assignment in method `{}` of class `{}` references unknown parameter `{parameter_name}`",
+                        method.name, class.name,
+                    ),
+                ));
+                continue;
+            };
+            if !method
+                .decorators
+                .iter()
+                .any(|decorator| decorator.name == "action" && decorator.is_invoked)
+            {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSC1041",
+                    format!(
+                        "parameter `{parameter_name}` assigned to state in method `{}` of class `{}` requires @action()",
+                        method.name, class.name,
+                    ),
+                ));
+            }
+            if parameter.type_annotation.is_none() {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSC1041",
+                    format!(
+                        "parameter `{parameter_name}` assigned to state in method `{}` of class `{}` requires a primitive TypeScript annotation",
+                        method.name, class.name,
+                    ),
+                ));
+            }
+        }
+    }
+}
+
+fn static_argument_matches_annotation(
+    argument: &SerializableValue,
+    annotation: Option<&str>,
+) -> bool {
+    match annotation.map(str::trim) {
+        Some("string") => matches!(argument, SerializableValue::String(_)),
+        Some("number") => matches!(argument, SerializableValue::Number(_)),
+        Some("boolean") => matches!(argument, SerializableValue::Boolean(_)),
+        Some("null") => matches!(argument, SerializableValue::Null),
+        Some(_) | None => false,
+    }
+}
+
 fn state_operation_from_parsed(operation: &ParsedStateOperation) -> StateOperation {
     match operation {
         ParsedStateOperation::Increment => StateOperation::Increment,
@@ -3832,6 +3925,9 @@ fn state_operation_from_parsed(operation: &ParsedStateOperation) -> StateOperati
         }
         ParsedStateOperation::Assign(value) => {
             StateOperation::Assign(serializable_value_from_parsed(value))
+        }
+        ParsedStateOperation::AssignParameter(parameter) => {
+            StateOperation::AssignParameter(parameter.clone())
         }
         ParsedStateOperation::Toggle => StateOperation::Toggle,
     }
@@ -4036,6 +4132,11 @@ fn render_event_handler_from_parsed(
         owner: SemanticOwner::entity(component_id.template()),
         event: event_handler.event.clone(),
         handler: event_handler.handler.clone(),
+        arguments: event_handler
+            .arguments
+            .iter()
+            .map(serializable_value_from_parsed)
+            .collect(),
         span: event_handler.span,
     }
 }

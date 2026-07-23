@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "components": [
     {
       "component_id": "module:fixtures/0012-boolean-toggle/input/ToggleFlag.tsx/component:x-toggle-flag",

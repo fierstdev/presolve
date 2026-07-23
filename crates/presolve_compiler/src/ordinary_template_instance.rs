@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::component_graph::render_event_handlers;
+use crate::component_graph::SerializableValue;
 use crate::{
     ApplicationSemanticModel, ComponentInstanceId, ComponentInstanceStatus, IrStorageId,
     SemanticId, SemanticReferenceKind, SourceProvenance, TemplateInstanceBindingId,
@@ -67,6 +68,7 @@ pub struct OrdinaryTemplateInstanceEventRecord {
     pub event_type: String,
     pub handler_method_id: SemanticId,
     pub action_batch_id: Option<SemanticId>,
+    pub arguments: Vec<SerializableValue>,
     pub existing_event_program_identity: SemanticId,
     pub provenance: SourceProvenance,
 }
@@ -184,6 +186,7 @@ pub fn build_ordinary_template_instance_registry(
                             event_type: event.event.clone(),
                             handler_method_id: method.id.clone(),
                             action_batch_id: Some(action_batch_id),
+                            arguments: event.arguments.clone(),
                             existing_event_program_identity: event.id.clone(),
                             provenance: model
                                 .provenance(&event.id)

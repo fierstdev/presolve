@@ -656,15 +656,15 @@ fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
     let component_artifact =
         build_runtime_component_artifact(&model, &model.component_ir_optimization);
     assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 6);
-    assert_eq!(RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION, 3);
+    assert_eq!(RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION, 4);
     assert_eq!(RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, 2);
     assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 6);
-    assert_eq!(TEMPLATE_MANIFEST_SCHEMA_VERSION, 4);
-    assert_eq!(component_artifact.schema_version, 3);
+    assert_eq!(TEMPLATE_MANIFEST_SCHEMA_VERSION, 5);
+    assert_eq!(component_artifact.schema_version, 4);
     assert!(validate_runtime_component_artifact(&component_artifact).is_ok());
     assert_eq!(build_semantic_graph(&model).schema_version, 6);
     assert_eq!(build_resume_manifest(&model).schema_version, 6);
-    assert_eq!(build_template_manifest_from_asm(&model).schema_version, 4);
+    assert_eq!(build_template_manifest_from_asm(&model).schema_version, 5);
 
     for (args, expected_status, expected_schema) in [
         (vec!["check", path, "--format", "json"], Some(1), 6),
@@ -686,7 +686,7 @@ fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
     }
 
     let runtime = generate_runtime_stub();
-    assert!(runtime.contains("SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = 3"));
+    assert!(runtime.contains("SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = 4"));
     assert!(!runtime.contains("__EZ_COMPONENT_SCHEMA_VERSION__"));
     for forbidden in [
         "resolveComponent",
@@ -715,6 +715,7 @@ fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
             "ComponentInstanceId::for_",
             &[
                 "component_instance.rs",
+                "resource.rs",
                 "resume_identity.rs",
                 "resume_liveness.rs",
             ][..],

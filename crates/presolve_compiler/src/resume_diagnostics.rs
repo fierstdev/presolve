@@ -556,7 +556,7 @@ mod tests {
         );
         assert_eq!(crate::RESUME_MANIFEST_SCHEMA_VERSION, 6);
         assert_eq!(crate::SEMANTIC_GRAPH_SCHEMA_VERSION, 6);
-        assert_eq!(crate::TEMPLATE_MANIFEST_SCHEMA_VERSION, 4);
+        assert_eq!(crate::TEMPLATE_MANIFEST_SCHEMA_VERSION, 5);
     }
 
     #[test]
