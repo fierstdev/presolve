@@ -22,6 +22,15 @@ Current Phase R slice
   become one compiler-planned component/slot/instance tree before Phase R can
   claim conventional layouts are usable.
 
+* Slice: R3-F0 - Layout Composition Contract
+* Result: froze the compiler-only automatic layout composition contract. It
+  requires one default Slot per conventional layout, virtual compiler-issued
+  invocation identity, normal existing instance/Slot/Context/action/resume
+  products, and fail-closed diagnostics. Static HTML wrapping is prohibited.
+* Next: extend the component instance planner and Slot products with the
+  contract's virtual composition edges, then prove ordinary HTML and resume
+  behavior on nested layouts.
+
 * Slice: R3-D - Compiler Multi-Route Publication Product
 * Result: added a compiler-owned `FileRoutePublicationRequestV1`/product that
   lowers every validated discovered page through the existing entry-scoped
