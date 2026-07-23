@@ -3,16 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N3-B - Static Action Parameters
-* Working tree: clean after the N3-B static-action-parameters commit.
+* Latest completed slice: N3-C - Action Parameter State Types
+* Working tree: clean after the N3-C action-parameter-state-types commit.
 * Date: 2026-07-22
 
 Last completed slice
 
-* Slice: N3-B - Static Action Parameters
-* Result: admits explicitly typed primitive Action parameters only where a compiler-known event callback supplies matching serializable literals and the Action assigns the parameter to a complete State field. The compiler carries arguments through the ordinary-instance plan, template manifest v5, component runtime artifact v4, and one generated runtime batch; no event payload, callback execution, or framework runtime is introduced.
-* Verification: `./scripts/verify-n3b-static-action-parameters.sh` passes compiler diagnostics/registry, focused Chrome browser execution, compiler check, formatting, and diff checks.
-* Next: N3-C may select one further real-data operation with a complete compiler-owned alias/type/lowering/runtime contract; do not broaden arbitrary Action bodies.
+* Slice: N3-C - Action Parameter State Types
+* Result: validates the N3-B parameter-to-State operation before artifact emission. The Action parameter and target State field must have the same compiler-known primitive kind, declared directly or inferred from the State initializer; `PSC1044` rejects mismatch or an unprovable structural boundary. No checker runtime, new artifact field, or dynamic fallback was added.
+* Verification: `./scripts/verify-n3c-action-parameter-state-types.sh` passes the typed-negative compiler/registry proof, compiler check, formatting, and diff checks.
+* Next: N3-D may select one further real-data operation with a complete compiler-owned alias/type/lowering/runtime contract; do not broaden arbitrary Action bodies.
 
 * Slice: N4-B - JSX HTML Attribute Aliases
 * Result: compiler template lowering canonically maps only `className` to `class` and `htmlFor` to `for`, before semantic type checks, static HTML, manifests, and ordinary runtime binding artifacts. Framework JSX transforms, runtime aliases, spreads, style objects, and unbounded class helpers were not introduced.

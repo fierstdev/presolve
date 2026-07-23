@@ -1860,6 +1860,32 @@ class Parameterized extends Component {
     }
 
     #[test]
+    fn component_graph_rejects_action_parameter_state_type_mismatch() {
+        let source = r#"
+@component("x-parameterized")
+class Parameterized extends Component {
+  count = state(0);
+
+  @action() setCount(value: string) {
+    this.count = value;
+  }
+
+  render() {
+    return <button onClick={() => this.setCount("Locked")}>{this.count}</button>;
+  }
+}
+"#;
+
+        let parsed = presolve_parser::parse_file("MismatchedParameterized.tsx", source);
+        let graph = build_component_graph(&parsed);
+
+        assert!(graph
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "PSC1044"));
+    }
+
+    #[test]
     fn component_graph_reports_duplicate_event_errors() {
         let parsed = presolve_parser::ParsedFile {
             path: "DuplicateEvent.tsx".into(),

@@ -255,6 +255,14 @@ list through the ordinary-instance plan, manifest, runtime artifact, and one
 completed Action batch. Browser payload projection, dynamic captures, object
 parameters, and arbitrary callback execution remain separate capabilities.
 
+#### N3-C — Action parameter State compatibility
+
+Require every N3-B parameter-to-State replacement to prove the same primitive
+kind at both ends. The State kind may come from an exact annotation or a
+primitive initializer; unresolved structural/generic TypeScript types do not
+establish compatibility. This is compiler validation only and must not create a
+checker-owned runtime authority or dynamic fallback.
+
 Allow State fields to hold structurally serializable records, arrays, optional
 values, and discriminated unions. Add compiler-recognized immutable updates,
 safe indexed updates, and bounded collection operations. Define alias and

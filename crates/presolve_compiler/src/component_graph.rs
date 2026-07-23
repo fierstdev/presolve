@@ -3896,7 +3896,50 @@ fn collect_action_parameter_assignment_diagnostics(
                     ),
                 ));
             }
+            let parameter_kind = parameter
+                .type_annotation
+                .as_ref()
+                .and_then(|annotation| declared_state_type_kind(annotation.text.trim()));
+            let state_kind = state_field_primitive_kind(class, &update.field);
+            if parameter_kind.is_none() || state_kind.is_none() || parameter_kind != state_kind {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSC1044",
+                    format!(
+                        "parameter `{parameter_name}` in method `{}` of class `{}` is not primitively compatible with State field `{}`",
+                        method.name, class.name, update.field,
+                    ),
+                ));
+            }
         }
+    }
+}
+
+fn state_field_primitive_kind(
+    class: &ParsedClass,
+    field_name: &str,
+) -> Option<DeclaredStateTypeKind> {
+    let property = class.properties.iter().find(|property| {
+        property.name == field_name && property.initializer.as_deref() == Some("state(...)")
+    })?;
+    property
+        .state_type_annotation
+        .as_ref()
+        .and_then(|annotation| declared_state_type_kind(annotation.text.trim()))
+        .or_else(|| {
+            property
+                .state_initial_value
+                .as_ref()
+                .and_then(serializable_primitive_kind)
+        })
+}
+
+fn serializable_primitive_kind(value: &ParsedSerializableValue) -> Option<DeclaredStateTypeKind> {
+    match value {
+        ParsedSerializableValue::Null => Some(DeclaredStateTypeKind::Null),
+        ParsedSerializableValue::Number(_) => Some(DeclaredStateTypeKind::Number),
+        ParsedSerializableValue::String(_) => Some(DeclaredStateTypeKind::String),
+        ParsedSerializableValue::Boolean(_) => Some(DeclaredStateTypeKind::Boolean),
+        ParsedSerializableValue::Array(_) | ParsedSerializableValue::Object(_) => None,
     }
 }
 
