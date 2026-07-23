@@ -210,6 +210,13 @@ runtime instruction that reads own properties only. Dynamic keys, negative or
 non-integral numbers, optional indexing, prototype traversal, and index access
 in Actions or Effects remain outside this admission.
 
+#### N2-C — boolean computed conditionals
+
+Admit `condition ? whenTrue : whenFalse` only in a supported Computed getter.
+The condition must have a compiler-known boolean type and each branch must
+already be compiler-supported. Lower a pure `Select` instruction; do not apply
+JavaScript truthiness, branch callbacks, or control-flow statements.
+
 ### N3 — State, Actions, Computed, and Effects over real data
 
 Allow State fields to hold structurally serializable records, arrays, optional

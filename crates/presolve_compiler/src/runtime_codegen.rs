@@ -15,7 +15,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const ACTION_MANIFEST_SCHEMA_VERSION = 2;
   const FORMS_MANIFEST_SCHEMA_VERSION = 3;
   const LEGACY_MANIFEST_SCHEMA_VERSION = 1;
-  const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 6;
+  const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 7;
   const SUPPORTED_EFFECT_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = __EZ_COMPONENT_SCHEMA_VERSION__;
@@ -1662,6 +1662,15 @@ const RUNTIME_STUB: &str = r#"(() => {
         && Object.prototype.hasOwnProperty.call(object, key)
         ? object[key]
         : undefined;
+      values.set(instruction.result, value);
+      return true;
+    }
+
+    if (instruction.kind === "select") {
+      const condition = computedOperandValue(store, values, instruction.condition);
+      const value = condition === true
+        ? computedOperandValue(store, values, instruction.when_true)
+        : computedOperandValue(store, values, instruction.when_false);
       values.set(instruction.result, value);
       return true;
     }
@@ -3870,7 +3879,8 @@ mod tests {
         assert!(runtime.contains("contextSlots: new Map()"));
         assert!(runtime.contains("RUNTIME_VERSION = \"0.0.0\""));
         assert!(runtime.contains("SUPPORTED_SCHEMA_VERSION = 4"));
-        assert!(runtime.contains("SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 6"));
+        assert!(runtime.contains("SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 7"));
+        assert!(runtime.contains("instruction.kind === \"select\""));
         assert!(runtime.contains("instruction.kind === \"get-index\""));
         assert!(runtime.contains("presolve-forms-runtime"));
         assert!(runtime.contains("initializeFormsRuntime"));

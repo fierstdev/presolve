@@ -1456,6 +1456,15 @@ impl ExpressionIrLowering<'_> {
                 object: IrOperand::Value(self.lower_node(&object)?),
                 index: IrOperand::Value(self.lower_node(&index)?),
             },
+            ExpressionNodeKind::Conditional {
+                condition,
+                when_true,
+                when_false,
+            } => IrInstructionKind::Select {
+                condition: IrOperand::Value(self.lower_node(&condition)?),
+                when_true: IrOperand::Value(self.lower_node(&when_true)?),
+                when_false: IrOperand::Value(self.lower_node(&when_false)?),
+            },
             ExpressionNodeKind::Arithmetic {
                 left,
                 right,
@@ -3249,6 +3258,11 @@ fn instruction_operands(kind: &IrInstructionKind) -> Vec<IrOperand> {
         | IrInstructionKind::Copy { source: value }
         | IrInstructionKind::GetMember { object: value, .. } => vec![value.clone()],
         IrInstructionKind::GetIndex { object, index } => vec![object.clone(), index.clone()],
+        IrInstructionKind::Select {
+            condition,
+            when_true,
+            when_false,
+        } => vec![condition.clone(), when_true.clone(), when_false.clone()],
         IrInstructionKind::Binary { left, right, .. } => vec![left.clone(), right.clone()],
         IrInstructionKind::CapabilityCall { arguments, .. } => {
             arguments.iter().cloned().map(IrOperand::Value).collect()
@@ -3285,6 +3299,7 @@ fn instruction_storages(kind: &IrInstructionKind) -> Vec<&IrStorageId> {
         | IrInstructionKind::LoadContextSlot { .. }
         | IrInstructionKind::GetMember { .. }
         | IrInstructionKind::GetIndex { .. }
+        | IrInstructionKind::Select { .. }
         | IrInstructionKind::Template { .. }
         | IrInstructionKind::PurePackageCall { .. }
         | IrInstructionKind::CapabilityCall { .. }
@@ -3573,6 +3588,11 @@ pub enum IrInstructionKind {
         object: IrOperand,
         index: IrOperand,
     },
+    Select {
+        condition: IrOperand,
+        when_true: IrOperand,
+        when_false: IrOperand,
+    },
     /// Compiler-lowered interpolation with source-retained cooked literal segments.
     Template {
         quasis: Vec<String>,
@@ -3785,6 +3805,15 @@ fn replace_copy_operands(kind: &mut IrInstructionKind, copies: &BTreeMap<IrValue
         IrInstructionKind::GetIndex { object, index } => {
             resolve(object);
             resolve(index);
+        }
+        IrInstructionKind::Select {
+            condition,
+            when_true,
+            when_false,
+        } => {
+            resolve(condition);
+            resolve(when_true);
+            resolve(when_false);
         }
         IrInstructionKind::Binary { left, right, .. } => {
             resolve(left);

@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N2-B - Static Index Access
-* Working tree: clean after the N2-B static-index-access commit.
+* Latest completed slice: N2-C - Boolean Computed Conditionals
+* Working tree: clean after the N2-C boolean-conditional commit.
 * Date: 2026-07-22
 
 Last completed slice
+
+* Slice: N2-C - Boolean Computed Conditionals
+* Result: admits `condition ? whenTrue : whenFalse` only in supported Computed getters. The compiler proves a boolean condition (otherwise `PSC1029`), derives every branch dependency, infers the normalized branch union, lowers `Select` IR, and publishes schema-v7 runtime-computed metadata. The generated runtime consumes artifact operands only and uses exact boolean selection; no authored source evaluation or JavaScript truthiness is introduced.
+* Verification: `./scripts/verify-n2c-boolean-conditional.sh` passes, including compiler positive/negative, capability-registry, CLI/runtime, formatting, and real-browser evidence.
+* Next: N2-D may select the next bounded expression or registered helper family. Preserve compiler ownership and the no-arbitrary-call boundary.
 
 * Slice: N2-B - Static Index Access
 * Result: admits bracket reads in a supported Computed getter only when the index is a string literal or non-negative integer literal. The compiler retains `IndexAccess`, derives the object dependency, lowers canonical `GetIndex` IR, publishes a schema-v6 `get-index` runtime-computed instruction, and performs own-property reads without evaluating authored source or traversing prototypes. Dynamic/optional indexing, non-integral or negative keys, writes, Actions, and Effects remain outside the admitted subset.

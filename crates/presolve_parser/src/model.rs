@@ -265,6 +265,11 @@ pub enum ParsedComputedExpressionKind {
         object: Box<ParsedComputedExpression>,
         index: Box<ParsedComputedExpression>,
     },
+    Conditional {
+        condition: Box<ParsedComputedExpression>,
+        when_true: Box<ParsedComputedExpression>,
+        when_false: Box<ParsedComputedExpression>,
+    },
     Template {
         quasis: Vec<String>,
         expressions: Vec<ParsedComputedExpression>,

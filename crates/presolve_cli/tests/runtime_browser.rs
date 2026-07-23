@@ -3209,6 +3209,7 @@ class IndexedComputed extends Component {
   get selected() { return this.labels[1]; }
   render() { return <output>Indexed</output>; }
 }
+
 "#,
     )
     .expect("write index source");
@@ -3243,6 +3244,65 @@ class IndexedComputed extends Component {
     server.stop();
     assert!(
         stdout.contains("PRESOLVE_STATIC_INDEX_BROWSER_TEST_PASS"),
+        "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn boolean_conditional_computed_values_execute_from_compiler_generated_runtime_programs() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/psc-browser-test/conditional-computed-runtime");
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("clean conditional browser output");
+    }
+    fs::create_dir_all(&out_dir).expect("create conditional browser output");
+    let source = out_dir.join("ConditionalComputed.tsx");
+    fs::write(
+        &source,
+        r#"
+@component("x-conditional-computed")
+class ConditionalComputed extends Component {
+  enabled: boolean = state(true);
+  @computed()
+  get label() { return this.enabled ? "enabled" : "disabled"; }
+  render() { return <output>Conditional</output>; }
+}
+"#,
+    )
+    .expect("write conditional source");
+    let output = Command::new(presolve_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            source.to_str().expect("source path"),
+            "--out",
+            out_dir.to_str().expect("output path"),
+        ])
+        .output()
+        .expect("build conditional runtime fixture");
+    assert!(
+        output.status.success(),
+        "conditional build failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    write_boolean_conditional_probe_page(&out_dir);
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("create Chrome profile directory");
+    let output = run_chrome_probe(
+        chrome,
+        &format!("--user-data-dir={}", profile_dir.display()),
+        &format!("http://127.0.0.1:{}/probe.html", server.port),
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("PRESOLVE_BOOLEAN_CONDITIONAL_BROWSER_TEST_PASS"),
         "browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
         output.status,
         stdout,
@@ -3697,6 +3757,24 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 </body>"#,
     );
     fs::write(out_dir.join("probe.html"), probe).expect("write static index probe page");
+}
+
+fn write_boolean_conditional_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("read built page");
+    let probe = index.replace("</body>", r#"<script>
+(async () => {
+  const deadline = Date.now() + 3000;
+  while (document.documentElement.dataset.presolveRuntime !== "ready") {
+    if (Date.now() > deadline) throw new Error("timed out waiting for runtime");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  const label = window.__PRESOLVE__.computed.find((entry) => entry.computed.endsWith("/computed:label"));
+  if (label?.value !== "enabled" || label?.dirty !== false) throw new Error("conditional did not select true branch");
+  if (window.__PRESOLVE__.diagnostics.length !== 0) throw new Error("conditional reported diagnostics");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_BOOLEAN_CONDITIONAL_BROWSER_TEST_PASS</div>");
+})().catch((error) => { document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_BOOLEAN_CONDITIONAL_BROWSER_TEST_FAIL: ${error.message}</div>`); });
+</script></body>"#);
+    fs::write(out_dir.join("probe.html"), probe).expect("write conditional probe page");
 }
 
 fn write_initial_effect_probe_page(out_dir: &Path) {

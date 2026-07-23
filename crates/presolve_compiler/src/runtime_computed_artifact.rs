@@ -8,7 +8,7 @@ use crate::{
     SemanticId, SerializableValue, SerializationCompatibility,
 };
 
-pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 6;
+pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 7;
 
 /// Versioned runtime metadata and executable programs emitted from canonical IR.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -91,6 +91,12 @@ pub enum RuntimeComputedArtifactInstruction {
         result: String,
         object: RuntimeComputedArtifactOperand,
         index: RuntimeComputedArtifactOperand,
+    },
+    Select {
+        result: String,
+        condition: RuntimeComputedArtifactOperand,
+        when_true: RuntimeComputedArtifactOperand,
+        when_false: RuntimeComputedArtifactOperand,
     },
     Template {
         result: String,
@@ -403,6 +409,16 @@ pub(crate) fn runtime_instruction(
                 index: runtime_operand(index),
             })
         }
+        IrInstructionKind::Select {
+            condition,
+            when_true,
+            when_false,
+        } => Some(RuntimeComputedArtifactInstruction::Select {
+            result,
+            condition: runtime_operand(condition),
+            when_true: runtime_operand(when_true),
+            when_false: runtime_operand(when_false),
+        }),
         IrInstructionKind::Template {
             quasis,
             expressions,
@@ -605,7 +621,7 @@ class RuntimeComputedArtifact extends Component {
         let second = runtime_computed_artifact_json(&build_runtime_computed_artifact(&model, &ir));
         assert_eq!(first, second);
         let json: serde_json::Value = serde_json::from_str(&first).expect("artifact JSON");
-        assert_eq!(json["schema_version"], 6);
+        assert_eq!(json["schema_version"], 7);
         assert_eq!(
             json["evaluations"][0]["program"]["instructions"][0]["kind"],
             "load-state"
@@ -770,5 +786,59 @@ class IndexedComputed extends Component {
             index,
             super::RuntimeComputedArtifactOperand::Value { .. }
         ));
+    }
+
+    #[test]
+    fn emits_boolean_conditional_select_program() {
+        let parsed = presolve_parser::parse_file(
+            "src/ConditionalComputed.tsx",
+            r#"
+@component("x-conditional-computed")
+class ConditionalComputed extends Component {
+  enabled: boolean = state(true);
+  @computed()
+  get label() { return this.enabled ? "enabled" : "disabled"; }
+  render() { return <output>Conditional</output>; }
+}
+"#,
+        );
+        let model = build_application_semantic_model(&parsed);
+        assert!(model.diagnostics.is_empty(), "{:?}", model.diagnostics);
+        let artifact = build_runtime_computed_artifact(&model, &lower_components_to_ir(&model));
+        assert!(artifact.evaluations[0]
+            .program
+            .instructions
+            .iter()
+            .any(|instruction| {
+                matches!(
+                    instruction,
+                    RuntimeComputedArtifactInstruction::Select { .. }
+                )
+            }));
+    }
+
+    #[test]
+    fn rejects_non_boolean_computed_conditional() {
+        let parsed = presolve_parser::parse_file(
+            "src/InvalidConditionalComputed.tsx",
+            r#"
+@component("x-invalid-conditional-computed")
+class InvalidConditionalComputed extends Component {
+  count: number = state(1);
+  @computed()
+  get label() { return this.count ? "one" : "zero"; }
+  render() { return <output>Conditional</output>; }
+}
+"#,
+        );
+        let model = build_application_semantic_model(&parsed);
+        assert!(
+            model
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code == "PSC1029"),
+            "{:?}",
+            model.diagnostics
+        );
     }
 }

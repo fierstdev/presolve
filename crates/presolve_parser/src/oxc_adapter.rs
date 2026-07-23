@@ -1175,6 +1175,14 @@ fn parsed_computed_expression(
                 span: source_span(source, member.span),
             })
         }
+        Expression::ConditionalExpression(conditional) => Some(ParsedComputedExpression {
+            kind: ParsedComputedExpressionKind::Conditional {
+                condition: Box::new(parsed_computed_expression(&conditional.test, source)?),
+                when_true: Box::new(parsed_computed_expression(&conditional.consequent, source)?),
+                when_false: Box::new(parsed_computed_expression(&conditional.alternate, source)?),
+            },
+            span: source_span(source, conditional.span),
+        }),
         Expression::BinaryExpression(binary) => {
             let operator = match binary.operator.as_str() {
                 "+" => ParsedComputedExpressionKind::Arithmetic {

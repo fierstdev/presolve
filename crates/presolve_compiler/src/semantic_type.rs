@@ -1732,6 +1732,14 @@ fn infer_effect_expression_type(
             &child_type(object, expression_types),
             &child_type(index, expression_types),
         ),
+        ExpressionNodeKind::Conditional {
+            when_true,
+            when_false,
+            ..
+        } => conditional_result_type(
+            child_type(when_true, expression_types),
+            child_type(when_false, expression_types),
+        ),
         ExpressionNodeKind::Arithmetic {
             left,
             right,
@@ -2136,7 +2144,8 @@ fn expression_semantic_type(
         | ExpressionNodeKind::SemanticPackagePureCall { .. }
         | ExpressionNodeKind::ThisMember { .. }
         | ExpressionNodeKind::MemberAccess { .. }
-        | ExpressionNodeKind::IndexAccess { .. } => SemanticType::Unknown,
+        | ExpressionNodeKind::IndexAccess { .. }
+        | ExpressionNodeKind::Conditional { .. } => SemanticType::Unknown,
         ExpressionNodeKind::Arithmetic {
             left,
             right,
@@ -2277,6 +2286,11 @@ fn infer_context_source_expression_type(
         ExpressionNodeKind::IndexAccess { object, index } => {
             computed_index_access_type(&child(object, inferred), &child(index, inferred))
         }
+        ExpressionNodeKind::Conditional {
+            when_true,
+            when_false,
+            ..
+        } => conditional_result_type(child(when_true, inferred), child(when_false, inferred)),
         ExpressionNodeKind::Arithmetic {
             left,
             right,
@@ -2387,6 +2401,14 @@ fn infer_computed_expression_type(
             let index = child_type(index, expression_types, computed_types, visiting);
             computed_index_access_type(&object, &index)
         }
+        ExpressionNodeKind::Conditional {
+            when_true,
+            when_false,
+            ..
+        } => conditional_result_type(
+            child_type(when_true, expression_types, computed_types, visiting),
+            child_type(when_false, expression_types, computed_types, visiting),
+        ),
         ExpressionNodeKind::Arithmetic {
             left,
             right,
@@ -2528,6 +2550,14 @@ fn computed_index_access_type(object: &SemanticType, index: &SemanticType) -> Se
             .cloned()
             .unwrap_or(SemanticType::Unknown),
         _ => SemanticType::Unknown,
+    }
+}
+
+fn conditional_result_type(when_true: SemanticType, when_false: SemanticType) -> SemanticType {
+    if when_true == when_false {
+        when_true
+    } else {
+        normalize_semantic_type(SemanticType::Union(vec![when_true, when_false]))
     }
 }
 

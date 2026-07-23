@@ -2702,6 +2702,15 @@ fn resolve_semantic_package_pure_call(
             resolve_semantic_package_pure_call(object, module_path, bindings);
             resolve_semantic_package_pure_call(index, module_path, bindings);
         }
+        ComputedExpressionKind::Conditional {
+            condition,
+            when_true,
+            when_false,
+        } => {
+            resolve_semantic_package_pure_call(condition, module_path, bindings);
+            resolve_semantic_package_pure_call(when_true, module_path, bindings);
+            resolve_semantic_package_pure_call(when_false, module_path, bindings);
+        }
         ComputedExpressionKind::Arithmetic { left, right, .. }
         | ComputedExpressionKind::Comparison { left, right, .. }
         | ComputedExpressionKind::Logical { left, right, .. }
@@ -2738,6 +2747,15 @@ fn contains_semantic_package_pure_call(expression: &ComputedExpression, callee: 
         ComputedExpressionKind::IndexAccess { object, index } => {
             contains_semantic_package_pure_call(object, callee)
                 || contains_semantic_package_pure_call(index, callee)
+        }
+        ComputedExpressionKind::Conditional {
+            condition,
+            when_true,
+            when_false,
+        } => {
+            contains_semantic_package_pure_call(condition, callee)
+                || contains_semantic_package_pure_call(when_true, callee)
+                || contains_semantic_package_pure_call(when_false, callee)
         }
         ComputedExpressionKind::Arithmetic { left, right, .. }
         | ComputedExpressionKind::Comparison { left, right, .. }
@@ -2807,8 +2825,91 @@ fn collect_computed_semantic_diagnostics(
         computed_values,
         semantic_types,
     ));
+    diagnostics.extend(collect_computed_conditional_diagnostics(
+        components,
+        expression_graph,
+        semantic_types,
+    ));
     sort_computed_diagnostics(&mut diagnostics);
     diagnostics
+}
+
+fn collect_computed_conditional_diagnostics(
+    components: &[ComponentNode],
+    expression_graph: &ExpressionGraph,
+    semantic_types: &SemanticTypeModel,
+) -> Vec<ComponentDiagnostic> {
+    expression_graph
+        .nodes
+        .values()
+        .filter_map(|node| {
+            let crate::ExpressionNodeKind::Conditional { condition, .. } = &node.kind else {
+                return None;
+            };
+            let condition_type = semantic_types
+                .assignments
+                .get(condition)
+                .map(|assignment| assignment.semantic_type.clone())
+                .or_else(|| match &expression_graph.node(condition)?.kind {
+                    crate::ExpressionNodeKind::ThisMember { name } => components
+                        .iter()
+                        .find(|component| {
+                            component
+                                .methods
+                                .iter()
+                                .any(|method| component.id.computed(&method.name) == node.owner)
+                        })
+                        .and_then(|component| {
+                            component
+                                .state_fields
+                                .iter()
+                                .find(|field| field.name == *name)
+                        })
+                        .and_then(|field| semantic_types.assignments.get(&field.id))
+                        .map(|assignment| assignment.semantic_type.clone()),
+                    _ => None,
+                })
+                .unwrap_or(crate::SemanticType::Unknown);
+            if is_boolean_computed_condition(&condition_type) {
+                None
+            } else {
+                Some(ComponentDiagnostic {
+                    severity: ComponentDiagnosticSeverity::Error,
+                    effect_id: None,
+                    statement_id: None,
+                    context_declaration_candidate_id: None,
+                    context_id: None,
+                    provider_id: None,
+                    consumer_id: None,
+                    slot_id: None,
+                    invocation_id: None,
+                    component_instance_id: None,
+                    slot_binding_id: None,
+                    structural_region_id: None,
+                    component_id: None,
+                    provider_instance_id: None,
+                    consumer_instance_id: None,
+                    secondary_labels: Vec::new(),
+                    code: crate::TypeDiagnosticCode::InvalidCondition
+                        .as_str()
+                        .to_string(),
+                    message: format!(
+                        "computed conditional requires boolean, but has {}",
+                        crate::semantic_type_text(&condition_type)
+                    ),
+                    provenance: Some(node.provenance.clone()),
+                })
+            }
+        })
+        .collect()
+}
+
+fn is_boolean_computed_condition(semantic_type: &crate::SemanticType) -> bool {
+    match semantic_type {
+        crate::SemanticType::Boolean | crate::SemanticType::BooleanLiteral(_) => true,
+        crate::SemanticType::Union(members) => members.iter().all(is_boolean_computed_condition),
+        _ => false,
+    }
 }
 
 fn collect_invalid_computed_declaration_diagnostics(

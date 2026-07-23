@@ -536,6 +536,11 @@ pub enum ComputedExpressionKind {
         object: Box<ComputedExpression>,
         index: Box<ComputedExpression>,
     },
+    Conditional {
+        condition: Box<ComputedExpression>,
+        when_true: Box<ComputedExpression>,
+        when_false: Box<ComputedExpression>,
+    },
     Template {
         quasis: Vec<String>,
         expressions: Vec<ComputedExpression>,
@@ -3377,6 +3382,15 @@ fn computed_expression_from_parsed(expression: &ParsedComputedExpression) -> Com
                 index: Box::new(computed_expression_from_parsed(index)),
             }
         }
+        ParsedComputedExpressionKind::Conditional {
+            condition,
+            when_true,
+            when_false,
+        } => ComputedExpressionKind::Conditional {
+            condition: Box::new(computed_expression_from_parsed(condition)),
+            when_true: Box::new(computed_expression_from_parsed(when_true)),
+            when_false: Box::new(computed_expression_from_parsed(when_false)),
+        },
         ParsedComputedExpressionKind::Template {
             quasis,
             expressions,

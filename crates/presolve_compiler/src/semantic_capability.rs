@@ -203,6 +203,17 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
                 "runtime-computed schema v6 get-index instruction",
                 "runtime_browser::static_index_accesses_execute_from_compiler_generated_runtime_programs",
             ),
+            admitted(
+                "boolean_computed_conditional",
+                SemanticCapabilityClass::Bounded,
+                "boolean condition ? compiler-supported consequent : compiler-supported alternate in @computed()",
+                "parser, ExpressionGraph, canonical IR, and runtime-computed artifact",
+                "boolean condition with serializable compiler-supported branch values",
+                "compiler-derived union of condition and both branch dependencies",
+                "serializable selected result; no independent resume record",
+                "runtime-computed schema v7 select instruction",
+                "runtime_browser::boolean_conditional_computed_values_execute_from_compiler_generated_runtime_programs",
+            ),
             deferred(
                 "semantic_package_exports",
                 SemanticCapabilityClass::Unsupported,
@@ -328,6 +339,7 @@ mod tests {
                 "semantic_package_pure_identity",
                 "template_interpolation",
                 "static_index_access",
+                "boolean_computed_conditional",
                 "semantic_package_exports",
                 "resources",
                 "opaque_typescript"

@@ -39,6 +39,11 @@ pub enum ExpressionNodeKind {
         object: SemanticId,
         index: SemanticId,
     },
+    Conditional {
+        condition: SemanticId,
+        when_true: SemanticId,
+        when_false: SemanticId,
+    },
     Template {
         quasis: Vec<String>,
         expressions: Vec<SemanticId>,
@@ -92,6 +97,11 @@ impl ExpressionNode {
             | ExpressionNodeKind::ThisMember { .. } => Vec::new(),
             ExpressionNodeKind::MemberAccess { object, .. } => vec![object],
             ExpressionNodeKind::IndexAccess { object, index } => vec![object, index],
+            ExpressionNodeKind::Conditional {
+                condition,
+                when_true,
+                when_false,
+            } => vec![condition, when_true, when_false],
             ExpressionNodeKind::Template { expressions, .. } => expressions.iter().collect(),
             ExpressionNodeKind::Call { arguments, .. }
             | ExpressionNodeKind::SemanticPackagePureCall { arguments, .. } => {
@@ -426,6 +436,15 @@ impl ExpressionGraph {
                     index: child(self, &format!("{path}.1"), index),
                 }
             }
+            ComputedExpressionKind::Conditional {
+                condition,
+                when_true,
+                when_false,
+            } => ExpressionNodeKind::Conditional {
+                condition: child(self, &format!("{path}.0"), condition),
+                when_true: child(self, &format!("{path}.1"), when_true),
+                when_false: child(self, &format!("{path}.2"), when_false),
+            },
             ComputedExpressionKind::Template {
                 quasis,
                 expressions,
@@ -605,6 +624,7 @@ impl ExpressionGraph {
             | ExpressionNodeKind::ThisMember { .. }
             | ExpressionNodeKind::MemberAccess { .. }
             | ExpressionNodeKind::IndexAccess { .. }
+            | ExpressionNodeKind::Conditional { .. }
             | ExpressionNodeKind::Template { .. }
             | ExpressionNodeKind::Call { .. }
             | ExpressionNodeKind::SemanticPackagePureCall { .. } => {
