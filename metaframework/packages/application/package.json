@@ -1,0 +1,12 @@
+{
+  "name": "@presolve/application",
+  "version": "0.1.0-alpha",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "check": "../../../scripts/verify-o1-explicit-application-build-handoff.sh"
+  }
+}

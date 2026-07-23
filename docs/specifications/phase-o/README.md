@@ -1,0 +1,11 @@
+# Phase O specifications
+
+Phase O is the metaframework/application-product authority over frozen Phase M
+framework declarations, Phase N capability semantics, and the existing public
+Presolve CLI products. It may orchestrate explicit caller-owned inputs but may
+not alter compiler semantics, parse application source, decode artifacts, or
+introduce a framework runtime.
+
+* [Phase O application productization plan](PHASE_O_APPLICATION_PRODUCTIZATION_PLAN.md)
+* [O0 application product constitution](PHASE_O_O0_APPLICATION_PRODUCT_CONSTITUTION.md)
+* [O1 explicit application build handoff](PHASE_O_O1_EXPLICIT_APPLICATION_BUILD_HANDOFF.md)

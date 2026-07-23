@@ -1634,16 +1634,14 @@ Known limitations
 
 Exact next step
 
-Phase M is frozen through M10 and Phase N through N10. M10-A adds
-`@resource(...)` and `Resource<Data, Error>` with readonly `data`, `error`,
-and lifecycle-state projections; M10-B classifies every registry entry and
-types only the admitted JSX aliases, accessibility attributes, and
-zero-argument Action event bindings. M10-C replays the M9 framework matrix,
-both M10 conformance families, and the canonical Phase N capability projection.
-No framework runtime, parser, JSX transform, DOM vocabulary, package resolver,
-artifact reader, or compatibility shim exists. Next: a metaframework phase
-requires separate authority for project/build orchestration and must preserve
-this compiler/framework boundary.
+Phase M is frozen through M10 and Phase N through N10. Phase O is active as
+the separately authorized metaframework/application-product phase. O0 freezes
+the `@presolve/application` boundary: caller-owned invocation projection only,
+with no source reading, compiler semantics, artifact decoding, or runtime.
+O1 supplies exact single-entry `presolve build` projection including explicit
+semantic-package contracts/runtime mappings. Next: O2 may expose only the
+existing explicit workspace and `watch --once` products; it may not create a
+watcher, dev server, HMR, discovery, or source-analysis path.
 
 Useful commands
 
@@ -1674,4 +1672,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* None; M10 and N10 are frozen and cleanly verified.
+* O0/O1 application product constitution and build handoff; commit pending.
