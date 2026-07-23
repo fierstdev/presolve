@@ -7,6 +7,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const CONTEXT_ARTIFACT_ELEMENT_ID = "presolve-context-runtime";
   const COMPONENT_ARTIFACT_ELEMENT_ID = "presolve-component-runtime";
   const FORMS_ARTIFACT_ELEMENT_ID = "presolve-forms-runtime";
+  const RESOURCES_ARTIFACT_ELEMENT_ID = "presolve-resources-runtime";
   const RESUME_MANIFEST_ELEMENT_ID = "presolve-resume-runtime";
   const RESUME_SNAPSHOT_ELEMENT_ID = "presolve-resume-snapshot";
   const PRODUCTION_RUNTIME_ELEMENT_ID = "presolve-production-runtime";
@@ -21,6 +22,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = __EZ_COMPONENT_SCHEMA_VERSION__;
   const LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 1;
+  const SUPPORTED_RESOURCES_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_RESUME_MANIFEST_SCHEMA_VERSION = 6;
   const SUPPORTED_RESUME_SNAPSHOT_SCHEMA_VERSION = 1;
   const SUPPORTED_RESUME_RUNTIME_PROTOCOL_VERSION = 1;
@@ -586,6 +588,52 @@ const RUNTIME_STUB: &str = r#"(() => {
     try { return JSON.parse(element.textContent ?? ""); } catch (error) {
       reportDiagnostic(diagnostics, "PSR_INVALID_FORMS_ARTIFACT", "Forms runtime metadata JSON could not be parsed", { message: error instanceof Error ? error.message : String(error) }, true);
       throw new PresolveBootError("PSR_INVALID_FORMS_ARTIFACT");
+    }
+  }
+
+  function readResourcesArtifact(diagnostics) {
+    const element = document.getElementById(RESOURCES_ARTIFACT_ELEMENT_ID);
+    if (element === null) return null;
+    if (!(element instanceof HTMLScriptElement)) {
+      reportDiagnostic(diagnostics, "PSR_INVALID_RESOURCES_ARTIFACT", "Resource runtime metadata was not stored in a script element", { artifactElementId: RESOURCES_ARTIFACT_ELEMENT_ID }, true);
+      throw new PresolveBootError("PSR_INVALID_RESOURCES_ARTIFACT");
+    }
+    try { return JSON.parse(element.textContent ?? ""); } catch (error) {
+      reportDiagnostic(diagnostics, "PSR_INVALID_RESOURCES_ARTIFACT", "Resource runtime metadata JSON could not be parsed", { message: error instanceof Error ? error.message : String(error) }, true);
+      throw new PresolveBootError("PSR_INVALID_RESOURCES_ARTIFACT");
+    }
+  }
+
+  function validateResourcesArtifact(resourcesArtifact, diagnostics) {
+    if (resourcesArtifact === null) return;
+    if (resourcesArtifact.schema_version !== SUPPORTED_RESOURCES_ARTIFACT_SCHEMA_VERSION
+      || !Array.isArray(resourcesArtifact.declarations)
+      || !Array.isArray(resourcesArtifact.activations)) {
+      reportDiagnostic(diagnostics, "PSR_UNSUPPORTED_RESOURCES_ARTIFACT_SCHEMA", "Resource runtime metadata did not match the compiler artifact contract", { schema_version: resourcesArtifact.schema_version }, true);
+      throw new PresolveBootError("PSR_UNSUPPORTED_RESOURCES_ARTIFACT_SCHEMA");
+    }
+    const declarations = new Set();
+    for (const declaration of resourcesArtifact.declarations) {
+      const endpoint = declaration?.endpoint;
+      if (typeof declaration?.id !== "string" || declarations.has(declaration.id)
+        || typeof endpoint?.package !== "string" || typeof endpoint?.version !== "string"
+        || typeof endpoint?.integrity !== "string" || typeof endpoint?.export !== "string"
+        || typeof endpoint?.runtime_module !== "string" || typeof endpoint?.runtime_location !== "string") {
+        reportDiagnostic(diagnostics, "PSR_INVALID_RESOURCES_ARTIFACT", "Resource declaration did not retain one exact executable endpoint", { declaration }, true);
+        throw new PresolveBootError("PSR_INVALID_RESOURCES_ARTIFACT");
+      }
+      declarations.add(declaration.id);
+    }
+    const activations = new Set();
+    for (const activation of resourcesArtifact.activations) {
+      const generationRequired = ["pending", "ready", "failed", "cancelled"].includes(activation?.state);
+      if (typeof activation?.id !== "string" || activations.has(activation.id)
+        || !declarations.has(activation?.declaration)
+        || generationRequired !== Number.isInteger(activation?.generation)) {
+        reportDiagnostic(diagnostics, "PSR_INVALID_RESOURCES_ARTIFACT", "Resource activation did not retain canonical lifecycle linkage", { activation }, true);
+        throw new PresolveBootError("PSR_INVALID_RESOURCES_ARTIFACT");
+      }
+      activations.add(activation.id);
     }
   }
 
@@ -3775,6 +3823,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       validateManifestSchema(manifest, effectArtifact, componentArtifact, diagnostics);
       const formsArtifact = readFormsArtifact(diagnostics);
       validateFormsArtifact(formsArtifact, manifest, diagnostics);
+      const resourcesArtifact = readResourcesArtifact(diagnostics);
+      validateResourcesArtifact(resourcesArtifact, diagnostics);
 
       const result = await bootstrapResume({
         diagnostics,
@@ -3906,6 +3956,8 @@ mod tests {
         assert!(runtime.contains("instruction.kind === \"select\""));
         assert!(runtime.contains("instruction.kind === \"get-index\""));
         assert!(runtime.contains("presolve-forms-runtime"));
+        assert!(runtime.contains("presolve-resources-runtime"));
+        assert!(runtime.contains("validateResourcesArtifact"));
         assert!(runtime.contains("initializeFormsRuntime"));
         assert!(runtime.contains("dispatchFormSubmit"));
         assert!(runtime.contains("form_hosts"));

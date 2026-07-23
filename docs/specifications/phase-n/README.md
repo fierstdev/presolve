@@ -35,3 +35,4 @@ numbered slice is accepted.
 * [N6-C6 Resource runtime module ABI contract](PHASE_N_N6C6_RESOURCE_RUNTIME_MODULE_ABI_CONTRACT.md)
 * [N6-C7 Resource artifact module binding contract](PHASE_N_N6C7_RESOURCE_ARTIFACT_MODULE_BINDING_CONTRACT.md)
 * [N6-C8 Resource page publication contract](PHASE_N_N6C8_RESOURCE_PAGE_PUBLICATION_CONTRACT.md)
+* [N6-C9 Resource runtime validation contract](PHASE_N_N6C9_RESOURCE_RUNTIME_VALIDATION_CONTRACT.md)
