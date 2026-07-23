@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use crate::compilation_unit::CompilationUnit;
 use crate::module_graph::{ModuleEdgeKind, ModuleGraph, ModuleTarget};
 use crate::semantic_package::{
-    SemanticPackageKind, SemanticPackagePureOperation, SemanticPackageResolutionTable,
-    SemanticPackageResourceEndpoint,
+    SemanticPackageKind, SemanticPackageOpaqueTerminal, SemanticPackagePureOperation,
+    SemanticPackageResolutionTable, SemanticPackageResourceEndpoint,
 };
 use crate::symbol_table::{ModuleSymbol, SymbolKind, SymbolTable};
 
@@ -56,6 +56,7 @@ pub enum ImportBindingTarget {
         resume_policy: String,
         pure_operation: Option<SemanticPackagePureOperation>,
         resource_endpoint: Option<SemanticPackageResourceEndpoint>,
+        opaque_terminal: Option<SemanticPackageOpaqueTerminal>,
     },
 }
 
@@ -301,6 +302,7 @@ fn resolve_semantic_package_import(
                     resume_policy: export.resume_policy.clone(),
                     pure_operation: export.pure_operation,
                     resource_endpoint: export.resource_endpoint.clone(),
+                    opaque_terminal: export.opaque_terminal.clone(),
                 },
             },
         );
@@ -793,6 +795,7 @@ class Second extends Component {
             resume_policy,
             pure_operation: _,
             resource_endpoint: _,
+            opaque_terminal: _,
         } = &bindings
             .resolve_import("src/App.tsx", "format")
             .unwrap()

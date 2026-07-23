@@ -26,18 +26,23 @@ body with one compiler-recorded terminal Action activation. The method remains
 the ordinary compiler-owned event target and Action batch boundary; the opaque
 export is never parsed, analyzed, inlined, or treated as a component callback.
 
-The selected package must be supplied through a new exact opaque-runtime table:
-package specifier, resolved version, SHA-256 integrity, runtime module location,
-and exported name. The compiler treats those values as an explicit host input,
-not package-manager discovery or a semantic package contract.
+The selected package must be an explicitly imported `opaque` export in the
+existing semantic-package resolution table. Its closed terminal contract binds
+the import specifier to the package coordinate, resolved version, SHA-256
+integrity, exported name, runtime module, `() -> void` signature, client
+boundary, and `cold_fallback` resume policy. This reuses the compiler's one
+integrity authority rather than creating an unverified opaque-runtime table.
+It is still an explicit host input: there is no package-manager discovery,
+lockfile read, or package implementation inspection.
 
 ## Initial boundary
 
 The first opaque capability is client-only and has no application inputs or
-outputs. Generated runtime dynamically imports only the exact host-bound
-module, obtains only the declared export, checks that it is callable, and calls
-it with no arguments after the compiler-owned Action batch starts. Failure is
-recorded as an opaque runtime diagnostic and leaves compiler-owned State, Form,
+outputs. A valid resolution is a compiler semantic product only; the later
+runtime slice will dynamically import only the exact host-bound module, obtain
+only the declared export, check that it is callable, and call it with no
+arguments after the compiler-owned Action batch starts. Failure must be
+recorded as an opaque runtime diagnostic and leave compiler-owned State, Form,
 Context, Component, and Resource storage untouched.
 
 It may not appear on State, Computed, Effect, Form, Resource, Context, Slot, or
@@ -56,9 +61,11 @@ the existing Action batch, not arbitrary source code. Inspection and every
 runtime diagnostic label the activation `opaque`.
 
 Malformed, duplicate, mismatched, non-client, missing-export, non-callable,
-or integrity-unbound records fail closed. There is no fallback to normal module
-resolution, an authored function body, `eval`, dynamic import expressions,
-opaque render islands, server execution, or hydration.
+or integrity-unbound records fail closed. An opaque declaration must match an
+actual imported opaque semantic-package export; a pure/resource/nonsemantic
+binding is rejected. There is no fallback to normal module resolution, an
+authored function body, `eval`, dynamic import expressions, opaque render
+islands, server execution, or hydration.
 
 ## Required proof
 

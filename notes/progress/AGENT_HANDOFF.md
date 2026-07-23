@@ -3,8 +3,8 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N9-B - Opaque terminal Action declaration validation
-* Working tree: clean after the N9-B declaration-validation commit.
+* Latest completed slice: N9-C - Opaque terminal package resolution
+* Working tree: N9-C is ready for final verification and commit.
 * Date: 2026-07-23
 
 Last completed slice
@@ -53,6 +53,11 @@ Last completed slice
 * Result: the framework-facing opaque boundary is specified as an explicit, terminal compiler activation: `@opaque("package", "export")` may annotate only an empty, synchronous, zero-parameter `@action()` method. The compiler retains a deterministic per-component opaque-activation fact with exact package/export coordinates and rejects malformed declarations as `PSC1130`; decorators alone remain semantically inert.
 * Verification: focused component-graph retention/diagnostic test, `cargo fmt --all --check`, and `cargo check -p presolve-compiler` pass.
 * Next: resolve each valid fact through an integrity-checked package contract, then lower only the resulting canonical activation into runtime/artifact lifecycle products. Do not introduce source interpretation or a framework-side external-call runtime.
+
+* Slice: N9-C - Opaque Terminal Package Resolution
+* Result: a valid opaque Action now resolves only when its package/export strings match an actual import backed by a closed `opaque` semantic-package export contract. The compiler records exact package/version/integrity/module/export coordinates, client terminal boundary, and cold-fallback policy as an ASM resolution product. Pure, Resource, local, missing, or uncontracted imports fail as `PSC1131`; the compiler does not load package bytes.
+* Verification: focused semantic-package validation plus positive integrity-bound and negative non-opaque application-model resolution tests, formatting, and compiler check pass.
+* Next: consume only resolved opaque terminal facts in a schema-versioned runtime artifact and exact package-runtime module binding; retain cold resume fallback and no State/Context/Form write authority.
 
 * Slice: N2-G - Compiler-Registered Math Rounding
 * Result: exact one-argument `Math.floor`, `Math.ceil`, and `Math.round` in supported Computed getters now resolve to compiler-registered unary operations, retain their operand dependencies, lower to canonical `Floor`/`Ceil`/`Round` IR, and execute only from schema-v11 computed-runtime instructions. No generic Math dispatch, overload, callback, alias, or authored JavaScript execution is admitted.

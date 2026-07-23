@@ -67,6 +67,7 @@ pub mod layout_graph;
 pub mod lazy_action_chunks;
 pub mod model;
 pub mod module_graph;
+pub mod opaque;
 pub mod ordinary_html_codegen;
 pub mod ordinary_template_instance;
 pub mod ordinary_template_integrity;
@@ -184,25 +185,25 @@ pub use component_diagnostics::{
     collect_component_diagnostics, ComponentDiagnosticContract, COMPONENT_DIAGNOSTIC_CONTRACTS,
 };
 pub use component_graph::{
-    build_component_graph, build_component_graph_for_module, ArithmeticEvaluationError,
-    ArithmeticExpression, ArithmeticExpressionKind, ArithmeticOperator, AuthoredComponentHeritage,
-    AuthoredContextDeclarationCandidate, AuthoredDeclarationKind, AuthoredSlotDeclarationCandidate,
-    AuthoredSubmissionDeclarationFact, AuthoredValidationRuleArgument,
-    AuthoredValidationRuleArgumentKind, AuthoredValidationRuleDeclarationFact,
-    AuthoredValidationRuleExpression, AuthoredValidationRuleExpressionKind, ComparisonOperator,
-    ComponentAction, ComponentDiagnostic, ComponentDiagnosticSeverity, ComponentGraph,
-    ComponentMethod, ComponentNode, ComputedExpression, ComputedExpressionKind,
-    ConstantEvaluationError, ConstantExpression, ConstantExpressionKind, ConsumerDeclaration,
-    ContextDeclaration, ContextDeclarationCandidateKind, ContextDeclarationViolation,
-    ContextDesignator, DeclaredStateType, DeclaredStateTypeKind, DiagnosticSecondaryLabel,
-    EffectBodySyntax, EffectExpression, EffectExpressionKind, EffectStatementSyntax,
-    EffectStatementSyntaxKind, FormDeclarationCandidate, FormDeclarationStatus,
-    FormDeclarationViolation, FormDesignatorFact, FormFieldDeclarationCandidate,
-    FormFieldDeclarationViolation, LogicalOperator, MethodCall, MethodLocalVariable,
-    MethodParameter, RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler,
-    RenderFragment, RenderList, RenderModel, SerializableValue, SlotDeclaration,
-    SlotDeclarationViolation, SlotKind, StateField, StateOperation, UnsupportedEffectStatementKind,
-    UnsupportedFormDesignatorFact,
+    build_component_graph, build_component_graph_for_module, is_valid_opaque_action_fact,
+    ArithmeticEvaluationError, ArithmeticExpression, ArithmeticExpressionKind, ArithmeticOperator,
+    AuthoredComponentHeritage, AuthoredContextDeclarationCandidate, AuthoredDeclarationKind,
+    AuthoredOpaqueActionFact, AuthoredSlotDeclarationCandidate, AuthoredSubmissionDeclarationFact,
+    AuthoredValidationRuleArgument, AuthoredValidationRuleArgumentKind,
+    AuthoredValidationRuleDeclarationFact, AuthoredValidationRuleExpression,
+    AuthoredValidationRuleExpressionKind, ComparisonOperator, ComponentAction, ComponentDiagnostic,
+    ComponentDiagnosticSeverity, ComponentGraph, ComponentMethod, ComponentNode,
+    ComputedExpression, ComputedExpressionKind, ConstantEvaluationError, ConstantExpression,
+    ConstantExpressionKind, ConsumerDeclaration, ContextDeclaration,
+    ContextDeclarationCandidateKind, ContextDeclarationViolation, ContextDesignator,
+    DeclaredStateType, DeclaredStateTypeKind, DiagnosticSecondaryLabel, EffectBodySyntax,
+    EffectExpression, EffectExpressionKind, EffectStatementSyntax, EffectStatementSyntaxKind,
+    FormDeclarationCandidate, FormDeclarationStatus, FormDeclarationViolation, FormDesignatorFact,
+    FormFieldDeclarationCandidate, FormFieldDeclarationViolation, LogicalOperator, MethodCall,
+    MethodLocalVariable, MethodParameter, RenderAttribute, RenderAttributeValue, RenderChild,
+    RenderEventHandler, RenderFragment, RenderList, RenderModel, SerializableValue,
+    SlotDeclaration, SlotDeclarationViolation, SlotKind, StateField, StateOperation,
+    UnsupportedEffectStatementKind, UnsupportedFormDesignatorFact,
 };
 pub use component_initialization::{
     plan_component_initialization, ComponentInitializationPlan, ComponentInstanceBatch,
@@ -423,6 +424,7 @@ pub use model::{
 pub use module_graph::{
     build_module_graph, ModuleEdge, ModuleEdgeKind, ModuleGraph, ModuleNode, ModuleTarget,
 };
+pub use opaque::{OpaqueActionResolution, OpaqueActionResolutionOutcome, OpaqueTerminalBinding};
 pub use ordinary_html_codegen::generate_ordinary_instance_html;
 pub use ordinary_template_instance::{
     build_ordinary_template_instance_registry, validate_ordinary_template_instance_registry,
@@ -715,7 +717,8 @@ pub use semantic_id::{
 };
 pub use semantic_package::{
     parse_semantic_package_contract, SemanticPackageContract, SemanticPackageContractError,
-    SemanticPackageExport, SemanticPackageKind, SemanticPackagePureOperation,
+    SemanticPackageExport, SemanticPackageKind, SemanticPackageOpaqueExecutionBoundary,
+    SemanticPackageOpaqueResumePolicy, SemanticPackageOpaqueTerminal, SemanticPackagePureOperation,
     SemanticPackageResolutionTable, SemanticPackageResourceCancellation,
     SemanticPackageResourceEndpoint, SemanticPackageResourceExecutionBoundary,
     SemanticPackageResourceResumePolicy, SEMANTIC_PACKAGE_CONTRACT_SCHEMA_VERSION,
@@ -2035,6 +2038,91 @@ class OpaqueActions extends Component {
             "{:?}",
             graph.diagnostics
         );
+    }
+
+    #[test]
+    fn resolves_opaque_action_through_an_integrity_checked_terminal_package_contract() {
+        let unit = CompilationUnit::parse_sources([(
+            "src/Checkout.tsx",
+            r#"
+import { trackPurchase } from "@acme/analytics";
+
+@component("x-checkout")
+class Checkout extends Component {
+  @action() @opaque("@acme/analytics", "trackPurchase")
+  track(): void {}
+
+  render() { return <button onClick={this.track}>Buy</button>; }
+}
+"#,
+        )]);
+        let contract = parse_semantic_package_contract(
+            r#"{"schema_version":1,"package":"@acme/analytics","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"trackPurchase":{"kind":"opaque","type_signature":"() -> void","runtime_module":"dist/track.js","resume_policy":"cold_fallback","opaque_terminal":{"execution_boundary":"client","resume":"cold_fallback"}}}}"#,
+        )
+        .expect("opaque terminal contract");
+        let mut packages = SemanticPackageResolutionTable::default();
+        packages
+            .insert("@acme/analytics".into(), contract)
+            .expect("unique contract");
+
+        let model = build_application_semantic_model_for_unit_with_packages(&unit, &packages);
+        assert_eq!(model.opaque_action_resolutions.len(), 1);
+        let resolution = &model.opaque_action_resolutions[0];
+        assert_eq!(
+            resolution.activation.as_str(),
+            "module:src/Checkout.tsx/component:x-checkout/opaque-activation:track"
+        );
+        let OpaqueActionResolutionOutcome::Resolved(binding) = &resolution.outcome else {
+            panic!(
+                "expected resolved opaque terminal: {:?}",
+                resolution.outcome
+            );
+        };
+        assert_eq!(binding.package, "@acme/analytics");
+        assert_eq!(binding.version, "1.2.3");
+        assert_eq!(binding.export, "trackPurchase");
+        assert_eq!(binding.runtime_module, "dist/track.js");
+        assert!(model
+            .diagnostics
+            .iter()
+            .all(|diagnostic| diagnostic.code != "PSC1130" && diagnostic.code != "PSC1131"));
+    }
+
+    #[test]
+    fn opaque_action_rejects_a_nonopaque_package_export() {
+        let unit = CompilationUnit::parse_sources([(
+            "src/Checkout.tsx",
+            r#"
+import { format } from "date-kit";
+
+@component("x-checkout")
+class Checkout extends Component {
+  @action() @opaque("date-kit", "format")
+  track(): void {}
+
+  render() { return <button onClick={this.track}>Buy</button>; }
+}
+"#,
+        )]);
+        let contract = parse_semantic_package_contract(
+            r#"{"schema_version":1,"package":"date-kit","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"format":{"kind":"pure","type_signature":"(Date) -> string","runtime_module":"dist/format.js","resume_policy":"input_only"}}}"#,
+        )
+        .expect("pure contract");
+        let mut packages = SemanticPackageResolutionTable::default();
+        packages.insert("date-kit".into(), contract).unwrap();
+
+        let model = build_application_semantic_model_for_unit_with_packages(&unit, &packages);
+        assert!(matches!(
+            model.opaque_action_resolutions[0].outcome,
+            OpaqueActionResolutionOutcome::NonOpaqueBinding {
+                kind: SemanticPackageKind::Pure,
+                ..
+            }
+        ));
+        assert!(model
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "PSC1131"));
     }
 
     #[test]

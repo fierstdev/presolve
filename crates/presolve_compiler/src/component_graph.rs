@@ -1575,17 +1575,7 @@ fn collect_opaque_action_diagnostics(
     diagnostics: &mut Vec<ComponentDiagnostic>,
 ) {
     for fact in facts {
-        let valid = fact.owner_component.is_some()
-            && fact.invoked
-            && fact.argument_count == 2
-            && fact.package.as_ref().is_some_and(|value| !value.is_empty())
-            && fact.export.as_ref().is_some_and(|value| !value.is_empty())
-            && fact.is_action
-            && fact.action_invoked
-            && !fact.is_async
-            && fact.parameter_count == 0
-            && !fact.has_body_effects;
-        if !valid {
+        if !is_valid_opaque_action_fact(fact) {
             diagnostics.push(ComponentDiagnostic::error(
                 "PSC1130",
                 format!(
@@ -1595,6 +1585,20 @@ fn collect_opaque_action_diagnostics(
             ));
         }
     }
+}
+
+#[must_use]
+pub fn is_valid_opaque_action_fact(fact: &AuthoredOpaqueActionFact) -> bool {
+    fact.owner_component.is_some()
+        && fact.invoked
+        && fact.argument_count == 2
+        && fact.package.as_ref().is_some_and(|value| !value.is_empty())
+        && fact.export.as_ref().is_some_and(|value| !value.is_empty())
+        && fact.is_action
+        && fact.action_invoked
+        && !fact.is_async
+        && fact.parameter_count == 0
+        && !fact.has_body_effects
 }
 
 fn opaque_action_facts_from_class(

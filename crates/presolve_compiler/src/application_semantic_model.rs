@@ -103,6 +103,10 @@ pub struct ApplicationSemanticModel {
     /// Integrity-checked package endpoint selections for Resource declaration
     /// and activation lowering.
     pub resource_endpoint_resolutions: Vec<crate::ResourceEndpointResolution>,
+    /// Integrity-checked opaque terminal package selections. These are
+    /// resolution facts only until a later artifact/runtime lowering product
+    /// consumes them.
+    pub opaque_action_resolutions: Vec<crate::OpaqueActionResolution>,
     /// Validated Resource declaration products projected into the canonical
     /// runtime activation artifact when a host supplies exact module locations.
     pub resource_declarations: BTreeMap<ResourceId, crate::ResourceDeclaration>,
@@ -1348,6 +1352,8 @@ pub fn build_application_semantic_model_from_component_graph(
     let forms = collect_form_entities(&component_graph.components);
     let resource_endpoint_resolutions =
         collect_resource_endpoint_resolutions(&component_graph.components, None);
+    let opaque_action_resolutions =
+        collect_opaque_action_resolutions(&component_graph.components, None);
     let base_semantic_types = SemanticTypeModel::from_components(
         &component_graph.components,
         &component_graph.provenance,
@@ -1709,6 +1715,7 @@ pub fn build_application_semantic_model_from_component_graph(
         consumers,
         forms,
         resource_endpoint_resolutions,
+        opaque_action_resolutions,
         resource_declarations,
         resource_activations,
         form_field_declaration_candidates,
@@ -1862,6 +1869,10 @@ fn build_application_semantic_model_from_files_with_bindings(
         collect_resource_endpoint_resolutions(&components, bindings);
     diagnostics.extend(collect_resource_lowering_diagnostics(
         &resource_endpoint_resolutions,
+    ));
+    let opaque_action_resolutions = collect_opaque_action_resolutions(&components, bindings);
+    diagnostics.extend(collect_opaque_action_lowering_diagnostics(
+        &opaque_action_resolutions,
     ));
 
     let component_invocations = collect_component_invocations(
@@ -2234,6 +2245,7 @@ fn build_application_semantic_model_from_files_with_bindings(
         consumers,
         forms,
         resource_endpoint_resolutions,
+        opaque_action_resolutions,
         resource_declarations,
         resource_activations,
         form_field_declaration_candidates,
@@ -2850,6 +2862,120 @@ fn collect_resource_endpoint_resolutions(
         }
     }
     resolutions
+}
+
+fn collect_opaque_action_resolutions(
+    components: &[ComponentNode],
+    bindings: Option<&crate::BindingTable>,
+) -> Vec<crate::OpaqueActionResolution> {
+    let mut resolutions = Vec::new();
+    for component in components {
+        for fact in component
+            .opaque_action_facts
+            .iter()
+            .filter(|fact| crate::component_graph::is_valid_opaque_action_fact(fact))
+        {
+            let (Some(owner_component), Some(method), Some(package_specifier), Some(export_name)) = (
+                fact.owner_component.as_ref(),
+                fact.method.as_ref(),
+                fact.package.as_ref(),
+                fact.export.as_ref(),
+            ) else {
+                continue;
+            };
+            let outcome = bindings
+                .and_then(|bindings| bindings.module(&component.module_path))
+                .and_then(|module| {
+                    module.imports.values().find(|binding| {
+                        binding.source_module == std::path::PathBuf::from(package_specifier)
+                            && binding.imported_name == *export_name
+                    })
+                })
+                .map_or_else(
+                    || crate::OpaqueActionResolutionOutcome::UnboundImport {
+                        package: package_specifier.clone(),
+                        export: export_name.clone(),
+                    },
+                    |binding| match &binding.target {
+                        crate::ImportBindingTarget::SemanticPackage {
+                            package,
+                            version,
+                            integrity,
+                            export,
+                            kind: crate::SemanticPackageKind::Opaque,
+                            type_signature,
+                            runtime_module,
+                            resume_policy,
+                            opaque_terminal: Some(terminal),
+                            ..
+                        } => crate::OpaqueActionResolutionOutcome::Resolved(
+                            crate::OpaqueTerminalBinding {
+                                local_name: binding.local_name.clone(),
+                                package: package.clone(),
+                                version: version.clone(),
+                                integrity: integrity.clone(),
+                                export: export.clone(),
+                                type_signature: type_signature.clone(),
+                                runtime_module: runtime_module.clone(),
+                                resume_policy: resume_policy.clone(),
+                                terminal: terminal.clone(),
+                            },
+                        ),
+                        crate::ImportBindingTarget::SemanticPackage { kind, .. } => {
+                            crate::OpaqueActionResolutionOutcome::NonOpaqueBinding {
+                                package: package_specifier.clone(),
+                                export: export_name.clone(),
+                                kind: kind.clone(),
+                            }
+                        }
+                        _ => crate::OpaqueActionResolutionOutcome::UnboundImport {
+                            package: package_specifier.clone(),
+                            export: export_name.clone(),
+                        },
+                    },
+                );
+            resolutions.push(crate::OpaqueActionResolution {
+                activation: fact.id.clone(),
+                owner_component: owner_component.clone(),
+                method: method.clone(),
+                method_name: fact.method_name.clone(),
+                package_specifier: package_specifier.clone(),
+                export_name: export_name.clone(),
+                outcome,
+                provenance: fact.provenance.clone(),
+            });
+        }
+    }
+    resolutions.sort_by(|left, right| left.activation.cmp(&right.activation));
+    resolutions
+}
+
+fn collect_opaque_action_lowering_diagnostics(
+    resolutions: &[crate::OpaqueActionResolution],
+) -> Vec<ComponentDiagnostic> {
+    resolutions
+        .iter()
+        .filter_map(|resolution| {
+            let message = match &resolution.outcome {
+                crate::OpaqueActionResolutionOutcome::Resolved(_) => return None,
+                crate::OpaqueActionResolutionOutcome::UnboundImport { package, export } => format!(
+                    "opaque Action `{}` requires an imported opaque semantic-package export `{package}` / `{export}`",
+                    resolution.method_name
+                ),
+                crate::OpaqueActionResolutionOutcome::NonOpaqueBinding {
+                    package,
+                    export,
+                    kind,
+                } => format!(
+                    "opaque Action `{}` selects `{package}` / `{export}` with package kind {kind:?}, not opaque",
+                    resolution.method_name
+                ),
+            };
+            let mut diagnostic = ComponentDiagnostic::error("PSC1131", message);
+            diagnostic.provenance = Some(resolution.provenance.clone());
+            Some(diagnostic)
+        })
+        .collect()
 }
 
 fn collect_resource_declarations(

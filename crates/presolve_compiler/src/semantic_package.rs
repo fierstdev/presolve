@@ -12,6 +12,7 @@ pub enum SemanticPackageKind {
     Resource,
     Codec,
     Component,
+    Opaque,
 }
 
 /// A closed compiler-lowered operation that a `pure` package export may declare.
@@ -45,6 +46,31 @@ pub enum SemanticPackageResourceResumePolicy {
     Snapshot,
 }
 
+/// Execution side for the initial opaque terminal package boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticPackageOpaqueExecutionBoundary {
+    Client,
+}
+
+/// Resume behavior for an opaque terminal package activation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticPackageOpaqueResumePolicy {
+    ColdFallback,
+}
+
+/// Closed contract for a no-input, no-output opaque terminal export.
+///
+/// This records how the application may use a package without giving the
+/// compiler authority to inspect its implementation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SemanticPackageOpaqueTerminal {
+    pub execution_boundary: SemanticPackageOpaqueExecutionBoundary,
+    pub resume: SemanticPackageOpaqueResumePolicy,
+}
+
 /// Closed semantic contract for an executable Resource package export.
 ///
 /// The compiler still does not execute or inspect package implementation. This
@@ -68,6 +94,8 @@ pub struct SemanticPackageExport {
     pub pure_operation: Option<SemanticPackagePureOperation>,
     #[serde(default)]
     pub resource_endpoint: Option<SemanticPackageResourceEndpoint>,
+    #[serde(default)]
+    pub opaque_terminal: Option<SemanticPackageOpaqueTerminal>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -91,6 +119,7 @@ pub enum SemanticPackageContractError {
     InvalidExportContract,
     InvalidPureOperation,
     InvalidResourceEndpoint,
+    InvalidOpaqueTerminal,
     DuplicateSpecifier,
 }
 
@@ -137,6 +166,14 @@ pub fn parse_semantic_package_contract(
         (export.kind == SemanticPackageKind::Resource) != export.resource_endpoint.is_some()
     }) {
         return Err(SemanticPackageContractError::InvalidResourceEndpoint);
+    }
+    if contract.exports.values().any(|export| {
+        (export.kind == SemanticPackageKind::Opaque) != export.opaque_terminal.is_some()
+            || (export.kind == SemanticPackageKind::Opaque
+                && (export.type_signature != "() -> void"
+                    || export.resume_policy != "cold_fallback"))
+    }) {
+        return Err(SemanticPackageContractError::InvalidOpaqueTerminal);
     }
     Ok(contract)
 }
@@ -220,6 +257,29 @@ mod tests {
                 execution_boundary: SemanticPackageResourceExecutionBoundary::Shared,
                 cancellation: SemanticPackageResourceCancellation::Abort,
                 resume: SemanticPackageResourceResumePolicy::Snapshot,
+            })
+        );
+    }
+
+    #[test]
+    fn opaque_exports_require_the_closed_terminal_contract() {
+        let missing_terminal = parse_semantic_package_contract(
+            r#"{"schema_version":1,"package":"@acme/analytics","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"trackPurchase":{"kind":"opaque","type_signature":"() -> void","runtime_module":"dist/track.js","resume_policy":"cold_fallback"}}}"#,
+        );
+        assert_eq!(
+            missing_terminal,
+            Err(SemanticPackageContractError::InvalidOpaqueTerminal)
+        );
+
+        let contract = parse_semantic_package_contract(
+            r#"{"schema_version":1,"package":"@acme/analytics","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"trackPurchase":{"kind":"opaque","type_signature":"() -> void","runtime_module":"dist/track.js","resume_policy":"cold_fallback","opaque_terminal":{"execution_boundary":"client","resume":"cold_fallback"}}}}"#,
+        )
+        .expect("opaque terminal contract");
+        assert_eq!(
+            contract.exports["trackPurchase"].opaque_terminal,
+            Some(SemanticPackageOpaqueTerminal {
+                execution_boundary: SemanticPackageOpaqueExecutionBoundary::Client,
+                resume: SemanticPackageOpaqueResumePolicy::ColdFallback,
             })
         );
     }
