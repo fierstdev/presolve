@@ -1959,6 +1959,7 @@ class ResourceFact extends Component {
         assert_eq!(facts[0].field, "profile");
         assert!(facts[0].decorator_invoked);
         assert_eq!(facts[0].decorator_argument_count, 1);
+        assert_eq!(facts[0].endpoint_designator.as_deref(), Some("profile"));
         assert!(graph
             .diagnostics
             .iter()

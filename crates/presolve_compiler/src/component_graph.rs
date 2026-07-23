@@ -150,6 +150,7 @@ pub struct AuthoredResourceDeclarationFact {
     pub field: String,
     pub decorator_invoked: bool,
     pub decorator_argument_count: usize,
+    pub endpoint_designator: Option<String>,
     pub declared_type: Option<DeclaredStateType>,
     pub provenance: SourceProvenance,
 }
@@ -3147,6 +3148,7 @@ fn resource_declaration_candidates_from_class(
                 field: property.name.clone(),
                 decorator_invoked: decorator.is_invoked,
                 decorator_argument_count: decorator.argument_count,
+                endpoint_designator: decorator.argument.clone(),
                 declared_type: property.type_annotation.as_ref().map(|annotation| {
                     DeclaredStateType {
                         text: annotation.text.clone(),
