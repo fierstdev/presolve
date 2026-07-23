@@ -224,6 +224,13 @@ the parser, expression graph, IR, and artifact; generated reads remain
 own-property and null-safe. Optional calls, optional index access, writes, and
 reflection remain outside this admission.
 
+#### N2-E — compiler-registered numeric helper
+
+Admit only exact `Math.abs(value)` as a registered pure helper in a supported
+Computed getter. It has one numeric operand, compiler-derived dependencies,
+unary IR lowering, and a versioned runtime operation; generic calls remain
+outside the language.
+
 ### N3 — State, Actions, Computed, and Effects over real data
 
 Allow State fields to hold structurally serializable records, arrays, optional

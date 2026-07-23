@@ -550,6 +550,10 @@ pub enum ComputedExpressionKind {
         callee: String,
         arguments: Vec<ComputedExpression>,
     },
+    BuiltinPureCall {
+        operation: BuiltinPureOperation,
+        arguments: Vec<ComputedExpression>,
+    },
     SemanticPackagePureCall {
         local_name: String,
         package: String,
@@ -584,6 +588,11 @@ pub enum ComputedExpressionKind {
         operand: Box<ComputedExpression>,
         operator: UnaryOperator,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuiltinPureOperation {
+    MathAbs,
 }
 
 /// Ordered source syntax retained from one `@effect()` body before semantic resolution.

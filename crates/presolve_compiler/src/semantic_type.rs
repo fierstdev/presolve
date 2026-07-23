@@ -1706,6 +1706,10 @@ fn infer_effect_expression_type(
         } => arguments.first().map_or(SemanticType::Unknown, |argument| {
             child_type(argument, expression_types)
         }),
+        ExpressionNodeKind::BuiltinPureCall {
+            operation: crate::component_graph::BuiltinPureOperation::MathAbs,
+            ..
+        } => SemanticType::Number,
         ExpressionNodeKind::ThisMember { name } => effects
             .get(&node.owner)
             .and_then(|effect| effect.owner.entity_id())
@@ -2144,6 +2148,7 @@ fn expression_semantic_type(
         ExpressionNodeKind::Identifier(_)
         | ExpressionNodeKind::Call { .. }
         | ExpressionNodeKind::SemanticPackagePureCall { .. }
+        | ExpressionNodeKind::BuiltinPureCall { .. }
         | ExpressionNodeKind::ThisMember { .. }
         | ExpressionNodeKind::MemberAccess { .. }
         | ExpressionNodeKind::IndexAccess { .. }
@@ -2264,6 +2269,10 @@ fn infer_context_source_expression_type(
         } => arguments
             .first()
             .map_or(SemanticType::Unknown, |argument| child(argument, inferred)),
+        ExpressionNodeKind::BuiltinPureCall {
+            operation: crate::component_graph::BuiltinPureOperation::MathAbs,
+            ..
+        } => SemanticType::Number,
         ExpressionNodeKind::ThisMember { name } => owners
             .get(&node.owner)
             .and_then(|owner| components.get(owner))
@@ -2382,6 +2391,10 @@ fn infer_computed_expression_type(
         } => arguments.first().map_or(SemanticType::Unknown, |argument| {
             child_type(argument, expression_types, computed_types, visiting)
         }),
+        ExpressionNodeKind::BuiltinPureCall {
+            operation: crate::component_graph::BuiltinPureOperation::MathAbs,
+            ..
+        } => SemanticType::Number,
         ExpressionNodeKind::ThisMember { name } => infer_computed_read_type(
             &node.owner,
             name,

@@ -1415,6 +1415,22 @@ impl ExpressionIrLowering<'_> {
             ExpressionNodeKind::Call { .. } => {
                 return None;
             }
+            ExpressionNodeKind::BuiltinPureCall {
+                operation,
+                arguments,
+            } => {
+                let [argument] = arguments.as_slice() else {
+                    return None;
+                };
+                IrInstructionKind::Unary {
+                    operation: match operation {
+                        crate::component_graph::BuiltinPureOperation::MathAbs => {
+                            IrUnaryOperation::Abs
+                        }
+                    },
+                    operand: IrOperand::Value(self.lower_node(argument)?),
+                }
+            }
             ExpressionNodeKind::Template {
                 quasis,
                 expressions,
@@ -3928,6 +3944,7 @@ pub enum IrUnaryOperation {
     Not,
     Identity,
     Negate,
+    Abs,
 }
 
 #[cfg(test)]

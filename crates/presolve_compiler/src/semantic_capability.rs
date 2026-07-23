@@ -214,6 +214,17 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
                 "runtime-computed schema v7 select instruction, retained in schema v8",
                 "runtime_browser::boolean_conditional_computed_values_execute_from_compiler_generated_runtime_programs",
             ),
+            admitted(
+                "builtin_math_abs",
+                SemanticCapabilityClass::Bounded,
+                "Math.abs(value) in a supported @computed() getter",
+                "compiler-registered BuiltinPureOperation, canonical IR, and runtime-computed artifact",
+                "exactly one compiler-supported numeric operand",
+                "inherits the operand's compiler-derived dependency set",
+                "serializable numeric result; no package or independent resume record",
+                "runtime-computed schema v9 unary abs operation",
+                "runtime_browser::registered_math_abs_executes_from_compiler_generated_runtime_programs",
+            ),
             deferred(
                 "semantic_package_exports",
                 SemanticCapabilityClass::Unsupported,
@@ -340,6 +351,7 @@ mod tests {
                 "template_interpolation",
                 "static_index_access",
                 "boolean_computed_conditional",
+                "builtin_math_abs",
                 "semantic_package_exports",
                 "resources",
                 "opaque_typescript"

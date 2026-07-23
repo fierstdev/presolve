@@ -197,6 +197,7 @@ fn constant_expression_diagnostic_code_from_node(
         | crate::ExpressionNodeKind::Conditional { .. }
         | crate::ExpressionNodeKind::Template { .. }
         | crate::ExpressionNodeKind::Call { .. }
+        | crate::ExpressionNodeKind::BuiltinPureCall { .. }
         | crate::ExpressionNodeKind::SemanticPackagePureCall { .. } => {
             unreachable!("constant folding only evaluates state initializer expressions")
         }
@@ -220,6 +221,7 @@ fn constant_expression_kind_name_from_node(kind: &crate::ExpressionNodeKind) -> 
         | crate::ExpressionNodeKind::Conditional { .. }
         | crate::ExpressionNodeKind::Template { .. }
         | crate::ExpressionNodeKind::Call { .. }
+        | crate::ExpressionNodeKind::BuiltinPureCall { .. }
         | crate::ExpressionNodeKind::SemanticPackagePureCall { .. } => {
             unreachable!("constant folding only evaluates state initializer expressions")
         }

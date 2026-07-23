@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use crate::component_graph::UnaryOperator;
+use crate::component_graph::{BuiltinPureOperation, UnaryOperator};
 use crate::{
     ComponentNode, ComputedExpression, ComputedExpressionKind, ConstantEvaluationError,
     ConstantExpression, ConstantExpressionKind, EffectExpression, EffectExpressionKind,
@@ -51,6 +51,10 @@ pub enum ExpressionNodeKind {
     },
     Call {
         callee: String,
+        arguments: Vec<SemanticId>,
+    },
+    BuiltinPureCall {
+        operation: BuiltinPureOperation,
         arguments: Vec<SemanticId>,
     },
     SemanticPackagePureCall {
@@ -105,6 +109,7 @@ impl ExpressionNode {
             } => vec![condition, when_true, when_false],
             ExpressionNodeKind::Template { expressions, .. } => expressions.iter().collect(),
             ExpressionNodeKind::Call { arguments, .. }
+            | ExpressionNodeKind::BuiltinPureCall { arguments, .. }
             | ExpressionNodeKind::SemanticPackagePureCall { arguments, .. } => {
                 arguments.iter().collect()
             }
@@ -468,6 +473,17 @@ impl ExpressionGraph {
                     .map(|(index, argument)| child(self, &format!("{path}.{index}"), argument))
                     .collect(),
             },
+            ComputedExpressionKind::BuiltinPureCall {
+                operation,
+                arguments,
+            } => ExpressionNodeKind::BuiltinPureCall {
+                operation: *operation,
+                arguments: arguments
+                    .iter()
+                    .enumerate()
+                    .map(|(index, argument)| child(self, &format!("{path}.{index}"), argument))
+                    .collect(),
+            },
             ComputedExpressionKind::SemanticPackagePureCall {
                 local_name: _,
                 package,
@@ -632,6 +648,7 @@ impl ExpressionGraph {
             | ExpressionNodeKind::Conditional { .. }
             | ExpressionNodeKind::Template { .. }
             | ExpressionNodeKind::Call { .. }
+            | ExpressionNodeKind::BuiltinPureCall { .. }
             | ExpressionNodeKind::SemanticPackagePureCall { .. } => {
                 return None;
             }

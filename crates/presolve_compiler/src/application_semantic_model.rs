@@ -2654,6 +2654,12 @@ fn resolve_semantic_package_pure_call(
                 resolve_semantic_package_pure_call(argument, module_path, bindings);
             }
             let Some(binding) = bindings.resolve_import(module_path, callee) else {
+                if callee == "Math.abs" && arguments.len() == 1 {
+                    expression.kind = ComputedExpressionKind::BuiltinPureCall {
+                        operation: crate::component_graph::BuiltinPureOperation::MathAbs,
+                        arguments: std::mem::take(arguments),
+                    };
+                }
                 return;
             };
             let crate::ImportBindingTarget::SemanticPackage {
@@ -2681,6 +2687,11 @@ fn resolve_semantic_package_pure_call(
                 operation: *operation,
                 arguments: std::mem::take(arguments),
             };
+        }
+        ComputedExpressionKind::BuiltinPureCall { arguments, .. } => {
+            for argument in arguments {
+                resolve_semantic_package_pure_call(argument, module_path, bindings);
+            }
         }
         ComputedExpressionKind::SemanticPackagePureCall { arguments, .. } => {
             for argument in arguments {
@@ -2735,6 +2746,9 @@ fn contains_semantic_package_pure_call(expression: &ComputedExpression, callee: 
                     .any(|argument| contains_semantic_package_pure_call(argument, callee))
         }
         ComputedExpressionKind::Call { arguments, .. } => arguments
+            .iter()
+            .any(|argument| contains_semantic_package_pure_call(argument, callee)),
+        ComputedExpressionKind::BuiltinPureCall { arguments, .. } => arguments
             .iter()
             .any(|argument| contains_semantic_package_pure_call(argument, callee)),
         ComputedExpressionKind::Template { expressions, .. } => expressions

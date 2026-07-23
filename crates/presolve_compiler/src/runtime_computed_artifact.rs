@@ -8,7 +8,7 @@ use crate::{
     SemanticId, SerializableValue, SerializationCompatibility,
 };
 
-pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 8;
+pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 9;
 
 /// Versioned runtime metadata and executable programs emitted from canonical IR.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -153,6 +153,7 @@ pub enum RuntimeComputedArtifactUnaryOperation {
     Not,
     Identity,
     Negate,
+    Abs,
 }
 
 /// Compiler-provided dirty state for one emitted computed evaluation.
@@ -540,6 +541,7 @@ const fn unary_operation(operation: IrUnaryOperation) -> RuntimeComputedArtifact
         IrUnaryOperation::Not => RuntimeComputedArtifactUnaryOperation::Not,
         IrUnaryOperation::Identity => RuntimeComputedArtifactUnaryOperation::Identity,
         IrUnaryOperation::Negate => RuntimeComputedArtifactUnaryOperation::Negate,
+        IrUnaryOperation::Abs => RuntimeComputedArtifactUnaryOperation::Abs,
     }
 }
 
@@ -625,7 +627,7 @@ class RuntimeComputedArtifact extends Component {
         let second = runtime_computed_artifact_json(&build_runtime_computed_artifact(&model, &ir));
         assert_eq!(first, second);
         let json: serde_json::Value = serde_json::from_str(&first).expect("artifact JSON");
-        assert_eq!(json["schema_version"], 8);
+        assert_eq!(json["schema_version"], 9);
         assert_eq!(
             json["evaluations"][0]["program"]["instructions"][0]["kind"],
             "load-state"
@@ -871,6 +873,38 @@ class OptionalComputed extends Component {
                 matches!(
                     instruction,
                     RuntimeComputedArtifactInstruction::GetMember { optional: true, .. }
+                )
+            }));
+    }
+
+    #[test]
+    fn emits_compiler_registered_math_abs_as_unary_program() {
+        let parsed = presolve_parser::parse_file(
+            "src/AbsComputed.tsx",
+            r#"
+@component("x-abs-computed")
+class AbsComputed extends Component {
+  count = state(-2);
+  @computed()
+  get magnitude() { return Math.abs(this.count); }
+  render() { return <output>Abs</output>; }
+}
+"#,
+        );
+        let model = build_application_semantic_model(&parsed);
+        assert!(model.diagnostics.is_empty(), "{:?}", model.diagnostics);
+        let artifact = build_runtime_computed_artifact(&model, &lower_components_to_ir(&model));
+        assert!(artifact.evaluations[0]
+            .program
+            .instructions
+            .iter()
+            .any(|instruction| {
+                matches!(
+                    instruction,
+                    RuntimeComputedArtifactInstruction::Unary {
+                        operation: super::RuntimeComputedArtifactUnaryOperation::Abs,
+                        ..
+                    }
                 )
             }));
     }

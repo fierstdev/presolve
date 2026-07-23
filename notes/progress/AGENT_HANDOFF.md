@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N2-D - Optional Member Access
-* Working tree: clean after the N2-D optional-member-access commit.
+* Latest completed slice: N2-E - Compiler-Registered Math.abs
+* Working tree: clean after the N2-E builtin-math-abs commit.
 * Date: 2026-07-22
 
 Last completed slice
+
+* Slice: N2-E - Compiler-Registered Math.abs
+* Result: admits only exact `Math.abs(value)` in supported Computed getters. The compiler recognizes the exact callee and arity, records `BuiltinPureOperation::MathAbs`, derives operand dependencies, lowers canonical unary `Abs` IR, emits schema-v9 metadata, and evaluates the generated operation without package code or generic calls.
+* Verification: focused compiler/registry/CLI/browser/format/diff verifier passes.
+* Next: N3 may extend real-data State and Action semantics through another complete compiler-owned vertical slice.
 
 * Slice: N2-D - Optional Member Access
 * Result: admits `value?.property` in supported Computed getters. Optionality remains explicit through the parser, expression graph, canonical IR, and schema-v8 `get-member` artifact metadata. The compiler-generated own-property read is null-safe without evaluating authored JavaScript. Optional calls/indexing, writes, and prototype traversal remain excluded.
