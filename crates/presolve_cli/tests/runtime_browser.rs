@@ -2465,6 +2465,68 @@ fn dynamic_attributes_update_in_a_real_browser() {
 }
 
 #[test]
+fn typed_aria_attribute_updates_in_a_real_browser() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let out_dir = repo_root.join("target/psc-browser-test/typed-aria-bindings");
+    if out_dir.exists() {
+        fs::remove_dir_all(&out_dir).expect("failed to clean ARIA browser output");
+    }
+    let output = Command::new(presolve_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            "fixtures/0073-typed-aria-bindings/input/AriaValidityButton.tsx",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("ARIA browser output path was not UTF-8"),
+        ])
+        .output()
+        .expect("failed to build ARIA fixture");
+    assert!(
+        output.status.success(),
+        "ARIA fixture build failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read ARIA page");
+    let probe = index.replace("</body>", r#"<script>
+const deadline = Date.now() + 3000;
+const timer = setInterval(() => {
+  const button = document.querySelector("button");
+  if (document.documentElement.dataset.presolveRuntime !== "ready" || button === null) return;
+  if (button.getAttribute("aria-invalid") !== "false") throw new Error("initial aria-invalid");
+  button.click();
+  const wait = setInterval(() => {
+    if (button.getAttribute("aria-invalid") === "true") {
+      clearInterval(wait); clearInterval(timer);
+      document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_TYPED_ARIA_BROWSER_TEST_PASS</div>");
+    } else if (Date.now() > deadline) throw new Error("updated aria-invalid");
+  }, 20);
+  clearInterval(timer);
+}, 20);
+</script></body>"#);
+    fs::write(out_dir.join("probe.html"), probe).expect("failed to write ARIA probe");
+    let server = StaticServer::start(out_dir.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = out_dir.join(format!("chrome-profile-{}", std::process::id()));
+    fs::create_dir_all(&profile_dir).expect("failed to create ARIA Chrome profile");
+    let output = run_chrome_probe(
+        chrome,
+        &format!("--user-data-dir={}", profile_dir.display()),
+        &format!("http://127.0.0.1:{}/probe.html", server.port),
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("PRESOLVE_TYPED_ARIA_BROWSER_TEST_PASS"),
+        "ARIA browser probe failed\nstdout:\n{}\nstderr:\n{}",
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn fragments_preserve_sibling_identity_in_a_real_browser() {
     let _guard = browser_test_guard();
     let repo_root = repo_root();
