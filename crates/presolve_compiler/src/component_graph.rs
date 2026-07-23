@@ -76,6 +76,9 @@ pub struct ComponentNode {
     pub submission_declaration_facts: Vec<AuthoredSubmissionDeclarationFact>,
     /// Parser-normalized source facts for every recognized `@serialize` placement.
     pub serialization_declaration_facts: Vec<AuthoredSerializationDeclarationFact>,
+    /// Retained N9 opaque terminal Action facts. They have no runtime lowering
+    /// authority until integrity-bound artifact publication is complete.
+    pub opaque_action_facts: Vec<AuthoredOpaqueActionFact>,
     /// Module imports that shadow compiler-owned validation intrinsic names.
     pub shadowed_validation_intrinsics: BTreeSet<String>,
     pub methods: Vec<ComponentMethod>,
@@ -86,6 +89,24 @@ pub struct ComponentNode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthoredComponentHeritage {
     pub base: String,
+    pub provenance: SourceProvenance,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthoredOpaqueActionFact {
+    pub id: SemanticId,
+    pub owner_component: Option<SemanticId>,
+    pub method: Option<SemanticId>,
+    pub method_name: String,
+    pub package: Option<String>,
+    pub export: Option<String>,
+    pub invoked: bool,
+    pub argument_count: usize,
+    pub is_action: bool,
+    pub action_invoked: bool,
+    pub is_async: bool,
+    pub parameter_count: usize,
+    pub has_body_effects: bool,
     pub provenance: SourceProvenance,
 }
 
@@ -1510,6 +1531,8 @@ fn build_component_node(
         submission_declaration_facts_from_class(class, path, element_name.is_some(), &id);
     let serialization_declaration_facts =
         serialization_declaration_facts_from_class(class, path, element_name.is_some(), &id);
+    let opaque_action_facts =
+        opaque_action_facts_from_class(class, path, element_name.is_some(), &id);
 
     ComponentNode {
         id,
@@ -1538,11 +1561,56 @@ fn build_component_node(
         validation_rule_declaration_facts,
         submission_declaration_facts,
         serialization_declaration_facts,
+        opaque_action_facts,
         shadowed_validation_intrinsics,
         methods,
         actions,
         render,
     }
+}
+
+fn opaque_action_facts_from_class(
+    class: &ParsedClass,
+    path: &Path,
+    is_canonical_component: bool,
+    component: &SemanticId,
+) -> Vec<AuthoredOpaqueActionFact> {
+    let mut facts = class
+        .methods
+        .iter()
+        .flat_map(|method| {
+            let action = method
+                .decorators
+                .iter()
+                .find(|decorator| decorator.name == "action");
+            method
+                .decorators
+                .iter()
+                .filter(move |decorator| decorator.name == "opaque")
+                .map(move |decorator| AuthoredOpaqueActionFact {
+                    id: component.opaque_activation(&method.name),
+                    owner_component: is_canonical_component.then(|| component.clone()),
+                    method: is_canonical_component.then(|| component.method(&method.name)),
+                    method_name: method.name.clone(),
+                    package: decorator.arguments.first().and_then(Clone::clone),
+                    export: decorator.arguments.get(1).and_then(Clone::clone),
+                    invoked: decorator.is_invoked,
+                    argument_count: decorator.argument_count,
+                    is_action: action.is_some(),
+                    action_invoked: action.is_some_and(|decorator| decorator.is_invoked),
+                    is_async: method.is_async,
+                    parameter_count: method.parameters.len(),
+                    has_body_effects: !method.state_updates.is_empty()
+                        || !method.local_variables.is_empty()
+                        || !method.return_values.is_empty()
+                        || !method.calls.is_empty()
+                        || method.effect_body.is_some(),
+                    provenance: SourceProvenance::new(path, decorator.span),
+                })
+        })
+        .collect::<Vec<_>>();
+    facts.sort_by(|left, right| left.id.cmp(&right.id));
+    facts
 }
 
 #[allow(clippy::too_many_lines)]
@@ -2554,6 +2622,7 @@ fn is_presolve_semantic_decorator(name: &str) -> bool {
             | "field"
             | "submit"
             | "validate"
+            | "opaque"
     )
 }
 

@@ -565,6 +565,11 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn opaque_activation(&self, method: &str) -> Self {
+        self.child("opaque-activation", method)
+    }
+
+    #[must_use]
     pub fn local_variable(&self, name: &str, index: usize) -> Self {
         self.child("local", &format!("{name}:{index}"))
     }
