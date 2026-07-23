@@ -659,10 +659,10 @@ pub use resume_schema::{
     ResumeSlotSchema, ResumeValueCodec, RESUME_SCHEMA_REGISTRY_VERSION,
 };
 pub use route_graph::{
-    build_file_route_graph_v1, build_route_graph, build_static_route_publication_v1,
-    build_validated_file_route_graph_v1, build_validated_route_graph_v1, route_manifest_json_v1,
-    route_manifest_v1, FileRouteGraphV1, FileRouteNodeV1, RouteGraph, RouteGraphError,
-    RouteManifestEntryV1, RouteManifestV1, RouteNode,
+    build_file_route_graph_from_components_v1, build_file_route_graph_v1, build_route_graph,
+    build_static_route_publication_v1, build_validated_file_route_graph_v1,
+    build_validated_route_graph_v1, route_manifest_json_v1, route_manifest_v1, FileRouteGraphV1,
+    FileRouteNodeV1, RouteGraph, RouteGraphError, RouteManifestEntryV1, RouteManifestV1, RouteNode,
 };
 pub use runtime_codegen::generate_runtime_stub;
 pub use runtime_component::{

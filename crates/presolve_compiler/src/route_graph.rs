@@ -94,6 +94,30 @@ pub fn build_file_route_graph_v1(model: &ApplicationSemanticModel) -> RouteGraph
     }
 }
 
+/// Builds ergonomic file-route topology directly from compiler component facts.
+/// This is used during file-route application-model assembly before the full
+/// application model has derived instance/runtime products.
+#[must_use]
+pub fn build_file_route_graph_from_components_v1(
+    components: &[crate::ComponentNode],
+) -> RouteGraph {
+    RouteGraph {
+        routes: components
+            .iter()
+            .filter_map(|component| {
+                component
+                    .route_path
+                    .clone()
+                    .or_else(|| file_route_path(&component.module_path))
+                    .map(|path| RouteNode {
+                        path,
+                        component: component.id.clone(),
+                    })
+            })
+            .collect(),
+    }
+}
+
 /// Builds and validates the complete `app/routes` topology, including
 /// conventional `layout.tsx` files. A layout file must declare exactly one
 /// component and cannot also claim a route through `@route()`.
