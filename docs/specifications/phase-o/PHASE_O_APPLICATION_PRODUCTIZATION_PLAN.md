@@ -1,7 +1,7 @@
 # Phase O: Application Productization
 
-**Status:** O0–O3 complete. O4 is delegated to the Phase P compiler amendment
-for a canonical multi-source artifact-publication product.
+**Status:** O0–O4 complete. O4 consumes the Phase P P3 canonical multi-source
+artifact-publication product without adding metaframework artifact authority.
 
 ## Objective
 

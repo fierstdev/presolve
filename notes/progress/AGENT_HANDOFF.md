@@ -1643,11 +1643,11 @@ semantic-package contracts/runtime mappings. O2 supplies only immutable
 projection of existing explicit `workspace` and `watch --once` products; it
 creates no watcher, dev server, HMR, discovery, or source-analysis path. O3
 adds a schema-v1 command envelope that selects those projectors and preserves
-executor results unchanged. O4 is delegated to active Phase P. P0-P3 now
-freeze the compiler-owned multi-source request, explicit entry identity,
-canonical artifact inventory, manifest, and atomic CLI publication pointer.
-P4 may project only this command from `@presolve/application`; it may not read
-sources, interpret artifacts, or change publication behavior.
+executor results unchanged. O4 is complete through Phase P P4. P0-P4 freeze
+the compiler-owned multi-source request, explicit entry identity, canonical
+artifact inventory, manifest, atomic CLI publication pointer, and the thin
+`@presolve/application` projection. P5 must execute the complete conformance
+matrix and freeze the compatibility contract.
 
 Useful commands
 
@@ -1678,4 +1678,4 @@ Useful commands
 
 Changed but uncommitted files
 
-* P3 atomic multi-source application publication CLI; commit pending.
+* P4 `@presolve/application` multi-source publication projection; commit pending.

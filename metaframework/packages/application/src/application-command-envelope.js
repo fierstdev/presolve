@@ -1,4 +1,5 @@
 import { createApplicationBuildInvocation } from "./application-build-handoff.js";
+import { createApplicationPublicationInvocation } from "./application-publication-handoff.js";
 import {
   createApplicationWatchOnceInvocation,
   createApplicationWorkspaceInvocation,
@@ -18,9 +19,10 @@ export function createApplicationCommandInvocation(request) {
   }
   switch (request.command) {
     case "build": return createApplicationBuildInvocation(request.input);
+    case "application-build": return createApplicationPublicationInvocation(request.input);
     case "workspace": return createApplicationWorkspaceInvocation(request.input);
     case "watch-once": return createApplicationWatchOnceInvocation(request.input);
-    default: throw new TypeError("command must be build, workspace, or watch-once");
+    default: throw new TypeError("command must be build, application-build, workspace, or watch-once");
   }
 }
 

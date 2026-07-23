@@ -3,6 +3,10 @@ export {
   invokeApplicationBuild,
 } from "./application-build-handoff.js";
 export {
+  createApplicationPublicationInvocation,
+  invokeApplicationPublication,
+} from "./application-publication-handoff.js";
+export {
   createApplicationWatchOnceInvocation,
   createApplicationWorkspaceInvocation,
   invokeApplicationDevelopment,

@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   createApplicationBuildInvocation,
+  createApplicationPublicationInvocation,
   createApplicationCommandInvocation,
   createApplicationWatchOnceInvocation,
   createApplicationWorkspaceInvocation,
   invokeApplicationBuild,
+  invokeApplicationPublication,
   invokeApplicationCommand,
   invokeApplicationDevelopment,
 } from "../src/index.js";
@@ -51,10 +53,47 @@ test("does not translate executor results", () => {
   );
 });
 
+test("projects the canonical explicit multi-source application publication command", () => {
+  const invocation = createApplicationPublicationInvocation({
+    configurationPath: "presolve.json",
+    sources: ["src/App.tsx=src/App.tsx", "src/Card.tsx=src/Card.tsx"],
+    entryPath: "src/App.tsx",
+    outputDirectory: "dist",
+    packageContracts: { "z-service": "contracts/z.json", "a-service": "contracts/a.json" },
+    packageRuntimeModules: { "z-service": "runtime/z.js", "a-service": "runtime/a.js" },
+    production: true,
+  });
+  assert.deepEqual(invocation, {
+    executable: "presolve",
+    arguments: [
+      "application", "build", "--config", "presolve.json",
+      "--source", "src/App.tsx=src/App.tsx",
+      "--source", "src/Card.tsx=src/Card.tsx",
+      "--entry", "src/App.tsx", "--out", "dist",
+      "--package-contract", "a-service=contracts/a.json",
+      "--package-contract", "z-service=contracts/z.json",
+      "--package-runtime", "a-service=runtime/a.js",
+      "--package-runtime", "z-service=runtime/z.js",
+      "--production",
+    ],
+  });
+  const result = Object.freeze({ exitCode: 0 });
+  assert.equal(invokeApplicationPublication({
+    configurationPath: "presolve.json",
+    sources: ["src/App.tsx=src/App.tsx"],
+    entryPath: "src/App.tsx",
+    outputDirectory: "dist",
+  }, () => result), result);
+});
+
 test("rejects malformed caller-owned requests", () => {
   assert.throws(
     () => createApplicationBuildInvocation({ entryPath: "", outputDirectory: "dist" }),
     /entryPath must be a non-empty string/,
+  );
+  assert.throws(
+    () => createApplicationPublicationInvocation({ configurationPath: "presolve.json", sources: [], entryPath: "src/App.tsx", outputDirectory: "dist" }),
+    /sources must be a non-empty array/,
   );
   assert.throws(
     () => createApplicationBuildInvocation({ entryPath: "src/App.tsx", outputDirectory: "dist", packageContracts: [] }),
@@ -113,6 +152,19 @@ test("selects a versioned command envelope without decoding executor output", ()
   );
   assert.throws(
     () => createApplicationCommandInvocation({ ...request, command: "dev" }),
-    /command must be build, workspace, or watch-once/,
+    /command must be build, application-build, workspace, or watch-once/,
   );
+  assert.deepEqual(createApplicationCommandInvocation({
+    schemaVersion: 1,
+    command: "application-build",
+    input: {
+      configurationPath: "presolve.json",
+      sources: ["src/App.tsx=src/App.tsx"],
+      entryPath: "src/App.tsx",
+      outputDirectory: "dist",
+    },
+  }), {
+    executable: "presolve",
+    arguments: ["application", "build", "--config", "presolve.json", "--source", "src/App.tsx=src/App.tsx", "--entry", "src/App.tsx", "--out", "dist"],
+  });
 });
