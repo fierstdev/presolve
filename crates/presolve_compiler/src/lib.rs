@@ -1981,6 +1981,63 @@ class ResourceFact extends Component {
     }
 
     #[test]
+    fn component_graph_retains_and_validates_opaque_action_declarations() {
+        let parsed = presolve_parser::parse_file(
+            "OpaqueActions.tsx",
+            r#"
+@component("x-opaque-actions")
+class OpaqueActions extends Component {
+  @action() @opaque("@acme/analytics", "trackPurchase")
+  track(): void {}
+
+  @action() @opaque("@acme/analytics")
+  missingExport(): void {}
+
+  @opaque("@acme/analytics", "trackPurchase")
+  missingAction(): void {}
+
+  @action() @opaque("@acme/analytics", "trackPurchase")
+  writesState(): void { this.count++; }
+
+  count = state(0);
+
+  render() { return <button onClick={this.track}>Buy</button>; }
+}
+"#,
+        );
+
+        let graph = build_component_graph(&parsed);
+        let component = &graph.components[0];
+        assert_eq!(component.opaque_action_facts.len(), 4);
+
+        let track = component
+            .opaque_action_facts
+            .iter()
+            .find(|fact| fact.method_name == "track")
+            .expect("retained track declaration");
+        assert_eq!(
+            track.id.as_str(),
+            "component:x-opaque-actions/opaque-activation:track"
+        );
+        assert_eq!(track.package.as_deref(), Some("@acme/analytics"));
+        assert_eq!(track.export.as_deref(), Some("trackPurchase"));
+        assert!(track.is_action);
+        assert!(track.action_invoked);
+        assert!(!track.has_body_effects);
+
+        assert_eq!(
+            graph
+                .diagnostics
+                .iter()
+                .filter(|diagnostic| diagnostic.code == "PSC1130")
+                .count(),
+            3,
+            "{:?}",
+            graph.diagnostics
+        );
+    }
+
+    #[test]
     fn resolves_resource_source_designator_through_integrity_checked_package_contract() {
         let unit = CompilationUnit::parse_sources([(
             "src/Profile.tsx",

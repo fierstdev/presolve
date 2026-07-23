@@ -3,8 +3,8 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N7-B-D - Nested Form Field-Path Admission
-* Working tree: N8-B compatibility and migration guidance is ready for final verification and commit.
+* Latest completed slice: N9-B - Opaque terminal Action declaration validation
+* Working tree: clean after the N9-B declaration-validation commit.
 * Date: 2026-07-23
 
 Last completed slice
@@ -48,6 +48,11 @@ Last completed slice
 * Result: `presolve explain --capabilities --format migration` now generates a deterministic compatibility policy, deferred-capability migration guide, and rejected-syntax catalog from the same semantic capability registry used by JSON and the human matrix. It lists only deferred records with their compiler-issued reasons, adds no source rewriter or legacy compatibility path, and makes clear that opaque TypeScript remains unavailable before N9.
 * Verification: focused compiler registry/migration rendering and CLI projection test plus both N8 verifier scripts.
 * Next: write and implement the N9 opaque boundary only as a terminal compiler activation boundary with explicit typed inputs, runtime integrity, lifecycle, error, and resume policy.
+
+* Slice: N9-A through N9-B - Opaque Terminal Action Contract and Declaration Validation
+* Result: the framework-facing opaque boundary is specified as an explicit, terminal compiler activation: `@opaque("package", "export")` may annotate only an empty, synchronous, zero-parameter `@action()` method. The compiler retains a deterministic per-component opaque-activation fact with exact package/export coordinates and rejects malformed declarations as `PSC1130`; decorators alone remain semantically inert.
+* Verification: focused component-graph retention/diagnostic test, `cargo fmt --all --check`, and `cargo check -p presolve-compiler` pass.
+* Next: resolve each valid fact through an integrity-checked package contract, then lower only the resulting canonical activation into runtime/artifact lifecycle products. Do not introduce source interpretation or a framework-side external-call runtime.
 
 * Slice: N2-G - Compiler-Registered Math Rounding
 * Result: exact one-argument `Math.floor`, `Math.ceil`, and `Math.round` in supported Computed getters now resolve to compiler-registered unary operations, retain their operand dependencies, lower to canonical `Floor`/`Ceil`/`Round` IR, and execute only from schema-v11 computed-runtime instructions. No generic Math dispatch, overload, callback, alias, or authored JavaScript execution is admitted.

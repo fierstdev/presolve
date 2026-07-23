@@ -1533,6 +1533,7 @@ fn build_component_node(
         serialization_declaration_facts_from_class(class, path, element_name.is_some(), &id);
     let opaque_action_facts =
         opaque_action_facts_from_class(class, path, element_name.is_some(), &id);
+    collect_opaque_action_diagnostics(&opaque_action_facts, diagnostics);
 
     ComponentNode {
         id,
@@ -1566,6 +1567,33 @@ fn build_component_node(
         methods,
         actions,
         render,
+    }
+}
+
+fn collect_opaque_action_diagnostics(
+    facts: &[AuthoredOpaqueActionFact],
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+) {
+    for fact in facts {
+        let valid = fact.owner_component.is_some()
+            && fact.invoked
+            && fact.argument_count == 2
+            && fact.package.as_ref().is_some_and(|value| !value.is_empty())
+            && fact.export.as_ref().is_some_and(|value| !value.is_empty())
+            && fact.is_action
+            && fact.action_invoked
+            && !fact.is_async
+            && fact.parameter_count == 0
+            && !fact.has_body_effects;
+        if !valid {
+            diagnostics.push(ComponentDiagnostic::error(
+                "PSC1130",
+                format!(
+                    "opaque Action `{}` must be @opaque(\"package\", \"export\") on an empty synchronous zero-parameter @action() method",
+                    fact.method_name
+                ),
+            ));
+        }
     }
 }
 
