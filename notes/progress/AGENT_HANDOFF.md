@@ -3,8 +3,8 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N9-H - Opaque terminal admission
-* Working tree: N9-H is ready for final verification and commit.
+* Latest completed slice: N10-A - Phase N freeze and framework adoption
+* Working tree: N10-A is ready for final verification and commit.
 * Date: 2026-07-23
 
 Last completed slice
@@ -78,6 +78,11 @@ Last completed slice
 * Result: a generated browser fixture proves an opaque terminal build rejects a missing exact runtime mapping (`PSOPA1001`), publishes `opaque.runtime.json` only with a package contract/mapping, dynamically invokes the declared third-party export exactly after its compiler-owned button action, rejects malformed embedded metadata before package code runs, and forces a valid snapshot into `OpaqueTerminalColdFallback`. The semantic capability registry now admits this one opaque terminal form.
 * Verification: focused serialized real-Chrome browser fixture, compiler registry test, compiler/CLI checks, and formatting pass.
 * Next: complete the N10 capability freeze: compatibility projections, framework-facing declaration availability, documented package author contract, and final focused verification matrix.
+
+* Slice: N10-A - Phase N Freeze and Framework Adoption
+* Result: the N10 freeze contract adopts the compiler registry’s exact source and package boundaries, records the closed opaque terminal contract, and adds `opaque(packageSpecifier, exportName)` only as a declaration-only standard decorator in `@presolve/framework-types`. The N10 verifier composes every pre-existing N verifier, N9’s browser proof, registry assertion, TypeScript 7.0 type fixture, formatting, and diff check without creating a framework package runtime.
+* Verification: the framework TypeScript 7.0 fixture, focused compiler/browser proofs, and N10 gate are ready; run the complete aggregate gate before marking Phase N frozen.
+* Next: run and record the N10 aggregate matrix, then freeze the active compatibility/migration projections and Phase N support boundary.
 
 * Slice: N2-G - Compiler-Registered Math Rounding
 * Result: exact one-argument `Math.floor`, `Math.ceil`, and `Math.round` in supported Computed getters now resolve to compiler-registered unary operations, retain their operand dependencies, lower to canonical `Floor`/`Ceil`/`Round` IR, and execute only from schema-v11 computed-runtime instructions. No generic Math dispatch, overload, callback, alias, or authored JavaScript execution is admitted.

@@ -16,6 +16,13 @@ declare global {
   /** Declares a compiler-recognized Action without installing an event wrapper. */
   function action(): PresolveMethodDecorator;
 
+  /**
+   * Declares one compiler-recorded third-party terminal on an otherwise empty
+   * Action. The compiler resolves the package contract and supplies all
+   * runtime behavior; this declaration never imports or invokes package code.
+   */
+  function opaque(packageSpecifier: string, exportName: string): PresolveMethodDecorator;
+
   /** Declares a compiler-recognized getter without caching or invalidation behavior. */
   function computed(): PresolveGetterDecorator;
 

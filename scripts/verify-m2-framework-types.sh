@@ -10,6 +10,7 @@ readonly fixture=framework/tests/counter-types
 test -s "$package/package.json"
 test -s "$package/src/index.d.ts"
 test -s "$fixture/src/Counter.tsx"
+test -s "$fixture/src/Opaque.tsx"
 test -s "$fixture/presolve.json"
 test -s "$fixture/tsconfig.json"
 
@@ -19,6 +20,7 @@ rg --fixed-strings --quiet '"types": "./src/index.d.ts"' "$package/package.json"
 rg --fixed-strings --quiet 'abstract class Component' "$package/src/index.d.ts"
 rg --fixed-strings --quiet 'function component(elementName: string)' "$package/src/index.d.ts"
 rg --fixed-strings --quiet 'function state<T>(initialValue: T): T' "$package/src/index.d.ts"
+rg --fixed-strings --quiet 'function opaque(packageSpecifier: string, exportName: string)' "$package/src/index.d.ts"
 rg --fixed-strings --quiet '"types": [' "$fixture/tsconfig.json"
 rg --fixed-strings --quiet '"@presolve/framework-types"' "$fixture/tsconfig.json"
 

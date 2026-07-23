@@ -14,6 +14,8 @@
     ]
   },
   "files": [
-    "src/Counter.tsx"
+    "src/Counter.tsx",
+    "src/Opaque.tsx",
+    "src/opaque-package.d.ts"
   ]
 }
