@@ -91,6 +91,7 @@ pub mod production_reports;
 pub mod production_runtime_artifact;
 pub mod production_scheduler;
 pub mod production_validation;
+pub mod project_discovery;
 pub mod provider;
 pub mod resource;
 pub mod resume_activation;
@@ -543,6 +544,9 @@ pub use production_scheduler::{
 pub use production_validation::{
     validate_production_runtime_pipeline, ProductionRuntimeFailure, ProductionValidationEvidence,
     ProductionValidationPhase, ProductionValidationResult,
+};
+pub use project_discovery::{
+    discover_project_v1, DiscoveredProjectSourceV1, DiscoveredProjectV1, ProjectDiscoveryErrorV1,
 };
 pub use provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
 pub use resource::{
