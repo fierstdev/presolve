@@ -679,8 +679,9 @@ pub use runtime_form_registry::{
     RUNTIME_FORM_REGISTRY_VERSION,
 };
 pub use runtime_resource_artifact::{
-    build_runtime_resource_artifact, runtime_resource_artifact_json,
-    validate_runtime_resource_artifact, RuntimeResourceArtifact, RuntimeResourceArtifactActivation,
+    build_runtime_resource_artifact, build_runtime_resource_artifact_with_modules,
+    runtime_resource_artifact_json, validate_runtime_resource_artifact, RuntimeResourceArtifact,
+    RuntimeResourceArtifactActivation, RuntimeResourceArtifactBuildError,
     RuntimeResourceArtifactDeclaration, RuntimeResourceArtifactEndpoint,
     RuntimeResourceArtifactValidationError, RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION,
 };

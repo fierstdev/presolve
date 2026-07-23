@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     semantic_type_text, ApplicationSemanticModel, ResourceEndpointResolutionOutcome,
-    ResourceLifecycleState,
+    ResourceLifecycleState, SemanticPackageRuntimeModuleKey, SemanticPackageRuntimeModuleTable,
 };
 
 pub const RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION: u32 = 1;
@@ -46,6 +46,8 @@ pub struct RuntimeResourceArtifactEndpoint {
     pub export: String,
     pub type_signature: String,
     pub runtime_module: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub runtime_location: Option<String>,
     pub resume_policy: String,
     pub cancellation: String,
 }
@@ -82,6 +84,11 @@ pub enum RuntimeResourceArtifactValidationError {
         activation: String,
         declaration: String,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RuntimeResourceArtifactBuildError {
+    MissingRuntimeModuleLocation { declaration: String },
 }
 
 /// Projects immutable Resource declaration and instance-activation records.
@@ -131,6 +138,7 @@ pub fn build_runtime_resource_artifact(
                     export: endpoint.export.clone(),
                     type_signature: endpoint.type_signature.clone(),
                     runtime_module: endpoint.runtime_module.clone(),
+                    runtime_location: None,
                     resume_policy: endpoint.resume_policy.clone(),
                     cancellation: format!("{:?}", endpoint.endpoint.cancellation),
                 },
@@ -156,6 +164,34 @@ pub fn build_runtime_resource_artifact(
         declarations,
         activations,
     }
+}
+
+/// Produces the execution-facing artifact only when every Resource endpoint
+/// has an explicit host-supplied location for its exact package coordinate.
+pub fn build_runtime_resource_artifact_with_modules(
+    model: &ApplicationSemanticModel,
+    modules: &SemanticPackageRuntimeModuleTable,
+) -> Result<RuntimeResourceArtifact, RuntimeResourceArtifactBuildError> {
+    let mut artifact = build_runtime_resource_artifact(model);
+    for declaration in &mut artifact.declarations {
+        let key = SemanticPackageRuntimeModuleKey {
+            package: declaration.endpoint.package.clone(),
+            version: declaration.endpoint.version.clone(),
+            integrity: declaration.endpoint.integrity.clone(),
+            runtime_module: declaration.endpoint.runtime_module.clone(),
+        };
+        declaration.endpoint.runtime_location = Some(
+            modules
+                .resolve(&key)
+                .ok_or_else(
+                    || RuntimeResourceArtifactBuildError::MissingRuntimeModuleLocation {
+                        declaration: declaration.id.clone(),
+                    },
+                )?
+                .to_string(),
+        );
+    }
+    Ok(artifact)
 }
 
 #[must_use]
@@ -245,9 +281,10 @@ fn resource_lifecycle_artifact_state(state: ResourceLifecycleState) -> (&'static
 mod tests {
     use crate::{
         build_application_semantic_model_for_unit_with_packages, build_runtime_resource_artifact,
-        parse_semantic_package_contract, runtime_resource_artifact_json,
-        validate_runtime_resource_artifact, CompilationUnit, SemanticPackageResolutionTable,
-        RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION,
+        build_runtime_resource_artifact_with_modules, parse_semantic_package_contract,
+        runtime_resource_artifact_json, validate_runtime_resource_artifact, CompilationUnit,
+        SemanticPackageResolutionTable, SemanticPackageRuntimeModuleKey,
+        SemanticPackageRuntimeModuleTable, RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION,
     };
 
     fn model() -> crate::ApplicationSemanticModel {
@@ -317,5 +354,36 @@ class Profile extends Component {
             error,
             crate::RuntimeResourceArtifactValidationError::UnknownActivationDeclaration { .. }
         )));
+    }
+
+    #[test]
+    fn requires_exact_runtime_module_location_for_execution_facing_artifact() {
+        let model = model();
+        let mut modules = SemanticPackageRuntimeModuleTable::default();
+        assert!(matches!(
+            build_runtime_resource_artifact_with_modules(&model, &modules),
+            Err(crate::RuntimeResourceArtifactBuildError::MissingRuntimeModuleLocation { .. })
+        ));
+        modules
+            .insert(
+                SemanticPackageRuntimeModuleKey {
+                    package: "profile-service".into(),
+                    version: "1.2.3".into(),
+                    integrity:
+                        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                            .into(),
+                    runtime_module: "dist/load-profile.js".into(),
+                },
+                "./vendor/profile-service.js".into(),
+            )
+            .unwrap();
+        let artifact = build_runtime_resource_artifact_with_modules(&model, &modules).unwrap();
+        assert_eq!(
+            artifact.declarations[0]
+                .endpoint
+                .runtime_location
+                .as_deref(),
+            Some("./vendor/profile-service.js")
+        );
     }
 }
