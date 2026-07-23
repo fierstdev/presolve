@@ -2,7 +2,8 @@ use crate::{
     runtime_component_artifact_json, runtime_computed_artifact_json, runtime_context_artifact_json,
     runtime_effect_artifact_json, runtime_forms_artifact_json, template_manifest_json,
     ResumeManifest, RuntimeComponentArtifact, RuntimeComputedArtifact, RuntimeContextArtifact,
-    RuntimeEffectArtifact, RuntimeFormsArtifact, RuntimeResourceArtifact, TemplateManifest,
+    RuntimeEffectArtifact, RuntimeFormsArtifact, RuntimeOpaqueArtifact, RuntimeResourceArtifact,
+    TemplateManifest,
 };
 
 #[must_use]
@@ -195,6 +196,26 @@ pub fn generate_standalone_page_with_resume_runtime_and_resources(
     )
 }
 
+/// Embeds a validated opaque-terminal artifact immediately before the runtime
+/// boot script. The caller composes this with other compiler-owned page
+/// products; the function never inspects application source.
+#[must_use]
+pub fn embed_opaque_runtime_artifact(page: String, opaque: &RuntimeOpaqueArtifact) -> String {
+    let mut opaque_script =
+        "    <script type=\"application/json\" id=\"presolve-opaque-runtime\">\n".to_string();
+    for line in crate::runtime_opaque_artifact_json(opaque).lines() {
+        opaque_script.push_str("      ");
+        opaque_script.push_str(&escape_script_json_line(line));
+        opaque_script.push('\n');
+    }
+    opaque_script.push_str("    </script>\n");
+    page.replacen(
+        "    <script src=\"./runtime.js\" defer></script>",
+        &(opaque_script + "    <script src=\"./runtime.js\" defer></script>"),
+        1,
+    )
+}
+
 #[allow(clippy::too_many_arguments)]
 fn generate_page(
     title: &str,
@@ -316,7 +337,7 @@ fn escape_script_json_line(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{escape_script_json_line, escape_text};
+    use super::{embed_opaque_runtime_artifact, escape_script_json_line, escape_text};
 
     #[test]
     fn escapes_title_text() {
@@ -326,5 +347,20 @@ mod tests {
     #[test]
     fn escapes_script_close_sequence() {
         assert_eq!(escape_script_json_line(r#""</script>""#), r#""<\/script>""#);
+    }
+
+    #[test]
+    fn embeds_opaque_artifact_before_the_runtime_boot_script() {
+        let artifact: crate::RuntimeOpaqueArtifact = serde_json::from_str(
+            r#"{"schema_version":1,"activations":[{"id":"opaque:track","owner_component":"component:x","method":"component:x/method:track","package":"@acme/analytics","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","export":"trackPurchase","type_signature":"() -> void","runtime_module":"dist/track.js","execution_boundary":"client","resume_policy":"cold_fallback"}]}"#,
+        )
+        .unwrap();
+        let page = embed_opaque_runtime_artifact(
+            "    <script src=\"./runtime.js\" defer></script>".to_string(),
+            &artifact,
+        );
+        assert!(page.contains("presolve-opaque-runtime"));
+        assert!(page.contains("trackPurchase"));
+        assert!(page.find("presolve-opaque-runtime") < page.find("./runtime.js"));
     }
 }

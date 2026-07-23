@@ -20,8 +20,9 @@ use presolve_compiler::{
     build_production_runtime_artifact, build_resume_chunk_graph, build_resume_manifest,
     build_runtime_component_artifact, build_runtime_computed_artifact,
     build_runtime_context_artifact, build_runtime_effect_artifact, build_runtime_forms_artifact,
-    build_runtime_resource_artifact_with_modules, build_semantic_graph, build_template_graph,
-    build_template_manifest_from_asm, emit_production_modules, explain_json, explain_text,
+    build_runtime_opaque_artifact_with_modules, build_runtime_resource_artifact_with_modules,
+    build_semantic_graph, build_template_graph, build_template_manifest_from_asm,
+    embed_opaque_runtime_artifact, emit_production_modules, explain_json, explain_text,
     extract_production_chunk_graph, fold_component_graph, generate_ordinary_instance_html,
     generate_runtime_stub, generate_standalone_page_with_resume_runtime,
     generate_standalone_page_with_resume_runtime_and_resources, generate_static_html,
@@ -29,13 +30,13 @@ use presolve_compiler::{
     production_runtime_artifact_json, project_production_diagnostics, project_resume_diagnostics,
     resume_manifest_json, runtime_component_artifact_json, runtime_computed_artifact_json,
     runtime_context_artifact_json, runtime_cost_report_json, runtime_effect_artifact_json,
-    runtime_forms_artifact_json, runtime_resource_artifact_json, semantic_capability_matrix_text,
-    semantic_capability_migration_text, semantic_capability_registry_json, semantic_graph_json,
-    semantic_type_text, summarize_source, template_manifest_json,
-    validate_application_semantic_model, validate_runtime_resource_artifact,
-    ApplicationSemanticModel, AsmValidationDiagnostic, AttributeValue, CompilationUnit,
-    ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind, EffectInspection,
-    EffectInspectionRegistry, ExecutableProgramFingerprint, ImmutableAsmPass,
+    runtime_forms_artifact_json, runtime_opaque_artifact_json, runtime_resource_artifact_json,
+    semantic_capability_matrix_text, semantic_capability_migration_text,
+    semantic_capability_registry_json, semantic_graph_json, semantic_type_text, summarize_source,
+    template_manifest_json, validate_application_semantic_model, validate_runtime_opaque_artifact,
+    validate_runtime_resource_artifact, ApplicationSemanticModel, AsmValidationDiagnostic,
+    AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
+    EffectInspection, EffectInspectionRegistry, ExecutableProgramFingerprint, ImmutableAsmPass,
     ProductionDiagnosticFact, ProductionDiagnosticKind, ProductionProjectedDiagnostic,
     ProductionReportInputs, ProductionRootChunkInput, RenderAttribute, RenderAttributeValue,
     SemanticEntity, SemanticEntityKind, SemanticId, SemanticOwner, SemanticPackageResolutionTable,
@@ -2963,7 +2964,8 @@ fn run_build(mut args: Vec<String>) {
         .diagnostics
         .iter()
         .filter(|diagnostic| {
-            diagnostic.code.starts_with("PSBIND10") || diagnostic.code == "PSC1128"
+            diagnostic.code.starts_with("PSBIND10")
+                || matches!(diagnostic.code.as_str(), "PSC1128" | "PSC1130" | "PSC1131")
         })
         .collect::<Vec<_>>();
     if !package_diagnostics.is_empty() {
@@ -3001,6 +3003,21 @@ fn run_build(mut args: Vec<String>) {
         }
         Some(artifact)
     };
+    let opaque_runtime_artifact = if asm.opaque_action_resolutions.is_empty() {
+        None
+    } else {
+        let artifact = build_runtime_opaque_artifact_with_modules(&asm, &resource_runtime_modules)
+            .unwrap_or_else(|error| {
+                eprintln!("PSOPA1001: opaque runtime module mapping is incomplete: {error:?}");
+                process::exit(2);
+            });
+        let validation = validate_runtime_opaque_artifact(&artifact);
+        if !validation.is_empty() {
+            eprintln!("PSOPA1002: generated opaque artifact is invalid: {validation:?}");
+            process::exit(2);
+        }
+        Some(artifact)
+    };
     let ir = lower_components_to_ir(&asm);
     let computed_runtime_artifact = build_runtime_computed_artifact(&asm, &ir);
     let computed_runtime_json = runtime_computed_artifact_json(&computed_runtime_artifact);
@@ -3020,6 +3037,9 @@ fn run_build(mut args: Vec<String>) {
     let resource_runtime_json = resource_runtime_artifact
         .as_ref()
         .map(runtime_resource_artifact_json);
+    let opaque_runtime_json = opaque_runtime_artifact
+        .as_ref()
+        .map(runtime_opaque_artifact_json);
     let (production_chunk_graph, _) = extract_production_chunk_graph(
         &SharedChunkCandidatePlan {
             candidates: Vec::new(),
@@ -3066,6 +3086,11 @@ fn run_build(mut args: Vec<String>) {
                 resources,
             )
         });
+    let page_html = if let Some(opaque) = &opaque_runtime_artifact {
+        embed_opaque_runtime_artifact(page_html, opaque)
+    } else {
+        page_html
+    };
     let page_html = production_mode_page_html(
         page_html,
         args.iter().any(|argument| argument == "--production"),
@@ -3085,6 +3110,8 @@ fn run_build(mut args: Vec<String>) {
         &runtime_js,
     ]) + resource_runtime_json.as_ref().map_or(0, |json| {
         u64::try_from(json.len()).expect("resource artifact byte count exceeds u64")
+    }) + opaque_runtime_json.as_ref().map_or(0, |json| {
+        u64::try_from(json.len()).expect("opaque artifact byte count exceeds u64")
     });
     let production_bytes = byte_count(
         std::iter::once(&production_runtime_json).chain(
@@ -3139,6 +3166,7 @@ fn run_build(mut args: Vec<String>) {
         &forms_runtime_json,
         &resume_runtime_json,
         resource_runtime_json.as_deref(),
+        opaque_runtime_json.as_deref(),
         &production_runtime_json,
         &optimization_report_json,
         &runtime_cost_report_json,
@@ -3159,7 +3187,12 @@ fn run_build(mut args: Vec<String>) {
         &production_chunk_graph,
     );
 
-    print_build_artifact_paths(&out_dir, &resume_chunks, resource_runtime_json.is_some());
+    print_build_artifact_paths(
+        &out_dir,
+        &resume_chunks,
+        resource_runtime_json.is_some(),
+        opaque_runtime_json.is_some(),
+    );
 }
 
 fn parse_semantic_package_contracts(args: &[String]) -> SemanticPackageResolutionTable {
@@ -3251,6 +3284,7 @@ fn print_build_artifact_paths(
     out_dir: &Path,
     resume_chunks: &presolve_compiler::ResumeChunkGraph,
     includes_resources: bool,
+    includes_opaque: bool,
 ) {
     for artifact in [
         "index.html",
@@ -3270,6 +3304,9 @@ fn print_build_artifact_paths(
     }
     if includes_resources {
         println!("Wrote {}", out_dir.join("resources.runtime.json").display());
+    }
+    if includes_opaque {
+        println!("Wrote {}", out_dir.join("opaque.runtime.json").display());
     }
     for chunk in &resume_chunks.chunks {
         println!(
@@ -4198,6 +4235,7 @@ fn write_build_artifacts(
     forms_runtime_json: &str,
     resume_runtime_json: &str,
     resource_runtime_json: Option<&str>,
+    opaque_runtime_json: Option<&str>,
     production_runtime_json: &str,
     optimization_report_json: &str,
     runtime_cost_report_json: &str,
@@ -4234,6 +4272,9 @@ fn write_build_artifacts(
             out_dir.join("resources.runtime.json"),
             resource_runtime_json,
         )?;
+    }
+    if let Some(opaque_runtime_json) = opaque_runtime_json {
+        fs::write(out_dir.join("opaque.runtime.json"), opaque_runtime_json)?;
     }
     fs::write(
         out_dir.join("production.runtime.json"),

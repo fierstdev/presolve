@@ -3,8 +3,8 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N9-D - Opaque terminal artifact projection
-* Working tree: N9-D is ready for final verification and commit.
+* Latest completed slice: N9-E - Opaque artifact publication
+* Working tree: N9-E is ready for final verification and commit.
 * Date: 2026-07-23
 
 Last completed slice
@@ -63,6 +63,11 @@ Last completed slice
 * Result: resolved terminal facts now project to deterministic `RuntimeOpaqueArtifact` schema v1 records. Validation fails closed for duplicate IDs, incomplete coordinates, or any deviation from the no-input/client/cold-fallback terminal contract; execution-facing projection requires the existing exact package runtime-module table.
 * Verification: focused artifact projection, malformed-artifact, and exact runtime-module-location tests plus compiler check and formatting pass.
 * Next: publish the artifact through the canonical CLI/page products, compile generated runtime behavior that consumes only its validated records, and prove browser execution and cold resume fallback.
+
+* Slice: N9-E - Opaque Artifact Publication
+* Result: `presolve build` now validates and publishes `opaque.runtime.json` only for resolved terminals with an exact `--package-runtime` location. The same artifact is embedded before `runtime.js` in the generated page; it composes with Resources without source reinterpretation. Missing mappings fail `PSOPA1001`; invalid generated records fail `PSOPA1002`.
+* Verification: focused compiler page embedding test, compiler/CLI checks, and formatting pass.
+* Next: extend the generated runtime with strict opaque-artifact parsing and one no-input terminal import/call path, then prove real-browser activation and cold resume fallback.
 
 * Slice: N2-G - Compiler-Registered Math Rounding
 * Result: exact one-argument `Math.floor`, `Math.ceil`, and `Math.round` in supported Computed getters now resolve to compiler-registered unary operations, retain their operand dependencies, lower to canonical `Floor`/`Ceil`/`Round` IR, and execute only from schema-v11 computed-runtime instructions. No generic Math dispatch, overload, callback, alias, or authored JavaScript execution is admitted.

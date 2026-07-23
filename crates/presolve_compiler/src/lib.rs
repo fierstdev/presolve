@@ -439,7 +439,8 @@ pub use ordinary_template_integrity::{
     StateInstanceStorageIntegrityCode,
 };
 pub use page_codegen::{
-    generate_standalone_page, generate_standalone_page_with_component_runtime,
+    embed_opaque_runtime_artifact, generate_standalone_page,
+    generate_standalone_page_with_component_runtime,
     generate_standalone_page_with_component_runtime_and_forms,
     generate_standalone_page_with_computed_runtime, generate_standalone_page_with_context_runtime,
     generate_standalone_page_with_effect_runtime, generate_standalone_page_with_resume_runtime,
