@@ -271,19 +271,42 @@ fn file_route_path(path: &std::path::Path) -> Option<String> {
     if values.get(index.checked_sub(1)?)? != &"app" {
         return None;
     }
-    let mut segments = values[index + 1..].to_vec();
+    let mut segments = values[index + 1..]
+        .iter()
+        .map(|value| (*value).to_string())
+        .collect::<Vec<_>>();
     let filename = segments.pop()?;
     let stem = filename
         .strip_suffix(".tsx")
         .or_else(|| filename.strip_suffix(".ts"))?;
     if stem != "index" {
-        segments.push(stem);
+        segments.push(route_segment(stem)?);
+    }
+    for segment in &mut segments {
+        *segment = route_segment(segment)?;
     }
     Some(if segments.is_empty() {
         "/".into()
     } else {
         format!("/{}", segments.join("/"))
     })
+}
+
+fn route_segment(segment: &str) -> Option<String> {
+    if let Some(parameter) = segment
+        .strip_prefix('[')
+        .and_then(|value| value.strip_suffix(']'))
+    {
+        if parameter.is_empty()
+            || !parameter
+                .chars()
+                .all(|character| character.is_ascii_alphanumeric() || character == '_')
+        {
+            return None;
+        }
+        return Some(format!(":{parameter}"));
+    }
+    (!segment.is_empty()).then(|| segment.into())
 }
 
 #[cfg(test)]
@@ -317,5 +340,17 @@ mod tests {
         let source = r#"@route("/welcome") @component() class Home extends Component { render() { return <main />; } }"#;
         let model = build_application_semantic_model(&parse_file("app/routes/index.tsx", source));
         assert_eq!(build_file_route_graph_v1(&model).routes[0].path, "/welcome");
+    }
+
+    #[test]
+    fn derives_typed_parameter_segment_from_file_name() {
+        let source =
+            r#"@component() class Post extends Component { render() { return <main />; } }"#;
+        let model =
+            build_application_semantic_model(&parse_file("app/routes/blog/[slug].tsx", source));
+        assert_eq!(
+            build_file_route_graph_v1(&model).routes[0].path,
+            "/blog/:slug"
+        );
     }
 }
