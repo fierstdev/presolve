@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N6-B - Resource Package Endpoint Contract
-* Working tree: clean after the N6-B resource-endpoint-contract commit.
+* Latest completed slice: N4-B - JSX HTML Attribute Aliases
+* Working tree: clean after the N4-B JSX attribute alias commit.
 * Date: 2026-07-22
 
 Last completed slice
+
+* Slice: N4-B - JSX HTML Attribute Aliases
+* Result: compiler template lowering canonically maps only `className` to `class` and `htmlFor` to `for`, before semantic type checks, static HTML, manifests, and ordinary runtime binding artifacts. Framework JSX transforms, runtime aliases, spreads, style objects, and unbounded class helpers were not introduced.
+* Verification: focused compiler test proves authored source lowers to canonical HTML, manifest binding, and runtime artifact names; normalizer and registry tests, compiler check, format, and diff checks pass.
+* Next: N4-C may introduce one further ordinary DOM family only with exact compiler lowering and lifecycle behavior.
 
 * Slice: N6-B - Resource Package Endpoint Contract
 * Result: makes the existing semantic-package `resource` kind an integrity-checked endpoint declaration with explicit `client`/`server`/`shared` boundary, required abort cancellation, and reload/snapshot resume vocabulary. It is still not callable from application source and cannot load package code.

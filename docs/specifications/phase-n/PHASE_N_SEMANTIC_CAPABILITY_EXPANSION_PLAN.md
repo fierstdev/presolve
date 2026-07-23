@@ -254,6 +254,10 @@ operation needs scheduling, cleanup/lifetime, failure, and resume behavior.
 
 ### N4 — structural templates and ordinary DOM semantics
 
+N4-B is complete: `className` and `htmlFor` normalize once to canonical HTML
+`class` and `for` before compiler semantic/type analysis and remain canonical
+through the HTML, manifest, and ordinary runtime artifact paths.
+
 Lower compiler-owned conditional, repeated, empty, and fallback template
 regions. Repetition requires explicit stable keys and instance/lifecycle plans;
 the compiler must never derive identity from DOM position. Support fragments,

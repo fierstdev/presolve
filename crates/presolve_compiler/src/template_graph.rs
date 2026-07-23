@@ -127,6 +127,21 @@ pub struct ListNode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TemplateNodeId(pub String);
 
+/// Maps the small JSX spelling subset that differs from HTML to the canonical
+/// attribute name carried by every compiler product.
+///
+/// This runs while lowering authored attributes, before template semantics,
+/// manifests, static HTML, and runtime bindings are constructed. No runtime
+/// JSX alias table or framework transform participates in the behavior.
+#[must_use]
+pub fn canonical_html_attribute_name(name: &str) -> &str {
+    match name {
+        "className" => "class",
+        "htmlFor" => "for",
+        _ => name,
+    }
+}
+
 #[derive(Clone, Copy)]
 struct ListItemTemplateScope<'a> {
     item_variable: &'a str,
@@ -298,24 +313,25 @@ fn template_attributes(
         if attribute.name == "field" || (tag_name == "form" && attribute.name == "form") {
             continue;
         }
+        let name = canonical_html_attribute_name(&attribute.name);
         match &attribute.value {
-            RenderAttributeValue::Boolean if !is_event_attribute(&attribute.name) => {
+            RenderAttributeValue::Boolean if !is_event_attribute(name) => {
                 attributes.push(TemplateAttribute {
-                    name: attribute.name.clone(),
+                    name: name.to_string(),
                     value: AttributeValue::Boolean,
                     span: Some(attribute.span),
                 });
             }
-            RenderAttributeValue::Static(value) if !is_event_attribute(&attribute.name) => {
+            RenderAttributeValue::Static(value) if !is_event_attribute(name) => {
                 attributes.push(TemplateAttribute {
-                    name: attribute.name.clone(),
+                    name: name.to_string(),
                     value: AttributeValue::Static(value.clone()),
                     span: Some(attribute.span),
                 });
             }
             RenderAttributeValue::Expression(Some(expression))
-                if !is_event_attribute(&attribute.name)
-                    && attribute.name != "key"
+                if !is_event_attribute(name)
+                    && name != "key"
                     && (expression.strip_prefix("this.").is_some()
                         || (list_scope.is_none()
                             && unique_local_variable(local_variables, expression).is_some())
@@ -323,7 +339,7 @@ fn template_attributes(
                             .is_some_and(|scope| list_item_expression(expression, scope))) =>
             {
                 attributes.push(TemplateAttribute {
-                    name: attribute.name.clone(),
+                    name: name.to_string(),
                     value: AttributeValue::Binding {
                         id: ids.alloc(),
                         expression: expression.clone(),
@@ -553,4 +569,16 @@ fn unique_local_variable<'a>(
     let mut locals = local_variables.iter().filter(|local| local.name == name);
     let local = locals.next()?;
     locals.next().is_none().then_some(local)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::canonical_html_attribute_name;
+
+    #[test]
+    fn normalizes_jsx_html_attribute_aliases() {
+        assert_eq!(canonical_html_attribute_name("className"), "class");
+        assert_eq!(canonical_html_attribute_name("htmlFor"), "for");
+        assert_eq!(canonical_html_attribute_name("aria-label"), "aria-label");
+    }
 }

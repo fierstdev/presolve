@@ -2138,6 +2138,51 @@ class Counter extends Component {
     }
 
     #[test]
+    fn lowers_jsx_html_attribute_aliases_before_html_and_manifest_generation() {
+        let source = r#"
+@component("x-attribute-alias")
+class AttributeAlias extends Component {
+  target = state("profile-name");
+  render() {
+    return <label className={this.target} htmlFor={this.target}>Profile</label>;
+  }
+}
+"#;
+        let parsed = presolve_parser::parse_file("AttributeAlias.tsx", source);
+        let component_graph = build_component_graph(&parsed);
+        let template_graph = build_template_graph(&component_graph);
+        let html = generate_static_html(&template_graph);
+        let manifest = build_template_manifest(&component_graph, &template_graph);
+        let model = build_application_semantic_model_from_component_graph(&component_graph);
+        let runtime = build_runtime_component_artifact(&model, &model.component_ir_optimization);
+
+        assert!(html.contains("class=\"profile-name\""));
+        assert!(html.contains("for=\"profile-name\""));
+        assert!(!html.contains("className="));
+        assert!(!html.contains("htmlFor="));
+        assert_eq!(
+            manifest.components[0]
+                .template
+                .nodes
+                .iter()
+                .filter_map(|node| match node {
+                    ManifestNode::Binding { attribute, .. } => attribute.as_deref(),
+                    _ => None,
+                })
+                .collect::<Vec<_>>(),
+            vec!["class", "for"]
+        );
+        assert_eq!(
+            runtime
+                .ordinary_template_bindings
+                .iter()
+                .filter_map(|binding| binding.attribute_name.as_deref())
+                .collect::<Vec<_>>(),
+            vec!["class", "for"]
+        );
+    }
+
+    #[test]
     fn preserves_string_state_literals_in_template_outputs() {
         let source = include_str!("../../../fixtures/0006-string-state/input/StringGreeting.tsx");
 

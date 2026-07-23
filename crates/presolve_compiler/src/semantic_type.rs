@@ -53,6 +53,11 @@ pub fn dom_binding_contract(name: &str) -> Option<DomBindingContract> {
             kind: DomBindingKind::Attribute,
             semantic_type: SemanticType::String,
         }),
+        "class" | "for" => Some(DomBindingContract {
+            name: if name == "class" { "class" } else { "for" },
+            kind: DomBindingKind::Attribute,
+            semantic_type: SemanticType::String,
+        }),
         "value" => Some(DomBindingContract {
             name: "value",
             kind: DomBindingKind::Property,
