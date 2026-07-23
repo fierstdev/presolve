@@ -531,6 +531,7 @@ pub enum ComputedExpressionKind {
     MemberAccess {
         object: Box<ComputedExpression>,
         property: String,
+        optional: bool,
     },
     IndexAccess {
         object: Box<ComputedExpression>,
@@ -3370,12 +3371,15 @@ fn computed_expression_from_parsed(expression: &ParsedComputedExpression) -> Com
         ParsedComputedExpressionKind::ThisMember(name) => {
             ComputedExpressionKind::ThisMember(name.clone())
         }
-        ParsedComputedExpressionKind::MemberAccess { object, property } => {
-            ComputedExpressionKind::MemberAccess {
-                object: Box::new(computed_expression_from_parsed(object)),
-                property: property.clone(),
-            }
-        }
+        ParsedComputedExpressionKind::MemberAccess {
+            object,
+            property,
+            optional,
+        } => ComputedExpressionKind::MemberAccess {
+            object: Box::new(computed_expression_from_parsed(object)),
+            property: property.clone(),
+            optional: *optional,
+        },
         ParsedComputedExpressionKind::IndexAccess { object, index } => {
             ComputedExpressionKind::IndexAccess {
                 object: Box::new(computed_expression_from_parsed(object)),

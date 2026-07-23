@@ -3311,6 +3311,63 @@ class ConditionalComputed extends Component {
 }
 
 #[test]
+fn optional_member_accesses_execute_from_compiler_generated_runtime_programs() {
+    let _guard = browser_test_guard();
+    let root = repo_root();
+    let out = root.join("target/psc-browser-test/optional-member-runtime");
+    if out.exists() {
+        fs::remove_dir_all(&out).expect("clean optional output");
+    }
+    fs::create_dir_all(&out).expect("create optional output");
+    let source = out.join("OptionalComputed.tsx");
+    fs::write(
+        &source,
+        r#"
+@component("x-optional-computed")
+class OptionalComputed extends Component {
+  profile = state({ label: "Presolve" });
+  @computed()
+  get label() { return this.profile?.label; }
+  render() { return <output>Optional</output>; }
+}
+"#,
+    )
+    .expect("write optional source");
+    let build = Command::new(presolve_cli_bin())
+        .current_dir(&root)
+        .args([
+            "build",
+            source.to_str().expect("source"),
+            "--out",
+            out.to_str().expect("out"),
+        ])
+        .output()
+        .expect("build optional fixture");
+    assert!(
+        build.status.success(),
+        "{}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    write_optional_member_probe_page(&out);
+    let server = StaticServer::start(out.clone());
+    let chrome = chrome_bin().expect("Chrome");
+    let profile = out.join("chrome-profile");
+    fs::create_dir_all(&profile).expect("profile");
+    let output = run_chrome_probe(
+        chrome,
+        &format!("--user-data-dir={}", profile.display()),
+        &format!("http://127.0.0.1:{}/probe.html", server.port),
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("PRESOLVE_OPTIONAL_MEMBER_BROWSER_TEST_PASS"),
+        "{}",
+        stdout
+    );
+}
+
+#[test]
 fn initial_effects_execute_once_from_compiler_generated_runtime_programs() {
     let _guard = browser_test_guard();
     let repo_root = repo_root();
@@ -3775,6 +3832,24 @@ fn write_boolean_conditional_probe_page(out_dir: &Path) {
 })().catch((error) => { document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_BOOLEAN_CONDITIONAL_BROWSER_TEST_FAIL: ${error.message}</div>`); });
 </script></body>"#);
     fs::write(out_dir.join("probe.html"), probe).expect("write conditional probe page");
+}
+
+fn write_optional_member_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html")).expect("read optional page");
+    let probe = index.replace("</body>", r#"<script>
+(async () => {
+  const until = Date.now() + 3000;
+  while (document.documentElement.dataset.presolveRuntime !== "ready") {
+    if (Date.now() > until) throw new Error("runtime not ready");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  const label = window.__PRESOLVE__.computed.find((entry) => entry.computed.endsWith("/computed:label"));
+  if (label?.value !== "Presolve" || label?.dirty !== false) throw new Error("optional member did not evaluate");
+  if (window.__PRESOLVE__.diagnostics.length !== 0) throw new Error("optional member diagnostics");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_OPTIONAL_MEMBER_BROWSER_TEST_PASS</div>");
+})().catch((error) => { document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_OPTIONAL_MEMBER_BROWSER_TEST_FAIL: ${error.message}</div>`); });
+</script></body>"#);
+    fs::write(out_dir.join("probe.html"), probe).expect("write optional probe");
 }
 
 fn write_initial_effect_probe_page(out_dir: &Path) {

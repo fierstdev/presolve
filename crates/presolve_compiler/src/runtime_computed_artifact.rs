@@ -8,7 +8,7 @@ use crate::{
     SemanticId, SerializableValue, SerializationCompatibility,
 };
 
-pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 7;
+pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 8;
 
 /// Versioned runtime metadata and executable programs emitted from canonical IR.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -86,6 +86,7 @@ pub enum RuntimeComputedArtifactInstruction {
         result: String,
         object: RuntimeComputedArtifactOperand,
         property: String,
+        optional: bool,
     },
     GetIndex {
         result: String,
@@ -395,13 +396,16 @@ pub(crate) fn runtime_instruction(
                 computed: computed.as_str().to_string(),
             })
         }
-        IrInstructionKind::GetMember { object, property } => {
-            Some(RuntimeComputedArtifactInstruction::GetMember {
-                result,
-                object: runtime_operand(object),
-                property: property.clone(),
-            })
-        }
+        IrInstructionKind::GetMember {
+            object,
+            property,
+            optional,
+        } => Some(RuntimeComputedArtifactInstruction::GetMember {
+            result,
+            object: runtime_operand(object),
+            property: property.clone(),
+            optional: *optional,
+        }),
         IrInstructionKind::GetIndex { object, index } => {
             Some(RuntimeComputedArtifactInstruction::GetIndex {
                 result,
@@ -621,7 +625,7 @@ class RuntimeComputedArtifact extends Component {
         let second = runtime_computed_artifact_json(&build_runtime_computed_artifact(&model, &ir));
         assert_eq!(first, second);
         let json: serde_json::Value = serde_json::from_str(&first).expect("artifact JSON");
-        assert_eq!(json["schema_version"], 7);
+        assert_eq!(json["schema_version"], 8);
         assert_eq!(
             json["evaluations"][0]["program"]["instructions"][0]["kind"],
             "load-state"
@@ -840,5 +844,34 @@ class InvalidConditionalComputed extends Component {
             "{:?}",
             model.diagnostics
         );
+    }
+
+    #[test]
+    fn emits_optional_member_read_with_compiler_retained_optionality() {
+        let parsed = presolve_parser::parse_file(
+            "src/OptionalComputed.tsx",
+            r#"
+@component("x-optional-computed")
+class OptionalComputed extends Component {
+  profile = state({ label: "Presolve" });
+  @computed()
+  get label() { return this.profile?.label; }
+  render() { return <output>Optional</output>; }
+}
+"#,
+        );
+        let model = build_application_semantic_model(&parsed);
+        assert!(model.diagnostics.is_empty(), "{:?}", model.diagnostics);
+        let artifact = build_runtime_computed_artifact(&model, &lower_components_to_ir(&model));
+        assert!(artifact.evaluations[0]
+            .program
+            .instructions
+            .iter()
+            .any(|instruction| {
+                matches!(
+                    instruction,
+                    RuntimeComputedArtifactInstruction::GetMember { optional: true, .. }
+                )
+            }));
     }
 }

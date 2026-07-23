@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
-    Argument, AssignmentTarget, BindingPatternKind, ClassElement, Declaration,
+    Argument, AssignmentTarget, BindingPatternKind, ChainElement, ClassElement, Declaration,
     ExportDefaultDeclarationKind, Expression, ImportDeclarationSpecifier, JSXAttributeItem,
     JSXAttributeName, JSXAttributeValue, JSXChild, JSXElementName, JSXExpression, JSXFragment,
     JSXMemberExpression, JSXMemberExpressionObject, ModuleExportName, ObjectPropertyKind, Program,
@@ -1148,6 +1148,7 @@ fn parsed_computed_expression(
                 ParsedComputedExpressionKind::MemberAccess {
                     object: Box::new(parsed_computed_expression(&member.object, source)?),
                     property,
+                    optional: member.optional,
                 }
             };
             Some(ParsedComputedExpression {
@@ -1155,6 +1156,17 @@ fn parsed_computed_expression(
                 span: source_span(source, member.span),
             })
         }
+        Expression::ChainExpression(chain) => match &chain.expression {
+            ChainElement::StaticMemberExpression(member) => Some(ParsedComputedExpression {
+                kind: ParsedComputedExpressionKind::MemberAccess {
+                    object: Box::new(parsed_computed_expression(&member.object, source)?),
+                    property: member.property.name.to_string(),
+                    optional: true,
+                },
+                span: source_span(source, chain.span),
+            }),
+            _ => None,
+        },
         Expression::ComputedMemberExpression(member) => {
             let index = parsed_computed_expression(&member.expression, source)?;
             let supported_index = match &index.kind {

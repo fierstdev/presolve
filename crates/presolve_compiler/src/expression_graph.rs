@@ -34,6 +34,7 @@ pub enum ExpressionNodeKind {
     MemberAccess {
         object: SemanticId,
         property: String,
+        optional: bool,
     },
     IndexAccess {
         object: SemanticId,
@@ -424,12 +425,15 @@ impl ExpressionGraph {
             ComputedExpressionKind::ThisMember(name) => {
                 ExpressionNodeKind::ThisMember { name: name.clone() }
             }
-            ComputedExpressionKind::MemberAccess { object, property } => {
-                ExpressionNodeKind::MemberAccess {
-                    object: child(self, &format!("{path}.0"), object),
-                    property: property.clone(),
-                }
-            }
+            ComputedExpressionKind::MemberAccess {
+                object,
+                property,
+                optional,
+            } => ExpressionNodeKind::MemberAccess {
+                object: child(self, &format!("{path}.0"), object),
+                property: property.clone(),
+                optional: *optional,
+            },
             ComputedExpressionKind::IndexAccess { object, index } => {
                 ExpressionNodeKind::IndexAccess {
                     object: child(self, &format!("{path}.0"), object),
@@ -559,6 +563,7 @@ impl ExpressionGraph {
                 ExpressionNodeKind::MemberAccess {
                     object: child(self, &format!("{path}.0"), object),
                     property: property.clone(),
+                    optional: false,
                 }
             }
             EffectExpressionKind::Arithmetic {

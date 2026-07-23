@@ -1448,9 +1448,14 @@ impl ExpressionIrLowering<'_> {
                     .collect::<Option<Vec<_>>>()?,
             },
             ExpressionNodeKind::ThisMember { name } => self.lower_this_member(&name)?,
-            ExpressionNodeKind::MemberAccess { object, property } => IrInstructionKind::GetMember {
+            ExpressionNodeKind::MemberAccess {
+                object,
+                property,
+                optional,
+            } => IrInstructionKind::GetMember {
                 object: IrOperand::Value(self.lower_node(&object)?),
                 property,
+                optional,
             },
             ExpressionNodeKind::IndexAccess { object, index } => IrInstructionKind::GetIndex {
                 object: IrOperand::Value(self.lower_node(&object)?),
@@ -3583,6 +3588,7 @@ pub enum IrInstructionKind {
     GetMember {
         object: IrOperand,
         property: String,
+        optional: bool,
     },
     GetIndex {
         object: IrOperand,

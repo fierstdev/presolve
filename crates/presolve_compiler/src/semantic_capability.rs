@@ -200,7 +200,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
                 "tuple, array, or object read with a literal string or non-negative integer index",
                 "compiler-derived dependency on the indexed object only; the literal index has no reactive dependency",
                 "serializable result when the selected value is serializable; no independent resume record",
-                "runtime-computed schema v6 get-index instruction",
+                "runtime-computed schema v6 get-index instruction, retained in schema v8",
                 "runtime_browser::static_index_accesses_execute_from_compiler_generated_runtime_programs",
             ),
             admitted(
@@ -211,7 +211,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
                 "boolean condition with serializable compiler-supported branch values",
                 "compiler-derived union of condition and both branch dependencies",
                 "serializable selected result; no independent resume record",
-                "runtime-computed schema v7 select instruction",
+                "runtime-computed schema v7 select instruction, retained in schema v8",
                 "runtime_browser::boolean_conditional_computed_values_execute_from_compiler_generated_runtime_programs",
             ),
             deferred(

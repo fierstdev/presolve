@@ -256,6 +256,7 @@ pub enum ParsedComputedExpressionKind {
     MemberAccess {
         object: Box<ParsedComputedExpression>,
         property: String,
+        optional: bool,
     },
     /// A statically bounded property or array-element read.
     ///

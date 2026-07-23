@@ -1725,9 +1725,9 @@ fn infer_effect_expression_type(
             .map_or(SemanticType::Unknown, |assignment| {
                 assignment.semantic_type.clone()
             }),
-        ExpressionNodeKind::MemberAccess { object, property } => {
-            computed_member_access_type(&child_type(object, expression_types), property)
-        }
+        ExpressionNodeKind::MemberAccess {
+            object, property, ..
+        } => computed_member_access_type(&child_type(object, expression_types), property),
         ExpressionNodeKind::IndexAccess { object, index } => computed_index_access_type(
             &child_type(object, expression_types),
             &child_type(index, expression_types),
@@ -2018,7 +2018,9 @@ fn this_member_name<'a>(id: &SemanticId, graph: &'a ExpressionGraph) -> Option<&
 fn static_capability_path(id: &SemanticId, graph: &ExpressionGraph) -> Option<String> {
     match &graph.node(id)?.kind {
         ExpressionNodeKind::Identifier(name) if name != "this" => Some(name.clone()),
-        ExpressionNodeKind::MemberAccess { object, property } => Some(format!(
+        ExpressionNodeKind::MemberAccess {
+            object, property, ..
+        } => Some(format!(
             "{}.{}",
             static_capability_path(object, graph)?,
             property
@@ -2280,9 +2282,9 @@ fn infer_context_source_expression_type(
             .map_or(SemanticType::Unknown, |assignment| {
                 assignment.semantic_type.clone()
             }),
-        ExpressionNodeKind::MemberAccess { object, property } => {
-            computed_member_access_type(&child(object, inferred), property)
-        }
+        ExpressionNodeKind::MemberAccess {
+            object, property, ..
+        } => computed_member_access_type(&child(object, inferred), property),
         ExpressionNodeKind::IndexAccess { object, index } => {
             computed_index_access_type(&child(object, inferred), &child(index, inferred))
         }
@@ -2392,7 +2394,9 @@ fn infer_computed_expression_type(
             expression_types,
             visiting,
         ),
-        ExpressionNodeKind::MemberAccess { object, property } => {
+        ExpressionNodeKind::MemberAccess {
+            object, property, ..
+        } => {
             let object = child_type(object, expression_types, computed_types, visiting);
             computed_member_access_type(&object, property)
         }

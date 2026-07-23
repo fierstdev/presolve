@@ -504,9 +504,9 @@ fn static_path(model: &ApplicationSemanticModel, id: &SemanticId) -> Option<Stri
     match &model.expression(id)?.kind {
         ExpressionNodeKind::Identifier(name) => Some(name.clone()),
         ExpressionNodeKind::ThisMember { name } => Some(format!("this.{name}")),
-        ExpressionNodeKind::MemberAccess { object, property } => {
-            Some(format!("{}.{}", static_path(model, object)?, property))
-        }
+        ExpressionNodeKind::MemberAccess {
+            object, property, ..
+        } => Some(format!("{}.{}", static_path(model, object)?, property)),
         _ => None,
     }
 }

@@ -3,11 +3,16 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: N2-C - Boolean Computed Conditionals
-* Working tree: clean after the N2-C boolean-conditional commit.
+* Latest completed slice: N2-D - Optional Member Access
+* Working tree: clean after the N2-D optional-member-access commit.
 * Date: 2026-07-22
 
 Last completed slice
+
+* Slice: N2-D - Optional Member Access
+* Result: admits `value?.property` in supported Computed getters. Optionality remains explicit through the parser, expression graph, canonical IR, and schema-v8 `get-member` artifact metadata. The compiler-generated own-property read is null-safe without evaluating authored JavaScript. Optional calls/indexing, writes, and prototype traversal remain excluded.
+* Verification: focused compiler and CLI artifact tests plus the real-browser generated-runtime proof pass.
+* Next: N2-E may add another bounded expression or compiler-registered pure helper.
 
 * Slice: N2-C - Boolean Computed Conditionals
 * Result: admits `condition ? whenTrue : whenFalse` only in supported Computed getters. The compiler proves a boolean condition (otherwise `PSC1029`), derives every branch dependency, infers the normalized branch union, lowers `Select` IR, and publishes schema-v7 runtime-computed metadata. The generated runtime consumes artifact operands only and uses exact boolean selection; no authored source evaluation or JavaScript truthiness is introduced.

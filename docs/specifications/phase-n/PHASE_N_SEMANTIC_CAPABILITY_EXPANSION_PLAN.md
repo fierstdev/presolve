@@ -217,6 +217,13 @@ The condition must have a compiler-known boolean type and each branch must
 already be compiler-supported. Lower a pure `Select` instruction; do not apply
 JavaScript truthiness, branch callbacks, or control-flow statements.
 
+#### N2-D — optional member access
+
+Admit `value?.property` in a supported Computed getter. Preserve optionality in
+the parser, expression graph, IR, and artifact; generated reads remain
+own-property and null-safe. Optional calls, optional index access, writes, and
+reflection remain outside this admission.
+
 ### N3 — State, Actions, Computed, and Effects over real data
 
 Allow State fields to hold structurally serializable records, arrays, optional
