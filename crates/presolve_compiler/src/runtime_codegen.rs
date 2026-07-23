@@ -3663,6 +3663,9 @@ const RUNTIME_STUB: &str = r#"(() => {
 
   async function initializeResourcesRuntime(store, resourcesArtifact, diagnostics) {
     if (resourcesArtifact === null) return;
+    window.addEventListener("pagehide", () => {
+      for (const resource of store.resources.values()) resource.controller.abort();
+    }, { once: true });
     const declarations = new Map(resourcesArtifact.declarations.map((declaration) => [declaration.id, declaration]));
     for (const activation of resourcesArtifact.activations) {
       const declaration = declarations.get(activation.declaration);
@@ -4003,6 +4006,7 @@ mod tests {
         assert!(runtime.contains("validateResourcesArtifact"));
         assert!(runtime.contains("initializeResourcesRuntime"));
         assert!(runtime.contains("AbortController"));
+        assert!(runtime.contains("pagehide"));
         assert!(runtime.contains("initializeFormsRuntime"));
         assert!(runtime.contains("dispatchFormSubmit"));
         assert!(runtime.contains("form_hosts"));
