@@ -122,6 +122,7 @@ pub mod semantic_capability;
 pub mod semantic_graph;
 pub mod semantic_id;
 pub mod semantic_package;
+pub mod semantic_package_runtime;
 pub mod semantic_provenance;
 pub mod semantic_reference;
 pub mod semantic_type;
@@ -714,6 +715,10 @@ pub use semantic_package::{
     SemanticPackageResolutionTable, SemanticPackageResourceCancellation,
     SemanticPackageResourceEndpoint, SemanticPackageResourceExecutionBoundary,
     SemanticPackageResourceResumePolicy, SEMANTIC_PACKAGE_CONTRACT_SCHEMA_VERSION,
+};
+pub use semantic_package_runtime::{
+    SemanticPackageRuntimeModuleError, SemanticPackageRuntimeModuleKey,
+    SemanticPackageRuntimeModuleTable,
 };
 pub use semantic_provenance::SourceProvenance;
 pub use semantic_reference::{SemanticReference, SemanticReferenceKind};
