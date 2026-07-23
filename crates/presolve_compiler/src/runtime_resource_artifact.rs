@@ -3,6 +3,8 @@
 //! This is a projection of already-resolved compiler products. It deliberately
 //! has no endpoint transport or executable runtime behavior.
 
+use std::collections::BTreeSet;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -57,6 +59,29 @@ pub struct RuntimeResourceArtifactActivation {
     pub state: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub generation: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RuntimeResourceArtifactValidationError {
+    UnsupportedSchemaVersion {
+        actual: u32,
+    },
+    DuplicateDeclarationId {
+        id: String,
+    },
+    DuplicateActivationId {
+        id: String,
+    },
+    MissingEndpointCoordinate {
+        declaration: String,
+    },
+    InvalidLifecycleGeneration {
+        activation: String,
+    },
+    UnknownActivationDeclaration {
+        activation: String,
+        declaration: String,
+    },
 }
 
 /// Projects immutable Resource declaration and instance-activation records.
@@ -138,6 +163,74 @@ pub fn runtime_resource_artifact_json(artifact: &RuntimeResourceArtifact) -> Str
     serde_json::to_string_pretty(artifact).expect("resource artifact should serialize") + "\n"
 }
 
+/// Validates the exact identity and endpoint prerequisites required by the
+/// Resource runtime boundary. Callers must reject the artifact on any error.
+#[must_use]
+pub fn validate_runtime_resource_artifact(
+    artifact: &RuntimeResourceArtifact,
+) -> Vec<RuntimeResourceArtifactValidationError> {
+    let mut errors = Vec::new();
+    if artifact.schema_version != RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION {
+        errors.push(
+            RuntimeResourceArtifactValidationError::UnsupportedSchemaVersion {
+                actual: artifact.schema_version,
+            },
+        );
+    }
+    let mut declarations = BTreeSet::new();
+    for declaration in &artifact.declarations {
+        if !declarations.insert(declaration.id.clone()) {
+            errors.push(
+                RuntimeResourceArtifactValidationError::DuplicateDeclarationId {
+                    id: declaration.id.clone(),
+                },
+            );
+        }
+        if declaration.endpoint.package.is_empty()
+            || declaration.endpoint.version.is_empty()
+            || declaration.endpoint.integrity.is_empty()
+            || declaration.endpoint.export.is_empty()
+            || declaration.endpoint.runtime_module.is_empty()
+        {
+            errors.push(
+                RuntimeResourceArtifactValidationError::MissingEndpointCoordinate {
+                    declaration: declaration.id.clone(),
+                },
+            );
+        }
+    }
+    let mut activations = BTreeSet::new();
+    for activation in &artifact.activations {
+        if !activations.insert(activation.id.clone()) {
+            errors.push(
+                RuntimeResourceArtifactValidationError::DuplicateActivationId {
+                    id: activation.id.clone(),
+                },
+            );
+        }
+        let generation_required = matches!(
+            activation.state.as_str(),
+            "pending" | "ready" | "failed" | "cancelled"
+        );
+        if generation_required != activation.generation.is_some() {
+            errors.push(
+                RuntimeResourceArtifactValidationError::InvalidLifecycleGeneration {
+                    activation: activation.id.clone(),
+                },
+            );
+        }
+        if !declarations.contains(&activation.declaration) {
+            errors.push(
+                RuntimeResourceArtifactValidationError::UnknownActivationDeclaration {
+                    activation: activation.id.clone(),
+                    declaration: activation.declaration.clone(),
+                },
+            );
+        }
+    }
+    errors
+}
+
 fn resource_lifecycle_artifact_state(state: ResourceLifecycleState) -> (&'static str, Option<u64>) {
     match state {
         ResourceLifecycleState::Idle => ("idle", None),
@@ -152,8 +245,9 @@ fn resource_lifecycle_artifact_state(state: ResourceLifecycleState) -> (&'static
 mod tests {
     use crate::{
         build_application_semantic_model_for_unit_with_packages, build_runtime_resource_artifact,
-        parse_semantic_package_contract, runtime_resource_artifact_json, CompilationUnit,
-        SemanticPackageResolutionTable, RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION,
+        parse_semantic_package_contract, runtime_resource_artifact_json,
+        validate_runtime_resource_artifact, CompilationUnit, SemanticPackageResolutionTable,
+        RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION,
     };
 
     fn model() -> crate::ApplicationSemanticModel {
@@ -190,9 +284,38 @@ class Profile extends Component {
         assert_eq!(artifact.declarations[0].endpoint.export, "loadProfile");
         assert_eq!(artifact.activations.len(), 1);
         assert_eq!(artifact.activations[0].state, "idle");
+        assert!(validate_runtime_resource_artifact(&artifact).is_empty());
         assert_eq!(
             runtime_resource_artifact_json(&artifact),
             runtime_resource_artifact_json(&build_runtime_resource_artifact(&model))
         );
+    }
+
+    #[test]
+    fn rejects_malformed_resource_artifact_identity_and_lifecycle_records() {
+        let model = model();
+        let mut artifact = build_runtime_resource_artifact(&model);
+        artifact.schema_version = 9;
+        artifact.declarations[0].endpoint.integrity.clear();
+        artifact.activations[0].declaration = "resource:missing".to_string();
+        artifact.activations[0].state = "ready".to_string();
+
+        let errors = validate_runtime_resource_artifact(&artifact);
+        assert!(errors.iter().any(|error| matches!(
+            error,
+            crate::RuntimeResourceArtifactValidationError::UnsupportedSchemaVersion { actual: 9 }
+        )));
+        assert!(errors.iter().any(|error| matches!(
+            error,
+            crate::RuntimeResourceArtifactValidationError::MissingEndpointCoordinate { .. }
+        )));
+        assert!(errors.iter().any(|error| matches!(
+            error,
+            crate::RuntimeResourceArtifactValidationError::InvalidLifecycleGeneration { .. }
+        )));
+        assert!(errors.iter().any(|error| matches!(
+            error,
+            crate::RuntimeResourceArtifactValidationError::UnknownActivationDeclaration { .. }
+        )));
     }
 }

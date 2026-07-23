@@ -350,6 +350,11 @@ lifecycle state. It is not yet published or executable, so source remains
 rejected and no transport, cancellation delivery, snapshot, or resume behavior
 is implied.
 
+N6-C4 is complete: the artifact has one fail-closed schema/identity/endpoint/
+lifecycle validator that rejects malformed records rather than recovering.
+Endpoint transport, cancellation delivery, result serialization, resume, and
+browser execution remain required before source admission.
+
 Introduce a compiler-owned Resource declaration with explicit key, input
 dependencies, loading/success/error state, cancellation, retry, invalidation,
 serialization, and resume rules. Resources may invoke only registered

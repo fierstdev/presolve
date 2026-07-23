@@ -678,9 +678,10 @@ pub use runtime_form_registry::{
     RUNTIME_FORM_REGISTRY_VERSION,
 };
 pub use runtime_resource_artifact::{
-    build_runtime_resource_artifact, runtime_resource_artifact_json, RuntimeResourceArtifact,
-    RuntimeResourceArtifactActivation, RuntimeResourceArtifactDeclaration,
-    RuntimeResourceArtifactEndpoint, RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION,
+    build_runtime_resource_artifact, runtime_resource_artifact_json,
+    validate_runtime_resource_artifact, RuntimeResourceArtifact, RuntimeResourceArtifactActivation,
+    RuntimeResourceArtifactDeclaration, RuntimeResourceArtifactEndpoint,
+    RuntimeResourceArtifactValidationError, RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION,
 };
 pub use semantic_capability::{
     build_semantic_capability_registry, semantic_capability_registry_json, SemanticCapability,
