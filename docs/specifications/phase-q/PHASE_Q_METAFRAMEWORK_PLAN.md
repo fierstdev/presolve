@@ -1,6 +1,6 @@
 # Phase Q: Presolve Metaframework
 
-**Status:** planned.
+**Status:** frozen through Q5.
 
 ## Objective
 

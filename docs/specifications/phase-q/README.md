@@ -11,3 +11,4 @@ deployment protocol.
 * [Q2 navigation topology](PHASE_Q_Q2_NAVIGATION_TOPOLOGY.md)
 * [Q3 static request handoff](PHASE_Q_Q3_STATIC_REQUEST_HANDOFF.md)
 * [Q4 deployable release handoff](PHASE_Q_Q4_DEPLOYABLE_RELEASE_HANDOFF.md)
+* [Q5 compatibility freeze](PHASE_Q_Q5_COMPATIBILITY_FREEZE.md)
