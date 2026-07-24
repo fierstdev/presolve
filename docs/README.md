@@ -17,6 +17,7 @@ that application.
 
 - [Composition: inputs, slots, and Context](guide/composition.md)
 - [Forms and resources](guide/forms-and-resources.md)
+- [Resumability](guide/resumability.md)
 - [Third-party packages and opaque boundaries](guide/third-party-packages.md)
 - [Build, inspect, and deploy](guide/production.md)
 

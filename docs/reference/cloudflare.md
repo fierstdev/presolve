@@ -35,3 +35,8 @@ The adapter is static-only in this alpha. It rejects executable server loaders
 and server actions rather than silently running arbitrary application
 JavaScript on a Worker. Secrets are represented by declared binding names; do
 not commit secret values to `.dev.vars`, `.env*`, or Wrangler configuration.
+
+Deploy the complete compiler artifact inventory, including resumability
+artifacts when an application is interactive. Do not mix generated files from
+separate builds; the runtime validates matching identities before it resumes.
+See [resumability](../guide/resumability.md).

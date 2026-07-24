@@ -41,8 +41,9 @@ share the same prerelease version.
 
 Start with the [introduction](docs/guide/introduction.md) and
 [installation guide](docs/guide/installation.md). The complete guide and
-reference cover components, state, routes, packages, VS Code, Cloudflare, and
-the maintainer [publication runbook](docs/reference/publishing.md).
+reference cover components, state, [resumability](docs/guide/resumability.md),
+routes, packages, VS Code, Cloudflare, and the maintainer
+[publication runbook](docs/reference/publishing.md).
 
 ## Contributing
 

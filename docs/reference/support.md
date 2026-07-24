@@ -27,3 +27,6 @@ are released as a lockstep compatibility train.
 
 Unsupported semantic forms fail closed with compiler diagnostics. Presolve does
 not switch to a general reactive runtime when a form cannot be lowered.
+
+Read the [resumability guide](../guide/resumability.md) for the authoring,
+artifact, deployment, and fallback contract.
