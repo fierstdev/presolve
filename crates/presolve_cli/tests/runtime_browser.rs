@@ -6771,7 +6771,10 @@ impl StaticServer {
 
             while !thread_stop.load(Ordering::SeqCst) {
                 match listener.accept() {
-                    Ok((stream, _)) => serve_request(stream, &root),
+                    Ok((stream, _)) => {
+                        let request_root = root.clone();
+                        thread::spawn(move || serve_request(stream, &request_root));
+                    }
                     Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                         thread::sleep(Duration::from_millis(10));
                     }
@@ -6790,6 +6793,10 @@ impl StaticServer {
 }
 
 fn serve_request(mut stream: TcpStream, root: &Path) {
+    let timeout = Duration::from_secs(2);
+    let _ = stream.set_read_timeout(Some(timeout));
+    let _ = stream.set_write_timeout(Some(timeout));
+
     let mut buffer = [0_u8; 1024];
     let Ok(read) = stream.read(&mut buffer) else {
         return;

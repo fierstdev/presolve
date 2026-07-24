@@ -437,13 +437,12 @@ fn expression_read_edges(
                 .find(|field| field.name == *name)
             {
                 (ContextDependencyNodeId::State(state.id.clone()), state_kind)
-            } else if let Some(computed) = computed_values.get(&component.id.computed(name)) {
+            } else {
+                let computed = computed_values.get(&component.id.computed(name))?;
                 (
                     ContextDependencyNodeId::Computed(computed.id.clone()),
                     computed_kind,
                 )
-            } else {
-                return None;
             };
             Some(ContextDependencyEdge {
                 dependent: dependent.clone(),
