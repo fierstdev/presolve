@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  packages:
+    name: Packages and documentation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.5.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cargo install wasm-bindgen-cli --version 0.2.108 --locked
+      - run: pnpm run build
+      - run: pnpm -r test
+      - run: pnpm run test:types
+      - run: pnpm run docs:check
+      - run: pnpm run release:prepare
+
+  rust:
+    name: Rust workspace
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@v2
+        id: setup-chrome
+        with:
+          chrome-version: stable
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Test
+        env:
+          PRESOLVE_CHROME: ${{ steps.setup-chrome.outputs.chrome-path }}
+          RUST_TEST_THREADS: 1
+        run: cargo test --workspace
+
+  browser-e2e:
+    name: Browser e2e
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@v2
+        id: setup-chrome
+        with:
+          chrome-version: stable
+
+      - name: Run browser e2e
+        env:
+          PRESOLVE_CHROME: ${{ steps.setup-chrome.outputs.chrome-path }}
+        run: cargo test -p presolve-cli --test runtime_browser -- --nocapture

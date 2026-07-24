@@ -1,0 +1,25 @@
+name: Learning task
+description: Study a concept needed for implementation
+title: "[learn] "
+labels: ["type: learning", "needs-triage"]
+body:
+  - type: textarea
+    id: concept
+    attributes:
+      label: Concept
+    validations:
+      required: true
+  - type: textarea
+    id: resources
+    attributes:
+      label: Resources
+      description: Official docs, specs, or source files to read.
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Learning output
+      description: What note, diagram, or implementation summary will be produced?
+    validations:
+      required: true

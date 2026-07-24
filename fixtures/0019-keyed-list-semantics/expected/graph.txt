@@ -1,0 +1,19 @@
+File: fixtures/0019-keyed-list-semantics/input/KeyedList.tsx
+ComponentGraph:
+  diagnostics:
+    none
+  components:
+    component KeyedList
+      element: x-keyed-list
+      route: /keyed-list
+      state:
+        items
+      methods:
+        render
+      render:
+        root: <ul>
+        attributes: none
+        event handlers: none
+        children:
+          List(iterable="this.items", item="item", index=Some("index"), key="item.id") @ 9:10 span=153..230
+        bindings: this.items

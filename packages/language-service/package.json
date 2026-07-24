@@ -1,0 +1,25 @@
+{
+  "name": "@presolve/language-service",
+  "version": "0.1.0-alpha.1",
+  "description": "Compiler-product language-service queries for Presolve.",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fierstdev/presolve.git",
+    "directory": "packages/language-service"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "alpha"
+  },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "dependencies": {
+    "@presolve/compiler-wasm": "workspace:*"
+  },
+  "scripts": {
+    "test": "node test/smoke.mjs"
+  }
+}

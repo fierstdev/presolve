@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://presolve.dev/schemas/source-summary.schema.json",
+  "title": "Presolve Source Summary",
+  "type": "object",
+  "required": [
+    "path",
+    "byteLen",
+    "lineCount",
+    "charCount",
+    "hasTsxLikeSyntax",
+    "componentDecorators",
+    "routeDecorators",
+    "classDeclarations",
+    "renderMethods",
+    "diagnostics"
+  ],
+  "properties": {
+    "path": { "type": "string" },
+    "byteLen": { "type": "integer", "minimum": 0 },
+    "lineCount": { "type": "integer", "minimum": 0 },
+    "charCount": { "type": "integer", "minimum": 0 },
+    "hasTsxLikeSyntax": { "type": "boolean" },
+    "componentDecorators": { "type": "array" },
+    "routeDecorators": { "type": "array" },
+    "classDeclarations": { "type": "array" },
+    "renderMethods": { "type": "array" },
+    "diagnostics": { "type": "array" }
+  }
+}

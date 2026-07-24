@@ -1,0 +1,19 @@
+File: fixtures/0036-constant-unary-state-initializer/input/UnaryState.tsx
+Diagnostics:
+  none
+
+Classes:
+  class UnaryState at 1:1
+    decorators:
+      @component("x-unary-state") at 1:1
+    properties:
+      negated = state(...) at 3:3
+      signed = state(...) at 4:3
+    methods:
+      render at 6:3
+        jsx root <output> at 7:12
+          attributes: none
+          event handlers: none
+          children:
+            Binding("this.signed") @ 7:20 span=172..185
+        bindings: this.signed

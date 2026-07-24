@@ -1,0 +1,78 @@
+{
+  "schema_version": 5,
+  "components": [
+    {
+      "component_id": "module:fixtures/0007-boolean-state/input/BooleanFlags.tsx/component:x-boolean-flags",
+      "name": "BooleanFlags",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "section"
+          },
+          {
+            "kind": "element",
+            "id": "n1",
+            "tag": "p"
+          },
+          {
+            "kind": "binding",
+            "id": "n2",
+            "expression": "this.enabled",
+            "initial_value": true
+          },
+          {
+            "kind": "element",
+            "id": "n3",
+            "tag": "p"
+          },
+          {
+            "kind": "binding",
+            "id": "n4",
+            "expression": "this.disabled",
+            "initial_value": false
+          }
+        ],
+        "events": []
+      },
+      "actions": []
+    }
+  ],
+  "ordinary_targets": [
+    {
+      "id": "root:module:fixtures/0007-boolean-state/input/BooleanFlags.tsx/component:x-boolean-flags/template-target:module%3Afixtures%2F0007-boolean-state%2Finput%2FBooleanFlags.tsx%2Fcomponent%3Ax-boolean-flags%2Ftemplate%3Arender%2Fbinding%3Aroot.0.1",
+      "component_instance_id": "root:module:fixtures/0007-boolean-state/input/BooleanFlags.tsx/component:x-boolean-flags",
+      "template_entity_id": "module:fixtures/0007-boolean-state/input/BooleanFlags.tsx/component:x-boolean-flags/template:render/binding:root.0.1",
+      "kind": "element"
+    },
+    {
+      "id": "root:module:fixtures/0007-boolean-state/input/BooleanFlags.tsx/component:x-boolean-flags/template-target:module%3Afixtures%2F0007-boolean-state%2Finput%2FBooleanFlags.tsx%2Fcomponent%3Ax-boolean-flags%2Ftemplate%3Arender%2Fbinding%3Aroot.1.1",
+      "component_instance_id": "root:module:fixtures/0007-boolean-state/input/BooleanFlags.tsx/component:x-boolean-flags",
+      "template_entity_id": "module:fixtures/0007-boolean-state/input/BooleanFlags.tsx/component:x-boolean-flags/template:render/binding:root.1.1",
+      "kind": "element"
+    }
+  ],
+  "ordinary_bindings": [
+    {
+      "instance_binding_id": "root:module:fixtures/0007-boolean-state/input/BooleanFlags.tsx/component:x-boolean-flags/template-binding:module%3Afixtures%2F0007-boolean-state%2Finput%2FBooleanFlags.tsx%2Fcomponent%3Ax-boolean-flags%2Ftemplate%3Arender%2Fbinding%3Aroot.0.1",
+      "component_instance_id": "root:module:fixtures/0007-boolean-state/input/BooleanFlags.tsx/component:x-boolean-flags",
+      "instance_target_id": "root:module:fixtures/0007-boolean-state/input/BooleanFlags.tsx/component:x-boolean-flags/template-target:module%3Afixtures%2F0007-boolean-state%2Finput%2FBooleanFlags.tsx%2Fcomponent%3Ax-boolean-flags%2Ftemplate%3Arender%2Fbinding%3Aroot.0.1",
+      "declaration_binding_id": "module:fixtures/0007-boolean-state/input/BooleanFlags.tsx/component:x-boolean-flags/template:render/binding:root.0.1",
+      "kind": "text",
+      "program_id": "module:fixtures/0007-boolean-state/input/BooleanFlags.tsx/component:x-boolean-flags/template:render/binding:root.0.1",
+      "expression": "this.enabled",
+      "attribute_name": null
+    },
+    {
+      "instance_binding_id": "root:module:fixtures/0007-boolean-state/input/BooleanFlags.tsx/component:x-boolean-flags/template-binding:module%3Afixtures%2F0007-boolean-state%2Finput%2FBooleanFlags.tsx%2Fcomponent%3Ax-boolean-flags%2Ftemplate%3Arender%2Fbinding%3Aroot.1.1",
+      "component_instance_id": "root:module:fixtures/0007-boolean-state/input/BooleanFlags.tsx/component:x-boolean-flags",
+      "instance_target_id": "root:module:fixtures/0007-boolean-state/input/BooleanFlags.tsx/component:x-boolean-flags/template-target:module%3Afixtures%2F0007-boolean-state%2Finput%2FBooleanFlags.tsx%2Fcomponent%3Ax-boolean-flags%2Ftemplate%3Arender%2Fbinding%3Aroot.1.1",
+      "declaration_binding_id": "module:fixtures/0007-boolean-state/input/BooleanFlags.tsx/component:x-boolean-flags/template:render/binding:root.1.1",
+      "kind": "text",
+      "program_id": "module:fixtures/0007-boolean-state/input/BooleanFlags.tsx/component:x-boolean-flags/template:render/binding:root.1.1",
+      "expression": "this.disabled",
+      "attribute_name": null
+    }
+  ]
+}

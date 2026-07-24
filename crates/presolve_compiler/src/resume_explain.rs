@@ -1,0 +1,26 @@
+use crate::application_semantic_model::ApplicationSemanticModel;
+use crate::lazy_action_chunks::plan_lazy_action_chunks;
+use crate::resume_boot::build_resume_boot_plan;
+
+#[must_use]
+pub fn explain_resume(model: &ApplicationSemanticModel) -> String {
+    let boot = build_resume_boot_plan(model);
+    let chunks = plan_lazy_action_chunks(model);
+    format!(
+        "components={}\ninstances={}\nchunks={}\nzero_replay={}\ndiagnostics={}\n",
+        boot.manifest
+            .phase_i_component_resume_records
+            .iter()
+            .filter(|record| {
+                matches!(
+                    record,
+                    crate::ResumeManifestPhaseIComponentResumeRecord::Component { .. }
+                )
+            })
+            .count(),
+        boot.instances.len(),
+        chunks.len(),
+        boot.zero_replay,
+        boot.diagnostics.len()
+    )
+}

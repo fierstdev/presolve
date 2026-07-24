@@ -1,0 +1,116 @@
+{
+  "schema_version": 5,
+  "components": [
+    {
+      "component_id": "module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list",
+      "name": "StaticObjectKeyedList",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "ol"
+          },
+          {
+            "kind": "list",
+            "id": "n1",
+            "start": "n2",
+            "end": "n3",
+            "iterable": "this.items",
+            "initial_value": [
+              {
+                "details": {
+                  "region": "west"
+                },
+                "id": "north",
+                "label": "North"
+              },
+              {
+                "details": {
+                  "region": "east"
+                },
+                "id": "south",
+                "label": "South"
+              }
+            ],
+            "item_variable": "item",
+            "index_variable": "index",
+            "key_expression": "item.id",
+            "item_root": "n4",
+            "item_template_html": "<li data-presolve-node=\"n4:__ez_list_key__\" data-presolve-bindings=\"index,item.label,item.details.region\"><!-- presolve-binding:n5:__ez_list_key__:index -->__ez_list_index__<!-- presolve-list-binding-end:n5:__ez_list_key__ -->:<!-- presolve-binding:n6:__ez_list_key__:item.label --><!-- presolve-list-binding-end:n6:__ez_list_key__ -->(<!-- presolve-binding:n7:__ez_list_key__:item.details.region --><!-- presolve-list-binding-end:n7:__ez_list_key__ -->)</li>"
+          }
+        ],
+        "events": []
+      },
+      "actions": []
+    }
+  ],
+  "ordinary_targets": [
+    {
+      "id": "root:module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template-target:module%3Afixtures%2F0024-static-object-keyed-list%2Finput%2FStaticObjectKeyedList.tsx%2Fcomponent%3Ax-static-object-keyed-list%2Ftemplate%3Arender%2Fbinding%3Aroot.0.item.0.0",
+      "component_instance_id": "root:module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list",
+      "template_entity_id": "module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template:render/binding:root.0.item.0.0",
+      "kind": "element"
+    },
+    {
+      "id": "root:module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template-target:module%3Afixtures%2F0024-static-object-keyed-list%2Finput%2FStaticObjectKeyedList.tsx%2Fcomponent%3Ax-static-object-keyed-list%2Ftemplate%3Arender%2Fbinding%3Aroot.0.item.0.2",
+      "component_instance_id": "root:module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list",
+      "template_entity_id": "module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template:render/binding:root.0.item.0.2",
+      "kind": "element"
+    },
+    {
+      "id": "root:module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template-target:module%3Afixtures%2F0024-static-object-keyed-list%2Finput%2FStaticObjectKeyedList.tsx%2Fcomponent%3Ax-static-object-keyed-list%2Ftemplate%3Arender%2Fbinding%3Aroot.0.item.0.4",
+      "component_instance_id": "root:module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list",
+      "template_entity_id": "module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template:render/binding:root.0.item.0.4",
+      "kind": "element"
+    },
+    {
+      "id": "root:module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template-target:module%3Afixtures%2F0024-static-object-keyed-list%2Finput%2FStaticObjectKeyedList.tsx%2Fcomponent%3Ax-static-object-keyed-list%2Ftemplate%3Arender%2Flist%3Aroot.0",
+      "component_instance_id": "root:module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list",
+      "template_entity_id": "module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template:render/list:root.0",
+      "kind": "list_boundary"
+    }
+  ],
+  "ordinary_bindings": [
+    {
+      "instance_binding_id": "root:module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template-binding:module%3Afixtures%2F0024-static-object-keyed-list%2Finput%2FStaticObjectKeyedList.tsx%2Fcomponent%3Ax-static-object-keyed-list%2Ftemplate%3Arender%2Fbinding%3Aroot.0.item.0.0",
+      "component_instance_id": "root:module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list",
+      "instance_target_id": "root:module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template-target:module%3Afixtures%2F0024-static-object-keyed-list%2Finput%2FStaticObjectKeyedList.tsx%2Fcomponent%3Ax-static-object-keyed-list%2Ftemplate%3Arender%2Fbinding%3Aroot.0.item.0.0",
+      "declaration_binding_id": "module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template:render/binding:root.0.item.0.0",
+      "kind": "text",
+      "program_id": "module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template:render/binding:root.0.item.0.0",
+      "expression": "index",
+      "attribute_name": null
+    },
+    {
+      "instance_binding_id": "root:module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template-binding:module%3Afixtures%2F0024-static-object-keyed-list%2Finput%2FStaticObjectKeyedList.tsx%2Fcomponent%3Ax-static-object-keyed-list%2Ftemplate%3Arender%2Fbinding%3Aroot.0.item.0.2",
+      "component_instance_id": "root:module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list",
+      "instance_target_id": "root:module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template-target:module%3Afixtures%2F0024-static-object-keyed-list%2Finput%2FStaticObjectKeyedList.tsx%2Fcomponent%3Ax-static-object-keyed-list%2Ftemplate%3Arender%2Fbinding%3Aroot.0.item.0.2",
+      "declaration_binding_id": "module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template:render/binding:root.0.item.0.2",
+      "kind": "text",
+      "program_id": "module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template:render/binding:root.0.item.0.2",
+      "expression": "item.label",
+      "attribute_name": null
+    },
+    {
+      "instance_binding_id": "root:module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template-binding:module%3Afixtures%2F0024-static-object-keyed-list%2Finput%2FStaticObjectKeyedList.tsx%2Fcomponent%3Ax-static-object-keyed-list%2Ftemplate%3Arender%2Fbinding%3Aroot.0.item.0.4",
+      "component_instance_id": "root:module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list",
+      "instance_target_id": "root:module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template-target:module%3Afixtures%2F0024-static-object-keyed-list%2Finput%2FStaticObjectKeyedList.tsx%2Fcomponent%3Ax-static-object-keyed-list%2Ftemplate%3Arender%2Fbinding%3Aroot.0.item.0.4",
+      "declaration_binding_id": "module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template:render/binding:root.0.item.0.4",
+      "kind": "text",
+      "program_id": "module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template:render/binding:root.0.item.0.4",
+      "expression": "item.details.region",
+      "attribute_name": null
+    },
+    {
+      "instance_binding_id": "root:module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template-binding:module%3Afixtures%2F0024-static-object-keyed-list%2Finput%2FStaticObjectKeyedList.tsx%2Fcomponent%3Ax-static-object-keyed-list%2Ftemplate%3Arender%2Flist%3Aroot.0",
+      "component_instance_id": "root:module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list",
+      "instance_target_id": "root:module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template-target:module%3Afixtures%2F0024-static-object-keyed-list%2Finput%2FStaticObjectKeyedList.tsx%2Fcomponent%3Ax-static-object-keyed-list%2Ftemplate%3Arender%2Flist%3Aroot.0",
+      "declaration_binding_id": "module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template:render/list:root.0",
+      "kind": "list",
+      "program_id": "module:fixtures/0024-static-object-keyed-list/input/StaticObjectKeyedList.tsx/component:x-static-object-keyed-list/template:render/list:root.0",
+      "expression": "this.items",
+      "attribute_name": null
+    }
+  ]
+}

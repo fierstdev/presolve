@@ -1,0 +1,22 @@
+File: fixtures/0003-semantic-errors/input/BrokenSemantics.tsx
+ComponentGraph:
+  diagnostics:
+    PSC1001: class `BrokenSemantics` is missing @component(...)
+    PSC1003: render binding `this.missingCount` references unknown field `missingCount` in class `BrokenSemantics`
+    PSC1004: event handler `this.increment` references unknown method `increment` in class `BrokenSemantics`
+  components:
+    component BrokenSemantics
+      element: <missing>
+      route: /semantic-errors
+      state:
+        count
+      methods:
+        render
+      render:
+        root: <button>
+        attributes: onClick={...}
+        event handlers: click -> this.increment
+        children:
+          Text("Count:") @ 8:9 span=172..178
+          Binding("this.missingCount") @ 8:16 span=179..198
+        bindings: this.missingCount

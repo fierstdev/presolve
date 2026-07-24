@@ -1,0 +1,64 @@
+{
+  "name": "presolve-vscode",
+  "displayName": "Presolve",
+  "version": "0.1.0-alpha.1",
+  "description": "Presolve language tooling for Visual Studio Code.",
+  "publisher": "fierstdev",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "main": "./extension.cjs",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Formatters"
+  ],
+  "keywords": [
+    "presolve",
+    "typescript",
+    "tsx",
+    "compiler"
+  ],
+  "activationEvents": [
+    "onLanguage:typescriptreact",
+    "onLanguage:typescript"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "presolve.status",
+        "title": "Presolve: Show Workspace Status"
+      }
+    ],
+    "configuration": {
+      "title": "Presolve",
+      "properties": {
+        "presolve.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Presolve workspace integration."
+        }
+      }
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fierstdev/presolve.git",
+    "directory": "packages/vscode"
+  },
+  "files": [
+    "extension.cjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "tag": "alpha"
+  },
+  "scripts": {
+    "test": "node test/workspace-fixture.mjs",
+    "package": "npx --yes @vscode/vsce package --no-dependencies"
+  }
+}

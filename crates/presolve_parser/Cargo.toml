@@ -1,0 +1,21 @@
+[package]
+name = "presolve-parser"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Parser implementation used by the Presolve compiler."
+readme = "README.md"
+rust-version.workspace = true
+
+[lib]
+name = "presolve_parser"
+
+[dependencies]
+oxc_allocator = "0.87"
+oxc_ast = "0.87"
+oxc_diagnostics = "0.87"
+oxc_parser = "0.87"
+oxc_regular_expression = "0.87"
+oxc_span = "0.87"

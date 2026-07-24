@@ -1,0 +1,1 @@
+{"schema":"presolve.watch-change-batch","version":1,"watch_session_id":"watch-fixture","sequence":1,"observed_changes":[{"kind":"renamed","logical_path":"src/new.ts","previous_logical_path":"src/old.ts"}],"candidate":{"candidate_id":"candidate-1","fingerprint":"sha256:fixture"}}

@@ -1,0 +1,1 @@
+{"schema":"presolve.watch-session-configuration","version":1,"watch_session_id":"watch-fixture","workspace_id":"workspace-fixture","debounce":{"quiet_period_milliseconds":10,"maximum_delay_milliseconds":30},"supersession_policy":"cancel_obsolete","event_detail":"summary","event_journal_capacity":8}

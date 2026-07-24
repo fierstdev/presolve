@@ -1,0 +1,60 @@
+{
+  "schema_version": 5,
+  "components": [
+    {
+      "component_id": "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter",
+      "name": "Counter",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "button"
+          },
+          {
+            "kind": "binding",
+            "id": "n1",
+            "expression": "this.count",
+            "initial_value": "0"
+          }
+        ],
+        "events": [
+          {
+            "node": "n0",
+            "event": "click",
+            "handler": "this.increment"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "method": "increment",
+          "operation": "add_assign",
+          "field": "count",
+          "storage_id": "storage:module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/state:count",
+          "operand": "1"
+        }
+      ]
+    }
+  ],
+  "ordinary_targets": [
+    {
+      "id": "root:module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/template-target:module%3Afixtures%2F0001-source-summary%2Finput%2FCounter.tsx%2Fcomponent%3Ax-counter%2Ftemplate%3Arender%2Fbinding%3Aroot.1",
+      "component_instance_id": "root:module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter",
+      "template_entity_id": "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/template:render/binding:root.1",
+      "kind": "element"
+    }
+  ],
+  "ordinary_bindings": [
+    {
+      "instance_binding_id": "root:module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/template-binding:module%3Afixtures%2F0001-source-summary%2Finput%2FCounter.tsx%2Fcomponent%3Ax-counter%2Ftemplate%3Arender%2Fbinding%3Aroot.1",
+      "component_instance_id": "root:module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter",
+      "instance_target_id": "root:module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/template-target:module%3Afixtures%2F0001-source-summary%2Finput%2FCounter.tsx%2Fcomponent%3Ax-counter%2Ftemplate%3Arender%2Fbinding%3Aroot.1",
+      "declaration_binding_id": "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/template:render/binding:root.1",
+      "kind": "text",
+      "program_id": "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter/template:render/binding:root.1",
+      "expression": "this.count",
+      "attribute_name": null
+    }
+  ]
+}

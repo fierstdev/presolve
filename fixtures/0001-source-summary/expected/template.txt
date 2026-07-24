@@ -1,0 +1,11 @@
+File: fixtures/0001-source-summary/input/Counter.tsx
+TemplateGraph:
+  templates:
+    template Counter
+      root: <button> id=n0 @ fixtures/0001-source-summary/input/Counter.tsx:12:7 span=172..257
+      attributes:
+        data-presolve-on-click = event-handler(click -> this.increment) @ fixtures/0001-source-summary/input/Counter.tsx:12:15 span=180..212
+        data-presolve-bindings = bindings(this.count) @ generated
+      children:
+        Text("Count:") @ fixtures/0001-source-summary/input/Counter.tsx:13:9 span=222..228
+        Binding id=n1 expression="this.count" initial=Some("0") @ fixtures/0001-source-summary/input/Counter.tsx:13:16 span=229..241

@@ -1,0 +1,20 @@
+File: fixtures/0007-boolean-state/input/BooleanFlags.tsx
+TemplateGraph:
+  templates:
+    template BooleanFlags
+      root: <section> id=n0 @ fixtures/0007-boolean-state/input/BooleanFlags.tsx:9:7 span=179..283
+      attributes:
+        none
+      children:
+        Element <p> id=n1 @ fixtures/0007-boolean-state/input/BooleanFlags.tsx:10:9 span=197..226
+          attributes:
+            data-presolve-bindings = bindings(this.enabled) @ generated
+          children:
+            Text("Enabled:") @ fixtures/0007-boolean-state/input/BooleanFlags.tsx:10:12 span=200..208
+            Binding id=n2 expression="this.enabled" initial=Some(true) @ fixtures/0007-boolean-state/input/BooleanFlags.tsx:10:20 span=208..222
+        Element <p> id=n3 @ fixtures/0007-boolean-state/input/BooleanFlags.tsx:11:9 span=235..266
+          attributes:
+            data-presolve-bindings = bindings(this.disabled) @ generated
+          children:
+            Text("Disabled:") @ fixtures/0007-boolean-state/input/BooleanFlags.tsx:11:12 span=238..247
+            Binding id=n4 expression="this.disabled" initial=Some(false) @ fixtures/0007-boolean-state/input/BooleanFlags.tsx:11:21 span=247..262

@@ -1,0 +1,22 @@
+[workspace]
+members = [
+  "crates/presolve_compiler",
+  "crates/presolve_cli",
+  "crates/presolve_parser",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/fierstdev/presolve"
+homepage = "https://github.com/fierstdev/presolve"
+description = "The Presolve compiler toolchain for TypeScript web applications."
+version = "0.1.0-alpha.1"
+rust-version = "1.85"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+correctness = "deny"

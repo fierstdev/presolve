@@ -1,0 +1,23 @@
+File: fixtures/0001-source-summary/input/Counter.tsx
+ComponentGraph:
+  diagnostics:
+    none
+  components:
+    component Counter
+      element: x-counter
+      route: /counter
+      state:
+        count
+      methods:
+        increment
+        render
+      actions:
+        increment: add-assign count
+      render:
+        root: <button>
+        attributes: onClick={...}
+        event handlers: click -> this.increment
+        children:
+          Text("Count:") @ 13:9 span=222..228
+          Binding("this.count") @ 13:16 span=229..241
+        bindings: this.count

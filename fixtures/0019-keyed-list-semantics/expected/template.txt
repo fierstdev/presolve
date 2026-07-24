@@ -1,0 +1,17 @@
+File: fixtures/0019-keyed-list-semantics/input/KeyedList.tsx
+TemplateGraph:
+  templates:
+    template KeyedList
+      root: <ul> id=n0 @ fixtures/0019-keyed-list-semantics/input/KeyedList.tsx:8:7 span=139..243
+      attributes:
+        data-presolve-bindings = bindings(this.items) @ generated
+      children:
+        List id=n1 start=n2 end=n3 iterable="this.items" initial=Some([]) item="item" index=Some("index") key="item.id" @ fixtures/0019-keyed-list-semantics/input/KeyedList.tsx:9:10 span=153..230
+          item template:
+            Element <li> id=n4 @ fixtures/0019-keyed-list-semantics/input/KeyedList.tsx:9:42 span=185..229
+              attributes:
+                data-presolve-bindings = bindings(index, item.label) @ generated
+              children:
+                Binding id=n5 expression="index" initial=None @ fixtures/0019-keyed-list-semantics/input/KeyedList.tsx:9:60 span=203..210
+                Text(":") @ fixtures/0019-keyed-list-semantics/input/KeyedList.tsx:9:67 span=210..211
+                Binding id=n6 expression="item.label" initial=None @ fixtures/0019-keyed-list-semantics/input/KeyedList.tsx:9:69 span=212..224

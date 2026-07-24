@@ -1,0 +1,104 @@
+{
+  "schema_version": 5,
+  "components": [
+    {
+      "component_id": "module:fixtures/0010-add-subtract-assign/input/StepCounter.tsx/component:x-step-counter",
+      "name": "StepCounter",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "section"
+          },
+          {
+            "kind": "element",
+            "id": "n1",
+            "tag": "button"
+          },
+          {
+            "kind": "binding",
+            "id": "n2",
+            "expression": "this.count",
+            "initial_value": "4"
+          },
+          {
+            "kind": "element",
+            "id": "n3",
+            "tag": "button"
+          },
+          {
+            "kind": "binding",
+            "id": "n4",
+            "expression": "this.count",
+            "initial_value": "4"
+          }
+        ],
+        "events": [
+          {
+            "node": "n1",
+            "event": "click",
+            "handler": "this.addTwo"
+          },
+          {
+            "node": "n3",
+            "event": "click",
+            "handler": "this.subtractThree"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "method": "addTwo",
+          "operation": "add_assign",
+          "field": "count",
+          "storage_id": "storage:module:fixtures/0010-add-subtract-assign/input/StepCounter.tsx/component:x-step-counter/state:count",
+          "operand": "2"
+        },
+        {
+          "method": "subtractThree",
+          "operation": "subtract_assign",
+          "field": "count",
+          "storage_id": "storage:module:fixtures/0010-add-subtract-assign/input/StepCounter.tsx/component:x-step-counter/state:count",
+          "operand": "3"
+        }
+      ]
+    }
+  ],
+  "ordinary_targets": [
+    {
+      "id": "root:module:fixtures/0010-add-subtract-assign/input/StepCounter.tsx/component:x-step-counter/template-target:module%3Afixtures%2F0010-add-subtract-assign%2Finput%2FStepCounter.tsx%2Fcomponent%3Ax-step-counter%2Ftemplate%3Arender%2Fbinding%3Aroot.0.1",
+      "component_instance_id": "root:module:fixtures/0010-add-subtract-assign/input/StepCounter.tsx/component:x-step-counter",
+      "template_entity_id": "module:fixtures/0010-add-subtract-assign/input/StepCounter.tsx/component:x-step-counter/template:render/binding:root.0.1",
+      "kind": "element"
+    },
+    {
+      "id": "root:module:fixtures/0010-add-subtract-assign/input/StepCounter.tsx/component:x-step-counter/template-target:module%3Afixtures%2F0010-add-subtract-assign%2Finput%2FStepCounter.tsx%2Fcomponent%3Ax-step-counter%2Ftemplate%3Arender%2Fbinding%3Aroot.1.1",
+      "component_instance_id": "root:module:fixtures/0010-add-subtract-assign/input/StepCounter.tsx/component:x-step-counter",
+      "template_entity_id": "module:fixtures/0010-add-subtract-assign/input/StepCounter.tsx/component:x-step-counter/template:render/binding:root.1.1",
+      "kind": "element"
+    }
+  ],
+  "ordinary_bindings": [
+    {
+      "instance_binding_id": "root:module:fixtures/0010-add-subtract-assign/input/StepCounter.tsx/component:x-step-counter/template-binding:module%3Afixtures%2F0010-add-subtract-assign%2Finput%2FStepCounter.tsx%2Fcomponent%3Ax-step-counter%2Ftemplate%3Arender%2Fbinding%3Aroot.0.1",
+      "component_instance_id": "root:module:fixtures/0010-add-subtract-assign/input/StepCounter.tsx/component:x-step-counter",
+      "instance_target_id": "root:module:fixtures/0010-add-subtract-assign/input/StepCounter.tsx/component:x-step-counter/template-target:module%3Afixtures%2F0010-add-subtract-assign%2Finput%2FStepCounter.tsx%2Fcomponent%3Ax-step-counter%2Ftemplate%3Arender%2Fbinding%3Aroot.0.1",
+      "declaration_binding_id": "module:fixtures/0010-add-subtract-assign/input/StepCounter.tsx/component:x-step-counter/template:render/binding:root.0.1",
+      "kind": "text",
+      "program_id": "module:fixtures/0010-add-subtract-assign/input/StepCounter.tsx/component:x-step-counter/template:render/binding:root.0.1",
+      "expression": "this.count",
+      "attribute_name": null
+    },
+    {
+      "instance_binding_id": "root:module:fixtures/0010-add-subtract-assign/input/StepCounter.tsx/component:x-step-counter/template-binding:module%3Afixtures%2F0010-add-subtract-assign%2Finput%2FStepCounter.tsx%2Fcomponent%3Ax-step-counter%2Ftemplate%3Arender%2Fbinding%3Aroot.1.1",
+      "component_instance_id": "root:module:fixtures/0010-add-subtract-assign/input/StepCounter.tsx/component:x-step-counter",
+      "instance_target_id": "root:module:fixtures/0010-add-subtract-assign/input/StepCounter.tsx/component:x-step-counter/template-target:module%3Afixtures%2F0010-add-subtract-assign%2Finput%2FStepCounter.tsx%2Fcomponent%3Ax-step-counter%2Ftemplate%3Arender%2Fbinding%3Aroot.1.1",
+      "declaration_binding_id": "module:fixtures/0010-add-subtract-assign/input/StepCounter.tsx/component:x-step-counter/template:render/binding:root.1.1",
+      "kind": "text",
+      "program_id": "module:fixtures/0010-add-subtract-assign/input/StepCounter.tsx/component:x-step-counter/template:render/binding:root.1.1",
+      "expression": "this.count",
+      "attribute_name": null
+    }
+  ]
+}

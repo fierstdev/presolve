@@ -1,0 +1,1 @@
+{"schema":"presolve.watch-execution-plan","version":1,"watch_session_id":"watch-fixture","workspace_id":"workspace-fixture","first_sequence":1,"last_sequence":2,"coalesced_batch_count":2,"candidate_fingerprint":"sha256:fixture","observed_changes":[{"kind":"modified","logical_path":"src/app.ts"}],"eligibility":"quiet_period_elapsed","plan_identity":"sha256:fixture-plan"}

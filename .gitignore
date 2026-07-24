@@ -1,0 +1,12 @@
+/target/
+node_modules/
+/dist/
+dist/
+target/
+target/ezc-test-output/
+/.turbo/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example

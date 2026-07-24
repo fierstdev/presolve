@@ -1,0 +1,31 @@
+{
+  "path": "fixtures/0001-source-summary/input/Counter.tsx",
+  "byteLen": 271,
+  "lineCount": 17,
+  "charCount": 271,
+  "hasTsxLikeSyntax": true,
+  "componentDecorators": [
+    {
+      "name": "component",
+      "argument": "x-counter",
+      "span": { "start": 19, "end": 42, "line": 2, "column": 1 }
+    }
+  ],
+  "routeDecorators": [
+    {
+      "name": "route",
+      "argument": "/counter",
+      "span": { "start": 0, "end": 18, "line": 1, "column": 1 }
+    }
+  ],
+  "classDeclarations": [
+    {
+      "name": "Counter",
+      "span": { "start": 43, "end": 56, "line": 3, "column": 1 }
+    }
+  ],
+  "renderMethods": [
+    { "span": { "start": 142, "end": 150, "line": 10, "column": 3 } }
+  ],
+  "diagnostics": []
+}

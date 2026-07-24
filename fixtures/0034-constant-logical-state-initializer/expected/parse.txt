@@ -1,0 +1,19 @@
+File: fixtures/0034-constant-logical-state-initializer/input/LogicalState.tsx
+Diagnostics:
+  none
+
+Classes:
+  class LogicalState at 1:1
+    decorators:
+      @component("x-logical-state") at 1:1
+    properties:
+      ready = state(...) at 3:3
+      fallback = state(...) at 4:3
+    methods:
+      render at 6:3
+        jsx root <output> at 7:12
+          attributes: none
+          event handlers: none
+          children:
+            Binding("this.ready") @ 7:20 span=199..211
+        bindings: this.ready

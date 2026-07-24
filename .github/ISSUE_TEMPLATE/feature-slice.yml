@@ -1,0 +1,33 @@
+name: Feature slice
+description: A small observable implementation slice
+title: "[slice] "
+labels: ["type: feature", "needs-triage"]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Observable outcome
+      description: What can be run, viewed, or tested when this is done?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What is included and explicitly excluded?
+    validations:
+      required: true
+  - type: textarea
+    id: proof
+    attributes:
+      label: Proof
+      description: What fixture, test, or explain output proves this works?
+    validations:
+      required: true
+  - type: textarea
+    id: learning
+    attributes:
+      label: Concepts to learn
+      description: What needs to be studied before or during this work?
+    validations:
+      required: true

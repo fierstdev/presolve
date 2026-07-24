@@ -1,0 +1,11 @@
+File: fixtures/0009-decrement-counter/input/DecrementCounter.tsx
+TemplateGraph:
+  templates:
+    template DecrementCounter
+      root: <button> id=n0 @ fixtures/0009-decrement-counter/input/DecrementCounter.tsx:12:7 span=190..275
+      attributes:
+        data-presolve-on-click = event-handler(click -> this.decrement) @ fixtures/0009-decrement-counter/input/DecrementCounter.tsx:12:15 span=198..230
+        data-presolve-bindings = bindings(this.count) @ generated
+      children:
+        Text("Count:") @ fixtures/0009-decrement-counter/input/DecrementCounter.tsx:13:9 span=240..246
+        Binding id=n1 expression="this.count" initial=Some("2") @ fixtures/0009-decrement-counter/input/DecrementCounter.tsx:13:16 span=247..259

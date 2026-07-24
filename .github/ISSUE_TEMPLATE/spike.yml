@@ -1,0 +1,25 @@
+name: Spike
+description: A time-boxed research task
+title: "[spike] "
+labels: ["type: spike", "needs-triage"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Research question
+    validations:
+      required: true
+  - type: textarea
+    id: timebox
+    attributes:
+      label: Time box
+      description: How much time is allowed before writing conclusions?
+    validations:
+      required: true
+  - type: textarea
+    id: outputs
+    attributes:
+      label: Required outputs
+      description: What notes, prototype, comparison table, or recommendation must exist?
+    validations:
+      required: true

@@ -1,0 +1,59 @@
+{
+  "schema_version": 5,
+  "components": [
+    {
+      "component_id": "module:fixtures/0012-boolean-toggle/input/ToggleFlag.tsx/component:x-toggle-flag",
+      "name": "ToggleFlag",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "button"
+          },
+          {
+            "kind": "binding",
+            "id": "n1",
+            "expression": "this.enabled",
+            "initial_value": false
+          }
+        ],
+        "events": [
+          {
+            "node": "n0",
+            "event": "click",
+            "handler": "this.toggle"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "method": "toggle",
+          "operation": "toggle",
+          "field": "enabled",
+          "storage_id": "storage:module:fixtures/0012-boolean-toggle/input/ToggleFlag.tsx/component:x-toggle-flag/state:enabled"
+        }
+      ]
+    }
+  ],
+  "ordinary_targets": [
+    {
+      "id": "root:module:fixtures/0012-boolean-toggle/input/ToggleFlag.tsx/component:x-toggle-flag/template-target:module%3Afixtures%2F0012-boolean-toggle%2Finput%2FToggleFlag.tsx%2Fcomponent%3Ax-toggle-flag%2Ftemplate%3Arender%2Fbinding%3Aroot.1",
+      "component_instance_id": "root:module:fixtures/0012-boolean-toggle/input/ToggleFlag.tsx/component:x-toggle-flag",
+      "template_entity_id": "module:fixtures/0012-boolean-toggle/input/ToggleFlag.tsx/component:x-toggle-flag/template:render/binding:root.1",
+      "kind": "element"
+    }
+  ],
+  "ordinary_bindings": [
+    {
+      "instance_binding_id": "root:module:fixtures/0012-boolean-toggle/input/ToggleFlag.tsx/component:x-toggle-flag/template-binding:module%3Afixtures%2F0012-boolean-toggle%2Finput%2FToggleFlag.tsx%2Fcomponent%3Ax-toggle-flag%2Ftemplate%3Arender%2Fbinding%3Aroot.1",
+      "component_instance_id": "root:module:fixtures/0012-boolean-toggle/input/ToggleFlag.tsx/component:x-toggle-flag",
+      "instance_target_id": "root:module:fixtures/0012-boolean-toggle/input/ToggleFlag.tsx/component:x-toggle-flag/template-target:module%3Afixtures%2F0012-boolean-toggle%2Finput%2FToggleFlag.tsx%2Fcomponent%3Ax-toggle-flag%2Ftemplate%3Arender%2Fbinding%3Aroot.1",
+      "declaration_binding_id": "module:fixtures/0012-boolean-toggle/input/ToggleFlag.tsx/component:x-toggle-flag/template:render/binding:root.1",
+      "kind": "text",
+      "program_id": "module:fixtures/0012-boolean-toggle/input/ToggleFlag.tsx/component:x-toggle-flag/template:render/binding:root.1",
+      "expression": "this.enabled",
+      "attribute_name": null
+    }
+  ]
+}

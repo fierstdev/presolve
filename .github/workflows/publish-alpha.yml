@@ -1,0 +1,181 @@
+name: Publish alpha
+
+on:
+  push:
+    tags:
+      - "v0.1.0-alpha.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Exact prerelease version, for example 0.1.0-alpha.1"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  verify:
+    name: Verify release inputs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.5.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cargo install wasm-bindgen-cli --version 0.2.108 --locked
+      - name: Verify lockstep release version
+        env:
+          RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+        run: node scripts/verify-release-version.mjs "${RELEASE_VERSION#v}"
+      - run: cargo fmt --all --check
+      - run: RUST_TEST_THREADS=1 cargo test --workspace
+      - run: pnpm --dir packages/create-presolve test
+      - run: pnpm --dir packages/compiler-wasm run build
+      - run: pnpm --dir packages/compiler-wasm test
+      - run: pnpm --dir framework/packages/presolve pack --pack-destination ../../../.release
+
+  publish-crates:
+    name: Publish crates.io packages
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: crates-io
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Publish parser, compiler, and CLI in dependency order
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          cargo publish -p presolve-parser
+          for crate in presolve-compiler presolve-cli; do
+            for attempt in $(seq 1 12); do
+              if cargo publish -p "$crate"; then break; fi
+              if [ "$attempt" = 12 ]; then exit 1; fi
+              sleep 15
+            done
+          done
+
+  native-cli:
+    name: Build ${{ matrix.package }}
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            package: cli-darwin-x64
+            executable: presolve
+          - os: macos-14
+            target: aarch64-apple-darwin
+            package: cli-darwin-arm64
+            executable: presolve
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            package: cli-linux-x64
+            executable: presolve
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            package: cli-win32-x64
+            executable: presolve.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.5.0
+      - run: cargo build --release --locked -p presolve-cli --target ${{ matrix.target }}
+      - name: Stage binary
+        shell: bash
+        run: |
+          mkdir -p packages/${{ matrix.package }}/bin
+          cp target/${{ matrix.target }}/release/${{ matrix.executable }} packages/${{ matrix.package }}/bin/${{ matrix.executable }}
+      - run: pnpm --dir packages/${{ matrix.package }} pack --pack-destination ../../.release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.package }}
+          path: .release/*.tgz
+          if-no-files-found: error
+
+  publish-npm:
+    name: Publish npm packages
+    needs: [native-cli, publish-crates]
+    runs-on: ubuntu-latest
+    environment:
+      name: npm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: actions/download-artifact@v4
+        with:
+          path: .release
+          merge-multiple: true
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.5.0
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cargo install wasm-bindgen-cli --version 0.2.108 --locked
+      - name: Build and verify compiler WebAssembly package
+        run: |
+          pnpm --dir packages/compiler-wasm run build
+          pnpm --dir packages/compiler-wasm test
+      - name: Publish platform packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          for package in .release/*.tgz; do
+            npm publish "$package" --tag alpha --access public --provenance
+          done
+      - name: Publish compiler tooling and application handoffs
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          pnpm --dir packages/compiler-wasm publish --no-git-checks --provenance
+          pnpm --dir packages/language-service publish --no-git-checks --provenance
+          pnpm --dir packages/lsp publish --no-git-checks --provenance
+          pnpm --dir packages/testing publish --no-git-checks --provenance
+      - name: Publish framework, CLI, and scaffold
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          pnpm --dir framework/packages/presolve publish --no-git-checks --provenance
+          pnpm --dir packages/cli publish --no-git-checks --provenance
+          pnpm --dir packages/create-presolve publish --no-git-checks --provenance
+
+  publish-vscode:
+    name: Publish VS Code extension
+    needs: publish-npm
+    runs-on: ubuntu-latest
+    environment:
+      name: vscode-marketplace
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.5.0
+      - name: Package extension
+        run: npx --yes @vscode/vsce package --no-dependencies --out presolve-vscode.vsix
+        working-directory: packages/vscode
+      - name: Publish extension
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: npx --yes @vscode/vsce publish --packagePath presolve-vscode.vsix --pat "$VSCE_PAT" --pre-release
+        working-directory: packages/vscode

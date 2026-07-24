@@ -1,0 +1,110 @@
+{
+  "schema_version": 5,
+  "components": [
+    {
+      "component_id": "module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button",
+      "name": "DynamicAttributeButton",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "button"
+          },
+          {
+            "kind": "binding",
+            "id": "n1",
+            "expression": "this.disabled",
+            "initial_value": false,
+            "target": "attribute",
+            "element": "n0",
+            "attribute": "disabled"
+          },
+          {
+            "kind": "binding",
+            "id": "n2",
+            "expression": "this.label",
+            "initial_value": "Ready",
+            "target": "attribute",
+            "element": "n0",
+            "attribute": "title"
+          },
+          {
+            "kind": "binding",
+            "id": "n3",
+            "expression": "this.label",
+            "initial_value": "Ready"
+          }
+        ],
+        "events": [
+          {
+            "node": "n0",
+            "event": "click",
+            "handler": "this.lock"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "method": "lock",
+          "operation": "toggle",
+          "field": "disabled",
+          "storage_id": "storage:module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button/state:disabled"
+        },
+        {
+          "method": "lock",
+          "operation": "assign",
+          "field": "label",
+          "storage_id": "storage:module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button/state:label",
+          "operand": "Locked"
+        }
+      ]
+    }
+  ],
+  "ordinary_targets": [
+    {
+      "id": "root:module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button/template-target:module%3Afixtures%2F0015-dynamic-attributes%2Finput%2FDynamicAttributeButton.tsx%2Fcomponent%3Ax-dynamic-attribute-button%2Ftemplate%3Arender%2Fbinding%3Aroot.1",
+      "component_instance_id": "root:module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button",
+      "template_entity_id": "module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button/template:render/binding:root.1",
+      "kind": "element"
+    },
+    {
+      "id": "root:module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button/template-target:module%3Afixtures%2F0015-dynamic-attributes%2Finput%2FDynamicAttributeButton.tsx%2Fcomponent%3Ax-dynamic-attribute-button%2Ftemplate%3Arender%2Felement%3Aroot",
+      "component_instance_id": "root:module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button",
+      "template_entity_id": "module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button/template:render/element:root",
+      "kind": "element"
+    }
+  ],
+  "ordinary_bindings": [
+    {
+      "instance_binding_id": "root:module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button/template-binding:module%3Afixtures%2F0015-dynamic-attributes%2Finput%2FDynamicAttributeButton.tsx%2Fcomponent%3Ax-dynamic-attribute-button%2Ftemplate%3Arender%2Fattribute-binding%3Aroot.disabled",
+      "component_instance_id": "root:module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button",
+      "instance_target_id": "root:module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button/template-target:module%3Afixtures%2F0015-dynamic-attributes%2Finput%2FDynamicAttributeButton.tsx%2Fcomponent%3Ax-dynamic-attribute-button%2Ftemplate%3Arender%2Felement%3Aroot",
+      "declaration_binding_id": "module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button/template:render/attribute-binding:root.disabled",
+      "kind": "attribute",
+      "program_id": "module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button/template:render/attribute-binding:root.disabled",
+      "expression": "this.disabled",
+      "attribute_name": "disabled"
+    },
+    {
+      "instance_binding_id": "root:module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button/template-binding:module%3Afixtures%2F0015-dynamic-attributes%2Finput%2FDynamicAttributeButton.tsx%2Fcomponent%3Ax-dynamic-attribute-button%2Ftemplate%3Arender%2Fattribute-binding%3Aroot.title",
+      "component_instance_id": "root:module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button",
+      "instance_target_id": "root:module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button/template-target:module%3Afixtures%2F0015-dynamic-attributes%2Finput%2FDynamicAttributeButton.tsx%2Fcomponent%3Ax-dynamic-attribute-button%2Ftemplate%3Arender%2Felement%3Aroot",
+      "declaration_binding_id": "module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button/template:render/attribute-binding:root.title",
+      "kind": "attribute",
+      "program_id": "module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button/template:render/attribute-binding:root.title",
+      "expression": "this.label",
+      "attribute_name": "title"
+    },
+    {
+      "instance_binding_id": "root:module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button/template-binding:module%3Afixtures%2F0015-dynamic-attributes%2Finput%2FDynamicAttributeButton.tsx%2Fcomponent%3Ax-dynamic-attribute-button%2Ftemplate%3Arender%2Fbinding%3Aroot.1",
+      "component_instance_id": "root:module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button",
+      "instance_target_id": "root:module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button/template-target:module%3Afixtures%2F0015-dynamic-attributes%2Finput%2FDynamicAttributeButton.tsx%2Fcomponent%3Ax-dynamic-attribute-button%2Ftemplate%3Arender%2Fbinding%3Aroot.1",
+      "declaration_binding_id": "module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button/template:render/binding:root.1",
+      "kind": "text",
+      "program_id": "module:fixtures/0015-dynamic-attributes/input/DynamicAttributeButton.tsx/component:x-dynamic-attribute-button/template:render/binding:root.1",
+      "expression": "this.label",
+      "attribute_name": null
+    }
+  ]
+}

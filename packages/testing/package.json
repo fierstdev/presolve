@@ -1,0 +1,22 @@
+{
+  "name": "@presolve/testing",
+  "version": "0.1.0-alpha.1",
+  "description": "Testing helpers for Presolve compiler products.",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fierstdev/presolve.git",
+    "directory": "packages/testing"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "alpha"
+  },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node test/smoke.mjs"
+  }
+}

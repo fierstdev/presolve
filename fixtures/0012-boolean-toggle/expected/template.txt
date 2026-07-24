@@ -1,0 +1,11 @@
+File: fixtures/0012-boolean-toggle/input/ToggleFlag.tsx
+TemplateGraph:
+  templates:
+    template ToggleFlag
+      root: <button> id=n0 @ fixtures/0012-boolean-toggle/input/ToggleFlag.tsx:12:7 span=199..285
+      attributes:
+        data-presolve-on-click = event-handler(click -> this.toggle) @ fixtures/0012-boolean-toggle/input/ToggleFlag.tsx:12:15 span=207..236
+        data-presolve-bindings = bindings(this.enabled) @ generated
+      children:
+        Text("Enabled:") @ fixtures/0012-boolean-toggle/input/ToggleFlag.tsx:13:9 span=246..254
+        Binding id=n1 expression="this.enabled" initial=Some(false) @ fixtures/0012-boolean-toggle/input/ToggleFlag.tsx:13:18 span=255..269

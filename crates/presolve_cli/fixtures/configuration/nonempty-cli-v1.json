@@ -1,0 +1,1 @@
+{"source_roots":["app","shared"],"feature_flags":["alpha","strict"],"target_profile":"development","platform_options":[["emit","full"],["optimize","true"]]}

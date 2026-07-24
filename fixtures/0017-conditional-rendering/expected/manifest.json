@@ -1,0 +1,63 @@
+{
+  "schema_version": 5,
+  "components": [
+    {
+      "component_id": "module:fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx/component:x-conditional-status",
+      "name": "ConditionalStatus",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "button"
+          },
+          {
+            "kind": "conditional",
+            "id": "n1",
+            "start": "n2",
+            "end": "n3",
+            "condition": "this.enabled",
+            "initial_value": true,
+            "when_true_html": "<span data-presolve-node=\"n4\">On</span>",
+            "when_false_html": "<span data-presolve-node=\"n5\">Off</span>"
+          }
+        ],
+        "events": [
+          {
+            "node": "n0",
+            "event": "click",
+            "handler": "this.toggle"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "method": "toggle",
+          "operation": "toggle",
+          "field": "enabled",
+          "storage_id": "storage:module:fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx/component:x-conditional-status/state:enabled"
+        }
+      ]
+    }
+  ],
+  "ordinary_targets": [
+    {
+      "id": "root:module:fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx/component:x-conditional-status/template-target:module%3Afixtures%2F0017-conditional-rendering%2Finput%2FConditionalStatus.tsx%2Fcomponent%3Ax-conditional-status%2Ftemplate%3Arender%2Fconditional%3Aroot.0",
+      "component_instance_id": "root:module:fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx/component:x-conditional-status",
+      "template_entity_id": "module:fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx/component:x-conditional-status/template:render/conditional:root.0",
+      "kind": "conditional_boundary"
+    }
+  ],
+  "ordinary_bindings": [
+    {
+      "instance_binding_id": "root:module:fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx/component:x-conditional-status/template-binding:module%3Afixtures%2F0017-conditional-rendering%2Finput%2FConditionalStatus.tsx%2Fcomponent%3Ax-conditional-status%2Ftemplate%3Arender%2Fconditional%3Aroot.0",
+      "component_instance_id": "root:module:fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx/component:x-conditional-status",
+      "instance_target_id": "root:module:fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx/component:x-conditional-status/template-target:module%3Afixtures%2F0017-conditional-rendering%2Finput%2FConditionalStatus.tsx%2Fcomponent%3Ax-conditional-status%2Ftemplate%3Arender%2Fconditional%3Aroot.0",
+      "declaration_binding_id": "module:fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx/component:x-conditional-status/template:render/conditional:root.0",
+      "kind": "conditional",
+      "program_id": "module:fixtures/0017-conditional-rendering/input/ConditionalStatus.tsx/component:x-conditional-status/template:render/conditional:root.0",
+      "expression": "this.enabled",
+      "attribute_name": null
+    }
+  ]
+}

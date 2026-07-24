@@ -1,0 +1,221 @@
+{
+  "schema_version": 5,
+  "components": [
+    {
+      "component_id": "module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior",
+      "name": "DynamicListItemBehavior",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "section"
+          },
+          {
+            "kind": "element",
+            "id": "n1",
+            "tag": "button"
+          },
+          {
+            "kind": "element",
+            "id": "n2",
+            "tag": "p"
+          },
+          {
+            "kind": "binding",
+            "id": "n3",
+            "expression": "this.selections",
+            "initial_value": "0"
+          },
+          {
+            "kind": "element",
+            "id": "n4",
+            "tag": "ol"
+          },
+          {
+            "kind": "list",
+            "id": "n5",
+            "start": "n6",
+            "end": "n7",
+            "iterable": "this.items",
+            "initial_value": [
+              {
+                "details": {
+                  "region": "west"
+                },
+                "id": "north",
+                "label": "North"
+              },
+              {
+                "details": {
+                  "region": "east"
+                },
+                "id": "south",
+                "label": "South"
+              }
+            ],
+            "item_variable": "item",
+            "index_variable": "index",
+            "key_expression": "item.id",
+            "item_root": "n8",
+            "item_template_html": "<li data-presolve-node=\"n8:__ez_list_key__\" title=\"\" data-label=\"\" data-presolve-list-bindings=\"title=item.details.region;data-label=item.label\"><button data-presolve-node=\"n11:__ez_list_key__\" data-presolve-on-click=\"this.select\" data-presolve-bindings=\"index,item.label,item.details.region\"><!-- presolve-binding:n12:__ez_list_key__:index -->__ez_list_index__<!-- presolve-list-binding-end:n12:__ez_list_key__ -->:<!-- presolve-binding:n13:__ez_list_key__:item.label --><!-- presolve-list-binding-end:n13:__ez_list_key__ -->(<!-- presolve-binding:n14:__ez_list_key__:item.details.region --><!-- presolve-list-binding-end:n14:__ez_list_key__ -->)</button></li>"
+          }
+        ],
+        "events": [
+          {
+            "node": "n1",
+            "event": "click",
+            "handler": "this.refresh"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "method": "refresh",
+          "operation": "assign",
+          "field": "items",
+          "storage_id": "storage:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/state:items",
+          "operand": [
+            {
+              "details": {
+                "region": "central"
+              },
+              "id": "north",
+              "label": "Northern"
+            },
+            {
+              "details": {
+                "region": "coastal"
+              },
+              "id": "east",
+              "label": "East"
+            },
+            {
+              "details": {
+                "region": "mountain"
+              },
+              "id": "south",
+              "label": "Southern"
+            }
+          ]
+        },
+        {
+          "method": "select",
+          "operation": "increment",
+          "field": "selections",
+          "storage_id": "storage:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/state:selections"
+        }
+      ]
+    }
+  ],
+  "ordinary_targets": [
+    {
+      "id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template-target:module%3Afixtures%2F0026-dynamic-list-item-behavior%2Finput%2FDynamicListItemBehavior.tsx%2Fcomponent%3Ax-dynamic-list-item-behavior%2Ftemplate%3Arender%2Fbinding%3Aroot.1.0",
+      "component_instance_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior",
+      "template_entity_id": "module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template:render/binding:root.1.0",
+      "kind": "element"
+    },
+    {
+      "id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template-target:module%3Afixtures%2F0026-dynamic-list-item-behavior%2Finput%2FDynamicListItemBehavior.tsx%2Fcomponent%3Ax-dynamic-list-item-behavior%2Ftemplate%3Arender%2Fbinding%3Aroot.2.0.item.0.0.0",
+      "component_instance_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior",
+      "template_entity_id": "module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template:render/binding:root.2.0.item.0.0.0",
+      "kind": "element"
+    },
+    {
+      "id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template-target:module%3Afixtures%2F0026-dynamic-list-item-behavior%2Finput%2FDynamicListItemBehavior.tsx%2Fcomponent%3Ax-dynamic-list-item-behavior%2Ftemplate%3Arender%2Fbinding%3Aroot.2.0.item.0.0.2",
+      "component_instance_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior",
+      "template_entity_id": "module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template:render/binding:root.2.0.item.0.0.2",
+      "kind": "element"
+    },
+    {
+      "id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template-target:module%3Afixtures%2F0026-dynamic-list-item-behavior%2Finput%2FDynamicListItemBehavior.tsx%2Fcomponent%3Ax-dynamic-list-item-behavior%2Ftemplate%3Arender%2Fbinding%3Aroot.2.0.item.0.0.4",
+      "component_instance_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior",
+      "template_entity_id": "module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template:render/binding:root.2.0.item.0.0.4",
+      "kind": "element"
+    },
+    {
+      "id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template-target:module%3Afixtures%2F0026-dynamic-list-item-behavior%2Finput%2FDynamicListItemBehavior.tsx%2Fcomponent%3Ax-dynamic-list-item-behavior%2Ftemplate%3Arender%2Felement%3Aroot.2.0.item.0",
+      "component_instance_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior",
+      "template_entity_id": "module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template:render/element:root.2.0.item.0",
+      "kind": "element"
+    },
+    {
+      "id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template-target:module%3Afixtures%2F0026-dynamic-list-item-behavior%2Finput%2FDynamicListItemBehavior.tsx%2Fcomponent%3Ax-dynamic-list-item-behavior%2Ftemplate%3Arender%2Flist%3Aroot.2.0",
+      "component_instance_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior",
+      "template_entity_id": "module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template:render/list:root.2.0",
+      "kind": "list_boundary"
+    }
+  ],
+  "ordinary_bindings": [
+    {
+      "instance_binding_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template-binding:module%3Afixtures%2F0026-dynamic-list-item-behavior%2Finput%2FDynamicListItemBehavior.tsx%2Fcomponent%3Ax-dynamic-list-item-behavior%2Ftemplate%3Arender%2Fattribute-binding%3Aroot.2.0.item.0.data-label",
+      "component_instance_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior",
+      "instance_target_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template-target:module%3Afixtures%2F0026-dynamic-list-item-behavior%2Finput%2FDynamicListItemBehavior.tsx%2Fcomponent%3Ax-dynamic-list-item-behavior%2Ftemplate%3Arender%2Felement%3Aroot.2.0.item.0",
+      "declaration_binding_id": "module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template:render/attribute-binding:root.2.0.item.0.data-label",
+      "kind": "attribute",
+      "program_id": "module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template:render/attribute-binding:root.2.0.item.0.data-label",
+      "expression": "item.label",
+      "attribute_name": "data-label"
+    },
+    {
+      "instance_binding_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template-binding:module%3Afixtures%2F0026-dynamic-list-item-behavior%2Finput%2FDynamicListItemBehavior.tsx%2Fcomponent%3Ax-dynamic-list-item-behavior%2Ftemplate%3Arender%2Fattribute-binding%3Aroot.2.0.item.0.title",
+      "component_instance_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior",
+      "instance_target_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template-target:module%3Afixtures%2F0026-dynamic-list-item-behavior%2Finput%2FDynamicListItemBehavior.tsx%2Fcomponent%3Ax-dynamic-list-item-behavior%2Ftemplate%3Arender%2Felement%3Aroot.2.0.item.0",
+      "declaration_binding_id": "module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template:render/attribute-binding:root.2.0.item.0.title",
+      "kind": "attribute",
+      "program_id": "module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template:render/attribute-binding:root.2.0.item.0.title",
+      "expression": "item.details.region",
+      "attribute_name": "title"
+    },
+    {
+      "instance_binding_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template-binding:module%3Afixtures%2F0026-dynamic-list-item-behavior%2Finput%2FDynamicListItemBehavior.tsx%2Fcomponent%3Ax-dynamic-list-item-behavior%2Ftemplate%3Arender%2Fbinding%3Aroot.1.0",
+      "component_instance_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior",
+      "instance_target_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template-target:module%3Afixtures%2F0026-dynamic-list-item-behavior%2Finput%2FDynamicListItemBehavior.tsx%2Fcomponent%3Ax-dynamic-list-item-behavior%2Ftemplate%3Arender%2Fbinding%3Aroot.1.0",
+      "declaration_binding_id": "module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template:render/binding:root.1.0",
+      "kind": "text",
+      "program_id": "module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template:render/binding:root.1.0",
+      "expression": "this.selections",
+      "attribute_name": null
+    },
+    {
+      "instance_binding_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template-binding:module%3Afixtures%2F0026-dynamic-list-item-behavior%2Finput%2FDynamicListItemBehavior.tsx%2Fcomponent%3Ax-dynamic-list-item-behavior%2Ftemplate%3Arender%2Fbinding%3Aroot.2.0.item.0.0.0",
+      "component_instance_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior",
+      "instance_target_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template-target:module%3Afixtures%2F0026-dynamic-list-item-behavior%2Finput%2FDynamicListItemBehavior.tsx%2Fcomponent%3Ax-dynamic-list-item-behavior%2Ftemplate%3Arender%2Fbinding%3Aroot.2.0.item.0.0.0",
+      "declaration_binding_id": "module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template:render/binding:root.2.0.item.0.0.0",
+      "kind": "text",
+      "program_id": "module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template:render/binding:root.2.0.item.0.0.0",
+      "expression": "index",
+      "attribute_name": null
+    },
+    {
+      "instance_binding_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template-binding:module%3Afixtures%2F0026-dynamic-list-item-behavior%2Finput%2FDynamicListItemBehavior.tsx%2Fcomponent%3Ax-dynamic-list-item-behavior%2Ftemplate%3Arender%2Fbinding%3Aroot.2.0.item.0.0.2",
+      "component_instance_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior",
+      "instance_target_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template-target:module%3Afixtures%2F0026-dynamic-list-item-behavior%2Finput%2FDynamicListItemBehavior.tsx%2Fcomponent%3Ax-dynamic-list-item-behavior%2Ftemplate%3Arender%2Fbinding%3Aroot.2.0.item.0.0.2",
+      "declaration_binding_id": "module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template:render/binding:root.2.0.item.0.0.2",
+      "kind": "text",
+      "program_id": "module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template:render/binding:root.2.0.item.0.0.2",
+      "expression": "item.label",
+      "attribute_name": null
+    },
+    {
+      "instance_binding_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template-binding:module%3Afixtures%2F0026-dynamic-list-item-behavior%2Finput%2FDynamicListItemBehavior.tsx%2Fcomponent%3Ax-dynamic-list-item-behavior%2Ftemplate%3Arender%2Fbinding%3Aroot.2.0.item.0.0.4",
+      "component_instance_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior",
+      "instance_target_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template-target:module%3Afixtures%2F0026-dynamic-list-item-behavior%2Finput%2FDynamicListItemBehavior.tsx%2Fcomponent%3Ax-dynamic-list-item-behavior%2Ftemplate%3Arender%2Fbinding%3Aroot.2.0.item.0.0.4",
+      "declaration_binding_id": "module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template:render/binding:root.2.0.item.0.0.4",
+      "kind": "text",
+      "program_id": "module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template:render/binding:root.2.0.item.0.0.4",
+      "expression": "item.details.region",
+      "attribute_name": null
+    },
+    {
+      "instance_binding_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template-binding:module%3Afixtures%2F0026-dynamic-list-item-behavior%2Finput%2FDynamicListItemBehavior.tsx%2Fcomponent%3Ax-dynamic-list-item-behavior%2Ftemplate%3Arender%2Flist%3Aroot.2.0",
+      "component_instance_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior",
+      "instance_target_id": "root:module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template-target:module%3Afixtures%2F0026-dynamic-list-item-behavior%2Finput%2FDynamicListItemBehavior.tsx%2Fcomponent%3Ax-dynamic-list-item-behavior%2Ftemplate%3Arender%2Flist%3Aroot.2.0",
+      "declaration_binding_id": "module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template:render/list:root.2.0",
+      "kind": "list",
+      "program_id": "module:fixtures/0026-dynamic-list-item-behavior/input/DynamicListItemBehavior.tsx/component:x-dynamic-list-item-behavior/template:render/list:root.2.0",
+      "expression": "this.items",
+      "attribute_name": null
+    }
+  ]
+}

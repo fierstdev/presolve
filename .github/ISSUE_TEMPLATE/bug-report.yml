@@ -1,0 +1,25 @@
+name: Bug report
+description: Report a reproducible problem in a supported repository surface
+title: "[bug] "
+labels: ["type: bug", "needs-triage"]
+body:
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide exact explicit inputs and commands.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Include a fixture, command output, or other safe proof.
+    validations:
+      required: true

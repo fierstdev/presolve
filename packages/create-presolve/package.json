@@ -1,0 +1,26 @@
+{
+  "name": "create-presolve",
+  "version": "0.1.0-alpha.1",
+  "description": "Create a Presolve application.",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fierstdev/presolve.git",
+    "directory": "packages/create-presolve"
+  },
+  "files": [
+    "bin",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "tag": "alpha"
+  },
+  "type": "module",
+  "bin": {
+    "create-presolve": "./bin/create-presolve.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

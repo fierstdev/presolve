@@ -1,0 +1,1 @@
+{"schema_version":1,"source_roots":["app","shared"],"compiler_flags":["alpha","strict"],"target_profile":"development","platform_options":[{"key":"emit","value":"full"},{"key":"optimize","value":"true"}]}

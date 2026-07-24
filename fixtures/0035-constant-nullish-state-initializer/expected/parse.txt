@@ -1,0 +1,19 @@
+File: fixtures/0035-constant-nullish-state-initializer/input/NullishState.tsx
+Diagnostics:
+  none
+
+Classes:
+  class NullishState at 1:1
+    decorators:
+      @component("x-nullish-state") at 1:1
+    properties:
+      label = state(...) at 3:3
+      total = state(...) at 4:3
+    methods:
+      render at 6:3
+        jsx root <output> at 7:12
+          attributes: none
+          event handlers: none
+          children:
+            Binding("this.label") @ 7:20 span=187..199
+        bindings: this.label
