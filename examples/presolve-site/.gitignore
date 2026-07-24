@@ -1,3 +1,4 @@
-dist/
+dist
+.dist.presolve-release-*/
 .presolve/
 node_modules/
