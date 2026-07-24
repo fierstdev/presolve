@@ -20,6 +20,6 @@
     "@presolve/language-service": "workspace:*"
   },
   "scripts": {
-    "check": "../../scripts/verify-l12d2-lsp-adapter.sh"
+    "test": "node test/smoke.mjs"
   }
 }

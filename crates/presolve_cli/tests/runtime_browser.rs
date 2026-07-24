@@ -714,7 +714,7 @@ fn explicit_form_hosts_submit_only_through_compiler_emitted_records() {
         .current_dir(&repo_root)
         .args([
             "build",
-            "framework/tests/forms-types/src/FormHost.tsx",
+            "fixtures/framework/forms.tsx",
             "--out",
             out_dir.to_str().expect("output UTF-8"),
         ])
@@ -1133,7 +1133,7 @@ fn resume_restores_compiler_owned_form_state_and_rejects_active_submission() {
         .current_dir(&repo_root)
         .args([
             "build",
-            "framework/tests/forms-resume-types/src/ResumeForms.tsx",
+            "fixtures/framework/resume-forms.tsx",
             "--out",
             out_dir.to_str().expect("output UTF-8"),
         ])
@@ -2357,7 +2357,7 @@ fn framework_counter_increments_through_compiler_artifacts_in_a_real_browser() {
         .current_dir(&repo_root)
         .args([
             "build",
-            "examples/counter/src/Counter.tsx",
+            "fixtures/framework/Counter.tsx",
             "--out",
             out_dir
                 .to_str()

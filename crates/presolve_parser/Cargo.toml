@@ -2,7 +2,12 @@
 name = "presolve-parser"
 version.workspace = true
 edition.workspace = true
-publish = false
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Parser implementation used by the Presolve compiler."
+readme = "README.md"
+rust-version.workspace = true
 
 [lib]
 name = "presolve_parser"

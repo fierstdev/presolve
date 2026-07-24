@@ -20,7 +20,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "../../scripts/build-l12c-compiler-wasm.sh",
-    "check": "../../scripts/verify-l12c3-wasm-binding.sh"
+    "build": "../../scripts/build-compiler-wasm.sh",
+    "test": "node test/smoke.mjs"
   }
 }

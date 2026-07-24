@@ -2704,6 +2704,7 @@ fn finalize_semantic_types(
         .normalized()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn extend_computed_diagnostics(
     diagnostics: &mut Vec<ComponentDiagnostic>,
     components: &[ComponentNode],
@@ -2994,7 +2995,7 @@ fn collect_opaque_action_resolutions(
                 .and_then(|bindings| bindings.module(&component.module_path))
                 .and_then(|module| {
                     module.imports.values().find(|binding| {
-                        binding.source_module == std::path::PathBuf::from(package_specifier)
+                        binding.source_module == *package_specifier
                             && binding.imported_name == *export_name
                     })
                 })

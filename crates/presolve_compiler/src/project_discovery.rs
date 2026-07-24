@@ -293,7 +293,7 @@ mod tests {
 
         let specifier = "@acme/analytics".to_string();
         let (contracts, modules) =
-            discover_semantic_packages_v1(&root, &[specifier.clone()]).unwrap();
+            discover_semantic_packages_v1(&root, std::slice::from_ref(&specifier)).unwrap();
 
         let contract = contracts.contract(&specifier).unwrap();
         assert_eq!(contract.package, specifier);

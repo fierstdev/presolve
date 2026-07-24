@@ -3616,7 +3616,7 @@ fn context_designator_from_decorator(
             {
                 return None;
             }
-            let provenance = SourceProvenance::new(path, decorator.argument_spans.first()?.clone());
+            let provenance = SourceProvenance::new(path, *decorator.argument_spans.first()?);
             Some(ContextDesignator {
                 component_symbol: component_symbol.to_string(),
                 context_member: context_member.to_string(),

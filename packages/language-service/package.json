@@ -20,6 +20,6 @@
     "@presolve/compiler-wasm": "workspace:*"
   },
   "scripts": {
-    "check": "../../scripts/verify-l12c4-language-service.sh"
+    "test": "node test/smoke.mjs"
   }
 }

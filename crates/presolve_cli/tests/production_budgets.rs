@@ -8,7 +8,7 @@ use serde::Deserialize;
 #[serde(rename_all = "camelCase")]
 struct Corpus {
     schema_version: u32,
-    phase: String,
+    suite: String,
     fixtures: Vec<CorpusFixture>,
 }
 
@@ -37,8 +37,8 @@ struct Budget {
     runtime_record_count: u64,
     static_operation_count: u64,
     module_count: usize,
-    phase_j_executable_bytes: Option<u64>,
-    phase_j_eager_bytes: Option<u64>,
+    baseline_executable_bytes: Option<u64>,
+    baseline_eager_bytes: Option<u64>,
     lifecycle_cycles: Option<u32>,
 }
 
@@ -51,13 +51,13 @@ fn repo_root() -> PathBuf {
 
 fn documents() -> (Corpus, Budgets) {
     let corpus = serde_json::from_str(include_str!(
-        "../../../fixtures/phase-k-benchmarks/corpus.json"
+        "../../../fixtures/production-benchmarks/corpus.json"
     ))
-    .expect("K16 corpus JSON");
+    .expect("production corpus JSON");
     let budgets = serde_json::from_str(include_str!(
-        "../../../fixtures/phase-k-benchmarks/budgets.json"
+        "../../../fixtures/production-benchmarks/budgets.json"
     ))
-    .expect("K16 budget JSON");
+    .expect("production budget JSON");
     (corpus, budgets)
 }
 
@@ -78,7 +78,7 @@ fn assert_fixture_budget(root: &Path, fixture: &CorpusFixture, budget: &Budget) 
     };
     let output = root
         .join("target/presolve-test-output")
-        .join(format!("phase-k-budget-{}", fixture.name));
+        .join(format!("production-budget-{}", fixture.name));
     if output.exists() {
         std::fs::remove_dir_all(&output).expect("clean prior budget output");
     }
@@ -166,21 +166,21 @@ fn assert_fixture_budget(root: &Path, fixture: &CorpusFixture, budget: &Budget) 
             .file_name()
             .is_some_and(|name| name.to_string_lossy().starts_with("boot."))));
     }
-    if fixture.kind == "phase-j-comparison" {
-        let phase_j_total = budget.phase_j_executable_bytes.expect("Phase J total");
-        let phase_j_eager = budget.phase_j_eager_bytes.expect("Phase J eager");
-        assert!(executable_bytes < phase_j_total);
-        assert!(file_size(eager) <= phase_j_eager + 128);
+    if fixture.kind == "resumability-baseline-comparison" {
+        let baseline_total = budget.baseline_executable_bytes.expect("baseline total");
+        let baseline_eager = budget.baseline_eager_bytes.expect("baseline eager");
+        assert!(executable_bytes < baseline_total);
+        assert!(file_size(eager) <= baseline_eager + 128);
     }
 }
 
 #[test]
-fn k16_corpus_is_complete_ordered_and_has_one_exact_budget_per_case() {
+fn production_corpus_is_complete_ordered_and_has_one_exact_budget_per_case() {
     let (corpus, budgets) = documents();
     assert_eq!(corpus.schema_version, 1);
-    assert_eq!(corpus.phase, "K16");
+    assert_eq!(corpus.suite, "production");
     assert_eq!(budgets.schema_version, 1);
-    assert_eq!(budgets.established_by, "K16");
+    assert_eq!(budgets.established_by, "production-baseline");
     assert_eq!(corpus.fixtures.len(), 16);
     assert_eq!(budgets.fixtures.len(), 16);
     assert_eq!(
@@ -214,7 +214,7 @@ fn k16_corpus_is_complete_ordered_and_has_one_exact_budget_per_case() {
 }
 
 #[test]
-fn k16_production_outputs_do_not_exceed_committed_static_budgets() {
+fn production_outputs_do_not_exceed_committed_static_budgets() {
     let root = repo_root();
     let (corpus, budgets) = documents();
     let corpus_by_name = corpus

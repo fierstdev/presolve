@@ -1,22 +1,25 @@
 # Architecture
 
-Presolve has one semantic authority: the compiler.
+Presolve has one semantic authority: the compiler. It reads TypeScript and TSX
+source, validates the language forms it supports, and publishes the HTML,
+browser artifacts, route inventory, resumability records, and deployment plan.
+
+The `presolve` package supplies types and compiler intrinsics. Its decorators
+do not create stores, renderers, dependency trackers, or registries at runtime.
+The CLI provides the application conventions: file routes, layouts, development
+workflow, production builds, and deployment preparation.
 
 ```text
-TypeScript / TSX source
+application source
         ↓
-compiler semantic products
-        ├── static HTML and browser runtime artifacts
-        ├── route and deployment handoffs
-        ├── resumability products
-        └── tooling query snapshots
+Presolve compiler
+        ├── static HTML and browser artifacts
+        ├── file-route inventory
+        ├── resumability records
+        └── deployment inventory
 ```
 
-The framework provides TypeScript declarations and compiler intrinsics. The
-metaframework supplies conventional project discovery and provider projections.
-The runtime, editor integrations, and deployment adapters consume compiler
-products; none is allowed to rediscover source semantics independently.
-
-This keeps dependency topology, component/instance identity, state storage,
-DOM operations, capability scheduling, artifact integrity, and deployment
-inventory in one verifiable place.
+This boundary is practical rather than ceremonial: a route, state update, or
+deployment artifact has one source of truth. Runtime code and editor tooling
+consume compiler products; they do not reverse-engineer application semantics
+from generated JavaScript.

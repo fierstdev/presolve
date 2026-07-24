@@ -9,7 +9,8 @@
     "directory": "framework/packages/presolve"
   },
   "files": [
-    "src"
+    "src",
+    "README.md"
   ],
   "publishConfig": {
     "access": "public",
@@ -21,5 +22,8 @@
       "types": "./src/index.d.ts",
       "default": "./src/index.js"
     }
+  },
+  "scripts": {
+    "test": "node --input-type=module -e \"import('./src/index.js').then(({state}) => { if (state(1) !== 1) throw new Error('state intrinsic must be inert'); })\""
   }
 }

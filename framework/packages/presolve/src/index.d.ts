@@ -36,6 +36,10 @@ export declare function provide(context: ContextDesignator): PresolveFieldDecora
 export declare function consume(context: ContextDesignator): PresolveFieldDecorator;
 
 export declare function form(): PresolveFieldDecorator;
+/** A compiler-owned Form declaration marker; it is not a runtime controller. */
+export interface Form {
+  readonly __presolveFormBrand: unique symbol;
+}
 export declare function serialize(
   format: "json" | "form-data" | "url-encoded"
 ): PresolveFieldDecorator;

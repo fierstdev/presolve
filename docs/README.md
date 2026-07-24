@@ -1,27 +1,37 @@
 # Presolve documentation
 
-These documents describe the public Presolve 0.1 alpha. They are written for
-application authors, package consumers, and contributors—not for reconstructing
-the repository's internal implementation history.
+Presolve is a compiler-founded framework for TypeScript web applications. You
+write components and application conventions; the compiler publishes the
+static HTML, browser artifacts, routes, and deployment inventory required by
+that application.
 
-## Use Presolve
+## Start here
 
-- [Alpha scope and compatibility](alpha.md)
-- [Getting started](getting-started.md)
-- [Framework authoring](framework.md)
-- [Metaframework workflow](metaframework.md)
-- [Editor and language tooling](tooling.md)
-- [Cloudflare deployment](deploy-cloudflare.md)
+- [Introduction](guide/introduction.md)
+- [Install Presolve](guide/installation.md)
+- [Project structure](guide/project-structure.md)
+- [Components](guide/components.md)
+- [State, actions, computed values, and effects](guide/reactivity.md)
 
-## Build Presolve
+## Build applications
 
-- [Architecture](architecture.md)
-- [Release process](releasing.md)
-- [Security policy](../SECURITY.md)
-- [Contribution guide](../CONTRIBUTING.md)
+- [Composition: inputs, slots, and Context](guide/composition.md)
+- [Forms and resources](guide/forms-and-resources.md)
+- [Third-party packages and opaque boundaries](guide/third-party-packages.md)
+- [Build, inspect, and deploy](guide/production.md)
 
-## Historical engineering material
+## Reference
 
-`archive/` and `specifications/` preserve design records, frozen contracts,
-fixtures, and verification history from development. They are historical
-evidence, not the public API reference or an application-authoring guide.
+- [Framework API](reference/framework-api.md)
+- [TypeScript and JSX](reference/typescript-and-jsx.md)
+- [CLI](reference/cli.md)
+- [VS Code and language tooling](reference/editor.md)
+- [Cloudflare deployment](reference/cloudflare.md)
+- [Supported alpha surface](reference/support.md)
+- [Publishing the Presolve release train](reference/publishing.md)
+
+## For contributors
+
+[Architecture](architecture.md) explains the product boundary. The guide and
+reference are the public documentation source; examples in them must be kept
+valid against the published `presolve` package and the CLI release train.

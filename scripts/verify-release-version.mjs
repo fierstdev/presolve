@@ -15,8 +15,7 @@ const packageManifests = [
   "packages/language-service/package.json",
   "packages/lsp/package.json",
   "packages/testing/package.json",
-  "packages/vscode/package.json",
-  "metaframework/packages/application/package.json"
+  "packages/vscode/package.json"
 ];
 
 function readJson(path) {
@@ -41,12 +40,16 @@ for (const manifestPath of packageManifests) {
   }
 }
 
-const cargoToml = readFileSync("Cargo.toml", "utf8");
-const cargoVersion = cargoToml.match(/^version\s*=\s*"([^"]+)"$/m)?.[1];
-if (cargoVersion !== requestedVersion) {
-  throw new Error(
-    `Cargo.toml has ${cargoVersion ?? "no workspace version"}; expected ${requestedVersion}.`
-  );
+for (const manifestPath of [
+  "Cargo.toml",
+  "crates/presolve_parser/Cargo.toml",
+  "crates/presolve_compiler/Cargo.toml",
+  "crates/presolve_cli/Cargo.toml"
+]) {
+  const cargoToml = readFileSync(manifestPath, "utf8");
+  if (!cargoToml.includes("version.workspace = true") && !cargoToml.includes(`version = "${requestedVersion}"`)) {
+    throw new Error(`${manifestPath} is not aligned to ${requestedVersion}.`);
+  }
 }
 
 console.log(`Presolve release train is locked at ${requestedVersion}.`);

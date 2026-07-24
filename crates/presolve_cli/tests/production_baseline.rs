@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 struct BaselineDocument {
-    phase: String,
+    suite: String,
     fixtures: Vec<FixtureBaseline>,
 }
 
@@ -40,10 +40,8 @@ fn repo_root() -> PathBuf {
 }
 
 fn baseline() -> BaselineDocument {
-    serde_json::from_str(include_str!(
-        "../../../fixtures/phase-k-production-baseline.json"
-    ))
-    .expect("Phase K baseline fixture should be valid JSON")
+    serde_json::from_str(include_str!("../../../fixtures/production-baseline.json"))
+        .expect("production baseline fixture should be valid JSON")
 }
 
 fn logical_artifact_name(path: &Path) -> String {
@@ -70,9 +68,9 @@ fn build_fixture(
 ) -> PathBuf {
     let output = repo_root
         .join("target/presolve-test-output")
-        .join(format!("phase-k-{}-{suffix}", fixture.name));
+        .join(format!("production-{}-{suffix}", fixture.name));
     if output.exists() {
-        std::fs::remove_dir_all(&output).expect("failed to clean prior Phase K output");
+        std::fs::remove_dir_all(&output).expect("failed to clean prior production output");
     }
     let mut arguments = vec![
         "build".to_string(),
@@ -87,7 +85,7 @@ fn build_fixture(
         .current_dir(repo_root)
         .args(arguments)
         .output()
-        .expect("failed to run Phase K baseline build");
+        .expect("failed to run production baseline build");
     assert!(
         result.status.success(),
         "baseline build failed for {}: {}",
@@ -170,20 +168,20 @@ fn assert_resume_matches_baseline(resume: &serde_json::Value, fixture: &FixtureB
 }
 
 #[test]
-fn k8_production_artifact_is_deterministic_and_preserves_the_k0_baseline() {
+fn production_artifact_is_deterministic_and_preserves_the_committed_baseline() {
     let repo_root = repo_root();
     let baseline = baseline();
-    assert_eq!(baseline.phase, "K0");
+    assert_eq!(baseline.suite, "production-baseline");
     for fixture in &baseline.fixtures {
         let first = build_fixture(&repo_root, fixture, "first", false);
         let second = build_fixture(&repo_root, fixture, "second", false);
         let mut first_artifacts = artifact_sizes(&first);
         let production_size = first_artifacts
             .remove("production.runtime.json")
-            .expect("K8 production artifact should be emitted");
+            .expect("production artifact should be emitted");
         let optimization_size = first_artifacts
             .remove("optimization-report.json")
-            .expect("K15 optimization report should be emitted");
+            .expect("production optimization report should be emitted");
         let cost_size = first_artifacts
             .remove("runtime-cost-report.json")
             .expect("K15 runtime cost report should be emitted");

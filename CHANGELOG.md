@@ -22,6 +22,5 @@ not publish or imply a release.
 
 ### Changed
 
-- The compiler service contract and release fixtures now identify
-  `0.1.0-alpha.1`.
-- Historical development-phase records are explicitly non-normative.
+- The compiler, framework, application workflow, tooling, and release train
+  identify `0.1.0-alpha.1`.

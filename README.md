@@ -1,16 +1,15 @@
 # Presolve
 
 Presolve is a compiler-founded framework for TypeScript web applications. You
-author components, routes, and explicit capability boundaries; the compiler
-publishes the HTML, browser runtime, route table, and deployment inventory.
-There is no application renderer, dependency tracker, or router hidden beside
-the compiler.
+write components and conventional application files; the compiler publishes the
+HTML, browser artifacts, route inventory, resumability records, and deployment
+plan. There is no separate renderer, dependency tracker, or router deciding
+application semantics beside it.
 
-**Presolve 0.1.0-alpha.1** is a public technical preview. It is suitable for
-evaluation and static documentation/marketing sites. It is not yet a general
-purpose replacement for every React/Next application.
+`0.1.0-alpha.1` is a public technical preview for evaluation and static sites.
+It is not yet a replacement for every React or Next.js application.
 
-## Start a project
+## Create an application
 
 ```sh
 pnpm create presolve my-app
@@ -19,78 +18,40 @@ pnpm install
 pnpm dev
 ```
 
-The starter includes a TypeScript 7 project configuration, file routes, the
-public `presolve` authoring package, a local `presolve` CLI, and a VS Code
-extension recommendation. Open the directory in VS Code after installing the
-**Presolve** extension; the workspace TypeScript project owns normal TypeScript
-and TSX syntax diagnostics.
+The generated application includes TypeScript 7, routes under `app/routes`, the
+public `presolve` package, the `@presolve/cli` command, and a VS Code extension
+recommendation. It needs no route registry or configuration file for the normal
+workflow.
 
-## What is in this repository
+## Products
 
-| Surface | Package / location | Purpose |
+| Product | Package | What it provides |
 | --- | --- | --- |
-| Compiler | `presolve-compiler`, `presolve-cli` | Canonical semantic analysis and artifact publication. |
-| Framework | `presolve` | TypeScript authoring vocabulary; its decorators have no runtime authority. |
-| Metaframework | `@presolve/application` | Compiler-owned project discovery, file routes, build, and deployment handoffs. |
-| Tooling | `@presolve/compiler-wasm`, `@presolve/language-service`, `@presolve/lsp` | Compiler-product queries for editor integrations. |
-| VS Code | `presolve-vscode` | Workspace integration over the public TypeScript project and compiler tooling. |
-| Scaffold | `create-presolve` | The `pnpm create presolve` application starter. |
-| Site example | `examples/presolve-site` | A reference documentation-site application for local compiler and deployment verification. |
+| Framework | `presolve` | Typed compiler intrinsics for components and application features. |
+| Compiler and application CLI | `@presolve/cli` | Development, checks, builds, file routes, and deployment preparation. |
+| Scaffold | `create-presolve` | The `pnpm create presolve` starter. |
+| Editor | `presolve-vscode` | Workspace integration with the project TypeScript configuration. |
+| Tooling APIs | `@presolve/compiler-wasm`, `@presolve/language-service`, `@presolve/lsp` | Compiler-product queries for editor integrations. |
+| Rust crates | `presolve-parser`, `presolve-compiler`, `presolve-cli` | Embedding and toolchain integration. |
 
-The package train is intentionally lockstep during the alpha: compatible
-compiler, framework, tooling, and CLI artifacts carry the same prerelease
-version.
+The alpha release train is lockstep: compatible published packages and crates
+share the same prerelease version.
 
-## Supported alpha workflow
+## Documentation
 
-```sh
-pnpm check
-pnpm build
-pnpm deploy:prepare
-pnpm deploy
-```
+Start with the [introduction](docs/guide/introduction.md) and
+[installation guide](docs/guide/installation.md). The complete guide and
+reference cover components, state, routes, packages, VS Code, Cloudflare, and
+the maintainer [publication runbook](docs/reference/publishing.md).
 
-Routes are inferred from `app/routes`; layouts are inferred from `app/layout`.
-The current Cloudflare adapter deploys compiler-published static assets through
-Workers Static Assets and validates the immutable artifact inventory before it
-invokes Wrangler. It intentionally rejects server loader/action handoffs: a
-server-capability executor is not bundled into the static adapter.
-
-## Alpha scope
-
-Presolve 0.1 supports compiler-admitted TypeScript/TSX components, state and
-actions, computed values and effects, components and slots, Context, forms,
-file routes, static production artifacts, resumability products, and Cloudflare
-static deployment preparation.
-
-It does **not** yet provide SSR, streaming, a generic server runtime, executable
-server actions/loaders, database/auth/session abstractions, or automatic
-deployment provisioning. Unsupported source is rejected with compiler
-diagnostics rather than silently delegated to a second runtime.
-
-Read the [alpha guide](docs/alpha.md), [framework guide](docs/framework.md),
-[metaframework guide](docs/metaframework.md), [tooling guide](docs/tooling.md),
-and [Cloudflare deployment guide](docs/deploy-cloudflare.md).
-
-## Develop this repository
+## Contributing
 
 ```sh
 pnpm install
-cargo test --workspace
-pnpm test
+pnpm check
 pnpm release:check
 ```
 
-The reference site example is a local dogfood application:
-
-```sh
-cd examples/presolve-site
-pnpm check
-pnpm build
-pnpm deploy:prepare
-```
-
-See [contributing](CONTRIBUTING.md), [security](SECURITY.md), [support](SUPPORT.md),
-and the [release guide](docs/releasing.md). Historical implementation records
-remain under `docs/archive/` and `docs/specifications/`; they are not the 0.1
-public product documentation.
+See [contributing](CONTRIBUTING.md), [security](SECURITY.md), and
+[support](SUPPORT.md). The dogfooded public site lives in
+[`apps/presolve.dev`](apps/presolve.dev).

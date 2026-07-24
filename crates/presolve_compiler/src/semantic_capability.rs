@@ -247,7 +247,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
                 "compiler-owned Form plans and explicit host markers",
                 "resumable through Form schema and records",
                 "Forms runtime artifact",
-                "framework/tests/forms-resume-types/src/ResumeForms.tsx",
+                "fixtures/framework/resume-forms.tsx",
             ),
             admitted(
                 "module_bindings",
@@ -502,6 +502,7 @@ fn capability_status_text(status: SemanticCapabilityStatus) -> &'static str {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn admitted(
     id: &'static str,
     class: SemanticCapabilityClass,
@@ -528,6 +529,7 @@ fn admitted(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn deferred(
     id: &'static str,
     class: SemanticCapabilityClass,

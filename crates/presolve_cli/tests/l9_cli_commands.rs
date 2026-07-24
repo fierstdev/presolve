@@ -25,6 +25,9 @@ fn project() -> (std::path::PathBuf, std::path::PathBuf) {
         "presolve-l9d-cli-{}",
         NEXT_ROOT.fetch_add(1, Ordering::Relaxed)
     ));
+    if root.exists() {
+        fs::remove_dir_all(&root).unwrap();
+    }
     fs::create_dir_all(root.join("src")).unwrap();
     let config = root.join("presolve.json");
     fs::write(
@@ -113,7 +116,7 @@ fn l9d_explicit_build_reports_configuration_errors_on_stderr() {
 }
 
 #[test]
-fn l9e_cache_inspection_requires_an_initialized_persistent_cache() {
+fn cache_inspection_initializes_and_reports_the_project_cache() {
     let (root, config) = project();
     let output = Command::new(env!("CARGO_BIN_EXE_presolve"))
         .current_dir(&root)
@@ -127,9 +130,15 @@ fn l9e_cache_inspection_requires_an_initialized_persistent_cache() {
         ])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(5));
-    assert!(output.stdout.is_empty());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("L6C023"));
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(result["schema"], "presolve.cache-inspection-report.v1");
+    assert_eq!(result["enabled"], true);
+    assert!(output.stderr.is_empty());
     fs::remove_dir_all(root).unwrap();
 }
 

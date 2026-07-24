@@ -50,7 +50,6 @@
   },
   "files": [
     "extension.cjs",
-    "src",
     "README.md",
     "LICENSE"
   ],
@@ -58,14 +57,8 @@
     "access": "public",
     "tag": "alpha"
   },
-  "exports": {
-    ".": "./src/index.js"
-  },
-  "dependencies": {
-    "@presolve/lsp": "workspace:*"
-  },
   "scripts": {
-    "check": "../../scripts/verify-l12e2-vscode-facade.sh",
+    "test": "node test/workspace-fixture.mjs",
     "package": "npx --yes @vscode/vsce package --no-dependencies"
   }
 }

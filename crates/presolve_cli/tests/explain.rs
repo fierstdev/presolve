@@ -4653,7 +4653,7 @@ class FormArtifact {
     let manifest = std::fs::read_to_string(out_dir.join("template.manifest.json"))
         .expect("failed to read template manifest");
     let manifest: serde_json::Value = serde_json::from_str(&manifest).expect("manifest JSON");
-    assert_eq!(manifest["schema_version"], 4);
+    assert_eq!(manifest["schema_version"], 5);
     assert_eq!(manifest["form_bindings"].as_array().map(Vec::len), Some(1));
     assert_eq!(manifest["form_hosts"].as_array().map(Vec::len), Some(1));
 
@@ -4792,7 +4792,7 @@ fn build_command_writes_compiler_generated_effect_runtime_metadata() {
     let manifest = std::fs::read_to_string(out_dir.join("template.manifest.json"))
         .expect("failed to read generated template manifest");
     let manifest: serde_json::Value = serde_json::from_str(&manifest).expect("manifest JSON");
-    assert_eq!(manifest["schema_version"], 4);
+    assert_eq!(manifest["schema_version"], 5);
     assert_eq!(
         manifest["components"][0]["template"]["events"][0]["kind"],
         "action"

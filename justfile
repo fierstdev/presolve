@@ -1,118 +1,22 @@
-# Repository task recipes. These commands are intentionally simple.
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+format:
+    pnpm run format
+
+lint:
+    pnpm run lint
+
+test:
+    pnpm run test
 
 check:
-    ./scripts/verify-l21-post-freeze-governance.sh
-    ./scripts/verify-l20-platform-freeze.sh
-    ./scripts/verify-l19b-clean-room-rehearsal.sh
-    ./scripts/verify-l19a-alpha-support-matrix.sh
-    ./scripts/verify-l18-launch-content.sh
-    ./scripts/verify-l17b-release-dry-run.sh
-    ./scripts/verify-l17a-distribution-contract.sh
-    ./scripts/verify-l16-community-readiness.sh
-    ./scripts/verify-l13d-public-surface-matrix.sh
-    ./scripts/verify-l13c-frozen-contract-map.sh
-    ./scripts/verify-l13b-public-cli-docs.sh
-    ./scripts/verify-l13a-public-docs-index.sh
-    ./scripts/verify-l14b-production-resume-example.sh
-    ./scripts/verify-l14b-explicit-workspace-example.sh
-    ./scripts/verify-l14b-forms-example.sh
-    ./scripts/verify-l14b-components-context-slots-example.sh
-    ./scripts/verify-l14b-counter-example.sh
-    ./scripts/verify-l14a-examples-contract.sh
-    ./scripts/verify-l15c-reproducibility-lanes.sh
-    ./scripts/verify-l15b-testing-package.sh
-    ./scripts/verify-l15a-testing-contract.sh
-    ./scripts/verify-l13-l21-continuation-contract.sh
-    ./scripts/verify-l12e2-vscode-facade.sh
-    ./scripts/verify-l12d2-lsp-adapter.sh
-    ./scripts/verify-l12c4-language-service.sh
-    ./scripts/verify-l12c3-wasm-binding.sh
-    ./scripts/verify-l12c2-rust-query-projection.sh
-    ./scripts/verify-l12c-wasm-binding-contract.sh
-    ./scripts/verify-l12c-language-service-binding-audit.sh
-    ./scripts/verify-l12c-query-snapshot-product.sh
-    ./scripts/verify-l12b-query-snapshot-amendment.sh
-    ./scripts/verify-l12a-editor-capability-audit.sh
-    ./scripts/verify-l11g-artifact-graph-command.sh
-    ./scripts/verify-l11g-profile-command.sh
-    ./scripts/verify-l11g-trace-command.sh
-    ./scripts/verify-l11f-tooling-products.sh
-    ./scripts/verify-l11e-artifact-graph-contract.sh
-    ./scripts/verify-l11d-trace-cost-contract.sh
-    ./scripts/verify-l11c-tooling-commands.sh
-    ./scripts/verify-l11b-tooling-product-readers.sh
-    ./scripts/verify-l11a-tooling-capability-contract.sh
-    ./scripts/verify-l10-schema-contract.sh
-    cargo fmt --all --check
-    cargo clippy --workspace --all-targets -- -D warnings
-    cargo test --workspace
-    ./scripts/verify-repository-layout.sh
-    ./scripts/verify-public-identity.sh
-    ./scripts/verify-l3-platform-contracts.sh
-    ./scripts/verify-l4-service-contracts.sh
-    ./scripts/verify-l5-incremental-contracts.sh
-    ./scripts/verify-l6-persistent-cache-contracts.sh
-    ./scripts/verify-l7-workspace-contracts.sh
-    ./scripts/verify-l8-watch-contracts.sh
-    ./scripts/verify-l9a1-configuration-codec-contracts.sh
-    ./scripts/verify-l9b-command-framework-contracts.sh
-    ./scripts/verify-l9c-compilation-adapter-contracts.sh
-    ./scripts/verify-l9d-build-check-contracts.sh
-    ./scripts/verify-l9e-cache-clean-contracts.sh
-    ./scripts/verify-l9f-workspace-contracts.sh
-    ./scripts/verify-l9g-command-dispatch-contracts.sh
-    ./scripts/verify-l9-final-contracts.sh
-
-repository-layout:
-    ./scripts/verify-repository-layout.sh
-
-phase-l-specifications:
-    ./scripts/verify-phase-l-specifications.sh
-
-l3-platform-contracts:
-    ./scripts/verify-l3-platform-contracts.sh
-
-l4-service-contracts:
-    ./scripts/verify-l4-service-contracts.sh
-
-l5-incremental-contracts:
-    ./scripts/verify-l5-incremental-contracts.sh
-
-l6-persistent-cache-contracts:
-    ./scripts/verify-l6-persistent-cache-contracts.sh
-
-l8-watch-contracts:
-    ./scripts/verify-l8-watch-contracts.sh
-
-l9a1-configuration-codec-contracts:
-    ./scripts/verify-l9a1-configuration-codec-contracts.sh
-
-l9b-command-framework-contracts:
-    ./scripts/verify-l9b-command-framework-contracts.sh
-
-l9c-compilation-adapter-contracts:
-    ./scripts/verify-l9c-compilation-adapter-contracts.sh
-
-l9d-build-check-contracts:
-    ./scripts/verify-l9d-build-check-contracts.sh
-
-l9e-cache-clean-contracts:
-    ./scripts/verify-l9e-cache-clean-contracts.sh
-
-l9f-workspace-contracts:
-    ./scripts/verify-l9f-workspace-contracts.sh
-
-l9g-command-dispatch-contracts:
-    ./scripts/verify-l9g-command-dispatch-contracts.sh
+    pnpm run check
 
 e2e:
-    cargo test -p presolve-cli --test runtime_browser -- --nocapture --test-threads=1
+    pnpm run test:e2e
 
-e2e-headed:
-    cargo test -p presolve-cli --test runtime_browser -- --nocapture --test-threads=1
+build:
+    pnpm run build
 
-explain-counter:
-    cargo run -p presolve-cli -- explain fixtures/0001-source-summary/input/Counter.tsx
-
-explain-counter-json:
-    cargo run -p presolve-cli -- explain fixtures/0001-source-summary/input/Counter.tsx --format json
+release-check:
+    pnpm run release:check

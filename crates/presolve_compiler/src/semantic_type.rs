@@ -184,14 +184,14 @@ impl BuiltinTypeAuthority {
             .local_type_bindings
             .iter()
             .any(|binding| binding == "Form");
-        let has_import_binding = parsed.imports.iter().any(|import| {
-            import
-                .specifiers
-                .iter()
-                .any(|specifier| specifier.local == "Form")
+        let has_non_presolve_import_binding = parsed.imports.iter().any(|import| {
+            import.specifiers.iter().any(|specifier| {
+                specifier.local == "Form"
+                    && !(import.source == "presolve" && specifier.imported == "Form")
+            })
         });
         Self {
-            form_marker_is_unshadowed: !has_local_binding && !has_import_binding,
+            form_marker_is_unshadowed: !has_local_binding && !has_non_presolve_import_binding,
         }
     }
 

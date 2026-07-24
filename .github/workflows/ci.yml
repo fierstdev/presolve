@@ -7,6 +7,31 @@ on:
   pull_request:
 
 jobs:
+  packages:
+    name: Packages and documentation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cargo install wasm-bindgen-cli --version 0.2.108 --locked
+      - run: pnpm run build
+      - run: pnpm -r test
+      - run: pnpm run test:types
+      - run: pnpm run docs:check
+      - run: pnpm run release:prepare
+      - run: pnpm --dir apps/presolve.dev check
+      - run: pnpm --dir apps/presolve.dev build
+      - run: pnpm --dir apps/presolve.dev deploy:prepare
+
   rust:
     name: Rust workspace
     runs-on: ubuntu-latest
@@ -33,6 +58,7 @@ jobs:
       - name: Test
         env:
           PRESOLVE_CHROME: ${{ steps.setup-chrome.outputs.chrome-path }}
+          RUST_TEST_THREADS: 1
         run: cargo test --workspace
 
   browser-e2e:

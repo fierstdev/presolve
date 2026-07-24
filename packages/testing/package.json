@@ -17,6 +17,6 @@
     ".": "./src/index.js"
   },
   "scripts": {
-    "check": "../../scripts/verify-l15b-testing-package.sh"
+    "test": "node test/smoke.mjs"
   }
 }

@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -27,7 +27,7 @@ fn setup() -> (PathBuf, PathBuf, PathBuf) {
     (root, config, output)
 }
 
-fn application_build(config: &PathBuf, output: &PathBuf, entry: &str) -> std::process::Output {
+fn application_build(config: &Path, output: &Path, entry: &str) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_presolve"))
         .args([
             "application",

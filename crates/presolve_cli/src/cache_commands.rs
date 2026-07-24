@@ -136,6 +136,9 @@ mod tests {
             "presolve-l9e-{}",
             NEXT_ROOT.fetch_add(1, Ordering::Relaxed)
         ));
+        if root.exists() {
+            fs::remove_dir_all(&root).unwrap();
+        }
         fs::create_dir_all(&root).unwrap();
         let config = root.join("presolve.json");
         fs::write(

@@ -358,6 +358,26 @@ class Profile {
     }
 
     #[test]
+    fn resolves_the_form_marker_from_the_public_presolve_package() {
+        let source = r#"
+import { Form } from "presolve";
+@component("profile")
+class Profile {
+  @form() profile!: Form;
+  render() { return <main />; }
+}
+"#;
+        let parsed = presolve_parser::parse_file("src/Profile.tsx", source);
+        let asm = build_application_semantic_model(&parsed);
+        assert_eq!(asm.forms().len(), 1);
+        assert_eq!(asm.forms()[0].name, "profile");
+        assert_eq!(
+            asm.form_declaration_candidates()[0].status,
+            FormDeclarationStatus::Valid
+        );
+    }
+
+    #[test]
     fn rejects_repeated_form_decorators_without_selecting_a_winner() {
         let parsed = presolve_parser::parse_file(
             "src/DuplicateDecorator.tsx",
