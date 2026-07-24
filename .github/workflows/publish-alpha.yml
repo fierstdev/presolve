@@ -22,12 +22,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: cargo install wasm-bindgen-cli --version 0.2.108 --locked
       - name: Verify lockstep release version
         env:
           RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
@@ -67,11 +70,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-13
+          - os: macos-15-intel
             target: x86_64-apple-darwin
             package: cli-darwin-x64
             executable: presolve
-          - os: macos-13
+          - os: macos-14
             target: aarch64-apple-darwin
             package: cli-darwin-arm64
             executable: presolve
@@ -113,6 +116,9 @@ jobs:
     environment: npm
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
       - uses: actions/download-artifact@v4
         with:
           path: .release
@@ -124,6 +130,7 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: cargo install wasm-bindgen-cli --version 0.2.108 --locked
       - name: Build and verify compiler WebAssembly package
         run: |
           pnpm --dir packages/compiler-wasm run build

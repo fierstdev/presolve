@@ -11,5 +11,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
       - uses: pnpm/action-setup@v4
+      - run: cargo install wasm-bindgen-cli --version 0.2.108 --locked
       - run: ./scripts/release-dry-run.sh
