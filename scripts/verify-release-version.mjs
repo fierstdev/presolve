@@ -14,8 +14,7 @@ const packageManifests = [
   "packages/create-presolve/package.json",
   "packages/language-service/package.json",
   "packages/lsp/package.json",
-  "packages/testing/package.json",
-  "packages/vscode/package.json"
+  "packages/testing/package.json"
 ];
 
 function readJson(path) {
@@ -25,10 +24,20 @@ function readJson(path) {
 const root = readJson("package.json");
 const requestedVersion = process.argv[2] ?? root.version;
 
-if (!/^\d+\.\d+\.\d+-alpha\.\d+$/.test(requestedVersion)) {
+const alphaVersion = requestedVersion.match(
+  /^(\d+)\.(\d+)\.(\d+)-alpha\.(\d+)$/
+);
+
+if (alphaVersion === null) {
   throw new Error(
     `Expected an alpha version such as 0.1.0-alpha.1; received ${requestedVersion}.`
   );
+}
+
+const [, major, minor, patch, alpha] = alphaVersion;
+const alphaNumber = Number(alpha);
+if (!Number.isSafeInteger(alphaNumber) || alphaNumber < 1) {
+  throw new Error(`Expected a positive alpha number; received ${alpha}.`);
 }
 
 for (const manifestPath of packageManifests) {
@@ -52,4 +61,14 @@ for (const manifestPath of [
   }
 }
 
-console.log(`Presolve release train is locked at ${requestedVersion}.`);
+const marketplaceVersion = `${major}.${minor}.${Number(patch) + alphaNumber}`;
+const vscodeManifest = readJson("packages/vscode/package.json");
+if (vscodeManifest.version !== marketplaceVersion) {
+  throw new Error(
+    `packages/vscode/package.json has ${vscodeManifest.version}; expected Marketplace version ${marketplaceVersion} for ${requestedVersion}.`
+  );
+}
+
+console.log(
+  `Presolve release train is locked at ${requestedVersion}; VS Code Marketplace prerelease ${marketplaceVersion}.`
+);

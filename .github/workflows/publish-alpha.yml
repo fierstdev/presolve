@@ -172,10 +172,10 @@ jobs:
         with:
           node-version: 26.5.0
       - name: Package extension
-        run: npx --yes @vscode/vsce package --no-dependencies --out presolve-vscode.vsix
+        run: npm exec --yes --package=@vscode/vsce@3.9.2 -- vsce package --no-dependencies --pre-release --out presolve-vscode.vsix
         working-directory: packages/vscode
       - name: Publish extension
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npx --yes @vscode/vsce publish --packagePath presolve-vscode.vsix --pat "$VSCE_PAT" --pre-release
+        run: npm exec --yes --package=@vscode/vsce@3.9.2 -- vsce publish --packagePath presolve-vscode.vsix --pat "$VSCE_PAT" --pre-release
         working-directory: packages/vscode
