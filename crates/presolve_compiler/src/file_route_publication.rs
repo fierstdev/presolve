@@ -8,9 +8,10 @@ use serde::Serialize;
 
 use crate::{
     build_application_publication_product_from_asm_v1,
-    build_application_semantic_model_for_unit_with_packages,
+    build_application_semantic_model_for_unit_with_packages, build_binding_table_with_packages,
     build_file_route_application_semantic_model_for_route_with_packages,
-    build_layout_composition_plan_v1, build_validated_file_route_graph_v1,
+    build_layout_composition_plan_v1, build_module_graph, build_route_loader_plan_v1,
+    build_symbol_table, build_validated_file_route_graph_v1, route_loader_plan_json_v1,
     validate_application_publication_request_v1, ApplicationPublicationArtifactV1,
     ApplicationPublicationErrorV1, ApplicationPublicationProfileV1,
     ApplicationPublicationRequestErrorV1, ApplicationPublicationRequestV1,
@@ -117,6 +118,15 @@ pub fn build_file_route_publication_v1(
             message: error.message,
         }
     })?;
+    let symbols = build_symbol_table(&unit);
+    let modules = build_module_graph(&unit);
+    let bindings =
+        build_binding_table_with_packages(&unit, &symbols, &modules, &request.package_contracts);
+    let route_loader_plan = build_route_loader_plan_v1(&model.components, &graph, &bindings)
+        .map_err(|error| FileRoutePublicationErrorV1 {
+            code: error.code,
+            message: error.message,
+        })?;
     if graph.routes.is_empty() {
         return Err(FileRoutePublicationErrorV1 {
             code: "PSROUTE2002_FILE_ROUTE_SET_EMPTY",
@@ -186,6 +196,10 @@ pub fn build_file_route_publication_v1(
         });
     }
     routes.sort_by(|left, right| left.path.cmp(&right.path));
+    artifacts.insert(
+        PathBuf::from("route-loaders.plan.json"),
+        route_loader_plan_json_v1(&route_loader_plan).into_bytes(),
+    );
     let manifest = FileRoutePublicationManifestV1 {
         schema_version: FILE_ROUTE_PUBLICATION_MANIFEST_SCHEMA_VERSION,
         compiler_contract: FILE_ROUTE_PUBLICATION_COMPILER_CONTRACT_V1.into(),
@@ -432,6 +446,43 @@ mod tests {
         assert!(html.contains("<main"));
         assert!(html.contains("<article"));
         assert!(html.contains("Home"));
+    }
+
+    #[test]
+    fn publishes_an_exact_route_loader_handoff_plan_without_server_execution() {
+        let contract = crate::parse_semantic_package_contract(
+            r#"{"schema_version":1,"package":"post-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadPost":{"kind":"resource","type_signature":"RouteParameters -> Resource<Post, NotFound>","runtime_module":"dist/load-post.js","resume_policy":"reload","resource_endpoint":{"execution_boundary":"server","cancellation":"abort","resume":"reload"},"route_loader":{"input":"route_parameters","cache":{"scope":"public","max_age_seconds":60},"failure":"typed"}}}}"#,
+        )
+        .unwrap();
+        let mut contracts = SemanticPackageResolutionTable::default();
+        contracts.insert("post-service".into(), contract).unwrap();
+        let product = build_file_route_publication_v1(FileRoutePublicationRequestV1 {
+            configuration: crate::platform::WorkspaceConfiguration::default(),
+            sources: vec![ApplicationPublicationSourceV1 {
+                logical_path: "app/routes/posts/[slug].tsx".into(),
+                source: r#"
+import { loadPost } from "post-service";
+@component() class Post {
+  @loader("loadPost") post!: Resource<Post, NotFound>;
+  render() { return <article />; }
+}
+"#
+                .into(),
+            }],
+            package_contracts: contracts,
+            package_runtime_modules: SemanticPackageRuntimeModuleTable::default(),
+            profile: ApplicationPublicationProfileV1::Development,
+            output_root: "dist".into(),
+        })
+        .expect("route loader handoff publication");
+
+        let plan =
+            String::from_utf8(product.artifacts[&PathBuf::from("route-loaders.plan.json")].clone())
+                .unwrap();
+        assert!(plan.contains("post-service"));
+        assert!(plan.contains("route_parameters"));
+        assert!(plan.contains("max_age_seconds"));
+        assert!(!plan.contains("function loadPost"));
     }
 
     #[test]

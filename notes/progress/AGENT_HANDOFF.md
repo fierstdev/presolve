@@ -3,11 +3,23 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: R6-C1 - route-loader source retention
-* Working tree: R6-C1 implementation is ready for commit.
+* Latest completed slice: R6-C2 - route-loader compiler handoff plan
+* Working tree: R6-C2 implementation is ready for commit.
 * Date: 2026-07-23
 
 Current Phase R slice
+
+* Slice: R6-C2 - Route-Loader Compiler Handoff Plan
+* Result: a conventional route page's `@loader()` field now resolves only
+  through the compiler binding table and R6-B capability, then publishes an
+  immutable `route-loaders.plan.json`. It carries route/component/field,
+  package integrity/module/export, input, cache, and error facts—never a
+  callback or package implementation. Ergonomic check validates the same plan
+  and discharges the provisional source-retention diagnostic only on success.
+* Verification: focused compiler plan/publication tests and the six-test
+  fresh-project CLI suite pass, including package discovery plus `check`/`build`.
+* Next: define server-action package/source/plan products and the shared typed
+  response/error handoff; no generic server runtime.
 
 * Slice: R6-C1 - Route-Loader Source Retention
 * Result: `@loader("endpoint") field!: Resource<Data, Error>` now has a

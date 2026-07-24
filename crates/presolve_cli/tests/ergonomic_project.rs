@@ -162,6 +162,60 @@ fn default_build_composes_a_conventional_layout_without_framework_wrapping() {
 }
 
 #[test]
+fn default_check_and_build_publish_a_compiler_route_loader_handoff() {
+    let root = project_root("route-loader");
+    let package = root.join("node_modules/post-service");
+    fs::create_dir_all(package.join("dist")).unwrap();
+    fs::create_dir_all(root.join("app/routes/posts")).unwrap();
+    fs::write(
+        root.join("app/routes/posts/[slug].tsx"),
+        r#"
+import { loadPost } from "post-service";
+@component() class Post {
+  @loader("loadPost") post!: Resource<Post, NotFound>;
+  render() { return <article />; }
+}
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join("presolve.contract.json"),
+        r#"{"schema_version":1,"package":"post-service","version":"1.0.0","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadPost":{"kind":"resource","type_signature":"RouteParameters -> Resource<Post, NotFound>","runtime_module":"dist/load-post.js","resume_policy":"reload","resource_endpoint":{"execution_boundary":"server","cancellation":"abort","resume":"reload"},"route_loader":{"input":"route_parameters","cache":{"scope":"public","max_age_seconds":60},"failure":"typed"}}}}"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join("dist/load-post.js"),
+        "export const loadPost = () => {};\n",
+    )
+    .unwrap();
+
+    let check = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("check")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        check.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&check.stderr)
+    );
+    let build = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("build")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let plan = fs::read_to_string(root.join("dist/route-loaders.plan.json")).unwrap();
+    assert!(plan.contains("post-service"));
+    assert!(plan.contains("route_parameters"));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn dev_serves_the_compiler_published_page() {
     let root = project_root("server");
     fs::write(

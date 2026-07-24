@@ -112,6 +112,7 @@ pub mod resume_plan;
 pub mod resume_restore;
 pub mod resume_schema;
 pub mod route_graph;
+pub mod route_loader;
 pub mod runtime_codegen;
 pub mod runtime_component;
 pub mod runtime_component_artifact;
@@ -670,6 +671,11 @@ pub use route_graph::{
     build_validated_file_route_graph_v1, build_validated_route_graph_v1, route_manifest_json_v1,
     route_manifest_v1, FileRouteGraphV1, FileRouteNodeV1, RouteGraph, RouteGraphError,
     RouteManifestEntryV1, RouteManifestV1, RouteNode,
+};
+pub use route_loader::{
+    build_route_loader_plan_v1, route_loader_plan_json_v1, RouteLoaderBindingV1,
+    RouteLoaderPlanErrorV1, RouteLoaderPlanV1, RouteLoaderRouteV1,
+    ROUTE_LOADER_PLAN_SCHEMA_VERSION,
 };
 pub use runtime_codegen::generate_runtime_stub;
 pub use runtime_component::{

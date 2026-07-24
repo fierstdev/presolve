@@ -57,6 +57,17 @@ lower it. `@loader()` source is retained with `PSC1132` and fails closed until
 the route-scoped loader plan and artifact exist; it never degrades into an
 ignored decorator. No server module executes at this boundary.
 
+### Route-loader plan
+
+`build_route_loader_plan_v1` joins a conventional route page's retained loader
+field to its exact binding-table import and capability record. It rejects a
+non-route component, malformed decorator, non-`Resource<Data, Error>` type,
+unbound import, or resource export without `route_loader`. Successful
+file-route publication emits `route-loaders.plan.json` schema v1 containing
+only route/component/field identity, package coordinate, runtime module/export,
+input, cache, and failure facts. Ergonomic `presolve check` validates this
+plan; only then is the provisional source-retention diagnostic discharged.
+
 ## Server actions
 
 The public form will be an explicitly marked Action method:

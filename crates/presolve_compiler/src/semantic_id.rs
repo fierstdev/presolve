@@ -387,6 +387,11 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn route_loader(&self, name: &str) -> Self {
+        self.child("route-loader", name)
+    }
+
+    #[must_use]
     pub fn form_field(&self, name: &str) -> Self {
         self.child("form-field", name)
     }

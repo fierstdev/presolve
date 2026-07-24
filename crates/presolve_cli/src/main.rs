@@ -17,19 +17,19 @@ use presolve_cli::{
 use presolve_compiler::tooling_reader::{read_tooling_product_v1, ToolingProductV1};
 use presolve_compiler::{
     build_application_publication_product_v1, build_application_semantic_model_for_unit,
-    build_application_semantic_model_for_unit_with_packages, build_component_graph,
-    build_context_inspection_registry, build_effect_inspection_registry,
-    build_file_route_publication_v1, build_form_inspection_registry,
+    build_application_semantic_model_for_unit_with_packages, build_binding_table_with_packages,
+    build_component_graph, build_context_inspection_registry, build_effect_inspection_registry,
+    build_file_route_publication_v1, build_form_inspection_registry, build_module_graph,
     build_production_reachability_graph, build_production_reports,
     build_production_runtime_artifact, build_resume_chunk_graph, build_resume_manifest,
-    build_runtime_component_artifact, build_runtime_computed_artifact,
+    build_route_loader_plan_v1, build_runtime_component_artifact, build_runtime_computed_artifact,
     build_runtime_context_artifact, build_runtime_effect_artifact, build_runtime_forms_artifact,
     build_runtime_opaque_artifact_with_modules, build_runtime_resource_artifact_with_modules,
-    build_semantic_graph, build_static_request_handoff_v1, build_template_graph,
-    build_template_manifest_from_asm, build_validated_route_graph_v1, discover_project_v1,
-    discover_semantic_packages_v1, embed_opaque_runtime_artifact, emit_production_modules,
-    explain_json, explain_text, extract_production_chunk_graph, fold_component_graph,
-    generate_ordinary_instance_html, generate_runtime_stub,
+    build_semantic_graph, build_static_request_handoff_v1, build_symbol_table,
+    build_template_graph, build_template_manifest_from_asm, build_validated_route_graph_v1,
+    discover_project_v1, discover_semantic_packages_v1, embed_opaque_runtime_artifact,
+    emit_production_modules, explain_json, explain_text, extract_production_chunk_graph,
+    fold_component_graph, generate_ordinary_instance_html, generate_runtime_stub,
     generate_standalone_page_with_resume_runtime,
     generate_standalone_page_with_resume_runtime_and_resources, generate_static_html,
     lower_components_to_ir, optimization_report_json, optimize_context_ir, optimize_effect_ir,
@@ -319,13 +319,19 @@ fn run_ergonomic_check(root: &Path) {
     );
     let (package_contracts, _) = discover_imported_package_tables(&project.root, &unit);
     let asm = build_application_semantic_model_for_unit_with_packages(&unit, &package_contracts);
-    presolve_compiler::build_validated_file_route_graph_v1(&asm)
+    let graph = presolve_compiler::build_validated_file_route_graph_v1(&asm)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    let symbols = build_symbol_table(&unit);
+    let modules = build_module_graph(&unit);
+    let bindings = build_binding_table_with_packages(&unit, &symbols, &modules, &package_contracts);
+    build_route_loader_plan_v1(&asm.components, &graph, &bindings)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
     let diagnostics = asm
         .diagnostics
         .iter()
         .filter(|diagnostic| {
-            diagnostic.code.starts_with("PSC") || diagnostic.code.starts_with("PSBIND")
+            (diagnostic.code.starts_with("PSC") && diagnostic.code != "PSC1132")
+                || diagnostic.code.starts_with("PSBIND")
         })
         .collect::<Vec<_>>();
     if diagnostics.is_empty() {
