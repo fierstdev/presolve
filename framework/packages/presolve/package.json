@@ -1,7 +1,20 @@
 {
   "name": "presolve",
-  "version": "0.1.0-alpha",
-  "private": true,
+  "version": "0.1.0-alpha.1",
+  "description": "Presolve compiler authoring vocabulary for TypeScript.",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fierstdev/presolve.git",
+    "directory": "framework/packages/presolve"
+  },
+  "files": [
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "tag": "alpha"
+  },
   "type": "module",
   "exports": {
     ".": {

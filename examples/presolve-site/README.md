@@ -1,8 +1,9 @@
-# Presolve public site dogfood application
+# Presolve documentation-site example
 
-This is the production-shaped public Presolve site: an introduction, public
-documentation, source examples, and framework capability comparisons authored
-as ordinary compiler-routed Presolve components.
+This is a local dogfood example: an introduction, documentation, source
+examples, and framework capability comparisons authored as ordinary
+compiler-routed Presolve components. It is not the source of the separately
+operated public Presolve website.
 
 ```sh
 presolve check

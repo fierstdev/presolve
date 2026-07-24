@@ -220,7 +220,7 @@ class AppShell extends Component {
     }
 
     #[test]
-    fn excludes_invalid_provider_forms_without_creating_runtime_facts() {
+    fn retains_the_single_structurally_resolved_provider_before_expression_validation() {
         let parsed = presolve_parser::parse_file(
             "src/AppShell.tsx",
             r#"
@@ -252,10 +252,16 @@ class AppShell extends Component {
 "#,
         );
         let asm = build_application_semantic_model(&parsed);
+        let component = &asm.components[0];
+        let provider_id = ProviderId::for_component(&component.id, "callProvider");
 
         assert_eq!(asm.contexts().len(), 1);
-        assert!(asm.providers().is_empty());
-        assert!(asm.references.is_empty());
+        assert_eq!(asm.providers().len(), 1);
+        assert!(asm.provider(&provider_id).is_some());
+        assert!(asm.references.iter().any(|reference| {
+            reference.kind == SemanticReferenceKind::ProvidesContext
+                && reference.source == *provider_id.as_semantic_id()
+        }));
         assert!(asm.components[0].state_fields.is_empty());
     }
 }

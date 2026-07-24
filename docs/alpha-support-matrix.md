@@ -1,4 +1,8 @@
-# Presolve alpha support matrix
+# Historical pre-public alpha support matrix
+
+> Historical engineering record. It describes the pre-public compiler-only
+> release boundary and is retained for fixture provenance. For the public
+> `0.1.0-alpha.1` surface, start with [Alpha status](alpha.md).
 
 **Status:** L19-A frozen alpha support matrix. This is a repository-local
 support declaration for `0.1.0-alpha`; it adds no command, product, package,

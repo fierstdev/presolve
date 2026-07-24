@@ -1,4 +1,7 @@
-# Public surface matrix
+# Historical pre-public surface matrix
+
+> Historical compiler-platform reference retained for fixture provenance. The
+> current public product surface is documented in [Alpha status](alpha.md).
 
 This **Reference** is fixture-validated from CLI dispatch, the L10 registry, and package manifests. It does not add commands, schemas, or exports.
 

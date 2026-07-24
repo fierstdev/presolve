@@ -1,8 +1,18 @@
 {
   "name": "@presolve/lsp",
-  "version": "0.1.0-alpha",
+  "version": "0.1.0-alpha.1",
+  "description": "LSP projection over Presolve compiler products.",
+  "license": "MIT OR Apache-2.0",
   "type": "module",
-  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fierstdev/presolve.git",
+    "directory": "packages/lsp"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "alpha"
+  },
   "exports": {
     ".": "./src/index.js"
   },

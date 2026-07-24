@@ -8,8 +8,8 @@ test -s "$package"
 rg --quiet 'wasm_bindgen' "$binding"
 rg --quiet 'query_snapshot_v1' "$binding"
 rg --quiet '@presolve/compiler-wasm' "$package"
-if rg --quiet 'decode_tooling_query_snapshot_v1|serde_json|std::fs|fetch|http|Path|URI|uri|sourceText' packages/compiler-wasm/package.json; then
-  echo 'L12-C-3 package surface must not decode or host the compiler product' >&2
+if rg --quiet 'decode_tooling_query_snapshot_v1|serde_json|std::fs|sourceText' packages/compiler-wasm/package.json; then
+  echo 'L12-C-3 package manifest must not claim compiler-product decoding authority' >&2
   exit 1
 fi
 ./scripts/build-l12c-compiler-wasm.sh

@@ -1,0 +1,10 @@
+{
+  "name": "@presolve/cli-linux-x64",
+  "version": "0.1.0-alpha.1",
+  "description": "Presolve CLI binary for Linux x64.",
+  "license": "MIT OR Apache-2.0",
+  "os": ["linux"],
+  "cpu": ["x64"],
+  "files": ["bin"],
+  "repository": { "type": "git", "url": "git+https://github.com/fierstdev/presolve.git" }
+}

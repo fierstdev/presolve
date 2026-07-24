@@ -1,7 +1,16 @@
 {
-  "name": "presolve-monorepo",
-  "version": "0.1.0-alpha",
+  "name": "presolve",
+  "version": "0.1.0-alpha.1",
   "private": true,
+  "description": "The Presolve compiler, framework, metaframework, and tooling source repository.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fierstdev/presolve.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fierstdev/presolve/issues"
+  },
+  "homepage": "https://github.com/fierstdev/presolve#readme",
   "type": "module",
   "scripts": {
     "check": "pnpm -r check",
@@ -9,7 +18,8 @@
     "test:e2e": "cargo test -p presolve-cli --test runtime_browser -- --nocapture --test-threads=1",
     "test:e2e:headed": "cargo test -p presolve-cli --test runtime_browser -- --nocapture --test-threads=1",
     "verify:identity": "./scripts/verify-public-identity.sh",
-    "verify:repository-layout": "./scripts/verify-repository-layout.sh"
+    "verify:repository-layout": "./scripts/verify-repository-layout.sh",
+    "release:check": "./scripts/release-dry-run.sh"
   },
   "devDependencies": {
     "@typescript/native": "npm:typescript@^7.0.2"

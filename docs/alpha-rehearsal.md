@@ -1,4 +1,7 @@
-# Presolve alpha clean-room rehearsal
+# Historical pre-public alpha clean-room rehearsal
+
+> Historical engineering record retained for release-provenance fixtures. The
+> public release procedure is [Releasing Presolve](releasing.md).
 
 **Status:** L19-B recorded rehearsal procedure. It creates no project and does
 not publish, sign, upload, deploy, or contact a registry. The supported starter

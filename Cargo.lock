@@ -777,7 +777,7 @@ dependencies = [
 
 [[package]]
 name = "presolve-cli"
-version = "0.1.0-alpha"
+version = "0.1.0-alpha.1"
 dependencies = [
  "presolve-compiler",
  "presolve-parser",
@@ -788,7 +788,7 @@ dependencies = [
 
 [[package]]
 name = "presolve-compiler"
-version = "0.1.0-alpha"
+version = "0.1.0-alpha.1"
 dependencies = [
  "presolve-parser",
  "serde",
@@ -799,7 +799,7 @@ dependencies = [
 
 [[package]]
 name = "presolve-parser"
-version = "0.1.0-alpha"
+version = "0.1.0-alpha.1"
 dependencies = [
  "oxc_allocator",
  "oxc_ast",
@@ -811,7 +811,7 @@ dependencies = [
 
 [[package]]
 name = "presolve-parser-spike"
-version = "0.1.0-alpha"
+version = "0.1.0-alpha.1"
 dependencies = [
  "oxc_allocator",
  "oxc_ast",

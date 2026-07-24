@@ -1,6 +1,6 @@
 {
   "name": "presolve-site",
-  "version": "0.1.0-alpha",
+  "version": "0.1.0-alpha.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,9 +11,11 @@
     "deploy": "presolve deploy cloudflare --name presolve-site"
   },
   "dependencies": {
-    "presolve": "0.1.0-alpha"
+    "presolve": "workspace:*"
   },
   "devDependencies": {
+    "@presolve/cli": "workspace:*",
+    "typescript": "npm:typescript@^7.0.2",
     "wrangler": "^4.0.0"
   }
 }

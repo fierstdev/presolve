@@ -1,8 +1,18 @@
 {
   "name": "@presolve/compiler-wasm",
-  "version": "0.1.0-alpha",
+  "version": "0.1.0-alpha.1",
+  "description": "Compiler-owned Presolve WebAssembly query bindings.",
+  "license": "MIT OR Apache-2.0",
   "type": "module",
-  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fierstdev/presolve.git",
+    "directory": "packages/compiler-wasm"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "alpha"
+  },
   "exports": {
     ".": "./dist/presolve_compiler_wasm.js"
   },

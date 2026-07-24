@@ -1,0 +1,29 @@
+{
+  "name": "@presolve/cli",
+  "version": "0.1.0-alpha.1",
+  "description": "The Presolve compiler command-line interface.",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "bin": {
+    "presolve": "./bin/presolve.mjs"
+  },
+  "files": [
+    "bin",
+    "README.md"
+  ],
+  "optionalDependencies": {
+    "@presolve/cli-darwin-arm64": "workspace:*",
+    "@presolve/cli-darwin-x64": "workspace:*",
+    "@presolve/cli-linux-x64": "workspace:*",
+    "@presolve/cli-win32-x64": "workspace:*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fierstdev/presolve.git",
+    "directory": "packages/cli"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "alpha"
+  }
+}

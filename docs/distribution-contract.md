@@ -1,4 +1,7 @@
-# Distribution contract
+# Historical pre-public distribution contract
+
+> Historical engineering record. Its private-package boundary was superseded
+> by the public alpha release train documented in [Releasing Presolve](releasing.md).
 
 **Status:** L17-A inventory only. No package in this repository is publishable;
 every package manifest sets `private: true`.

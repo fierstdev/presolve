@@ -1,20 +1,15 @@
-# Presolve Framework
+# Presolve framework
 
-This private workspace is the Phase M framework boundary. It exposes
-compiler-owned authoring forms through TypeScript declarations and focused
-conformance fixtures. It does not own a parser, source transform, compiler
-adapter, runtime, renderer, scheduler, artifact decoder, or generated output.
+The public framework package is [`presolve`](packages/presolve/). It exposes a
+small TypeScript authoring vocabulary over compiler-owned semantics and has no
+application renderer, scheduler, dependency tracker, parser, or reactive
+runtime of its own.
 
-M2 contains only `@presolve/framework-types`: ambient declarations needed for
-the existing Counter source. M6-B adds typed static Context declarations and
-compiler-resolved qualified Context designators as a documented production
-compiler-language contract, not a framework shim. M10-A adds the already
-compiler-admitted Resource declaration/type surface; package contracts and
-runtime mappings remain explicit compiler build inputs. Later slices may extend
-this workspace only when a frozen compiler capability and Phase M conformance
-contract authorize the exact form.
+The compiler decides component and instance identity, state storage,
+initialization order, dependency topology, DOM operations, effect scheduling,
+Context resolution, forms, serialization, resumability, and code generation.
+The framework declaration package makes those admitted forms pleasant to write
+and useful to TypeScript; it does not recreate them in JavaScript.
 
-M10-B makes the bounded compiler-supported JSX aliases, accessibility
-attributes, and Action event attributes visible to TypeScript without adding a
-JSX transform or framework DOM vocabulary. All remaining JSX admission is still
-decided by the compiler.
+Internal compatibility packages and conformance fixtures remain in this
+workspace to keep the public package small. They are not application imports.

@@ -1,8 +1,8 @@
 # Repository layout
 
-This is the current repository map for contributors. It describes present
-ownership only; it does not define future package, service, or release
-architecture.
+This is the current repository map for Presolve contributors. It describes
+present ownership only; the public product boundary is described in the
+[documentation index](README.md).
 
 ## Active boundaries
 
@@ -11,17 +11,18 @@ architecture.
 | `.github/` | GitHub workflows and collaboration templates. |
 | `adr/` | Accepted architectural-decision records. |
 | `crates/` | Active Rust compiler, parser, CLI, and supporting crates. |
-| `docs/` | Public documentation, current specifications, frozen contracts, and historical archive. |
+| `docs/` | Public product documentation plus historical engineering records. |
 | `e2e/` | Active browser-harness documentation. |
 | `examples/` | Active canonical examples. |
 | `fixtures/` | Frozen compiler, runtime, browser, and golden verification fixtures. |
-| `framework/` | Private Phase M framework packages and conformance fixtures; it cannot own compiler or runtime semantics. |
-| `notes/` | The live continuation log and current handoff remain under `notes/progress/`. |
+| `framework/` | The `presolve` authoring package and its compiler-conformance fixtures. |
+| `metaframework/` | Application-facing metaframework package and integration fixtures. |
+| `notes/` | Historical engineering progress records. |
 | `packages/` | Active JavaScript and TypeScript packages. |
 | `rfcs/` | Accepted or active technical RFCs. |
 | `schemas/` | Active and frozen versioned schemas. |
 | `scripts/` | Maintained repository automation. |
-| `site/` | Versioned repository-local launch content; deployment remains external. |
+| `site/` | Historical repository-local launch-content prototype; not the official website source. |
 
 `LICENSE`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`,
 `SUPPORT.md`,
@@ -34,22 +35,14 @@ slice introduces them.
 The repository deliberately has no root `compiler/`, `runtime/`, or `cli/`
 directory. Active responsibilities remain in `crates/` and `packages/`.
 
-## Historical archive
+## Historical records
 
 `docs/archive/engineering/` preserves non-normative engineering history without
-rewriting it. Planning documents live beneath `planning/`; accepted parser
-spike evidence lives beneath `spikes/accepted/`; inactive resource notes live
-beneath `resources/`. The live progress and handoff records remain under
-`notes/progress/` so the established continuation workflow and weekly-log
-automation keep their current paths.
-
-## Phase L authority
-
-The authoritative Phase L specifications are tracked in
-[`specifications/phase-l/`](specifications/phase-l/README.md). They are active
-constitutional documents, not archived planning material.
+rewriting it. `docs/specifications/` and `notes/progress/` also retain frozen
+pre-public engineering records at their original paths so evidence links and
+fixtures remain reproducible. They do not define the public product API.
 
 ## Enforcement
 
 Run `./scripts/verify-repository-layout.sh` (or `just repository-layout`) to
-validate this map, the archive boundaries, and the Phase L specification index.
+validate this map and the historical-record boundaries.

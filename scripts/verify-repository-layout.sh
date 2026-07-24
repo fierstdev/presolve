@@ -54,7 +54,7 @@ if git ls-files | rg --line-number '(^|/)(target|node_modules|dist|\.astro|test-
   exit 1
 fi
 
-readonly expected_roots=$'.gitattributes\n.github\n.gitignore\nCHANGELOG.md\nCODE_OF_CONDUCT.md\nCONTRIBUTING.md\nCargo.lock\nCargo.toml\nLICENSE\nREADME.md\nSECURITY.md\nSUPPORT.md\nadr\ncrates\ndocs\ne2e\nexamples\nfixtures\nframework\njustfile\nnotes\npackage.json\npackages\npnpm-lock.yaml\npnpm-workspace.yaml\nrfcs\nrust-toolchain.toml\nschemas\nscripts\nsite'
+readonly expected_roots=$'.gitattributes\n.github\n.gitignore\nCHANGELOG.md\nCODE_OF_CONDUCT.md\nCONTRIBUTING.md\nCargo.lock\nCargo.toml\nLICENSE\nREADME.md\nSECURITY.md\nSUPPORT.md\nadr\ncrates\ndocs\ne2e\nexamples\nfixtures\nframework\njustfile\nmetaframework\nnotes\npackage.json\npackages\npnpm-lock.yaml\npnpm-workspace.yaml\nrfcs\nrust-toolchain.toml\nschemas\nscripts\nsite'
 actual_roots="$(git ls-files | awk -F/ '{print $1}' | sort -u)"
 if [[ "$actual_roots" != "$expected_roots" ]]; then
   echo 'tracked root ownership differs from docs/repository-layout.md' >&2
