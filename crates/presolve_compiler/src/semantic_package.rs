@@ -46,6 +46,38 @@ pub enum SemanticPackageResourceResumePolicy {
     Snapshot,
 }
 
+/// Closed request input admitted for a server-backed route loader.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticPackageRouteLoaderInput {
+    RouteParameters,
+}
+
+/// Cache visibility declared by an integrity-bound server capability.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticPackageServerCacheScope {
+    NoStore,
+    Private,
+    Public,
+}
+
+/// Immutable cache policy a server adapter may honor but never broaden.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SemanticPackageServerCachePolicy {
+    pub scope: SemanticPackageServerCacheScope,
+    #[serde(default)]
+    pub max_age_seconds: Option<u64>,
+}
+
+/// Closed error transport selected by an integrity-bound route loader.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticPackageRouteLoaderFailure {
+    Typed,
+}
+
 /// Execution side for the initial opaque terminal package boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -83,6 +115,16 @@ pub struct SemanticPackageResourceEndpoint {
     pub resume: SemanticPackageResourceResumePolicy,
 }
 
+/// Additional contract required before a Resource endpoint may serve as a
+/// route loader. The package implementation remains opaque to the compiler.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SemanticPackageRouteLoader {
+    pub input: SemanticPackageRouteLoaderInput,
+    pub cache: SemanticPackageServerCachePolicy,
+    pub failure: SemanticPackageRouteLoaderFailure,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SemanticPackageExport {
@@ -94,6 +136,8 @@ pub struct SemanticPackageExport {
     pub pure_operation: Option<SemanticPackagePureOperation>,
     #[serde(default)]
     pub resource_endpoint: Option<SemanticPackageResourceEndpoint>,
+    #[serde(default)]
+    pub route_loader: Option<SemanticPackageRouteLoader>,
     #[serde(default)]
     pub opaque_terminal: Option<SemanticPackageOpaqueTerminal>,
 }
@@ -119,6 +163,7 @@ pub enum SemanticPackageContractError {
     InvalidExportContract,
     InvalidPureOperation,
     InvalidResourceEndpoint,
+    InvalidRouteLoader,
     InvalidOpaqueTerminal,
     DuplicateSpecifier,
 }
@@ -166,6 +211,31 @@ pub fn parse_semantic_package_contract(
         (export.kind == SemanticPackageKind::Resource) != export.resource_endpoint.is_some()
     }) {
         return Err(SemanticPackageContractError::InvalidResourceEndpoint);
+    }
+    if contract.exports.values().any(|export| {
+        let Some(loader) = &export.route_loader else {
+            return false;
+        };
+        let Some(endpoint) = &export.resource_endpoint else {
+            return true;
+        };
+        !matches!(export.kind, SemanticPackageKind::Resource)
+            || !matches!(
+                endpoint.execution_boundary,
+                SemanticPackageResourceExecutionBoundary::Server
+                    | SemanticPackageResourceExecutionBoundary::Shared
+            )
+            || match loader.cache.scope {
+                SemanticPackageServerCacheScope::Public => {
+                    loader.cache.max_age_seconds.is_none_or(|age| age == 0)
+                }
+                SemanticPackageServerCacheScope::NoStore
+                | SemanticPackageServerCacheScope::Private => {
+                    loader.cache.max_age_seconds.is_some()
+                }
+            }
+    }) {
+        return Err(SemanticPackageContractError::InvalidRouteLoader);
     }
     if contract.exports.values().any(|export| {
         (export.kind == SemanticPackageKind::Opaque) != export.opaque_terminal.is_some()
@@ -281,6 +351,33 @@ mod tests {
                 execution_boundary: SemanticPackageOpaqueExecutionBoundary::Client,
                 resume: SemanticPackageOpaqueResumePolicy::ColdFallback,
             })
+        );
+    }
+
+    #[test]
+    fn validates_route_loader_capabilities_on_server_or_shared_resource_exports() {
+        let contract = parse_semantic_package_contract(
+            r#"{"schema_version":1,"package":"post-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadPost":{"kind":"resource","type_signature":"RouteParameters -> Resource<Post, NotFound>","runtime_module":"dist/load-post.js","resume_policy":"reload","resource_endpoint":{"execution_boundary":"server","cancellation":"abort","resume":"reload"},"route_loader":{"input":"route_parameters","cache":{"scope":"public","max_age_seconds":60},"failure":"typed"}}}}"#,
+        )
+        .expect("closed route loader contract");
+        assert_eq!(
+            contract.exports["loadPost"].route_loader,
+            Some(SemanticPackageRouteLoader {
+                input: SemanticPackageRouteLoaderInput::RouteParameters,
+                cache: SemanticPackageServerCachePolicy {
+                    scope: SemanticPackageServerCacheScope::Public,
+                    max_age_seconds: Some(60),
+                },
+                failure: SemanticPackageRouteLoaderFailure::Typed,
+            })
+        );
+
+        let invalid_client = parse_semantic_package_contract(
+            r#"{"schema_version":1,"package":"post-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadPost":{"kind":"resource","type_signature":"RouteParameters -> Resource<Post, NotFound>","runtime_module":"dist/load-post.js","resume_policy":"reload","resource_endpoint":{"execution_boundary":"client","cancellation":"abort","resume":"reload"},"route_loader":{"input":"route_parameters","cache":{"scope":"no_store"},"failure":"typed"}}}}"#,
+        );
+        assert_eq!(
+            invalid_client,
+            Err(SemanticPackageContractError::InvalidRouteLoader)
         );
     }
 }

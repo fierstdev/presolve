@@ -778,7 +778,10 @@ pub use semantic_package::{
     SemanticPackageOpaqueResumePolicy, SemanticPackageOpaqueTerminal, SemanticPackagePureOperation,
     SemanticPackageResolutionTable, SemanticPackageResourceCancellation,
     SemanticPackageResourceEndpoint, SemanticPackageResourceExecutionBoundary,
-    SemanticPackageResourceResumePolicy, SEMANTIC_PACKAGE_CONTRACT_SCHEMA_VERSION,
+    SemanticPackageResourceResumePolicy, SemanticPackageRouteLoader,
+    SemanticPackageRouteLoaderFailure, SemanticPackageRouteLoaderInput,
+    SemanticPackageServerCachePolicy, SemanticPackageServerCacheScope,
+    SEMANTIC_PACKAGE_CONTRACT_SCHEMA_VERSION,
 };
 pub use semantic_package_runtime::{
     SemanticPackageRuntimeModuleError, SemanticPackageRuntimeModuleKey,

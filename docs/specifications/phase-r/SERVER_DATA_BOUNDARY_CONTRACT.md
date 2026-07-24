@@ -45,6 +45,16 @@ loader, source inspection of package implementation, ambient request object,
 or framework data cache. Client Resources retain their existing browser
 activation contract; a route loader is a distinct server handoff.
 
+### Published capability record
+
+R6-B admits the closed `route_loader` member only on a `resource` export. It
+requires a `server` or `shared` Resource endpoint and records
+`input: "route_parameters"`, `failure: "typed"`, and a cache policy. Cache
+policy is `no_store`, `private`, or `public`; only public policy has a positive
+`max_age_seconds`, while the other scopes must not carry a lifetime. The
+compiler validates this package metadata at resolution time but does not yet
+admit `@loader()` source or execute a server module.
+
 ## Server actions
 
 The public form will be an explicitly marked Action method:

@@ -3,11 +3,22 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: R6-A - compiler-owned route request context
-* Working tree: R6-A implementation is ready for commit.
+* Latest completed slice: R6-B - route-loader package capability contract
+* Working tree: R6-B implementation is ready for commit.
 * Date: 2026-07-23
 
 Current Phase R slice
+
+* Slice: R6-B - Route-Loader Package Capability Contract
+* Result: semantic-package `resource` exports may now opt into a closed
+  `route_loader` capability only when their endpoint is `server` or `shared`.
+  The contract binds route-parameter input, typed failure transport, and a
+  non-broadenable `no_store`/`private`/bounded-public cache policy through the
+  existing package version/integrity authority.
+* Verification: a focused semantic-package test accepts a valid server loader
+  and rejects a client endpoint using the same capability.
+* Next: retain and resolve the `@loader()` source declaration into a per-route
+  compiler plan, then publish that plan for a host adapter; no server callback.
 
 * Slice: R6-A - Compiler-Owned Route Request Context
 * Result: file-route publication now resolves the selected canonical route,
