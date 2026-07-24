@@ -77,12 +77,12 @@ plan; only then is the provisional source-retention diagnostic discharged.
 The public form will be an explicitly marked Action method:
 
 ```tsx
-@action()
 @serverAction("savePost")
 save(): void {}
 ```
 
-It is legal only for an otherwise empty, compiler-valid Action. The designator
+It is its own Action boundary and is legal only as an otherwise empty,
+compiler-valid server-action method. The designator
 must select a published server-action capability from an imported semantic
 package. Form submission binds its existing compiler-owned Form data record;
 non-form actions use an explicit later input schema. The generated action
@@ -93,8 +93,9 @@ capability extension. It may not receive arbitrary closures or mutate
 compiler-owned state directly.
 
 `build_route_server_action_plan_v1` accepts this form only on a conventional
-route page when it is a zero-argument, synchronous, empty `@action()` method
-with exactly one imported endpoint designator. It joins that declaration to an
+route page when it is a zero-argument, synchronous, empty method with exactly
+one `@serverAction("importedEndpoint")` designator. Combining it with
+`@action()` is rejected: there is one action boundary, not two. It joins that declaration to an
 integrity-bound `server_action` package capability. File-route publication
 emits `route-server-actions.plan.json` schema v1 with the route/component/action
 identity, package coordinate, module/export, FormData input, typed

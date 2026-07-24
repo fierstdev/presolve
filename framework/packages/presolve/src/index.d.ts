@@ -1,18 +1,74 @@
-export declare function component(): ClassDecorator;
-export declare function action(): MethodDecorator;
-export declare function computed(): MethodDecorator;
-export declare function effect(): MethodDecorator;
+/** Compiler intrinsics with no framework runtime authority. */
+export type PresolveClassDecorator = <TClass extends abstract new (...args: never[]) => object>(
+  value: TClass,
+  context: ClassDecoratorContext<TClass>
+) => TClass | void;
+export type PresolveMethodDecorator = <
+  This,
+  Value extends (this: This, ...args: any[]) => unknown,
+>(
+  value: Value,
+  context: ClassMethodDecoratorContext<This, Value>
+) => Value | void;
+export type PresolveGetterDecorator = <This, Value>(
+  value: (this: This) => Value,
+  context: ClassGetterDecoratorContext<This, Value>
+) => ((this: This) => Value) | void;
+export type PresolveFieldDecorator = <This, Value>(
+  value: undefined,
+  context: ClassFieldDecoratorContext<This, Value>
+) => void;
+
+export declare function component(): PresolveClassDecorator;
+export declare function action(): PresolveMethodDecorator;
+export declare function computed(): PresolveGetterDecorator;
+export declare function effect(): PresolveMethodDecorator;
 export declare function state<T>(initialValue: T): T;
-export declare function slot(): PropertyDecorator;
-export declare function context(): PropertyDecorator;
-export declare function provide(context: string): PropertyDecorator;
-export declare function consume(context: string): PropertyDecorator;
-export declare function form(): PropertyDecorator;
-export declare function field(form: string, path?: string): PropertyDecorator;
-export declare function validate(rule: unknown): PropertyDecorator;
-export declare function resource(endpoint: string): PropertyDecorator;
-/** Compiler-owned route data declaration; execution is a server handoff plan. */
-export declare function loader(endpoint: string): PropertyDecorator;
-export declare function serverAction(endpoint: string): MethodDecorator;
+
+export declare function slot(): PresolveFieldDecorator;
+export interface SlotContent {
+  readonly __presolveSlotContentBrand: unique symbol;
+}
+
+export declare function context(): PresolveFieldDecorator;
+export type ContextDesignator = `${string}.${string}`;
+export declare function provide(context: ContextDesignator): PresolveFieldDecorator;
+export declare function consume(context: ContextDesignator): PresolveFieldDecorator;
+
+export declare function form(): PresolveFieldDecorator;
+export declare function serialize(
+  format: "json" | "form-data" | "url-encoded"
+): PresolveFieldDecorator;
+export declare function field(form: string, path?: string): PresolveFieldDecorator;
+export interface ValidationRule {
+  readonly __presolveValidationRuleBrand: unique symbol;
+}
+export declare function validate(rule: ValidationRule): PresolveFieldDecorator;
+export declare function required(): ValidationRule;
+export declare function submit(form: string): PresolveMethodDecorator;
+
+export type ResourceState = "idle" | "pending" | "ready" | "failed" | "cancelled";
+export interface Resource<Data, Error> {
+  readonly data: Data | null;
+  readonly error: Error | null;
+  readonly state: ResourceState;
+  readonly __presolveResourceBrand: unique symbol;
+}
+export declare function resource(endpoint: string): PresolveFieldDecorator;
+export declare function loader(endpoint: string): PresolveFieldDecorator;
+export declare function serverAction(endpoint: string): PresolveMethodDecorator;
+export declare function opaque(
+  packageSpecifier: string,
+  exportName: string
+): PresolveMethodDecorator;
 
 export declare abstract class Component {}
+
+declare global {
+  namespace JSX {
+    type Element = unknown;
+    interface IntrinsicElements {
+      [elementName: string]: unknown;
+    }
+  }
+}

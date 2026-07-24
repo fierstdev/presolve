@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "jsx": "preserve",
+    "paths": {
+      "presolve": ["./../../packages/presolve/src/index.d.ts"]
+    }
+  },
+  "files": ["src/PublicCounter.tsx"]
+}

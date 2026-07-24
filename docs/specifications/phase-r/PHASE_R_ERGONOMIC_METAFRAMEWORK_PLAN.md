@@ -1,6 +1,6 @@
 # Phase R: Ergonomic Metaframework
 
-**Status:** active.
+**Status:** complete through R9.
 
 ## Goal
 
@@ -77,3 +77,8 @@ performance claims are allowed.
 Require a fresh-app proof with no configuration/manual source list/manual
 component identity/artifact handling, plus browser/build/route/server/release
 and compatibility matrices.
+
+The freeze includes a decorator-minimization audit: component identity,
+reactivity/capability boundaries stay explicit; everything losslessly derivable
+from ordinary TypeScript, imports, JSX, and file topology stays inferred.
+`@serverAction()` is one boundary, not `@action()` plus another.

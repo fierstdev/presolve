@@ -3,28 +3,31 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: R8-A - scaffold, explainability, and public-site dogfood
-* Working tree: R8-A implementation is ready for commit.
+* Latest completed slice: R9 - usability and decorator-minimization freeze
+* Working tree: Phase R completion implementation is ready for commit.
 * Date: 2026-07-23
 
 Current Phase R slice
 
-* Slice: R8-A - Scaffold, Explainability, and Public-Site Dogfood
-* Result: `create-presolve` now creates a zero-configuration file-route app
-  with normal dev/build/check/Cloudflare commands. `presolve explain route` and
-  `presolve explain deployment` project compiler/distribution products without
-  separate source intelligence. The public `presolve` authoring import is now
-  correctly recognized as declaration-only compiler vocabulary rather than a
-  third-party semantic package.
-* Dogfood: `examples/presolve-site` is a complete public-site-shaped Presolve
-  app with landing, docs, examples, component/deployment guides, and an
-  architecture comparison that explicitly avoids unsupported benchmark claims.
-  It builds through conventional layout and file-route publication.
-* Verification: Node scaffold test; focused compiler import test; CLI route and
-  deployment explanation test; and dogfood `check`/`build` proof with rendered
-  route content all pass.
-* Next: complete the R9 usability freeze, including a decorator-minimization
-  audit and a fresh-app no-configuration acceptance matrix.
+* Slice: R9 - Usability and Decorator-Minimization Freeze
+* Result: Phase R is complete through R9. The public `presolve` package now
+  uses TypeScript 7 native-decorator declarations, exports the actual
+  Component/authoring types, and has no runtime semantic authority.
+  The usability freeze classifies 17 decorators into four explicit semantic
+  boundary families; static pages normally use only `@component()`, state is a
+  function, and routes/inputs/JSX/imports/identity stay inferred. Server actions
+  now use one `@serverAction()` boundary rather than a duplicated `@action()`.
+* Verification: `scripts/verify-r9-usability-freeze.sh`, the complete
+  single-threaded 11-test ergonomic CLI suite, focused route-server-action
+  compiler tests, TypeScript 7 public package type checking, Node package
+  checks, and dogfood-site `check`/`build` all pass.
+* External release note: the Cloudflare adapter is implementation-complete and
+  deployable by a caller with Wrangler credentials. Publishing the public site
+  still requires that caller-authorized account/domain operation; no credentials
+  or live hostname are stored in the repository.
+* Next: choose a successor phase for a compiler-authorized server-capability
+  executor or public-site publishing/release operations; do not add a generic
+  server runtime to Phase R.
 
 * Addendum: the public inert `presolve` authoring package exports typed
   `loader(endpoint)` alongside `resource`, so the accepted compiler vocabulary

@@ -512,7 +512,7 @@ import { loadPost } from "post-service";
                 source: r#"
 import { savePost } from "post-service";
 @component() class Post {
-  @action() @serverAction("savePost") save(): void {}
+  @serverAction("savePost") save(): void {}
   render() { return <form />; }
 }
 "#

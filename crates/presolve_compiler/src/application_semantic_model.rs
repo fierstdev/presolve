@@ -6440,7 +6440,7 @@ class Post {
             r#"
 @component()
 class Post {
-  @action() @serverAction("savePost") save(): void {}
+  @serverAction("savePost") save(): void {}
   render() { return <form />; }
 }
 "#,
@@ -6451,8 +6451,8 @@ class Post {
         assert!(action.invoked);
         assert_eq!(action.argument_count, 1);
         assert_eq!(action.endpoint_designator.as_deref(), Some("savePost"));
-        assert!(action.is_action);
-        assert!(action.action_invoked);
+        assert!(!action.is_action);
+        assert!(!action.action_invoked);
         assert!(!action.has_body_effects);
         assert!(asm
             .diagnostics

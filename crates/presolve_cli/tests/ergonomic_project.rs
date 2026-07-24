@@ -226,7 +226,7 @@ fn default_check_and_build_publish_a_compiler_route_server_action_handoff() {
         r#"
 import { savePost } from "post-service";
 @component() class Post {
-  @action() @serverAction("savePost") save(): void {}
+  @serverAction("savePost") save(): void {}
   render() { return <form />; }
 }
 "#,
@@ -380,6 +380,60 @@ fn explain_projects_compiler_route_and_prepared_deployment_facts() {
     let deployment = String::from_utf8(deployment.stdout).unwrap();
     assert!(deployment.contains("Cloudflare deployment"));
     assert!(deployment.contains("presolve-docs"));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn fresh_scaffold_needs_no_configuration_source_list_or_component_identity() {
+    let root = std::env::temp_dir().join(format!(
+        "presolve-fresh-scaffold-{}-{}",
+        std::process::id(),
+        NEXT_ROOT.fetch_add(1, Ordering::Relaxed)
+    ));
+    let application = root.join("hello-presolve");
+    let scaffold = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../packages/create-presolve/bin/create-presolve.mjs");
+    let created = Command::new("node")
+        .arg(scaffold)
+        .arg(&application)
+        .output()
+        .unwrap();
+    assert!(
+        created.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&created.stderr)
+    );
+    let check = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("check")
+        .current_dir(&application)
+        .output()
+        .unwrap();
+    assert!(
+        check.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&check.stderr)
+    );
+    let build = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("build")
+        .current_dir(&application)
+        .output()
+        .unwrap();
+    assert!(build.status.success());
+    let deploy = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args(["deploy", "cloudflare", "--prepare"])
+        .current_dir(&application)
+        .output()
+        .unwrap();
+    assert!(
+        deploy.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&deploy.stderr)
+    );
+    assert!(application.join("dist/routes/root/index.html").is_file());
+    assert!(application
+        .join(".presolve/cloudflare/deployment.plan.json")
+        .is_file());
+    assert!(!application.join("presolve.json").exists());
     fs::remove_dir_all(root).unwrap();
 }
 

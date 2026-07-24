@@ -55,7 +55,7 @@ pub struct RouteServerActionBindingV1 {
     pub failure: String,
 }
 
-/// Resolves route-page `@action() @serverAction()` methods through the
+/// Resolves route-page `@serverAction()` methods through the
 /// canonical binding table and published package capability records.
 ///
 /// # Errors
@@ -105,8 +105,8 @@ pub fn build_route_server_action_plan_v1(
                     .endpoint_designator
                     .as_ref()
                     .is_none_or(String::is_empty)
-                || !fact.is_action
-                || !fact.action_invoked
+                || fact.is_action
+                || fact.action_invoked
                 || fact.is_async
                 || fact.parameter_count != 0
                 || fact.has_body_effects
@@ -114,7 +114,7 @@ pub fn build_route_server_action_plan_v1(
                 return Err(RouteServerActionPlanErrorV1 {
                     code: "PSROUTE1112_SERVER_ACTION_DECLARATION_INVALID",
                     message: format!(
-                        "server action `{}` must be an empty synchronous @action() @serverAction(\"importedEndpoint\") method with no parameters",
+                        "server action `{}` must be an empty synchronous @serverAction(\"importedEndpoint\") method with no parameters; @serverAction() is its action boundary",
                         fact.method_name
                     ),
                 });
@@ -231,7 +231,7 @@ mod tests {
             r#"
 import { savePost } from "post-service";
 @component() class Post {
-  @action() @serverAction("savePost") save(): void {}
+  @serverAction("savePost") save(): void {}
   render() { return <form />; }
 }
 "#,

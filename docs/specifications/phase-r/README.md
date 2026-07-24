@@ -11,3 +11,4 @@ ordinary application authors while preserving compiler ownership of semantics.
 * [Server and data boundary contract](SERVER_DATA_BOUNDARY_CONTRACT.md)
 * [Cloudflare Workers deployment contract](CLOUDFLARE_DEPLOYMENT_CONTRACT.md)
 * [R8 scaffold, DX, and dogfood contract](R8_SCAFFOLD_DX_DOGFOOD_CONTRACT.md)
+* [R9 usability and decorator-minimization freeze](R9_USABILITY_AND_DECORATOR_FREEZE.md)

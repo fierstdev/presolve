@@ -1,4 +1,4 @@
-import { component, slot } from "presolve";
+import { component, slot, Component, type SlotContent } from "presolve";
 
 @component()
 export class SiteLayout extends Component {

@@ -1,4 +1,4 @@
-import { component } from "presolve";
+import { component, Component } from "presolve";
 
 @component()
 export class Examples extends Component {
