@@ -56,9 +56,9 @@ requires a `server` or `shared` Resource endpoint and records
 `input: "route_parameters"`, `failure: "typed"`, and a cache policy. Cache
 policy is `no_store`, `private`, or `public`; only public policy has a positive
 `max_age_seconds`, while the other scopes must not carry a lifetime. The
-compiler validates this package metadata at resolution time but does not yet
-lower it. `@loader()` source is retained with `PSC1132` and fails closed until
-the route-scoped loader plan and artifact exist; it never degrades into an
+compiler validates this package metadata at resolution time and lowers it only
+through the route-scoped loader plan below. A source form that cannot make that
+closed join fails with a stable plan diagnostic; it never degrades into an
 ignored decorator. No server module executes at this boundary.
 
 ### Route-loader plan
@@ -87,13 +87,21 @@ must select a published server-action capability from an imported semantic
 package. Form submission binds its existing compiler-owned Form data record;
 non-form actions use an explicit later input schema. The generated action
 handoff contains an anti-confusion action identity, package coordinate,
-validated request/input codec, response/error policy, invalidation targets,
-and cold-resume policy. It may not receive arbitrary closures or mutate
+validated request/input codec, response/error policy, and cold-resume policy.
+Invalidation targets are not inferred in R6 and require a later explicit
+capability extension. It may not receive arbitrary closures or mutate
 compiler-owned state directly.
 
-The compiler retains this exact source form and emits `PSC1133` until its
-route-scoped server-action handoff plan is available. `@serverAction()` is
-never a runtime decorator or an ignored annotation.
+`build_route_server_action_plan_v1` accepts this form only on a conventional
+route page when it is a zero-argument, synchronous, empty `@action()` method
+with exactly one imported endpoint designator. It joins that declaration to an
+integrity-bound `server_action` package capability. File-route publication
+emits `route-server-actions.plan.json` schema v1 with the route/component/action
+identity, package coordinate, module/export, FormData input, typed
+JSON-or-redirect response, typed failure, and exact cold-fallback resume policy.
+`presolve check` validates the same plan before it discharges the provisional
+source-retention diagnostic. `@serverAction()` is never a runtime decorator or
+an ignored annotation.
 
 ## Responses, cache, and errors
 

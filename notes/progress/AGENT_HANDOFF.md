@@ -3,23 +3,26 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: R6-C2 - route-loader compiler handoff plan
-* Working tree: R6-C2 implementation is ready for commit.
+* Latest completed slice: R6-D - route server-action compiler handoff plan
+* Working tree: R6-D implementation is ready for commit.
 * Date: 2026-07-23
 
 Current Phase R slice
 
-* Slice: R6-C2 - Route-Loader Compiler Handoff Plan
-* Result: a conventional route page's `@loader()` field now resolves only
-  through the compiler binding table and R6-B capability, then publishes an
-  immutable `route-loaders.plan.json`. It carries route/component/field,
-  package integrity/module/export, input, cache, and error facts—never a
-  callback or package implementation. Ergonomic check validates the same plan
-  and discharges the provisional source-retention diagnostic only on success.
-* Verification: focused compiler plan/publication tests and the six-test
-  fresh-project CLI suite pass, including package discovery plus `check`/`build`.
-* Next: resolve retained server-action facts against the closed capability and
-  publish a route-scoped handoff plan; no generic server runtime.
+* Slice: R6-D - Route Server-Action Compiler Handoff Plan
+* Result: a conventional route page's empty synchronous
+  `@action() @serverAction("endpoint")` method now resolves only through the
+  compiler binding table and an integrity-bound `server_action` package
+  capability. File-route publication emits an immutable
+  `route-server-actions.plan.json` with route/component/action identity,
+  package integrity/module/export, FormData input, typed JSON/redirect failure
+  facts, and cold-fallback resume policy—never a callback or package source.
+  Ergonomic check validates the exact plan and discharges `PSC1133` only on
+  success.
+* Verification: focused source-retention, plan, publication, and fresh-project
+  CLI `check`/`build` tests pass, together with formatting and diff checks.
+* Next: close the R6 response/cache/error adapter boundary without introducing
+  a generic server runtime, then proceed to R7 deployment adapters.
 
 * Addendum: the public inert `presolve` authoring package exports typed
   `loader(endpoint)` alongside `resource`, so the accepted compiler vocabulary

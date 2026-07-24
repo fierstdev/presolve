@@ -216,6 +216,61 @@ import { loadPost } from "post-service";
 }
 
 #[test]
+fn default_check_and_build_publish_a_compiler_route_server_action_handoff() {
+    let root = project_root("route-server-action");
+    let package = root.join("node_modules/post-service");
+    fs::create_dir_all(package.join("dist")).unwrap();
+    fs::create_dir_all(root.join("app/routes/posts")).unwrap();
+    fs::write(
+        root.join("app/routes/posts/[slug].tsx"),
+        r#"
+import { savePost } from "post-service";
+@component() class Post {
+  @action() @serverAction("savePost") save(): void {}
+  render() { return <form />; }
+}
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join("presolve.contract.json"),
+        r#"{"schema_version":1,"package":"post-service","version":"1.0.0","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"savePost":{"kind":"server_action","type_signature":"FormData -> ServerActionResult","runtime_module":"dist/save-post.js","resume_policy":"cold_fallback","server_action":{"input":"form_data","response":"json","failure":"typed"}}}}"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join("dist/save-post.js"),
+        "export const savePost = () => {};\n",
+    )
+    .unwrap();
+
+    let check = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("check")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        check.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&check.stderr)
+    );
+    let build = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("build")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let plan = fs::read_to_string(root.join("dist/route-server-actions.plan.json")).unwrap();
+    assert!(plan.contains("post-service"));
+    assert!(plan.contains("form_data"));
+    assert!(plan.contains("cold_fallback"));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn dev_serves_the_compiler_published_page() {
     let root = project_root("server");
     fs::write(

@@ -113,6 +113,7 @@ pub mod resume_restore;
 pub mod resume_schema;
 pub mod route_graph;
 pub mod route_loader;
+pub mod route_server_action;
 pub mod runtime_codegen;
 pub mod runtime_component;
 pub mod runtime_component_artifact;
@@ -207,23 +208,23 @@ pub use component_graph::{
     build_component_graph, build_component_graph_for_module, is_valid_opaque_action_fact,
     ArithmeticEvaluationError, ArithmeticExpression, ArithmeticExpressionKind, ArithmeticOperator,
     AuthoredComponentHeritage, AuthoredContextDeclarationCandidate, AuthoredDeclarationKind,
-    AuthoredOpaqueActionFact, AuthoredRouteLoaderDeclarationFact, AuthoredSlotDeclarationCandidate,
-    AuthoredSubmissionDeclarationFact, AuthoredValidationRuleArgument,
-    AuthoredValidationRuleArgumentKind, AuthoredValidationRuleDeclarationFact,
-    AuthoredValidationRuleExpression, AuthoredValidationRuleExpressionKind, ComparisonOperator,
-    ComponentAction, ComponentDiagnostic, ComponentDiagnosticSeverity, ComponentGraph,
-    ComponentMethod, ComponentNode, ComputedExpression, ComputedExpressionKind,
-    ConstantEvaluationError, ConstantExpression, ConstantExpressionKind, ConsumerDeclaration,
-    ContextDeclaration, ContextDeclarationCandidateKind, ContextDeclarationViolation,
-    ContextDesignator, DeclaredStateType, DeclaredStateTypeKind, DiagnosticSecondaryLabel,
-    EffectBodySyntax, EffectExpression, EffectExpressionKind, EffectStatementSyntax,
-    EffectStatementSyntaxKind, FormDeclarationCandidate, FormDeclarationStatus,
-    FormDeclarationViolation, FormDesignatorFact, FormFieldDeclarationCandidate,
-    FormFieldDeclarationViolation, LogicalOperator, MethodCall, MethodLocalVariable,
-    MethodParameter, RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler,
-    RenderFragment, RenderList, RenderModel, SerializableValue, SlotDeclaration,
-    SlotDeclarationViolation, SlotKind, StateField, StateOperation, UnsupportedEffectStatementKind,
-    UnsupportedFormDesignatorFact,
+    AuthoredOpaqueActionFact, AuthoredRouteLoaderDeclarationFact, AuthoredServerActionFact,
+    AuthoredSlotDeclarationCandidate, AuthoredSubmissionDeclarationFact,
+    AuthoredValidationRuleArgument, AuthoredValidationRuleArgumentKind,
+    AuthoredValidationRuleDeclarationFact, AuthoredValidationRuleExpression,
+    AuthoredValidationRuleExpressionKind, ComparisonOperator, ComponentAction, ComponentDiagnostic,
+    ComponentDiagnosticSeverity, ComponentGraph, ComponentMethod, ComponentNode,
+    ComputedExpression, ComputedExpressionKind, ConstantEvaluationError, ConstantExpression,
+    ConstantExpressionKind, ConsumerDeclaration, ContextDeclaration,
+    ContextDeclarationCandidateKind, ContextDeclarationViolation, ContextDesignator,
+    DeclaredStateType, DeclaredStateTypeKind, DiagnosticSecondaryLabel, EffectBodySyntax,
+    EffectExpression, EffectExpressionKind, EffectStatementSyntax, EffectStatementSyntaxKind,
+    FormDeclarationCandidate, FormDeclarationStatus, FormDeclarationViolation, FormDesignatorFact,
+    FormFieldDeclarationCandidate, FormFieldDeclarationViolation, LogicalOperator, MethodCall,
+    MethodLocalVariable, MethodParameter, RenderAttribute, RenderAttributeValue, RenderChild,
+    RenderEventHandler, RenderFragment, RenderList, RenderModel, SerializableValue,
+    SlotDeclaration, SlotDeclarationViolation, SlotKind, StateField, StateOperation,
+    UnsupportedEffectStatementKind, UnsupportedFormDesignatorFact,
 };
 pub use component_initialization::{
     plan_component_initialization, ComponentInitializationPlan, ComponentInstanceBatch,
@@ -676,6 +677,11 @@ pub use route_loader::{
     build_route_loader_plan_v1, route_loader_plan_json_v1, RouteLoaderBindingV1,
     RouteLoaderPlanErrorV1, RouteLoaderPlanV1, RouteLoaderRouteV1,
     ROUTE_LOADER_PLAN_SCHEMA_VERSION,
+};
+pub use route_server_action::{
+    build_route_server_action_plan_v1, route_server_action_plan_json_v1,
+    RouteServerActionBindingV1, RouteServerActionPlanErrorV1, RouteServerActionPlanV1,
+    RouteServerActionRouteV1, ROUTE_SERVER_ACTION_PLAN_SCHEMA_VERSION,
 };
 pub use runtime_codegen::generate_runtime_stub;
 pub use runtime_component::{

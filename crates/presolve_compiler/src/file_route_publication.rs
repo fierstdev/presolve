@@ -11,7 +11,8 @@ use crate::{
     build_application_semantic_model_for_unit_with_packages, build_binding_table_with_packages,
     build_file_route_application_semantic_model_for_route_with_packages,
     build_layout_composition_plan_v1, build_module_graph, build_route_loader_plan_v1,
-    build_symbol_table, build_validated_file_route_graph_v1, route_loader_plan_json_v1,
+    build_route_server_action_plan_v1, build_symbol_table, build_validated_file_route_graph_v1,
+    route_loader_plan_json_v1, route_server_action_plan_json_v1,
     validate_application_publication_request_v1, ApplicationPublicationArtifactV1,
     ApplicationPublicationErrorV1, ApplicationPublicationProfileV1,
     ApplicationPublicationRequestErrorV1, ApplicationPublicationRequestV1,
@@ -127,6 +128,13 @@ pub fn build_file_route_publication_v1(
             code: error.code,
             message: error.message,
         })?;
+    let route_server_action_plan =
+        build_route_server_action_plan_v1(&model.components, &graph, &bindings).map_err(
+            |error| FileRoutePublicationErrorV1 {
+                code: error.code,
+                message: error.message,
+            },
+        )?;
     if graph.routes.is_empty() {
         return Err(FileRoutePublicationErrorV1 {
             code: "PSROUTE2002_FILE_ROUTE_SET_EMPTY",
@@ -199,6 +207,10 @@ pub fn build_file_route_publication_v1(
     artifacts.insert(
         PathBuf::from("route-loaders.plan.json"),
         route_loader_plan_json_v1(&route_loader_plan).into_bytes(),
+    );
+    artifacts.insert(
+        PathBuf::from("route-server-actions.plan.json"),
+        route_server_action_plan_json_v1(&route_server_action_plan).into_bytes(),
     );
     let manifest = FileRoutePublicationManifestV1 {
         schema_version: FILE_ROUTE_PUBLICATION_MANIFEST_SCHEMA_VERSION,
@@ -483,6 +495,45 @@ import { loadPost } from "post-service";
         assert!(plan.contains("route_parameters"));
         assert!(plan.contains("max_age_seconds"));
         assert!(!plan.contains("function loadPost"));
+    }
+
+    #[test]
+    fn publishes_an_exact_route_server_action_handoff_without_server_execution() {
+        let contract = crate::parse_semantic_package_contract(
+            r#"{"schema_version":1,"package":"post-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"savePost":{"kind":"server_action","type_signature":"FormData -> ServerActionResult","runtime_module":"dist/save-post.js","resume_policy":"cold_fallback","server_action":{"input":"form_data","response":"redirect","failure":"typed"}}}}"#,
+        )
+        .unwrap();
+        let mut contracts = SemanticPackageResolutionTable::default();
+        contracts.insert("post-service".into(), contract).unwrap();
+        let product = build_file_route_publication_v1(FileRoutePublicationRequestV1 {
+            configuration: crate::platform::WorkspaceConfiguration::default(),
+            sources: vec![ApplicationPublicationSourceV1 {
+                logical_path: "app/routes/posts/[slug].tsx".into(),
+                source: r#"
+import { savePost } from "post-service";
+@component() class Post {
+  @action() @serverAction("savePost") save(): void {}
+  render() { return <form />; }
+}
+"#
+                .into(),
+            }],
+            package_contracts: contracts,
+            package_runtime_modules: SemanticPackageRuntimeModuleTable::default(),
+            profile: ApplicationPublicationProfileV1::Development,
+            output_root: "dist".into(),
+        })
+        .expect("route server-action handoff publication");
+
+        let plan = String::from_utf8(
+            product.artifacts[&PathBuf::from("route-server-actions.plan.json")].clone(),
+        )
+        .unwrap();
+        assert!(plan.contains("post-service"));
+        assert!(plan.contains("form_data"));
+        assert!(plan.contains("redirect"));
+        assert!(plan.contains("cold_fallback"));
+        assert!(!plan.contains("function savePost"));
     }
 
     #[test]

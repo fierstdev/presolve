@@ -22,7 +22,8 @@ use presolve_compiler::{
     build_file_route_publication_v1, build_form_inspection_registry, build_module_graph,
     build_production_reachability_graph, build_production_reports,
     build_production_runtime_artifact, build_resume_chunk_graph, build_resume_manifest,
-    build_route_loader_plan_v1, build_runtime_component_artifact, build_runtime_computed_artifact,
+    build_route_loader_plan_v1, build_route_server_action_plan_v1,
+    build_runtime_component_artifact, build_runtime_computed_artifact,
     build_runtime_context_artifact, build_runtime_effect_artifact, build_runtime_forms_artifact,
     build_runtime_opaque_artifact_with_modules, build_runtime_resource_artifact_with_modules,
     build_semantic_graph, build_static_request_handoff_v1, build_symbol_table,
@@ -326,11 +327,15 @@ fn run_ergonomic_check(root: &Path) {
     let bindings = build_binding_table_with_packages(&unit, &symbols, &modules, &package_contracts);
     build_route_loader_plan_v1(&asm.components, &graph, &bindings)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    build_route_server_action_plan_v1(&asm.components, &graph, &bindings)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
     let diagnostics = asm
         .diagnostics
         .iter()
         .filter(|diagnostic| {
-            (diagnostic.code.starts_with("PSC") && diagnostic.code != "PSC1132")
+            (diagnostic.code.starts_with("PSC")
+                && diagnostic.code != "PSC1132"
+                && diagnostic.code != "PSC1133")
                 || diagnostic.code.starts_with("PSBIND")
         })
         .collect::<Vec<_>>();

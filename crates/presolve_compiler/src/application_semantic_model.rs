@@ -6432,4 +6432,31 @@ class Post {
             .iter()
             .any(|diagnostic| diagnostic.code == "PSC1132"));
     }
+
+    #[test]
+    fn retains_server_action_source_facts_before_route_capability_resolution() {
+        let asm = build_application_semantic_model(&presolve_parser::parse_file(
+            "app/routes/posts/[slug].tsx",
+            r#"
+@component()
+class Post {
+  @action() @serverAction("savePost") save(): void {}
+  render() { return <form />; }
+}
+"#,
+        ));
+
+        let action = &asm.components[0].server_action_facts[0];
+        assert_eq!(action.method_name, "save");
+        assert!(action.invoked);
+        assert_eq!(action.argument_count, 1);
+        assert_eq!(action.endpoint_designator.as_deref(), Some("savePost"));
+        assert!(action.is_action);
+        assert!(action.action_invoked);
+        assert!(!action.has_body_effects);
+        assert!(asm
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "PSC1133"));
+    }
 }
