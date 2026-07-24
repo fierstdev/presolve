@@ -9,10 +9,14 @@ jobs:
   dry-run:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.5.0
+          cache: pnpm
       - run: cargo install wasm-bindgen-cli --version 0.2.108 --locked
       - run: ./scripts/release-dry-run.sh

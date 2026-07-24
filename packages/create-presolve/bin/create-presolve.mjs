@@ -42,6 +42,7 @@ function template(name) {
       name,
       private: true,
       type: "module",
+      packageManager: "pnpm@11.17.0",
       scripts: {
         dev: "presolve dev",
         build: "presolve build",

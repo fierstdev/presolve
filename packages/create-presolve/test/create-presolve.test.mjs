@@ -14,7 +14,9 @@ const result = spawnSync(process.execPath, ["bin/create-presolve.mjs", target], 
 assert.equal(result.status, 0, result.stderr);
 assert.ok(existsSync(join(target, "app/routes/index.tsx")));
 assert.ok(existsSync(join(target, "app/routes/docs/getting-started.tsx")));
-assert.match(readFileSync(join(target, "package.json"), "utf8"), /deploy:prepare/);
+const manifest = JSON.parse(readFileSync(join(target, "package.json"), "utf8"));
+assert.equal(manifest.packageManager, "pnpm@11.17.0");
+assert.ok(manifest.scripts["deploy:prepare"]);
 const second = spawnSync(process.execPath, ["bin/create-presolve.mjs", target], {
   cwd: new URL("..", import.meta.url),
   encoding: "utf8",
