@@ -15,3 +15,4 @@ export function form() { return emptyField; }
 export function field() { return emptyField; }
 export function validate() { return emptyField; }
 export function resource() { return emptyField; }
+export function loader() { return emptyField; }

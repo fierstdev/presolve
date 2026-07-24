@@ -11,5 +11,7 @@ export declare function form(): PropertyDecorator;
 export declare function field(form: string, path?: string): PropertyDecorator;
 export declare function validate(rule: unknown): PropertyDecorator;
 export declare function resource(endpoint: string): PropertyDecorator;
+/** Compiler-owned route data declaration; execution is a server handoff plan. */
+export declare function loader(endpoint: string): PropertyDecorator;
 
 export declare abstract class Component {}

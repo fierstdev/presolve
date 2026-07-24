@@ -21,6 +21,10 @@ Current Phase R slice
 * Next: define server-action package/source/plan products and the shared typed
   response/error handoff; no generic server runtime.
 
+* Addendum: the public inert `presolve` authoring package exports typed
+  `loader(endpoint)` alongside `resource`, so the accepted compiler vocabulary
+  is available without an ambient declaration or a framework data runtime.
+
 * Slice: R6-C1 - Route-Loader Source Retention
 * Result: `@loader("endpoint") field!: Resource<Data, Error>` now has a
   source-faithful compiler fact with exact decorator/type provenance. It fails

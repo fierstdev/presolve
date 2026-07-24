@@ -32,6 +32,10 @@ module callback:
 post!: Resource<Post, NotFound>;
 ```
 
+The public `presolve` package exports the corresponding inert `loader()`
+decorator declaration. Running it does not activate data fetching or a server
+runtime; only successful compiler planning supplies its meaning.
+
 The designator must resolve to an imported semantic-package `resource` export
 whose endpoint is `server` or `shared` and whose published contract explicitly
 admits the canonical route-request input record. The compiler owns the loader
