@@ -18,8 +18,8 @@ Current Phase R slice
   and discharges the provisional source-retention diagnostic only on success.
 * Verification: focused compiler plan/publication tests and the six-test
   fresh-project CLI suite pass, including package discovery plus `check`/`build`.
-* Next: define server-action package/source/plan products and the shared typed
-  response/error handoff; no generic server runtime.
+* Next: resolve retained server-action facts against the closed capability and
+  publish a route-scoped handoff plan; no generic server runtime.
 
 * Addendum: the public inert `presolve` authoring package exports typed
   `loader(endpoint)` alongside `resource`, so the accepted compiler vocabulary

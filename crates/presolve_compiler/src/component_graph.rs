@@ -82,6 +82,7 @@ pub struct ComponentNode {
     /// Retained N9 opaque terminal Action facts. They have no runtime lowering
     /// authority until integrity-bound artifact publication is complete.
     pub opaque_action_facts: Vec<AuthoredOpaqueActionFact>,
+    pub server_action_facts: Vec<AuthoredServerActionFact>,
     /// Module imports that shadow compiler-owned validation intrinsic names.
     pub shadowed_validation_intrinsics: BTreeSet<String>,
     pub methods: Vec<ComponentMethod>,
@@ -103,6 +104,23 @@ pub struct AuthoredOpaqueActionFact {
     pub method_name: String,
     pub package: Option<String>,
     pub export: Option<String>,
+    pub invoked: bool,
+    pub argument_count: usize,
+    pub is_action: bool,
+    pub action_invoked: bool,
+    pub is_async: bool,
+    pub parameter_count: usize,
+    pub has_body_effects: bool,
+    pub provenance: SourceProvenance,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthoredServerActionFact {
+    pub id: SemanticId,
+    pub owner_component: Option<SemanticId>,
+    pub method: Option<SemanticId>,
+    pub method_name: String,
+    pub endpoint_designator: Option<String>,
     pub invoked: bool,
     pub argument_count: usize,
     pub is_action: bool,
@@ -1552,6 +1570,9 @@ fn build_component_node(
     let opaque_action_facts =
         opaque_action_facts_from_class(class, path, element_name.is_some(), &id);
     collect_opaque_action_diagnostics(&opaque_action_facts, diagnostics);
+    let server_action_facts =
+        server_action_facts_from_class(class, path, element_name.is_some(), &id);
+    collect_server_action_diagnostics(&server_action_facts, diagnostics);
     collect_route_loader_diagnostics(&route_loader_declaration_candidates, diagnostics);
 
     ComponentNode {
@@ -1583,6 +1604,7 @@ fn build_component_node(
         submission_declaration_facts,
         serialization_declaration_facts,
         opaque_action_facts,
+        server_action_facts,
         shadowed_validation_intrinsics,
         methods,
         actions,
@@ -1619,6 +1641,21 @@ fn collect_opaque_action_diagnostics(
                 ),
             ));
         }
+    }
+}
+
+fn collect_server_action_diagnostics(
+    facts: &[AuthoredServerActionFact],
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+) {
+    for fact in facts {
+        diagnostics.push(ComponentDiagnostic::error(
+            "PSC1133",
+            format!(
+                "server Action `{}` requires a compiler server-action plan",
+                fact.method_name
+            ),
+        ));
     }
 }
 
@@ -1661,6 +1698,49 @@ fn opaque_action_facts_from_class(
                     method_name: method.name.clone(),
                     package: decorator.arguments.first().and_then(Clone::clone),
                     export: decorator.arguments.get(1).and_then(Clone::clone),
+                    invoked: decorator.is_invoked,
+                    argument_count: decorator.argument_count,
+                    is_action: action.is_some(),
+                    action_invoked: action.is_some_and(|decorator| decorator.is_invoked),
+                    is_async: method.is_async,
+                    parameter_count: method.parameters.len(),
+                    has_body_effects: !method.state_updates.is_empty()
+                        || !method.local_variables.is_empty()
+                        || !method.return_values.is_empty()
+                        || !method.calls.is_empty()
+                        || method.effect_body.is_some(),
+                    provenance: SourceProvenance::new(path, decorator.span),
+                })
+        })
+        .collect::<Vec<_>>();
+    facts.sort_by(|left, right| left.id.cmp(&right.id));
+    facts
+}
+
+fn server_action_facts_from_class(
+    class: &ParsedClass,
+    path: &Path,
+    is_canonical_component: bool,
+    component: &SemanticId,
+) -> Vec<AuthoredServerActionFact> {
+    let mut facts = class
+        .methods
+        .iter()
+        .flat_map(|method| {
+            let action = method
+                .decorators
+                .iter()
+                .find(|decorator| decorator.name == "action");
+            method
+                .decorators
+                .iter()
+                .filter(move |decorator| decorator.name == "serverAction")
+                .map(move |decorator| AuthoredServerActionFact {
+                    id: component.server_action(&method.name),
+                    owner_component: is_canonical_component.then(|| component.clone()),
+                    method: is_canonical_component.then(|| component.method(&method.name)),
+                    method_name: method.name.clone(),
+                    endpoint_designator: decorator.argument.clone(),
                     invoked: decorator.is_invoked,
                     argument_count: decorator.argument_count,
                     is_action: action.is_some(),

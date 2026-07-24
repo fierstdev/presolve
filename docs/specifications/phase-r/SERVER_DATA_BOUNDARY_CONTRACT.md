@@ -91,6 +91,10 @@ validated request/input codec, response/error policy, invalidation targets,
 and cold-resume policy. It may not receive arbitrary closures or mutate
 compiler-owned state directly.
 
+The compiler retains this exact source form and emits `PSC1133` until its
+route-scoped server-action handoff plan is available. `@serverAction()` is
+never a runtime decorator or an ignored annotation.
+
 ## Responses, cache, and errors
 
 Each route data/action product declares exactly one response class:
