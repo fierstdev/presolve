@@ -271,6 +271,60 @@ import { savePost } from "post-service";
 }
 
 #[test]
+fn deploy_prepare_projects_compiler_artifacts_to_cloudflare_workers_static_assets() {
+    let root = project_root("cloudflare");
+    fs::write(
+        root.join("app/routes/index.tsx"),
+        r#"@component() class Home extends Component { render() { return <main>Presolve</main>; } }"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("app/routes/about.tsx"),
+        r#"@component() class About extends Component { render() { return <main>About</main>; } }"#,
+    )
+    .unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args([
+            "deploy",
+            "cloudflare",
+            "--prepare",
+            "--name",
+            "presolve-docs",
+            "--secret",
+            "DOCS_TOKEN",
+        ])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let adapter = root.join(".presolve/cloudflare");
+    let plan = fs::read_to_string(adapter.join("deployment.plan.json")).unwrap();
+    let worker = fs::read_to_string(adapter.join("worker.mjs")).unwrap();
+    let config = fs::read_to_string(adapter.join("wrangler.jsonc")).unwrap();
+    assert!(plan.contains("cloudflare_workers_static_assets"));
+    assert!(plan.contains("routes/segment-about/index.html"));
+    assert!(worker.contains("routeFor"));
+    assert!(config.contains("run_worker_first"));
+    assert!(config.contains("DOCS_TOKEN"));
+    let syntax = Command::new("node")
+        .arg("--check")
+        .arg(adapter.join("worker.mjs"))
+        .output()
+        .unwrap();
+    assert!(
+        syntax.status.success(),
+        "worker syntax stderr: {}",
+        String::from_utf8_lossy(&syntax.stderr)
+    );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn dev_serves_the_compiler_published_page() {
     let root = project_root("server");
     fs::write(

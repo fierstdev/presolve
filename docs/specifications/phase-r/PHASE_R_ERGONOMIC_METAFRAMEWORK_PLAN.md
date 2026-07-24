@@ -58,6 +58,9 @@ cache, and error-boundary products. No generic arbitrary server runtime.
 
 Add one provider adapter over the frozen release handoff, including public
 configuration, secret bindings, rollback, integrity, and audit products.
+Cloudflare Workers Static Assets is the first adapter. It serves only the
+compiler artifact/route handoff and rejects non-empty server-capability plans
+until a dedicated capability executor is published.
 
 ## R8 — scaffold and DX
 

@@ -9,3 +9,4 @@ ordinary application authors while preserving compiler ownership of semantics.
 * [Layout composition contract](LAYOUT_COMPOSITION_CONTRACT.md)
 * [Layout model integration contract](LAYOUT_MODEL_INTEGRATION_CONTRACT.md)
 * [Server and data boundary contract](SERVER_DATA_BOUNDARY_CONTRACT.md)
+* [Cloudflare Workers deployment contract](CLOUDFLARE_DEPLOYMENT_CONTRACT.md)

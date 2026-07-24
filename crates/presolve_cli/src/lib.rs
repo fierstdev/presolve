@@ -2,6 +2,7 @@
 
 pub mod build_check_commands;
 pub mod cache_commands;
+pub mod cloudflare_deployment;
 pub mod command_framework;
 pub mod compilation_commands;
 pub mod configuration_codec;

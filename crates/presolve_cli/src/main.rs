@@ -5,9 +5,15 @@ use std::fs;
 use std::io::{self, Read as _, Write as _};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::process;
+use std::process::{self, Command};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use presolve_cli::cloudflare_deployment::{
+    build_cloudflare_workers_static_deployment_plan_v1, cloudflare_workers_static_plan_json_v1,
+    cloudflare_workers_static_worker_module_v1, cloudflare_workers_wrangler_jsonc_v1,
+    validate_cloudflare_workers_artifacts_v1, CloudflareWorkersDeploymentOptionsV1,
+    CLOUDFLARE_WORKERS_COMPATIBILITY_DATE_V1,
+};
 use presolve_cli::{
     load_explicit_project_envelope_v1, load_explicit_source_inputs_v1,
     parse_explicit_source_spec_v1, run_explicit_build_or_check_v1, run_explicit_watch_once_v1,
@@ -118,6 +124,7 @@ fn main() {
             }
         }
         "dev" => run_ergonomic_dev(&args),
+        "deploy" => run_ergonomic_deploy(&args),
         "application" => run_application_command(args),
         "route" => run_route_command(args),
         "cache" => run_l9_cache(&args),
@@ -204,6 +211,204 @@ fn run_ergonomic_dev(args: &[String]) {
         return;
     }
     serve_ergonomic_development_output(&Path::new(".").join("dist"), port, manifest);
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CloudflareDeployArgumentsV1 {
+    prepare_only: bool,
+    dry_run: bool,
+    worker_name: Option<String>,
+    compatibility_date: String,
+    required_secrets: Vec<String>,
+}
+
+fn run_ergonomic_deploy(args: &[String]) {
+    let arguments = parse_cloudflare_deploy_arguments(args).unwrap_or_else(|message| {
+        application_cli_error("PSCFL1011_DEPLOY_ARGUMENT_INVALID", &message)
+    });
+    let root = Path::new(".");
+    let manifest = run_ergonomic_build(root, ApplicationPublicationProfileV1::Production);
+    let project = discover_project_v1(root)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    let worker_name = arguments.worker_name.unwrap_or_else(|| {
+        cloudflare_worker_name_from_project_root(&project.root).unwrap_or_else(|message| {
+            application_cli_error("PSCFL1012_DEFAULT_WORKER_NAME_INVALID", &message)
+        })
+    });
+    let plan = build_cloudflare_workers_static_deployment_plan_v1(
+        &manifest,
+        &CloudflareWorkersDeploymentOptionsV1 {
+            worker_name,
+            compatibility_date: arguments.compatibility_date,
+            required_secrets: arguments.required_secrets,
+        },
+    )
+    .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    let output_root = project.root.join("dist");
+    validate_cloudflare_workers_artifacts_v1(&output_root, &plan)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    reject_unimplemented_cloudflare_server_handoffs(&output_root);
+    let adapter_root = project.root.join(".presolve/cloudflare");
+    fs::create_dir_all(&adapter_root).unwrap_or_else(|error| {
+        application_cli_error("PSCFL1013_ADAPTER_OUTPUT_UNAVAILABLE", &error.to_string())
+    });
+    write_cloudflare_adapter_file(
+        &adapter_root.join("deployment.plan.json"),
+        cloudflare_workers_static_plan_json_v1(&plan).as_bytes(),
+    );
+    write_cloudflare_adapter_file(
+        &adapter_root.join("worker.mjs"),
+        cloudflare_workers_static_worker_module_v1(&plan).as_bytes(),
+    );
+    write_cloudflare_adapter_file(
+        &adapter_root.join("wrangler.jsonc"),
+        cloudflare_workers_wrangler_jsonc_v1(&plan, "../../dist").as_bytes(),
+    );
+    let config = adapter_root.join("wrangler.jsonc");
+    if arguments.prepare_only {
+        println!(
+            "Prepared Cloudflare Workers deployment {} ({})",
+            config.display(),
+            plan.release_id
+        );
+        return;
+    }
+    let mut command = Command::new("npx");
+    command
+        .args(["--no-install", "wrangler", "deploy", "--config"])
+        .arg(&config)
+        .current_dir(&project.root);
+    if arguments.dry_run {
+        command.arg("--dry-run");
+    }
+    let status = command.status().unwrap_or_else(|error| {
+        application_cli_error(
+            "PSCFL1014_WRANGLER_UNAVAILABLE",
+            &format!(
+                "{error}; install Wrangler in this project with `npm install -D wrangler@latest`"
+            ),
+        )
+    });
+    if !status.success() {
+        process::exit(status.code().unwrap_or(1));
+    }
+    println!("Cloudflare release {} deployed", plan.release_id);
+}
+
+fn parse_cloudflare_deploy_arguments(
+    args: &[String],
+) -> Result<CloudflareDeployArgumentsV1, String> {
+    let mut index = 0;
+    if args.first().is_some_and(|value| !value.starts_with('-')) {
+        if args[0] != "cloudflare" {
+            return Err("only the `cloudflare` deployment target is currently available".into());
+        }
+        index += 1;
+    }
+    let mut result = CloudflareDeployArgumentsV1 {
+        prepare_only: false,
+        dry_run: false,
+        worker_name: None,
+        compatibility_date: CLOUDFLARE_WORKERS_COMPATIBILITY_DATE_V1.into(),
+        required_secrets: Vec::new(),
+    };
+    while index < args.len() {
+        match args[index].as_str() {
+            "--prepare" => result.prepare_only = true,
+            "--dry-run" => result.dry_run = true,
+            "--name" => {
+                let Some(value) = args.get(index + 1) else {
+                    return Err("--name requires a value".into());
+                };
+                result.worker_name = Some(value.clone());
+                index += 1;
+            }
+            "--compatibility-date" => {
+                let Some(value) = args.get(index + 1) else {
+                    return Err("--compatibility-date requires YYYY-MM-DD".into());
+                };
+                result.compatibility_date = value.clone();
+                index += 1;
+            }
+            "--secret" => {
+                let Some(value) = args.get(index + 1) else {
+                    return Err("--secret requires a binding name".into());
+                };
+                result.required_secrets.push(value.clone());
+                index += 1;
+            }
+            option => return Err(format!("unknown deploy option `{option}`")),
+        }
+        index += 1;
+    }
+    if result.prepare_only && result.dry_run {
+        return Err("--prepare and --dry-run cannot be used together".into());
+    }
+    Ok(result)
+}
+
+fn cloudflare_worker_name_from_project_root(root: &Path) -> Result<String, String> {
+    let name = root
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "project root has no Unicode directory name".to_string())?
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() {
+                character.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>();
+    let name = name.trim_matches('-');
+    if name.is_empty() {
+        Err("project root cannot derive a Cloudflare Worker name; use --name".into())
+    } else {
+        Ok(name.into())
+    }
+}
+
+fn reject_unimplemented_cloudflare_server_handoffs(output_root: &Path) {
+    for (file, member) in [
+        ("route-loaders.plan.json", "loaders"),
+        ("route-server-actions.plan.json", "actions"),
+    ] {
+        let source = fs::read_to_string(output_root.join(file)).unwrap_or_else(|error| {
+            application_cli_error("PSCFL1015_SERVER_HANDOFF_READ_FAILED", &error.to_string())
+        });
+        let value = serde_json::from_str::<serde_json::Value>(&source).unwrap_or_else(|error| {
+            application_cli_error("PSCFL1016_SERVER_HANDOFF_INVALID", &error.to_string())
+        });
+        let has_server_work = value
+            .get("routes")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|routes| {
+                routes.iter().any(|route| {
+                    route
+                        .get(member)
+                        .and_then(serde_json::Value::as_array)
+                        .is_some_and(|entries| !entries.is_empty())
+                })
+            });
+        if has_server_work {
+            application_cli_error(
+                "PSCFL1017_SERVER_HANDOFF_EXECUTOR_UNAVAILABLE",
+                &format!(
+                    "Cloudflare static deployment cannot execute {member}; the compiler handoff remains intact until a capability-specific server executor is published"
+                ),
+            );
+        }
+    }
+}
+
+fn write_cloudflare_adapter_file(path: &Path, contents: &[u8]) {
+    fs::write(path, contents).unwrap_or_else(|error| {
+        application_cli_error(
+            "PSCFL1018_ADAPTER_OUTPUT_WRITE_FAILED",
+            &format!("{}: {error}", path.display()),
+        )
+    });
 }
 
 fn serve_ergonomic_development_output(
