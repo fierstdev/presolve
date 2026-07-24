@@ -46,7 +46,8 @@ jobs:
     name: Publish crates.io packages
     needs: verify
     runs-on: ubuntu-latest
-    environment: crates-io
+    environment:
+      name: crates-io
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -113,7 +114,8 @@ jobs:
     name: Publish npm packages
     needs: [native-cli, publish-crates]
     runs-on: ubuntu-latest
-    environment: npm
+    environment:
+      name: npm
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -162,7 +164,8 @@ jobs:
     name: Publish VS Code extension
     needs: publish-npm
     runs-on: ubuntu-latest
-    environment: vscode-marketplace
+    environment:
+      name: vscode-marketplace
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
