@@ -65,6 +65,9 @@ pub struct ComponentNode {
     /// Source-faithful Resource declarations retained before endpoint resolution
     /// and activation lowering.
     pub resource_declaration_candidates: Vec<AuthoredResourceDeclarationFact>,
+    /// Source-faithful conventional route-loader declarations retained before
+    /// package capability resolution and server handoff planning.
+    pub route_loader_declaration_candidates: Vec<AuthoredRouteLoaderDeclarationFact>,
     /// Normalized I3 candidates. Canonical Form resolution, type assignment,
     /// duplicate grouping, and `FieldId` construction occur during ASM
     /// assembly over existing immutable authorities.
@@ -167,6 +170,19 @@ pub struct AuthoredSerializationDeclarationFact {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthoredResourceDeclarationFact {
+    pub owner_component: SemanticId,
+    pub field: String,
+    pub decorator_invoked: bool,
+    pub decorator_argument_count: usize,
+    pub endpoint_designator: Option<String>,
+    pub declared_type: Option<DeclaredStateType>,
+    pub provenance: SourceProvenance,
+}
+
+/// Source-faithful `@loader()` field retained before it is associated with a
+/// compiler-selected file route and an integrity-bound package capability.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthoredRouteLoaderDeclarationFact {
     pub owner_component: SemanticId,
     pub field: String,
     pub decorator_invoked: bool,
@@ -1475,6 +1491,8 @@ fn build_component_node(
     );
     let resource_declaration_candidates =
         resource_declaration_candidates_from_class(class, path, &id);
+    let route_loader_declaration_candidates =
+        route_loader_declaration_candidates_from_class(class, path, &id);
     let form_field_declaration_candidates =
         form_field_declaration_candidates_from_class(class, path, element_name.is_some(), &id);
     let validation_rule_declaration_facts =
@@ -1534,6 +1552,7 @@ fn build_component_node(
     let opaque_action_facts =
         opaque_action_facts_from_class(class, path, element_name.is_some(), &id);
     collect_opaque_action_diagnostics(&opaque_action_facts, diagnostics);
+    collect_route_loader_diagnostics(&route_loader_declaration_candidates, diagnostics);
 
     ComponentNode {
         id,
@@ -1558,6 +1577,7 @@ fn build_component_node(
         slot_declaration_candidates,
         form_declaration_candidates,
         resource_declaration_candidates,
+        route_loader_declaration_candidates,
         form_field_declaration_candidates,
         validation_rule_declaration_facts,
         submission_declaration_facts,
@@ -1567,6 +1587,21 @@ fn build_component_node(
         methods,
         actions,
         render,
+    }
+}
+
+fn collect_route_loader_diagnostics(
+    facts: &[AuthoredRouteLoaderDeclarationFact],
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+) {
+    for fact in facts {
+        diagnostics.push(ComponentDiagnostic::error(
+            "PSC1132",
+            format!(
+                "route loader field `{}` requires a compiler route-loader plan",
+                fact.field
+            ),
+        ));
     }
 }
 
@@ -3271,6 +3306,38 @@ fn resource_declaration_candidates_from_class(
                 .iter()
                 .find(|decorator| decorator.name == "resource")?;
             Some(AuthoredResourceDeclarationFact {
+                owner_component: component_id.clone(),
+                field: property.name.clone(),
+                decorator_invoked: decorator.is_invoked,
+                decorator_argument_count: decorator.argument_count,
+                endpoint_designator: decorator.argument.clone(),
+                declared_type: property.type_annotation.as_ref().map(|annotation| {
+                    DeclaredStateType {
+                        text: annotation.text.clone(),
+                        provenance: SourceProvenance::new(path, annotation.span),
+                        kind: declared_state_type_kind(&annotation.text),
+                    }
+                }),
+                provenance: SourceProvenance::new(path, property.span),
+            })
+        })
+        .collect()
+}
+
+fn route_loader_declaration_candidates_from_class(
+    class: &ParsedClass,
+    path: &Path,
+    component_id: &SemanticId,
+) -> Vec<AuthoredRouteLoaderDeclarationFact> {
+    class
+        .properties
+        .iter()
+        .filter_map(|property| {
+            let decorator = property
+                .decorators
+                .iter()
+                .find(|decorator| decorator.name == "loader")?;
+            Some(AuthoredRouteLoaderDeclarationFact {
                 owner_component: component_id.clone(),
                 field: property.name.clone(),
                 decorator_invoked: decorator.is_invoked,

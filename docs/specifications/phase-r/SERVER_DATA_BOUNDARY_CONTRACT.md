@@ -53,7 +53,9 @@ requires a `server` or `shared` Resource endpoint and records
 policy is `no_store`, `private`, or `public`; only public policy has a positive
 `max_age_seconds`, while the other scopes must not carry a lifetime. The
 compiler validates this package metadata at resolution time but does not yet
-admit `@loader()` source or execute a server module.
+lower it. `@loader()` source is retained with `PSC1132` and fails closed until
+the route-scoped loader plan and artifact exist; it never degrades into an
+ignored decorator. No server module executes at this boundary.
 
 ## Server actions
 

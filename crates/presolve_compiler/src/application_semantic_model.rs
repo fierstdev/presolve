@@ -6401,4 +6401,35 @@ class Home extends Component {
         assert!(html.contains("<article"));
         assert!(html.contains("Home"));
     }
+
+    #[test]
+    fn retains_route_loader_source_facts_before_server_capability_resolution() {
+        let asm = build_application_semantic_model(&presolve_parser::parse_file(
+            "app/routes/posts/[slug].tsx",
+            r#"
+@component()
+class Post {
+  @loader("loadPost") post!: Resource<Post, NotFound>;
+  render() { return <article />; }
+}
+"#,
+        ));
+
+        let loader = &asm.components[0].route_loader_declaration_candidates[0];
+        assert_eq!(loader.field, "post");
+        assert!(loader.decorator_invoked);
+        assert_eq!(loader.decorator_argument_count, 1);
+        assert_eq!(loader.endpoint_designator.as_deref(), Some("loadPost"));
+        assert_eq!(
+            loader
+                .declared_type
+                .as_ref()
+                .map(|type_| type_.text.as_str()),
+            Some("Resource<Post, NotFound>")
+        );
+        assert!(asm
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "PSC1132"));
+    }
 }

@@ -3,11 +3,21 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: R6-B - route-loader package capability contract
-* Working tree: R6-B implementation is ready for commit.
+* Latest completed slice: R6-C1 - route-loader source retention
+* Working tree: R6-C1 implementation is ready for commit.
 * Date: 2026-07-23
 
 Current Phase R slice
+
+* Slice: R6-C1 - Route-Loader Source Retention
+* Result: `@loader("endpoint") field!: Resource<Data, Error>` now has a
+  source-faithful compiler fact with exact decorator/type provenance. It fails
+  closed as `PSC1132` until the route-scoped package-resolution and artifact
+  plan exists, preventing an ignored decorator from becoming accidental API.
+* Verification: focused application-model testing proves fact retention and
+  the fail-closed diagnostic; compiler checks and formatting pass.
+* Next: resolve retained loader facts against R6-B package capabilities and
+  selected route topology, then replace `PSC1132` with exact diagnostics.
 
 * Slice: R6-B - Route-Loader Package Capability Contract
 * Result: semantic-package `resource` exports may now opt into a closed
