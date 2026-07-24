@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -16,21 +16,25 @@ try {
   const tarballs = {
     framework: pack("framework/packages/presolve"),
     cli: pack("packages/cli"),
-    platform: pack(`packages/${platformPackage()}`),
+    platform: packNative(`packages/${platformPackage()}`),
     create: pack("packages/create-presolve"),
   };
 
   run("pnpm", ["dlx", "--package", tarballs.create, "create-presolve", app]);
-  const manifestPath = join(app, "package.json");
-  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-  manifest.pnpm = {
-    overrides: {
-      presolve: `file:${tarballs.framework}`,
-      "@presolve/cli": `file:${tarballs.cli}`,
-      [`@presolve/${platformPackage()}`]: `file:${tarballs.platform}`,
-    },
+  const overrides = {
+    presolve: `file:${tarballs.framework}`,
+    "@presolve/cli": `file:${tarballs.cli}`,
+    [`@presolve/${platformPackage()}`]: `file:${tarballs.platform}`,
   };
-  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  const workspaceConfiguration = [
+    "overrides:",
+    ...Object.entries(overrides).map(
+      ([packageName, specifier]) =>
+        `  ${JSON.stringify(packageName)}: ${JSON.stringify(specifier)}`,
+    ),
+    "",
+  ].join("\n");
+  writeFileSync(join(app, "pnpm-workspace.yaml"), workspaceConfiguration);
 
   run("pnpm", ["install", "--ignore-scripts"], app);
   run("pnpm", ["check"], app);
@@ -46,6 +50,16 @@ function pack(directory) {
   const result = run("pnpm", ["--dir", directory, "pack", "--json", "--pack-destination", packages]);
   const output = JSON.parse(result.stdout);
   return output.tarball ?? output.filename;
+}
+
+function packNative(directory) {
+  const result = run(
+    "npm",
+    ["pack", "--json", "--pack-destination", packages],
+    resolve(root, directory),
+  );
+  const [output] = JSON.parse(result.stdout);
+  return join(packages, output.filename);
 }
 
 function platformPackage() {

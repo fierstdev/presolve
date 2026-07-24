@@ -45,18 +45,11 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Install Chrome
-        uses: browser-actions/setup-chrome@v2
-        id: setup-chrome
-        with:
-          chrome-version: stable
-
       - name: Format
         run: cargo fmt --all --check
 
       - name: Test
         env:
-          PRESOLVE_CHROME: ${{ steps.setup-chrome.outputs.chrome-path }}
           RUST_TEST_THREADS: 1
         run: cargo test --workspace
 
@@ -74,13 +67,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Install Chrome
-        uses: browser-actions/setup-chrome@v2
-        id: setup-chrome
-        with:
-          chrome-version: stable
-
       - name: Run browser e2e
         env:
-          PRESOLVE_CHROME: ${{ steps.setup-chrome.outputs.chrome-path }}
+          RUST_TEST_THREADS: 1
         run: cargo test -p presolve-cli --test runtime_browser -- --nocapture
