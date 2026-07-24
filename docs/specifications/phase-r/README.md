@@ -8,3 +8,4 @@ ordinary application authors while preserving compiler ownership of semantics.
 * [Development workflow contract](DEVELOPMENT_WORKFLOW_CONTRACT.md)
 * [Layout composition contract](LAYOUT_COMPOSITION_CONTRACT.md)
 * [Layout model integration contract](LAYOUT_MODEL_INTEGRATION_CONTRACT.md)
+* [Server and data boundary contract](SERVER_DATA_BOUNDARY_CONTRACT.md)

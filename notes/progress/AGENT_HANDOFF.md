@@ -3,11 +3,23 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: R3-F - compiler-owned layout composition publication
-* Working tree: R3-F implementation is ready for commit.
+* Latest completed slice: R6-A - compiler-owned route request context
+* Working tree: R6-A implementation is ready for commit.
 * Date: 2026-07-23
 
 Current Phase R slice
+
+* Slice: R6-A - Compiler-Owned Route Request Context
+* Result: file-route publication now resolves the selected canonical route,
+  page identity, and exact named dynamic path segments in one immutable match
+  record in addition to the existing opaque artifact/redirect target. Hosts can
+  retain these request facts for later server data handoffs without re-matching
+  source paths or patterns. The existing development host remains a static
+  artifact server and does not gain a server runtime.
+* Verification: focused compiler route-publication tests prove nested parameter
+  extraction together with existing static-over-parameter request behavior.
+* Next: define semantic-package server capability records, then lower route
+  loaders against this exact request context; do not admit arbitrary callbacks.
 
 * Slice: R3-F - Compiler-Owned Layout Composition Publication
 * Result: conventional layouts now lower into compiler-issued virtual child

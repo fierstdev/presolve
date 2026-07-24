@@ -74,6 +74,20 @@ pub enum FileRouteRequestTargetV1 {
     Artifact { path: PathBuf },
 }
 
+/// Compiler-resolved request facts for one conventional file route. Server
+/// adapters consume this record instead of re-matching route patterns or
+/// deriving parameter names from source paths.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileRouteRequestMatchV1 {
+    pub route_path: String,
+    pub entry_component_id: String,
+    /// Exact non-empty path-segment values keyed by the compiler-issued route
+    /// parameter name. Values remain percent-encoded request segments; URL
+    /// decoding belongs to a later explicit normalization contract.
+    pub parameters: BTreeMap<String, String>,
+    pub target: FileRouteRequestTargetV1,
+}
+
 /// Builds exact compiler artifacts for every validated `app/routes` page.
 ///
 /// Every page is lowered through the existing explicit application-publication
@@ -227,6 +241,17 @@ pub fn resolve_file_route_request_v1(
     manifest: &FileRoutePublicationManifestV1,
     request_path: &str,
 ) -> Option<FileRouteRequestTargetV1> {
+    resolve_file_route_request_match_v1(manifest, request_path).map(|match_| match_.target)
+}
+
+/// Resolves a request through compiler-issued route topology and retains the
+/// selected route identity plus exact dynamic parameter values. It does not
+/// execute application code or interpret query, header, or body data.
+#[must_use]
+pub fn resolve_file_route_request_match_v1(
+    manifest: &FileRoutePublicationManifestV1,
+    request_path: &str,
+) -> Option<FileRouteRequestMatchV1> {
     if !request_path.starts_with('/') || request_path.contains('?') || request_path.contains('#') {
         return None;
     }
@@ -260,22 +285,39 @@ pub fn resolve_file_route_request_v1(
             route_match_score(left_segments).cmp(&route_match_score(right_segments))
         })?;
     let (route, route_segments) = route;
+    let parameters = route_segments
+        .iter()
+        .zip(&segments)
+        .filter_map(|(route_segment, request_segment)| {
+            route_segment
+                .strip_prefix(':')
+                .map(|name| (name.to_string(), (*request_segment).to_string()))
+        })
+        .collect::<BTreeMap<_, _>>();
+    let match_record = |target| FileRouteRequestMatchV1 {
+        route_path: route.path.clone(),
+        entry_component_id: route.entry_component_id.clone(),
+        parameters: parameters.clone(),
+        target,
+    };
     if segments.len() == route_segments.len() {
         if route.path != "/" && !trailing_slash {
-            return Some(FileRouteRequestTargetV1::Redirect {
+            return Some(match_record(FileRouteRequestTargetV1::Redirect {
                 location: format!("{request_path}/"),
-            });
+            }));
         }
-        return Some(FileRouteRequestTargetV1::Artifact {
+        return Some(match_record(FileRouteRequestTargetV1::Artifact {
             path: PathBuf::from(&route.artifact_root).join("index.html"),
-        });
+        }));
     }
     let suffix = &segments[route_segments.len()..];
     suffix
         .iter()
         .all(|segment| is_safe_request_asset_segment(segment))
-        .then(|| FileRouteRequestTargetV1::Artifact {
-            path: PathBuf::from(&route.artifact_root).join(suffix.iter().collect::<PathBuf>()),
+        .then(|| {
+            match_record(FileRouteRequestTargetV1::Artifact {
+                path: PathBuf::from(&route.artifact_root).join(suffix.iter().collect::<PathBuf>()),
+            })
         })
 }
 
@@ -425,6 +467,41 @@ mod tests {
             Some(FileRouteRequestTargetV1::Artifact {
                 path: "routes/segment-posts/parameter-slug/runtime.js".into()
             })
+        );
+    }
+
+    #[test]
+    fn retains_dynamic_parameter_facts_from_the_selected_compiler_route() {
+        let manifest = FileRoutePublicationManifestV1 {
+            schema_version: 1,
+            compiler_contract: FILE_ROUTE_PUBLICATION_COMPILER_CONTRACT_V1.into(),
+            profile: "development".into(),
+            routes: vec![FileRoutePublicationRouteV1 {
+                path: "/posts/:slug/comments/:commentId".into(),
+                entry_component_id: "component:comment".into(),
+                artifact_root: "routes/comment".into(),
+                layout_component_ids: Vec::new(),
+            }],
+            artifacts: Vec::new(),
+        };
+
+        let resolved =
+            resolve_file_route_request_match_v1(&manifest, "/posts/hello-world/comments/42/")
+                .expect("selected route");
+        assert_eq!(resolved.route_path, "/posts/:slug/comments/:commentId");
+        assert_eq!(resolved.entry_component_id, "component:comment");
+        assert_eq!(
+            resolved.parameters,
+            BTreeMap::from([
+                ("slug".to_string(), "hello-world".to_string()),
+                ("commentId".to_string(), "42".to_string()),
+            ])
+        );
+        assert_eq!(
+            resolved.target,
+            FileRouteRequestTargetV1::Artifact {
+                path: "routes/comment/index.html".into(),
+            }
         );
     }
 }
