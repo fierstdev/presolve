@@ -1,7 +1,7 @@
 {
   "name": "presolve-vscode",
   "displayName": "Presolve",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.1",
   "description": "Presolve language tooling for Visual Studio Code.",
   "publisher": "fierstdev",
   "license": "MIT OR Apache-2.0",
@@ -59,6 +59,6 @@
   },
   "scripts": {
     "test": "node test/workspace-fixture.mjs",
-    "package": "npx --yes @vscode/vsce package --no-dependencies"
+    "package": "npm exec --yes --package=@vscode/vsce@3.9.2 -- vsce package --no-dependencies --pre-release"
   }
 }

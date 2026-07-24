@@ -18,7 +18,11 @@ versioned compatibility train, not a set of independently published packages.
 ## Required release sequence
 
 1. Choose one prerelease version and update every publishable Cargo and npm
-   manifest, package metadata, extension manifest, and compatibility assertion.
+   manifest, package metadata, and compatibility assertion. Map
+   `MAJOR.MINOR.PATCH-alpha.N` to the numeric Visual Studio Marketplace
+   prerelease version `MAJOR.MINOR.(PATCH + N)` because the Marketplace does
+   not accept SemVer prerelease suffixes. Presolve `0.1.0-alpha.1` therefore
+   publishes as Marketplace prerelease `0.1.1`.
 2. Run the full Rust, package, browser, artifact, formatter, and release-check
    matrix from a clean checkout.
 3. Pack every npm package, install the tarballs in a fresh external directory,

@@ -15,6 +15,13 @@ pnpm run test:scaffold
 # unpublished alpha can resolve from the public registry during a dry run.
 cargo package -p presolve-parser --allow-dirty --no-verify
 pnpm run release:prepare
+(
+  cd packages/vscode
+  npm exec --yes --package=@vscode/vsce@3.9.2 -- vsce package \
+    --no-dependencies \
+    --pre-release \
+    --out "$release_dir/presolve-vscode.vsix"
+)
 
 printf '{"schema":"presolve.release-dry-run","version":1,"packages":['
 first=true
