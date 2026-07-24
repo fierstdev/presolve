@@ -1,0 +1,6 @@
+// chunk=resume-chunk:Eager:application
+// kind=Eager
+// root=
+// boundaries=resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ApplicationRoot:root:module:app/layout.tsx/component:presolve-site-layout,resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ApplicationRoot:root:module:app/routes/compare.tsx/component:presolve-comparison,resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ApplicationRoot:root:module:app/routes/docs/components.tsx/component:presolve-components,resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ApplicationRoot:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment,resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ApplicationRoot:root:module:app/routes/docs/index.tsx/component:presolve-documentation,resume-boundary:root:module:app/routes/examples.tsx/component:presolve-examples:ApplicationRoot:root:module:app/routes/examples.tsx/component:presolve-examples,resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ApplicationRoot:root:module:app/routes/index.tsx/component:presolve-home
+// programs=RuntimeBootstrap,RuntimeRegistries,EventDelegation
+export {};

@@ -1247,6 +1247,31 @@ fn l9_config_and_format(command: &str, args: &[String]) -> (PathBuf, bool) {
 }
 
 fn run_explain(mut args: Vec<String>) {
+    if args.first().is_some_and(|argument| argument == "route") {
+        args.remove(0);
+        if !args.is_empty() {
+            application_cli_error(
+                "PSEXPLAIN1001_ROUTE_ARGUMENT_INVALID",
+                "presolve explain route accepts no positional arguments",
+            );
+        }
+        run_ergonomic_route_explain(Path::new("."));
+        return;
+    }
+    if args
+        .first()
+        .is_some_and(|argument| argument == "deployment")
+    {
+        args.remove(0);
+        if !args.is_empty() {
+            application_cli_error(
+                "PSEXPLAIN1002_DEPLOYMENT_ARGUMENT_INVALID",
+                "presolve explain deployment accepts no positional arguments",
+            );
+        }
+        run_cloudflare_deployment_explain(Path::new("."));
+        return;
+    }
     if args
         .first()
         .is_some_and(|argument| argument == "--capabilities")
@@ -1301,6 +1326,75 @@ fn run_explain(mut args: Vec<String>) {
             process::exit(1);
         }
     }
+}
+
+fn run_ergonomic_route_explain(root: &Path) {
+    let project = discover_project_v1(root)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    let unit = CompilationUnit::parse_sources(
+        project
+            .sources
+            .iter()
+            .map(|source| (source.logical_path.clone(), source.source.as_str())),
+    );
+    let (packages, _) = discover_imported_package_tables(&project.root, &unit);
+    let asm = build_application_semantic_model_for_unit_with_packages(&unit, &packages);
+    let graph = presolve_compiler::build_validated_file_route_graph_v1(&asm)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    println!("Routes");
+    for route in graph.routes {
+        let layouts = if route.layouts.is_empty() {
+            "none".into()
+        } else {
+            route
+                .layouts
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        println!("  {}", route.path);
+        println!("    component: {}", route.component);
+        println!("    layouts: {layouts}");
+    }
+}
+
+fn run_cloudflare_deployment_explain(root: &Path) {
+    let project = discover_project_v1(root)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    let path = project
+        .root
+        .join(".presolve/cloudflare/deployment.plan.json");
+    let source = fs::read_to_string(&path).unwrap_or_else(|_| {
+        application_cli_error(
+            "PSEXPLAIN1003_DEPLOYMENT_PLAN_MISSING",
+            "run `presolve deploy cloudflare --prepare` before explaining deployment",
+        )
+    });
+    let value = serde_json::from_str::<serde_json::Value>(&source).unwrap_or_else(|error| {
+        application_cli_error("PSEXPLAIN1004_DEPLOYMENT_PLAN_INVALID", &error.to_string())
+    });
+    let worker = value
+        .get("worker_name")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("unknown");
+    let release = value
+        .get("release_id")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("unknown");
+    let routes = value
+        .get("routes")
+        .and_then(serde_json::Value::as_array)
+        .map_or(0, Vec::len);
+    let artifacts = value
+        .get("artifacts")
+        .and_then(serde_json::Value::as_array)
+        .map_or(0, Vec::len);
+    println!("Cloudflare deployment");
+    println!("  worker: {worker}");
+    println!("  release: {release}");
+    println!("  routes: {routes}");
+    println!("  compiler artifacts: {artifacts}");
 }
 
 fn run_graph(mut args: Vec<String>) {

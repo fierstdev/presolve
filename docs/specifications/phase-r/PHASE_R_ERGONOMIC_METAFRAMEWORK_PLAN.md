@@ -67,6 +67,11 @@ until a dedicated capability executor is published.
 Add `npm create presolve`, templates, explain views, examples, and migrations
 from advanced explicit mode.
 
+The dogfood acceptance target is the public Presolve site: public docs, code
+examples, and capability comparisons authored and deployed as a Presolve
+application. Comparisons need reproducible measurements before numerical
+performance claims are allowed.
+
 ## R9 — usability freeze
 
 Require a fresh-app proof with no configuration/manual source list/manual

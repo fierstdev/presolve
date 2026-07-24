@@ -338,6 +338,52 @@ fn deploy_rejects_rollback_mixed_with_preparation_options() {
 }
 
 #[test]
+fn explain_projects_compiler_route_and_prepared_deployment_facts() {
+    let root = project_root("explain");
+    fs::write(
+        root.join("app/routes/index.tsx"),
+        r#"@component() class Home extends Component { render() { return <main>Home</main>; } }"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("app/routes/about.tsx"),
+        r#"@component() class About extends Component { render() { return <main>About</main>; } }"#,
+    )
+    .unwrap();
+    let route = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args(["explain", "route"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(route.status.success());
+    let route = String::from_utf8(route.stdout).unwrap();
+    assert!(route.contains("Routes"));
+    assert!(route.contains("/about"));
+    let prepare = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args([
+            "deploy",
+            "cloudflare",
+            "--prepare",
+            "--name",
+            "presolve-docs",
+        ])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(prepare.status.success());
+    let deployment = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args(["explain", "deployment"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(deployment.status.success());
+    let deployment = String::from_utf8(deployment.stdout).unwrap();
+    assert!(deployment.contains("Cloudflare deployment"));
+    assert!(deployment.contains("presolve-docs"));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn dev_serves_the_compiler_published_page() {
     let root = project_root("server");
     fs::write(

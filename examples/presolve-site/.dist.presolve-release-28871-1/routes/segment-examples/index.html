@@ -1,0 +1,737 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>SiteLayout</title>
+  </head>
+  <body>
+    <main data-presolve-node="n0"><header data-presolve-node="n1"><a data-presolve-node="n2" href="/">Presolve</a><nav data-presolve-node="n3"><a data-presolve-node="n4" href="/docs/">Docs</a><a data-presolve-node="n5" href="/examples/">Examples</a><a data-presolve-node="n6" href="/compare/">Compare</a></nav></header><article data-presolve-node="n57"><h1 data-presolve-node="n58">Examples</h1><p data-presolve-node="n59">Counter, composition, Context, forms, resumability, routes, and this documentation site are all compiled from the same authoring model.</p><p data-presolve-node="n60">Read the source in the Presolve repository to see the exact compiler contracts behind each feature.</p></article><footer data-presolve-node="n8">Compiler-founded UI for the web.</footer></main>
+    <script type="application/json" id="presolve-template-manifest">
+      {
+        "schema_version": 5,
+        "components": [
+          {
+            "component_id": "module:app/layout.tsx/component:presolve-site-layout",
+            "name": "SiteLayout",
+            "template": {
+              "nodes": [
+                {
+                  "kind": "element",
+                  "id": "n0",
+                  "tag": "main"
+                },
+                {
+                  "kind": "element",
+                  "id": "n1",
+                  "tag": "header"
+                },
+                {
+                  "kind": "element",
+                  "id": "n2",
+                  "tag": "a"
+                },
+                {
+                  "kind": "element",
+                  "id": "n3",
+                  "tag": "nav"
+                },
+                {
+                  "kind": "element",
+                  "id": "n4",
+                  "tag": "a"
+                },
+                {
+                  "kind": "element",
+                  "id": "n5",
+                  "tag": "a"
+                },
+                {
+                  "kind": "element",
+                  "id": "n6",
+                  "tag": "a"
+                },
+                {
+                  "kind": "element",
+                  "id": "n7",
+                  "tag": "slot"
+                },
+                {
+                  "kind": "element",
+                  "id": "n8",
+                  "tag": "footer"
+                }
+              ],
+              "events": []
+            },
+            "actions": []
+          },
+          {
+            "component_id": "module:app/routes/compare.tsx/component:presolve-comparison",
+            "name": "Comparison",
+            "template": {
+              "nodes": [
+                {
+                  "kind": "element",
+                  "id": "n9",
+                  "tag": "article"
+                },
+                {
+                  "kind": "element",
+                  "id": "n10",
+                  "tag": "h1"
+                },
+                {
+                  "kind": "element",
+                  "id": "n11",
+                  "tag": "p"
+                },
+                {
+                  "kind": "element",
+                  "id": "n12",
+                  "tag": "table"
+                },
+                {
+                  "kind": "element",
+                  "id": "n13",
+                  "tag": "thead"
+                },
+                {
+                  "kind": "element",
+                  "id": "n14",
+                  "tag": "tr"
+                },
+                {
+                  "kind": "element",
+                  "id": "n15",
+                  "tag": "th"
+                },
+                {
+                  "kind": "element",
+                  "id": "n16",
+                  "tag": "th"
+                },
+                {
+                  "kind": "element",
+                  "id": "n17",
+                  "tag": "th"
+                },
+                {
+                  "kind": "element",
+                  "id": "n18",
+                  "tag": "tbody"
+                },
+                {
+                  "kind": "element",
+                  "id": "n19",
+                  "tag": "tr"
+                },
+                {
+                  "kind": "element",
+                  "id": "n20",
+                  "tag": "td"
+                },
+                {
+                  "kind": "element",
+                  "id": "n21",
+                  "tag": "td"
+                },
+                {
+                  "kind": "element",
+                  "id": "n22",
+                  "tag": "td"
+                },
+                {
+                  "kind": "element",
+                  "id": "n23",
+                  "tag": "tr"
+                },
+                {
+                  "kind": "element",
+                  "id": "n24",
+                  "tag": "td"
+                },
+                {
+                  "kind": "element",
+                  "id": "n25",
+                  "tag": "td"
+                },
+                {
+                  "kind": "element",
+                  "id": "n26",
+                  "tag": "td"
+                },
+                {
+                  "kind": "element",
+                  "id": "n27",
+                  "tag": "tr"
+                },
+                {
+                  "kind": "element",
+                  "id": "n28",
+                  "tag": "td"
+                },
+                {
+                  "kind": "element",
+                  "id": "n29",
+                  "tag": "td"
+                },
+                {
+                  "kind": "element",
+                  "id": "n30",
+                  "tag": "td"
+                },
+                {
+                  "kind": "element",
+                  "id": "n31",
+                  "tag": "p"
+                }
+              ],
+              "events": []
+            },
+            "actions": []
+          },
+          {
+            "component_id": "module:app/routes/docs/components.tsx/component:presolve-components",
+            "name": "Components",
+            "template": {
+              "nodes": [
+                {
+                  "kind": "element",
+                  "id": "n32",
+                  "tag": "article"
+                },
+                {
+                  "kind": "element",
+                  "id": "n33",
+                  "tag": "h1"
+                },
+                {
+                  "kind": "element",
+                  "id": "n34",
+                  "tag": "p"
+                }
+              ],
+              "events": []
+            },
+            "actions": []
+          },
+          {
+            "component_id": "module:app/routes/docs/deployment.tsx/component:presolve-deployment",
+            "name": "Deployment",
+            "template": {
+              "nodes": [
+                {
+                  "kind": "element",
+                  "id": "n35",
+                  "tag": "article"
+                },
+                {
+                  "kind": "element",
+                  "id": "n36",
+                  "tag": "h1"
+                },
+                {
+                  "kind": "element",
+                  "id": "n37",
+                  "tag": "p"
+                },
+                {
+                  "kind": "element",
+                  "id": "n38",
+                  "tag": "p"
+                }
+              ],
+              "events": []
+            },
+            "actions": []
+          },
+          {
+            "component_id": "module:app/routes/docs/getting-started.tsx/component:presolve-getting-started",
+            "name": "GettingStarted",
+            "template": {
+              "nodes": [
+                {
+                  "kind": "element",
+                  "id": "n39",
+                  "tag": "article"
+                },
+                {
+                  "kind": "element",
+                  "id": "n40",
+                  "tag": "h1"
+                },
+                {
+                  "kind": "element",
+                  "id": "n41",
+                  "tag": "ol"
+                },
+                {
+                  "kind": "element",
+                  "id": "n42",
+                  "tag": "li"
+                },
+                {
+                  "kind": "element",
+                  "id": "n43",
+                  "tag": "li"
+                },
+                {
+                  "kind": "element",
+                  "id": "n44",
+                  "tag": "li"
+                },
+                {
+                  "kind": "element",
+                  "id": "n45",
+                  "tag": "li"
+                },
+                {
+                  "kind": "element",
+                  "id": "n46",
+                  "tag": "p"
+                }
+              ],
+              "events": []
+            },
+            "actions": []
+          },
+          {
+            "component_id": "module:app/routes/docs/index.tsx/component:presolve-documentation",
+            "name": "Documentation",
+            "template": {
+              "nodes": [
+                {
+                  "kind": "element",
+                  "id": "n47",
+                  "tag": "article"
+                },
+                {
+                  "kind": "element",
+                  "id": "n48",
+                  "tag": "h1"
+                },
+                {
+                  "kind": "element",
+                  "id": "n49",
+                  "tag": "p"
+                },
+                {
+                  "kind": "element",
+                  "id": "n50",
+                  "tag": "ul"
+                },
+                {
+                  "kind": "element",
+                  "id": "n51",
+                  "tag": "li"
+                },
+                {
+                  "kind": "element",
+                  "id": "n52",
+                  "tag": "a"
+                },
+                {
+                  "kind": "element",
+                  "id": "n53",
+                  "tag": "li"
+                },
+                {
+                  "kind": "element",
+                  "id": "n54",
+                  "tag": "a"
+                },
+                {
+                  "kind": "element",
+                  "id": "n55",
+                  "tag": "li"
+                },
+                {
+                  "kind": "element",
+                  "id": "n56",
+                  "tag": "a"
+                }
+              ],
+              "events": []
+            },
+            "actions": []
+          },
+          {
+            "component_id": "module:app/routes/examples.tsx/component:presolve-examples",
+            "name": "Examples",
+            "template": {
+              "nodes": [
+                {
+                  "kind": "element",
+                  "id": "n57",
+                  "tag": "article"
+                },
+                {
+                  "kind": "element",
+                  "id": "n58",
+                  "tag": "h1"
+                },
+                {
+                  "kind": "element",
+                  "id": "n59",
+                  "tag": "p"
+                },
+                {
+                  "kind": "element",
+                  "id": "n60",
+                  "tag": "p"
+                }
+              ],
+              "events": []
+            },
+            "actions": []
+          },
+          {
+            "component_id": "module:app/routes/index.tsx/component:presolve-home",
+            "name": "Home",
+            "template": {
+              "nodes": [
+                {
+                  "kind": "element",
+                  "id": "n61",
+                  "tag": "article"
+                },
+                {
+                  "kind": "element",
+                  "id": "n62",
+                  "tag": "h1"
+                },
+                {
+                  "kind": "element",
+                  "id": "n63",
+                  "tag": "p"
+                },
+                {
+                  "kind": "element",
+                  "id": "n64",
+                  "tag": "p"
+                },
+                {
+                  "kind": "element",
+                  "id": "n65",
+                  "tag": "a"
+                },
+                {
+                  "kind": "element",
+                  "id": "n66",
+                  "tag": "h2"
+                },
+                {
+                  "kind": "element",
+                  "id": "n67",
+                  "tag": "ul"
+                },
+                {
+                  "kind": "element",
+                  "id": "n68",
+                  "tag": "li"
+                },
+                {
+                  "kind": "element",
+                  "id": "n69",
+                  "tag": "li"
+                },
+                {
+                  "kind": "element",
+                  "id": "n70",
+                  "tag": "li"
+                }
+              ],
+              "events": []
+            },
+            "actions": []
+          }
+        ]
+      }
+    </script>
+    <script type="application/json" id="presolve-computed-runtime">
+      {
+        "schema_version": 12,
+        "state": [],
+        "invalidations": [],
+        "resource_invalidations": [],
+        "evaluations": [],
+        "evaluation_order": [],
+        "update_batches": []
+      }
+    </script>
+    <script type="application/json" id="presolve-context-runtime">
+      {
+        "schema_version": 2,
+        "sources": [],
+        "consumers": [],
+        "initial_batches": [],
+        "action_updates": []
+      }
+    </script>
+    <script type="application/json" id="presolve-effect-runtime">
+      {
+        "schema_version": 1,
+        "effects": []
+      }
+    </script>
+    <script type="application/json" id="presolve-component-runtime">
+      {
+        "schema_version": 4,
+        "component_definitions": [
+          {
+            "component": "module:app/layout.tsx/component:presolve-site-layout",
+            "template": "module:app/layout.tsx/component:presolve-site-layout/template:render",
+            "slots": [
+              "module:app/layout.tsx/component:presolve-site-layout/slot:children"
+            ],
+            "boundary": "client"
+          },
+          {
+            "component": "module:app/routes/compare.tsx/component:presolve-comparison",
+            "template": "module:app/routes/compare.tsx/component:presolve-comparison/template:render",
+            "slots": [],
+            "boundary": "client"
+          },
+          {
+            "component": "module:app/routes/docs/components.tsx/component:presolve-components",
+            "template": "module:app/routes/docs/components.tsx/component:presolve-components/template:render",
+            "slots": [],
+            "boundary": "client"
+          },
+          {
+            "component": "module:app/routes/docs/deployment.tsx/component:presolve-deployment",
+            "template": "module:app/routes/docs/deployment.tsx/component:presolve-deployment/template:render",
+            "slots": [],
+            "boundary": "client"
+          },
+          {
+            "component": "module:app/routes/docs/getting-started.tsx/component:presolve-getting-started",
+            "template": "module:app/routes/docs/getting-started.tsx/component:presolve-getting-started/template:render",
+            "slots": [],
+            "boundary": "client"
+          },
+          {
+            "component": "module:app/routes/docs/index.tsx/component:presolve-documentation",
+            "template": "module:app/routes/docs/index.tsx/component:presolve-documentation/template:render",
+            "slots": [],
+            "boundary": "client"
+          },
+          {
+            "component": "module:app/routes/examples.tsx/component:presolve-examples",
+            "template": "module:app/routes/examples.tsx/component:presolve-examples/template:render",
+            "slots": [],
+            "boundary": "client"
+          },
+          {
+            "component": "module:app/routes/index.tsx/component:presolve-home",
+            "template": "module:app/routes/index.tsx/component:presolve-home/template:render",
+            "slots": [],
+            "boundary": "client"
+          }
+        ],
+        "instances": [
+          {
+            "instance": "root:module:app/layout.tsx/component:presolve-site-layout",
+            "component": "module:app/layout.tsx/component:presolve-site-layout",
+            "invocation": null,
+            "parent": null,
+            "depth": 0,
+            "initialization_batch": 0,
+            "ordinary_template_targets": [],
+            "ordinary_template_bindings": [],
+            "ordinary_template_events": [],
+            "state_slots": [],
+            "context_prefix": "component-context:root:module:app/layout.tsx/component:presolve-site-layout",
+            "instruction_indices": [
+              0,
+              1,
+              2
+            ],
+            "structural_region": null
+          },
+          {
+            "instance": "root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0",
+            "component": "module:app/routes/examples.tsx/component:presolve-examples",
+            "invocation": "module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0",
+            "parent": "root:module:app/layout.tsx/component:presolve-site-layout",
+            "depth": 1,
+            "initialization_batch": 1,
+            "ordinary_template_targets": [],
+            "ordinary_template_bindings": [],
+            "ordinary_template_events": [],
+            "state_slots": [],
+            "context_prefix": "component-context:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0",
+            "instruction_indices": [
+              21,
+              22,
+              23
+            ],
+            "structural_region": null
+          },
+          {
+            "instance": "root:module:app/routes/compare.tsx/component:presolve-comparison",
+            "component": "module:app/routes/compare.tsx/component:presolve-comparison",
+            "invocation": null,
+            "parent": null,
+            "depth": 0,
+            "initialization_batch": 0,
+            "ordinary_template_targets": [],
+            "ordinary_template_bindings": [],
+            "ordinary_template_events": [],
+            "state_slots": [],
+            "context_prefix": "component-context:root:module:app/routes/compare.tsx/component:presolve-comparison",
+            "instruction_indices": [
+              3,
+              4,
+              5
+            ],
+            "structural_region": null
+          },
+          {
+            "instance": "root:module:app/routes/docs/components.tsx/component:presolve-components",
+            "component": "module:app/routes/docs/components.tsx/component:presolve-components",
+            "invocation": null,
+            "parent": null,
+            "depth": 0,
+            "initialization_batch": 0,
+            "ordinary_template_targets": [],
+            "ordinary_template_bindings": [],
+            "ordinary_template_events": [],
+            "state_slots": [],
+            "context_prefix": "component-context:root:module:app/routes/docs/components.tsx/component:presolve-components",
+            "instruction_indices": [
+              6,
+              7,
+              8
+            ],
+            "structural_region": null
+          },
+          {
+            "instance": "root:module:app/routes/docs/deployment.tsx/component:presolve-deployment",
+            "component": "module:app/routes/docs/deployment.tsx/component:presolve-deployment",
+            "invocation": null,
+            "parent": null,
+            "depth": 0,
+            "initialization_batch": 0,
+            "ordinary_template_targets": [],
+            "ordinary_template_bindings": [],
+            "ordinary_template_events": [],
+            "state_slots": [],
+            "context_prefix": "component-context:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment",
+            "instruction_indices": [
+              9,
+              10,
+              11
+            ],
+            "structural_region": null
+          },
+          {
+            "instance": "root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started",
+            "component": "module:app/routes/docs/getting-started.tsx/component:presolve-getting-started",
+            "invocation": null,
+            "parent": null,
+            "depth": 0,
+            "initialization_batch": 0,
+            "ordinary_template_targets": [],
+            "ordinary_template_bindings": [],
+            "ordinary_template_events": [],
+            "state_slots": [],
+            "context_prefix": "component-context:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started",
+            "instruction_indices": [
+              12,
+              13,
+              14
+            ],
+            "structural_region": null
+          },
+          {
+            "instance": "root:module:app/routes/docs/index.tsx/component:presolve-documentation",
+            "component": "module:app/routes/docs/index.tsx/component:presolve-documentation",
+            "invocation": null,
+            "parent": null,
+            "depth": 0,
+            "initialization_batch": 0,
+            "ordinary_template_targets": [],
+            "ordinary_template_bindings": [],
+            "ordinary_template_events": [],
+            "state_slots": [],
+            "context_prefix": "component-context:root:module:app/routes/docs/index.tsx/component:presolve-documentation",
+            "instruction_indices": [
+              15,
+              16,
+              17
+            ],
+            "structural_region": null
+          },
+          {
+            "instance": "root:module:app/routes/index.tsx/component:presolve-home",
+            "component": "module:app/routes/index.tsx/component:presolve-home",
+            "invocation": null,
+            "parent": null,
+            "depth": 0,
+            "initialization_batch": 0,
+            "ordinary_template_targets": [],
+            "ordinary_template_bindings": [],
+            "ordinary_template_events": [],
+            "state_slots": [],
+            "context_prefix": "component-context:root:module:app/routes/index.tsx/component:presolve-home",
+            "instruction_indices": [
+              18,
+              19,
+              20
+            ],
+            "structural_region": null
+          }
+        ],
+        "initialization_batches": [
+          {
+            "index": 0,
+            "instances": [
+              "root:module:app/layout.tsx/component:presolve-site-layout",
+              "root:module:app/routes/compare.tsx/component:presolve-comparison",
+              "root:module:app/routes/docs/components.tsx/component:presolve-components",
+              "root:module:app/routes/docs/deployment.tsx/component:presolve-deployment",
+              "root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started",
+              "root:module:app/routes/docs/index.tsx/component:presolve-documentation",
+              "root:module:app/routes/index.tsx/component:presolve-home"
+            ],
+            "context_sources": [],
+            "slot_bindings": []
+          },
+          {
+            "index": 1,
+            "instances": [
+              "root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0"
+            ],
+            "context_sources": [],
+            "slot_bindings": []
+          }
+        ],
+        "slot_binding_programs": [],
+        "instance_context_bindings": [],
+        "ordinary_template_targets": [],
+        "ordinary_template_bindings": [],
+        "ordinary_template_events": [],
+        "destruction": {
+          "operation": "destroy_component_instance",
+          "enabled": true
+        },
+        "structural_programs": []
+      }
+    </script>
+    <script type="application/json" id="presolve-forms-runtime">
+      {
+        "schema_version": 2,
+        "registry_version": 1,
+        "forms": [],
+        "instances": [],
+        "hosts": []
+      }
+    </script>
+    <script type="application/json" id="presolve-resume-runtime">{"schema_version":6,"build_id":"resume-build:8b8a2a9fa250fcc4b130f268f6be855c9e9ecdeeabfd154960ea974b91b7a033","snapshot_schema_version":1,"runtime_protocol_version":1,"application_root_boundary_id":"resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ApplicationRoot:root:module:app/layout.tsx/component:presolve-site-layout","boundaries":[{"boundary_id":"resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ApplicationRoot:root:module:app/layout.tsx/component:presolve-site-layout","kind":"application_root","owner_instance_id":"root:module:app/layout.tsx/component:presolve-site-layout","child_boundary_ids":["resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout"],"activation_policy":"eager","schema_id":"resume-schema:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ApplicationRoot:root:module:app/layout.tsx/component:presolve-site-layout","capture_program_id":"resume-capture:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ApplicationRoot:root:module:app/layout.tsx/component:presolve-site-layout","restore_program_id":"resume-restore:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ApplicationRoot:root:module:app/layout.tsx/component:presolve-site-layout","anchor_ids":[],"event_ids":[],"provenance":{"path":"app/layout.tsx","start":65,"end":379,"line":4,"column":8}},{"boundary_id":"resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ApplicationRoot:root:module:app/routes/compare.tsx/component:presolve-comparison","kind":"application_root","owner_instance_id":"root:module:app/routes/compare.tsx/component:presolve-comparison","child_boundary_ids":["resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ComponentInstance:root:module:app/routes/compare.tsx/component:presolve-comparison"],"activation_policy":"eager","schema_id":"resume-schema:resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ApplicationRoot:root:module:app/routes/compare.tsx/component:presolve-comparison","capture_program_id":"resume-capture:resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ApplicationRoot:root:module:app/routes/compare.tsx/component:presolve-comparison","restore_program_id":"resume-restore:resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ApplicationRoot:root:module:app/routes/compare.tsx/component:presolve-comparison","anchor_ids":[],"event_ids":[],"provenance":{"path":"app/routes/compare.tsx","start":59,"end":988,"line":4,"column":8}},{"boundary_id":"resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ApplicationRoot:root:module:app/routes/docs/components.tsx/component:presolve-components","kind":"application_root","owner_instance_id":"root:module:app/routes/docs/components.tsx/component:presolve-components","child_boundary_ids":["resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ComponentInstance:root:module:app/routes/docs/components.tsx/component:presolve-components"],"activation_policy":"eager","schema_id":"resume-schema:resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ApplicationRoot:root:module:app/routes/docs/components.tsx/component:presolve-components","capture_program_id":"resume-capture:resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ApplicationRoot:root:module:app/routes/docs/components.tsx/component:presolve-components","restore_program_id":"resume-restore:resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ApplicationRoot:root:module:app/routes/docs/components.tsx/component:presolve-components","anchor_ids":[],"event_ids":[],"provenance":{"path":"app/routes/docs/components.tsx","start":59,"end":405,"line":4,"column":8}},{"boundary_id":"resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ApplicationRoot:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","kind":"application_root","owner_instance_id":"root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","child_boundary_ids":["resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ComponentInstance:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment"],"activation_policy":"eager","schema_id":"resume-schema:resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ApplicationRoot:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","capture_program_id":"resume-capture:resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ApplicationRoot:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","restore_program_id":"resume-restore:resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ApplicationRoot:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","anchor_ids":[],"event_ids":[],"provenance":{"path":"app/routes/docs/deployment.tsx","start":59,"end":441,"line":4,"column":8}},{"boundary_id":"resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ApplicationRoot:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","kind":"application_root","owner_instance_id":"root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","child_boundary_ids":["resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ComponentInstance:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started"],"activation_policy":"eager","schema_id":"resume-schema:resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ApplicationRoot:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","capture_program_id":"resume-capture:resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ApplicationRoot:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","restore_program_id":"resume-restore:resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ApplicationRoot:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","anchor_ids":[],"event_ids":[],"provenance":{"path":"app/routes/docs/getting-started.tsx","start":59,"end":426,"line":4,"column":8}},{"boundary_id":"resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ApplicationRoot:root:module:app/routes/docs/index.tsx/component:presolve-documentation","kind":"application_root","owner_instance_id":"root:module:app/routes/docs/index.tsx/component:presolve-documentation","child_boundary_ids":["resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ComponentInstance:root:module:app/routes/docs/index.tsx/component:presolve-documentation"],"activation_policy":"eager","schema_id":"resume-schema:resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ApplicationRoot:root:module:app/routes/docs/index.tsx/component:presolve-documentation","capture_program_id":"resume-capture:resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ApplicationRoot:root:module:app/routes/docs/index.tsx/component:presolve-documentation","restore_program_id":"resume-restore:resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ApplicationRoot:root:module:app/routes/docs/index.tsx/component:presolve-documentation","anchor_ids":[],"event_ids":[],"provenance":{"path":"app/routes/docs/index.tsx","start":59,"end":485,"line":4,"column":8}},{"boundary_id":"resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ApplicationRoot:root:module:app/routes/index.tsx/component:presolve-home","kind":"application_root","owner_instance_id":"root:module:app/routes/index.tsx/component:presolve-home","child_boundary_ids":["resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ComponentInstance:root:module:app/routes/index.tsx/component:presolve-home"],"activation_policy":"eager","schema_id":"resume-schema:resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ApplicationRoot:root:module:app/routes/index.tsx/component:presolve-home","capture_program_id":"resume-capture:resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ApplicationRoot:root:module:app/routes/index.tsx/component:presolve-home","restore_program_id":"resume-restore:resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ApplicationRoot:root:module:app/routes/index.tsx/component:presolve-home","anchor_ids":[],"event_ids":[],"provenance":{"path":"app/routes/index.tsx","start":59,"end":585,"line":4,"column":8}},{"boundary_id":"resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout","kind":"component_instance","owner_instance_id":"root:module:app/layout.tsx/component:presolve-site-layout","parent_boundary_id":"resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ApplicationRoot:root:module:app/layout.tsx/component:presolve-site-layout","child_boundary_ids":["resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0"],"activation_policy":"none","schema_id":"resume-schema:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout","capture_program_id":"resume-capture:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout","restore_program_id":"resume-restore:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout","anchor_ids":[],"event_ids":[],"provenance":{"path":"app/layout.tsx","start":65,"end":379,"line":4,"column":8}},{"boundary_id":"resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ComponentInstance:root:module:app/routes/compare.tsx/component:presolve-comparison","kind":"component_instance","owner_instance_id":"root:module:app/routes/compare.tsx/component:presolve-comparison","parent_boundary_id":"resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ApplicationRoot:root:module:app/routes/compare.tsx/component:presolve-comparison","child_boundary_ids":[],"activation_policy":"none","schema_id":"resume-schema:resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ComponentInstance:root:module:app/routes/compare.tsx/component:presolve-comparison","capture_program_id":"resume-capture:resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ComponentInstance:root:module:app/routes/compare.tsx/component:presolve-comparison","restore_program_id":"resume-restore:resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ComponentInstance:root:module:app/routes/compare.tsx/component:presolve-comparison","anchor_ids":[],"event_ids":[],"provenance":{"path":"app/routes/compare.tsx","start":59,"end":988,"line":4,"column":8}},{"boundary_id":"resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ComponentInstance:root:module:app/routes/docs/components.tsx/component:presolve-components","kind":"component_instance","owner_instance_id":"root:module:app/routes/docs/components.tsx/component:presolve-components","parent_boundary_id":"resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ApplicationRoot:root:module:app/routes/docs/components.tsx/component:presolve-components","child_boundary_ids":[],"activation_policy":"none","schema_id":"resume-schema:resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ComponentInstance:root:module:app/routes/docs/components.tsx/component:presolve-components","capture_program_id":"resume-capture:resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ComponentInstance:root:module:app/routes/docs/components.tsx/component:presolve-components","restore_program_id":"resume-restore:resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ComponentInstance:root:module:app/routes/docs/components.tsx/component:presolve-components","anchor_ids":[],"event_ids":[],"provenance":{"path":"app/routes/docs/components.tsx","start":59,"end":405,"line":4,"column":8}},{"boundary_id":"resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ComponentInstance:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","kind":"component_instance","owner_instance_id":"root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","parent_boundary_id":"resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ApplicationRoot:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","child_boundary_ids":[],"activation_policy":"none","schema_id":"resume-schema:resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ComponentInstance:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","capture_program_id":"resume-capture:resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ComponentInstance:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","restore_program_id":"resume-restore:resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ComponentInstance:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","anchor_ids":[],"event_ids":[],"provenance":{"path":"app/routes/docs/deployment.tsx","start":59,"end":441,"line":4,"column":8}},{"boundary_id":"resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ComponentInstance:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","kind":"component_instance","owner_instance_id":"root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","parent_boundary_id":"resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ApplicationRoot:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","child_boundary_ids":[],"activation_policy":"none","schema_id":"resume-schema:resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ComponentInstance:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","capture_program_id":"resume-capture:resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ComponentInstance:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","restore_program_id":"resume-restore:resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ComponentInstance:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","anchor_ids":[],"event_ids":[],"provenance":{"path":"app/routes/docs/getting-started.tsx","start":59,"end":426,"line":4,"column":8}},{"boundary_id":"resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ComponentInstance:root:module:app/routes/docs/index.tsx/component:presolve-documentation","kind":"component_instance","owner_instance_id":"root:module:app/routes/docs/index.tsx/component:presolve-documentation","parent_boundary_id":"resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ApplicationRoot:root:module:app/routes/docs/index.tsx/component:presolve-documentation","child_boundary_ids":[],"activation_policy":"none","schema_id":"resume-schema:resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ComponentInstance:root:module:app/routes/docs/index.tsx/component:presolve-documentation","capture_program_id":"resume-capture:resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ComponentInstance:root:module:app/routes/docs/index.tsx/component:presolve-documentation","restore_program_id":"resume-restore:resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ComponentInstance:root:module:app/routes/docs/index.tsx/component:presolve-documentation","anchor_ids":[],"event_ids":[],"provenance":{"path":"app/routes/docs/index.tsx","start":59,"end":485,"line":4,"column":8}},{"boundary_id":"resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ComponentInstance:root:module:app/routes/index.tsx/component:presolve-home","kind":"component_instance","owner_instance_id":"root:module:app/routes/index.tsx/component:presolve-home","parent_boundary_id":"resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ApplicationRoot:root:module:app/routes/index.tsx/component:presolve-home","child_boundary_ids":[],"activation_policy":"none","schema_id":"resume-schema:resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ComponentInstance:root:module:app/routes/index.tsx/component:presolve-home","capture_program_id":"resume-capture:resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ComponentInstance:root:module:app/routes/index.tsx/component:presolve-home","restore_program_id":"resume-restore:resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ComponentInstance:root:module:app/routes/index.tsx/component:presolve-home","anchor_ids":[],"event_ids":[],"provenance":{"path":"app/routes/index.tsx","start":59,"end":585,"line":4,"column":8}},{"boundary_id":"resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0","kind":"component_instance","owner_instance_id":"root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0","parent_boundary_id":"resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout","child_boundary_ids":[],"activation_policy":"none","schema_id":"resume-schema:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0","capture_program_id":"resume-capture:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0","restore_program_id":"resume-restore:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0","anchor_ids":[],"event_ids":[],"provenance":{"path":"app/layout.tsx","start":65,"end":379,"line":4,"column":8}}],"slot_schemas":[],"capture_programs":[{"program_id":"resume-capture:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ApplicationRoot:root:module:app/layout.tsx/component:presolve-site-layout","boundary_id":"resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ApplicationRoot:root:module:app/layout.tsx/component:presolve-site-layout","instructions":[]},{"program_id":"resume-capture:resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ApplicationRoot:root:module:app/routes/compare.tsx/component:presolve-comparison","boundary_id":"resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ApplicationRoot:root:module:app/routes/compare.tsx/component:presolve-comparison","instructions":[]},{"program_id":"resume-capture:resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ApplicationRoot:root:module:app/routes/docs/components.tsx/component:presolve-components","boundary_id":"resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ApplicationRoot:root:module:app/routes/docs/components.tsx/component:presolve-components","instructions":[]},{"program_id":"resume-capture:resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ApplicationRoot:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","boundary_id":"resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ApplicationRoot:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","instructions":[]},{"program_id":"resume-capture:resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ApplicationRoot:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","boundary_id":"resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ApplicationRoot:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","instructions":[]},{"program_id":"resume-capture:resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ApplicationRoot:root:module:app/routes/docs/index.tsx/component:presolve-documentation","boundary_id":"resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ApplicationRoot:root:module:app/routes/docs/index.tsx/component:presolve-documentation","instructions":[]},{"program_id":"resume-capture:resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ApplicationRoot:root:module:app/routes/index.tsx/component:presolve-home","boundary_id":"resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ApplicationRoot:root:module:app/routes/index.tsx/component:presolve-home","instructions":[]},{"program_id":"resume-capture:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout","boundary_id":"resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout","instructions":[]},{"program_id":"resume-capture:resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ComponentInstance:root:module:app/routes/compare.tsx/component:presolve-comparison","boundary_id":"resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ComponentInstance:root:module:app/routes/compare.tsx/component:presolve-comparison","instructions":[]},{"program_id":"resume-capture:resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ComponentInstance:root:module:app/routes/docs/components.tsx/component:presolve-components","boundary_id":"resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ComponentInstance:root:module:app/routes/docs/components.tsx/component:presolve-components","instructions":[]},{"program_id":"resume-capture:resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ComponentInstance:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","boundary_id":"resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ComponentInstance:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","instructions":[]},{"program_id":"resume-capture:resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ComponentInstance:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","boundary_id":"resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ComponentInstance:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","instructions":[]},{"program_id":"resume-capture:resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ComponentInstance:root:module:app/routes/docs/index.tsx/component:presolve-documentation","boundary_id":"resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ComponentInstance:root:module:app/routes/docs/index.tsx/component:presolve-documentation","instructions":[]},{"program_id":"resume-capture:resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ComponentInstance:root:module:app/routes/index.tsx/component:presolve-home","boundary_id":"resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ComponentInstance:root:module:app/routes/index.tsx/component:presolve-home","instructions":[]},{"program_id":"resume-capture:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0","boundary_id":"resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0","instructions":[]}],"restore_programs":[{"program_id":"resume-restore:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ApplicationRoot:root:module:app/layout.tsx/component:presolve-site-layout","boundary_id":"resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ApplicationRoot:root:module:app/layout.tsx/component:presolve-site-layout","instructions":[{"phase":"R2","instruction":{"kind":"allocate_boundary_runtime_record"}},{"phase":"R19","instruction":{"kind":"mark_boundary_restored"}}]},{"program_id":"resume-restore:resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ApplicationRoot:root:module:app/routes/compare.tsx/component:presolve-comparison","boundary_id":"resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ApplicationRoot:root:module:app/routes/compare.tsx/component:presolve-comparison","instructions":[{"phase":"R2","instruction":{"kind":"allocate_boundary_runtime_record"}},{"phase":"R19","instruction":{"kind":"mark_boundary_restored"}}]},{"program_id":"resume-restore:resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ApplicationRoot:root:module:app/routes/docs/components.tsx/component:presolve-components","boundary_id":"resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ApplicationRoot:root:module:app/routes/docs/components.tsx/component:presolve-components","instructions":[{"phase":"R2","instruction":{"kind":"allocate_boundary_runtime_record"}},{"phase":"R19","instruction":{"kind":"mark_boundary_restored"}}]},{"program_id":"resume-restore:resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ApplicationRoot:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","boundary_id":"resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ApplicationRoot:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","instructions":[{"phase":"R2","instruction":{"kind":"allocate_boundary_runtime_record"}},{"phase":"R19","instruction":{"kind":"mark_boundary_restored"}}]},{"program_id":"resume-restore:resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ApplicationRoot:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","boundary_id":"resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ApplicationRoot:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","instructions":[{"phase":"R2","instruction":{"kind":"allocate_boundary_runtime_record"}},{"phase":"R19","instruction":{"kind":"mark_boundary_restored"}}]},{"program_id":"resume-restore:resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ApplicationRoot:root:module:app/routes/docs/index.tsx/component:presolve-documentation","boundary_id":"resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ApplicationRoot:root:module:app/routes/docs/index.tsx/component:presolve-documentation","instructions":[{"phase":"R2","instruction":{"kind":"allocate_boundary_runtime_record"}},{"phase":"R19","instruction":{"kind":"mark_boundary_restored"}}]},{"program_id":"resume-restore:resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ApplicationRoot:root:module:app/routes/index.tsx/component:presolve-home","boundary_id":"resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ApplicationRoot:root:module:app/routes/index.tsx/component:presolve-home","instructions":[{"phase":"R2","instruction":{"kind":"allocate_boundary_runtime_record"}},{"phase":"R19","instruction":{"kind":"mark_boundary_restored"}}]},{"program_id":"resume-restore:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout","boundary_id":"resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout","instructions":[{"phase":"R2","instruction":{"kind":"allocate_boundary_runtime_record"}},{"phase":"R19","instruction":{"kind":"mark_boundary_restored"}}]},{"program_id":"resume-restore:resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ComponentInstance:root:module:app/routes/compare.tsx/component:presolve-comparison","boundary_id":"resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ComponentInstance:root:module:app/routes/compare.tsx/component:presolve-comparison","instructions":[{"phase":"R2","instruction":{"kind":"allocate_boundary_runtime_record"}},{"phase":"R19","instruction":{"kind":"mark_boundary_restored"}}]},{"program_id":"resume-restore:resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ComponentInstance:root:module:app/routes/docs/components.tsx/component:presolve-components","boundary_id":"resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ComponentInstance:root:module:app/routes/docs/components.tsx/component:presolve-components","instructions":[{"phase":"R2","instruction":{"kind":"allocate_boundary_runtime_record"}},{"phase":"R19","instruction":{"kind":"mark_boundary_restored"}}]},{"program_id":"resume-restore:resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ComponentInstance:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","boundary_id":"resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ComponentInstance:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","instructions":[{"phase":"R2","instruction":{"kind":"allocate_boundary_runtime_record"}},{"phase":"R19","instruction":{"kind":"mark_boundary_restored"}}]},{"program_id":"resume-restore:resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ComponentInstance:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","boundary_id":"resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ComponentInstance:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","instructions":[{"phase":"R2","instruction":{"kind":"allocate_boundary_runtime_record"}},{"phase":"R19","instruction":{"kind":"mark_boundary_restored"}}]},{"program_id":"resume-restore:resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ComponentInstance:root:module:app/routes/docs/index.tsx/component:presolve-documentation","boundary_id":"resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ComponentInstance:root:module:app/routes/docs/index.tsx/component:presolve-documentation","instructions":[{"phase":"R2","instruction":{"kind":"allocate_boundary_runtime_record"}},{"phase":"R19","instruction":{"kind":"mark_boundary_restored"}}]},{"program_id":"resume-restore:resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ComponentInstance:root:module:app/routes/index.tsx/component:presolve-home","boundary_id":"resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ComponentInstance:root:module:app/routes/index.tsx/component:presolve-home","instructions":[{"phase":"R2","instruction":{"kind":"allocate_boundary_runtime_record"}},{"phase":"R19","instruction":{"kind":"mark_boundary_restored"}}]},{"program_id":"resume-restore:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0","boundary_id":"resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0","instructions":[{"phase":"R2","instruction":{"kind":"allocate_boundary_runtime_record"}},{"phase":"R19","instruction":{"kind":"mark_boundary_restored"}}]}],"chunks":[{"chunk_id":"resume-chunk:Eager:application","root_kind":"eager","root_id":"application","module_path":"boot.application.5007b9c1f6351a901243030f72248137f4f80188e2bbf6fd682bdd4f354244c7.js","content_hash":"5007b9c1f6351a901243030f72248137f4f80188e2bbf6fd682bdd4f354244c7","required_boundary_ids":["resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ApplicationRoot:root:module:app/layout.tsx/component:presolve-site-layout","resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ApplicationRoot:root:module:app/routes/compare.tsx/component:presolve-comparison","resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ApplicationRoot:root:module:app/routes/docs/components.tsx/component:presolve-components","resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ApplicationRoot:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ApplicationRoot:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ApplicationRoot:root:module:app/routes/docs/index.tsx/component:presolve-documentation","resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ApplicationRoot:root:module:app/routes/index.tsx/component:presolve-home"],"provided_program_ids":["runtime-bootstrap","runtime-registries","event-delegation"],"dependency_chunk_ids":[]}],"activations":[{"activation_id":"resume-activation:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ApplicationRoot:root:module:app/layout.tsx/component:presolve-site-layout","boundary_id":"resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ApplicationRoot:root:module:app/layout.tsx/component:presolve-site-layout","policy":"eager","chunk_id":"resume-chunk:Eager:application","prerequisite_boundary_ids":[]},{"activation_id":"resume-activation:resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ApplicationRoot:root:module:app/routes/compare.tsx/component:presolve-comparison","boundary_id":"resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ApplicationRoot:root:module:app/routes/compare.tsx/component:presolve-comparison","policy":"eager","chunk_id":"resume-chunk:Eager:application","prerequisite_boundary_ids":[]},{"activation_id":"resume-activation:resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ApplicationRoot:root:module:app/routes/docs/components.tsx/component:presolve-components","boundary_id":"resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ApplicationRoot:root:module:app/routes/docs/components.tsx/component:presolve-components","policy":"eager","chunk_id":"resume-chunk:Eager:application","prerequisite_boundary_ids":[]},{"activation_id":"resume-activation:resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ApplicationRoot:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","boundary_id":"resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ApplicationRoot:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","policy":"eager","chunk_id":"resume-chunk:Eager:application","prerequisite_boundary_ids":[]},{"activation_id":"resume-activation:resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ApplicationRoot:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","boundary_id":"resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ApplicationRoot:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","policy":"eager","chunk_id":"resume-chunk:Eager:application","prerequisite_boundary_ids":[]},{"activation_id":"resume-activation:resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ApplicationRoot:root:module:app/routes/docs/index.tsx/component:presolve-documentation","boundary_id":"resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ApplicationRoot:root:module:app/routes/docs/index.tsx/component:presolve-documentation","policy":"eager","chunk_id":"resume-chunk:Eager:application","prerequisite_boundary_ids":[]},{"activation_id":"resume-activation:resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ApplicationRoot:root:module:app/routes/index.tsx/component:presolve-home","boundary_id":"resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ApplicationRoot:root:module:app/routes/index.tsx/component:presolve-home","policy":"eager","chunk_id":"resume-chunk:Eager:application","prerequisite_boundary_ids":[]}],"anchors":[],"events":[],"phase_i_component_resume_records":[{"record_kind":"component","component":{"component":"module:app/layout.tsx/component:presolve-site-layout","state":[],"computed":[],"events":[]}},{"record_kind":"component","component":{"component":"module:app/routes/compare.tsx/component:presolve-comparison","state":[],"computed":[],"events":[]}},{"record_kind":"component","component":{"component":"module:app/routes/docs/components.tsx/component:presolve-components","state":[],"computed":[],"events":[]}},{"record_kind":"component","component":{"component":"module:app/routes/docs/deployment.tsx/component:presolve-deployment","state":[],"computed":[],"events":[]}},{"record_kind":"component","component":{"component":"module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","state":[],"computed":[],"events":[]}},{"record_kind":"component","component":{"component":"module:app/routes/docs/index.tsx/component:presolve-documentation","state":[],"computed":[],"events":[]}},{"record_kind":"component","component":{"component":"module:app/routes/examples.tsx/component:presolve-examples","state":[],"computed":[],"events":[]}},{"record_kind":"component","component":{"component":"module:app/routes/index.tsx/component:presolve-home","state":[],"computed":[],"events":[]}},{"record_kind":"component_instance","component_instance":{"instance":"root:module:app/layout.tsx/component:presolve-site-layout","resume_id":"resume-instance:root:module:app/layout.tsx/component:presolve-site-layout","component":"module:app/layout.tsx/component:presolve-site-layout","parent_instance":null,"active_status":"active","structural_region":null}},{"record_kind":"component_instance","component_instance":{"instance":"root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0","resume_id":"resume-instance:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0","component":"module:app/routes/examples.tsx/component:presolve-examples","parent_instance":"root:module:app/layout.tsx/component:presolve-site-layout","active_status":"active","structural_region":null}},{"record_kind":"component_instance","component_instance":{"instance":"root:module:app/routes/compare.tsx/component:presolve-comparison","resume_id":"resume-instance:root:module:app/routes/compare.tsx/component:presolve-comparison","component":"module:app/routes/compare.tsx/component:presolve-comparison","parent_instance":null,"active_status":"active","structural_region":null}},{"record_kind":"component_instance","component_instance":{"instance":"root:module:app/routes/docs/components.tsx/component:presolve-components","resume_id":"resume-instance:root:module:app/routes/docs/components.tsx/component:presolve-components","component":"module:app/routes/docs/components.tsx/component:presolve-components","parent_instance":null,"active_status":"active","structural_region":null}},{"record_kind":"component_instance","component_instance":{"instance":"root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","resume_id":"resume-instance:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","component":"module:app/routes/docs/deployment.tsx/component:presolve-deployment","parent_instance":null,"active_status":"active","structural_region":null}},{"record_kind":"component_instance","component_instance":{"instance":"root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","resume_id":"resume-instance:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","component":"module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","parent_instance":null,"active_status":"active","structural_region":null}},{"record_kind":"component_instance","component_instance":{"instance":"root:module:app/routes/docs/index.tsx/component:presolve-documentation","resume_id":"resume-instance:root:module:app/routes/docs/index.tsx/component:presolve-documentation","component":"module:app/routes/docs/index.tsx/component:presolve-documentation","parent_instance":null,"active_status":"active","structural_region":null}},{"record_kind":"component_instance","component_instance":{"instance":"root:module:app/routes/index.tsx/component:presolve-home","resume_id":"resume-instance:root:module:app/routes/index.tsx/component:presolve-home","component":"module:app/routes/index.tsx/component:presolve-home","parent_instance":null,"active_status":"active","structural_region":null}},{"record_kind":"slot_binding","slot_binding":{"binding":"root:module:app/layout.tsx/component:presolve-site-layout/slot-binding:layout-child:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0","resume_id":"resume-slot-binding:root:module:app/layout.tsx/component:presolve-site-layout/slot-binding:layout-child:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0","caller_instance":"root:module:app/layout.tsx/component:presolve-site-layout","callee_instance":"root:module:app/layout.tsx/component:presolve-site-layout"}}],"phase_i_form_resume_records":[]}
+    </script>
+    <script type="application/json" id="presolve-production-runtime">{"schemaVersion":1,"buildId":"resume-build:8b8a2a9fa250fcc4b130f268f6be855c9e9ecdeeabfd154960ea974b91b7a033","runtimeProtocolVersion":1,"optimizationPolicy":"optimization-policy:production-v1","tables":{"tables":[{"table_id":"runtime-table:production_runtime:activations","table_kind":"activations","schema_version":1,"count":7,"ordinal_width":"u8","checksum":"c92cc36c4fd71534bf4ae7e02f0ef7fbe7f018757263000c76642b1376955327","mappings":[{"canonical_id":"resume-activation:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ApplicationRoot:root:module:app/layout.tsx/component:presolve-site-layout","ordinal":0},{"canonical_id":"resume-activation:resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ApplicationRoot:root:module:app/routes/compare.tsx/component:presolve-comparison","ordinal":1},{"canonical_id":"resume-activation:resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ApplicationRoot:root:module:app/routes/docs/components.tsx/component:presolve-components","ordinal":2},{"canonical_id":"resume-activation:resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ApplicationRoot:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","ordinal":3},{"canonical_id":"resume-activation:resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ApplicationRoot:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","ordinal":4},{"canonical_id":"resume-activation:resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ApplicationRoot:root:module:app/routes/docs/index.tsx/component:presolve-documentation","ordinal":5},{"canonical_id":"resume-activation:resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ApplicationRoot:root:module:app/routes/index.tsx/component:presolve-home","ordinal":6}],"referenced_table_ids":["runtime-table:production_runtime:chunks"]},{"table_id":"runtime-table:production_runtime:activation_roots","table_kind":"activation_roots","schema_version":1,"count":0,"ordinal_width":"u8","checksum":"7b35ccd663e0b632e2de8aa32db9f6ea12cc2003535183f1125f936fcb3c71b9","mappings":[],"referenced_table_ids":["runtime-table:production_runtime:chunks"]},{"table_id":"runtime-table:production_runtime:anchors","table_kind":"anchors","schema_version":1,"count":0,"ordinal_width":"u8","checksum":"2d35fec3534375112c8a63d3e372bda3032424ec39899ccf3081bd810f57a52b","mappings":[],"referenced_table_ids":[]},{"table_id":"runtime-table:production_runtime:chunks","table_kind":"chunks","schema_version":1,"count":1,"ordinal_width":"u8","checksum":"dad5e0c7f312f5177348914fbd2563b3b8ec806c099fa763f1a4d93941578f49","mappings":[{"canonical_id":"production-chunk:eager:runtime-v1","ordinal":0}],"referenced_table_ids":[]},{"table_id":"runtime-table:production_runtime:events","table_kind":"events","schema_version":1,"count":0,"ordinal_width":"u8","checksum":"9389261c185bd5674546ffd8a903815cdc4bd77dead00565c2f63cf6f0e2d9e7","mappings":[],"referenced_table_ids":["runtime-table:production_runtime:anchors"]},{"table_id":"runtime-table:production_runtime:programs","table_kind":"programs","schema_version":1,"count":33,"ordinal_width":"u8","checksum":"d7b434da098719eb630ab543f7d718fa87808f4757f2d66ea65d6ce528d0a958","mappings":[{"canonical_id":"event-delegation","ordinal":0},{"canonical_id":"resume-capture:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0","ordinal":1},{"canonical_id":"resume-capture:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ApplicationRoot:root:module:app/layout.tsx/component:presolve-site-layout","ordinal":2},{"canonical_id":"resume-capture:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout","ordinal":3},{"canonical_id":"resume-capture:resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ApplicationRoot:root:module:app/routes/compare.tsx/component:presolve-comparison","ordinal":4},{"canonical_id":"resume-capture:resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ComponentInstance:root:module:app/routes/compare.tsx/component:presolve-comparison","ordinal":5},{"canonical_id":"resume-capture:resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ApplicationRoot:root:module:app/routes/docs/components.tsx/component:presolve-components","ordinal":6},{"canonical_id":"resume-capture:resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ComponentInstance:root:module:app/routes/docs/components.tsx/component:presolve-components","ordinal":7},{"canonical_id":"resume-capture:resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ApplicationRoot:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","ordinal":8},{"canonical_id":"resume-capture:resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ComponentInstance:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","ordinal":9},{"canonical_id":"resume-capture:resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ApplicationRoot:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","ordinal":10},{"canonical_id":"resume-capture:resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ComponentInstance:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","ordinal":11},{"canonical_id":"resume-capture:resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ApplicationRoot:root:module:app/routes/docs/index.tsx/component:presolve-documentation","ordinal":12},{"canonical_id":"resume-capture:resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ComponentInstance:root:module:app/routes/docs/index.tsx/component:presolve-documentation","ordinal":13},{"canonical_id":"resume-capture:resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ApplicationRoot:root:module:app/routes/index.tsx/component:presolve-home","ordinal":14},{"canonical_id":"resume-capture:resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ComponentInstance:root:module:app/routes/index.tsx/component:presolve-home","ordinal":15},{"canonical_id":"resume-restore:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0","ordinal":16},{"canonical_id":"resume-restore:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ApplicationRoot:root:module:app/layout.tsx/component:presolve-site-layout","ordinal":17},{"canonical_id":"resume-restore:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout","ordinal":18},{"canonical_id":"resume-restore:resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ApplicationRoot:root:module:app/routes/compare.tsx/component:presolve-comparison","ordinal":19},{"canonical_id":"resume-restore:resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ComponentInstance:root:module:app/routes/compare.tsx/component:presolve-comparison","ordinal":20},{"canonical_id":"resume-restore:resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ApplicationRoot:root:module:app/routes/docs/components.tsx/component:presolve-components","ordinal":21},{"canonical_id":"resume-restore:resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ComponentInstance:root:module:app/routes/docs/components.tsx/component:presolve-components","ordinal":22},{"canonical_id":"resume-restore:resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ApplicationRoot:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","ordinal":23},{"canonical_id":"resume-restore:resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ComponentInstance:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","ordinal":24},{"canonical_id":"resume-restore:resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ApplicationRoot:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","ordinal":25},{"canonical_id":"resume-restore:resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ComponentInstance:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","ordinal":26},{"canonical_id":"resume-restore:resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ApplicationRoot:root:module:app/routes/docs/index.tsx/component:presolve-documentation","ordinal":27},{"canonical_id":"resume-restore:resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ComponentInstance:root:module:app/routes/docs/index.tsx/component:presolve-documentation","ordinal":28},{"canonical_id":"resume-restore:resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ApplicationRoot:root:module:app/routes/index.tsx/component:presolve-home","ordinal":29},{"canonical_id":"resume-restore:resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ComponentInstance:root:module:app/routes/index.tsx/component:presolve-home","ordinal":30},{"canonical_id":"runtime-bootstrap","ordinal":31},{"canonical_id":"runtime-registries","ordinal":32}],"referenced_table_ids":[]}]},"programs":["event-delegation","resume-capture:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0","resume-capture:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ApplicationRoot:root:module:app/layout.tsx/component:presolve-site-layout","resume-capture:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout","resume-capture:resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ApplicationRoot:root:module:app/routes/compare.tsx/component:presolve-comparison","resume-capture:resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ComponentInstance:root:module:app/routes/compare.tsx/component:presolve-comparison","resume-capture:resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ApplicationRoot:root:module:app/routes/docs/components.tsx/component:presolve-components","resume-capture:resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ComponentInstance:root:module:app/routes/docs/components.tsx/component:presolve-components","resume-capture:resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ApplicationRoot:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","resume-capture:resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ComponentInstance:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","resume-capture:resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ApplicationRoot:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","resume-capture:resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ComponentInstance:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","resume-capture:resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ApplicationRoot:root:module:app/routes/docs/index.tsx/component:presolve-documentation","resume-capture:resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ComponentInstance:root:module:app/routes/docs/index.tsx/component:presolve-documentation","resume-capture:resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ApplicationRoot:root:module:app/routes/index.tsx/component:presolve-home","resume-capture:resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ComponentInstance:root:module:app/routes/index.tsx/component:presolve-home","resume-restore:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout/invocation:module:app/layout.tsx/component:presolve-site-layout/layout-composition:module:app/routes/examples.tsx/component:presolve-examples:0","resume-restore:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ApplicationRoot:root:module:app/layout.tsx/component:presolve-site-layout","resume-restore:resume-boundary:root:module:app/layout.tsx/component:presolve-site-layout:ComponentInstance:root:module:app/layout.tsx/component:presolve-site-layout","resume-restore:resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ApplicationRoot:root:module:app/routes/compare.tsx/component:presolve-comparison","resume-restore:resume-boundary:root:module:app/routes/compare.tsx/component:presolve-comparison:ComponentInstance:root:module:app/routes/compare.tsx/component:presolve-comparison","resume-restore:resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ApplicationRoot:root:module:app/routes/docs/components.tsx/component:presolve-components","resume-restore:resume-boundary:root:module:app/routes/docs/components.tsx/component:presolve-components:ComponentInstance:root:module:app/routes/docs/components.tsx/component:presolve-components","resume-restore:resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ApplicationRoot:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","resume-restore:resume-boundary:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment:ComponentInstance:root:module:app/routes/docs/deployment.tsx/component:presolve-deployment","resume-restore:resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ApplicationRoot:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","resume-restore:resume-boundary:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started:ComponentInstance:root:module:app/routes/docs/getting-started.tsx/component:presolve-getting-started","resume-restore:resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ApplicationRoot:root:module:app/routes/docs/index.tsx/component:presolve-documentation","resume-restore:resume-boundary:root:module:app/routes/docs/index.tsx/component:presolve-documentation:ComponentInstance:root:module:app/routes/docs/index.tsx/component:presolve-documentation","resume-restore:resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ApplicationRoot:root:module:app/routes/index.tsx/component:presolve-home","resume-restore:resume-boundary:root:module:app/routes/index.tsx/component:presolve-home:ComponentInstance:root:module:app/routes/index.tsx/component:presolve-home","runtime-bootstrap","runtime-registries"],"chunks":[{"chunk_id":"production-chunk:eager:runtime-v1","kind":"eager","module_filename":"boot.pending-content-hash.js","dependency_chunk_ids":[]}],"entry":{"eager_chunk_id":"production-chunk:eager:runtime-v1","activations":[]},"integrity":{"artifact_checksum":"2a8078a8d8f006c5fc34eb7a2be1c9a6f2f88a2366c15af5ce98ce3d05dd4254","table_checksums":["c92cc36c4fd71534bf4ae7e02f0ef7fbe7f018757263000c76642b1376955327","7b35ccd663e0b632e2de8aa32db9f6ea12cc2003535183f1125f936fcb3c71b9","2d35fec3534375112c8a63d3e372bda3032424ec39899ccf3081bd810f57a52b","dad5e0c7f312f5177348914fbd2563b3b8ec806c099fa763f1a4d93941578f49","9389261c185bd5674546ffd8a903815cdc4bd77dead00565c2f63cf6f0e2d9e7","d7b434da098719eb630ab543f7d718fa87808f4757f2d66ea65d6ce528d0a958"]}}
+    </script>
+    <script src="./runtime.js" defer></script>
+  </body>
+</html>

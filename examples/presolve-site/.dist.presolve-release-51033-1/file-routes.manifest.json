@@ -1,0 +1,493 @@
+{
+  "schema_version": 1,
+  "compiler_contract": "presolve-file-route-publication:1",
+  "profile": "production",
+  "routes": [
+    {
+      "path": "/",
+      "entry_component_id": "module:app/routes/index.tsx/component:presolve-home",
+      "artifact_root": "routes/root",
+      "layout_component_ids": [
+        "module:app/layout.tsx/component:presolve-site-layout"
+      ]
+    },
+    {
+      "path": "/compare",
+      "entry_component_id": "module:app/routes/compare.tsx/component:presolve-comparison",
+      "artifact_root": "routes/segment-compare",
+      "layout_component_ids": [
+        "module:app/layout.tsx/component:presolve-site-layout"
+      ]
+    },
+    {
+      "path": "/docs",
+      "entry_component_id": "module:app/routes/docs/index.tsx/component:presolve-documentation",
+      "artifact_root": "routes/segment-docs",
+      "layout_component_ids": [
+        "module:app/layout.tsx/component:presolve-site-layout"
+      ]
+    },
+    {
+      "path": "/docs/components",
+      "entry_component_id": "module:app/routes/docs/components.tsx/component:presolve-components",
+      "artifact_root": "routes/segment-docs/segment-components",
+      "layout_component_ids": [
+        "module:app/layout.tsx/component:presolve-site-layout"
+      ]
+    },
+    {
+      "path": "/docs/deployment",
+      "entry_component_id": "module:app/routes/docs/deployment.tsx/component:presolve-deployment",
+      "artifact_root": "routes/segment-docs/segment-deployment",
+      "layout_component_ids": [
+        "module:app/layout.tsx/component:presolve-site-layout"
+      ]
+    },
+    {
+      "path": "/docs/getting-started",
+      "entry_component_id": "module:app/routes/docs/getting-started.tsx/component:presolve-getting-started",
+      "artifact_root": "routes/segment-docs/segment-getting-started",
+      "layout_component_ids": [
+        "module:app/layout.tsx/component:presolve-site-layout"
+      ]
+    },
+    {
+      "path": "/examples",
+      "entry_component_id": "module:app/routes/examples.tsx/component:presolve-examples",
+      "artifact_root": "routes/segment-examples",
+      "layout_component_ids": [
+        "module:app/layout.tsx/component:presolve-site-layout"
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "route-loaders.plan.json",
+      "digest": "sha256:2adeb8a7cc16f6d97083bf4f8e178c76076e83459fde1720ca72a329147ef5bf"
+    },
+    {
+      "path": "route-server-actions.plan.json",
+      "digest": "sha256:f4ccb1fcaf63c8554380048296d2be5f0195552e1d2ff762c1db5d3f29cc1d73"
+    },
+    {
+      "path": "routes/root/application.manifest.json",
+      "digest": "sha256:4b79688294d0298c03aeafa732b74a99df51ca3d8837f3ec1a0031e3af91f599"
+    },
+    {
+      "path": "routes/root/boot.application.962f03cc36e22674ee30429a64bf6293803173cdffbeb44745a9d5d87c151ec2.js",
+      "digest": "sha256:962f03cc36e22674ee30429a64bf6293803173cdffbeb44745a9d5d87c151ec2"
+    },
+    {
+      "path": "routes/root/component.runtime.json",
+      "digest": "sha256:1100d358bb68c0b2aba7bb2bc5ac60e5bbf51ad8fa66a106dc4d29e68f88a0a5"
+    },
+    {
+      "path": "routes/root/computed.runtime.json",
+      "digest": "sha256:e09d2a6de3e80f7c01537155aa94eafc3d0c30d2b6fb389792c41c61fd4e72ec"
+    },
+    {
+      "path": "routes/root/context.runtime.json",
+      "digest": "sha256:8a9de2e39918bdd2b097c35c823cc497d6dc6552fb6752c1949d011b9d7141e4"
+    },
+    {
+      "path": "routes/root/effect.runtime.json",
+      "digest": "sha256:efb8b81be3dfc4a33b32ab5eb317b473ce6d37a1f9e520514b7d022981bf62fd"
+    },
+    {
+      "path": "routes/root/forms.runtime.json",
+      "digest": "sha256:c7dc94c23345a4aa686fa2cda22047844d558db60361446d0cdd033cec18007b"
+    },
+    {
+      "path": "routes/root/index.html",
+      "digest": "sha256:90237fcf224714c89d40ded18da7e3554207ca0e2644d083ce9cb16ed8c9efb4"
+    },
+    {
+      "path": "routes/root/optimization-report.json",
+      "digest": "sha256:6aa7542c9d1df89fc9ec086a30c9f9cba7bb90b512b43d1bf3c3615d69d53e9c"
+    },
+    {
+      "path": "routes/root/production/boot.e6d1789381c134f9.js",
+      "digest": "sha256:e6d1789381c134f99edcabfee1b80073a71dfe3517b13a2742f2895c6366b440"
+    },
+    {
+      "path": "routes/root/production.runtime.json",
+      "digest": "sha256:6cee3f33de340d559188f7a612f5cdf8c2c97085be0556dbd06130455008645b"
+    },
+    {
+      "path": "routes/root/resume.runtime.json",
+      "digest": "sha256:3ceaf7d4cca80ffea37c84059e538bb83c3325efd0916f11a074dfbee20f6f95"
+    },
+    {
+      "path": "routes/root/runtime-cost-report.json",
+      "digest": "sha256:e3975bcf0a468cb51a9834e0cebc8c00b27ba4632f93801b2883ae21404a0116"
+    },
+    {
+      "path": "routes/root/runtime.js",
+      "digest": "sha256:4c12467348887f3c1443b26f7b67a8749301adf9c960c74f472992351e31dd7e"
+    },
+    {
+      "path": "routes/root/template.manifest.json",
+      "digest": "sha256:80b3c7b0fa7b2f19c3cfe2335f674f8f0bff691fbaf3e31f6c570fd3caaa3031"
+    },
+    {
+      "path": "routes/segment-compare/application.manifest.json",
+      "digest": "sha256:1a821dfd46317508cefb36e35acbb0a7c2395d53572985a2be2242f127beb611"
+    },
+    {
+      "path": "routes/segment-compare/boot.application.9e5b4bfc4cbb6796e8ff58313a47c20541fc3b979fed2799b22509b860cefc9b.js",
+      "digest": "sha256:9e5b4bfc4cbb6796e8ff58313a47c20541fc3b979fed2799b22509b860cefc9b"
+    },
+    {
+      "path": "routes/segment-compare/component.runtime.json",
+      "digest": "sha256:01fe581c299bd446aa9c8d8cadfe942be1984761446700d3ef0a4ce46ecadb33"
+    },
+    {
+      "path": "routes/segment-compare/computed.runtime.json",
+      "digest": "sha256:e09d2a6de3e80f7c01537155aa94eafc3d0c30d2b6fb389792c41c61fd4e72ec"
+    },
+    {
+      "path": "routes/segment-compare/context.runtime.json",
+      "digest": "sha256:8a9de2e39918bdd2b097c35c823cc497d6dc6552fb6752c1949d011b9d7141e4"
+    },
+    {
+      "path": "routes/segment-compare/effect.runtime.json",
+      "digest": "sha256:efb8b81be3dfc4a33b32ab5eb317b473ce6d37a1f9e520514b7d022981bf62fd"
+    },
+    {
+      "path": "routes/segment-compare/forms.runtime.json",
+      "digest": "sha256:c7dc94c23345a4aa686fa2cda22047844d558db60361446d0cdd033cec18007b"
+    },
+    {
+      "path": "routes/segment-compare/index.html",
+      "digest": "sha256:48cf89422fd9f6afc06fa15bcd7c29affd59e30efdf86a87f46b5ac5f6b8036a"
+    },
+    {
+      "path": "routes/segment-compare/optimization-report.json",
+      "digest": "sha256:ca0fc1d64ccd577894dae6b29aff6c48a3fb15c3c29c8ab24ebdc99c69e87cf9"
+    },
+    {
+      "path": "routes/segment-compare/production/boot.e6d1789381c134f9.js",
+      "digest": "sha256:e6d1789381c134f99edcabfee1b80073a71dfe3517b13a2742f2895c6366b440"
+    },
+    {
+      "path": "routes/segment-compare/production.runtime.json",
+      "digest": "sha256:ca0afc15dda2ac4030d421a42b615ac2df4d06aca1a11cb952270041360707dd"
+    },
+    {
+      "path": "routes/segment-compare/resume.runtime.json",
+      "digest": "sha256:ee2043b0bb48a485a896684c571075f7681602bb857b9684b1a009566c3d1f67"
+    },
+    {
+      "path": "routes/segment-compare/runtime-cost-report.json",
+      "digest": "sha256:93a104ca6445c387b686de721c8580f0db3e3ab4937b8b148b59b46f81b84724"
+    },
+    {
+      "path": "routes/segment-compare/runtime.js",
+      "digest": "sha256:4c12467348887f3c1443b26f7b67a8749301adf9c960c74f472992351e31dd7e"
+    },
+    {
+      "path": "routes/segment-compare/template.manifest.json",
+      "digest": "sha256:80b3c7b0fa7b2f19c3cfe2335f674f8f0bff691fbaf3e31f6c570fd3caaa3031"
+    },
+    {
+      "path": "routes/segment-docs/application.manifest.json",
+      "digest": "sha256:7adce1f536adba53f58cbeb5ca6970de12c1ea64b4328450c8e8cd389ac24dc5"
+    },
+    {
+      "path": "routes/segment-docs/boot.application.1bf35da4f4c3061e641f8c28f70e907e597bf19c45f69a86f72bdd357488d524.js",
+      "digest": "sha256:1bf35da4f4c3061e641f8c28f70e907e597bf19c45f69a86f72bdd357488d524"
+    },
+    {
+      "path": "routes/segment-docs/component.runtime.json",
+      "digest": "sha256:a549ded872c21f9c1cf97f714a44007bdd900be8f4ee36c7a5258ed4842bc39c"
+    },
+    {
+      "path": "routes/segment-docs/computed.runtime.json",
+      "digest": "sha256:e09d2a6de3e80f7c01537155aa94eafc3d0c30d2b6fb389792c41c61fd4e72ec"
+    },
+    {
+      "path": "routes/segment-docs/context.runtime.json",
+      "digest": "sha256:8a9de2e39918bdd2b097c35c823cc497d6dc6552fb6752c1949d011b9d7141e4"
+    },
+    {
+      "path": "routes/segment-docs/effect.runtime.json",
+      "digest": "sha256:efb8b81be3dfc4a33b32ab5eb317b473ce6d37a1f9e520514b7d022981bf62fd"
+    },
+    {
+      "path": "routes/segment-docs/forms.runtime.json",
+      "digest": "sha256:c7dc94c23345a4aa686fa2cda22047844d558db60361446d0cdd033cec18007b"
+    },
+    {
+      "path": "routes/segment-docs/index.html",
+      "digest": "sha256:0692e83e669b2873b26aaeaaf220d62bdda3c7d84c486f7a9df52e9b13e6a8bc"
+    },
+    {
+      "path": "routes/segment-docs/optimization-report.json",
+      "digest": "sha256:611106bfc21f4344efbd95e2cac929e65bffe3378dc44cb11325c9ff9af206b5"
+    },
+    {
+      "path": "routes/segment-docs/production/boot.e6d1789381c134f9.js",
+      "digest": "sha256:e6d1789381c134f99edcabfee1b80073a71dfe3517b13a2742f2895c6366b440"
+    },
+    {
+      "path": "routes/segment-docs/production.runtime.json",
+      "digest": "sha256:eb4567883e56fb69b0f0964116b78b12f5e8966d19fc338d3ecd5666bed9e5e6"
+    },
+    {
+      "path": "routes/segment-docs/resume.runtime.json",
+      "digest": "sha256:b7131567720618096ccea7886ac61534795f60b8aad6c64338026e23bd714332"
+    },
+    {
+      "path": "routes/segment-docs/runtime-cost-report.json",
+      "digest": "sha256:56ef1c6157f9ea9be3afa6ed2a7ae2a3b33de451fd4273c826714d614ac89574"
+    },
+    {
+      "path": "routes/segment-docs/runtime.js",
+      "digest": "sha256:4c12467348887f3c1443b26f7b67a8749301adf9c960c74f472992351e31dd7e"
+    },
+    {
+      "path": "routes/segment-docs/segment-components/application.manifest.json",
+      "digest": "sha256:02935f9b5440aedd973e75b76487054186988a512a5231e07f5df140b309218f"
+    },
+    {
+      "path": "routes/segment-docs/segment-components/boot.application.0e29b74f981f99f3ff8e160f8a62259ca674aa4cc397837fcad89102f839705d.js",
+      "digest": "sha256:0e29b74f981f99f3ff8e160f8a62259ca674aa4cc397837fcad89102f839705d"
+    },
+    {
+      "path": "routes/segment-docs/segment-components/component.runtime.json",
+      "digest": "sha256:7aed007bf74e251877e49af52a154e3ac8a2d7c5b21fe672397e217dd8f2bceb"
+    },
+    {
+      "path": "routes/segment-docs/segment-components/computed.runtime.json",
+      "digest": "sha256:e09d2a6de3e80f7c01537155aa94eafc3d0c30d2b6fb389792c41c61fd4e72ec"
+    },
+    {
+      "path": "routes/segment-docs/segment-components/context.runtime.json",
+      "digest": "sha256:8a9de2e39918bdd2b097c35c823cc497d6dc6552fb6752c1949d011b9d7141e4"
+    },
+    {
+      "path": "routes/segment-docs/segment-components/effect.runtime.json",
+      "digest": "sha256:efb8b81be3dfc4a33b32ab5eb317b473ce6d37a1f9e520514b7d022981bf62fd"
+    },
+    {
+      "path": "routes/segment-docs/segment-components/forms.runtime.json",
+      "digest": "sha256:c7dc94c23345a4aa686fa2cda22047844d558db60361446d0cdd033cec18007b"
+    },
+    {
+      "path": "routes/segment-docs/segment-components/index.html",
+      "digest": "sha256:2d8f92b7efa73c2b7965a733d71afc4f53f67baabbc4e6572e812b95b109b659"
+    },
+    {
+      "path": "routes/segment-docs/segment-components/optimization-report.json",
+      "digest": "sha256:2a4056a3d44f89c30a43f49e5fb5bbe8965f3233dce3a5eb2488205da14c5d7d"
+    },
+    {
+      "path": "routes/segment-docs/segment-components/production/boot.e6d1789381c134f9.js",
+      "digest": "sha256:e6d1789381c134f99edcabfee1b80073a71dfe3517b13a2742f2895c6366b440"
+    },
+    {
+      "path": "routes/segment-docs/segment-components/production.runtime.json",
+      "digest": "sha256:286db77cd11f90515b96147e5c9039b549eaa556a0a1c7101cd806bb276d837d"
+    },
+    {
+      "path": "routes/segment-docs/segment-components/resume.runtime.json",
+      "digest": "sha256:8072311936da863748498708502ba362db18f7f39c42a2206a26f63c4ba47573"
+    },
+    {
+      "path": "routes/segment-docs/segment-components/runtime-cost-report.json",
+      "digest": "sha256:92bc99e72b9bca1fb0b16fe2deb263550336118b2f45e00cd211e44562ce4081"
+    },
+    {
+      "path": "routes/segment-docs/segment-components/runtime.js",
+      "digest": "sha256:4c12467348887f3c1443b26f7b67a8749301adf9c960c74f472992351e31dd7e"
+    },
+    {
+      "path": "routes/segment-docs/segment-components/template.manifest.json",
+      "digest": "sha256:80b3c7b0fa7b2f19c3cfe2335f674f8f0bff691fbaf3e31f6c570fd3caaa3031"
+    },
+    {
+      "path": "routes/segment-docs/segment-deployment/application.manifest.json",
+      "digest": "sha256:228fb65f006ac2f888fdf389b953e84407936da6b3a8c95102a5b37ca97d4c4f"
+    },
+    {
+      "path": "routes/segment-docs/segment-deployment/boot.application.2b6afe74f3ecb8406520bde217f69bf7275036846685b4575b3dcc75c710f1d2.js",
+      "digest": "sha256:2b6afe74f3ecb8406520bde217f69bf7275036846685b4575b3dcc75c710f1d2"
+    },
+    {
+      "path": "routes/segment-docs/segment-deployment/component.runtime.json",
+      "digest": "sha256:83ac1662887d33b2f2d54a87f8fabedf897586ea9128ce68814997289726a89e"
+    },
+    {
+      "path": "routes/segment-docs/segment-deployment/computed.runtime.json",
+      "digest": "sha256:e09d2a6de3e80f7c01537155aa94eafc3d0c30d2b6fb389792c41c61fd4e72ec"
+    },
+    {
+      "path": "routes/segment-docs/segment-deployment/context.runtime.json",
+      "digest": "sha256:8a9de2e39918bdd2b097c35c823cc497d6dc6552fb6752c1949d011b9d7141e4"
+    },
+    {
+      "path": "routes/segment-docs/segment-deployment/effect.runtime.json",
+      "digest": "sha256:efb8b81be3dfc4a33b32ab5eb317b473ce6d37a1f9e520514b7d022981bf62fd"
+    },
+    {
+      "path": "routes/segment-docs/segment-deployment/forms.runtime.json",
+      "digest": "sha256:c7dc94c23345a4aa686fa2cda22047844d558db60361446d0cdd033cec18007b"
+    },
+    {
+      "path": "routes/segment-docs/segment-deployment/index.html",
+      "digest": "sha256:3e362a25d0bbeade3d0d59b6b8c1a299b70f4e1bb44257676b1ac171afc0ae07"
+    },
+    {
+      "path": "routes/segment-docs/segment-deployment/optimization-report.json",
+      "digest": "sha256:a4adf87a250c0324094956605532e30b399ac906ad5e49a53ddb4ae370c4dcac"
+    },
+    {
+      "path": "routes/segment-docs/segment-deployment/production/boot.e6d1789381c134f9.js",
+      "digest": "sha256:e6d1789381c134f99edcabfee1b80073a71dfe3517b13a2742f2895c6366b440"
+    },
+    {
+      "path": "routes/segment-docs/segment-deployment/production.runtime.json",
+      "digest": "sha256:3826a0aad150ff79d5d5144f0672cc80f6585109401705a8e821d552bb0ffa97"
+    },
+    {
+      "path": "routes/segment-docs/segment-deployment/resume.runtime.json",
+      "digest": "sha256:169d1466b56a3004c6710dc788cec5f8f1ad641f12159c485cc8cdba371cddca"
+    },
+    {
+      "path": "routes/segment-docs/segment-deployment/runtime-cost-report.json",
+      "digest": "sha256:28c09c788e91bc8f3fe7ad9989bc11a7052be6e34b2aedfbbe507d2f39b34204"
+    },
+    {
+      "path": "routes/segment-docs/segment-deployment/runtime.js",
+      "digest": "sha256:4c12467348887f3c1443b26f7b67a8749301adf9c960c74f472992351e31dd7e"
+    },
+    {
+      "path": "routes/segment-docs/segment-deployment/template.manifest.json",
+      "digest": "sha256:80b3c7b0fa7b2f19c3cfe2335f674f8f0bff691fbaf3e31f6c570fd3caaa3031"
+    },
+    {
+      "path": "routes/segment-docs/segment-getting-started/application.manifest.json",
+      "digest": "sha256:eee4ea3189ae2d497a43130b9534f83e8aee0903fae14ae0cc0155fb1026e2fc"
+    },
+    {
+      "path": "routes/segment-docs/segment-getting-started/boot.application.f73a1cf3546c020ae7aa4fc4a36d224a94d4ac70ddfe7af59cf5dc73f30e7f2a.js",
+      "digest": "sha256:f73a1cf3546c020ae7aa4fc4a36d224a94d4ac70ddfe7af59cf5dc73f30e7f2a"
+    },
+    {
+      "path": "routes/segment-docs/segment-getting-started/component.runtime.json",
+      "digest": "sha256:5ba110a8cac5412e54c27cbc6c395126b1570bbcbe69a06eab9b5f428cbadd90"
+    },
+    {
+      "path": "routes/segment-docs/segment-getting-started/computed.runtime.json",
+      "digest": "sha256:e09d2a6de3e80f7c01537155aa94eafc3d0c30d2b6fb389792c41c61fd4e72ec"
+    },
+    {
+      "path": "routes/segment-docs/segment-getting-started/context.runtime.json",
+      "digest": "sha256:8a9de2e39918bdd2b097c35c823cc497d6dc6552fb6752c1949d011b9d7141e4"
+    },
+    {
+      "path": "routes/segment-docs/segment-getting-started/effect.runtime.json",
+      "digest": "sha256:efb8b81be3dfc4a33b32ab5eb317b473ce6d37a1f9e520514b7d022981bf62fd"
+    },
+    {
+      "path": "routes/segment-docs/segment-getting-started/forms.runtime.json",
+      "digest": "sha256:c7dc94c23345a4aa686fa2cda22047844d558db60361446d0cdd033cec18007b"
+    },
+    {
+      "path": "routes/segment-docs/segment-getting-started/index.html",
+      "digest": "sha256:ab8e5d7d40965b1d7a26d9e0c555956e54c729a39a73ddab953b767ea302c173"
+    },
+    {
+      "path": "routes/segment-docs/segment-getting-started/optimization-report.json",
+      "digest": "sha256:17286a7492e12fd35e1a323049ea4856926df69a98fb1a59cb8ef06115d4fda2"
+    },
+    {
+      "path": "routes/segment-docs/segment-getting-started/production/boot.e6d1789381c134f9.js",
+      "digest": "sha256:e6d1789381c134f99edcabfee1b80073a71dfe3517b13a2742f2895c6366b440"
+    },
+    {
+      "path": "routes/segment-docs/segment-getting-started/production.runtime.json",
+      "digest": "sha256:586214c436dc15fbdf3fe39fcb0eb7b2b6a8368f972cb02de1472848d2d323cd"
+    },
+    {
+      "path": "routes/segment-docs/segment-getting-started/resume.runtime.json",
+      "digest": "sha256:f07147edacda0cb003fe508fd9c440af591f231ea96794468b50b46abf80d046"
+    },
+    {
+      "path": "routes/segment-docs/segment-getting-started/runtime-cost-report.json",
+      "digest": "sha256:6c017b70b7ce7200c0386ce37d93b63a09830fcb83dfafb48f1560e215e79e5e"
+    },
+    {
+      "path": "routes/segment-docs/segment-getting-started/runtime.js",
+      "digest": "sha256:4c12467348887f3c1443b26f7b67a8749301adf9c960c74f472992351e31dd7e"
+    },
+    {
+      "path": "routes/segment-docs/segment-getting-started/template.manifest.json",
+      "digest": "sha256:80b3c7b0fa7b2f19c3cfe2335f674f8f0bff691fbaf3e31f6c570fd3caaa3031"
+    },
+    {
+      "path": "routes/segment-docs/template.manifest.json",
+      "digest": "sha256:80b3c7b0fa7b2f19c3cfe2335f674f8f0bff691fbaf3e31f6c570fd3caaa3031"
+    },
+    {
+      "path": "routes/segment-examples/application.manifest.json",
+      "digest": "sha256:695b8ce23eaa3ae5998b52f4fe347c2ddedafa709edaeb4d16476774157a86c7"
+    },
+    {
+      "path": "routes/segment-examples/boot.application.5007b9c1f6351a901243030f72248137f4f80188e2bbf6fd682bdd4f354244c7.js",
+      "digest": "sha256:5007b9c1f6351a901243030f72248137f4f80188e2bbf6fd682bdd4f354244c7"
+    },
+    {
+      "path": "routes/segment-examples/component.runtime.json",
+      "digest": "sha256:b50feb11be3e8e5dee492a738641a9b3290a74f13e780078ff330e2b6bfa901d"
+    },
+    {
+      "path": "routes/segment-examples/computed.runtime.json",
+      "digest": "sha256:e09d2a6de3e80f7c01537155aa94eafc3d0c30d2b6fb389792c41c61fd4e72ec"
+    },
+    {
+      "path": "routes/segment-examples/context.runtime.json",
+      "digest": "sha256:8a9de2e39918bdd2b097c35c823cc497d6dc6552fb6752c1949d011b9d7141e4"
+    },
+    {
+      "path": "routes/segment-examples/effect.runtime.json",
+      "digest": "sha256:efb8b81be3dfc4a33b32ab5eb317b473ce6d37a1f9e520514b7d022981bf62fd"
+    },
+    {
+      "path": "routes/segment-examples/forms.runtime.json",
+      "digest": "sha256:c7dc94c23345a4aa686fa2cda22047844d558db60361446d0cdd033cec18007b"
+    },
+    {
+      "path": "routes/segment-examples/index.html",
+      "digest": "sha256:1dc981d7e825db6cdc88f0ed50124dfec8a0ab1b24370330ca78cab4ff9346f4"
+    },
+    {
+      "path": "routes/segment-examples/optimization-report.json",
+      "digest": "sha256:ce85d939a3c5fc3a5afa2acca0f7d9a7d2ce9de170e51df20b32702ee5e80863"
+    },
+    {
+      "path": "routes/segment-examples/production/boot.e6d1789381c134f9.js",
+      "digest": "sha256:e6d1789381c134f99edcabfee1b80073a71dfe3517b13a2742f2895c6366b440"
+    },
+    {
+      "path": "routes/segment-examples/production.runtime.json",
+      "digest": "sha256:80231f868b379f91451170ba99fdd1bd7ae6cc47e68746514b46ab55a32dea4d"
+    },
+    {
+      "path": "routes/segment-examples/resume.runtime.json",
+      "digest": "sha256:307f716539f934e2adfb471e6841b3af525c565027ecbf14daec6e110c9ca5ab"
+    },
+    {
+      "path": "routes/segment-examples/runtime-cost-report.json",
+      "digest": "sha256:3a1623c9cc8575193125d14a64743182c9fb4e1e64291aee52a98f927bff8430"
+    },
+    {
+      "path": "routes/segment-examples/runtime.js",
+      "digest": "sha256:4c12467348887f3c1443b26f7b67a8749301adf9c960c74f472992351e31dd7e"
+    },
+    {
+      "path": "routes/segment-examples/template.manifest.json",
+      "digest": "sha256:80b3c7b0fa7b2f19c3cfe2335f674f8f0bff691fbaf3e31f6c570fd3caaa3031"
+    }
+  ]
+}

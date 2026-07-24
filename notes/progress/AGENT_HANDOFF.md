@@ -3,26 +3,28 @@ Presolve Agent Handoff
 Repository state
 
 * Branch: main
-* Latest completed slice: R7-A - Cloudflare Workers Static Assets deployment adapter
-* Working tree: R7-A implementation is ready for commit.
+* Latest completed slice: R8-A - scaffold, explainability, and public-site dogfood
+* Working tree: R8-A implementation is ready for commit.
 * Date: 2026-07-23
 
 Current Phase R slice
 
-* Slice: R7-A - Cloudflare Workers Static Assets Deployment Adapter
-* Result: `presolve deploy [cloudflare] --prepare` builds through the canonical
-  compiler path, verifies every published artifact digest, and writes a
-  Cloudflare plan, Worker module, and `wrangler.jsonc` below
-  `.presolve/cloudflare/`. The generated Worker is limited to compiler-issued
-  static route dispatch and `ASSETS` retrieval; it owns neither source parsing
-  nor framework routing. A normal deploy invokes project-local Wrangler only
-  after the same integrity gate.
-* Verification: focused adapter tests prove immutable route/artifact projection
-  and tamper rejection; a fresh-project CLI test validates generated Worker
-  JavaScript syntax and static-assets configuration.
-* Next: begin R8 scaffold, explain surfaces, and dogfood site. A dedicated
-  server-capability executor remains a later compiler-backed slice; R7 static
-  deployment fails closed rather than adding a generic server runtime.
+* Slice: R8-A - Scaffold, Explainability, and Public-Site Dogfood
+* Result: `create-presolve` now creates a zero-configuration file-route app
+  with normal dev/build/check/Cloudflare commands. `presolve explain route` and
+  `presolve explain deployment` project compiler/distribution products without
+  separate source intelligence. The public `presolve` authoring import is now
+  correctly recognized as declaration-only compiler vocabulary rather than a
+  third-party semantic package.
+* Dogfood: `examples/presolve-site` is a complete public-site-shaped Presolve
+  app with landing, docs, examples, component/deployment guides, and an
+  architecture comparison that explicitly avoids unsupported benchmark claims.
+  It builds through conventional layout and file-route publication.
+* Verification: Node scaffold test; focused compiler import test; CLI route and
+  deployment explanation test; and dogfood `check`/`build` proof with rendered
+  route content all pass.
+* Next: complete the R9 usability freeze, including a decorator-minimization
+  audit and a fresh-app no-configuration acceptance matrix.
 
 * Addendum: the public inert `presolve` authoring package exports typed
   `loader(endpoint)` alongside `resource`, so the accepted compiler vocabulary

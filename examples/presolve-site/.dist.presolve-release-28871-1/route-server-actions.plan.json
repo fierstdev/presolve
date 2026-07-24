@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "routes": [
+    {
+      "path": "/",
+      "page_component_id": "module:app/routes/index.tsx/component:presolve-home",
+      "actions": []
+    },
+    {
+      "path": "/compare",
+      "page_component_id": "module:app/routes/compare.tsx/component:presolve-comparison",
+      "actions": []
+    },
+    {
+      "path": "/docs",
+      "page_component_id": "module:app/routes/docs/index.tsx/component:presolve-documentation",
+      "actions": []
+    },
+    {
+      "path": "/docs/components",
+      "page_component_id": "module:app/routes/docs/components.tsx/component:presolve-components",
+      "actions": []
+    },
+    {
+      "path": "/docs/deployment",
+      "page_component_id": "module:app/routes/docs/deployment.tsx/component:presolve-deployment",
+      "actions": []
+    },
+    {
+      "path": "/docs/getting-started",
+      "page_component_id": "module:app/routes/docs/getting-started.tsx/component:presolve-getting-started",
+      "actions": []
+    },
+    {
+      "path": "/examples",
+      "page_component_id": "module:app/routes/examples.tsx/component:presolve-examples",
+      "actions": []
+    }
+  ]
+}

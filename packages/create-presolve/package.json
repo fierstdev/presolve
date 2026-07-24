@@ -1,0 +1,12 @@
+{
+  "name": "create-presolve",
+  "version": "0.1.0-alpha",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "create-presolve": "./bin/create-presolve.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

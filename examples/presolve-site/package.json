@@ -1,0 +1,19 @@
+{
+  "name": "presolve-site",
+  "version": "0.1.0-alpha",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "presolve dev",
+    "build": "presolve build",
+    "check": "presolve check",
+    "deploy:prepare": "presolve deploy cloudflare --prepare --name presolve-site",
+    "deploy": "presolve deploy cloudflare --name presolve-site"
+  },
+  "dependencies": {
+    "presolve": "0.1.0-alpha"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

@@ -1,0 +1,440 @@
+{
+  "schema_version": 5,
+  "components": [
+    {
+      "component_id": "module:app/layout.tsx/component:presolve-site-layout",
+      "name": "SiteLayout",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n0",
+            "tag": "main"
+          },
+          {
+            "kind": "element",
+            "id": "n1",
+            "tag": "header"
+          },
+          {
+            "kind": "element",
+            "id": "n2",
+            "tag": "a"
+          },
+          {
+            "kind": "element",
+            "id": "n3",
+            "tag": "nav"
+          },
+          {
+            "kind": "element",
+            "id": "n4",
+            "tag": "a"
+          },
+          {
+            "kind": "element",
+            "id": "n5",
+            "tag": "a"
+          },
+          {
+            "kind": "element",
+            "id": "n6",
+            "tag": "a"
+          },
+          {
+            "kind": "element",
+            "id": "n7",
+            "tag": "slot"
+          },
+          {
+            "kind": "element",
+            "id": "n8",
+            "tag": "footer"
+          }
+        ],
+        "events": []
+      },
+      "actions": []
+    },
+    {
+      "component_id": "module:app/routes/compare.tsx/component:presolve-comparison",
+      "name": "Comparison",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n9",
+            "tag": "article"
+          },
+          {
+            "kind": "element",
+            "id": "n10",
+            "tag": "h1"
+          },
+          {
+            "kind": "element",
+            "id": "n11",
+            "tag": "p"
+          },
+          {
+            "kind": "element",
+            "id": "n12",
+            "tag": "table"
+          },
+          {
+            "kind": "element",
+            "id": "n13",
+            "tag": "thead"
+          },
+          {
+            "kind": "element",
+            "id": "n14",
+            "tag": "tr"
+          },
+          {
+            "kind": "element",
+            "id": "n15",
+            "tag": "th"
+          },
+          {
+            "kind": "element",
+            "id": "n16",
+            "tag": "th"
+          },
+          {
+            "kind": "element",
+            "id": "n17",
+            "tag": "th"
+          },
+          {
+            "kind": "element",
+            "id": "n18",
+            "tag": "tbody"
+          },
+          {
+            "kind": "element",
+            "id": "n19",
+            "tag": "tr"
+          },
+          {
+            "kind": "element",
+            "id": "n20",
+            "tag": "td"
+          },
+          {
+            "kind": "element",
+            "id": "n21",
+            "tag": "td"
+          },
+          {
+            "kind": "element",
+            "id": "n22",
+            "tag": "td"
+          },
+          {
+            "kind": "element",
+            "id": "n23",
+            "tag": "tr"
+          },
+          {
+            "kind": "element",
+            "id": "n24",
+            "tag": "td"
+          },
+          {
+            "kind": "element",
+            "id": "n25",
+            "tag": "td"
+          },
+          {
+            "kind": "element",
+            "id": "n26",
+            "tag": "td"
+          },
+          {
+            "kind": "element",
+            "id": "n27",
+            "tag": "tr"
+          },
+          {
+            "kind": "element",
+            "id": "n28",
+            "tag": "td"
+          },
+          {
+            "kind": "element",
+            "id": "n29",
+            "tag": "td"
+          },
+          {
+            "kind": "element",
+            "id": "n30",
+            "tag": "td"
+          },
+          {
+            "kind": "element",
+            "id": "n31",
+            "tag": "p"
+          }
+        ],
+        "events": []
+      },
+      "actions": []
+    },
+    {
+      "component_id": "module:app/routes/docs/components.tsx/component:presolve-components",
+      "name": "Components",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n32",
+            "tag": "article"
+          },
+          {
+            "kind": "element",
+            "id": "n33",
+            "tag": "h1"
+          },
+          {
+            "kind": "element",
+            "id": "n34",
+            "tag": "p"
+          }
+        ],
+        "events": []
+      },
+      "actions": []
+    },
+    {
+      "component_id": "module:app/routes/docs/deployment.tsx/component:presolve-deployment",
+      "name": "Deployment",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n35",
+            "tag": "article"
+          },
+          {
+            "kind": "element",
+            "id": "n36",
+            "tag": "h1"
+          },
+          {
+            "kind": "element",
+            "id": "n37",
+            "tag": "p"
+          },
+          {
+            "kind": "element",
+            "id": "n38",
+            "tag": "p"
+          }
+        ],
+        "events": []
+      },
+      "actions": []
+    },
+    {
+      "component_id": "module:app/routes/docs/getting-started.tsx/component:presolve-getting-started",
+      "name": "GettingStarted",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n39",
+            "tag": "article"
+          },
+          {
+            "kind": "element",
+            "id": "n40",
+            "tag": "h1"
+          },
+          {
+            "kind": "element",
+            "id": "n41",
+            "tag": "ol"
+          },
+          {
+            "kind": "element",
+            "id": "n42",
+            "tag": "li"
+          },
+          {
+            "kind": "element",
+            "id": "n43",
+            "tag": "li"
+          },
+          {
+            "kind": "element",
+            "id": "n44",
+            "tag": "li"
+          },
+          {
+            "kind": "element",
+            "id": "n45",
+            "tag": "li"
+          },
+          {
+            "kind": "element",
+            "id": "n46",
+            "tag": "p"
+          }
+        ],
+        "events": []
+      },
+      "actions": []
+    },
+    {
+      "component_id": "module:app/routes/docs/index.tsx/component:presolve-documentation",
+      "name": "Documentation",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n47",
+            "tag": "article"
+          },
+          {
+            "kind": "element",
+            "id": "n48",
+            "tag": "h1"
+          },
+          {
+            "kind": "element",
+            "id": "n49",
+            "tag": "p"
+          },
+          {
+            "kind": "element",
+            "id": "n50",
+            "tag": "ul"
+          },
+          {
+            "kind": "element",
+            "id": "n51",
+            "tag": "li"
+          },
+          {
+            "kind": "element",
+            "id": "n52",
+            "tag": "a"
+          },
+          {
+            "kind": "element",
+            "id": "n53",
+            "tag": "li"
+          },
+          {
+            "kind": "element",
+            "id": "n54",
+            "tag": "a"
+          },
+          {
+            "kind": "element",
+            "id": "n55",
+            "tag": "li"
+          },
+          {
+            "kind": "element",
+            "id": "n56",
+            "tag": "a"
+          }
+        ],
+        "events": []
+      },
+      "actions": []
+    },
+    {
+      "component_id": "module:app/routes/examples.tsx/component:presolve-examples",
+      "name": "Examples",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n57",
+            "tag": "article"
+          },
+          {
+            "kind": "element",
+            "id": "n58",
+            "tag": "h1"
+          },
+          {
+            "kind": "element",
+            "id": "n59",
+            "tag": "p"
+          },
+          {
+            "kind": "element",
+            "id": "n60",
+            "tag": "p"
+          }
+        ],
+        "events": []
+      },
+      "actions": []
+    },
+    {
+      "component_id": "module:app/routes/index.tsx/component:presolve-home",
+      "name": "Home",
+      "template": {
+        "nodes": [
+          {
+            "kind": "element",
+            "id": "n61",
+            "tag": "article"
+          },
+          {
+            "kind": "element",
+            "id": "n62",
+            "tag": "h1"
+          },
+          {
+            "kind": "element",
+            "id": "n63",
+            "tag": "p"
+          },
+          {
+            "kind": "element",
+            "id": "n64",
+            "tag": "p"
+          },
+          {
+            "kind": "element",
+            "id": "n65",
+            "tag": "a"
+          },
+          {
+            "kind": "element",
+            "id": "n66",
+            "tag": "h2"
+          },
+          {
+            "kind": "element",
+            "id": "n67",
+            "tag": "ul"
+          },
+          {
+            "kind": "element",
+            "id": "n68",
+            "tag": "li"
+          },
+          {
+            "kind": "element",
+            "id": "n69",
+            "tag": "li"
+          },
+          {
+            "kind": "element",
+            "id": "n70",
+            "tag": "li"
+          }
+        ],
+        "events": []
+      },
+      "actions": []
+    }
+  ]
+}

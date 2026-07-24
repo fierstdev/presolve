@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "compiler_contract": "presolve-application-publication:1",
+  "workspace_snapshot_id": "application-workspace:sha256:eb4af31331162ee5a5920a99fc95ec00546056f38439ac894228c24710ed1184",
+  "entry_component_id": "module:app/routes/index.tsx/component:presolve-home",
+  "profile": "production",
+  "artifacts": [
+    {
+      "path": "boot.application.962f03cc36e22674ee30429a64bf6293803173cdffbeb44745a9d5d87c151ec2.js",
+      "digest": "sha256:962f03cc36e22674ee30429a64bf6293803173cdffbeb44745a9d5d87c151ec2"
+    },
+    {
+      "path": "component.runtime.json",
+      "digest": "sha256:1100d358bb68c0b2aba7bb2bc5ac60e5bbf51ad8fa66a106dc4d29e68f88a0a5"
+    },
+    {
+      "path": "computed.runtime.json",
+      "digest": "sha256:e09d2a6de3e80f7c01537155aa94eafc3d0c30d2b6fb389792c41c61fd4e72ec"
+    },
+    {
+      "path": "context.runtime.json",
+      "digest": "sha256:8a9de2e39918bdd2b097c35c823cc497d6dc6552fb6752c1949d011b9d7141e4"
+    },
+    {
+      "path": "effect.runtime.json",
+      "digest": "sha256:efb8b81be3dfc4a33b32ab5eb317b473ce6d37a1f9e520514b7d022981bf62fd"
+    },
+    {
+      "path": "forms.runtime.json",
+      "digest": "sha256:c7dc94c23345a4aa686fa2cda22047844d558db60361446d0cdd033cec18007b"
+    },
+    {
+      "path": "index.html",
+      "digest": "sha256:90237fcf224714c89d40ded18da7e3554207ca0e2644d083ce9cb16ed8c9efb4"
+    },
+    {
+      "path": "optimization-report.json",
+      "digest": "sha256:6aa7542c9d1df89fc9ec086a30c9f9cba7bb90b512b43d1bf3c3615d69d53e9c"
+    },
+    {
+      "path": "production/boot.e6d1789381c134f9.js",
+      "digest": "sha256:e6d1789381c134f99edcabfee1b80073a71dfe3517b13a2742f2895c6366b440"
+    },
+    {
+      "path": "production.runtime.json",
+      "digest": "sha256:6cee3f33de340d559188f7a612f5cdf8c2c97085be0556dbd06130455008645b"
+    },
+    {
+      "path": "resume.runtime.json",
+      "digest": "sha256:3ceaf7d4cca80ffea37c84059e538bb83c3325efd0916f11a074dfbee20f6f95"
+    },
+    {
+      "path": "runtime-cost-report.json",
+      "digest": "sha256:e3975bcf0a468cb51a9834e0cebc8c00b27ba4632f93801b2883ae21404a0116"
+    },
+    {
+      "path": "runtime.js",
+      "digest": "sha256:4c12467348887f3c1443b26f7b67a8749301adf9c960c74f472992351e31dd7e"
+    },
+    {
+      "path": "template.manifest.json",
+      "digest": "sha256:80b3c7b0fa7b2f19c3cfe2335f674f8f0bff691fbaf3e31f6c570fd3caaa3031"
+    }
+  ]
+}
