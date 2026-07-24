@@ -13,5 +13,6 @@ export declare function validate(rule: unknown): PropertyDecorator;
 export declare function resource(endpoint: string): PropertyDecorator;
 /** Compiler-owned route data declaration; execution is a server handoff plan. */
 export declare function loader(endpoint: string): PropertyDecorator;
+export declare function serverAction(endpoint: string): MethodDecorator;
 
 export declare abstract class Component {}

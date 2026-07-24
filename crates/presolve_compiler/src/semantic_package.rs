@@ -13,6 +13,7 @@ pub enum SemanticPackageKind {
     Codec,
     Component,
     Opaque,
+    ServerAction,
 }
 
 /// A closed compiler-lowered operation that a `pure` package export may declare.
@@ -78,6 +79,27 @@ pub enum SemanticPackageRouteLoaderFailure {
     Typed,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticPackageServerActionInput {
+    FormData,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticPackageServerActionResponse {
+    Json,
+    Redirect,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SemanticPackageServerAction {
+    pub input: SemanticPackageServerActionInput,
+    pub response: SemanticPackageServerActionResponse,
+    pub failure: SemanticPackageRouteLoaderFailure,
+}
+
 /// Execution side for the initial opaque terminal package boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -139,6 +161,8 @@ pub struct SemanticPackageExport {
     #[serde(default)]
     pub route_loader: Option<SemanticPackageRouteLoader>,
     #[serde(default)]
+    pub server_action: Option<SemanticPackageServerAction>,
+    #[serde(default)]
     pub opaque_terminal: Option<SemanticPackageOpaqueTerminal>,
 }
 
@@ -164,6 +188,7 @@ pub enum SemanticPackageContractError {
     InvalidPureOperation,
     InvalidResourceEndpoint,
     InvalidRouteLoader,
+    InvalidServerAction,
     InvalidOpaqueTerminal,
     DuplicateSpecifier,
 }
@@ -236,6 +261,14 @@ pub fn parse_semantic_package_contract(
             }
     }) {
         return Err(SemanticPackageContractError::InvalidRouteLoader);
+    }
+    if contract.exports.values().any(|export| {
+        (export.kind == SemanticPackageKind::ServerAction) != export.server_action.is_some()
+            || (export.kind == SemanticPackageKind::ServerAction
+                && (export.type_signature != "FormData -> ServerActionResult"
+                    || export.resume_policy != "cold_fallback"))
+    }) {
+        return Err(SemanticPackageContractError::InvalidServerAction);
     }
     if contract.exports.values().any(|export| {
         (export.kind == SemanticPackageKind::Opaque) != export.opaque_terminal.is_some()
@@ -379,5 +412,13 @@ mod tests {
             invalid_client,
             Err(SemanticPackageContractError::InvalidRouteLoader)
         );
+    }
+
+    #[test]
+    fn validates_closed_server_action_capabilities() {
+        let contract = parse_semantic_package_contract(
+            r#"{"schema_version":1,"package":"post-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"savePost":{"kind":"server_action","type_signature":"FormData -> ServerActionResult","runtime_module":"dist/save-post.js","resume_policy":"cold_fallback","server_action":{"input":"form_data","response":"json","failure":"typed"}}}}"#,
+        );
+        assert!(contract.is_ok());
     }
 }

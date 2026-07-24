@@ -6,6 +6,7 @@ use crate::module_graph::{ModuleEdgeKind, ModuleGraph, ModuleTarget};
 use crate::semantic_package::{
     SemanticPackageKind, SemanticPackageOpaqueTerminal, SemanticPackagePureOperation,
     SemanticPackageResolutionTable, SemanticPackageResourceEndpoint, SemanticPackageRouteLoader,
+    SemanticPackageServerAction,
 };
 use crate::symbol_table::{ModuleSymbol, SymbolKind, SymbolTable};
 
@@ -57,6 +58,7 @@ pub enum ImportBindingTarget {
         pure_operation: Option<SemanticPackagePureOperation>,
         resource_endpoint: Option<SemanticPackageResourceEndpoint>,
         route_loader: Option<SemanticPackageRouteLoader>,
+        server_action: Option<SemanticPackageServerAction>,
         opaque_terminal: Option<SemanticPackageOpaqueTerminal>,
     },
 }
@@ -304,6 +306,7 @@ fn resolve_semantic_package_import(
                     pure_operation: export.pure_operation,
                     resource_endpoint: export.resource_endpoint.clone(),
                     route_loader: export.route_loader.clone(),
+                    server_action: export.server_action.clone(),
                     opaque_terminal: export.opaque_terminal.clone(),
                 },
             },
@@ -798,6 +801,7 @@ class Second extends Component {
             pure_operation: _,
             resource_endpoint: _,
             route_loader: _,
+            server_action: _,
             opaque_terminal: _,
         } = &bindings
             .resolve_import("src/App.tsx", "format")
