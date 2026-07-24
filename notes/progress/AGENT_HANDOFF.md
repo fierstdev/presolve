@@ -20,9 +20,9 @@ Current Phase R slice
 * Verification: focused adapter tests prove immutable route/artifact projection
   and tamper rejection; a fresh-project CLI test validates generated Worker
   JavaScript syntax and static-assets configuration.
-* Next: extend R7 with provider version/audit/rollback command integration and
-  a dedicated server-capability executor only when the compiler product is
-  explicit; then begin R8 scaffold, explain surfaces, and dogfood site.
+* Next: begin R8 scaffold, explain surfaces, and dogfood site. A dedicated
+  server-capability executor remains a later compiler-backed slice; R7 static
+  deployment fails closed rather than adding a generic server runtime.
 
 * Addendum: the public inert `presolve` authoring package exports typed
   `loader(endpoint)` alongside `resource`, so the accepted compiler vocabulary

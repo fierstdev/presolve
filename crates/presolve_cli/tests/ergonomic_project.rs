@@ -325,6 +325,19 @@ fn deploy_prepare_projects_compiler_artifacts_to_cloudflare_workers_static_asset
 }
 
 #[test]
+fn deploy_rejects_rollback_mixed_with_preparation_options() {
+    let root = project_root("cloudflare-rollback-arguments");
+    let output = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args(["deploy", "cloudflare", "--rollback", "--prepare"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("PSCFL1011_DEPLOY_ARGUMENT_INVALID"));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn dev_serves_the_compiler_published_page() {
     let root = project_root("server");
     fs::write(

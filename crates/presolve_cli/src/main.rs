@@ -217,6 +217,7 @@ fn run_ergonomic_dev(args: &[String]) {
 struct CloudflareDeployArgumentsV1 {
     prepare_only: bool,
     dry_run: bool,
+    rollback_version: Option<Option<String>>,
     worker_name: Option<String>,
     compatibility_date: String,
     required_secrets: Vec<String>,
@@ -227,6 +228,10 @@ fn run_ergonomic_deploy(args: &[String]) {
         application_cli_error("PSCFL1011_DEPLOY_ARGUMENT_INVALID", &message)
     });
     let root = Path::new(".");
+    if let Some(version) = &arguments.rollback_version {
+        run_cloudflare_rollback(root, version.as_deref());
+        return;
+    }
     let manifest = run_ergonomic_build(root, ApplicationPublicationProfileV1::Production);
     let project = discover_project_v1(root)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
@@ -308,6 +313,7 @@ fn parse_cloudflare_deploy_arguments(
     let mut result = CloudflareDeployArgumentsV1 {
         prepare_only: false,
         dry_run: false,
+        rollback_version: None,
         worker_name: None,
         compatibility_date: CLOUDFLARE_WORKERS_COMPATIBILITY_DATE_V1.into(),
         required_secrets: Vec::new(),
@@ -316,6 +322,16 @@ fn parse_cloudflare_deploy_arguments(
         match args[index].as_str() {
             "--prepare" => result.prepare_only = true,
             "--dry-run" => result.dry_run = true,
+            "--rollback" => {
+                let version = args
+                    .get(index + 1)
+                    .filter(|value| !value.starts_with('-'))
+                    .cloned();
+                if version.is_some() {
+                    index += 1;
+                }
+                result.rollback_version = Some(version);
+            }
             "--name" => {
                 let Some(value) = args.get(index + 1) else {
                     return Err("--name requires a value".into());
@@ -341,10 +357,53 @@ fn parse_cloudflare_deploy_arguments(
         }
         index += 1;
     }
+    if result.rollback_version.is_some()
+        && (result.prepare_only
+            || result.dry_run
+            || result.worker_name.is_some()
+            || !result.required_secrets.is_empty()
+            || result.compatibility_date != CLOUDFLARE_WORKERS_COMPATIBILITY_DATE_V1)
+    {
+        return Err("--rollback cannot be combined with deployment preparation options".into());
+    }
     if result.prepare_only && result.dry_run {
         return Err("--prepare and --dry-run cannot be used together".into());
     }
     Ok(result)
+}
+
+fn run_cloudflare_rollback(root: &Path, version: Option<&str>) {
+    let project = discover_project_v1(root)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    let config = project.root.join(".presolve/cloudflare/wrangler.jsonc");
+    if !config.is_file() {
+        application_cli_error(
+            "PSCFL1019_ROLLBACK_CONFIGURATION_MISSING",
+            "prepare or deploy this project before requesting a Cloudflare rollback",
+        );
+    }
+    let mut command = Command::new("npx");
+    command.args(["--no-install", "wrangler", "rollback"]);
+    if let Some(version) = version {
+        command.arg(version);
+    }
+    let status = command
+        .args(["--config"])
+        .arg(&config)
+        .current_dir(&project.root)
+        .status()
+        .unwrap_or_else(|error| {
+            application_cli_error(
+                "PSCFL1014_WRANGLER_UNAVAILABLE",
+                &format!(
+                    "{error}; install Wrangler in this project with `npm install -D wrangler@latest`"
+                ),
+            )
+        });
+    if !status.success() {
+        process::exit(status.code().unwrap_or(1));
+    }
+    println!("Cloudflare rollback complete");
 }
 
 fn cloudflare_worker_name_from_project_root(root: &Path) -> Result<String, String> {

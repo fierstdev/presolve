@@ -47,8 +47,11 @@ provider binding for a later compiler-owned server capability contract.
 The immutable plan is the deployment audit record and includes the release
 digest that maps one-for-one to compiler artifact bytes. The adapter does not
 pretend a Presolve release digest is a Cloudflare Worker version ID. Once a
-deployment exists, rollback is Cloudflare's version operation and must use the
-provider-issued version identity; it never rewrites the compiler inventory.
+deployment exists, `presolve deploy cloudflare --rollback [version-id]`
+delegates to Cloudflare's version operation using the prepared configuration.
+The optional identifier is a provider-issued version ID; omitting it uses the
+provider's previous-version behavior. Rollback never rewrites the compiler
+inventory.
 
 ## Server-data boundary
 
