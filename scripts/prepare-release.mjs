@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { copyFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { platform, arch } from "node:process";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -14,6 +14,7 @@ const destination = resolve(root, "packages", packageName, "bin", executable);
 run("cargo", ["build", "--release", "--locked", "-p", "presolve-cli", "--target", target]);
 mkdirSync(resolve(destination, ".."), { recursive: true });
 copyFileSync(resolve(root, "target", target, "release", executable), destination);
+if (platform !== "win32") chmodSync(destination, 0o755);
 console.log(`Staged ${packageName}/${executable} for packaging.`);
 
 function targetName() {
