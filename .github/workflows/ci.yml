@@ -28,9 +28,6 @@ jobs:
       - run: pnpm run test:types
       - run: pnpm run docs:check
       - run: pnpm run release:prepare
-      - run: pnpm --dir apps/presolve.dev check
-      - run: pnpm --dir apps/presolve.dev build
-      - run: pnpm --dir apps/presolve.dev deploy:prepare
 
   rust:
     name: Rust workspace

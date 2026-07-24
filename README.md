@@ -54,5 +54,4 @@ pnpm release:check
 ```
 
 See [contributing](CONTRIBUTING.md), [security](SECURITY.md), and
-[support](SUPPORT.md). The dogfooded public site lives in
-[`apps/presolve.dev`](apps/presolve.dev).
+[support](SUPPORT.md).
