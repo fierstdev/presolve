@@ -1,7 +1,6 @@
 import { API, SymbolFlags } from "@typescript/native/unstable/async";
 import { getTokenAtPosition } from "@typescript/native/unstable/ast";
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { dirname, relative, resolve, sep } from "node:path";
 
 export const TYPESCRIPT_SEMANTIC_AUTHORITY_SCHEMA_VERSION = 1;
 export const PRIMARY_TYPESCRIPT_VERSION = "7.0.2";
@@ -62,7 +61,7 @@ async function collectDiagnostics(program, config) {
 async function querySymbols(project, queries) {
   return Promise.all(queries.map(async query => {
     const symbol = await symbolAt(project, query);
-    return { id: query.id, symbol: await serializeSymbol(project.checker, symbol) };
+    return { id: query.id, symbol: await serializeSymbol(project, symbol) };
   }));
 }
 
@@ -104,8 +103,17 @@ async function queryAssignability(project, queries) {
 
 async function queryModules(project, queries) {
   return Promise.all(queries.map(async query => {
-    const symbol = await symbolAt(project, query);
-    return { id: query.id, module: await serializeSymbol(project.checker, symbol) };
+    const { file, token } = await tokenAt(project, query);
+    const symbol = await project.checker.getSymbolAtPosition(file.fileName, query.position);
+    const module = await serializeSymbol(project, symbol);
+    return {
+      id: query.id,
+      module: module && {
+        ...module,
+        specifier: token.getText(file).replace(/^(?:"|')|(?:"|')$/g, ""),
+        resolvedModulePaths: module.identity.declarationModules,
+      },
+    };
   }));
 }
 
@@ -151,12 +159,18 @@ async function nearestSignature(checker, token) {
   return undefined;
 }
 
-async function serializeSymbol(checker, symbol) {
+async function serializeSymbol(project, symbol) {
   if (!symbol) return undefined;
+  const { checker } = project;
   const declarationPaths = symbol.declarations
     .map(declaration => String(declaration.path))
     .sort();
-  const serialized = { name: symbol.name, flags: symbol.flags, declarationPaths };
+  const serialized = {
+    name: symbol.name,
+    flags: symbol.flags,
+    declarationPaths,
+    identity: identityForSymbol(project, symbol, declarationPaths),
+  };
   if ((symbol.flags & SymbolFlags.Alias) === 0) return serialized;
 
   const target = await checker.getAliasedSymbol(symbol);
@@ -166,9 +180,28 @@ async function serializeSymbol(checker, symbol) {
       name: target.name,
       flags: target.flags,
       declarationPaths: target.declarations.map(declaration => String(declaration.path)).sort(),
+      identity: identityForSymbol(
+        project,
+        target,
+        target.declarations.map(declaration => String(declaration.path)).sort(),
+      ),
       unknown: await checker.isUnknownSymbol(target),
     },
   };
+}
+
+function identityForSymbol(project, symbol, declarationPaths) {
+  const projectRoot = dirname(String(project.id));
+  return {
+    name: symbol.name,
+    flags: symbol.flags,
+    declarationModules: [...new Set(declarationPaths.map(path => normalizeProjectPath(projectRoot, path)))],
+  };
+}
+
+function normalizeProjectPath(projectRoot, path) {
+  const relativePath = relative(projectRoot, path);
+  return relativePath.split(sep).join("/") || ".";
 }
 
 async function serializeType(checker, type) {

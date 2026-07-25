@@ -43,7 +43,10 @@ test("the authority adapter owns TypeScript semantic queries", async () => {
           target: { file, position: position("selected =") },
         },
       ],
-      modules: [{ id: "package-export", file, position: position("@compat/library") }],
+      modules: [
+        { id: "package-export", file, position: position("@compat/library") },
+        { id: "re-export", file, position: position("@compat/library", 1) },
+      ],
     },
   });
 
@@ -53,6 +56,7 @@ test("the authority adapter owns TypeScript semantic queries", async () => {
   assert.equal(result.symbols[0].symbol.name, "overload");
   assert.equal(result.symbols[0].symbol.aliasTarget.name, "overload");
   assert.match(result.symbols[0].symbol.aliasTarget.declarationPaths[0], /@compat\/library\/types\/index\.d\.ts$/);
+  assert.deepEqual(result.symbols[0].symbol.aliasTarget.identity.declarationModules, ["node_modules/@compat/library/types/index.d.ts"]);
   assert.equal(result.types[0].type.text, "Box<LocalAlias>");
   assert.equal(result.contextualTypes[0].type.text, "number");
   assert.deepEqual(result.signatures[0].signature.parameterTypes.map(parameter => parameter.type.text), ["string"]);
@@ -60,6 +64,9 @@ test("the authority adapter owns TypeScript semantic queries", async () => {
   assert.equal(result.assignability[0].assignable, true);
   assert.equal(result.assignability[1].assignable, false);
   assert.match(result.modules[0].module.declarationPaths[0], /@compat\/library\/types\/index\.d\.ts$/);
+  assert.equal(result.modules[0].module.specifier, "@compat/library");
+  assert.deepEqual(result.modules[0].module.resolvedModulePaths, ["node_modules/@compat/library/types/index.d.ts"]);
+  assert.deepEqual(result.modules[1].module.resolvedModulePaths, result.modules[0].module.resolvedModulePaths);
 });
 
 test("the authority adapter preserves native TypeScript diagnostics", async () => {

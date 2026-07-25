@@ -31,6 +31,6 @@ normative source for this handoff.
 ## Current boundary
 
 The characterization, compatibility-corpus, and semantic-authority slices are
-complete. The next slice is resolved module and symbol identity. It must consume
-the authority adapter rather than match intrinsic spellings or recreate module
-resolution in compiler code.
+complete, as is resolved module and symbol identity. The next slice is the
+general source AST. It must preserve broad syntax without replacing the
+TypeScript-authority boundary or extending feature-specific parser facts.

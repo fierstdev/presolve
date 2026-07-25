@@ -17,16 +17,23 @@ the following schema-v1 products:
 - native config, program, syntactic, bind, and semantic diagnostics, each with
   its original TypeScript diagnostic code and source span;
 - resolved symbols, including an alias target only when TypeScript classifies
-  the symbol as an alias;
+  the symbol as an alias, and a project-relative declaration-module identity;
 - type and contextual-type displays derived by TypeScript;
 - resolved call signatures with parameter and return types;
 - TypeScript assignability results for requested source/target positions; and
-- module symbols obtained at import, export, or package-specifier positions.
+- module symbols obtained at import, export, or package-specifier positions,
+  including their resolved declaration modules.
 
 The request carries a configuration file plus explicit file/UTF-16 positions.
 Returned symbols and modules expose declaration paths, not TypeScript process
 handles or compiler-internal IDs. This keeps the boundary deterministic and
 serializable while retaining TypeScript as the authority.
+
+The identity is a normalized declaration-module vector plus TypeScript symbol
+name and flags. It deliberately is not a durable Presolve semantic ID; stable
+cross-edit IDs are a later incremental-compilation product. Consumers that need
+the canonical target of an import must use `aliasTarget.identity`, not the
+author's local spelling.
 
 ## Ownership
 
