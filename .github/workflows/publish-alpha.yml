@@ -37,11 +37,19 @@ jobs:
         run: node scripts/verify-release-version.mjs "${RELEASE_VERSION#v}"
       - run: cargo fmt --all --check
       - run: RUST_TEST_THREADS=1 cargo test --workspace
-      - run: cargo test -p presolve-cli --features browser-tests --test runtime_browser -- --nocapture --test-threads=1
       - run: pnpm --dir packages/create-presolve test
       - run: pnpm --dir packages/compiler-wasm run build
       - run: pnpm --dir packages/compiler-wasm test
       - run: pnpm --dir framework/packages/presolve pack --pack-destination ../../../.release
+
+  verify-browser:
+    name: Verify browser runtime
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run browser e2e
+        run: cargo test -p presolve-cli --features browser-tests --test runtime_browser -- --nocapture --test-threads=1
 
   publish-crates:
     name: Publish crates.io packages
@@ -114,7 +122,7 @@ jobs:
 
   verify-npm-auth:
     name: Verify npm publishing identity
-    needs: verify
+    needs: [verify, verify-browser]
     runs-on: ubuntu-latest
     environment:
       name: npm
