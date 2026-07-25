@@ -39,9 +39,15 @@ Candidates outside the complete source-AST extent are rejected. This makes the
 serialized boundary safe for a future process transport without permitting
 invented source locations.
 
-## Deliberate non-goals
+## Legacy compatibility lowering
 
-This slice does not discover legacy decorators or lower them into candidates.
-That compatibility work belongs to the next slice, which may create these
-records only after TypeScript identity classification. Existing legacy graph
-and ASM products remain unchanged until that lowering is present.
+`presolve_compiler::legacy_decorator_lowering` enumerates class, property,
+method, and parameter decorator sites without assigning any meaning to their
+spelling. A TypeScript-authority client joins a resolved intrinsic identity to
+an exact decorator source range; only those joined records lower to canonical
+candidates. Unresolved decorators are ignored, and duplicate or dangling join
+records are rejected.
+
+The lowering product feeds the same canonical model above. It does not modify
+the existing component graph or ASM yet, so migration remains explicit and no
+second compiler pipeline is introduced.

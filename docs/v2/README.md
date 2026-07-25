@@ -35,6 +35,6 @@ normative source for this handoff.
 ## Current boundary
 
 The characterization, compatibility-corpus, semantic-authority, source-AST,
-intrinsic-registry, and canonical-authored-semantics slices are complete. The
-next slice is legacy decorator lowering, which will create canonical candidates
-only after resolved-intrinsic classification.
+intrinsic-registry, canonical-authored-semantics, and legacy-lowering slices
+are complete. The next slice is the Vite backend skeleton, which will consume
+compiler products through a new external adapter boundary.

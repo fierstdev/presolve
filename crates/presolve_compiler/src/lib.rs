@@ -69,6 +69,7 @@ mod language_service;
 pub mod layout_composition;
 pub mod layout_graph;
 pub mod lazy_action_chunks;
+pub mod legacy_decorator_lowering;
 pub mod metaframework_handoff;
 pub mod model;
 pub mod module_graph;
@@ -461,6 +462,10 @@ pub use layout_composition::{
     layout_composition_virtual_invocations_from_provenance_v1,
     layout_composition_virtual_invocations_v1, LayoutCompositionEdgeV1, LayoutCompositionErrorV1,
     LayoutCompositionPlanV1, LayoutCompositionRouteV1,
+};
+pub use legacy_decorator_lowering::{
+    legacy_decorator_sites_v1, lower_legacy_decorators_v1, LegacyDecoratorLoweringErrorV1,
+    LegacyDecoratorLoweringV1, LegacyDecoratorResolutionV1, LegacyDecoratorSiteV1,
 };
 pub use metaframework_handoff::{
     build_deployable_release_manifest_v1, build_static_request_handoff_v1,
