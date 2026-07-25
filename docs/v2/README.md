@@ -29,10 +29,12 @@ normative source for this handoff.
   V2 schema and ownership rule for TypeScript semantic queries.
 - [General source AST](source-ast.md) records the source-faithful parser
   product and the compatibility role of the existing derived facts.
+- [Canonical authored semantics](authored-semantics.md) records the normalized
+  source-AST and TypeScript-identity boundary.
 
 ## Current boundary
 
-The characterization, compatibility-corpus, and semantic-authority slices are
-complete, as is the general source AST and canonical intrinsic registry. The
-next slice is canonical authored semantics, which will normalize existing
-authoring only after consuming syntax and resolved-intrinsic products.
+The characterization, compatibility-corpus, semantic-authority, source-AST,
+intrinsic-registry, and canonical-authored-semantics slices are complete. The
+next slice is legacy decorator lowering, which will create canonical candidates
+only after resolved-intrinsic classification.

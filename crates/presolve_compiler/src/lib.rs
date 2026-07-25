@@ -7,6 +7,7 @@
 pub mod application_publication;
 pub mod application_semantic_model;
 pub mod asm_validation;
+pub mod authored_semantics;
 pub mod binding_table;
 pub mod compilation_unit;
 pub mod compiler_pass;
@@ -189,6 +190,14 @@ pub use application_semantic_model::{
     FileRouteApplicationModelErrorV1, SemanticEntity, SemanticEntityKind,
 };
 pub use asm_validation::{validate_application_semantic_model, AsmValidationDiagnostic};
+pub use authored_semantics::{
+    normalize_authored_semantics_v1, AuthoredSemanticCandidateKindV1,
+    AuthoredSemanticNormalizationErrorV1, AuthoredSourceRangeV1,
+    CanonicalAuthoredDeclarationKindV1, CanonicalAuthoredDeclarationV1,
+    CanonicalAuthoredSemanticModelV1, CanonicalIntrinsicKindV1,
+    ResolvedAuthoredSemanticCandidateV1, ResolvedIntrinsicIdentityV1,
+    CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION,
+};
 pub use binding_table::{
     build_binding_table, build_binding_table_with_packages, BindingDiagnostic, BindingTable,
     ExportBinding, ImportBinding, ImportBindingTarget, ModuleBindingTable,
@@ -2377,6 +2386,11 @@ class ChainedProfile extends Component {
     fn component_graph_reports_duplicate_event_errors() {
         let parsed = presolve_parser::ParsedFile {
             path: "DuplicateEvent.tsx".into(),
+            syntax: presolve_parser::ParsedSourceAst {
+                source: String::new(),
+                estree_json: "{}".to_owned(),
+                span: test_span(),
+            },
             diagnostics: Vec::new(),
             imports: Vec::new(),
             exports: Vec::new(),
