@@ -152,6 +152,7 @@ pub mod semantic_package_runtime;
 pub mod semantic_provenance;
 pub mod semantic_reference;
 pub mod semantic_type;
+pub mod server_action_projection;
 pub mod service;
 pub mod shared_chunk_candidate;
 pub mod slot;
