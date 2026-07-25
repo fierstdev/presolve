@@ -6,7 +6,7 @@ const product = await readFile(fileURLToPath(new URL("../../../crates/presolve_c
 const snapshot = JSON.parse(product);
 const wasm = await readFile(fileURLToPath(new URL("../../compiler-wasm/dist/presolve_compiler_wasm_bg.wasm", import.meta.url)));
 const service = await initializeLanguageService(wasm);
-const result = service.query(product, { schema: "presolve.language-service-wasm-request", version: 1, operation: "hover" });
-if (result.status !== "unsupported" || result.capability !== "hover") throw new Error("language service must preserve the WASM result");
+const result = service.query(product, { schema: "presolve.language-service-wasm-request", version: 1, operation: "hover", querySemanticId: snapshot.references[0].targetQuerySemanticId });
+if (result.status !== "ok" || result.result.record.querySemanticId !== snapshot.references[0].targetQuerySemanticId) throw new Error("language service must preserve the canonical WASM hover record");
 const position = service.query(product, { schema: "presolve.language-service-wasm-request", version: 1, operation: "position", sourceUnitId: snapshot.sourceUnits[0].sourceUnitId, offset: 114 });
 if (position.status !== "ok" || position.result.records.length !== 6) throw new Error("language service must preserve WASM position records");

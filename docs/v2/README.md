@@ -42,6 +42,8 @@ normative source for this handoff.
   compiler-produced production-report audit and adapter verification boundary.
 - [Source maps contract](source-maps-contract.md) records Vite physical-map
   ownership and the manifest-bound compiler artifact translation boundary.
+- [Tooling query contract](tooling-query-contract.md) records the canonical
+  WASM, language-service, LSP, hover, and explain query boundary.
 - [Application Platform contract](application-platform-contract.md) records
   the additive project, environment, Vite, testing, and deployment boundary.
 - [Control-flow contract](control-flow-contract.md) records the fail-closed

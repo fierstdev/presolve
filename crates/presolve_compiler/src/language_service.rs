@@ -45,6 +45,7 @@ struct UnsupportedRequestV1 {
 
 enum QueryRequestV1 {
     Position(PositionRequestV1),
+    Hover(SemanticIdRequestV1),
     Definition(SemanticIdRequestV1),
     References(SemanticIdRequestV1),
     DocumentSymbols(SourceUnitRequestV1),
@@ -150,6 +151,16 @@ pub(crate) fn query_snapshot_v1(product_bytes: &[u8], request_bytes: &[u8]) -> V
                 },
             )
         }
+        QueryRequestV1::Hover(request) => {
+            let Some(record) = product
+                .semantic_records
+                .into_iter()
+                .find(|record| record.query_semantic_id == request.query_semantic_id)
+            else {
+                return error_response(&request.operation, "unknown_query_semantic_id");
+            };
+            ok_response(request.operation, RecordResultV1 { record })
+        }
         QueryRequestV1::Definition(request) => {
             let Some(record) = product
                 .semantic_records
@@ -238,6 +249,10 @@ fn decode_request_v1(bytes: &[u8]) -> Result<QueryRequestV1, String> {
             .ok()
             .filter(valid_position_request)
             .map(QueryRequestV1::Position),
+        "hover" => serde_json::from_value::<SemanticIdRequestV1>(value.clone())
+            .ok()
+            .filter(|request| valid_semantic_id_request(request, "hover"))
+            .map(QueryRequestV1::Hover),
         "definition" => serde_json::from_value::<SemanticIdRequestV1>(value.clone())
             .ok()
             .filter(|request| valid_semantic_id_request(request, "definition"))
@@ -254,13 +269,11 @@ fn decode_request_v1(bytes: &[u8]) -> Result<QueryRequestV1, String> {
             .ok()
             .filter(|request| valid_source_unit_request(request, "diagnostics"))
             .map(QueryRequestV1::Diagnostics),
-        "hover" | "rename" | "completion" | "signatureHelp" | "semanticTokens"
-        | "sourceMapping" | "edits" | "codeActions" => {
-            serde_json::from_value::<UnsupportedRequestV1>(value.clone())
-                .ok()
-                .filter(valid_unsupported_request)
-                .map(QueryRequestV1::Unsupported)
-        }
+        "rename" | "completion" | "signatureHelp" | "semanticTokens" | "sourceMapping"
+        | "edits" | "codeActions" => serde_json::from_value::<UnsupportedRequestV1>(value.clone())
+            .ok()
+            .filter(valid_unsupported_request)
+            .map(QueryRequestV1::Unsupported),
         _ => None,
     }
     .ok_or_else(|| operation.clone())?;
@@ -307,7 +320,9 @@ fn valid_unsupported_request(request: &UnsupportedRequestV1) -> bool {
 fn request_json(request: &QueryRequestV1) -> String {
     match request {
         QueryRequestV1::Position(request) => json(request),
-        QueryRequestV1::Definition(request) | QueryRequestV1::References(request) => json(request),
+        QueryRequestV1::Hover(request)
+        | QueryRequestV1::Definition(request)
+        | QueryRequestV1::References(request) => json(request),
         QueryRequestV1::DocumentSymbols(request) | QueryRequestV1::Diagnostics(request) => {
             json(request)
         }
@@ -411,6 +426,12 @@ mod tests {
         );
         assert_eq!(definition["result"]["record"]["querySemanticId"], target);
 
+        let hover = response(
+            PRODUCT,
+            &request("hover", &format!(",\"querySemanticId\":\"{target}\"")),
+        );
+        assert_eq!(hover["result"]["record"]["querySemanticId"], target);
+
         let references = response(
             PRODUCT,
             &request("references", &format!(",\"querySemanticId\":\"{target}\"")),
@@ -505,7 +526,6 @@ mod tests {
         assert_eq!(unknown_id["code"], "unknown_query_semantic_id");
 
         for operation in [
-            "hover",
             "rename",
             "completion",
             "signatureHelp",
