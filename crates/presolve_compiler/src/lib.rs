@@ -10,6 +10,7 @@ pub mod application_semantic_model;
 pub mod asm_validation;
 pub mod authored_semantics;
 pub mod binding_table;
+pub mod capability_projection;
 pub mod capture_escape;
 pub mod codec_protocol;
 pub mod compilation_unit;
