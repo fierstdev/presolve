@@ -2379,7 +2379,7 @@ pub fn analyze_liveness(function: &IrFunction) -> IrLivenessAnalysis {
         let mut uses = BTreeSet::new();
         let mut definitions = BTreeSet::new();
         for instruction in &block.instructions {
-            for operand in instruction_operands(&instruction.kind) {
+            for operand in ir_instruction_operands(&instruction.kind) {
                 if let IrOperand::Value(value) = operand {
                     if !definitions.contains(&value) {
                         uses.insert(value);
@@ -2435,7 +2435,7 @@ pub fn analyze_use_definitions(function: &IrFunction) -> Vec<IrUseDefinition> {
     let mut relations = Vec::new();
     for block in &function.blocks {
         for instruction in &block.instructions {
-            for (operand_index, operand) in instruction_operands(&instruction.kind)
+            for (operand_index, operand) in ir_instruction_operands(&instruction.kind)
                 .into_iter()
                 .enumerate()
             {
@@ -2477,7 +2477,7 @@ pub fn analyze_definition_uses(function: &IrFunction) -> IrDefinitionUseAnalysis
         .collect::<BTreeMap<_, _>>();
     for block in &function.blocks {
         for instruction in &block.instructions {
-            for (operand_index, operand) in instruction_operands(&instruction.kind)
+            for (operand_index, operand) in ir_instruction_operands(&instruction.kind)
                 .into_iter()
                 .enumerate()
             {
@@ -3285,7 +3285,7 @@ fn validate_instruction(
             }),
         }
     }
-    for operand in instruction_operands(&instruction.kind) {
+    for operand in ir_instruction_operands(&instruction.kind) {
         if let IrOperand::Value(value) = operand {
             if function.is_none_or(|function| !function.values.contains_key(&value)) {
                 diagnostics.push(IrValidationDiagnostic {
@@ -3346,7 +3346,12 @@ fn validate_instruction(
     }
 }
 
-fn instruction_operands(kind: &IrInstructionKind) -> Vec<IrOperand> {
+/// Returns the exact operand reads encoded by one canonical IR instruction.
+///
+/// This is the closed IR operand authority shared by data-flow projections;
+/// callers must not infer additional reads from instruction spelling.
+#[must_use]
+pub fn ir_instruction_operands(kind: &IrInstructionKind) -> Vec<IrOperand> {
     match kind {
         IrInstructionKind::StoreStorage { value, .. }
         | IrInstructionKind::Unary { operand: value, .. }

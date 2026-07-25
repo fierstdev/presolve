@@ -33,11 +33,13 @@ normative source for this handoff.
   source-AST and TypeScript-identity boundary.
 - [Vite adapter boundary](vite-adapter.md) records the compiler-product-only
   integration seam for the required external backend.
+- [Control-flow contract](control-flow-contract.md) records the fail-closed
+  IR projection and the coverage required before later analyses may rely on it.
 
 ## Current boundary
 
 The characterization, compatibility-corpus, semantic-authority, source-AST,
 intrinsic-registry, canonical-authored-semantics, legacy-lowering, the Vite
 backend skeleton, virtual-module registry, and dev-server integration are
-complete, as is production build integration. The next slice is the
-control-flow graph foundation.
+complete, as are production build integration and the control-flow graph
+foundation. The next slice is function summaries.

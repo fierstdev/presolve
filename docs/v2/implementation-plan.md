@@ -41,7 +41,7 @@ in the same change.
 
 | PR | Scope | Repository trace | Products and proof |
 | ---: | --- | --- | --- |
-| 13 | Control-flow graph | new `control_flow`; `expression_graph`, IR lowering | Function CFG schema and control-flow corpus. |
+| 13 | Control-flow graph | `presolve_compiler::control_flow`; `intermediate_representation` | Implemented schema v1 IR-backed function CFG projection with branch/loop topology and exact IR-visible dataflow; unsupported exception, suspension, unknown-call, capture, and cancellation coverage is explicit and fail-closed. |
 | 14 | Function summaries | new analysis module; `semantic_graph`, `service` | Stable summaries for calls and dependencies; cross-module fixtures. |
 | 15 | Purity/effect classification | `effect`, `effect_capability`, `computed_value` | Conservative purity/effect classifications and unknown-call diagnostics. |
 | 16 | Capture and escape analysis | `resume_capture`, `resume_liveness`, `resume_boundary` | Capture/escape products; serialization and resume rejection fixtures. |

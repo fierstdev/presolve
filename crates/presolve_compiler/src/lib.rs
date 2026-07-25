@@ -38,6 +38,7 @@ pub mod context_resolution;
 pub mod context_resume;
 pub mod context_typing;
 pub mod context_update;
+pub mod control_flow;
 pub mod effect;
 pub mod effect_capability;
 pub mod effect_diagnostics;
@@ -319,6 +320,12 @@ pub use context_typing::{
     ContextTypeProducts, ContextTypeRecord, ProviderTypeRecord,
 };
 pub use context_update::{build_context_update_plan, ContextActionUpdatePlan, ContextUpdatePlan};
+pub use control_flow::{
+    build_control_flow_graph_v1, ControlFlowAccessKindV1, ControlFlowAccessV1, ControlFlowBlockV1,
+    ControlFlowBranchArmV1, ControlFlowBranchEdgeV1, ControlFlowCoverageStatusV1,
+    ControlFlowCoverageV1, ControlFlowFunctionV1, ControlFlowGraphV1, ControlFlowLoopV1,
+    ControlFlowProvenanceV1, CONTROL_FLOW_SCHEMA_VERSION,
+};
 pub use effect::{
     analyze_effect_reactivity, collect_effects, derive_effect_trigger_plan, lower_effect_bodies,
     plan_effect_execution, validate_effects, ActionBatch, ActionBatchEffectTrigger,
