@@ -9,6 +9,7 @@ pub mod application_semantic_model;
 pub mod asm_validation;
 pub mod authored_semantics;
 pub mod binding_table;
+pub mod capture_escape;
 pub mod compilation_unit;
 pub mod compiler_pass;
 pub mod component_composition;
@@ -205,6 +206,11 @@ pub use authored_semantics::{
 pub use binding_table::{
     build_binding_table, build_binding_table_with_packages, BindingDiagnostic, BindingTable,
     ExportBinding, ImportBinding, ImportBindingTarget, ModuleBindingTable,
+};
+pub use capture_escape::{
+    build_capture_escape_graph_v1, CaptureEscapeCoverageV1, CaptureEscapeErrorV1,
+    CaptureEscapeFactV1, CaptureEscapeFactsV1, CaptureEscapeGraphV1, CaptureEscapeKindV1,
+    FunctionCaptureEscapeV1, ResumeCaptureAdmissionV1, CAPTURE_ESCAPE_SCHEMA_VERSION,
 };
 pub use compilation_unit::CompilationUnit;
 pub use compiler_pass::{

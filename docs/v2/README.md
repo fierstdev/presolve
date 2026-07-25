@@ -39,12 +39,14 @@ normative source for this handoff.
   explicit call-fact boundary and conservative transitive-summary rules.
 - [Purity and effect contract](purity-effect-contract.md) records the
   compiler-visible effect classes and conservative unknown classification.
+- [Capture and escape contract](capture-escape-contract.md) records the
+  explicit evidence boundary and fail-closed resume admission rule.
 
 ## Current boundary
 
 The characterization, compatibility-corpus, semantic-authority, source-AST,
 intrinsic-registry, canonical-authored-semantics, legacy-lowering, the Vite
 backend skeleton, virtual-module registry, and dev-server integration are
-complete, as are production build integration and the control-flow graph
-foundation and function summaries. The next slice is purity and effect
-classification, followed by capture and escape analysis.
+complete, as are production build integration, the control-flow graph
+foundation, function summaries, purity/effect classification, and explicit
+capture/escape analysis. The next slice is environment ownership.
