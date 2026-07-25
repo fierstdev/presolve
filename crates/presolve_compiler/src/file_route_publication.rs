@@ -68,6 +68,9 @@ pub struct FileRoutePublicationRouteV1 {
 pub struct FileRoutePublicationProductV1 {
     pub manifest: FileRoutePublicationManifestV1,
     pub artifacts: BTreeMap<PathBuf, Vec<u8>>,
+    /// Internal compiler-selected route sources for sidecar joins. This is not
+    /// serialized and must not be reconstructed by adapters.
+    pub route_source_paths: BTreeMap<String, PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -149,6 +152,7 @@ pub fn build_file_route_publication_v1(
         .collect::<BTreeMap<_, _>>();
     let mut artifacts = BTreeMap::new();
     let mut routes = Vec::new();
+    let mut route_source_paths = BTreeMap::new();
     for route in &graph.routes {
         let entry_path =
             component_modules
@@ -202,6 +206,7 @@ pub fn build_file_route_publication_v1(
             artifact_root,
             layout_component_ids: route.layouts.iter().map(ToString::to_string).collect(),
         });
+        route_source_paths.insert(route.path.clone(), entry_path.clone());
     }
     routes.sort_by(|left, right| left.path.cmp(&right.path));
     artifacts.insert(
@@ -232,6 +237,7 @@ pub fn build_file_route_publication_v1(
     Ok(FileRoutePublicationProductV1 {
         manifest,
         artifacts,
+        route_source_paths,
     })
 }
 
