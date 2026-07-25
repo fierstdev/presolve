@@ -8,7 +8,7 @@ versioned compatibility train, not a set of independently published packages.
 - crates.io: `presolve-parser`, `presolve-compiler`, and `presolve-cli`,
   published in dependency order so the public compiler has resolvable registry
   dependencies.
-- npm: `presolve`, `create-presolve`, `@presolve/cli`, supported platform CLI
+- npm: `@presolve/core`, `create-presolve`, `@presolve/cli`, supported platform CLI
   packages, and any public runtime/tooling/application packages.
 - Visual Studio Marketplace: `presolve-vscode` under the `fierstdev` publisher.
 - GitHub: a matching annotated release tag and release notes.
@@ -21,8 +21,8 @@ versioned compatibility train, not a set of independently published packages.
    manifest, package metadata, and compatibility assertion. Map
    `MAJOR.MINOR.PATCH-alpha.N` to the numeric Visual Studio Marketplace
    prerelease version `MAJOR.MINOR.(PATCH + N)` because the Marketplace does
-   not accept SemVer prerelease suffixes. Presolve `0.1.0-alpha.6` therefore
-   publishes as Marketplace prerelease `0.1.6`.
+   not accept SemVer prerelease suffixes. Presolve `0.1.0-alpha.7` therefore
+   publishes as Marketplace prerelease `0.1.7`.
 2. Run the full Rust, package, browser, artifact, formatter, and release-check
    matrix from a clean checkout.
 3. Pack every npm package, install the tarballs in a fresh external directory,

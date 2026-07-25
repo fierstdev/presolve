@@ -48,7 +48,7 @@ Most applications need no resumability-specific syntax. Write ordinary
 compiler-admitted components and use the framework vocabulary normally:
 
 ```tsx
-import { action, component, state, Component } from "presolve";
+import { action, component, state, Component } from "@presolve/core";
 
 @component()
 export class Counter extends Component {

@@ -1,6 +1,6 @@
 {
   "name": "@presolve/cli-darwin-arm64",
-  "version": "0.1.0-alpha.6",
+  "version": "0.1.0-alpha.7",
   "description": "Presolve CLI binary for macOS Apple Silicon.",
   "license": "MIT OR Apache-2.0",
   "os": ["darwin"],

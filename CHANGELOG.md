@@ -8,6 +8,19 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.1.0-alpha.7 - 2026-07-24
+
+### Changed
+
+- Renamed the public framework authoring package and compiler-recognized import
+  from the npm-rejected unscoped `presolve` name to `@presolve/core`.
+- Updated the scaffold, examples, framework fixtures, editor fixtures, and
+  public documentation to use only `@presolve/core`; no unreleased legacy import
+  alias remains.
+- Advanced the complete release train to `0.1.0-alpha.7` after alpha.6 published
+  its crates and scoped npm tooling before npm rejected the unscoped framework
+  package name.
+
 ## 0.1.0-alpha.6 - 2026-07-24
 
 ### Changed

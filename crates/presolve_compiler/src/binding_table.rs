@@ -262,11 +262,11 @@ fn resolve_semantic_package_import(
     diagnostics: &mut Vec<BindingDiagnostic>,
     module: &Path,
 ) {
-    // `presolve` is the public declaration-only authoring vocabulary. Its
+    // `@presolve/core` is the public declaration-only authoring vocabulary. Its
     // imports select compiler intrinsics that are already recognized by the
     // parser/component model; unlike third-party packages, they have no
     // runtime module, integrity coordinate, or semantic capability to bind.
-    if import.source == "presolve" {
+    if import.source == "@presolve/core" {
         return;
     }
     let Some(contract) = packages.contract(&import.source) else {
@@ -831,10 +831,10 @@ class Second extends Component {
     }
 
     #[test]
-    fn accepts_the_public_presolve_authoring_import_without_a_package_capability_contract() {
+    fn accepts_the_public_core_authoring_import_without_a_package_capability_contract() {
         let unit = CompilationUnit::parse_sources([(
             "src/App.tsx",
-            "import { component, state } from \"presolve\"; export class App {}",
+            "import { component, state } from \"@presolve/core\"; export class App {}",
         )]);
         let symbols = build_symbol_table(&unit);
         let modules = build_module_graph(&unit);

@@ -50,9 +50,9 @@ function template(name) {
         deploy: "presolve deploy cloudflare",
         "deploy:prepare": "presolve deploy cloudflare --prepare",
       },
-      dependencies: { presolve: "0.1.0-alpha.6" },
+      dependencies: { "@presolve/core": "0.1.0-alpha.7" },
       devDependencies: {
-        "@presolve/cli": "0.1.0-alpha.6",
+        "@presolve/cli": "0.1.0-alpha.7",
         "typescript": "npm:typescript@^7.0.2",
         "wrangler": "^4.0.0",
       },
@@ -72,8 +72,8 @@ function template(name) {
       include: ["app/**/*.ts", "app/**/*.tsx"],
     }, null, 2)}\n`,
     ".vscode/extensions.json": `${JSON.stringify({ recommendations: ["fierstdev.presolve-vscode"] }, null, 2)}\n`,
-    "app/routes/index.tsx": `import { component, Component } from "presolve";\n\n@component()\nexport class Home extends Component {\n  render() {\n    return <main><h1>${name}</h1><p>Built by the Presolve compiler.</p><a href="/docs/">Read the docs</a></main>;\n  }\n}\n`,
-    "app/routes/docs/index.tsx": `import { component, Component } from "presolve";\n\n@component()\nexport class Docs extends Component {\n  render() {\n    return <main><h1>Presolve documentation</h1><p>Start with compiler-owned components, routes, and deployment.</p><a href="/docs/getting-started/">Getting started</a></main>;\n  }\n}\n`,
-    "app/routes/docs/getting-started.tsx": `import { component, Component } from "presolve";\n\n@component()\nexport class GettingStarted extends Component {\n  render() {\n    return <main><h1>Getting started</h1><p>Author components. Presolve publishes static HTML and the minimal runtime artifacts required by your application.</p></main>;\n  }\n}\n`,
+    "app/routes/index.tsx": `import { component, Component } from "@presolve/core";\n\n@component()\nexport class Home extends Component {\n  render() {\n    return <main><h1>${name}</h1><p>Built by the Presolve compiler.</p><a href="/docs/">Read the docs</a></main>;\n  }\n}\n`,
+    "app/routes/docs/index.tsx": `import { component, Component } from "@presolve/core";\n\n@component()\nexport class Docs extends Component {\n  render() {\n    return <main><h1>Presolve documentation</h1><p>Start with compiler-owned components, routes, and deployment.</p><a href="/docs/getting-started/">Getting started</a></main>;\n  }\n}\n`,
+    "app/routes/docs/getting-started.tsx": `import { component, Component } from "@presolve/core";\n\n@component()\nexport class GettingStarted extends Component {\n  render() {\n    return <main><h1>Getting started</h1><p>Author components. Presolve publishes static HTML and the minimal runtime artifacts required by your application.</p></main>;\n  }\n}\n`,
   };
 }

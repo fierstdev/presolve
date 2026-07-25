@@ -1,4 +1,4 @@
-import { action, component, state, Component } from "presolve";
+import { action, component, state, Component } from "@presolve/core";
 
 @component()
 export class Counter extends Component {

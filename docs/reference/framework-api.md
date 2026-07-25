@@ -1,13 +1,13 @@
 # Framework API
 
-Import application authoring primitives from `presolve`.
+Import application authoring primitives from `@presolve/core`.
 
 ```ts
 import {
   action, component, computed, consume, context, effect, field, form,
   loader, opaque, provide, required, resource, serialize, serverAction, slot,
   state, submit, validate, Component, type Form,
-} from "presolve";
+} from "@presolve/core";
 ```
 
 All decorators are compiler intrinsics with no runtime registration authority.

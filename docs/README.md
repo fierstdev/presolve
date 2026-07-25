@@ -35,4 +35,4 @@ that application.
 
 [Architecture](architecture.md) explains the product boundary. The guide and
 reference are the public documentation source; examples in them must be kept
-valid against the published `presolve` package and the CLI release train.
+valid against the published `@presolve/core` package and the CLI release train.

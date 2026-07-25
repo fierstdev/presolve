@@ -8,7 +8,7 @@ import {
   submit,
   Component,
   type Form,
-} from "presolve";
+} from "@presolve/core";
 
 @component()
 export class FormHost extends Component {

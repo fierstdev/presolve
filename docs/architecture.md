@@ -4,7 +4,7 @@ Presolve has one semantic authority: the compiler. It reads TypeScript and TSX
 source, validates the language forms it supports, and publishes the HTML,
 browser artifacts, route inventory, resumability records, and deployment plan.
 
-The `presolve` package supplies types and compiler intrinsics. Its decorators
+The `@presolve/core` package supplies types and compiler intrinsics. Its decorators
 do not create stores, renderers, dependency trackers, or registries at runtime.
 The CLI provides the application conventions: file routes, layouts, development
 workflow, production builds, and deployment preparation.

@@ -4,7 +4,7 @@ A Presolve component is an exported class marked with `@component()` and one
 instance `render()` method. `render()` returns TSX.
 
 ```tsx
-import { component, Component } from "presolve";
+import { component, Component } from "@presolve/core";
 
 @component()
 export class Welcome extends Component {

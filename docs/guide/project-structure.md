@@ -22,7 +22,7 @@ compiler-discovered; applications do not maintain a parallel router table.
 Each route exports a compiler component. The following home route is complete:
 
 ```tsx
-import { component, Component } from "presolve";
+import { component, Component } from "@presolve/core";
 
 @component()
 export class Home extends Component {

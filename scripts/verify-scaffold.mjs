@@ -22,7 +22,7 @@ try {
 
   run("pnpm", ["dlx", "--package", tarballs.create, "create-presolve", app]);
   const overrides = {
-    presolve: `file:${tarballs.framework}`,
+    "@presolve/core": `file:${tarballs.framework}`,
     "@presolve/cli": `file:${tarballs.cli}`,
     [`@presolve/${platformPackage()}`]: `file:${tarballs.platform}`,
   };

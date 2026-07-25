@@ -8,7 +8,7 @@
     "jsx": "preserve",
     "skipLibCheck": true,
     "paths": {
-      "presolve": ["../../framework/packages/presolve/src/index.d.ts"]
+      "@presolve/core": ["../../framework/packages/presolve/src/index.d.ts"]
     }
   },
   "include": ["src/**/*.tsx"]

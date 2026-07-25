@@ -10,7 +10,7 @@ import {
   validate,
   Component,
   type Form,
-} from "presolve";
+} from "@presolve/core";
 
 @component()
 export class ResumeForms extends Component {

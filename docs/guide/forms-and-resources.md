@@ -12,7 +12,7 @@ field with it, and `@submit()` declares the action that handles its submission.
 ```tsx
 import {
   action, component, field, form, serialize, submit, Component, type Form,
-} from "presolve";
+} from "@presolve/core";
 
 @component()
 export class ProfileForm extends Component {
