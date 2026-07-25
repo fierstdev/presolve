@@ -39,4 +39,5 @@ normative source for this handoff.
 The characterization, compatibility-corpus, semantic-authority, source-AST,
 intrinsic-registry, canonical-authored-semantics, legacy-lowering, the Vite
 backend skeleton, virtual-module registry, and dev-server integration are
-complete. The next slice is production build integration.
+complete, as is production build integration. The next slice is the
+control-flow graph foundation.

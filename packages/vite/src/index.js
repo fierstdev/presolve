@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 /** V1 shape of the compiler manifest consumed by this external adapter. */
 export const PRESOLVE_VITE_ADAPTER_SCHEMA_VERSION = 1;
@@ -6,6 +8,7 @@ export const PRESOLVE_APPLICATION_PUBLICATION_CONTRACT_V1 = "presolve-applicatio
 export const PRESOLVE_VIRTUAL_MODULE_SCHEMA_VERSION = 1;
 export const PRESOLVE_VIRTUAL_MODULE_PREFIX = "virtual:presolve/v1/";
 export const PRESOLVE_DEVELOPMENT_DIAGNOSTICS_SCHEMA_VERSION = 1;
+export const PRESOLVE_VITE_PRODUCTION_SCHEMA_VERSION = 1;
 
 /**
  * Creates the empty Vite boundary over an already-produced compiler product.
@@ -107,6 +110,82 @@ export function composeDevelopmentDiagnostics({ typescript = [], presolve = [] }
   return Object.freeze({
     schemaVersion: PRESOLVE_DEVELOPMENT_DIAGNOSTICS_SCHEMA_VERSION,
     diagnostics: Object.freeze(diagnostics),
+  });
+}
+
+/**
+ * Runs Vite's production build for one compiler-selected logical entry.
+ *
+ * The Vite manifest is read after physical output is written and then mapped
+ * back to the stable compiler entry-component ID. No Vite filename becomes a
+ * compiler semantic identity.
+ */
+export async function buildPresolveProduction({
+  compilerProduct,
+  readArtifact,
+  entryArtifactPath,
+  vite = {},
+} = {}) {
+  const manifest = validateCompilerProduct(compilerProduct);
+  if (typeof entryArtifactPath !== "string" || !entryArtifactPath) {
+    throw new TypeError("Presolve production build requires an entryArtifactPath");
+  }
+  if (!manifest.artifacts.some(artifact => artifact.path === entryArtifactPath)) {
+    throw new TypeError(`Presolve production entry is not a compiler artifact: ${entryArtifactPath}`);
+  }
+  if (typeof manifest.entry_component_id !== "string" || !manifest.entry_component_id) {
+    throw new TypeError("Presolve production build requires manifest.entry_component_id");
+  }
+  const outDir = vite.build?.outDir;
+  if (typeof outDir !== "string" || !outDir) {
+    throw new TypeError("Presolve production build requires an explicit Vite build.outDir");
+  }
+  const manifestName = "presolve-vite-manifest.json";
+  const virtualEntryId = `${PRESOLVE_VIRTUAL_MODULE_PREFIX}${entryArtifactPath}`;
+  const plugin = createPresolveVitePlugin({ compilerProduct, readArtifact });
+  const configuredPlugins = vite.plugins === undefined
+    ? []
+    : Array.isArray(vite.plugins) ? vite.plugins : [vite.plugins];
+  const { build } = await import("vite");
+  await build({
+    ...vite,
+    configFile: false,
+    plugins: [...configuredPlugins, plugin],
+    build: {
+      ...vite.build,
+      outDir,
+      emptyOutDir: false,
+      manifest: manifestName,
+      rollupOptions: {
+        ...vite.build?.rollupOptions,
+        input: virtualEntryId,
+      },
+    },
+  });
+  const viteManifestPath = join(outDir, manifestName);
+  const viteManifest = JSON.parse(await readFile(viteManifestPath, "utf8"));
+  const entries = Object.entries(viteManifest)
+    .filter(([, output]) => output.isEntry)
+    .map(([input, output]) => Object.freeze({
+      input,
+      file: output.file,
+      css: Object.freeze([...(output.css ?? [])].sort()),
+      assets: Object.freeze([...(output.assets ?? [])].sort()),
+      imports: Object.freeze([...(output.imports ?? [])].sort()),
+      compilerArtifactPath: input === virtualEntryId ? entryArtifactPath : undefined,
+      componentId: input === virtualEntryId ? manifest.entry_component_id : undefined,
+    }))
+    .sort((left, right) => left.input.localeCompare(right.input));
+  if (!entries.some(entry => entry.compilerArtifactPath === entryArtifactPath)) {
+    throw new Error("Vite production manifest did not retain the compiler-selected virtual entry");
+  }
+  return Object.freeze({
+    schemaVersion: PRESOLVE_VITE_PRODUCTION_SCHEMA_VERSION,
+    compilerContract: manifest.compiler_contract,
+    workspaceSnapshotId: manifest.workspace_snapshot_id,
+    entryComponentId: manifest.entry_component_id,
+    viteManifestPath,
+    entries: Object.freeze(entries),
   });
 }
 

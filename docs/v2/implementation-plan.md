@@ -35,7 +35,7 @@ in the same change.
 | 9 | Vite backend skeleton | `packages/vite`; application-publication manifest | Implemented `@presolve/vite` compiler-product contract check and empty Vite plugin boundary; package smoke test proves it has no source, virtual-module, or dev-server behavior. |
 | 10 | Virtual module registry | `packages/vite`; application-publication manifest/artifacts | Implemented versioned module IDs and digest-checked artifact-content exports; smoke test fixes the golden virtual module source and rejects drift. |
 | 11 | Dev server integration | `packages/vite`; later CLI command adapters | Implemented `presolve dev` lifecycle seam, compiler-owned request-host delegation, and versioned combined TypeScript/Presolve diagnostic transport; live Vite probe covers hosted routes and Vite asset fallback. |
-| 12 | Production build integration | `packages/vite`, `application_publication`, production products | Physical Vite output mapped back to Presolve manifest; production build fixtures. |
+| 12 | Production build integration | `packages/vite`; application-publication manifest/artifacts | Implemented written Vite production output with a manifest-derived component-entry mapping; live temporary-output probe proves physical files map back to stable compiler identity. |
 
 ## Analysis
 

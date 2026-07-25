@@ -38,6 +38,15 @@ to Vite middleware for JavaScript, CSS, and assets. Endpoint classification is
 therefore not invented by the Vite package. Vite's native watcher remains live
 across ordinary asset edits; semantic HMR classification is a later slice.
 
+## Production build
+
+`buildPresolveProduction` runs Vite for one explicit compiler artifact and
+requires an explicit output directory. It leaves existing output files intact,
+writes Vite's physical manifest, then returns a versioned Presolve product that
+maps the manifest entry back to the publication manifest's stable
+`entry_component_id`. Physical Vite filenames remain output metadata, never
+semantic identity.
+
 The workspace keeps `esbuild` build scripts disabled while this skeleton does
 not execute Vite. A later slice that starts a Vite process must make and test
 an explicit build-tool approval decision.

@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
+  buildPresolveProduction,
   createPresolveVitePlugin,
   createPresolveVirtualModuleRegistry,
   composeDevelopmentDiagnostics,
@@ -105,6 +109,37 @@ try {
   }
 } finally {
   await dev.close();
+}
+
+const outputDirectory = await mkdtemp(join(tmpdir(), "presolve-vite-build-"));
+try {
+  const production = await buildPresolveProduction({
+    compilerProduct: {
+      manifest: {
+        schema_version: 1,
+        compiler_contract: "presolve-application-publication:1",
+        workspace_snapshot_id: "fixture-snapshot",
+        entry_component_id: "component:x-app",
+        artifacts: [{ path: "runtime.js", digest }],
+      },
+    },
+    readArtifact: () => runtime,
+    entryArtifactPath: "runtime.js",
+    vite: { logLevel: "silent", build: { outDir: outputDirectory } },
+  });
+  if (production.entryComponentId !== "component:x-app" || production.entries.length !== 1) {
+    throw new Error("production build must map the Vite entry back to the compiler component");
+  }
+  const entry = production.entries[0];
+  if (entry.compilerArtifactPath !== "runtime.js" || entry.componentId !== "component:x-app") {
+    throw new Error("production entry mapping must retain compiler identities");
+  }
+  const physicalManifest = JSON.parse(await readFile(production.viteManifestPath, "utf8"));
+  if (!Object.values(physicalManifest).some(output => output.file === entry.file)) {
+    throw new Error("production product must describe a file from Vite's written manifest");
+  }
+} finally {
+  await rm(outputDirectory, { recursive: true, force: true });
 }
 
 function assertRejects(action, message) {
