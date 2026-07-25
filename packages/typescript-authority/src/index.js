@@ -2,6 +2,8 @@ import { API, SymbolFlags } from "@typescript/native/unstable/async";
 import { getTokenAtPosition } from "@typescript/native/unstable/ast";
 import { dirname, relative, resolve, sep } from "node:path";
 
+export { CANONICAL_INTRINSIC_KINDS, classifyResolvedIntrinsic, createCanonicalIntrinsicRegistry } from "./intrinsics.js";
+
 export const TYPESCRIPT_SEMANTIC_AUTHORITY_SCHEMA_VERSION = 1;
 export const PRIMARY_TYPESCRIPT_VERSION = "7.0.2";
 

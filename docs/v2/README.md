@@ -33,6 +33,6 @@ normative source for this handoff.
 ## Current boundary
 
 The characterization, compatibility-corpus, and semantic-authority slices are
-complete, as is the general source AST. The next slice is the canonical
-intrinsic registry, which must resolve registered symbols through the
-TypeScript-authority boundary rather than matching decorator spelling.
+complete, as is the general source AST and canonical intrinsic registry. The
+next slice is canonical authored semantics, which will normalize existing
+authoring only after consuming syntax and resolved-intrinsic products.

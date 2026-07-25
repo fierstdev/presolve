@@ -5,6 +5,8 @@ import { resolve } from "node:path";
 
 import {
   analyzeTypeScriptProject,
+  classifyResolvedIntrinsic,
+  createCanonicalIntrinsicRegistry,
   PRIMARY_TYPESCRIPT_VERSION,
   TYPESCRIPT_SEMANTIC_AUTHORITY_SCHEMA_VERSION,
 } from "../src/index.js";
@@ -75,4 +77,23 @@ test("the authority adapter preserves native TypeScript diagnostics", async () =
   });
   assert.deepEqual(diagnostics.diagnostics.map(diagnostic => diagnostic.code), [2322, 2345]);
   assert(diagnostics.diagnostics.every(diagnostic => diagnostic.source === "semantic"));
+});
+
+test("canonical intrinsics classify resolved exports rather than local spellings", async () => {
+  const frameworkFile = resolve(root, "tests/framework-public-api/src/PublicCounter.tsx");
+  const frameworkSource = readFileSync(frameworkFile, "utf8");
+  const frameworkResult = await analyzeTypeScriptProject({
+    configFile: resolve(root, "tests/framework-public-api/tsconfig.json"),
+    queries: {
+      symbols: [
+        { id: "component-import", file: frameworkFile, position: frameworkSource.indexOf("component,") },
+        { id: "component-use", file: frameworkFile, position: frameworkSource.indexOf("@component()") + 1 },
+      ],
+    },
+  });
+  const registry = createCanonicalIntrinsicRegistry([
+    { kind: "component", symbol: frameworkResult.symbols[0].symbol },
+  ]);
+  assert.equal(classifyResolvedIntrinsic(registry, frameworkResult.symbols[1].symbol)?.kind, "component");
+  assert.equal(classifyResolvedIntrinsic(registry, { identity: { name: "component", flags: 0, declarationModules: [] } }), undefined);
 });
