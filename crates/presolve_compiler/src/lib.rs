@@ -99,6 +99,7 @@ pub mod production_scheduler;
 pub mod production_validation;
 pub mod project_discovery;
 pub mod provider;
+pub mod purity_effect;
 pub mod resource;
 pub mod resume_activation;
 pub mod resume_anchor;
@@ -601,6 +602,11 @@ pub use project_discovery::{
     DiscoveredProjectV1, ProjectDiscoveryErrorV1,
 };
 pub use provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
+pub use purity_effect::{
+    build_purity_effect_graph_v1, FunctionEffectFactV1, FunctionEffectKindV1,
+    FunctionPurityEffectV1, FunctionPurityV1, PurityEffectErrorV1, PurityEffectGraphV1,
+    PURITY_EFFECT_SCHEMA_VERSION,
+};
 pub use resource::{
     ResourceActivation, ResourceDeclaration, ResourceDeclarationError, ResourceEndpointBinding,
     ResourceEndpointResolution, ResourceEndpointResolutionOutcome, ResourceInvalidationPolicy,

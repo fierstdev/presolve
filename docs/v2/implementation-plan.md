@@ -43,7 +43,7 @@ in the same change.
 | ---: | --- | --- | --- |
 | 13 | Control-flow graph | `presolve_compiler::control_flow`; `intermediate_representation` | Implemented schema v1 IR-backed function CFG projection with branch/loop topology and exact IR-visible dataflow; unsupported exception, suspension, unknown-call, capture, and cancellation coverage is explicit and fail-closed. |
 | 14 | Function summaries | `presolve_compiler::function_summary`; `control_flow` | Implemented schema v1 stable direct/transitive summaries over explicit call facts; cross-module and unknown-call proof, with transitive facts fail-closed when call coverage is unavailable. |
-| 15 | Purity/effect classification | `effect`, `effect_capability`, `computed_value` | Conservative purity/effect classifications and unknown-call diagnostics. |
+| 15 | Purity/effect classification | `presolve_compiler::purity_effect`; `control_flow`; `function_summary` | Implemented schema v1 conservative classification for compiler-visible writes, observable instructions, Resource reads, explicit unknown calls, and unavailable call coverage. |
 | 16 | Capture and escape analysis | `resume_capture`, `resume_liveness`, `resume_boundary` | Capture/escape products; serialization and resume rejection fixtures. |
 | 17 | Environment ownership | `context_ownership`, `form_ownership`, component instance scope | Ownership graph; isolation/cycle diagnostics and fixtures. |
 | 18 | Serialization and codec protocol | `semantic_type`, `form_serialization`, `resume_schema`, `platform` | Versioned codec protocol; valid/invalid serialization corpus. |

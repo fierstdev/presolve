@@ -37,6 +37,8 @@ normative source for this handoff.
   IR projection and the coverage required before later analyses may rely on it.
 - [Function-summary contract](function-summaries-contract.md) records the
   explicit call-fact boundary and conservative transitive-summary rules.
+- [Purity and effect contract](purity-effect-contract.md) records the
+  compiler-visible effect classes and conservative unknown classification.
 
 ## Current boundary
 
@@ -45,4 +47,4 @@ intrinsic-registry, canonical-authored-semantics, legacy-lowering, the Vite
 backend skeleton, virtual-module registry, and dev-server integration are
 complete, as are production build integration and the control-flow graph
 foundation and function summaries. The next slice is purity and effect
-classification.
+classification, followed by capture and escape analysis.
