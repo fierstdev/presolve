@@ -47,6 +47,8 @@ normative source for this handoff.
   records independent serialization classes and versioned codec declarations.
 - [Structural components and props contract](structural-components-contract.md)
   records the TypeScript-authority boundary for inheritance and generic props.
+- [Slots contract](slots-contract.md) records immutable slot ownership and the
+  explicit boundary before capture/resume analysis.
 
 ## Current boundary
 
@@ -57,4 +59,4 @@ complete, as are production build integration, the control-flow graph
 foundation, function summaries, purity/effect classification, and explicit
 capture/escape analysis and environment ownership. The next slice is the
 serialization and codec protocol. The next slice is structural components and
-props. The next slice is slots.
+props and slots. The next slice is state.

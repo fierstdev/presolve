@@ -148,6 +148,7 @@ pub mod shared_chunk_candidate;
 pub mod slot;
 pub mod slot_binding;
 pub mod slot_content;
+pub mod slot_projection;
 pub mod state_instance_storage;
 pub mod structural_component;
 pub mod summarize;
@@ -882,6 +883,10 @@ pub use slot_content::{
     collect_slot_composition, SlotCompositionRegistry, SlotContentFragment,
     SlotContentFragmentStatus, SlotContentFragmentViolation, SlotOutlet, SlotOutletStatus,
     SlotOutletViolation,
+};
+pub use slot_projection::{
+    build_slot_projection_graph_v1, SlotProjectionGraphV1, SlotProjectionRecordV1,
+    SlotProjectionStatusV1, SlotResumabilityCoverageV1, SLOT_PROJECTION_SCHEMA_VERSION,
 };
 pub use state_instance_storage::{
     build_state_instance_storage_registry, validate_state_instance_storage_registry,
