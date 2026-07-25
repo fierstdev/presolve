@@ -12,7 +12,7 @@ pub use model::{
     ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional, ParsedJsxElement,
     ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLocalVariable, ParsedLogicalOperator,
     ParsedMethod, ParsedMethodCall, ParsedMethodParameter, ParsedProperty, ParsedSerializableValue,
-    ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator,
+    ParsedSourceAst, ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator,
     ParsedThisMemberDesignator, ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator,
     ParsedUnsupportedEffectStatementKind, ParsedValidationRuleArgument,
     ParsedValidationRuleArgumentKind, ParsedValidationRuleExpression,
@@ -100,6 +100,28 @@ class Profile {
             ParsedValidationRuleArgumentKind::ThisMember(designator)
                 if designator.member == "name"
         ));
+    }
+
+    #[test]
+    fn retains_a_source_faithful_general_estree_product() {
+        let source = r#"
+import type { CardProps } from "./types";
+export const Card = <section aria-label="card">{1 + 2}</section>;
+"#;
+        let parsed = parse_file("src/Card.tsx", source);
+        assert_eq!(parsed.syntax.source, source);
+        assert_eq!(parsed.syntax.span.start, 0);
+        assert_eq!(parsed.syntax.span.end, source.len());
+        assert!(parsed.syntax.estree_json.contains("\"Program\""));
+        assert!(parsed.syntax.estree_json.contains("\"ImportDeclaration\""));
+        assert!(parsed.syntax.estree_json.contains("\"JSXElement\""));
+        assert!(
+            parsed.syntax.estree_json.contains("\"TSImportType\"")
+                || parsed
+                    .syntax
+                    .estree_json
+                    .contains("\"importKind\":\"type\"")
+        );
     }
 
     #[test]

@@ -27,10 +27,12 @@ normative source for this handoff.
   pull requests to current modules, intended products, and proof surfaces.
 - [TypeScript semantic-authority boundary](typescript-authority.md) records the
   V2 schema and ownership rule for TypeScript semantic queries.
+- [General source AST](source-ast.md) records the source-faithful parser
+  product and the compatibility role of the existing derived facts.
 
 ## Current boundary
 
 The characterization, compatibility-corpus, and semantic-authority slices are
-complete, as is resolved module and symbol identity. The next slice is the
-general source AST. It must preserve broad syntax without replacing the
-TypeScript-authority boundary or extending feature-specific parser facts.
+complete, as is the general source AST. The next slice is the canonical
+intrinsic registry, which must resolve registered symbols through the
+TypeScript-authority boundary rather than matching decorator spelling.

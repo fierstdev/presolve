@@ -5,6 +5,9 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedFile {
     pub path: PathBuf,
+    /// The complete source-faithful syntax product. Feature-specific parser
+    /// facts below are derived views and must not become a second frontend.
+    pub syntax: ParsedSourceAst,
     pub classes: Vec<ParsedClass>,
     pub type_aliases: Vec<ParsedTypeAlias>,
     /// Module-local declarations that bind a name in TypeScript's type
@@ -18,6 +21,13 @@ pub struct ParsedFile {
     pub imports: Vec<ParsedImport>,
     pub exports: Vec<ParsedExport>,
     pub diagnostics: Vec<ParseDiagnostic>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedSourceAst {
+    pub source: String,
+    pub estree_json: String,
+    pub span: SourceSpan,
 }
 
 /// Authored type alias retained for canonical semantic type lowering.

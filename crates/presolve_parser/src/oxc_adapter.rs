@@ -10,6 +10,7 @@ use oxc_ast::ast::{
     PropertyKey, PropertyKind, SimpleAssignmentTarget, Statement,
 };
 use oxc_diagnostics::Severity as OxcSeverity;
+use oxc_estree::{CompactTSSerializer, ESTree};
 use oxc_parser::Parser;
 use oxc_span::{GetSpan, SourceType, Span};
 
@@ -24,7 +25,7 @@ use crate::model::{
     ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional, ParsedJsxElement,
     ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLocalVariable, ParsedLogicalOperator,
     ParsedMethod, ParsedMethodCall, ParsedMethodParameter, ParsedProperty, ParsedSerializableValue,
-    ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator,
+    ParsedSourceAst, ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator,
     ParsedThisMemberDesignator, ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator,
     ParsedUnsupportedEffectStatementKind, ParsedValidationRuleArgument,
     ParsedValidationRuleArgumentKind, ParsedValidationRuleExpression,
@@ -40,6 +41,7 @@ pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
 
     let allocator = Allocator::default();
     let ret = Parser::new(&allocator, source, source_type).parse();
+    let syntax = parse_source_ast(&ret.program, source);
 
     let ParsedProgramFacts {
         classes,
@@ -57,6 +59,7 @@ pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
 
     ParsedFile {
         path: PathBuf::from(path),
+        syntax,
         classes,
         type_aliases,
         local_type_bindings,
@@ -64,6 +67,16 @@ pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
         imports,
         exports,
         diagnostics,
+    }
+}
+
+fn parse_source_ast(program: &Program<'_>, source: &str) -> ParsedSourceAst {
+    let mut serializer = CompactTSSerializer::new(true);
+    program.serialize(&mut serializer);
+    ParsedSourceAst {
+        source: source.to_string(),
+        estree_json: serializer.into_string(),
+        span: source_span(source, program.span),
     }
 }
 
