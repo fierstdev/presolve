@@ -35,6 +35,8 @@ normative source for this handoff.
   integration seam for the required external backend.
 - [Control-flow contract](control-flow-contract.md) records the fail-closed
   IR projection and the coverage required before later analyses may rely on it.
+- [Function-summary contract](function-summaries-contract.md) records the
+  explicit call-fact boundary and conservative transitive-summary rules.
 
 ## Current boundary
 
@@ -42,4 +44,5 @@ The characterization, compatibility-corpus, semantic-authority, source-AST,
 intrinsic-registry, canonical-authored-semantics, legacy-lowering, the Vite
 backend skeleton, virtual-module registry, and dev-server integration are
 complete, as are production build integration and the control-flow graph
-foundation. The next slice is function summaries.
+foundation and function summaries. The next slice is purity and effect
+classification.

@@ -62,6 +62,7 @@ pub mod form_submission_host;
 pub mod form_tracking;
 pub mod form_validation;
 pub mod form_validation_plan;
+pub mod function_summary;
 pub mod html_codegen;
 pub mod instance_context;
 pub mod intermediate_representation;
@@ -430,6 +431,11 @@ pub use form_validation_plan::{
     FieldValidationSourceEntry, FieldValidationTargetEntry, FormValidationDependencyPlan,
     ValidationDependencyPlanIntegrityDiagnostic, ValidationDependencyPlanIntegrityKind,
     ValidationDependencyPlanValidation, ValidationDependencyPlans, ValidationPlanningStatus,
+};
+pub use function_summary::{
+    build_function_summary_graph_v1, FunctionCallCoverageV1, FunctionCallFactV1,
+    FunctionCallFactsV1, FunctionSummaryErrorV1, FunctionSummaryGraphV1, FunctionSummaryV1,
+    FUNCTION_SUMMARY_SCHEMA_VERSION,
 };
 pub use html_codegen::generate_static_html;
 pub use instance_context::{
