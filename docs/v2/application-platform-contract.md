@@ -46,6 +46,15 @@ host rejects those server-bound routes until a capability-specific executor is
 published. Provider adapters consume the compiler's immutable release inventory
 and must not reconstruct route or artifact identity.
 
+## Vite styles and assets
+
+`buildPresolveProduction` now accepts explicit Vite entries in addition to its
+compiler virtual entry. CSS, CSS Modules, PostCSS/Tailwind configuration,
+imported fonts/media, and `public` assets remain Vite inputs with physical
+output identities only. The adapter records the Vite manifest output but gives
+no compiler identity to those entries; it preserves a compiler identity only
+for the compiler-selected virtual entry.
+
 ## Testing and proof
 
 Vitest and Playwright are Vite-hosted integrations, not semantic authorities.

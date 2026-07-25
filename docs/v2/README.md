@@ -42,6 +42,8 @@ normative source for this handoff.
   compiler-produced production-report audit and adapter verification boundary.
 - [Source maps contract](source-maps-contract.md) records Vite physical-map
   ownership and the manifest-bound compiler artifact translation boundary.
+- [Vite styles and assets contract](vite-assets-contract.md) records explicit
+  Vite-owned CSS, PostCSS/Tailwind, imported-asset, and public-directory input.
 - [Tooling query contract](tooling-query-contract.md) records the canonical
   WASM, language-service, LSP, hover, and explain query boundary.
 - [Migration command contract](migration-contract.md) records the
@@ -84,5 +86,5 @@ normative source for this handoff.
 The tracker records repository-owned V2 authority products through the
 compiler-issued Node release inventory and static eligibility classification.
 It remains the source of implementation status and intentionally separates
-those products from the remaining server-executor, environment, Vite asset,
-performance, and hardening evidence required for beta readiness.
+those products from the remaining server-executor, environment, performance,
+and hardening evidence required for beta readiness.

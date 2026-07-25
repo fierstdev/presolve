@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 /** V1 shape of the compiler manifest consumed by this external adapter. */
 export const PRESOLVE_VITE_ADAPTER_SCHEMA_VERSION = 1;
@@ -208,6 +208,7 @@ export async function buildPresolveProduction({
   compilerProduct,
   readArtifact,
   entryArtifactPath,
+  viteEntries = [],
   vite = {},
 } = {}) {
   const manifest = validateCompilerProduct(compilerProduct);
@@ -220,12 +221,26 @@ export async function buildPresolveProduction({
   if (typeof manifest.entry_component_id !== "string" || !manifest.entry_component_id) {
     throw new TypeError("Presolve production build requires manifest.entry_component_id");
   }
+  if (!Array.isArray(viteEntries)) {
+    throw new TypeError("Presolve Vite entries must be an array");
+  }
   const outDir = vite.build?.outDir;
   if (typeof outDir !== "string" || !outDir) {
     throw new TypeError("Presolve production build requires an explicit Vite build.outDir");
   }
   const manifestName = "presolve-vite-manifest.json";
   const virtualEntryId = `${PRESOLVE_VIRTUAL_MODULE_PREFIX}${entryArtifactPath}`;
+  const viteRoot = typeof vite.root === "string" && vite.root ? vite.root : process.cwd();
+  const additionalInputs = viteEntries
+    .map(validateViteEntry)
+    .map(entry => Object.freeze({ ...entry, path: resolve(viteRoot, entry.path) }));
+  if (new Set(additionalInputs.map(entry => entry.name)).size !== additionalInputs.length) {
+    throw new TypeError("Presolve Vite entry names must be unique");
+  }
+  const input = Object.fromEntries([
+    ["presolve-compiler-entry", virtualEntryId],
+    ...additionalInputs.map(entry => [entry.name, entry.path]),
+  ]);
   const plugin = createPresolveVitePlugin({ compilerProduct, readArtifact });
   const configuredPlugins = vite.plugins === undefined
     ? []
@@ -243,12 +258,15 @@ export async function buildPresolveProduction({
       sourcemap: true,
       rollupOptions: {
         ...vite.build?.rollupOptions,
-        input: virtualEntryId,
+        input,
       },
     },
   });
   const viteManifestPath = join(outDir, manifestName);
   const viteManifest = JSON.parse(await readFile(viteManifestPath, "utf8"));
+  const isCompilerEntry = input => input === virtualEntryId
+    || input === "presolve-compiler-entry"
+    || input.endsWith(`${PRESOLVE_VIRTUAL_MODULE_PREFIX}${entryArtifactPath}`);
   const entries = Object.entries(viteManifest)
     .filter(([, output]) => output.isEntry)
     .map(([input, output]) => Object.freeze({
@@ -257,14 +275,20 @@ export async function buildPresolveProduction({
       css: Object.freeze([...(output.css ?? [])].sort()),
       assets: Object.freeze([...(output.assets ?? [])].sort()),
       imports: Object.freeze([...(output.imports ?? [])].sort()),
-      compilerArtifactPath: input === virtualEntryId ? entryArtifactPath : undefined,
-      componentId: input === virtualEntryId ? manifest.entry_component_id : undefined,
+      compilerArtifactPath: isCompilerEntry(input)
+        ? entryArtifactPath
+        : undefined,
+      componentId: isCompilerEntry(input)
+        ? manifest.entry_component_id
+        : undefined,
     }))
     .sort((left, right) => left.input.localeCompare(right.input));
   if (!entries.some(entry => entry.compilerArtifactPath === entryArtifactPath)) {
     throw new Error("Vite production manifest did not retain the compiler-selected virtual entry");
   }
-  const sourceMaps = await Promise.all(entries.map(async entry => {
+  const sourceMaps = await Promise.all(entries
+    .filter(entry => entry.compilerArtifactPath !== undefined)
+    .map(async entry => {
     const mapPath = join(outDir, `${entry.file}.map`);
     let map;
     try {
@@ -277,7 +301,7 @@ export async function buildPresolveProduction({
       mapPath,
       translation: translatePresolveSourceMap({ compilerProduct, sourceMap: map }),
     });
-  }));
+    }));
   return Object.freeze({
     schemaVersion: PRESOLVE_VITE_PRODUCTION_SCHEMA_VERSION,
     compilerContract: manifest.compiler_contract,
@@ -287,6 +311,16 @@ export async function buildPresolveProduction({
     entries: Object.freeze(entries),
     sourceMaps: Object.freeze(sourceMaps),
   });
+}
+
+function validateViteEntry(entry) {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)
+    || typeof entry.name !== "string" || !entry.name
+    || typeof entry.path !== "string" || !entry.path
+    || entry.name === "presolve-compiler-entry") {
+    throw new TypeError("Presolve Vite entries require a non-empty name and path");
+  }
+  return Object.freeze({ name: entry.name, path: entry.path });
 }
 
 /**

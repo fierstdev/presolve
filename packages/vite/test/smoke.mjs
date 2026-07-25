@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -230,7 +230,19 @@ try {
 }
 
 const outputDirectory = await mkdtemp(join(tmpdir(), "presolve-vite-build-"));
+const applicationDirectory = await mkdtemp(join(tmpdir(), "presolve-vite-assets-"));
 try {
+  await mkdir(join(applicationDirectory, "styles"));
+  await mkdir(join(applicationDirectory, "assets"));
+  await mkdir(join(applicationDirectory, "public"));
+  await writeFile(join(applicationDirectory, "assets", "mark.svg"), "<svg xmlns=\"http://www.w3.org/2000/svg\"/>\n");
+  await writeFile(join(applicationDirectory, "public", "robots.txt"), "User-agent: *\n");
+  await writeFile(join(applicationDirectory, "styles", "app.css"), ".app { background-image: url('../assets/mark.svg'); }\n");
+  await writeFile(join(applicationDirectory, "styles", "card.module.css"), ".card { --presolve-card-color: 43; color: var(--presolve-card-color); }\n");
+  await writeFile(
+    join(applicationDirectory, "ui-entry.js"),
+    "import './styles/app.css'; import styles from './styles/card.module.css'; document.documentElement.className = styles.card;\n",
+  );
   const production = await buildPresolveProduction({
     compilerProduct: {
       manifest: {
@@ -243,15 +255,21 @@ try {
     },
     readArtifact: () => runtime,
     entryArtifactPath: "runtime.js",
-    vite: { logLevel: "silent", build: { outDir: outputDirectory } },
+    viteEntries: [{ name: "application-ui", path: "ui-entry.js" }],
+    vite: {
+      root: applicationDirectory,
+      publicDir: "public",
+      logLevel: "silent",
+      build: { outDir: outputDirectory, assetsInlineLimit: 0 },
+    },
   });
-  if (production.entryComponentId !== "component:x-app" || production.entries.length !== 1) {
-    throw new Error("production build must map the Vite entry back to the compiler component");
+  if (production.entryComponentId !== "component:x-app" || production.entries.length !== 2) {
+    throw new Error("production build must retain the compiler entry and explicit Vite entries");
   }
   if (production.sourceMaps.length !== 1 || !production.sourceMaps[0].mapPath.endsWith(".map")) {
     throw new Error("production builds must emit and report Vite source maps");
   }
-  const entry = production.entries[0];
+  const entry = production.entries.find(candidate => candidate.compilerArtifactPath === "runtime.js");
   if (entry.compilerArtifactPath !== "runtime.js" || entry.componentId !== "component:x-app") {
     throw new Error("production entry mapping must retain compiler identities");
   }
@@ -259,8 +277,20 @@ try {
   if (!Object.values(physicalManifest).some(output => output.file === entry.file)) {
     throw new Error("production product must describe a file from Vite's written manifest");
   }
+  const ui = production.entries.find(candidate => candidate.input.endsWith("ui-entry.js"));
+  if (!ui || ui.compilerArtifactPath !== undefined || ui.css.length === 0) {
+    throw new Error("Vite-owned CSS module entries must stay outside compiler identity mapping");
+  }
+  const css = (await Promise.all(ui.css.map(path => readFile(join(outputDirectory, path), "utf8")))).join("\n");
+  if (!css.includes("--presolve-card-color") || !css.includes("mark-")) {
+    throw new Error("Vite must package CSS modules and imported asset URLs");
+  }
+  if (await readFile(join(outputDirectory, "robots.txt"), "utf8") !== "User-agent: *\n") {
+    throw new Error("Vite must copy caller-declared public assets");
+  }
 } finally {
   await rm(outputDirectory, { recursive: true, force: true });
+  await rm(applicationDirectory, { recursive: true, force: true });
 }
 
 function assertRejects(action, message) {
