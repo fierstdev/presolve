@@ -52,6 +52,7 @@ pub mod effect_diagnostics;
 pub mod effect_inspection;
 pub mod effect_projection;
 pub mod effect_resume;
+pub mod environment_input;
 pub mod environment_ownership;
 pub mod explain;
 pub mod expression_graph;
@@ -410,6 +411,10 @@ pub use effect_resume::{
     build_effect_resume_plan, validate_effect_resume_plan, EffectActivationSlotId,
     EffectActivationStatus, EffectInitialResumeMembership, EffectResumePlan, EffectResumeRecord,
     EffectResumeValidationDiagnostic,
+};
+pub use environment_input::{
+    build_environment_input_manifest_v1, environment_input_manifest_json_v1,
+    EnvironmentInputErrorV1, EnvironmentInputManifestV1, ENVIRONMENT_INPUT_SCHEMA_VERSION,
 };
 pub use environment_ownership::{
     build_environment_ownership_graph_v1, EnvironmentClassV1, EnvironmentOwnershipDiagnosticV1,

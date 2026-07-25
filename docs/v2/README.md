@@ -68,6 +68,8 @@ normative source for this handoff.
   explicit evidence boundary and fail-closed resume admission rule.
 - [Environment ownership contract](environment-ownership-contract.md) records
   explicit environment/lifetime classifications and path-bearing leak rules.
+- [Explicit environment-input contract](environment-input-contract.md) records
+  the named-file public/server value classification boundary.
 - [Serialization and codec protocol contract](codec-protocol-contract.md)
   records independent serialization classes and versioned codec declarations.
 - [Structural components and props contract](structural-components-contract.md)

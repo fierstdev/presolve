@@ -95,6 +95,7 @@ fn main() {
         "help" | "--help" | "-h" => print_l9_usage(),
         "create" | "benchmark" | "doctor" => l9_reserved_command(&command),
         "migrate" => run_migrate(&args),
+        "environment" => run_environment(&args),
         "explain" => run_explain(args),
         "parse" => run_parse(args),
         "graph" => {
@@ -1343,6 +1344,54 @@ fn l9_config_and_format(command: &str, args: &[String]) -> (PathBuf, bool) {
         l9_command_error(command, "--config is required", 2);
     };
     (configuration_path, json)
+}
+
+fn run_environment(args: &[String]) {
+    if args.len() != 2 || args[0] != "--file" {
+        application_cli_error(
+            "PSENV1004_ARGUMENT_INVALID",
+            "usage: presolve environment --file <path>",
+        );
+    }
+    let file = Path::new(&args[1]);
+    let source = fs::read_to_string(file).unwrap_or_else(|error| {
+        application_cli_error(
+            "PSENV1005_INPUT_READ_FAILED",
+            &format!("{}: {error}", file.display()),
+        )
+    });
+    let values = parse_explicit_dotenv_v1(&source)
+        .unwrap_or_else(|message| application_cli_error("PSENV1006_INPUT_INVALID", &message));
+    let manifest = presolve_compiler::build_environment_input_manifest_v1(&args[1], &values)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    print!(
+        "{}",
+        presolve_compiler::environment_input_manifest_json_v1(&manifest)
+    );
+}
+
+fn parse_explicit_dotenv_v1(source: &str) -> Result<BTreeMap<String, String>, String> {
+    let mut values = BTreeMap::new();
+    for (line_number, line) in source.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let Some((name, value)) = line.split_once('=') else {
+            return Err(format!("line {} must use NAME=VALUE", line_number + 1));
+        };
+        if name.is_empty()
+            || name.trim() != name
+            || value.contains('\n')
+            || values.insert(name.into(), value.into()).is_some()
+        {
+            return Err(format!(
+                "line {} is not a unique NAME=VALUE declaration",
+                line_number + 1
+            ));
+        }
+    }
+    Ok(values)
 }
 
 fn run_migrate(args: &[String]) {
