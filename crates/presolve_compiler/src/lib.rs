@@ -111,6 +111,7 @@ pub mod project_discovery;
 pub mod provider;
 pub mod purity_effect;
 pub mod resource;
+pub mod resource_projection;
 pub mod resume_activation;
 pub mod resume_anchor;
 pub mod resume_boot;
