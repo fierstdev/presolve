@@ -80,7 +80,7 @@ in the same change.
 | 39 | Source maps | Vite adapter, publication manifest, CLI explain | Implemented schema v1 physical Vite map reporting and manifest-bound virtual-source translation; compacted wrappers with no retained sources stay unmapped, while authored locations remain compiler-provenance/explain authority. |
 | 40 | LSP and explain | `tooling_*`, `explain`, WASM, language-service, LSP, VS Code | Implemented canonical query projections through compiler WASM, language service, and LSP: position, hover, definition, references, symbols, diagnostics, and native explain all consume the same strict snapshot protocol. |
 | 41 | Migration command | CLI command modules, `semantic_capability` | Implemented schema v1 `presolve migrate` report from the canonical capability registry; automatic codemods are explicitly empty until a compiler-owned source-transform contract exists. |
-| 42 | V2 scaffold/examples | `create-presolve`, framework package, Vite package | V2 starter contract; scaffold snapshot and install/build test. |
+| 42 | V2 scaffold/examples | `create-presolve`, framework package, Vite package | Implemented conventional V2 project layout, public-environment example, and scaffold package/ergonomic build proof; Vite command configuration remains an explicit later adapter product. |
 | 43 | Representative applications | new application fixtures; CLI/Vite test harness | Product-level cold/resume/HMR/build evidence for supported app shapes. |
 | 44 | Performance budgets | `production_reports`, `production_benchmarks`, compile-cost tooling | Versioned budgets and benchmark baselines; regression gate. |
 | 45 | Beta hardening | all public packages, schemas, fixtures, docs, release scripts | Compatibility matrix, release dry run, determinism, diagnostics, artifact, and product gates. |
@@ -94,7 +94,7 @@ pull-request plan; their complete ownership boundary is
 
 | Slice | Scope | Repository trace | Products and proof |
 | --- | --- | --- | --- |
-| AP1 | Conventional project layout and environment | `create-presolve`, `environment_ownership`, ergonomic fixtures | Complete scaffold layout and compiler-owned `PRESOLVE_PUBLIC_*` admission; browser/server isolation fixtures. |
+| AP1 | Conventional project layout and environment | `create-presolve`, `environment_ownership`, ergonomic fixtures | Scaffold layout and `PRESOLVE_PUBLIC_*` declaration implemented; compiler environment-value admission and browser/server isolation remain pending an explicit environment input product. |
 | AP2 | Routes, layouts, loaders, metadata, and server actions | `route_graph`, `layout_composition`, `route_loader`, `route_server_action`, publication | End-to-end conventional route artifacts and server-boundary diagnostics. |
 | AP3 | Vite CSS, assets, PostCSS, and Tailwind | `packages/vite`, production manifest adapter | Vite-native style/asset output with compiler identity translation and browser proof. |
 | AP4 | Testing integrations | `packages/testing`, Vite integration, browser harness | Vitest and Playwright adapters over published applications, without semantic duplication. |

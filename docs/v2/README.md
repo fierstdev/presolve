@@ -46,6 +46,8 @@ normative source for this handoff.
   WASM, language-service, LSP, hover, and explain query boundary.
 - [Migration command contract](migration-contract.md) records the
   registry-derived report and explicit no-unowned-source-rewrite boundary.
+- [V2 scaffold contract](scaffold-contract.md) records the conventional
+  Application Platform layout and public-environment starter boundary.
 - [Application Platform contract](application-platform-contract.md) records
   the additive project, environment, Vite, testing, and deployment boundary.
 - [Control-flow contract](control-flow-contract.md) records the fail-closed
