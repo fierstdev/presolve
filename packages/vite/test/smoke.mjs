@@ -2,8 +2,10 @@ import { createHash } from "node:crypto";
 import {
   createPresolveVitePlugin,
   createPresolveVirtualModuleRegistry,
+  composeDevelopmentDiagnostics,
   PRESOLVE_VITE_ADAPTER_SCHEMA_VERSION,
   PRESOLVE_VIRTUAL_MODULE_PREFIX,
+  startPresolveDevServer,
 } from "../src/index.js";
 
 const runtime = "export const runtime = 1;\n";
@@ -62,6 +64,48 @@ await assertAsyncRejects(
   }).load(`\0${virtualId}`),
   "registry must reject artifact content that differs from its compiler digest",
 );
+
+const diagnostics = composeDevelopmentDiagnostics({
+  typescript: [{ code: 2322, message: "Type mismatch", file: "src/App.tsx", start: 12 }],
+  presolve: [{ code: "PSV1001", message: "Unsupported construct", file: "src/App.tsx", start: 3 }],
+});
+if (diagnostics.diagnostics.map(diagnostic => diagnostic.authority).join(",") !== "presolve,typescript") {
+  throw new Error("development diagnostics must compose and order both authorities");
+}
+
+const dev = await startPresolveDevServer({
+  compilerProduct: {
+    manifest: {
+      schema_version: 1,
+      compiler_contract: "presolve-application-publication:1",
+      workspace_snapshot_id: "fixture-snapshot",
+      artifacts: [{ path: "runtime.js", digest }],
+    },
+  },
+  readArtifact: () => runtime,
+  requestHost: request => request.url === "/route"
+    ? { status: 200, headers: { "content-type": "text/plain" }, body: "Presolve route" }
+    : undefined,
+  diagnostics: () => ({ typescript: [{ code: 2322, message: "Type mismatch" }], presolve: [] }),
+  vite: { logLevel: "silent", server: { host: "127.0.0.1", port: 0 } },
+});
+try {
+  const address = dev.server.httpServer.address();
+  const response = await fetch(`http://127.0.0.1:${address.port}/route`);
+  if (response.status !== 200 || await response.text() !== "Presolve route") {
+    throw new Error("presolve dev must route compiler-owned requests without restarting Vite");
+  }
+  const viteAsset = await fetch(`http://127.0.0.1:${address.port}/@vite/client`);
+  if (viteAsset.status !== 200 || !(await viteAsset.text()).includes("createHotContext")) {
+    throw new Error("unclaimed JS assets must continue through Vite middleware");
+  }
+  const published = await dev.publishDiagnostics();
+  if (published.diagnostics.length !== 1 || published.diagnostics[0].authority !== "typescript") {
+    throw new Error("presolve dev must republish the composed diagnostics product");
+  }
+} finally {
+  await dev.close();
+}
 
 function assertRejects(action, message) {
   try {

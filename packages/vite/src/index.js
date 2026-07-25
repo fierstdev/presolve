@@ -5,16 +5,15 @@ export const PRESOLVE_VITE_ADAPTER_SCHEMA_VERSION = 1;
 export const PRESOLVE_APPLICATION_PUBLICATION_CONTRACT_V1 = "presolve-application-publication:1";
 export const PRESOLVE_VIRTUAL_MODULE_SCHEMA_VERSION = 1;
 export const PRESOLVE_VIRTUAL_MODULE_PREFIX = "virtual:presolve/v1/";
+export const PRESOLVE_DEVELOPMENT_DIAGNOSTICS_SCHEMA_VERSION = 1;
 
 /**
  * Creates the empty Vite boundary over an already-produced compiler product.
  *
  * The compiler owns parsing, TypeScript semantics, lowering, and artifact
- * contents. This package owns only Vite integration, beginning with this
- * contract check. Virtual modules and dev-server hooks are intentionally
- * deferred to their own versioned products.
+ * contents. This package owns only Vite integration and its transport hooks.
  */
-export function createPresolveVitePlugin({ compilerProduct, readArtifact } = {}) {
+export function createPresolveVitePlugin({ compilerProduct, readArtifact, requestHost } = {}) {
   const manifest = validateCompilerProduct(compilerProduct);
   const plugin = {
     name: "presolve:compiler-products",
@@ -30,7 +29,85 @@ export function createPresolveVitePlugin({ compilerProduct, readArtifact } = {})
     plugin.resolveId = registry.resolveId;
     plugin.load = registry.load;
   }
+  if (requestHost) {
+    if (typeof requestHost !== "function") {
+      throw new TypeError("@presolve/vite requestHost must be a function");
+    }
+    plugin.configureServer = server => {
+      server.middlewares.use((request, response, next) => {
+        Promise.resolve(requestHost(request)).then(hostResponse => {
+          if (hostResponse === undefined) {
+            next();
+            return;
+          }
+          writeHostResponse(response, hostResponse);
+        }).catch(next);
+      });
+    };
+  }
   return Object.freeze(plugin);
+}
+
+/**
+ * Starts the Vite development server owned by the `presolve dev` boundary.
+ *
+ * The request host decides document, route, loader, and action routing from
+ * compiler products; returning `undefined` delegates JS, CSS, and assets to
+ * Vite middleware. Vite types are intentionally not exposed from this API.
+ */
+export async function startPresolveDevServer({
+  compilerProduct,
+  readArtifact,
+  requestHost,
+  diagnostics = () => ({}),
+  vite = {},
+} = {}) {
+  if (typeof requestHost !== "function") {
+    throw new TypeError("presolve dev requires a compiler-owned requestHost");
+  }
+  if (typeof diagnostics !== "function") {
+    throw new TypeError("presolve dev diagnostics must be a function");
+  }
+  const { createServer } = await import("vite");
+  const plugin = createPresolveVitePlugin({ compilerProduct, readArtifact, requestHost });
+  const configuredPlugins = vite.plugins === undefined
+    ? []
+    : Array.isArray(vite.plugins) ? vite.plugins : [vite.plugins];
+  const server = await createServer({
+    ...vite,
+    appType: "custom",
+    plugins: [...configuredPlugins, plugin],
+  });
+  let currentDiagnostics = composeDevelopmentDiagnostics(await diagnostics());
+  const publishDiagnostics = async () => {
+    currentDiagnostics = composeDevelopmentDiagnostics(await diagnostics());
+    server.ws.send({
+      type: "custom",
+      event: "presolve:diagnostics",
+      data: currentDiagnostics,
+    });
+    return currentDiagnostics;
+  };
+  await server.listen();
+  await publishDiagnostics();
+  return Object.freeze({
+    server,
+    diagnostics: () => currentDiagnostics,
+    publishDiagnostics,
+    close: () => server.close(),
+  });
+}
+
+/** Merges TypeScript and Presolve diagnostics without changing their meaning. */
+export function composeDevelopmentDiagnostics({ typescript = [], presolve = [] } = {}) {
+  const diagnostics = [
+    ...normalizeDiagnostics("typescript", typescript),
+    ...normalizeDiagnostics("presolve", presolve),
+  ].sort(compareDevelopmentDiagnostics);
+  return Object.freeze({
+    schemaVersion: PRESOLVE_DEVELOPMENT_DIAGNOSTICS_SCHEMA_VERSION,
+    diagnostics: Object.freeze(diagnostics),
+  });
 }
 
 /**
@@ -121,4 +198,40 @@ function virtualModuleSource(artifactPath, content) {
     "export default content;",
     "",
   ].join("\n");
+}
+
+function writeHostResponse(response, hostResponse) {
+  if (!hostResponse || typeof hostResponse !== "object") {
+    throw new TypeError("Presolve requestHost must return undefined or a response object");
+  }
+  const { status = 200, headers = {}, body = "" } = hostResponse;
+  if (!Number.isInteger(status) || status < 100 || status > 599) {
+    throw new TypeError("Presolve requestHost response status must be an HTTP status code");
+  }
+  if (!headers || typeof headers !== "object" || Array.isArray(headers)) {
+    throw new TypeError("Presolve requestHost response headers must be an object");
+  }
+  response.statusCode = status;
+  for (const [name, value] of Object.entries(headers)) response.setHeader(name, value);
+  response.end(toBytes(body));
+}
+
+function normalizeDiagnostics(authority, diagnostics) {
+  if (!Array.isArray(diagnostics)) {
+    throw new TypeError(`${authority} diagnostics must be an array`);
+  }
+  return diagnostics.map(diagnostic => {
+    if (!diagnostic || typeof diagnostic !== "object" || diagnostic.code === undefined
+      || typeof diagnostic.message !== "string") {
+      throw new TypeError(`${authority} diagnostics require code and message`);
+    }
+    return Object.freeze({ authority, ...diagnostic });
+  });
+}
+
+function compareDevelopmentDiagnostics(left, right) {
+  return String(left.file ?? "").localeCompare(String(right.file ?? ""))
+    || (left.start ?? -1) - (right.start ?? -1)
+    || String(left.code).localeCompare(String(right.code))
+    || left.authority.localeCompare(right.authority);
 }

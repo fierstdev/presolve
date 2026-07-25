@@ -38,5 +38,5 @@ normative source for this handoff.
 
 The characterization, compatibility-corpus, semantic-authority, source-AST,
 intrinsic-registry, canonical-authored-semantics, legacy-lowering, the Vite
-backend skeleton, and virtual-module registry are complete. The next slice is
-dev-server integration.
+backend skeleton, virtual-module registry, and dev-server integration are
+complete. The next slice is production build integration.

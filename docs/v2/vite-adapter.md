@@ -19,8 +19,24 @@ recomputes SHA-256 and rejects bytes that do not match the compiler manifest.
 The resulting module exports the artifact path and exact UTF-8 content. The
 registry therefore has no independent content authority.
 
-Dev-server, HMR, and production-output hooks still require their own compiler
+HMR classification and production-output hooks still require their own compiler
 products and will be added as later tracked slices.
+
+## Development server
+
+`startPresolveDevServer` is the implementation seam for `presolve dev`: it
+starts and closes the Vite lifecycle, adds the compiler-product plugin, and
+publishes a versioned combined diagnostic product over Vite's custom WebSocket
+event channel. TypeScript and Presolve diagnostics retain their original
+records with an explicit authority label; the adapter does not reinterpret
+either diagnostic vocabulary.
+
+The required `requestHost` is a compiler-owned transport callback. It receives
+each request first and either returns a complete response for a document,
+route, loader, or server action, or returns `undefined` to delegate the request
+to Vite middleware for JavaScript, CSS, and assets. Endpoint classification is
+therefore not invented by the Vite package. Vite's native watcher remains live
+across ordinary asset edits; semantic HMR classification is a later slice.
 
 The workspace keeps `esbuild` build scripts disabled while this skeleton does
 not execute Vite. A later slice that starts a Vite process must make and test
