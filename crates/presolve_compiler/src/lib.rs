@@ -166,6 +166,7 @@ pub mod template_semantics;
 pub mod tooling_products;
 pub mod tooling_reader;
 pub mod tooling_schema;
+pub mod tsx_binding_projection;
 pub mod validation_projection;
 pub use tooling_products::{
     build_tooling_artifact_graph_v1, build_tooling_build_trace_v1,
