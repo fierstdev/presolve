@@ -36,3 +36,8 @@ that application.
 [Architecture](architecture.md) explains the product boundary. The guide and
 reference are the public documentation source; examples in them must be kept
 valid against the published `presolve` package and the CLI release train.
+
+The [V2 engineering handoff](v2/README.md) records the normative beta
+specification provenance, the alpha characterization snapshot, and the
+implementation tracking map. It is contributor planning material, not public
+API documentation.
