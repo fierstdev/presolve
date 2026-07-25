@@ -19,7 +19,7 @@
     "lint": "cargo clippy --workspace --all-targets -- -D warnings",
     "check": "pnpm run format && pnpm run lint && pnpm run test && pnpm run docs:check",
     "test": "RUST_TEST_THREADS=1 cargo test --workspace && pnpm run build && pnpm -r test && pnpm run test:types",
-    "test:types": "tsc -p tests/framework-public-api/tsconfig.json --pretty false",
+    "test:types": "node scripts/test-typescript-compatibility.mjs && tsc -p tests/framework-public-api/tsconfig.json --pretty false",
     "test:scaffold": "node scripts/verify-scaffold.mjs",
     "test:e2e": "cargo test -p presolve-cli --test runtime_browser -- --nocapture --test-threads=1",
     "test:e2e:headed": "cargo test -p presolve-cli --test runtime_browser -- --nocapture --test-threads=1",

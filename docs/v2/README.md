@@ -28,7 +28,7 @@ normative source for this handoff.
 
 ## Current boundary
 
-The active slice is architecture mapping and characterization only. It makes no
-runtime, compiler-semantic, package, or generated-artifact change. The next
-slice is the TypeScript compatibility corpus; it may begin only after this
-snapshot and tracker have been reviewed as the baseline for its assertions.
+The characterization and TypeScript compatibility-corpus slices are complete.
+They make no runtime or compiler-semantic change. The next slice is the
+TypeScript semantic-authority adapter, which must consume the corpus as its
+compatibility baseline rather than introduce a second type checker.

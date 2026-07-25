@@ -25,7 +25,7 @@ in the same change.
 | PR | Scope | Repository trace | Products and proof |
 | ---: | --- | --- | --- |
 | 1 | Architecture map and characterization snapshots | `docs/v2`, workspace manifests, `docs/architecture.md`, all crate/package entry points | This snapshot and tracker; `pnpm run docs:check`. |
-| 2 | TypeScript compatibility corpus | new `tests/typescript-compatibility`; `tests/framework-public-api`; parser tests | Versioned conformance cases for aliases, exports, references, diagnostics; type test runner. |
+| 2 | TypeScript compatibility corpus | `tests/typescript-compatibility`; `scripts/test-typescript-compatibility.mjs`; `tests/framework-public-api` | Implemented against pinned TypeScript 7.0.2: aliases, exports, package imports, TSX, class/access, async flow, project references/source maps, and native diagnostic codes. |
 | 3 | Semantic authority adapter | new TypeScript-adapter package/protocol; `presolve_parser`; `presolve_compiler::{service,platform}` | Versioned semantic query boundary; adapter contract fixtures and diagnostic composition tests. |
 | 4 | Resolved module and symbol identity | `binding_table`, `module_graph`, `semantic_reference`, `semantic_id` | Resolved module/symbol identities; alias and re-export fixture proofs. |
 | 5 | General source AST | `presolve_parser::{oxc_adapter,model}` | Source-faithful syntax product with spans and recovery diagnostics; parse corpus snapshots. |
