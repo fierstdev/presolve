@@ -7,12 +7,15 @@ user guide.
 ## Authority
 
 Current behavior remains defined by this repository. V2 behavior is defined by
-the user-supplied `presolve-v2-beta-specification.zip`, whose SHA-256 is
-`483a5b3a2ea6e43970c64e93c63834f0a94f0942158f69662e10669d7ce3bf1b`.
-The archive's `CODEX-HANDOFF.md` establishes the order of work: characterize
-the current repository, create the implementation tracker, then establish
-canonical authored semantics and the TypeScript authority boundary before any
-V2 feature rewrite.
+the user-supplied base `presolve-v2-beta-specification.zip`, whose SHA-256 is
+`483a5b3a2ea6e43970c64e93c63834f0a94f0942158f69662e10669d7ce3bf1b`, plus
+the additive `presolve-v2-beta-specification-updated.zip`, whose SHA-256 is
+`ea116678de4ea860daad03a1a50f5714470986d3831798d01784a9bf24dcf7d9`.
+The base archive's `CODEX-HANDOFF.md` establishes the order of work:
+characterize the current repository, create the implementation tracker, then
+establish canonical authored semantics and the TypeScript authority boundary
+before any V2 feature rewrite. The updated archive adds the Application
+Platform workstream and gate before beta hardening.
 
 The archive is an input artifact and is not copied here so that the tracked
 documents remain a concise, reviewable account of its application to this
@@ -35,6 +38,8 @@ normative source for this handoff.
   integration seam for the required external backend.
 - [Presolve-aware HMR contract](hmr-contract.md) records the compiler-selected
   update vocabulary, state-preservation evidence, and Vite transport boundary.
+- [Application Platform contract](application-platform-contract.md) records
+  the additive project, environment, Vite, testing, and deployment boundary.
 - [Control-flow contract](control-flow-contract.md) records the fail-closed
   IR projection and the coverage required before later analyses may rely on it.
 - [Function-summary contract](function-summaries-contract.md) records the

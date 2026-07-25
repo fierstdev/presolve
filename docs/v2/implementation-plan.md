@@ -85,6 +85,22 @@ in the same change.
 | 44 | Performance budgets | `production_reports`, `production_benchmarks`, compile-cost tooling | Versioned budgets and benchmark baselines; regression gate. |
 | 45 | Beta hardening | all public packages, schemas, fixtures, docs, release scripts | Compatibility matrix, release dry run, determinism, diagnostics, artifact, and product gates. |
 
+## Application Platform extension
+
+The updated V2 specification adds this workstream before beta hardening. These
+are named implementation slices rather than a renumbering of the base 45
+pull-request plan; their complete ownership boundary is
+[`application-platform-contract.md`](application-platform-contract.md).
+
+| Slice | Scope | Repository trace | Products and proof |
+| --- | --- | --- | --- |
+| AP1 | Conventional project layout and environment | `create-presolve`, `environment_ownership`, ergonomic fixtures | Complete scaffold layout and compiler-owned `PRESOLVE_PUBLIC_*` admission; browser/server isolation fixtures. |
+| AP2 | Routes, layouts, loaders, metadata, and server actions | `route_graph`, `layout_composition`, `route_loader`, `route_server_action`, publication | End-to-end conventional route artifacts and server-boundary diagnostics. |
+| AP3 | Vite CSS, assets, PostCSS, and Tailwind | `packages/vite`, production manifest adapter | Vite-native style/asset output with compiler identity translation and browser proof. |
+| AP4 | Testing integrations | `packages/testing`, Vite integration, browser harness | Vitest and Playwright adapters over published applications, without semantic duplication. |
+| AP5 | Node deployment and static export | deployment adapters, `metaframework_handoff`, CLI | Node release inventory and compiler-proven static-export eligibility fixtures. |
+| AP6 | Production scaffold and representative applications | `create-presolve`, application fixtures, release scripts | Full platform scaffold, cold/resume/HMR application evidence, and platform gate. |
+
 ## Sequencing guardrails
 
 Rows 2 through 8 establish the TypeScript and authored-semantics foundation.
