@@ -31,10 +31,11 @@ normative source for this handoff.
   product and the compatibility role of the existing derived facts.
 - [Canonical authored semantics](authored-semantics.md) records the normalized
   source-AST and TypeScript-identity boundary.
+- [Vite adapter boundary](vite-adapter.md) records the compiler-product-only
+  integration seam for the required external backend.
 
 ## Current boundary
 
 The characterization, compatibility-corpus, semantic-authority, source-AST,
-intrinsic-registry, canonical-authored-semantics, and legacy-lowering slices
-are complete. The next slice is the Vite backend skeleton, which will consume
-compiler products through a new external adapter boundary.
+intrinsic-registry, canonical-authored-semantics, legacy-lowering, and the Vite
+backend skeleton are complete. The next slice is the virtual-module registry.

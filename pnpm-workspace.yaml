@@ -2,3 +2,5 @@ packages:
   - "packages/*"
   - "framework/packages/*"
   - "examples/*"
+allowBuilds:
+  esbuild: false
