@@ -8,6 +8,20 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.1.0-alpha.4 - 2026-07-24
+
+### Changed
+
+- Advanced the complete release train to `0.1.0-alpha.4` after the alpha.3
+  Windows native package could not launch npm.
+- Release dry runs now package and upload all four native CLI targets on their
+  matching GitHub-hosted operating systems before any release tag is created.
+
+### Fixed
+
+- Native CLI packaging now launches Windows npm command shims through the
+  Windows command processor and reports process-launch failures explicitly.
+
 ## 0.1.0-alpha.3 - 2026-07-24
 
 ### Changed

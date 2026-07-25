@@ -85,15 +85,29 @@ assert(
 );
 
 mkdirSync(destination, { recursive: true });
-const npm = platform === "win32" ? "npm.cmd" : "npm";
+const npmArguments = [
+  "pack",
+  packageRoot,
+  "--pack-destination",
+  destination,
+  "--json",
+];
+const npm = platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : "npm";
+const npmCommandArguments =
+  platform === "win32"
+    ? ["/d", "/s", "/c", "npm.cmd", ...npmArguments]
+    : npmArguments;
 const result = spawnSync(
   npm,
-  ["pack", packageRoot, "--pack-destination", destination, "--json"],
+  npmCommandArguments,
   {
     cwd: root,
     encoding: "utf8",
   },
 );
+if (result.error) {
+  fail(`Unable to execute npm pack: ${result.error.message}`);
+}
 if (result.status !== 0) {
   if (result.stdout) process.stderr.write(result.stdout);
   if (result.stderr) process.stderr.write(result.stderr);
