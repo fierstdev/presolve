@@ -8,6 +8,8 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.1.0-alpha.2 - 2026-07-24
+
 ### Changed
 
 - Advanced the complete compiler, framework, tooling, and extension release
