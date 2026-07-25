@@ -4,6 +4,7 @@
 //! spans, obvious declarations, and diagnostics. That gives the project a stable
 //! place to learn compiler fundamentals before choosing a real parser backend.
 
+pub mod action_authority;
 pub mod application_publication;
 pub mod application_semantic_model;
 pub mod asm_validation;
@@ -181,6 +182,10 @@ pub mod workspace;
 #[cfg(all(feature = "wasm", target_arch = "wasm32"))]
 mod wasm_binding;
 
+pub use action_authority::{
+    build_action_authority_v1, ActionAdmissionV1, ActionAuthorityV1, ActionCaptureCoverageV1,
+    ActionEnvironmentV1, ActionFactV1, ActionRecordV1, ACTION_AUTHORITY_SCHEMA_VERSION,
+};
 pub use application_publication::{
     application_publication_manifest_json_v1, build_application_publication_product_from_asm_v1,
     build_application_publication_product_v1, validate_application_publication_request_v1,

@@ -51,6 +51,7 @@ normative source for this handoff.
   explicit boundary before capture/resume analysis.
 - [State contract](state-contract.md) records instance-qualified State storage
   and codec-backed resume admission.
+- [Actions contract](actions-contract.md) records the authored action authority.
 
 ## Current boundary
 

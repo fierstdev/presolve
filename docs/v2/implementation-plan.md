@@ -55,7 +55,7 @@ in the same change.
 | 19 | Structural components and props | `presolve_compiler::structural_component`; `component_*`; `composition_typing`; TypeScript authority | Implemented schema v1 TypeScript-authoritative inheritance and props projection; unresolved route generics fail early and `children` is never implicitly injected. |
 | 20 | Slots | `presolve_compiler::slot_projection`; `slot`; `slot_binding`; `slot_content` | Implemented schema v1 deterministic ownership/composition projection over exact bindings; slot capture/resume remains explicitly unavailable. |
 | 21 | State | `presolve_compiler::state_projection`; `state_instance_storage`; existing lowering | Implemented schema v1 instance-qualified State inspection with closed-codec resume admission; update behavior remains owned by existing lowering. |
-| 22 | Actions | `component_graph`, `lazy_action_chunks`, `runtime_*` | Action call/capture products; lazy activation and diagnostics. |
+| 22 | Actions | `presolve_compiler::action_authority`; later TypeScript adapter | Implemented authored schema v1 action-fact authority with capture and server-import rejection; runtime activation remains a later adopter. |
 | 23 | Computed getters | `computed_value`, `computed_instance_slots`, `runtime_computed` | Cached computed products; cycles and invalidation fixtures. |
 | 24 | Effects | `effect`, `effect_*`, `runtime_effect_*` | Effect scheduling/ownership products; cold/resume behavior and diagnostics. |
 | 25 | Context tokens/providers | `context`, `provider`, `context_*` | Token/provider records and diagnostics; structural resolution cases. |
