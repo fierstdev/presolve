@@ -41,6 +41,7 @@ pub mod context_ownership;
 pub mod context_projection;
 pub mod context_resolution;
 pub mod context_resume;
+pub mod context_resume_projection;
 pub mod context_typing;
 pub mod context_update;
 pub mod control_flow;
@@ -348,6 +349,11 @@ pub use context_resolution::{
 pub use context_resume::{
     build_context_resume_plan, ContextResumePlan, ContextResumeRecord, ContextResumeSlotId,
     ContextSlotResumeStatus,
+};
+pub use context_resume_projection::{
+    build_context_resume_projection_v1, ContextConsumerResolutionV1,
+    ContextResumeProjectionRecordV1, ContextResumeProjectionV1,
+    CONTEXT_RESUME_PROJECTION_SCHEMA_VERSION,
 };
 pub use context_typing::{
     collect_context_type_products, CompatibilityStatus, ConsumerTypeRecord,
