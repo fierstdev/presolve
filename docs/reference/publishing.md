@@ -21,8 +21,8 @@ versioned compatibility train, not a set of independently published packages.
    manifest, package metadata, and compatibility assertion. Map
    `MAJOR.MINOR.PATCH-alpha.N` to the numeric Visual Studio Marketplace
    prerelease version `MAJOR.MINOR.(PATCH + N)` because the Marketplace does
-   not accept SemVer prerelease suffixes. Presolve `0.1.0-alpha.7` therefore
-   publishes as Marketplace prerelease `0.1.7`.
+   not accept SemVer prerelease suffixes. Presolve `0.1.0-alpha.8` therefore
+   publishes as Marketplace prerelease `0.1.8`.
 2. Run the full Rust, package, browser, artifact, formatter, and release-check
    matrix from a clean checkout.
 3. Pack every npm package, install the tarballs in a fresh external directory,

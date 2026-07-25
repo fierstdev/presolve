@@ -17,6 +17,10 @@ assert.ok(existsSync(join(target, "app/routes/docs/getting-started.tsx")));
 const manifest = JSON.parse(readFileSync(join(target, "package.json"), "utf8"));
 assert.equal(manifest.packageManager, "pnpm@11.17.0");
 assert.ok(manifest.scripts["deploy:prepare"]);
+assert.equal(
+  readFileSync(join(target, "pnpm-workspace.yaml"), "utf8"),
+  "allowBuilds:\n  esbuild: true\n  workerd: true\n",
+);
 const second = spawnSync(process.execPath, ["bin/create-presolve.mjs", target], {
   cwd: new URL("..", import.meta.url),
   encoding: "utf8",

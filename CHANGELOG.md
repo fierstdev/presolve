@@ -8,6 +8,22 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.1.0-alpha.8 - 2026-07-24
+
+### Changed
+
+- Advanced the coherent public release train to `0.1.0-alpha.8` after alpha.7
+  reached crates.io and npm but did not complete its Marketplace publication.
+- Generated applications now declare the two pnpm lifecycle-script approvals
+  required by the bundled Cloudflare tooling: `esbuild` and `workerd`.
+- Scaffold conformance now performs a normal pnpm install so missing lifecycle
+  approvals fail before publication.
+
+### Fixed
+
+- A fresh `pnpm create presolve` project now installs under pnpm 11 without an
+  interactive `pnpm approve-builds` interruption.
+
 ## 0.1.0-alpha.7 - 2026-07-24
 
 ### Changed
@@ -17,7 +33,7 @@ not publish or imply a release.
 - Updated the scaffold, examples, framework fixtures, editor fixtures, and
   public documentation to use only `@presolve/core`; no unreleased legacy import
   alias remains.
-- Advanced the complete release train to `0.1.0-alpha.7` after alpha.6 published
+- Advanced the release train to `0.1.0-alpha.7` after alpha.6 published
   its crates and scoped npm tooling before npm rejected the unscoped framework
   package name.
 

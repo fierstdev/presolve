@@ -50,13 +50,14 @@ function template(name) {
         deploy: "presolve deploy cloudflare",
         "deploy:prepare": "presolve deploy cloudflare --prepare",
       },
-      dependencies: { "@presolve/core": "0.1.0-alpha.7" },
+      dependencies: { "@presolve/core": "0.1.0-alpha.8" },
       devDependencies: {
-        "@presolve/cli": "0.1.0-alpha.7",
+        "@presolve/cli": "0.1.0-alpha.8",
         "typescript": "npm:typescript@^7.0.2",
         "wrangler": "^4.0.0",
       },
     }, null, 2)}\n`,
+    "pnpm-workspace.yaml": "allowBuilds:\n  esbuild: true\n  workerd: true\n",
     ".gitignore": "node_modules/\ndist/\n.presolve/\n.dev.vars\n.env*\n",
     "README.md": `# ${name}\n\nA Presolve application.\n\n## Development\n\n\`pnpm dev\` builds and serves compiler-published routes.\n\n\`pnpm build\` emits immutable artifacts in \`dist/\`.\n\n\`pnpm deploy:prepare\` validates a Cloudflare Workers Static Assets deployment without uploading.\n\n\`pnpm deploy\` deploys the prepared compiler artifact inventory through Wrangler.\n\nVS Code will use the TypeScript configuration in this project. Install the **Presolve** extension for compiler-language tooling as it becomes available during the alpha.\n`,
     "tsconfig.json": `${JSON.stringify({
