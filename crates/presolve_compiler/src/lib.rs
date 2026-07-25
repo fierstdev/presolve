@@ -63,6 +63,7 @@ pub mod form_inspection;
 pub mod form_ir;
 pub mod form_ir_optimization;
 pub mod form_ownership;
+pub mod form_projection;
 pub mod form_reset;
 pub mod form_serialization;
 pub mod form_submission;
