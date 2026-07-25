@@ -68,6 +68,7 @@ pub mod form_reset;
 pub mod form_serialization;
 pub mod form_submission;
 pub mod form_submission_host;
+pub mod form_submission_projection;
 pub mod form_tracking;
 pub mod form_validation;
 pub mod form_validation_plan;
