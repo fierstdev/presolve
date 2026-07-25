@@ -75,6 +75,7 @@ pub mod form_validation;
 pub mod form_validation_plan;
 pub mod function_summary;
 pub mod html_codegen;
+pub mod incremental_projection;
 pub mod instance_context;
 pub mod intermediate_representation;
 #[cfg(any(test, all(feature = "wasm", target_arch = "wasm32")))]
