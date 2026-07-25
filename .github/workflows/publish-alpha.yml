@@ -103,7 +103,8 @@ jobs:
         run: |
           mkdir -p packages/${{ matrix.package }}/bin
           cp target/${{ matrix.target }}/release/${{ matrix.executable }} packages/${{ matrix.package }}/bin/${{ matrix.executable }}
-      - run: npm pack packages/${{ matrix.package }} --pack-destination .release
+      - name: Pack and verify native CLI package
+        run: node scripts/pack-native-cli.mjs "${{ matrix.package }}" .release
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.package }}
