@@ -53,6 +53,8 @@ normative source for this handoff.
   and codec-backed resume admission.
 - [Actions contract](actions-contract.md) records the authored action authority.
 - [Computed contract](computed-contract.md) records computed runtime inspection.
+- [Context tokens/providers contract](context-contract.md) records canonical
+  token and provider inspection.
 
 ## Current boundary
 

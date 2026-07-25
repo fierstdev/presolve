@@ -38,6 +38,7 @@ pub mod context_evaluation;
 pub mod context_inspection;
 pub mod context_lifetime;
 pub mod context_ownership;
+pub mod context_projection;
 pub mod context_resolution;
 pub mod context_resume;
 pub mod context_typing;
@@ -336,6 +337,10 @@ pub use context_ownership::{
     collect_context_ownership_graph, ContextOwnedEntities, ContextOwnershipEdge,
     ContextOwnershipEdgeKind, ContextOwnershipGraph, ContextOwnershipNode, ContextOwnershipNodeId,
     ContextOwnershipNodeKind, ContextOwnershipOwnerId, ContextOwnershipTargetId,
+};
+pub use context_projection::{
+    build_context_projection_v1, ContextProjectionV1, ContextProviderRecordV1,
+    ContextTokenRecordV1, CONTEXT_PROJECTION_SCHEMA_VERSION,
 };
 pub use context_resolution::{
     collect_context_resolutions, ContextResolution, ContextResolutionResult,

@@ -58,7 +58,7 @@ in the same change.
 | 22 | Actions | `presolve_compiler::action_authority`; later TypeScript adapter | Implemented authored schema v1 action-fact authority with capture and server-import rejection; runtime activation remains a later adopter. |
 | 23 | Computed getters | `presolve_compiler::computed_projection`; existing computed products | Implemented schema v1 inspection projection over canonical dependencies, caches, and dirty flags. |
 | 24 | Effects | `effect`, `effect_*`, `runtime_effect_*` | Effect scheduling/ownership products; cold/resume behavior and diagnostics. |
-| 25 | Context tokens/providers | `context`, `provider`, `context_*` | Token/provider records and diagnostics; structural resolution cases. |
+| 25 | Context tokens/providers | `presolve_compiler::context_projection`; existing Context products | Implemented schema v1 canonical token/provider inspection with default and codec evidence. |
 | 26 | Context consumption/resume | `consumer`, `context_resolution`, `context_resume` | Context resume plan; nearest-provider cold/resume fixtures. |
 | 27 | Forms and fields | `form`, `form_field`, `form_binding`, `form_ir` | Canonical form/field products; generated form artifacts and diagnostics. |
 | 28 | Validation/coercion | `form_validation`, `form_validation_plan`, `form_diagnostics` | Validation/coercion protocol; invalid and normalized-data fixtures. |
