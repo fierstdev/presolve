@@ -11,6 +11,8 @@ export const PRESOLVE_DEVELOPMENT_DIAGNOSTICS_SCHEMA_VERSION = 1;
 export const PRESOLVE_VITE_PRODUCTION_SCHEMA_VERSION = 1;
 export const PRESOLVE_HMR_UPDATE_SCHEMA_VERSION = 1;
 export const PRESOLVE_HMR_EVENT = "presolve:hmr";
+export const PRESOLVE_PRODUCTION_AUDIT_SCHEMA_VERSION = 1;
+export const PRESOLVE_PRODUCTION_AUDIT_ARTIFACT = "production-audit.json";
 
 const PRESOLVE_HMR_MESSAGE_CLASSES = new Set([
   "template-update",
@@ -252,6 +254,52 @@ export async function buildPresolveProduction({
     entryComponentId: manifest.entry_component_id,
     viteManifestPath,
     entries: Object.freeze(entries),
+  });
+}
+
+/**
+ * Reads the compiler-produced production audit after verifying its publication
+ * digest. The adapter validates transport shape only; audit policy remains in
+ * the compiler artifact.
+ */
+export async function readPresolveProductionAudit({ compilerProduct, readArtifact } = {}) {
+  const manifest = validateCompilerProduct(compilerProduct);
+  if (typeof readArtifact !== "function") {
+    throw new TypeError("Presolve production audit requires a readArtifact function");
+  }
+  const artifact = manifest.artifacts.find(candidate => candidate.path === PRESOLVE_PRODUCTION_AUDIT_ARTIFACT);
+  if (!artifact) {
+    throw new TypeError("compiler product does not publish a production audit artifact");
+  }
+  validateArtifact(artifact);
+  const bytes = toBytes(await readArtifact(artifact.path));
+  const digest = createHash("sha256").update(bytes).digest("hex");
+  if (digest !== artifact.digest) {
+    throw new Error("compiler production audit digest mismatch");
+  }
+  let audit;
+  try {
+    audit = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+  } catch {
+    throw new TypeError("compiler production audit must be UTF-8 JSON");
+  }
+  if (!audit || typeof audit !== "object" || Array.isArray(audit)
+    || audit.schemaVersion !== PRESOLVE_PRODUCTION_AUDIT_SCHEMA_VERSION
+    || audit.status !== "passed"
+    || typeof audit.buildId !== "string" || !audit.buildId
+    || !Array.isArray(audit.checks) || audit.checks.some(check => typeof check !== "string" || !check)) {
+    throw new TypeError("compiler production audit is not a passing schema-v1 product");
+  }
+  return Object.freeze({
+    schemaVersion: audit.schemaVersion,
+    buildId: audit.buildId,
+    optimizationReportSchemaVersion: audit.optimizationReportSchemaVersion,
+    runtimeCostReportSchemaVersion: audit.runtimeCostReportSchemaVersion,
+    runtimeTableCount: audit.runtimeTableCount,
+    authorityCount: audit.authorityCount,
+    invariantCount: audit.invariantCount,
+    checks: Object.freeze([...audit.checks]),
+    status: audit.status,
   });
 }
 

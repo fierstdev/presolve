@@ -9,6 +9,7 @@ import {
   createPresolveVirtualModuleRegistry,
   composeDevelopmentDiagnostics,
   PRESOLVE_HMR_EVENT,
+  readPresolveProductionAudit,
   PRESOLVE_VITE_ADAPTER_SCHEMA_VERSION,
   PRESOLVE_VIRTUAL_MODULE_PREFIX,
   startPresolveDevServer,
@@ -16,6 +17,18 @@ import {
 
 const runtime = "export const runtime = 1;\n";
 const digest = createHash("sha256").update(runtime).digest("hex");
+const auditJson = JSON.stringify({
+  schemaVersion: 1,
+  buildId: "resume-build:fixture",
+  optimizationReportSchemaVersion: 1,
+  runtimeCostReportSchemaVersion: 1,
+  runtimeTableCount: 0,
+  authorityCount: 8,
+  invariantCount: 13,
+  checks: ["report-schema"],
+  status: "passed",
+});
+const auditDigest = createHash("sha256").update(auditJson).digest("hex");
 const plugin = createPresolveVitePlugin({
   compilerProduct: {
     manifest: {
@@ -69,6 +82,35 @@ await assertAsyncRejects(
     readArtifact: () => runtime,
   }).load(`\0${virtualId}`),
   "registry must reject artifact content that differs from its compiler digest",
+);
+
+const audit = await readPresolveProductionAudit({
+  compilerProduct: {
+    manifest: {
+      schema_version: 1,
+      compiler_contract: "presolve-application-publication:1",
+      workspace_snapshot_id: "fixture-snapshot",
+      artifacts: [{ path: "production-audit.json", digest: auditDigest }],
+    },
+  },
+  readArtifact: () => auditJson,
+});
+if (audit.status !== "passed" || audit.buildId !== "resume-build:fixture") {
+  throw new Error("Vite must expose the digest-verified compiler production audit");
+}
+await assertAsyncRejects(
+  () => readPresolveProductionAudit({
+    compilerProduct: {
+      manifest: {
+        schema_version: 1,
+        compiler_contract: "presolve-application-publication:1",
+        workspace_snapshot_id: "fixture-snapshot",
+        artifacts: [{ path: "production-audit.json", digest: "0".repeat(64) }],
+      },
+    },
+    readArtifact: () => auditJson,
+  }),
+  "Vite must reject a production audit whose bytes differ from the compiler manifest",
 );
 
 const diagnostics = composeDevelopmentDiagnostics({

@@ -574,8 +574,9 @@ pub use page_codegen::{
     generate_standalone_page_with_resume_runtime_and_resources,
 };
 pub use production_audit::{
-    ProductionRuntimeAuthority, PRODUCTION_RUNTIME_AUTHORITIES,
-    PRODUCTION_RUNTIME_REFINEMENT_INVARIANTS,
+    build_production_audit_report_v1, production_audit_report_json_v1, ProductionAuditErrorV1,
+    ProductionAuditReportV1, ProductionRuntimeAuthority, PRODUCTION_AUDIT_REPORT_SCHEMA_VERSION,
+    PRODUCTION_RUNTIME_AUTHORITIES, PRODUCTION_RUNTIME_REFINEMENT_INVARIANTS,
 };
 pub use production_bootstrap::{
     build_production_bootstrap_plan, ProductionBootstrapBlock, ProductionBootstrapPlan,

@@ -26,9 +26,9 @@ use presolve_compiler::{
     build_application_semantic_model_for_unit_with_packages, build_binding_table_with_packages,
     build_component_graph, build_context_inspection_registry, build_effect_inspection_registry,
     build_file_route_publication_v1, build_form_inspection_registry, build_module_graph,
-    build_production_reachability_graph, build_production_reports,
-    build_production_runtime_artifact, build_resume_chunk_graph, build_resume_manifest,
-    build_route_loader_plan_v1, build_route_server_action_plan_v1,
+    build_production_audit_report_v1, build_production_reachability_graph,
+    build_production_reports, build_production_runtime_artifact, build_resume_chunk_graph,
+    build_resume_manifest, build_route_loader_plan_v1, build_route_server_action_plan_v1,
     build_runtime_component_artifact, build_runtime_computed_artifact,
     build_runtime_context_artifact, build_runtime_effect_artifact, build_runtime_forms_artifact,
     build_runtime_opaque_artifact_with_modules, build_runtime_resource_artifact_with_modules,
@@ -40,21 +40,21 @@ use presolve_compiler::{
     generate_standalone_page_with_resume_runtime,
     generate_standalone_page_with_resume_runtime_and_resources, generate_static_html,
     lower_components_to_ir, optimization_report_json, optimize_context_ir, optimize_effect_ir,
-    production_runtime_artifact_json, project_production_diagnostics, project_resume_diagnostics,
-    resolve_file_route_request_v1, resume_manifest_json, runtime_component_artifact_json,
-    runtime_computed_artifact_json, runtime_context_artifact_json, runtime_cost_report_json,
-    runtime_effect_artifact_json, runtime_forms_artifact_json, runtime_opaque_artifact_json,
-    runtime_resource_artifact_json, semantic_capability_matrix_text,
-    semantic_capability_migration_text, semantic_capability_registry_json, semantic_graph_json,
-    semantic_type_text, summarize_source, template_manifest_json,
-    validate_application_publication_request_v1, validate_application_semantic_model,
-    validate_runtime_opaque_artifact, validate_runtime_resource_artifact,
-    ApplicationPublicationProfileV1, ApplicationPublicationRequestV1,
-    ApplicationPublicationSourceV1, ApplicationSemanticModel, AsmValidationDiagnostic,
-    AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
-    EffectInspection, EffectInspectionRegistry, ExecutableProgramFingerprint,
-    FileRoutePublicationManifestV1, FileRoutePublicationRequestV1, FileRouteRequestTargetV1,
-    ImmutableAsmPass, ProductionDiagnosticFact, ProductionDiagnosticKind,
+    production_audit_report_json_v1, production_runtime_artifact_json,
+    project_production_diagnostics, project_resume_diagnostics, resolve_file_route_request_v1,
+    resume_manifest_json, runtime_component_artifact_json, runtime_computed_artifact_json,
+    runtime_context_artifact_json, runtime_cost_report_json, runtime_effect_artifact_json,
+    runtime_forms_artifact_json, runtime_opaque_artifact_json, runtime_resource_artifact_json,
+    semantic_capability_matrix_text, semantic_capability_migration_text,
+    semantic_capability_registry_json, semantic_graph_json, semantic_type_text, summarize_source,
+    template_manifest_json, validate_application_publication_request_v1,
+    validate_application_semantic_model, validate_runtime_opaque_artifact,
+    validate_runtime_resource_artifact, ApplicationPublicationProfileV1,
+    ApplicationPublicationRequestV1, ApplicationPublicationSourceV1, ApplicationSemanticModel,
+    AsmValidationDiagnostic, AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass,
+    DeclaredStateTypeKind, EffectInspection, EffectInspectionRegistry,
+    ExecutableProgramFingerprint, FileRoutePublicationManifestV1, FileRoutePublicationRequestV1,
+    FileRouteRequestTargetV1, ImmutableAsmPass, ProductionDiagnosticFact, ProductionDiagnosticKind,
     ProductionProjectedDiagnostic, ProductionReportInputs, ProductionRootChunkInput,
     RenderAttribute, RenderAttributeValue, SemanticEntity, SemanticEntityKind, SemanticId,
     SemanticOwner, SemanticPackageResolutionTable, SemanticPackageRuntimeModuleKey,
@@ -3769,6 +3769,10 @@ fn run_build(mut args: Vec<String>) {
     );
     let optimization_report_json = optimization_report_json(&optimization_report);
     let runtime_cost_report_json = runtime_cost_report_json(&runtime_cost_report);
+    let production_audit_report_json = production_audit_report_json_v1(
+        &build_production_audit_report_v1(&optimization_report, &runtime_cost_report)
+            .expect("fresh compiler production reports must satisfy the audit"),
+    );
     write_build_artifacts(
         &out_dir,
         &page_html,
@@ -3784,6 +3788,7 @@ fn run_build(mut args: Vec<String>) {
         &production_runtime_json,
         &optimization_report_json,
         &runtime_cost_report_json,
+        &production_audit_report_json,
         &runtime_js,
         &resume_chunks,
     )
@@ -4393,6 +4398,7 @@ fn print_build_artifact_paths(
         "production.runtime.json",
         "optimization-report.json",
         "runtime-cost-report.json",
+        "production-audit.json",
         "runtime.js",
     ] {
         println!("Wrote {}", out_dir.join(artifact).display());
@@ -5334,6 +5340,7 @@ fn write_build_artifacts(
     production_runtime_json: &str,
     optimization_report_json: &str,
     runtime_cost_report_json: &str,
+    production_audit_report_json: &str,
     runtime_js: &str,
     resume_chunks: &presolve_compiler::ResumeChunkGraph,
 ) -> io::Result<()> {
@@ -5359,6 +5366,10 @@ fn write_build_artifacts(
     fs::write(
         out_dir.join("runtime-cost-report.json"),
         runtime_cost_report_json,
+    )?;
+    fs::write(
+        out_dir.join("production-audit.json"),
+        production_audit_report_json,
     )?;
     fs::write(out_dir.join("forms.runtime.json"), forms_runtime_json)?;
     fs::write(out_dir.join("resume.runtime.json"), resume_runtime_json)?;
