@@ -156,6 +156,27 @@ fn capability_registry_has_deterministic_json_human_and_migration_projections() 
 }
 
 #[test]
+fn migration_command_projects_the_canonical_registry_without_rewriting_source() {
+    let output = Command::new(presolve_cli_bin())
+        .current_dir(repo_root())
+        .args(["migrate", "--format", "json"])
+        .output()
+        .expect("failed to run migration report");
+    assert!(
+        output.status.success(),
+        "migration report failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("migration report JSON");
+    assert_eq!(report["schema"], "presolve.migration-report");
+    assert_eq!(report["version"], 1);
+    assert_eq!(report["policy"], "report-only-no-source-rewrites");
+    assert_eq!(report["automaticCodemods"], serde_json::json!([]));
+    assert_eq!(report["registry"]["schema_version"], 1);
+}
+
+#[test]
 fn explain_command_inspects_entities_through_the_canonical_inspection_view() {
     let path = "fixtures/0001-source-summary/input/Counter.tsx";
     let entity_id = "module:fixtures/0001-source-summary/input/Counter.tsx/component:x-counter";

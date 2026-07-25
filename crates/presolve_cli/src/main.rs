@@ -32,12 +32,12 @@ use presolve_compiler::{
     build_runtime_component_artifact, build_runtime_computed_artifact,
     build_runtime_context_artifact, build_runtime_effect_artifact, build_runtime_forms_artifact,
     build_runtime_opaque_artifact_with_modules, build_runtime_resource_artifact_with_modules,
-    build_semantic_graph, build_static_request_handoff_v1, build_symbol_table,
-    build_template_graph, build_template_manifest_from_asm, build_validated_route_graph_v1,
-    discover_project_v1, discover_semantic_packages_v1, embed_opaque_runtime_artifact,
-    emit_production_modules, explain_json, explain_text, extract_production_chunk_graph,
-    fold_component_graph, generate_ordinary_instance_html, generate_runtime_stub,
-    generate_standalone_page_with_resume_runtime,
+    build_semantic_capability_registry, build_semantic_graph, build_static_request_handoff_v1,
+    build_symbol_table, build_template_graph, build_template_manifest_from_asm,
+    build_validated_route_graph_v1, discover_project_v1, discover_semantic_packages_v1,
+    embed_opaque_runtime_artifact, emit_production_modules, explain_json, explain_text,
+    extract_production_chunk_graph, fold_component_graph, generate_ordinary_instance_html,
+    generate_runtime_stub, generate_standalone_page_with_resume_runtime,
     generate_standalone_page_with_resume_runtime_and_resources, generate_static_html,
     lower_components_to_ir, optimization_report_json, optimize_context_ir, optimize_effect_ir,
     production_audit_report_json_v1, production_runtime_artifact_json,
@@ -90,6 +90,7 @@ fn main() {
         "version" => run_l9_version(&args),
         "help" | "--help" | "-h" => print_l9_usage(),
         "create" | "benchmark" | "doctor" => l9_reserved_command(&command),
+        "migrate" => run_migrate(&args),
         "explain" => run_explain(args),
         "parse" => run_parse(args),
         "graph" => {
@@ -663,7 +664,7 @@ fn l9_reserved_command(command: &str) -> ! {
 
 fn print_l9_usage() -> ! {
     println!("presolve <command> [options]");
-    println!("commands: version, build, check, clean, cache, workspace, watch, dev, create, explain, inspect, graph, trace, profile, benchmark, doctor");
+    println!("commands: version, build, check, clean, cache, workspace, watch, dev, create, migrate, explain, inspect, graph, trace, profile, benchmark, doctor");
     println!(
         "explicit project commands require --config <file> and --source <logical=relative-file>"
     );
@@ -1244,6 +1245,41 @@ fn l9_config_and_format(command: &str, args: &[String]) -> (PathBuf, bool) {
         l9_command_error(command, "--config is required", 2);
     };
     (configuration_path, json)
+}
+
+fn run_migrate(args: &[String]) {
+    let mut format = "human";
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--format" => {
+                let Some(value) = args.get(index + 1) else {
+                    l9_command_error("migrate", "missing value for --format", 2);
+                };
+                format = value;
+                index += 2;
+            }
+            value => l9_command_error("migrate", &format!("unknown option: {value}"), 2),
+        }
+    }
+    let registry = build_semantic_capability_registry();
+    match format {
+        "human" => {
+            print!("{}", semantic_capability_migration_text());
+            println!("\nAutomatic codemods: none (no canonical source-transform authority is published).");
+        }
+        "json" => println!(
+            "{}",
+            serde_json::json!({
+                "schema": "presolve.migration-report",
+                "version": 1,
+                "registry": registry,
+                "automaticCodemods": [],
+                "policy": "report-only-no-source-rewrites",
+            })
+        ),
+        _ => l9_command_error("migrate", "--format must be human or json", 2),
+    }
 }
 
 fn run_explain(mut args: Vec<String>) {
@@ -5401,6 +5437,7 @@ fn write_build_artifacts(
 fn print_usage_and_exit() -> ! {
     eprintln!("usage:");
     eprintln!("  presolve explain --capabilities --format human|json|migration");
+    eprintln!("  presolve migrate --format human|json");
     eprintln!("  presolve explain <file> [--format text|json]");
     eprintln!("  presolve explain <file> [--inspect] [--entity semantic-id | --source path --offset byte] [--child-kind kind] [--reference-kind kind] [--format text|json|graph]");
     eprintln!(
