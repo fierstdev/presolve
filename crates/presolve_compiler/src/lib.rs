@@ -45,6 +45,7 @@ pub mod effect_capability;
 pub mod effect_diagnostics;
 pub mod effect_inspection;
 pub mod effect_resume;
+pub mod environment_ownership;
 pub mod explain;
 pub mod expression_graph;
 pub mod file_route_publication;
@@ -364,6 +365,12 @@ pub use effect_resume::{
     build_effect_resume_plan, validate_effect_resume_plan, EffectActivationSlotId,
     EffectActivationStatus, EffectInitialResumeMembership, EffectResumePlan, EffectResumeRecord,
     EffectResumeValidationDiagnostic,
+};
+pub use environment_ownership::{
+    build_environment_ownership_graph_v1, EnvironmentClassV1, EnvironmentOwnershipDiagnosticV1,
+    EnvironmentOwnershipEdgeKindV1, EnvironmentOwnershipEdgeV1, EnvironmentOwnershipErrorV1,
+    EnvironmentOwnershipFactsV1, EnvironmentOwnershipGraphV1, EnvironmentOwnershipNodeV1,
+    EnvironmentOwnershipViolationV1, LifetimeClassV1, ENVIRONMENT_OWNERSHIP_SCHEMA_VERSION,
 };
 pub use explain::{explain_json, explain_text};
 pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};

@@ -41,6 +41,8 @@ normative source for this handoff.
   compiler-visible effect classes and conservative unknown classification.
 - [Capture and escape contract](capture-escape-contract.md) records the
   explicit evidence boundary and fail-closed resume admission rule.
+- [Environment ownership contract](environment-ownership-contract.md) records
+  explicit environment/lifetime classifications and path-bearing leak rules.
 
 ## Current boundary
 
@@ -49,4 +51,5 @@ intrinsic-registry, canonical-authored-semantics, legacy-lowering, the Vite
 backend skeleton, virtual-module registry, and dev-server integration are
 complete, as are production build integration, the control-flow graph
 foundation, function summaries, purity/effect classification, and explicit
-capture/escape analysis. The next slice is environment ownership.
+capture/escape analysis and environment ownership. The next slice is the
+serialization and codec protocol.
