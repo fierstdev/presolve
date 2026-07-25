@@ -26,6 +26,7 @@ pub mod component_ir_optimization;
 pub mod component_scope;
 pub mod composition_typing;
 pub mod computed_instance_slots;
+pub mod computed_projection;
 pub mod computed_value;
 pub mod consumer;
 pub mod context;
@@ -294,6 +295,10 @@ pub use computed_instance_slots::{
     build_computed_instance_slot_registry, validate_computed_instance_slot_registry,
     ComputedInstanceSlotRecord, ComputedInstanceSlotRegistry,
     COMPUTED_INSTANCE_SLOT_REGISTRY_VERSION,
+};
+pub use computed_projection::{
+    build_computed_projection_v1, ComputedProjectionRecordV1, ComputedProjectionV1,
+    COMPUTED_PROJECTION_SCHEMA_VERSION,
 };
 pub use computed_value::{
     collect_computed_values, ComputedCachePolicy, ComputedDiagnosticCode, ComputedPurity,

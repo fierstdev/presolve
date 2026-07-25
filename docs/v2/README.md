@@ -52,6 +52,7 @@ normative source for this handoff.
 - [State contract](state-contract.md) records instance-qualified State storage
   and codec-backed resume admission.
 - [Actions contract](actions-contract.md) records the authored action authority.
+- [Computed contract](computed-contract.md) records computed runtime inspection.
 
 ## Current boundary
 
