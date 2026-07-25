@@ -149,6 +149,7 @@ pub mod slot;
 pub mod slot_binding;
 pub mod slot_content;
 pub mod state_instance_storage;
+pub mod structural_component;
 pub mod summarize;
 pub mod symbol_table;
 pub mod template_graph;
@@ -886,6 +887,12 @@ pub use state_instance_storage::{
     build_state_instance_storage_registry, validate_state_instance_storage_registry,
     StateInstanceStorageRecord, StateInstanceStorageRegistry,
     STATE_INSTANCE_STORAGE_REGISTRY_VERSION,
+};
+pub use structural_component::{
+    build_structural_component_graph_v1, ComponentInheritanceStatusV1, ComponentPropsResolutionV1,
+    StructuralComponentDiagnosticReasonV1, StructuralComponentDiagnosticV1,
+    StructuralComponentFactV1, StructuralComponentGraphV1, StructuralComponentPropV1,
+    StructuralComponentRecordV1, STRUCTURAL_COMPONENT_SCHEMA_VERSION,
 };
 pub use summarize::summarize_source;
 pub use symbol_table::{

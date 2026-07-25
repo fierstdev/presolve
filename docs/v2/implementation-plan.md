@@ -52,7 +52,7 @@ in the same change.
 
 | PR | Scope | Repository trace | Products and proof |
 | ---: | --- | --- | --- |
-| 19 | Structural components and props | `component_*`, `composition_typing`, framework declarations | Canonical component/prop records; structural compatibility and artifact fixtures. |
+| 19 | Structural components and props | `presolve_compiler::structural_component`; `component_*`; `composition_typing`; TypeScript authority | Implemented schema v1 TypeScript-authoritative inheritance and props projection; unresolved route generics fail early and `children` is never implicitly injected. |
 | 20 | Slots | `slot`, `slot_binding`, `slot_content` | Slot ownership and projection products; nested/cold/resume cases. |
 | 21 | State | `state_instance_storage`, `component_graph`, runtime codegen | State semantic records and update protocol; deterministic runtime fixtures. |
 | 22 | Actions | `component_graph`, `lazy_action_chunks`, `runtime_*` | Action call/capture products; lazy activation and diagnostics. |

@@ -45,6 +45,8 @@ normative source for this handoff.
   explicit environment/lifetime classifications and path-bearing leak rules.
 - [Serialization and codec protocol contract](codec-protocol-contract.md)
   records independent serialization classes and versioned codec declarations.
+- [Structural components and props contract](structural-components-contract.md)
+  records the TypeScript-authority boundary for inheritance and generic props.
 
 ## Current boundary
 
@@ -55,4 +57,4 @@ complete, as are production build integration, the control-flow graph
 foundation, function summaries, purity/effect classification, and explicit
 capture/escape analysis and environment ownership. The next slice is the
 serialization and codec protocol. The next slice is structural components and
-props.
+props. The next slice is slots.
