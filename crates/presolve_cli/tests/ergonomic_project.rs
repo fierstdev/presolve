@@ -100,6 +100,31 @@ fn default_check_reports_file_route_pattern_conflicts() {
 }
 
 #[test]
+fn environment_command_publishes_only_explicit_public_values() {
+    let root = project_root("environment");
+    fs::write(
+        root.join(".env"),
+        "PRESOLVE_PUBLIC_NAME=Presolve\nDATABASE_URL=postgres://secret\n",
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args(["environment", "--file", ".env"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let manifest: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(manifest["browserValues"]["PRESOLVE_PUBLIC_NAME"], "Presolve");
+    assert_eq!(manifest["serverValueNames"], serde_json::json!(["DATABASE_URL"]));
+    assert!(!String::from_utf8(output.stdout).unwrap().contains("postgres://secret"));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn dev_once_builds_a_default_project_without_configuration() {
     let root = project_root("dev");
     fs::write(
