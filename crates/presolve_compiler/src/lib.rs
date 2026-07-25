@@ -47,6 +47,7 @@ pub mod effect;
 pub mod effect_capability;
 pub mod effect_diagnostics;
 pub mod effect_inspection;
+pub mod effect_projection;
 pub mod effect_resume;
 pub mod environment_ownership;
 pub mod explain;
@@ -380,6 +381,10 @@ pub use effect_inspection::{
     EffectInspectionRuntime, EffectInspectionSchedule, EffectInspectionScheduledAction,
     EffectInspectionUnplanned, EffectInspectionValidation, EffectInspectionValidationDiagnostic,
     EffectInspectionViolation,
+};
+pub use effect_projection::{
+    build_effect_projection_v1, EffectProjectionRecordV1, EffectProjectionV1,
+    EFFECT_PROJECTION_SCHEMA_VERSION,
 };
 pub use effect_resume::{
     build_effect_resume_plan, validate_effect_resume_plan, EffectActivationSlotId,
