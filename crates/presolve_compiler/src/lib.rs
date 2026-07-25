@@ -133,6 +133,7 @@ pub mod resume_schema;
 pub mod route_graph;
 pub mod route_loader;
 pub mod route_loader_projection;
+pub mod route_metadata;
 pub mod route_server_action;
 pub mod runtime_codegen;
 pub mod runtime_component;
@@ -774,6 +775,11 @@ pub use route_loader::{
     build_route_loader_plan_v1, route_loader_plan_json_v1, RouteLoaderBindingV1,
     RouteLoaderPlanErrorV1, RouteLoaderPlanV1, RouteLoaderRouteV1,
     ROUTE_LOADER_PLAN_SCHEMA_VERSION,
+};
+pub use route_metadata::{
+    build_route_metadata_manifest_v1, route_metadata_manifest_json_v1, RouteMetadataErrorV1,
+    RouteMetadataInputV1, RouteMetadataManifestV1, RouteMetadataRecordV1,
+    ROUTE_METADATA_SCHEMA_VERSION,
 };
 pub use route_server_action::{
     build_route_server_action_plan_v1, route_server_action_plan_json_v1,
