@@ -81,7 +81,7 @@ in the same change.
 | 40 | LSP and explain | `tooling_*`, `explain`, WASM, language-service, LSP, VS Code | Implemented canonical query projections through compiler WASM, language service, and LSP: position, hover, definition, references, symbols, diagnostics, and native explain all consume the same strict snapshot protocol. |
 | 41 | Migration command | CLI command modules, `semantic_capability` | Implemented schema v1 `presolve migrate` report from the canonical capability registry; automatic codemods are explicitly empty until a compiler-owned source-transform contract exists. |
 | 42 | V2 scaffold/examples | `create-presolve`, framework package, Vite package | Implemented conventional V2 project layout, public-environment example, and scaffold package/ergonomic build proof; Vite command configuration remains an explicit later adapter product. |
-| 43 | Representative applications | new application fixtures; CLI/Vite test harness | Product-level cold/resume/HMR/build evidence for supported app shapes. |
+| 43 | Representative applications | `fixtures/representative-applications`, CLI/Vite test harness | Implemented conventional counter/resume and nested-route/layout applications; ergonomic production builds prove route-scoped resume and audit artifacts, linked to existing browser cold/resume and Vite HMR transport gates. |
 | 44 | Performance budgets | `production_reports`, `production_benchmarks`, compile-cost tooling | Versioned budgets and benchmark baselines; regression gate. |
 | 45 | Beta hardening | all public packages, schemas, fixtures, docs, release scripts | Compatibility matrix, release dry run, determinism, diagnostics, artifact, and product gates. |
 

@@ -48,6 +48,8 @@ normative source for this handoff.
   registry-derived report and explicit no-unowned-source-rewrite boundary.
 - [V2 scaffold contract](scaffold-contract.md) records the conventional
   Application Platform layout and public-environment starter boundary.
+- [Representative applications contract](representative-applications-contract.md)
+  records the conventional-project build corpus and its product evidence.
 - [Application Platform contract](application-platform-contract.md) records
   the additive project, environment, Vite, testing, and deployment boundary.
 - [Control-flow contract](control-flow-contract.md) records the fail-closed
