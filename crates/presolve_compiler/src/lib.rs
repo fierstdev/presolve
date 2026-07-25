@@ -129,6 +129,7 @@ pub mod resume_restore;
 pub mod resume_schema;
 pub mod route_graph;
 pub mod route_loader;
+pub mod route_loader_projection;
 pub mod route_server_action;
 pub mod runtime_codegen;
 pub mod runtime_component;
