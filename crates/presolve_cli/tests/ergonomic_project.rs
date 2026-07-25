@@ -358,6 +358,32 @@ fn deploy_prepare_projects_compiler_artifacts_to_cloudflare_workers_static_asset
         "Node release syntax stderr: {}",
         String::from_utf8_lossy(&syntax.stderr)
     );
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    drop(listener);
+    let mut host = Command::new("node")
+        .arg(node_adapter.join("server.mjs"))
+        .env("PORT", port.to_string())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    let mut response = Vec::new();
+    for _ in 0..120 {
+        if let Ok(mut stream) = TcpStream::connect(("127.0.0.1", port)) {
+            stream
+                .write_all(b"GET /about/ HTTP/1.1\r\nHost: localhost\r\n\r\n")
+                .unwrap();
+            stream.read_to_end(&mut response).unwrap();
+            break;
+        }
+        thread::sleep(Duration::from_millis(25));
+    }
+    host.kill().unwrap();
+    host.wait().unwrap();
+    let response = String::from_utf8(response).unwrap();
+    assert!(response.starts_with("HTTP/1.1 200 OK"));
+    assert!(response.contains("About"));
     fs::remove_dir_all(root).unwrap();
 }
 
