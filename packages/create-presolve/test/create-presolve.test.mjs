@@ -21,6 +21,8 @@ assert.match(readFileSync(join(target, ".env.example"), "utf8"), /PRESOLVE_PUBLI
 const manifest = JSON.parse(readFileSync(join(target, "package.json"), "utf8"));
 assert.equal(manifest.packageManager, "pnpm@11.17.0");
 assert.ok(manifest.scripts["deploy:prepare"]);
+assert.equal(manifest.scripts["deploy:node:prepare"], "presolve deploy node --prepare");
+assert.match(readFileSync(join(target, "README.md"), "utf8"), /deploy:node:prepare/);
 const second = spawnSync(process.execPath, ["bin/create-presolve.mjs", target], {
   cwd: new URL("..", import.meta.url),
   encoding: "utf8",
