@@ -33,7 +33,7 @@ in the same change.
 | 7 | Canonical authored semantic model | `presolve_compiler::authored_semantics`; `presolve_parser::ParsedFile`; `packages/typescript-authority` | Implemented schema v1 boundary for syntax-selected, TypeScript-resolved intrinsic facts and TSX bindings/events; deterministic deduplicated models with source provenance. |
 | 8 | Legacy decorator lowering | `presolve_compiler::legacy_decorator_lowering`; `presolve_parser::ParsedFile`; `packages/typescript-authority` | Implemented adapter-fed lowering from class/property/method/parameter decorator spans to canonical candidates; arbitrary decorator spelling remains unrecognized. |
 | 9 | Vite backend skeleton | `packages/vite`; application-publication manifest | Implemented `@presolve/vite` compiler-product contract check and empty Vite plugin boundary; package smoke test proves it has no source, virtual-module, or dev-server behavior. |
-| 10 | Virtual module registry | new `packages/vite`; `application_publication`, `tooling_products` | Versioned virtual-module names/content derived from compiler products; golden modules. |
+| 10 | Virtual module registry | `packages/vite`; application-publication manifest/artifacts | Implemented versioned module IDs and digest-checked artifact-content exports; smoke test fixes the golden virtual module source and rejects drift. |
 | 11 | Dev server integration | `packages/vite`, CLI command adapters | Dev transport adapter with compiler diagnostics; dev-server integration probes. |
 | 12 | Production build integration | `packages/vite`, `application_publication`, production products | Physical Vite output mapped back to Presolve manifest; production build fixtures. |
 
