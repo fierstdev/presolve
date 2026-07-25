@@ -4,9 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   buildPresolveProduction,
+  createPresolveHmrTransport,
   createPresolveVitePlugin,
   createPresolveVirtualModuleRegistry,
   composeDevelopmentDiagnostics,
+  PRESOLVE_HMR_EVENT,
   PRESOLVE_VITE_ADAPTER_SCHEMA_VERSION,
   PRESOLVE_VIRTUAL_MODULE_PREFIX,
   startPresolveDevServer,
@@ -75,6 +77,63 @@ const diagnostics = composeDevelopmentDiagnostics({
 });
 if (diagnostics.diagnostics.map(diagnostic => diagnostic.authority).join(",") !== "presolve,typescript") {
   throw new Error("development diagnostics must compose and order both authorities");
+}
+
+const hmrMessages = [];
+const hmr = createPresolveHmrTransport({
+  workspaceSnapshotId: "fixture-snapshot",
+  send: message => hmrMessages.push(message),
+});
+const actionUpdate = {
+  schemaVersion: 1,
+  workspaceSnapshotId: "fixture-snapshot",
+  updateId: "hmr-action-1",
+  messageClass: "action-update",
+  affectedModuleIds: ["virtual:presolve/v1/runtime.js"],
+  stateCompatibility: "proven-compatible",
+  preserveState: true,
+};
+if (hmr.publish(actionUpdate, [{ id: "vite-runtime" }]).length !== 0) {
+  throw new Error("semantic HMR must suppress Vite module replacement");
+}
+if (hmrMessages.length !== 1 || hmrMessages[0].event !== PRESOLVE_HMR_EVENT
+  || hmrMessages[0].data.preserveState !== true) {
+  throw new Error("semantic HMR must transport the compiler-selected update unchanged");
+}
+const viteModules = [{ id: "vite-style" }];
+if (hmr.publish({ ...actionUpdate, updateId: "hmr-style-1", messageClass: "style-update" }, viteModules) !== viteModules) {
+  throw new Error("style updates must remain under Vite native CSS HMR");
+}
+hmr.publish({
+  ...actionUpdate,
+  updateId: "hmr-full-1",
+  messageClass: "full-reload",
+  stateCompatibility: "reload-required",
+  preserveState: false,
+});
+if (hmrMessages.at(-1).type !== "full-reload") {
+  throw new Error("full reload must use Vite's native transport");
+}
+assertRejects(
+  () => hmr.publish({ ...actionUpdate, updateId: "hmr-unsafe-1", preserveState: false }),
+  "the adapter must reject state preservation that was not compiler-proven",
+);
+const hmrPlugin = createPresolveVitePlugin({
+  compilerProduct: {
+    manifest: {
+      schema_version: 1,
+      compiler_contract: "presolve-application-publication:1",
+      workspace_snapshot_id: "fixture-snapshot",
+      artifacts: [{ path: "runtime.js", digest }],
+    },
+  },
+  hmr: observation => ({ ...actionUpdate, updateId: `hmr-hook-${observation.timestamp}` }),
+});
+const hmrPluginMessages = [];
+hmrPlugin.configureServer({ ws: { send: message => hmrPluginMessages.push(message) }, middlewares: { use() {} } });
+const hmrResult = await hmrPlugin.handleHotUpdate({ file: "/work/runtime.ts", timestamp: 10, modules: viteModules });
+if (hmrResult.length !== 0 || hmrPluginMessages[0].data.updateId !== "hmr-hook-10") {
+  throw new Error("Vite's hot-update hook must only forward the compiler HMR product");
 }
 
 const dev = await startPresolveDevServer({

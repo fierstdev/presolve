@@ -19,8 +19,15 @@ recomputes SHA-256 and rejects bytes that do not match the compiler manifest.
 The resulting module exports the artifact path and exact UTF-8 content. The
 registry therefore has no independent content authority.
 
-HMR classification and production-output hooks still require their own compiler
-products and will be added as later tracked slices.
+## HMR
+
+The adapter transports the compiler-owned `presolve.hmr-update` schema v1
+product. Vite's update hook supplies only observation facts to a required
+compiler callback; it does not classify source edits. CSS updates stay on
+Vite's native HMR path, full reloads use Vite's native full-reload message, and
+other compiler-selected classes travel on the `presolve:hmr` custom channel.
+See [the HMR contract](hmr-contract.md) for state-preservation admission and
+the complete message vocabulary.
 
 ## Development server
 
@@ -36,7 +43,8 @@ each request first and either returns a complete response for a document,
 route, loader, or server action, or returns `undefined` to delegate the request
 to Vite middleware for JavaScript, CSS, and assets. Endpoint classification is
 therefore not invented by the Vite package. Vite's native watcher remains live
-across ordinary asset edits; semantic HMR classification is a later slice.
+across ordinary asset edits; semantic HMR classification is compiler-owned and
+fails closed when the callback does not provide a valid product.
 
 ## Production build
 

@@ -9,15 +9,29 @@ export const PRESOLVE_VIRTUAL_MODULE_SCHEMA_VERSION = 1;
 export const PRESOLVE_VIRTUAL_MODULE_PREFIX = "virtual:presolve/v1/";
 export const PRESOLVE_DEVELOPMENT_DIAGNOSTICS_SCHEMA_VERSION = 1;
 export const PRESOLVE_VITE_PRODUCTION_SCHEMA_VERSION = 1;
+export const PRESOLVE_HMR_UPDATE_SCHEMA_VERSION = 1;
+export const PRESOLVE_HMR_EVENT = "presolve:hmr";
+
+const PRESOLVE_HMR_MESSAGE_CLASSES = new Set([
+  "template-update",
+  "action-update",
+  "computed-update",
+  "style-update",
+  "server-only-update",
+  "component-instance-reload",
+  "route-reload",
+  "full-reload",
+]);
 
 /**
- * Creates the empty Vite boundary over an already-produced compiler product.
+ * Creates the Vite transport boundary over an already-produced compiler product.
  *
  * The compiler owns parsing, TypeScript semantics, lowering, and artifact
  * contents. This package owns only Vite integration and its transport hooks.
  */
-export function createPresolveVitePlugin({ compilerProduct, readArtifact, requestHost } = {}) {
+export function createPresolveVitePlugin({ compilerProduct, readArtifact, requestHost, hmr } = {}) {
   const manifest = validateCompilerProduct(compilerProduct);
+  let hmrTransport;
   const plugin = {
     name: "presolve:compiler-products",
     enforce: "pre",
@@ -32,23 +46,74 @@ export function createPresolveVitePlugin({ compilerProduct, readArtifact, reques
     plugin.resolveId = registry.resolveId;
     plugin.load = registry.load;
   }
-  if (requestHost) {
-    if (typeof requestHost !== "function") {
-      throw new TypeError("@presolve/vite requestHost must be a function");
-    }
+  if (requestHost !== undefined && typeof requestHost !== "function") {
+    throw new TypeError("@presolve/vite requestHost must be a function");
+  }
+  if (hmr !== undefined && typeof hmr !== "function") {
+    throw new TypeError("@presolve/vite hmr must be a compiler-owned function");
+  }
+  if (hmr) {
+    plugin.handleHotUpdate = async context => {
+      if (!hmrTransport) {
+        throw new Error("Presolve HMR transport is unavailable before Vite configures the server");
+      }
+      return hmrTransport.publish(
+        await hmr(Object.freeze({ file: context.file, timestamp: context.timestamp })),
+        context.modules,
+      );
+    };
+  }
+  if (requestHost || hmr) {
     plugin.configureServer = server => {
-      server.middlewares.use((request, response, next) => {
-        Promise.resolve(requestHost(request)).then(hostResponse => {
-          if (hostResponse === undefined) {
-            next();
-            return;
-          }
-          writeHostResponse(response, hostResponse);
-        }).catch(next);
-      });
+      if (requestHost) {
+        server.middlewares.use((request, response, next) => {
+          Promise.resolve(requestHost(request)).then(hostResponse => {
+            if (hostResponse === undefined) {
+              next();
+              return;
+            }
+            writeHostResponse(response, hostResponse);
+          }).catch(next);
+        });
+      }
+      if (hmr) {
+        hmrTransport = createPresolveHmrTransport({
+          workspaceSnapshotId: manifest.workspace_snapshot_id,
+          send: message => server.ws.send(message),
+        });
+      }
     };
   }
   return Object.freeze(plugin);
+}
+
+/**
+ * Validates and transports one compiler-selected HMR update without deriving
+ * semantics from Vite modules, source text, or filenames.
+ */
+export function createPresolveHmrTransport({ workspaceSnapshotId, send } = {}) {
+  if (typeof workspaceSnapshotId !== "string" || !workspaceSnapshotId) {
+    throw new TypeError("Presolve HMR transport requires a workspaceSnapshotId");
+  }
+  if (typeof send !== "function") {
+    throw new TypeError("Presolve HMR transport requires a Vite send function");
+  }
+  return Object.freeze({
+    schemaVersion: PRESOLVE_HMR_UPDATE_SCHEMA_VERSION,
+    publish(update, viteModules = []) {
+      const canonical = validateHmrUpdate(update, workspaceSnapshotId);
+      if (!Array.isArray(viteModules)) {
+        throw new TypeError("Vite HMR modules must be an array");
+      }
+      if (canonical.messageClass === "style-update") return viteModules;
+      if (canonical.messageClass === "full-reload") {
+        send({ type: "full-reload", path: "*" });
+        return [];
+      }
+      send({ type: "custom", event: PRESOLVE_HMR_EVENT, data: canonical });
+      return [];
+    },
+  });
 }
 
 /**
@@ -62,6 +127,7 @@ export async function startPresolveDevServer({
   compilerProduct,
   readArtifact,
   requestHost,
+  hmr,
   diagnostics = () => ({}),
   vite = {},
 } = {}) {
@@ -72,7 +138,7 @@ export async function startPresolveDevServer({
     throw new TypeError("presolve dev diagnostics must be a function");
   }
   const { createServer } = await import("vite");
-  const plugin = createPresolveVitePlugin({ compilerProduct, readArtifact, requestHost });
+  const plugin = createPresolveVitePlugin({ compilerProduct, readArtifact, requestHost, hmr });
   const configuredPlugins = vite.plugins === undefined
     ? []
     : Array.isArray(vite.plugins) ? vite.plugins : [vite.plugins];
@@ -252,6 +318,47 @@ function validateCompilerProduct(product) {
     throw new TypeError("Presolve publication manifest must contain artifacts");
   }
   return manifest;
+}
+
+function validateHmrUpdate(update, workspaceSnapshotId) {
+  if (!update || typeof update !== "object" || Array.isArray(update)) {
+    throw new TypeError("Presolve HMR update must be an object");
+  }
+  if (update.schemaVersion !== PRESOLVE_HMR_UPDATE_SCHEMA_VERSION) {
+    throw new TypeError(`unsupported Presolve HMR update schema ${update.schemaVersion}`);
+  }
+  if (update.workspaceSnapshotId !== workspaceSnapshotId) {
+    throw new TypeError("Presolve HMR update workspace snapshot does not match the compiler product");
+  }
+  if (typeof update.updateId !== "string" || !update.updateId) {
+    throw new TypeError("Presolve HMR update requires a stable updateId");
+  }
+  if (!PRESOLVE_HMR_MESSAGE_CLASSES.has(update.messageClass)) {
+    throw new TypeError("Presolve HMR update has an unsupported messageClass");
+  }
+  if (!Array.isArray(update.affectedModuleIds)
+    || update.affectedModuleIds.some(id => typeof id !== "string" || !id)
+    || [...new Set(update.affectedModuleIds)].length !== update.affectedModuleIds.length
+    || [...update.affectedModuleIds].sort().some((id, index) => id !== update.affectedModuleIds[index])) {
+    throw new TypeError("Presolve HMR update requires sorted unique affectedModuleIds");
+  }
+  if (!matchesStateCompatibility(update)) {
+    throw new TypeError("Presolve HMR state preservation must be explicitly compiler-proven");
+  }
+  return Object.freeze({
+    schemaVersion: update.schemaVersion,
+    workspaceSnapshotId: update.workspaceSnapshotId,
+    updateId: update.updateId,
+    messageClass: update.messageClass,
+    affectedModuleIds: Object.freeze([...update.affectedModuleIds]),
+    stateCompatibility: update.stateCompatibility,
+    preserveState: update.preserveState,
+  });
+}
+
+function matchesStateCompatibility(update) {
+  return (update.stateCompatibility === "proven-compatible" && update.preserveState === true)
+    || (update.stateCompatibility === "reload-required" && update.preserveState === false);
 }
 
 function validateArtifact(artifact) {

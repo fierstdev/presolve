@@ -75,7 +75,7 @@ in the same change.
 | ---: | --- | --- | --- |
 | 35 | Stable IDs and incremental invalidation | `semantic_id`, `watch`, `persistent_cache`, `platform` | Stable identity and invalidation products; reorder/edit regression corpus. |
 | 36 | Versioned publication/resume contracts | `application_publication`, `resume_manifest`, `template_manifest`, runtime artifacts | Schema migration policy and cold/resume equivalence fixtures. |
-| 37 | Presolve-aware HMR | `watch`, new Vite adapter, compiler publication products | Semantic invalidation to Vite transport mapping; HMR browser probes. |
+| 37 | Presolve-aware HMR | `watch`, `packages/vite`, compiler publication products | Implemented schema v1 compiler-authored eight-class HMR transport; Vite forwards observation only, preserves state only with explicit proof, retains native CSS/full-reload paths, and rejects absent or malformed semantic products. |
 | 38 | Production audit | `production_audit`, `production_*`, Vite manifest adapter | Audit report product and failure diagnostics; production fixture/budget checks. |
 | 39 | Source maps | Vite adapter, publication manifest, CLI explain | Source-map translation product; source-location regression fixtures. |
 | 40 | LSP and explain | `tooling_*`, `explain`, WASM, language-service, LSP, VS Code | Canonical query projections; hover/definition/reference/explain integration tests. |

@@ -33,6 +33,8 @@ normative source for this handoff.
   source-AST and TypeScript-identity boundary.
 - [Vite adapter boundary](vite-adapter.md) records the compiler-product-only
   integration seam for the required external backend.
+- [Presolve-aware HMR contract](hmr-contract.md) records the compiler-selected
+  update vocabulary, state-preservation evidence, and Vite transport boundary.
 - [Control-flow contract](control-flow-contract.md) records the fail-closed
   IR projection and the coverage required before later analyses may rely on it.
 - [Function-summary contract](function-summaries-contract.md) records the
@@ -58,11 +60,8 @@ normative source for this handoff.
 
 ## Current boundary
 
-The characterization, compatibility-corpus, semantic-authority, source-AST,
-intrinsic-registry, canonical-authored-semantics, legacy-lowering, the Vite
-backend skeleton, virtual-module registry, and dev-server integration are
-complete, as are production build integration, the control-flow graph
-foundation, function summaries, purity/effect classification, and explicit
-capture/escape analysis and environment ownership. The next slice is the
-serialization and codec protocol. The next slice is structural components and
-props and slots. The next slice is state.
+The tracker records completed, repository-owned V2 authority products through
+the compiler-selected HMR transport. It is the current source of implementation
+status and intentionally separates those products from the remaining audit,
+source-map, tooling, migration, representative-application, performance, and
+hardening evidence required for beta readiness.
