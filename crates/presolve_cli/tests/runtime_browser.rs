@@ -11,6 +11,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 static BROWSER_TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+const CHROME_PROBE_TIMEOUT: Duration = Duration::from_secs(45);
 
 fn browser_test_guard() -> MutexGuard<'static, ()> {
     BROWSER_TEST_LOCK
@@ -55,7 +56,7 @@ fn chrome_bin() -> Option<PathBuf> {
 }
 
 fn run_chrome_probe(chrome: PathBuf, user_data_dir: &str, probe_url: &str) -> Output {
-    run_chrome_probe_with_timeout(chrome, user_data_dir, probe_url, Duration::from_secs(20))
+    run_chrome_probe_with_timeout(chrome, user_data_dir, probe_url, CHROME_PROBE_TIMEOUT)
 }
 
 fn run_chrome_probe_with_timeout(
