@@ -52,6 +52,8 @@ normative source for this handoff.
   Application Platform layout and public-environment starter boundary.
 - [Representative applications contract](representative-applications-contract.md)
   records the conventional-project build corpus and its product evidence.
+- [Route metadata contract](route-metadata-contract.md) records the
+  compiler-owned sidecar schema and publication boundary.
 - [Node deployment contract](node-deployment-contract.md) records the
   compiler-issued Node release inventory and static-export eligibility rule.
 - [Testing integration contract](testing-integration-contract.md) records the
