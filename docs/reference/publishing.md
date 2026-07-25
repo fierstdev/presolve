@@ -35,7 +35,12 @@ versioned compatibility train, not a set of independently published packages.
    using a registry token with only the permissions required for those crates.
 6. Package and publish `presolve-vscode`; install the produced VSIX in a clean
    VS Code profile and validate a newly generated project.
-7. Create the GitHub release, then build and deploy the documentation site via
+7. After the complete registry and Marketplace train succeeds, promote
+   `create-presolve` to npm's `latest` tag so the documented
+   `pnpm create presolve` command resolves the verified alpha. Keep framework,
+   CLI, tooling, and native packages on their explicit `alpha` tag; the
+   scaffold pins their exact compatible versions.
+8. Create the GitHub release, then build and deploy the documentation site via
    its Cloudflare workflow.
 
 Never publish from ordinary CI. Use protected release environments and scoped

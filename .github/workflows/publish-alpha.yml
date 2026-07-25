@@ -205,3 +205,23 @@ jobs:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: npm exec --yes --package=@vscode/vsce@3.9.2 -- vsce publish --packagePath presolve-vscode.vsix --pat "$VSCE_PAT" --pre-release
         working-directory: packages/vscode
+
+  promote-scaffold:
+    name: Promote the public scaffold command
+    needs: publish-vscode
+    runs-on: ubuntu-latest
+    environment:
+      name: npm
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.5.0
+          registry-url: https://registry.npmjs.org
+      - name: Promote create-presolve only after the complete train succeeds
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+        run: |
+          version="${RELEASE_VERSION#v}"
+          npm dist-tag add "create-presolve@${version}" latest
+          npm view create-presolve dist-tags --json
