@@ -14,6 +14,10 @@ use presolve_cli::cloudflare_deployment::{
     validate_cloudflare_workers_artifacts_v1, CloudflareWorkersDeploymentOptionsV1,
     CLOUDFLARE_WORKERS_COMPATIBILITY_DATE_V1,
 };
+use presolve_cli::node_deployment::{
+    build_node_deployment_plan_v1, node_deployment_plan_json_v1, node_static_host_module_v1,
+    validate_node_deployment_artifacts_v1, NodeDeploymentOptionsV1,
+};
 use presolve_cli::{
     load_explicit_project_envelope_v1, load_explicit_source_inputs_v1,
     parse_explicit_source_spec_v1, run_explicit_build_or_check_v1, run_explicit_watch_once_v1,
@@ -225,6 +229,10 @@ struct CloudflareDeployArgumentsV1 {
 }
 
 fn run_ergonomic_deploy(args: &[String]) {
+    if args.first().is_some_and(|value| value == "node") {
+        run_ergonomic_node_deploy(&args[1..]);
+        return;
+    }
     let arguments = parse_cloudflare_deploy_arguments(args).unwrap_or_else(|message| {
         application_cli_error("PSCFL1011_DEPLOY_ARGUMENT_INVALID", &message)
     });
@@ -299,6 +307,96 @@ fn run_ergonomic_deploy(args: &[String]) {
         process::exit(status.code().unwrap_or(1));
     }
     println!("Cloudflare release {} deployed", plan.release_id);
+}
+
+fn run_ergonomic_node_deploy(args: &[String]) {
+    let application_name = parse_node_deploy_arguments(args).unwrap_or_else(|message| {
+        application_cli_error("PSNODE1011_DEPLOY_ARGUMENT_INVALID", &message)
+    });
+    let root = Path::new(".");
+    let manifest = run_ergonomic_build(root, ApplicationPublicationProfileV1::Production);
+    let project = discover_project_v1(root)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    let output_root = project.root.join("dist");
+    let loader_plan = fs::read_to_string(output_root.join("route-loaders.plan.json"))
+        .unwrap_or_else(|error| {
+            application_cli_error("PSNODE1012_LOADER_HANDOFF_READ_FAILED", &error.to_string())
+        });
+    let action_plan = fs::read_to_string(output_root.join("route-server-actions.plan.json"))
+        .unwrap_or_else(|error| {
+            application_cli_error(
+                "PSNODE1013_SERVER_ACTION_HANDOFF_READ_FAILED",
+                &error.to_string(),
+            )
+        });
+    let application_name = application_name.unwrap_or_else(|| {
+        cloudflare_worker_name_from_project_root(&project.root).unwrap_or_else(|message| {
+            application_cli_error("PSNODE1014_DEFAULT_APPLICATION_NAME_INVALID", &message)
+        })
+    });
+    let plan = build_node_deployment_plan_v1(
+        &manifest,
+        &loader_plan,
+        &action_plan,
+        &NodeDeploymentOptionsV1 { application_name },
+    )
+    .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    validate_node_deployment_artifacts_v1(&output_root, &plan)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    let adapter_root = project.root.join(".presolve/node");
+    fs::create_dir_all(&adapter_root).unwrap_or_else(|error| {
+        application_cli_error("PSNODE1015_ADAPTER_OUTPUT_UNAVAILABLE", &error.to_string())
+    });
+    write_node_adapter_file(
+        &adapter_root.join("deployment.plan.json"),
+        node_deployment_plan_json_v1(&plan).as_bytes(),
+    );
+    write_node_adapter_file(
+        &adapter_root.join("server.mjs"),
+        node_static_host_module_v1(&plan).as_bytes(),
+    );
+    write_node_adapter_file(
+        &adapter_root.join("package.json"),
+        format!(
+            "{{\n  \"name\": \"{}-presolve-release\",\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {{ \"start\": \"node server.mjs\" }}\n}}\n",
+            plan.application_name
+        )
+        .as_bytes(),
+    );
+    println!(
+        "Prepared Node release {} ({})",
+        adapter_root.join("server.mjs").display(),
+        plan.release_id
+    );
+}
+
+fn parse_node_deploy_arguments(args: &[String]) -> Result<Option<String>, String> {
+    let mut application_name = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--prepare" => {}
+            "--name" => {
+                let Some(value) = args.get(index + 1) else {
+                    return Err("--name requires a value".into());
+                };
+                application_name = Some(value.clone());
+                index += 1;
+            }
+            option => return Err(format!("unknown Node deploy option `{option}`")),
+        }
+        index += 1;
+    }
+    Ok(application_name)
+}
+
+fn write_node_adapter_file(path: &Path, contents: &[u8]) {
+    fs::write(path, contents).unwrap_or_else(|error| {
+        application_cli_error(
+            "PSNODE1016_ADAPTER_OUTPUT_WRITE_FAILED",
+            &format!("{}: {error}", path.display()),
+        )
+    });
 }
 
 fn parse_cloudflare_deploy_arguments(

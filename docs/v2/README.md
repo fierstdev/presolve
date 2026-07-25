@@ -50,6 +50,8 @@ normative source for this handoff.
   Application Platform layout and public-environment starter boundary.
 - [Representative applications contract](representative-applications-contract.md)
   records the conventional-project build corpus and its product evidence.
+- [Node deployment contract](node-deployment-contract.md) records the
+  compiler-issued Node release inventory and static-export eligibility rule.
 - [Application Platform contract](application-platform-contract.md) records
   the additive project, environment, Vite, testing, and deployment boundary.
 - [Control-flow contract](control-flow-contract.md) records the fail-closed
@@ -77,8 +79,9 @@ normative source for this handoff.
 
 ## Current boundary
 
-The tracker records completed, repository-owned V2 authority products through
-the compiler-selected HMR transport. It is the current source of implementation
-status and intentionally separates those products from the remaining audit,
-source-map, tooling, migration, representative-application, performance, and
-hardening evidence required for beta readiness.
+The tracker records repository-owned V2 authority products through the
+compiler-issued Node release inventory and static eligibility classification.
+It remains the source of implementation status and intentionally separates
+those products from the remaining server-executor, environment, Vite asset,
+testing-integration, performance, and hardening evidence required for beta
+readiness.

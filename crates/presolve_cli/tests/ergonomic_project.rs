@@ -267,6 +267,19 @@ import { savePost } from "post-service";
     assert!(plan.contains("post-service"));
     assert!(plan.contains("form_data"));
     assert!(plan.contains("cold_fallback"));
+    let node = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args(["deploy", "node", "--prepare"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        node.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&node.stderr)
+    );
+    let deployment = fs::read_to_string(root.join(".presolve/node/deployment.plan.json")).unwrap();
+    assert!(deployment.contains("\"execution\": \"node\""));
+    assert!(deployment.contains("\"serverActionCount\": 1"));
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -319,6 +332,30 @@ fn deploy_prepare_projects_compiler_artifacts_to_cloudflare_workers_static_asset
     assert!(
         syntax.status.success(),
         "worker syntax stderr: {}",
+        String::from_utf8_lossy(&syntax.stderr)
+    );
+    let node = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args(["deploy", "node", "--prepare", "--name", "presolve-docs"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        node.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&node.stderr)
+    );
+    let node_adapter = root.join(".presolve/node");
+    let node_plan = fs::read_to_string(node_adapter.join("deployment.plan.json")).unwrap();
+    assert!(node_plan.contains("\"provider\": \"node\""));
+    assert!(node_plan.contains("\"execution\": \"static\""));
+    let syntax = Command::new("node")
+        .arg("--check")
+        .arg(node_adapter.join("server.mjs"))
+        .output()
+        .unwrap();
+    assert!(
+        syntax.status.success(),
+        "Node release syntax stderr: {}",
         String::from_utf8_lossy(&syntax.stderr)
     );
     fs::remove_dir_all(root).unwrap();

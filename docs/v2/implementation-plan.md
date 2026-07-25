@@ -82,7 +82,7 @@ in the same change.
 | 41 | Migration command | CLI command modules, `semantic_capability` | Implemented schema v1 `presolve migrate` report from the canonical capability registry; automatic codemods are explicitly empty until a compiler-owned source-transform contract exists. |
 | 42 | V2 scaffold/examples | `create-presolve`, framework package, Vite package | Implemented conventional V2 project layout, public-environment example, and scaffold package/ergonomic build proof; Vite command configuration remains an explicit later adapter product. |
 | 43 | Representative applications | `fixtures/representative-applications`, CLI/Vite test harness | Implemented conventional counter/resume and nested-route/layout applications; ergonomic production builds prove route-scoped resume and audit artifacts, linked to existing browser cold/resume and Vite HMR transport gates. |
-| 44 | Performance budgets | `production_reports`, `production_benchmarks`, compile-cost tooling | Versioned budgets and benchmark baselines; regression gate. |
+| 44 | Performance budgets | `production_reports`, `production_benchmarks`, compile-cost tooling | Existing schema-v1 sixteen-case corpus fixes output, eager, artifact, record, operation, module-count, resumability-baseline, and lifecycle ceilings; the focused regression gate executes production builds for every case. |
 | 45 | Beta hardening | all public packages, schemas, fixtures, docs, release scripts | Compatibility matrix, release dry run, determinism, diagnostics, artifact, and product gates. |
 
 ## Application Platform extension
@@ -98,7 +98,7 @@ pull-request plan; their complete ownership boundary is
 | AP2 | Routes, layouts, loaders, metadata, and server actions | `route_graph`, `layout_composition`, `route_loader`, `route_server_action`, publication | End-to-end conventional route artifacts and server-boundary diagnostics. |
 | AP3 | Vite CSS, assets, PostCSS, and Tailwind | `packages/vite`, production manifest adapter | Vite-native style/asset output with compiler identity translation and browser proof. |
 | AP4 | Testing integrations | `packages/testing`, Vite integration, browser harness | Vitest and Playwright adapters over published applications, without semantic duplication. |
-| AP5 | Node deployment and static export | deployment adapters, `metaframework_handoff`, CLI | Node release inventory and compiler-proven static-export eligibility fixtures. |
+| AP5 | Node deployment and static export | `node_deployment`, file-route publication, CLI | Implemented schema-v1 Node release inventory and static-host preparation; exact loader/action handoffs classify routes as `static` or `node`. A server executor remains explicitly pending. |
 | AP6 | Production scaffold and representative applications | `create-presolve`, application fixtures, release scripts | Full platform scaffold, cold/resume/HMR application evidence, and platform gate. |
 
 ## Sequencing guardrails

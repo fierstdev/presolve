@@ -38,10 +38,12 @@ browser path by the environment-ownership authority. The project-level
 environment loader and its provenance are a later explicit product; this rule
 does not authorize ambient environment reads in compiler analysis.
 
-Node deployment is required for beta. Static export is permitted only for a
-route that the compiler can publish through the existing static-request
-handoff; routes requiring a server loader or server action are Node deployment
-inputs. Provider adapters consume the compiler's immutable release inventory
+Node deployment is required for beta. `presolve deploy node --prepare` now
+emits a compiler-derived release inventory and static host. Static export is
+permitted only for a route whose exact compiler loader and server-action
+handoffs are empty; routes requiring either handoff are marked `node`. The
+host rejects those server-bound routes until a capability-specific executor is
+published. Provider adapters consume the compiler's immutable release inventory
 and must not reconstruct route or artifact identity.
 
 ## Testing and proof
