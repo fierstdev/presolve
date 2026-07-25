@@ -49,6 +49,8 @@ normative source for this handoff.
   records the TypeScript-authority boundary for inheritance and generic props.
 - [Slots contract](slots-contract.md) records immutable slot ownership and the
   explicit boundary before capture/resume analysis.
+- [State contract](state-contract.md) records instance-qualified State storage
+  and codec-backed resume admission.
 
 ## Current boundary
 

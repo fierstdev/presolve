@@ -150,6 +150,7 @@ pub mod slot_binding;
 pub mod slot_content;
 pub mod slot_projection;
 pub mod state_instance_storage;
+pub mod state_projection;
 pub mod structural_component;
 pub mod summarize;
 pub mod symbol_table;
@@ -892,6 +893,10 @@ pub use state_instance_storage::{
     build_state_instance_storage_registry, validate_state_instance_storage_registry,
     StateInstanceStorageRecord, StateInstanceStorageRegistry,
     STATE_INSTANCE_STORAGE_REGISTRY_VERSION,
+};
+pub use state_projection::{
+    build_state_projection_v1, StateProjectionRecordV1, StateProjectionV1, StateResumeAdmissionV1,
+    StateUpdateCoverageV1, STATE_PROJECTION_SCHEMA_VERSION,
 };
 pub use structural_component::{
     build_structural_component_graph_v1, ComponentInheritanceStatusV1, ComponentPropsResolutionV1,
