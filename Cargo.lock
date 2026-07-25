@@ -433,7 +433,7 @@ dependencies = [
 
 [[package]]
 name = "presolve-cli"
-version = "0.1.0-alpha.4"
+version = "0.1.0-alpha.5"
 dependencies = [
  "presolve-compiler",
  "presolve-parser",
@@ -444,7 +444,7 @@ dependencies = [
 
 [[package]]
 name = "presolve-compiler"
-version = "0.1.0-alpha.4"
+version = "0.1.0-alpha.5"
 dependencies = [
  "presolve-parser",
  "serde",
@@ -455,7 +455,7 @@ dependencies = [
 
 [[package]]
 name = "presolve-parser"
-version = "0.1.0-alpha.4"
+version = "0.1.0-alpha.5"
 dependencies = [
  "oxc_allocator",
  "oxc_ast",

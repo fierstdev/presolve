@@ -8,7 +8,7 @@ import {
 } from "node:fs";
 import { resolve } from "node:path";
 import { arch, platform } from "node:process";
-import { spawnSync } from "node:child_process";
+import { runNpm } from "./npm-command.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const packageDefinitions = {
@@ -92,19 +92,9 @@ const npmArguments = [
   destination,
   "--json",
 ];
-const npm = platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : "npm";
-const npmCommandArguments =
-  platform === "win32"
-    ? ["/d", "/s", "/c", "npm.cmd", ...npmArguments]
-    : npmArguments;
-const result = spawnSync(
-  npm,
-  npmCommandArguments,
-  {
-    cwd: root,
-    encoding: "utf8",
-  },
-);
+const result = runNpm(npmArguments, {
+  cwd: root,
+});
 if (result.error) {
   fail(`Unable to execute npm pack: ${result.error.message}`);
 }

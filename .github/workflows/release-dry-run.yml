@@ -53,8 +53,27 @@ jobs:
             "packages/${{ matrix.package }}/bin/${{ matrix.executable }}"
       - name: Pack and verify native package
         run: node scripts/pack-native-cli.mjs "${{ matrix.package }}" release-artifacts
+      - name: Validate native publication input
+        run: node scripts/publish-native-cli.mjs --dry-run release-artifacts
       - uses: actions/upload-artifact@v4
         with:
           name: native-package-smoke-${{ matrix.package }}
           path: release-artifacts/*.tgz
           if-no-files-found: error
+
+  native-publication:
+    name: Native publication smoke
+    needs: native-package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-package-smoke-*
+          path: release-artifacts
+          merge-multiple: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.5.0
+      - name: Validate complete native publication
+        run: node scripts/publish-native-cli.mjs --dry-run --require-all release-artifacts

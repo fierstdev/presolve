@@ -16,6 +16,7 @@ pnpm run test:scaffold
 cargo package -p presolve-parser --allow-dirty --no-verify
 pnpm run release:prepare
 native_packed="$(node scripts/pack-native-cli.mjs --host "$release_dir")"
+node scripts/publish-native-cli.mjs --dry-run "$release_dir"
 (
   cd packages/vscode
   npm exec --yes --package=@vscode/vsce@3.9.2 -- vsce package \

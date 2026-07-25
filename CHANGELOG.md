@@ -8,6 +8,23 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.1.0-alpha.5 - 2026-07-24
+
+### Changed
+
+- Advanced the complete release train to `0.1.0-alpha.5` after the alpha.4
+  crates published without their downstream npm artifacts.
+- Native CLI publication now validates the complete artifact set and dry-runs
+  every tarball before the first registry write.
+
+### Fixed
+
+- Native CLI publishing now resolves every tarball to an absolute local path,
+  preventing npm from interpreting release artifact paths as GitHub package
+  specifications.
+- Pre-tag release checks now exercise the same native publication helper used
+  by the gated npm release job.
+
 ## 0.1.0-alpha.4 - 2026-07-24
 
 ### Changed

@@ -141,10 +141,7 @@ jobs:
       - name: Publish platform packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          for package in release-artifacts/*.tgz; do
-            npm publish "$package" --tag alpha --access public --provenance
-          done
+        run: node scripts/publish-native-cli.mjs --require-all release-artifacts
       - name: Publish compiler tooling and application handoffs
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
