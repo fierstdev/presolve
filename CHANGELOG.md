@@ -8,6 +8,18 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.1.0-alpha.3 - 2026-07-24
+
+### Changed
+
+- Advanced the complete release train to `0.1.0-alpha.3` after the alpha.2
+  crates published without their downstream npm artifacts.
+
+### Fixed
+
+- Native CLI tarballs now cross GitHub job boundaries through a visible
+  `release-artifacts` directory accepted by `actions/upload-artifact`.
+
 ## 0.1.0-alpha.2 - 2026-07-24
 
 ### Changed

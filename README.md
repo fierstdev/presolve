@@ -6,7 +6,7 @@ HTML, browser artifacts, route inventory, resumability records, and deployment
 plan. There is no separate renderer, dependency tracker, or router deciding
 application semantics beside it.
 
-`0.1.0-alpha.2` is a public technical preview for evaluation and static sites.
+`0.1.0-alpha.3` is a public technical preview for evaluation and static sites.
 It is not yet a replacement for every React or Next.js application.
 
 ## Create an application

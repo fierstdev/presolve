@@ -104,11 +104,11 @@ jobs:
           mkdir -p packages/${{ matrix.package }}/bin
           cp target/${{ matrix.target }}/release/${{ matrix.executable }} packages/${{ matrix.package }}/bin/${{ matrix.executable }}
       - name: Pack and verify native CLI package
-        run: node scripts/pack-native-cli.mjs "${{ matrix.package }}" .release
+        run: node scripts/pack-native-cli.mjs "${{ matrix.package }}" release-artifacts
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.package }}
-          path: .release/*.tgz
+          path: release-artifacts/*.tgz
           if-no-files-found: error
 
   publish-npm:
@@ -124,7 +124,7 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: actions/download-artifact@v4
         with:
-          path: .release
+          path: release-artifacts
           merge-multiple: true
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
@@ -142,7 +142,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          for package in .release/*.tgz; do
+          for package in release-artifacts/*.tgz; do
             npm publish "$package" --tag alpha --access public --provenance
           done
       - name: Publish compiler tooling and application handoffs

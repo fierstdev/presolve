@@ -10,8 +10,8 @@ readme = "README.md"
 rust-version.workspace = true
 
 [dependencies]
-presolve_compiler = { package = "presolve-compiler", path = "../presolve_compiler", version = "0.1.0-alpha.2" }
-presolve_parser = { package = "presolve-parser", path = "../presolve_parser", version = "0.1.0-alpha.2" }
+presolve_compiler = { package = "presolve-compiler", path = "../presolve_compiler", version = "0.1.0-alpha.3" }
+presolve_parser = { package = "presolve-parser", path = "../presolve_parser", version = "0.1.0-alpha.3" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"

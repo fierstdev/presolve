@@ -1,6 +1,6 @@
 {
   "name": "@presolve/language-service",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "description": "Compiler-product language-service queries for Presolve.",
   "license": "MIT OR Apache-2.0",
   "type": "module",

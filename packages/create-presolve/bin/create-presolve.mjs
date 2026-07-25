@@ -50,9 +50,9 @@ function template(name) {
         deploy: "presolve deploy cloudflare",
         "deploy:prepare": "presolve deploy cloudflare --prepare",
       },
-      dependencies: { presolve: "0.1.0-alpha.2" },
+      dependencies: { presolve: "0.1.0-alpha.3" },
       devDependencies: {
-        "@presolve/cli": "0.1.0-alpha.2",
+        "@presolve/cli": "0.1.0-alpha.3",
         "typescript": "npm:typescript@^7.0.2",
         "wrangler": "^4.0.0",
       },
