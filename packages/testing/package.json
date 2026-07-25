@@ -16,6 +16,9 @@
   "exports": {
     ".": "./src/index.js"
   },
+  "dependencies": {
+    "@presolve/vite": "workspace:*"
+  },
   "scripts": {
     "test": "node test/smoke.mjs"
   }

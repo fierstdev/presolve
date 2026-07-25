@@ -49,8 +49,10 @@ and must not reconstruct route or artifact identity.
 ## Testing and proof
 
 Vitest and Playwright are Vite-hosted integrations, not semantic authorities.
-Their adapters may execute published applications and report fixtures, but
-compiler diagnostics and artifact comparisons remain the source of truth. The
+`@presolve/testing` now projects immutable Vitest configuration and Playwright
+project metadata from the existing Vite compiler-product plugin. Their callers
+execute published applications and report declared fixtures, while compiler
+diagnostics and artifact comparisons remain the source of truth. The
 Application Platform gate requires route/layout, CSS/assets, public and
 server-environment isolation, HMR, Node deployment, static eligibility, a
 scaffold snapshot, and representative cold/resume applications.

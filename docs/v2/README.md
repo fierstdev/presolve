@@ -52,6 +52,8 @@ normative source for this handoff.
   records the conventional-project build corpus and its product evidence.
 - [Node deployment contract](node-deployment-contract.md) records the
   compiler-issued Node release inventory and static-export eligibility rule.
+- [Testing integration contract](testing-integration-contract.md) records the
+  Vitest and Playwright adapters over the existing Vite compiler boundary.
 - [Application Platform contract](application-platform-contract.md) records
   the additive project, environment, Vite, testing, and deployment boundary.
 - [Control-flow contract](control-flow-contract.md) records the fail-closed
@@ -83,5 +85,4 @@ The tracker records repository-owned V2 authority products through the
 compiler-issued Node release inventory and static eligibility classification.
 It remains the source of implementation status and intentionally separates
 those products from the remaining server-executor, environment, Vite asset,
-testing-integration, performance, and hardening evidence required for beta
-readiness.
+performance, and hardening evidence required for beta readiness.
