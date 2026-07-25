@@ -718,13 +718,17 @@ fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
                 "resource.rs",
                 "resume_identity.rs",
                 "resume_liveness.rs",
+                "slot_projection.rs",
             ][..],
         ),
         (
             "ComponentStructuralRegionId::for_",
             &["component_instance.rs", "resume_restore.rs"][..],
         ),
-        ("SlotBindingId::for_instance", &["slot_binding.rs"][..]),
+        (
+            "SlotBindingId::for_instance",
+            &["slot_binding.rs", "slot_projection.rs"][..],
+        ),
         ("ProviderInstanceId::new", &["instance_context.rs"][..]),
         ("ConsumerInstanceId::new", &["instance_context.rs"][..]),
     ] {
