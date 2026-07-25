@@ -10,6 +10,7 @@ pub mod asm_validation;
 pub mod authored_semantics;
 pub mod binding_table;
 pub mod capture_escape;
+pub mod codec_protocol;
 pub mod compilation_unit;
 pub mod compiler_pass;
 pub mod component_composition;
@@ -212,6 +213,12 @@ pub use capture_escape::{
     build_capture_escape_graph_v1, CaptureEscapeCoverageV1, CaptureEscapeErrorV1,
     CaptureEscapeFactV1, CaptureEscapeFactsV1, CaptureEscapeGraphV1, CaptureEscapeKindV1,
     FunctionCaptureEscapeV1, ResumeCaptureAdmissionV1, CAPTURE_ESCAPE_SCHEMA_VERSION,
+};
+pub use codec_protocol::{
+    build_codec_protocol_v1, CodecBehaviorV1, CodecClassificationV1, CodecClassificationsV1,
+    CodecDeclarationV1, CodecEnvironmentV1, CodecFailureBehaviorV1,
+    CodecProtocolDiagnosticReasonV1, CodecProtocolDiagnosticV1, CodecProtocolRecordV1,
+    CodecProtocolV1, CodecRepresentationV1, CODEC_PROTOCOL_SCHEMA_VERSION,
 };
 pub use compilation_unit::CompilationUnit;
 pub use compiler_pass::{

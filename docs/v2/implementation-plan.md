@@ -46,7 +46,7 @@ in the same change.
 | 15 | Purity/effect classification | `presolve_compiler::purity_effect`; `control_flow`; `function_summary` | Implemented schema v1 conservative classification for compiler-visible writes, observable instructions, Resource reads, explicit unknown calls, and unavailable call coverage. |
 | 16 | Capture and escape analysis | `presolve_compiler::capture_escape`; `control_flow`; `function_summary` | Implemented schema v1 explicit capture/escape evidence and fail-closed resume admission; existing runtime capture serialization remains outside this analysis authority. |
 | 17 | Environment ownership | `presolve_compiler::environment_ownership`; `context_ownership`; `form_ownership`; component instance scope | Implemented schema v1 explicit environment/lifetime fact graph with deterministic ownership-cycle and browser/server or shared/request leak paths. |
-| 18 | Serialization and codec protocol | `semantic_type`, `form_serialization`, `resume_schema`, `platform` | Versioned codec protocol; valid/invalid serialization corpus. |
+| 18 | Serialization and codec protocol | `presolve_compiler::codec_protocol`; `semantic_type`; `form_serialization`; `resume_schema`; `platform` | Implemented schema v1 versioned codec declaration ledger with six independent classifications and early unsupported-source diagnostics; frozen Form, resume, and platform encodings remain unchanged. |
 
 ## V2 language normalization
 

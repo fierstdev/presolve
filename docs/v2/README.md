@@ -43,6 +43,8 @@ normative source for this handoff.
   explicit evidence boundary and fail-closed resume admission rule.
 - [Environment ownership contract](environment-ownership-contract.md) records
   explicit environment/lifetime classifications and path-bearing leak rules.
+- [Serialization and codec protocol contract](codec-protocol-contract.md)
+  records independent serialization classes and versioned codec declarations.
 
 ## Current boundary
 
@@ -52,4 +54,5 @@ backend skeleton, virtual-module registry, and dev-server integration are
 complete, as are production build integration, the control-flow graph
 foundation, function summaries, purity/effect classification, and explicit
 capture/escape analysis and environment ownership. The next slice is the
-serialization and codec protocol.
+serialization and codec protocol. The next slice is structural components and
+props.
