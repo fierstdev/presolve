@@ -37,6 +37,7 @@ jobs:
         run: node scripts/verify-release-version.mjs "${RELEASE_VERSION#v}"
       - run: cargo fmt --all --check
       - run: RUST_TEST_THREADS=1 cargo test --workspace
+      - run: cargo test -p presolve-cli --features browser-tests --test runtime_browser -- --nocapture --test-threads=1
       - run: pnpm --dir packages/create-presolve test
       - run: pnpm --dir packages/compiler-wasm run build
       - run: pnpm --dir packages/compiler-wasm test

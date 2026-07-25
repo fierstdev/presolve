@@ -16,13 +16,13 @@
   "scripts": {
     "build": "pnpm --filter @presolve/compiler-wasm run build",
     "format": "cargo fmt --all --check",
-    "lint": "cargo clippy --workspace --all-targets -- -D warnings",
+    "lint": "cargo clippy --workspace --all-targets --all-features -- -D warnings",
     "check": "pnpm run format && pnpm run lint && pnpm run test && pnpm run docs:check",
-    "test": "RUST_TEST_THREADS=1 cargo test --workspace && pnpm run build && pnpm -r test && pnpm run test:types",
+    "test": "RUST_TEST_THREADS=1 cargo test --workspace && pnpm run test:e2e && pnpm run build && pnpm -r test && pnpm run test:types",
     "test:types": "tsc -p tests/framework-public-api/tsconfig.json --pretty false",
     "test:scaffold": "node scripts/verify-scaffold.mjs",
-    "test:e2e": "cargo test -p presolve-cli --test runtime_browser -- --nocapture --test-threads=1",
-    "test:e2e:headed": "cargo test -p presolve-cli --test runtime_browser -- --nocapture --test-threads=1",
+    "test:e2e": "cargo test -p presolve-cli --features browser-tests --test runtime_browser -- --nocapture --test-threads=1",
+    "test:e2e:headed": "cargo test -p presolve-cli --features browser-tests --test runtime_browser -- --nocapture --test-threads=1",
     "docs:check": "node scripts/verify-docs.mjs",
     "release:prepare": "node scripts/prepare-release.mjs",
     "release:check": "./scripts/release-dry-run.sh"
