@@ -44,7 +44,7 @@ jobs:
 
   publish-crates:
     name: Publish crates.io packages
-    needs: verify
+    needs: [verify, verify-npm-auth]
     runs-on: ubuntu-latest
     environment:
       name: crates-io
@@ -66,7 +66,7 @@ jobs:
 
   native-cli:
     name: Build ${{ matrix.package }}
-    needs: verify
+    needs: [verify, verify-npm-auth]
     strategy:
       fail-fast: false
       matrix:
@@ -110,6 +110,25 @@ jobs:
           name: ${{ matrix.package }}
           path: release-artifacts/*.tgz
           if-no-files-found: error
+
+  verify-npm-auth:
+    name: Verify npm publishing identity
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: npm
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.5.0
+          registry-url: https://registry.npmjs.org
+      - name: Verify npm identity and Presolve organization access
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm whoami
+          npm org ls presolve --json
+          npm access list packages @presolve --json
 
   publish-npm:
     name: Publish npm packages

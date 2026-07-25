@@ -8,6 +8,16 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.1.0-alpha.6 - 2026-07-24
+
+### Changed
+
+- Advanced the complete release train to `0.1.0-alpha.6` after npm rejected the
+  alpha.5 scoped packages before their first publication.
+- Tag releases now verify the npm publishing identity, Presolve organization,
+  and scope access before publishing immutable crates or building native
+  release artifacts.
+
 ## 0.1.0-alpha.5 - 2026-07-24
 
 ### Changed

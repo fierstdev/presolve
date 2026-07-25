@@ -21,8 +21,8 @@ versioned compatibility train, not a set of independently published packages.
    manifest, package metadata, and compatibility assertion. Map
    `MAJOR.MINOR.PATCH-alpha.N` to the numeric Visual Studio Marketplace
    prerelease version `MAJOR.MINOR.(PATCH + N)` because the Marketplace does
-   not accept SemVer prerelease suffixes. Presolve `0.1.0-alpha.5` therefore
-   publishes as Marketplace prerelease `0.1.5`.
+   not accept SemVer prerelease suffixes. Presolve `0.1.0-alpha.6` therefore
+   publishes as Marketplace prerelease `0.1.6`.
 2. Run the full Rust, package, browser, artifact, formatter, and release-check
    matrix from a clean checkout.
 3. Pack every npm package, install the tarballs in a fresh external directory,
@@ -43,3 +43,12 @@ credentials: npm token, crates.io token, Visual Studio Marketplace token, and
 Cloudflare deployment credentials. The release workflow must verify package
 contents, provenance, version equality, and no generated artifacts or secrets
 before any registry upload.
+
+The initial npm release requires an npm organization named `presolve`; that
+organization owns the `@presolve` scope. Its GitHub Actions granular access
+token must enable bypass 2FA, grant read/write access to all packages and
+scopes the npm account can access, and grant at least read-only access to the
+`presolve` organization. Organization permission alone does not grant package
+publishing permission. The protected npm environment verifies the token's npm
+identity, organization membership, and scope access before any immutable crate
+is published.

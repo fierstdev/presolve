@@ -1,6 +1,6 @@
 {
   "name": "@presolve/cli",
-  "version": "0.1.0-alpha.5",
+  "version": "0.1.0-alpha.6",
   "description": "The Presolve compiler command-line interface.",
   "license": "MIT OR Apache-2.0",
   "type": "module",
