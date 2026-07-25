@@ -13,6 +13,7 @@ export const PRESOLVE_HMR_UPDATE_SCHEMA_VERSION = 1;
 export const PRESOLVE_HMR_EVENT = "presolve:hmr";
 export const PRESOLVE_PRODUCTION_AUDIT_SCHEMA_VERSION = 1;
 export const PRESOLVE_PRODUCTION_AUDIT_ARTIFACT = "production-audit.json";
+export const PRESOLVE_SOURCE_MAP_TRANSLATION_SCHEMA_VERSION = 1;
 
 const PRESOLVE_HMR_MESSAGE_CLASSES = new Set([
   "template-update",
@@ -46,7 +47,22 @@ export function createPresolveVitePlugin({ compilerProduct, readArtifact, reques
   if (readArtifact) {
     const registry = createPresolveVirtualModuleRegistry({ compilerProduct, readArtifact });
     plugin.resolveId = registry.resolveId;
-    plugin.load = registry.load;
+    plugin.load = async resolvedId => {
+      const code = await registry.load(resolvedId);
+      if (code === undefined) return undefined;
+      return {
+        code,
+        // This is a transport map for the virtual compiler artifact, not an
+        // authored-source map. Vite may retain it in physical output maps.
+        map: {
+          version: 3,
+          sources: [resolvedId.replace(/^\0/, "")],
+          sourcesContent: [code],
+          names: [],
+          mappings: "AAAA",
+        },
+      };
+    };
   }
   if (requestHost !== undefined && typeof requestHost !== "function") {
     throw new TypeError("@presolve/vite requestHost must be a function");
@@ -224,6 +240,7 @@ export async function buildPresolveProduction({
       outDir,
       emptyOutDir: false,
       manifest: manifestName,
+      sourcemap: true,
       rollupOptions: {
         ...vite.build?.rollupOptions,
         input: virtualEntryId,
@@ -247,6 +264,20 @@ export async function buildPresolveProduction({
   if (!entries.some(entry => entry.compilerArtifactPath === entryArtifactPath)) {
     throw new Error("Vite production manifest did not retain the compiler-selected virtual entry");
   }
+  const sourceMaps = await Promise.all(entries.map(async entry => {
+    const mapPath = join(outDir, `${entry.file}.map`);
+    let map;
+    try {
+      map = JSON.parse(await readFile(mapPath, "utf8"));
+    } catch {
+      throw new Error(`Vite did not emit a source map for ${entry.file}`);
+    }
+    return Object.freeze({
+      file: entry.file,
+      mapPath,
+      translation: translatePresolveSourceMap({ compilerProduct, sourceMap: map }),
+    });
+  }));
   return Object.freeze({
     schemaVersion: PRESOLVE_VITE_PRODUCTION_SCHEMA_VERSION,
     compilerContract: manifest.compiler_contract,
@@ -254,6 +285,39 @@ export async function buildPresolveProduction({
     entryComponentId: manifest.entry_component_id,
     viteManifestPath,
     entries: Object.freeze(entries),
+    sourceMaps: Object.freeze(sourceMaps),
+  });
+}
+
+/**
+ * Associates Vite map sources with exact compiler publication artifacts. This
+ * does not decode mappings or fabricate authored locations: Vite owns map
+ * generation and the compiler manifest owns the logical source identity.
+ */
+export function translatePresolveSourceMap({ compilerProduct, sourceMap } = {}) {
+  const manifest = validateCompilerProduct(compilerProduct);
+  if (!sourceMap || typeof sourceMap !== "object" || !Array.isArray(sourceMap.sources)) {
+    throw new TypeError("Vite source map requires a sources array");
+  }
+  const artifactPaths = new Set(manifest.artifacts.map(artifact => {
+    validateArtifact(artifact);
+    return artifact.path;
+  }));
+  const sources = sourceMap.sources.map(source => {
+    if (typeof source !== "string" || !source) {
+      throw new TypeError("Vite source map sources must be non-empty strings");
+    }
+    const index = source.indexOf(PRESOLVE_VIRTUAL_MODULE_PREFIX);
+    const artifactPath = index < 0 ? undefined : source.slice(index + PRESOLVE_VIRTUAL_MODULE_PREFIX.length);
+    return Object.freeze({
+      viteSource: source,
+      compilerArtifactPath: artifactPaths.has(artifactPath) ? artifactPath : undefined,
+    });
+  });
+  return Object.freeze({
+    schemaVersion: PRESOLVE_SOURCE_MAP_TRANSLATION_SCHEMA_VERSION,
+    workspaceSnapshotId: manifest.workspace_snapshot_id,
+    sources: Object.freeze(sources),
   });
 }
 

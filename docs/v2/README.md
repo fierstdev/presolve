@@ -40,6 +40,8 @@ normative source for this handoff.
   update vocabulary, state-preservation evidence, and Vite transport boundary.
 - [Production audit contract](production-audit-contract.md) records the
   compiler-produced production-report audit and adapter verification boundary.
+- [Source maps contract](source-maps-contract.md) records Vite physical-map
+  ownership and the manifest-bound compiler artifact translation boundary.
 - [Application Platform contract](application-platform-contract.md) records
   the additive project, environment, Vite, testing, and deployment boundary.
 - [Control-flow contract](control-flow-contract.md) records the fail-closed

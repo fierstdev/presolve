@@ -10,6 +10,7 @@ import {
   composeDevelopmentDiagnostics,
   PRESOLVE_HMR_EVENT,
   readPresolveProductionAudit,
+  translatePresolveSourceMap,
   PRESOLVE_VITE_ADAPTER_SCHEMA_VERSION,
   PRESOLVE_VIRTUAL_MODULE_PREFIX,
   startPresolveDevServer,
@@ -112,6 +113,22 @@ await assertAsyncRejects(
   }),
   "Vite must reject a production audit whose bytes differ from the compiler manifest",
 );
+
+const sourceMapTranslation = translatePresolveSourceMap({
+  compilerProduct: {
+    manifest: {
+      schema_version: 1,
+      compiler_contract: "presolve-application-publication:1",
+      workspace_snapshot_id: "fixture-snapshot",
+      artifacts: [{ path: "runtime.js", digest }],
+    },
+  },
+  sourceMap: { version: 3, sources: [`\0${PRESOLVE_VIRTUAL_MODULE_PREFIX}runtime.js`, "node_modules/dependency.js"] },
+});
+if (sourceMapTranslation.sources[0].compilerArtifactPath !== "runtime.js"
+  || sourceMapTranslation.sources[1].compilerArtifactPath !== undefined) {
+  throw new Error("source-map translation must retain only manifest-bound compiler identities");
+}
 
 const diagnostics = composeDevelopmentDiagnostics({
   typescript: [{ code: 2322, message: "Type mismatch", file: "src/App.tsx", start: 12 }],
@@ -230,6 +247,9 @@ try {
   });
   if (production.entryComponentId !== "component:x-app" || production.entries.length !== 1) {
     throw new Error("production build must map the Vite entry back to the compiler component");
+  }
+  if (production.sourceMaps.length !== 1 || !production.sourceMaps[0].mapPath.endsWith(".map")) {
+    throw new Error("production builds must emit and report Vite source maps");
   }
   const entry = production.entries[0];
   if (entry.compilerArtifactPath !== "runtime.js" || entry.componentId !== "component:x-app") {
