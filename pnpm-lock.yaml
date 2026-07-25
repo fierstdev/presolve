@@ -55,6 +55,12 @@ importers:
 
   packages/testing: {}
 
+  packages/typescript-authority:
+    dependencies:
+      '@typescript/native':
+        specifier: npm:typescript@^7.0.2
+        version: typescript@7.0.2
+
   packages/vscode: {}
 
 packages:

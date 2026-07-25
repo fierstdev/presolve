@@ -25,10 +25,12 @@ normative source for this handoff.
   the repository at the V2 start point.
 - [V2 implementation tracker](implementation-plan.md) maps all 45 specified
   pull requests to current modules, intended products, and proof surfaces.
+- [TypeScript semantic-authority boundary](typescript-authority.md) records the
+  V2 schema and ownership rule for TypeScript semantic queries.
 
 ## Current boundary
 
-The characterization and TypeScript compatibility-corpus slices are complete.
-They make no runtime or compiler-semantic change. The next slice is the
-TypeScript semantic-authority adapter, which must consume the corpus as its
-compatibility baseline rather than introduce a second type checker.
+The characterization, compatibility-corpus, and semantic-authority slices are
+complete. The next slice is resolved module and symbol identity. It must consume
+the authority adapter rather than match intrinsic spellings or recreate module
+resolution in compiler code.

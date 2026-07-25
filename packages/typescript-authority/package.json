@@ -1,0 +1,25 @@
+{
+  "name": "@presolve/typescript-authority",
+  "version": "0.1.0-alpha.1",
+  "description": "The sole TypeScript semantic-authority boundary for Presolve.",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fierstdev/presolve.git",
+    "directory": "packages/typescript-authority"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "alpha"
+  },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "dependencies": {
+    "@typescript/native": "npm:typescript@^7.0.2"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}
