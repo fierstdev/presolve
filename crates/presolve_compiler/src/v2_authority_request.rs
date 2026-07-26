@@ -16,6 +16,7 @@ pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 1;
 #[serde(rename_all = "camelCase")]
 pub struct V2AuthorityPositionV1 {
     pub file: PathBuf,
+    /// Zero-based UTF-16 code-unit offset used by the TypeScript API.
     pub position: usize,
 }
 
@@ -49,6 +50,7 @@ pub struct V2AuthorityRequestV1 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum V2AuthorityRequestErrorV1 {
     MissingCanonicalExport(&'static str),
+    InvalidSourceOffset(usize),
 }
 
 impl std::fmt::Display for V2AuthorityRequestErrorV1 {
@@ -57,6 +59,10 @@ impl std::fmt::Display for V2AuthorityRequestErrorV1 {
             Self::MissingCanonicalExport(name) => write!(
                 f,
                 "missing `{name}` import from presolve needed for V2 authority query"
+            ),
+            Self::InvalidSourceOffset(offset) => write!(
+                f,
+                "V2 authority query offset {offset} is not a UTF-8 source boundary"
             ),
         }
     }
@@ -77,32 +83,58 @@ pub fn build_v2_authority_request_v1(
             .filter(|import| import.source == "presolve")
             .flat_map(|import| &import.specifiers)
             .find(|specifier| specifier.imported == name)
-            .map(|specifier| V2AuthorityPositionV1 {
-                file: parsed.path.clone(),
-                position: specifier.local_span.start,
+            .map(|specifier| {
+                utf16_position(&parsed.syntax.source, specifier.local_span.start).map(|position| {
+                    V2AuthorityPositionV1 {
+                        file: parsed.path.clone(),
+                        position,
+                    }
+                })
             })
+            .transpose()
     };
-    let component = canonical("Component").ok_or(
+    let component = canonical("Component")?.ok_or(
         V2AuthorityRequestErrorV1::MissingCanonicalExport("Component"),
     )?;
     let state =
-        canonical("state").ok_or(V2AuthorityRequestErrorV1::MissingCanonicalExport("state"))?;
+        canonical("state")?.ok_or(V2AuthorityRequestErrorV1::MissingCanonicalExport("state"))?;
     let action =
-        canonical("action").ok_or(V2AuthorityRequestErrorV1::MissingCanonicalExport("action"))?;
+        canonical("action")?.ok_or(V2AuthorityRequestErrorV1::MissingCanonicalExport("action"))?;
     let components = component_inheritance_sites_v1(parsed)
         .into_iter()
-        .map(|site| site_for("component", site.heritage_source, &parsed.path))
-        .collect();
+        .map(|site| {
+            site_for(
+                "component",
+                site.heritage_source,
+                &parsed.path,
+                &parsed.syntax.source,
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let states = crate::state_initializer_sites_v1(parsed, component_model)
         .unwrap_or_default()
         .into_iter()
-        .map(|site| site_for("state", site.callee_source, &parsed.path))
-        .collect();
+        .map(|site| {
+            site_for(
+                "state",
+                site.callee_source,
+                &parsed.path,
+                &parsed.syntax.source,
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let actions = action_field_sites_v1(parsed, component_model)
         .unwrap_or_default()
         .into_iter()
-        .map(|site| site_for("action", site.callee_source, &parsed.path))
-        .collect();
+        .map(|site| {
+            site_for(
+                "action",
+                site.callee_source,
+                &parsed.path,
+                &parsed.syntax.source,
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(V2AuthorityRequestV1 {
         schema_version: V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
         config_file,
@@ -117,12 +149,24 @@ pub fn build_v2_authority_request_v1(
     })
 }
 
-fn site_for(kind: &str, range: AuthoredSourceRangeV1, path: &std::path::Path) -> V2AuthoritySiteV1 {
-    V2AuthoritySiteV1 {
+fn site_for(
+    kind: &str,
+    range: AuthoredSourceRangeV1,
+    path: &std::path::Path,
+    source: &str,
+) -> Result<V2AuthoritySiteV1, V2AuthorityRequestErrorV1> {
+    Ok(V2AuthoritySiteV1 {
         id: format!("{kind}:{}:{}", range.start, range.end),
         file: path.to_path_buf(),
-        position: range.start,
-    }
+        position: utf16_position(source, range.start)?,
+    })
+}
+
+fn utf16_position(source: &str, byte_offset: usize) -> Result<usize, V2AuthorityRequestErrorV1> {
+    let Some(prefix) = source.get(..byte_offset) else {
+        return Err(V2AuthorityRequestErrorV1::InvalidSourceOffset(byte_offset));
+    };
+    Ok(prefix.encode_utf16().count())
 }
 
 #[cfg(test)]
@@ -196,5 +240,38 @@ class Counter extends FrameworkBase { count = reactiveCell(0); increment = activ
             error,
             V2AuthorityRequestErrorV1::MissingCanonicalExport("Component")
         ));
+    }
+
+    #[test]
+    fn converts_parser_byte_offsets_to_typescript_utf16_positions() {
+        let source = r#"
+// 🚀
+import { Component as FrameworkBase, state, action } from "presolve";
+class Counter extends FrameworkBase { count = state(0); increment = action(() => {}); }
+"#;
+        let parsed = parse_file("src/Counter.tsx", source);
+        let heritage = component_inheritance_sites_v1(&parsed).pop().unwrap();
+        let components = lower_component_inheritance_v1(
+            &parsed,
+            [ResolvedComponentInheritanceV1 {
+                heritage_source: heritage.heritage_source,
+                component_identity: ResolvedIntrinsicIdentityV1 {
+                    name: "Component".into(),
+                    flags: 32,
+                    declaration_modules: vec!["presolve".into()],
+                },
+            }],
+        )
+        .unwrap()
+        .model;
+        let request =
+            build_v2_authority_request_v1(&parsed, PathBuf::from("tsconfig.json"), &components)
+                .unwrap();
+        let byte_position = source.find("FrameworkBase").unwrap();
+        assert_eq!(
+            request.canonical.component.position,
+            source[..byte_position].encode_utf16().count()
+        );
+        assert_ne!(request.canonical.component.position, byte_position);
     }
 }
