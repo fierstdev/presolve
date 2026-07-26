@@ -881,11 +881,12 @@ pub use runtime_effect_artifact::{
     RuntimeEffectArtifactInitialTrigger, RuntimeEffectArtifactInstance,
     RuntimeEffectArtifactInstruction, RuntimeEffectArtifactPrerequisiteBatch,
     RuntimeEffectArtifactProgram, RuntimeEffectArtifactRenderBoundary,
-    RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION,
+    RuntimeEffectArtifactStructuralTemplate, RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION,
 };
 pub use runtime_effect_instance::{
-    build_runtime_effect_instance_registry, RuntimeEffectInstanceRecord,
-    RuntimeEffectInstanceRegistry, RUNTIME_EFFECT_INSTANCE_REGISTRY_VERSION,
+    build_runtime_effect_instance_registry, build_runtime_effect_structural_template_registry,
+    RuntimeEffectInstanceRecord, RuntimeEffectInstanceRegistry,
+    RuntimeEffectStructuralTemplateRecord, RUNTIME_EFFECT_INSTANCE_REGISTRY_VERSION,
 };
 pub use runtime_form_artifact::{
     build_runtime_forms_artifact, runtime_forms_artifact_json, validate_runtime_forms_artifact,

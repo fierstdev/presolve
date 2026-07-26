@@ -286,6 +286,7 @@ mod tests {
                 schema_version: 1,
                 effects: Vec::new(),
                 instances: Vec::new(),
+                structural_templates: Vec::new(),
             },
             &RuntimeFormsArtifact {
                 schema_version: 1,
