@@ -580,6 +580,16 @@ const RUNTIME_STUB: &str = r#"(() => {
           );
           throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
         }
+        if (host.kind === "list" && program.conditional_host_fragments.length !== 0) {
+          reportDiagnostic(
+            diagnostics,
+            "PSR_INVALID_COMPONENT_ARTIFACT",
+            "Conditional host fragments were attached to a keyed-list host",
+            { region: program.region, host_component: program.host_component, host_node: program.host_node },
+            true
+          );
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
       }
     }
 
@@ -4487,6 +4497,7 @@ mod tests {
         assert!(runtime.contains("form_hosts"));
         assert!(runtime.contains("structuralOccurrences = new Map"));
         assert!(runtime.contains("structuralOccurrencesByInvocation"));
+        assert!(runtime.contains("Conditional host fragments were attached to a keyed-list host"));
         assert!(runtime.contains("occurrence.ordinary_template_targets"));
         assert!(runtime.contains("occurrence.ordinary_template_bindings"));
         assert!(runtime.contains("occurrence.ordinary_template_events"));

@@ -644,6 +644,11 @@ pub fn validate_runtime_component_artifact(
         .iter()
         .map(|r| r.instance.as_str())
         .collect::<std::collections::BTreeSet<_>>();
+    let instance_components = artifact
+        .instances
+        .iter()
+        .map(|instance| (instance.instance.as_str(), instance.component.as_str()))
+        .collect::<std::collections::BTreeMap<_, _>>();
     if artifact.structural_programs.iter().any(|program| {
         let host_instances = program
             .conditional_host_fragments
@@ -651,10 +656,12 @@ pub fn validate_runtime_component_artifact(
             .map(|fragments| fragments.host_instance.as_str())
             .collect::<std::collections::BTreeSet<_>>();
         host_instances.len() != program.conditional_host_fragments.len()
-            || program
-                .conditional_host_fragments
-                .iter()
-                .any(|fragments| !instances.contains(fragments.host_instance.as_str()))
+            || program.conditional_host_fragments.iter().any(|fragments| {
+                !instances.contains(fragments.host_instance.as_str())
+                    || instance_components
+                        .get(fragments.host_instance.as_str())
+                        .is_none_or(|component| *component != program.host_component)
+            })
     }) {
         return Err("component artifact has invalid conditional host fragments".to_string());
     }
@@ -950,6 +957,7 @@ mod tests {
   items = state([{ id: "a" }]);
   render() { return <main>{this.visible ? <Leaf /> : <span>Hidden</span>}<ul>{this.items.map(item => <li key={item.id}><Leaf /></li>)}</ul></main>; }
 }
+@component("x-idle") class Idle extends Component { render() { return <aside />; } }
 "#,
         ));
         let mut artifact =
@@ -1069,6 +1077,23 @@ mod tests {
             .when_false_html
             .clear();
         assert!(validate_runtime_component_artifact(&invalid_fragments).is_err());
+
+        let mut invalid_host = artifact.clone();
+        let idle = invalid_host
+            .instances
+            .iter()
+            .find(|instance| instance.component.ends_with("/component:x-idle"))
+            .expect("unrelated static host instance")
+            .instance
+            .clone();
+        invalid_host
+            .structural_programs
+            .iter_mut()
+            .find(|program| !program.conditional_host_fragments.is_empty())
+            .expect("conditional host has compiler-authored fragments")
+            .conditional_host_fragments[0]
+            .host_instance = idle;
+        assert!(validate_runtime_component_artifact(&invalid_host).is_err());
 
         let first = &mut artifact.structural_programs[0].template_occurrences[0];
         first
