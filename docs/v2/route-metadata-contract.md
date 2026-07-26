@@ -14,6 +14,6 @@ identity. Vite, Node, and deployment adapters may transport that artifact but
 must not infer metadata from HTML, source filenames, or module exports.
 
 This contract deliberately does not introduce component syntax or runtime head
-mutation. The next implementation slice must add sidecar discovery to the
-existing ergonomic project input and join it against the compiler-issued route
-manifest before publication.
+mutation. The ergonomic CLI now discovers sidecars only from the compiler's
+selected route-source mapping, joins them against the compiler-issued route
+manifest, and refreshes the manifest before atomic publication.

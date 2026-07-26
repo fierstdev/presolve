@@ -70,7 +70,7 @@ use presolve_parser::{
     parse_file, ParseDiagnostic, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
     ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxNode, ParsedMethod, SourceSpan,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 
 const ASM_INSPECTION_SCHEMA_VERSION: u32 = 12;
@@ -178,12 +178,38 @@ fn run_ergonomic_build(
         profile,
         output_root: output_root.clone(),
     };
-    let product = build_file_route_publication_v1(request)
+    let mut product = build_file_route_publication_v1(request)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    attach_route_metadata(&project.root, &mut product)
+        .unwrap_or_else(|message| application_cli_error("PSMETA1004_DISCOVERY_FAILED", &message));
     publish_file_route_product(&output_root, &product)
         .unwrap_or_else(|error| application_cli_error("PSROUTE3008_PUBLICATION_FAILED", &error));
     println!("Built {}", output_root.display());
     product.manifest
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RouteMetadataSidecar { title: String, description: Option<String> }
+
+fn attach_route_metadata(root: &Path, product: &mut presolve_compiler::FileRoutePublicationProductV1) -> Result<(), String> {
+    let mut inputs = Vec::new();
+    for (route_path, source_path) in &product.route_source_paths {
+        let sidecar = root.join(source_path).with_extension("metadata.json");
+        if !sidecar.is_file() { continue; }
+        let source = fs::read_to_string(&sidecar).map_err(|error| format!("{}: {error}", sidecar.display()))?;
+        let sidecar: RouteMetadataSidecar = serde_json::from_str(&source).map_err(|error| format!("{}: {error}", sidecar.display()))?;
+        inputs.push(presolve_compiler::RouteMetadataInputV1 { route_path: route_path.clone(), title: sidecar.title, description: sidecar.description });
+    }
+    if inputs.is_empty() { return Ok(()); }
+    let metadata = presolve_compiler::build_route_metadata_manifest_v1(&product.manifest, &inputs).map_err(|error| format!("{}: {}", error.code, error.message))?;
+    let path = PathBuf::from("route-metadata.json");
+    let bytes = presolve_compiler::route_metadata_manifest_json_v1(&metadata).into_bytes();
+    product.manifest.artifacts.push(presolve_compiler::ApplicationPublicationArtifactV1 { path: path.to_string_lossy().into_owned(), digest: format!("sha256:{:x}", Sha256::digest(&bytes)) });
+    product.manifest.artifacts.sort_by(|left, right| left.path.cmp(&right.path));
+    product.artifacts.insert(path, bytes);
+    product.artifacts.insert(PathBuf::from("file-routes.manifest.json"), presolve_compiler::file_route_publication_manifest_json_v1(&product.manifest).into_bytes());
+    Ok(())
 }
 
 fn run_ergonomic_dev(args: &[String]) {
