@@ -1686,6 +1686,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       parent_scope: decoded.parent_scope,
       structural_region: templateRecord.structural_region,
       template_instance: templateInstance,
+      occurrence,
       component: occurrence.component,
       definition: templateRecord.definition,
       state_slots: slots.state_slots,
@@ -1904,20 +1905,33 @@ const RUNTIME_STUB: &str = r#"(() => {
     let staged = null;
     let attachment = null;
     let registration = null;
+    const children = [];
     try {
       staged = stageStructuralOccurrenceRecords(store, records);
+      const program = store.componentRegions?.get(records.structural_region);
+      const fragment = renderStructuralOccurrenceTemplate(records);
+      const anchors = compilerFragmentInvocationAnchors(
+        fragment,
+        program,
+        records.occurrence.nested_invocations
+      );
       attachment = attachStructuralOccurrenceFragment(
         marker,
         invocation,
-        renderStructuralOccurrenceTemplate(records)
+        fragment
       );
       registration = registerStructuralOccurrenceRecords(store, staged);
+      for (const anchor of anchors) {
+        children.push(materializeStructuralOccurrence(store, anchor.marker, identity, localOccurrence));
+      }
       return Object.freeze({ ...staged, attachment, registration, dispose: () => {
+        for (const child of [...children].reverse()) child.dispose();
         registration.rollback();
         attachment.rollback();
         staged.rollback();
       }});
     } catch (error) {
+      for (const child of [...children].reverse()) child.dispose();
       registration?.rollback();
       attachment?.rollback();
       staged?.rollback();
