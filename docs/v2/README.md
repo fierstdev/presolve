@@ -64,6 +64,9 @@ normative source for this handoff.
 - [Route-loader handoff contract](route-loader-handoff-contract.md) fixes the
   integrity-bound compiler publication boundary and the explicit no-executor
   rule for server route loaders.
+- [Server-action and capability contract](server-action-capability-contract.md)
+  records the closed server-action handoff and the public capability-registry
+  boundary for Resources, loaders, and server actions.
 - [V2 effect-field source contract](effect-field-source-contract.md) defines
   the authority-backed, decorator-free effect declaration boundary before
   lifecycle runtime adoption.
