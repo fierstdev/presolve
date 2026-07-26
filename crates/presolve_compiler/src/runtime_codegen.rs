@@ -836,7 +836,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
   function validateEffectArtifactInstances(effectArtifact, componentArtifact, diagnostics) {
     if (effectArtifact === null) return;
-    if (!Array.isArray(effectArtifact.instances)) {
+    if (!Array.isArray(effectArtifact.instances) || !Array.isArray(effectArtifact.structural_templates)) {
       reportDiagnostic(diagnostics, "PSR_INVALID_EFFECT_INSTANCE_ARTIFACT", "Effect runtime metadata omitted instance ownership records", {}, true);
       throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
     }
@@ -858,6 +858,20 @@ const RUNTIME_STUB: &str = r#"(() => {
         throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
       }
       identities.add(record.effect_instance);
+    }
+    const regions = new Map((componentArtifact.structural_programs ?? []).map((program) => [program.region, program]));
+    const templateIds = new Set([...regions.values()].flatMap((program) => program.template_instances ?? []));
+    const templateIdentities = new Set();
+    for (const record of effectArtifact.structural_templates) {
+      const region = regions.get(record.structural_region);
+      if (typeof record.template_instance !== "string" || templateIdentities.has(record.template_instance)
+        || !templateIds.has(record.template_instance) || region === undefined
+        || !declarations.has(record.effect) || !Number.isInteger(record.depth) || record.depth < 0
+        || !Number.isInteger(record.declaration_order) || record.declaration_order < 0) {
+        reportDiagnostic(diagnostics, "PSR_INVALID_EFFECT_INSTANCE_ARTIFACT", "Structural effect template metadata did not match compiler component metadata", { template_instance: record.template_instance }, true);
+        throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
+      }
+      templateIdentities.add(record.template_instance);
     }
   }
 
@@ -4430,6 +4444,7 @@ mod tests {
         assert!(runtime.contains("executeInitialEffects"));
         assert!(runtime.contains("function executeResumeEffects"));
         assert!(runtime.contains("function validateEffectArtifactInstances"));
+        assert!(runtime.contains("effectArtifact.structural_templates"));
         assert!(runtime.contains("function disposeEffectInstances"));
         assert!(runtime.contains("effect.run_on_resume !== true"));
         assert!(runtime.contains("dispatchEffectCapability"));
