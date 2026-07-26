@@ -729,6 +729,54 @@ fn insert_effect_body_expressions(
             | EffectStatementSyntaxKind::Unsupported(_) => {}
         }
     }
+    if let Some(cleanup) = &body.cleanup {
+        for (index, statement) in cleanup.body.statements.iter().enumerate() {
+            let path = format!("cleanup/statement:{index}");
+            match &statement.kind {
+                EffectStatementSyntaxKind::StaticMemberAssignment { target, value } => {
+                    graph.insert_effect_expression(
+                        effect,
+                        &format!("{path}/target"),
+                        target,
+                        provenance,
+                    );
+                    graph.insert_effect_expression(
+                        effect,
+                        &format!("{path}/value"),
+                        value,
+                        provenance,
+                    );
+                }
+                EffectStatementSyntaxKind::CapabilityCall { callee, arguments } => {
+                    graph.insert_effect_expression(
+                        effect,
+                        &format!("{path}/callee"),
+                        callee,
+                        provenance,
+                    );
+                    for (argument_index, argument) in arguments.iter().enumerate() {
+                        graph.insert_effect_expression(
+                            effect,
+                            &format!("{path}/argument:{argument_index}"),
+                            argument,
+                            provenance,
+                        );
+                    }
+                }
+                EffectStatementSyntaxKind::EffectReturn { value: Some(value) } => {
+                    graph.insert_effect_expression(
+                        effect,
+                        &format!("{path}/return"),
+                        value,
+                        provenance,
+                    );
+                }
+                EffectStatementSyntaxKind::EffectReturn { value: None }
+                | EffectStatementSyntaxKind::Empty
+                | EffectStatementSyntaxKind::Unsupported(_) => {}
+            }
+        }
+    }
 }
 
 #[cfg(test)]

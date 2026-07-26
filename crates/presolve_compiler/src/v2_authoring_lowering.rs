@@ -120,7 +120,7 @@ mod tests {
 class Counter extends AliasedBase {
   count = reactiveCell(0);
   increment = activate(() => { this.count += 1; });
-  sync = observe(() => {});
+  sync = observe(() => { document.title = this.count; return () => { document.title = ""; }; });
   get doubled() { return this.count * 2; }
   get quadrupled() { return this.doubled * 2; }
 }
@@ -214,15 +214,28 @@ class Counter extends AliasedBase {
         let graph = build_v2_component_graph_for_module(&parsed, &lowering.model);
         assert_eq!(graph.components[0].effect_fields.len(), 1);
         assert_eq!(graph.components[0].effect_fields[0].name, "sync");
-        assert!(graph.components[0].effect_fields[0]
-            .body
-            .statements
-            .is_empty());
+        assert_eq!(
+            graph.components[0].effect_fields[0].body.statements.len(),
+            1
+        );
+        assert!(graph.components[0].effect_fields[0].body.cleanup.is_some());
         let effects = crate::collect_effects(&graph.components, &graph.provenance);
         let effect = effects
             .get(&graph.components[0].id.effect("sync"))
             .expect("canonical V2 effect field is collected");
         assert_eq!(effect.declaration, crate::EffectDeclaration::V2Field);
+        let expressions =
+            crate::ExpressionGraph::from_components(&graph.components, &graph.provenance);
+        let (bodies, _) = crate::lower_effect_bodies(&graph.components, &effects, &expressions);
+        assert_eq!(
+            bodies
+                .get(&graph.components[0].id.effect("sync"))
+                .and_then(|body| body.cleanup.as_ref())
+                .expect("V2 cleanup body")
+                .statements
+                .len(),
+            1
+        );
         assert_eq!(graph.components[0].methods.len(), 2);
         assert!(graph.components[0].methods[0].is_computed());
         assert_eq!(graph.components[0].methods[0].name, "doubled");

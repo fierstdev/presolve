@@ -565,6 +565,11 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn effect_cleanup_statement(&self, index: usize) -> Self {
+        self.child("cleanup-statement", &index.to_string())
+    }
+
+    #[must_use]
     pub fn action(&self, method: &str, index: usize) -> Self {
         self.child("action", &format!("{method}:{index}"))
     }

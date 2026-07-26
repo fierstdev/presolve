@@ -173,6 +173,14 @@ pub struct Effect {
 pub struct EffectBody {
     pub effect: SemanticId,
     pub statements: Vec<SemanticId>,
+    pub cleanup: Option<EffectCleanupBody>,
+    pub provenance: SourceProvenance,
+}
+
+/// The separately ordered cleanup program for one effect body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EffectCleanupBody {
+    pub statements: Vec<SemanticId>,
     pub provenance: SourceProvenance,
 }
 
@@ -772,31 +780,7 @@ pub fn lower_effect_bodies(
             let id = effect.id.effect_statement(index);
             let path = format!("statement:{index}");
             let expression = |suffix: &str| effect.id.expression(&format!("{path}/{suffix}"));
-            let kind = match &statement.kind {
-                EffectStatementSyntaxKind::StaticMemberAssignment { .. } => {
-                    EffectStatementKind::ExternalMemberAssignment {
-                        target: expression("target"),
-                        value: expression("value"),
-                    }
-                }
-                EffectStatementSyntaxKind::CapabilityCall { arguments, .. } => {
-                    EffectStatementKind::CapabilityCall {
-                        callee: expression("callee"),
-                        arguments: (0..arguments.len())
-                            .map(|argument| expression(&format!("argument:{argument}")))
-                            .collect(),
-                    }
-                }
-                EffectStatementSyntaxKind::EffectReturn { value } => {
-                    EffectStatementKind::EffectReturn {
-                        value: value.as_ref().map(|_| expression("return")),
-                    }
-                }
-                EffectStatementSyntaxKind::Empty => EffectStatementKind::Empty,
-                EffectStatementSyntaxKind::Unsupported(kind) => {
-                    EffectStatementKind::Unsupported(*kind)
-                }
-            };
+            let kind = effect_statement_kind(statement, &expression);
             assert_effect_statement_expressions_exist(&kind, expression_graph);
             body_statement_ids.push(id.clone());
             statements.insert(
@@ -809,16 +793,68 @@ pub fn lower_effect_bodies(
                 },
             );
         }
+        let cleanup = syntax.cleanup.as_ref().map(|cleanup| {
+            let mut cleanup_statement_ids = Vec::new();
+            for (index, statement) in cleanup.body.statements.iter().enumerate() {
+                let id = effect.id.effect_cleanup_statement(index);
+                let path = format!("cleanup/statement:{index}");
+                let expression = |suffix: &str| effect.id.expression(&format!("{path}/{suffix}"));
+                let kind = effect_statement_kind(statement, &expression);
+                assert_effect_statement_expressions_exist(&kind, expression_graph);
+                cleanup_statement_ids.push(id.clone());
+                statements.insert(
+                    id.clone(),
+                    EffectStatement {
+                        id,
+                        owner: effect.id.clone(),
+                        kind,
+                        provenance: SourceProvenance::new(&effect.provenance.path, statement.span),
+                    },
+                );
+            }
+            EffectCleanupBody {
+                statements: cleanup_statement_ids,
+                provenance: SourceProvenance::new(&effect.provenance.path, cleanup.span),
+            }
+        });
         bodies.insert(
             effect.id.clone(),
             EffectBody {
                 effect: effect.id.clone(),
                 statements: body_statement_ids,
+                cleanup,
                 provenance: effect.provenance.clone(),
             },
         );
     }
     (bodies, statements)
+}
+
+fn effect_statement_kind(
+    statement: &crate::EffectStatementSyntax,
+    expression: &impl Fn(&str) -> SemanticId,
+) -> EffectStatementKind {
+    match &statement.kind {
+        EffectStatementSyntaxKind::StaticMemberAssignment { .. } => {
+            EffectStatementKind::ExternalMemberAssignment {
+                target: expression("target"),
+                value: expression("value"),
+            }
+        }
+        EffectStatementSyntaxKind::CapabilityCall { arguments, .. } => {
+            EffectStatementKind::CapabilityCall {
+                callee: expression("callee"),
+                arguments: (0..arguments.len())
+                    .map(|argument| expression(&format!("argument:{argument}")))
+                    .collect(),
+            }
+        }
+        EffectStatementSyntaxKind::EffectReturn { value } => EffectStatementKind::EffectReturn {
+            value: value.as_ref().map(|_| expression("return")),
+        },
+        EffectStatementSyntaxKind::Empty => EffectStatementKind::Empty,
+        EffectStatementSyntaxKind::Unsupported(kind) => EffectStatementKind::Unsupported(*kind),
+    }
 }
 
 fn effect_is_async(components: &[ComponentNode], effect: &Effect) -> bool {
