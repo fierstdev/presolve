@@ -570,6 +570,11 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn effect_cleanup_program(&self) -> Self {
+        self.child("cleanup", "program")
+    }
+
+    #[must_use]
     pub fn action(&self, method: &str, index: usize) -> Self {
         self.child("action", &format!("{method}:{index}"))
     }

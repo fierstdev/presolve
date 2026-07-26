@@ -57,6 +57,9 @@ pub struct IrEffectExecution {
     pub entry_block: IrBlockId,
     pub completion: IrEffectCompletion,
     pub capability_operations: Vec<CapabilityOperationId>,
+    pub cleanup_function: Option<SemanticId>,
+    pub cleanup_entry_block: Option<IrBlockId>,
+    pub cleanup_capability_operations: Vec<CapabilityOperationId>,
     pub provenance: SourceProvenance,
 }
 
@@ -1088,10 +1091,10 @@ fn lower_component_to_ir(
             && effect.validation == EffectValidation::Valid
             && effect_is_scheduled(model, &effect.id)
     }) {
-        if let Some((function, execution)) =
+        if let Some((functions, execution)) =
             lower_effect_execution(model, component, effect, &executable_computed)
         {
-            module.functions.push(function);
+            module.functions.extend(functions);
             module.effect_executions.push(execution);
         }
     }
@@ -1297,13 +1300,79 @@ fn lower_effect_execution(
     component: &ComponentNode,
     effect: &Effect,
     executable_computed: &BTreeSet<SemanticId>,
-) -> Option<(IrFunction, IrEffectExecution)> {
+) -> Option<(Vec<IrFunction>, IrEffectExecution)> {
     let body = model.effect_body(&effect.id)?;
-    let entry_block = IrBlockId::entry_for(&effect.id);
+    let (function, capability_operations) = lower_effect_program(
+        model,
+        component,
+        effect,
+        &effect.id,
+        &effect.name,
+        &body.statements,
+        &effect.provenance,
+        executable_computed,
+    )?;
+    let cleanup = if let Some(cleanup) = &body.cleanup {
+        let id = effect.id.effect_cleanup_program();
+        let (function, operations) = lower_effect_program(
+            model,
+            component,
+            effect,
+            &id,
+            &format!("{} cleanup", effect.name),
+            &cleanup.statements,
+            &cleanup.provenance,
+            executable_computed,
+        )?;
+        Some((id, function, operations))
+    } else {
+        None
+    };
+    let entry_block = function.entry_block.clone();
+    let (cleanup_function, cleanup_entry_block, cleanup_capability_operations, functions) =
+        match cleanup {
+            Some((id, cleanup_function, operations)) => {
+                let entry = cleanup_function.entry_block.clone();
+                (
+                    Some(id),
+                    Some(entry),
+                    operations,
+                    vec![function, cleanup_function],
+                )
+            }
+            None => (None, None, Vec::new(), vec![function]),
+        };
+    Some((
+        functions,
+        IrEffectExecution {
+            effect: effect.id.clone(),
+            function: effect.id.clone(),
+            entry_block,
+            completion: IrEffectCompletion::Normal,
+            capability_operations,
+            cleanup_function,
+            cleanup_entry_block,
+            cleanup_capability_operations,
+            provenance: effect.provenance.clone(),
+        },
+    ))
+}
+
+fn lower_effect_program(
+    model: &ApplicationSemanticModel,
+    component: &ComponentNode,
+    effect: &Effect,
+    function_id: &SemanticId,
+    name: &str,
+    statements: &[SemanticId],
+    provenance: &SourceProvenance,
+    executable_computed: &BTreeSet<SemanticId>,
+) -> Option<(IrFunction, Vec<CapabilityOperationId>)> {
+    let entry_block = IrBlockId::entry_for(function_id);
     let mut lowering = ExpressionIrLowering {
         model,
         component,
-        function: &effect.id,
+        function: function_id,
         reference_owner: &effect.id,
         entry_block: entry_block.clone(),
         instructions: Vec::new(),
@@ -1312,7 +1381,7 @@ fn lower_effect_execution(
         allowed_dependencies: None,
     };
     let mut capability_operations = Vec::new();
-    for statement_id in &body.statements {
+    for statement_id in statements {
         let statement = model.effect_statement(statement_id)?;
         let record = model.effect_statement_type(statement_id)?;
         match &statement.kind {
@@ -1351,30 +1420,20 @@ fn lower_effect_execution(
         }
     }
     let function = IrFunction {
-        id: effect.id.clone(),
-        name: effect.name.clone(),
-        provenance: effect.provenance.clone(),
+        id: function_id.clone(),
+        name: name.to_owned(),
+        provenance: provenance.clone(),
         entry_block: entry_block.clone(),
         blocks: vec![IrBlock {
             id: entry_block.clone(),
-            provenance: effect.provenance.clone(),
+            provenance: provenance.clone(),
             instructions: lowering.instructions,
         }],
         branch_edges: Vec::new(),
         values: lowering.values,
         loops: Vec::new(),
     };
-    Some((
-        function,
-        IrEffectExecution {
-            effect: effect.id.clone(),
-            function: effect.id.clone(),
-            entry_block,
-            completion: IrEffectCompletion::Normal,
-            capability_operations,
-            provenance: effect.provenance.clone(),
-        },
-    ))
+    Some((function, capability_operations))
 }
 
 fn effect_is_scheduled(model: &ApplicationSemanticModel, effect: &SemanticId) -> bool {
@@ -2086,7 +2145,10 @@ pub fn optimize_effect_ir(input: &IntermediateRepresentation) -> IrOptimizationR
         let effect_functions = module
             .effect_executions
             .iter()
-            .map(|execution| execution.function.clone())
+            .flat_map(|execution| {
+                std::iter::once(execution.function.clone())
+                    .chain(execution.cleanup_function.clone())
+            })
             .collect::<BTreeSet<_>>();
         module
             .functions
@@ -3253,6 +3315,60 @@ fn validate_effect_executions(
                     execution.effect
                 ),
             });
+        }
+        match (&execution.cleanup_function, &execution.cleanup_entry_block) {
+            (Some(cleanup_id), Some(cleanup_entry)) if cleanup_id != &execution.effect => {
+                let Some(cleanup) = module
+                    .functions
+                    .iter()
+                    .find(|function| function.id == *cleanup_id)
+                else {
+                    diagnostics.push(IrValidationDiagnostic {
+                        code: "PSIR1023",
+                        message: format!(
+                            "effect execution {} references a missing cleanup function",
+                            execution.effect
+                        ),
+                    });
+                    continue;
+                };
+                if cleanup.entry_block != *cleanup_entry {
+                    diagnostics.push(IrValidationDiagnostic {
+                        code: "PSIR1024",
+                        message: format!(
+                            "effect execution {} has an inconsistent cleanup entry block",
+                            execution.effect
+                        ),
+                    });
+                }
+                let operations = cleanup
+                    .blocks
+                    .iter()
+                    .flat_map(|block| &block.instructions)
+                    .filter_map(|instruction| match instruction.kind {
+                        IrInstructionKind::CapabilityCall { operation, .. }
+                        | IrInstructionKind::CapabilityAssign { operation, .. } => Some(operation),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>();
+                if operations != execution.cleanup_capability_operations {
+                    diagnostics.push(IrValidationDiagnostic {
+                        code: "PSIR1025",
+                        message: format!(
+                            "effect execution {} has inconsistent cleanup capability operations",
+                            execution.effect
+                        ),
+                    });
+                }
+            }
+            (None, None) if execution.cleanup_capability_operations.is_empty() => {}
+            _ => diagnostics.push(IrValidationDiagnostic {
+                code: "PSIR1026",
+                message: format!(
+                    "effect execution {} has malformed cleanup program metadata",
+                    execution.effect
+                ),
+            }),
         }
     }
 }
