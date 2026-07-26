@@ -31,6 +31,11 @@ export declare function action<This, Args extends readonly unknown[], Value>(
 /** @deprecated Alpha compatibility decorator. */
 export declare function action(): PresolveMethodDecorator;
 export declare function computed(): PresolveGetterDecorator;
+/** Creates a V2 browser effect instance field. */
+export declare function effect<This>(
+  handler: (this: This) => void | (() => void)
+): void;
+/** @deprecated Alpha compatibility decorator. */
 export declare function effect(): PresolveMethodDecorator;
 export declare function state<T>(initialValue: T): T;
 

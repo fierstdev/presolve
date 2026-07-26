@@ -52,6 +52,7 @@ pub mod control_flow;
 pub mod effect;
 pub mod effect_capability;
 pub mod effect_diagnostics;
+pub mod effect_field_lowering;
 pub mod effect_inspection;
 pub mod effect_projection;
 pub mod effect_resume;
@@ -419,6 +420,10 @@ pub use effect_capability::{
     EFFECT_CAPABILITY_REGISTRY_VERSION,
 };
 pub use effect_diagnostics::{collect_effect_diagnostics, EffectDiagnosticCode};
+pub use effect_field_lowering::{
+    effect_field_sites_v1, lower_effect_fields_v1, EffectFieldLoweringErrorV1,
+    EffectFieldLoweringV1, EffectFieldSiteV1, ResolvedEffectFieldV1,
+};
 pub use effect_inspection::{
     build_effect_inspection_registry, validate_effect_inspection_registry, EffectInspection,
     EffectInspectionActionTrigger, EffectInspectionCapability, EffectInspectionDependencies,

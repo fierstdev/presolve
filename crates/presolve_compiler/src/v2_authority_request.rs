@@ -6,11 +6,11 @@ use presolve_parser::ParsedFile;
 use serde::Serialize;
 
 use crate::{
-    action_field_sites_v1, component_inheritance_sites_v1, AuthoredSourceRangeV1,
-    CanonicalAuthoredSemanticModelV1,
+    action_field_sites_v1, component_inheritance_sites_v1, effect_field_sites_v1,
+    AuthoredSourceRangeV1, CanonicalAuthoredSemanticModelV1,
 };
 
-pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 1;
+pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -36,6 +36,8 @@ pub struct V2AuthorityCanonicalV1 {
     pub state: Option<V2AuthorityPositionV1>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub action: Option<V2AuthorityPositionV1>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effect: Option<V2AuthorityPositionV1>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -47,6 +49,7 @@ pub struct V2AuthorityRequestV1 {
     pub components: Vec<V2AuthoritySiteV1>,
     pub states: Vec<V2AuthoritySiteV1>,
     pub actions: Vec<V2AuthoritySiteV1>,
+    pub effects: Vec<V2AuthoritySiteV1>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -69,7 +72,7 @@ impl std::fmt::Display for V2AuthorityRequestErrorV1 {
             ),
             Self::FieldSiteSelection(message) => write!(
                 f,
-                "unable to select V2 State or Action authority sites: {message}"
+                "unable to select V2 State, Action, or Effect authority sites: {message}"
             ),
         }
     }
@@ -88,6 +91,7 @@ pub fn build_v2_authority_request_v1(
     )?;
     let state = canonical_import(parsed, "state")?;
     let action = canonical_import(parsed, "action")?;
+    let effect = canonical_import(parsed, "effect")?;
     let components = component_inheritance_sites_v1(parsed)
         .into_iter()
         .map(|site| {
@@ -131,6 +135,22 @@ pub fn build_v2_authority_request_v1(
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
+    let effects = effect
+        .is_some()
+        .then(|| effect_field_sites_v1(parsed, component_model))
+        .transpose()
+        .map_err(|error| V2AuthorityRequestErrorV1::FieldSiteSelection(error.to_string()))?
+        .unwrap_or_default()
+        .into_iter()
+        .map(|site| {
+            site_for(
+                "effect",
+                site.callee_source,
+                &parsed.path,
+                &parsed.syntax.source,
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(V2AuthorityRequestV1 {
         schema_version: V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
         config_file,
@@ -138,10 +158,12 @@ pub fn build_v2_authority_request_v1(
             component,
             state,
             action,
+            effect,
         },
         components,
         states,
         actions,
+        effects,
     })
 }
 
@@ -173,10 +195,12 @@ pub fn build_v2_authority_component_request_v1(
             component,
             state: canonical_import(parsed, "state")?,
             action: canonical_import(parsed, "action")?,
+            effect: canonical_import(parsed, "effect")?,
         },
         components,
         states: Vec::new(),
         actions: Vec::new(),
+        effects: Vec::new(),
     })
 }
 
@@ -240,8 +264,8 @@ mod tests {
     #[test]
     fn builds_source_faithful_queries_for_aliases_and_canonical_fields() {
         let source = r#"
-import { Component as FrameworkBase, state as reactiveCell, action as activate } from "presolve";
-class Counter extends FrameworkBase { count = reactiveCell(0); increment = activate(() => {}); }
+import { Component as FrameworkBase, state as reactiveCell, action as activate, effect as observe } from "presolve";
+class Counter extends FrameworkBase { count = reactiveCell(0); increment = activate(() => {}); sync = observe(() => {}); }
 "#;
         let parsed = parse_file("src/Counter.tsx", source);
         let heritage = component_inheritance_sites_v1(&parsed).pop().unwrap();
@@ -273,9 +297,14 @@ class Counter extends FrameworkBase { count = reactiveCell(0); increment = activ
             &source[request.canonical.action.as_ref().unwrap().position..][..8],
             "activate"
         );
+        assert_eq!(
+            &source[request.canonical.effect.as_ref().unwrap().position..][..7],
+            "observe"
+        );
         assert_eq!(request.components.len(), 1);
-        assert_eq!(request.states.len(), 2);
-        assert_eq!(request.actions.len(), 2);
+        assert_eq!(request.states.len(), 3);
+        assert_eq!(request.actions.len(), 3);
+        assert_eq!(request.effects.len(), 3);
     }
 
     #[test]

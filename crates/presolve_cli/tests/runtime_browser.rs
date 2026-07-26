@@ -2438,11 +2438,12 @@ import { readFileSync } from "node:fs";
 const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 process.stdout.write(JSON.stringify({
-  schemaVersion: 1,
+  schemaVersion: 2,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
   actions: request.actions.map(site => ({ id: site.id, identity: identity("action") })),
+  effects: request.effects.map(site => ({ id: site.id, identity: identity("effect") })),
 }));
 "#,
     )

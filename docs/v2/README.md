@@ -52,6 +52,9 @@ normative source for this handoff.
 - [V2 action endpoint identity contract](action-endpoint-identity-contract.md)
   defines the no-synthetic-method migration from V2 action fields into the
   existing action-batch and runtime binding products.
+- [V2 effect-field source contract](effect-field-source-contract.md) defines
+  the authority-backed, decorator-free effect declaration boundary before
+  lifecycle runtime adoption.
 - [Vite adapter boundary](vite-adapter.md) records the compiler-product-only
   integration seam for the required external backend.
 - [Presolve-aware HMR contract](hmr-contract.md) records the compiler-selected

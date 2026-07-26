@@ -8,11 +8,11 @@ use presolve_parser::ParsedFile;
 
 use crate::{
     v2_authority_request::V2AuthorityRequestV1, AuthoredSourceRangeV1, ResolvedActionFieldV1,
-    ResolvedComponentInheritanceV1, ResolvedIntrinsicIdentityV1, ResolvedStateInitializerV1,
-    V2AuthoringResolutionsV1,
+    ResolvedComponentInheritanceV1, ResolvedEffectFieldV1, ResolvedIntrinsicIdentityV1,
+    ResolvedStateInitializerV1, V2AuthoringResolutionsV1,
 };
 
-pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 1;
+pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -22,6 +22,7 @@ pub struct V2AuthorityResponseV1 {
     pub components: Vec<V2AuthorityResolutionV1>,
     pub states: Vec<V2AuthorityResolutionV1>,
     pub actions: Vec<V2AuthorityResolutionV1>,
+    pub effects: Vec<V2AuthorityResolutionV1>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -79,7 +80,8 @@ pub fn validate_v2_authority_response_v1(
     }
     validate_family(&request.components, &response.components)?;
     validate_family(&request.states, &response.states)?;
-    validate_family(&request.actions, &response.actions)
+    validate_family(&request.actions, &response.actions)?;
+    validate_family(&request.effects, &response.effects)
 }
 
 /// Converts a validated authority response into the exact syntax joins consumed
@@ -119,6 +121,13 @@ pub fn v2_authoring_resolutions_from_response_v1(
             .map(|(callee_source, identity)| ResolvedActionFieldV1 {
                 callee_source,
                 action_identity: identity,
+            })
+            .collect(),
+        effects: resolutions_for(&response.effects, "effect", parsed)?
+            .into_iter()
+            .map(|(callee_source, identity)| ResolvedEffectFieldV1 {
+                callee_source,
+                effect_identity: identity,
             })
             .collect(),
     })
@@ -266,7 +275,7 @@ class Counter extends Component { count = state(0); increment = action(() => {})
         )
         .unwrap();
         let response = V2AuthorityResponseV1 {
-            schema_version: 1,
+            schema_version: 2,
             diagnostics: Vec::new(),
             components: vec![V2AuthorityResolutionV1 {
                 id: request.components[0].id.clone(),
@@ -280,6 +289,7 @@ class Counter extends Component { count = state(0); increment = action(() => {})
                 id: request.actions[1].id.clone(),
                 identity: identity("action"),
             }],
+            effects: Vec::new(),
         };
         (parsed, request, response)
     }
@@ -310,10 +320,10 @@ class Counter extends Component { count = state(0); increment = action(() => {})
         ));
 
         let (_, request, mut response) = request_and_response();
-        response.schema_version = 2;
+        response.schema_version = 1;
         assert_eq!(
             validate_v2_authority_response_v1(&request, &response),
-            Err(V2AuthorityResponseErrorV1::SchemaVersion(2))
+            Err(V2AuthorityResponseErrorV1::SchemaVersion(1))
         );
     }
 

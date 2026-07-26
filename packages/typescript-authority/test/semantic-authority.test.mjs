@@ -120,34 +120,40 @@ test("component heritage preserves aliases and indirect bases for registry class
   assert.equal(classifyResolvedComponentHeritage(registry, heritage.bases)?.kind, "component");
 });
 
-test("the V2 authoring bridge resolves canonical component, State, and Action evidence", async () => {
+test("the V2 authoring bridge resolves canonical component, State, Action, and Effect evidence", async () => {
   const frameworkFile = resolve(root, "tests/framework-public-api/src/V2Counter.tsx");
   const frameworkSource = readFileSync(frameworkFile, "utf8");
   const result = await analyzeV2Authoring({
+    schemaVersion: V2_AUTHORED_AUTHORITY_SCHEMA_VERSION,
     configFile: resolve(root, "tests/framework-public-api/tsconfig.json"),
     canonical: {
       component: { file: frameworkFile, position: frameworkSource.indexOf("Component") },
       state: { file: frameworkFile, position: frameworkSource.indexOf("state") },
       action: { file: frameworkFile, position: frameworkSource.indexOf("action") },
+      effect: { file: frameworkFile, position: frameworkSource.indexOf("effect") },
     },
     components: [{ id: "counter", file: frameworkFile, position: frameworkSource.indexOf("V2Counter extends") }],
     states: [{ id: "count", file: frameworkFile, position: frameworkSource.indexOf("state(0)") }],
     actions: [{ id: "increment", file: frameworkFile, position: frameworkSource.indexOf("action(()") }],
+    effects: [{ id: "syncTitle", file: frameworkFile, position: frameworkSource.indexOf("effect(()") }],
   });
   assert.equal(result.schemaVersion, V2_AUTHORED_AUTHORITY_SCHEMA_VERSION);
   assert.equal(result.diagnostics.length, 0);
   assert.deepEqual(result.components.map(entry => entry.id), ["counter"]);
   assert.deepEqual(result.states.map(entry => entry.id), ["count"]);
   assert.deepEqual(result.actions.map(entry => entry.id), ["increment"]);
+  assert.deepEqual(result.effects.map(entry => entry.id), ["syncTitle"]);
   assert.equal(result.components[0].identity.name, "Component");
   assert.equal(result.states[0].identity.name, "state");
   assert.equal(result.actions[0].identity.name, "action");
+  assert.equal(result.effects[0].identity.name, "effect");
 });
 
 test("the V2 authoring bridge supports a component-only discovery phase", async () => {
   const frameworkFile = resolve(root, "tests/framework-public-api/src/V2Counter.tsx");
   const frameworkSource = readFileSync(frameworkFile, "utf8");
   const result = await analyzeV2Authoring({
+    schemaVersion: V2_AUTHORED_AUTHORITY_SCHEMA_VERSION,
     configFile: resolve(root, "tests/framework-public-api/tsconfig.json"),
     canonical: {
       component: { file: frameworkFile, position: frameworkSource.indexOf("Component") },
@@ -155,10 +161,12 @@ test("the V2 authoring bridge supports a component-only discovery phase", async 
     components: [{ id: "counter", file: frameworkFile, position: frameworkSource.indexOf("V2Counter extends") }],
     states: [],
     actions: [],
+    effects: [],
   });
   assert.deepEqual(result.components.map(entry => entry.id), ["counter"]);
   assert.deepEqual(result.states, []);
   assert.deepEqual(result.actions, []);
+  assert.deepEqual(result.effects, []);
 });
 
 test("the V2 authoring executable speaks the versioned stdin/stdout bridge protocol", () => {
@@ -169,15 +177,18 @@ test("the V2 authoring executable speaks the versioned stdin/stdout bridge proto
     [resolve(import.meta.dirname, "../bin/presolve-typescript-authority.mjs")],
     {
       input: JSON.stringify({
+        schemaVersion: V2_AUTHORED_AUTHORITY_SCHEMA_VERSION,
         configFile: resolve(root, "tests/framework-public-api/tsconfig.json"),
         canonical: {
           component: { file: frameworkFile, position: frameworkSource.indexOf("Component") },
           state: { file: frameworkFile, position: frameworkSource.indexOf("state") },
           action: { file: frameworkFile, position: frameworkSource.indexOf("action") },
+          effect: { file: frameworkFile, position: frameworkSource.indexOf("effect") },
         },
         components: [{ id: "counter", file: frameworkFile, position: frameworkSource.indexOf("V2Counter extends") }],
         states: [{ id: "count", file: frameworkFile, position: frameworkSource.indexOf("state(0)") }],
         actions: [{ id: "increment", file: frameworkFile, position: frameworkSource.indexOf("action(()") }],
+        effects: [{ id: "syncTitle", file: frameworkFile, position: frameworkSource.indexOf("effect(()") }],
       }),
       encoding: "utf8",
     },

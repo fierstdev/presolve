@@ -1,4 +1,4 @@
-import { action, state, Component } from "presolve";
+import { action, effect, state, Component } from "presolve";
 
 export abstract class V2CounterBase extends Component {}
 
@@ -7,6 +7,10 @@ export class V2Counter extends V2CounterBase {
 
   increment = action(() => {
     this.count += 1;
+  });
+
+  syncTitle = effect(() => {
+    document.title = String(this.count);
   });
 
   get label(): number {

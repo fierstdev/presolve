@@ -6,8 +6,9 @@ use crate::{
     compose_authored_semantics_v1, lower_action_fields_v1, lower_component_inheritance_v1,
     lower_computed_getters_v1, lower_state_initializers_v1, ActionFieldLoweringErrorV1,
     AuthoredSemanticCompositionErrorV1, CanonicalAuthoredSemanticModelV1,
-    ComponentInheritanceLoweringErrorV1, ComputedGetterLoweringErrorV1, ResolvedActionFieldV1,
-    ResolvedComponentInheritanceV1, ResolvedStateInitializerV1, StateInitializerLoweringErrorV1,
+    ComponentInheritanceLoweringErrorV1, ComputedGetterLoweringErrorV1, EffectFieldLoweringErrorV1,
+    ResolvedActionFieldV1, ResolvedComponentInheritanceV1, ResolvedEffectFieldV1,
+    ResolvedStateInitializerV1, StateInitializerLoweringErrorV1,
 };
 
 /// The authority-resolved inputs for the currently implemented V2 source forms.
@@ -16,6 +17,7 @@ pub struct V2AuthoringResolutionsV1 {
     pub components: Vec<ResolvedComponentInheritanceV1>,
     pub states: Vec<ResolvedStateInitializerV1>,
     pub actions: Vec<ResolvedActionFieldV1>,
+    pub effects: Vec<ResolvedEffectFieldV1>,
 }
 
 /// The unified decorator-free canonical model and its constituent proof products.
@@ -26,6 +28,7 @@ pub struct V2AuthoringLoweringV1 {
     pub state_count: usize,
     pub action_count: usize,
     pub computed_count: usize,
+    pub effect_count: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,6 +36,7 @@ pub enum V2AuthoringLoweringErrorV1 {
     Component(ComponentInheritanceLoweringErrorV1),
     State(StateInitializerLoweringErrorV1),
     Action(ActionFieldLoweringErrorV1),
+    Effect(EffectFieldLoweringErrorV1),
     Computed(ComputedGetterLoweringErrorV1),
     Composition(AuthoredSemanticCompositionErrorV1),
 }
@@ -43,6 +47,7 @@ impl std::fmt::Display for V2AuthoringLoweringErrorV1 {
             Self::Component(error) => error.fmt(formatter),
             Self::State(error) => error.fmt(formatter),
             Self::Action(error) => error.fmt(formatter),
+            Self::Effect(error) => error.fmt(formatter),
             Self::Computed(error) => error.fmt(formatter),
             Self::Composition(error) => error.fmt(formatter),
         }
@@ -62,10 +67,13 @@ pub fn lower_v2_authoring_v1(
         .map_err(V2AuthoringLoweringErrorV1::State)?;
     let actions = lower_action_fields_v1(parsed, &components.model, resolutions.actions)
         .map_err(V2AuthoringLoweringErrorV1::Action)?;
+    let effects = crate::lower_effect_fields_v1(parsed, &components.model, resolutions.effects)
+        .map_err(V2AuthoringLoweringErrorV1::Effect)?;
     let input = compose_authored_semantics_v1([
         components.model.clone(),
         states.model.clone(),
         actions.model.clone(),
+        effects.model.clone(),
     ])
     .map_err(V2AuthoringLoweringErrorV1::Composition)?;
     let computed =
@@ -74,6 +82,7 @@ pub fn lower_v2_authoring_v1(
     let state_count = states.model.declarations.len();
     let action_count = actions.model.declarations.len();
     let computed_count = computed.model.declarations.len();
+    let effect_count = effects.model.declarations.len();
     let model = compose_authored_semantics_v1([input, computed.model])
         .map_err(V2AuthoringLoweringErrorV1::Composition)?;
     Ok(V2AuthoringLoweringV1 {
@@ -81,6 +90,7 @@ pub fn lower_v2_authoring_v1(
         state_count,
         action_count,
         computed_count,
+        effect_count,
         model,
     })
 }
@@ -110,6 +120,7 @@ mod tests {
 class Counter extends AliasedBase {
   count = reactiveCell(0);
   increment = activate(() => { this.count += 1; });
+  sync = observe(() => {});
   get doubled() { return this.count * 2; }
   get quadrupled() { return this.doubled * 2; }
 }
@@ -123,6 +134,11 @@ class Counter extends AliasedBase {
             .unwrap()
             .callee_span;
         let action_callee = parsed.classes[0].properties[1]
+            .initializer_call
+            .as_ref()
+            .unwrap()
+            .callee_span;
+        let effect_callee = parsed.classes[0].properties[2]
             .initializer_call
             .as_ref()
             .unwrap()
@@ -157,12 +173,22 @@ class Counter extends AliasedBase {
                     },
                     action_identity: identity("action"),
                 }],
+                effects: vec![crate::ResolvedEffectFieldV1 {
+                    callee_source: crate::AuthoredSourceRangeV1 {
+                        start: effect_callee.start,
+                        end: effect_callee.end,
+                        line: effect_callee.line,
+                        column: effect_callee.column,
+                    },
+                    effect_identity: identity("effect"),
+                }],
             },
         )
         .expect("one authority-backed V2 source model");
         assert_eq!(lowering.component_count, 1);
         assert_eq!(lowering.state_count, 1);
         assert_eq!(lowering.action_count, 1);
+        assert_eq!(lowering.effect_count, 1);
         assert_eq!(lowering.computed_count, 2);
         assert_eq!(
             lowering
@@ -177,6 +203,7 @@ class Counter extends AliasedBase {
                 CanonicalAuthoredDeclarationKindV1::Action,
                 CanonicalAuthoredDeclarationKindV1::Computed,
                 CanonicalAuthoredDeclarationKindV1::Computed,
+                CanonicalAuthoredDeclarationKindV1::Effect,
             ]
         );
         assert!(lowering

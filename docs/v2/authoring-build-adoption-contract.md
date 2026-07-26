@@ -12,14 +12,14 @@ acceptable fallback for these applications.
 2. The CLI invokes the installed `@presolve/typescript-authority` bridge with
    explicit syntax-site positions selected from the parser's source-faithful
    AST. It first proves component heritage, then selects instance field calls
-   from only those proven components for the State/Action query.
+   from only those proven components for the State/Action/Effect query.
 3. The bridge returns serialized resolved symbols and component base chains.
    The canonical intrinsic registry classifies only resolved framework targets.
 4. The compiler converts those exact source joins into
    `V2AuthoringResolutionsV1`, then calls `lower_v2_authoring_v1`.
 5. Downstream graph, route, template, publication, and runtime products adopt
    the resulting canonical model through a versioned adapter. They must not
-   infer components, State, or Actions from decorators, names, import text, or
+   infer components, State, Actions, or Effects from decorators, names, import text, or
    raw heritage spelling.
 
 The bridge is an installed CLI dependency, not a repository-relative script,
