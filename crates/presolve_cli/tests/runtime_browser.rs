@@ -265,6 +265,85 @@ const wait = setInterval(() => {
         String::from_utf8_lossy(&output.stderr)
     );
 
+    let resources: serde_json::Value = serde_json::from_str(&artifact)
+        .expect("Resource artifact JSON");
+    let activation = resources["activations"]
+        .as_array()
+        .and_then(|activations| activations.first())
+        .expect("one Resource activation");
+    let manifest: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(out_dir.join("resume.runtime.json"))
+            .expect("Resource resume manifest"),
+    )
+    .expect("Resource resume manifest JSON");
+    let mut snapshot = resume_bootstrap_snapshot(&manifest);
+    let mut values = snapshot["boundaries"]
+        .as_array_mut()
+        .expect("snapshot boundaries")
+        .iter_mut()
+        .flat_map(|boundary| boundary["values"].as_array_mut().expect("snapshot values"))
+        .collect::<Vec<_>>();
+    for (storage_slot, value) in [
+        (&activation["state_slot"], serde_json::json!({"state": "ready", "generation": 1})),
+        (&activation["data_slot"], serde_json::json!("Ada")),
+        (&activation["error_slot"], serde_json::Value::Null),
+    ] {
+        let slot_id = manifest["slot_schemas"]
+            .as_array()
+            .expect("manifest slots")
+            .iter()
+            .find(|slot| slot["existing_storage_slot_id"] == *storage_slot)
+            .and_then(|slot| slot["slot_id"].as_str())
+            .expect("Resource resume slot");
+        values
+            .iter_mut()
+            .find(|record| record["slotId"] == slot_id)
+            .expect("Resource snapshot value")["value"] = value;
+    }
+    fs::write(
+        out_dir.join("resource-endpoint.js"),
+        "export async function loadProfile() { window.__PRESOLVE_RESOURCE_ENDPOINT_CALLED__ = true; throw new Error('must-not-run-on-snapshot'); }\n",
+    )
+    .expect("failed to write snapshot-forbidden Resource endpoint module");
+    let snapshot_json = serde_json::to_string(&snapshot).expect("Resource snapshot JSON");
+    let snapshot_probe = index.replace(
+        "</body>",
+        &format!(r#"<script>
+window.__PRESOLVE_RESUME_SNAPSHOT__ = {snapshot_json};
+const deadline = Date.now() + 4000;
+const wait = setInterval(() => {{
+  const runtime = window.__PRESOLVE__;
+  const resource = runtime?.resources?.find((record) => record.id.includes("resource:profile"));
+  if (runtime?.resume?.mode === "resume" && resource?.state === "ready" && resource?.generation === 1
+    && document.querySelector("main")?.textContent === "Ada" && window.__PRESOLVE_RESOURCE_ENDPOINT_CALLED__ !== true) {{
+    clearInterval(wait);
+    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_RESOURCE_SNAPSHOT_BROWSER_TEST_PASS</div>");
+  }} else if (Date.now() > deadline) {{
+    clearInterval(wait);
+    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_RESOURCE_SNAPSHOT_BROWSER_TEST_FAIL</div>");
+  }}
+}}, 20);
+</script></body>"#),
+    );
+    fs::write(out_dir.join("snapshot-probe.html"), snapshot_probe)
+        .expect("failed to write Resource snapshot probe");
+    let server = StaticServer::start(out_dir.clone());
+    let profile_dir = out_dir.join(format!("chrome-snapshot-profile-{}", std::process::id()));
+    fs::create_dir_all(&profile_dir).expect("failed to create Resource snapshot Chrome profile");
+    let output = run_chrome_probe(
+        chrome.clone(),
+        &format!("--user-data-dir={}", profile_dir.display()),
+        &format!("http://127.0.0.1:{}/snapshot-probe.html", server.port),
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("PRESOLVE_RESOURCE_SNAPSHOT_BROWSER_TEST_PASS"),
+        "Resource snapshot browser probe failed\nstdout:\n{}\nstderr:\n{}",
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
     fs::write(
         out_dir.join("resource-endpoint.js"),
         "export async function loadProfile() { return { name: 'Ada' }; }\n",

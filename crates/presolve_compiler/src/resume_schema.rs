@@ -338,7 +338,12 @@ impl ResumeSlotTypeAuthority {
             }
             types.insert(
                 ResumeExistingSlot::ResourceState(activation.id.state_slot()),
-                SemanticType::String,
+                SemanticType::Object(crate::ObjectType {
+                    properties: BTreeMap::from([
+                        ("generation".to_string(), SemanticType::Number),
+                        ("state".to_string(), SemanticType::String),
+                    ]),
+                }),
             );
             types.insert(
                 ResumeExistingSlot::ResourceData(activation.id.data_slot()),
@@ -760,8 +765,17 @@ import { loadProfile } from "profile-service";
             (slot, codec),
             (
                 ResumeExistingSlot::ResourceState(_),
-                ResumeValueCodec::StringCodec
-            )
+                ResumeValueCodec::ObjectCodec(properties)
+            ) if properties == &vec![
+                ResumeObjectPropertyCodec {
+                    name: "generation".to_string(),
+                    codec: ResumeValueCodec::NumberCodec,
+                },
+                ResumeObjectPropertyCodec {
+                    name: "state".to_string(),
+                    codec: ResumeValueCodec::StringCodec,
+                },
+            ]
         )));
         assert_eq!(
             codecs

@@ -14,8 +14,9 @@ use crate::{
     SemanticPackageRuntimeModuleKey, SemanticPackageRuntimeModuleTable,
 };
 
-/// Version 2 adds compiler-issued data and error codecs for opaque endpoint values.
-pub const RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION: u32 = 2;
+/// Version 3 adds exact activation-to-resume-slot linkage for atomic browser
+/// snapshot restoration.
+pub const RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -63,6 +64,9 @@ pub struct RuntimeResourceArtifactActivation {
     pub id: String,
     pub declaration: String,
     pub component_instance: String,
+    pub state_slot: String,
+    pub data_slot: String,
+    pub error_slot: String,
     pub state: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub generation: Option<u64>,
@@ -88,6 +92,9 @@ pub enum RuntimeResourceArtifactValidationError {
     UnknownActivationDeclaration {
         activation: String,
         declaration: String,
+    },
+    InvalidResumeSlotIdentity {
+        activation: String,
     },
     InvalidValueCodec {
         declaration: String,
@@ -168,6 +175,9 @@ pub fn build_runtime_resource_artifact(
                 id: activation.id.as_str().to_string(),
                 declaration: activation.declaration.as_str().to_string(),
                 component_instance: activation.component_instance.as_str().to_string(),
+                state_slot: activation.id.state_slot().as_str().to_string(),
+                data_slot: activation.id.data_slot().as_str().to_string(),
+                error_slot: activation.id.error_slot().as_str().to_string(),
                 state: state.to_string(),
                 generation,
             }
@@ -284,6 +294,20 @@ pub fn validate_runtime_resource_artifact(
                 },
             );
         }
+        let expected_prefix = format!("{}/resource-slot:", activation.id);
+        if activation.state_slot != format!("{expected_prefix}state")
+            || activation.data_slot != format!("{expected_prefix}data")
+            || activation.error_slot != format!("{expected_prefix}error")
+            || activation.state_slot == activation.data_slot
+            || activation.state_slot == activation.error_slot
+            || activation.data_slot == activation.error_slot
+        {
+            errors.push(
+                RuntimeResourceArtifactValidationError::InvalidResumeSlotIdentity {
+                    activation: activation.id.clone(),
+                },
+            );
+        }
     }
     errors
 }
@@ -394,6 +418,7 @@ class Profile extends Component {
             },
         ]);
         artifact.activations[0].declaration = "resource:missing".to_string();
+        artifact.activations[0].data_slot = "fabricated:slot".to_string();
         artifact.activations[0].state = "ready".to_string();
 
         let errors = validate_runtime_resource_artifact(&artifact);
@@ -416,6 +441,10 @@ class Profile extends Component {
         assert!(errors.iter().any(|error| matches!(
             error,
             crate::RuntimeResourceArtifactValidationError::UnknownActivationDeclaration { .. }
+        )));
+        assert!(errors.iter().any(|error| matches!(
+            error,
+            crate::RuntimeResourceArtifactValidationError::InvalidResumeSlotIdentity { .. }
         )));
     }
 

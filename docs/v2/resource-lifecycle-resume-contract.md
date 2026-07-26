@@ -52,6 +52,13 @@ capture shape for either `ready` or `failed`. A Resource-reading computed
 depends on that activation's data slot, so its recomputation cannot precede
 Resource restoration. `reload` activations publish no snapshot slots.
 
+The browser consumes those compiler-issued slot IDs directly from Resource
+artifact schema v3. It stages the complete Resource registry, restores all R3
+slots, and accepts only a positive-generation `ready` or `failed` lifecycle
+with the opposite terminal value null. Any missing slot, wrong linkage, bad
+codec value, pending/cancelled state, or cross-terminal value causes one cold
+fallback; snapshot restore never imports or invokes the endpoint.
+
 ## Acceptance
 
 - Browser tests prove ready snapshot restoration without endpoint execution,

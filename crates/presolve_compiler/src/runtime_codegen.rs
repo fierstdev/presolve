@@ -23,7 +23,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = __EZ_COMPONENT_SCHEMA_VERSION__;
   const LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 2;
-  const SUPPORTED_RESOURCES_ARTIFACT_SCHEMA_VERSION = 2;
+  const SUPPORTED_RESOURCES_ARTIFACT_SCHEMA_VERSION = 3;
   const SUPPORTED_OPAQUE_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_RESUME_MANIFEST_SCHEMA_VERSION = 7;
   const SUPPORTED_RESUME_SNAPSHOT_SCHEMA_VERSION = 2;
@@ -740,12 +740,24 @@ const RUNTIME_STUB: &str = r#"(() => {
       const generationRequired = ["pending", "ready", "failed", "cancelled"].includes(activation?.state);
       if (typeof activation?.id !== "string" || activations.has(activation.id)
         || !declarations.has(activation?.declaration)
-        || generationRequired !== Number.isInteger(activation?.generation)) {
+        || generationRequired !== Number.isInteger(activation?.generation)
+        || !hasExactResourceResumeSlots(activation)) {
         reportDiagnostic(diagnostics, "PSR_INVALID_RESOURCES_ARTIFACT", "Resource activation did not retain canonical lifecycle linkage", { activation }, true);
         throw new PresolveBootError("PSR_INVALID_RESOURCES_ARTIFACT");
       }
       activations.add(activation.id);
     }
+  }
+
+  function hasExactResourceResumeSlots(activation) {
+    if (typeof activation?.id !== "string"
+      || typeof activation?.state_slot !== "string"
+      || typeof activation?.data_slot !== "string"
+      || typeof activation?.error_slot !== "string") return false;
+    const prefix = `${activation.id}/resource-slot:`;
+    return activation.state_slot === `${prefix}state`
+      && activation.data_slot === `${prefix}data`
+      && activation.error_slot === `${prefix}error`;
   }
 
   function isValidResourceValueCodec(codec, depth = 0) {
@@ -2990,6 +3002,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       ])),
       resources: new Map(),
       resourceActivationsByInstanceDeclaration: new Map(),
+      resourceSlots: new Map(),
       activeActionBatch: null
     };
   }
@@ -4888,6 +4901,12 @@ const RUNTIME_STUB: &str = r#"(() => {
   function writeResumeSlot(store, registry, slotSchema, value) {
     registry.slot_values.set(slotSchema.slot_id, value);
     const existing = slotSchema.existing_storage_slot_id;
+    const resourceSlot = store.resourceSlots.get(existing);
+    if (resourceSlot !== undefined) {
+      if (slotSchema.restore_phase !== "R3") throw new ResumeBootError("RestoreInstructionFailure");
+      resourceSlot.resource.restoredValues[resourceSlot.kind] = value;
+      return;
+    }
     if (slotSchema.restore_phase === "R3") {
       store.storageValues.set(existing, value);
       return;
@@ -5443,6 +5462,78 @@ const RUNTIME_STUB: &str = r#"(() => {
     };
   }
 
+  function allocateResumeResources(store, registry, resourcesArtifact) {
+    if (resourcesArtifact === null) return;
+    const declarations = new Map((resourcesArtifact.declarations ?? []).map((declaration) => [declaration.id, declaration]));
+    if (declarations.size !== (resourcesArtifact.declarations ?? []).length) {
+      throw new ResumeBootError("ResourceArtifactMismatch");
+    }
+    const staged = [];
+    for (const activation of resourcesArtifact.activations ?? []) {
+      const declaration = declarations.get(activation.declaration);
+      if (declaration === undefined || declaration.endpoint?.resume_policy !== "snapshot") {
+        throw new ResumeBootError("ResourceResumeUnsupported");
+      }
+      const slotIds = [activation.state_slot, activation.data_slot, activation.error_slot];
+      const schemasByExisting = new Map(
+        [...registry.definitions.slots.values()].map((schema) => [schema.existing_storage_slot_id, schema])
+      );
+      const stateSchema = schemasByExisting.get(activation.state_slot);
+      const dataSchema = schemasByExisting.get(activation.data_slot);
+      const errorSchema = schemasByExisting.get(activation.error_slot);
+      if (stateSchema === undefined || dataSchema === undefined || errorSchema === undefined
+        || stateSchema.restore_phase !== "R3" || dataSchema.restore_phase !== "R3" || errorSchema.restore_phase !== "R3"
+        || store.resources.has(activation.id)
+        || store.resourceActivationsByInstanceDeclaration.has(`${activation.component_instance}\u001f${activation.declaration}`)
+        || slotIds.some((slot) => store.resourceSlots.has(slot))) {
+        throw new ResumeBootError("ResourceArtifactMismatch");
+      }
+      staged.push({ activation, declaration, schemas: [stateSchema, dataSchema, errorSchema] });
+    }
+    for (const record of staged) {
+      const resource = {
+        activation: record.activation,
+        declaration: record.declaration,
+        controller: new AbortController(),
+        state: "restoring",
+        generation: null,
+        data: null,
+        error: null,
+        restoredValues: {}
+      };
+      store.resources.set(record.activation.id, resource);
+      store.resourceActivationsByInstanceDeclaration.set(
+        `${record.activation.component_instance}\u001f${record.activation.declaration}`,
+        record.activation.id
+      );
+      for (const [kind, schema] of [["state", record.schemas[0]], ["data", record.schemas[1]], ["error", record.schemas[2]]]) {
+        store.resourceSlots.set(schema.existing_storage_slot_id, { resource, kind });
+        resource.restoredValues[kind] = undefined;
+      }
+    }
+  }
+
+  function finalizeRestoredResources(store) {
+    for (const resource of store.resources.values()) {
+      const values = resource.restoredValues;
+      const lifecycle = values.state;
+      if (lifecycle === null || typeof lifecycle !== "object" || Array.isArray(lifecycle)
+        || !exactObjectKeys(lifecycle, ["state", "generation"])
+        || !["ready", "failed"].includes(lifecycle.state)
+        || !Number.isInteger(lifecycle.generation) || lifecycle.generation < 1
+        || values.data === undefined || values.error === undefined
+        || (lifecycle.state === "ready" && values.error !== null)
+        || (lifecycle.state === "failed" && values.data !== null)) {
+        throw new ResumeBootError("ResourceSnapshotMismatch");
+      }
+      resource.state = lifecycle.state;
+      resource.generation = lifecycle.generation;
+      resource.data = values.data;
+      resource.error = values.error;
+      delete resource.restoredValues;
+    }
+  }
+
   function restoreResumeRuntimeThroughForms(
     manifest,
     snapshot,
@@ -5453,13 +5544,9 @@ const RUNTIME_STUB: &str = r#"(() => {
     effectArtifact,
     componentArtifact,
     formsArtifact,
+    resourcesArtifact,
     diagnostics
   ) {
-    if ((computedArtifact?.evaluations ?? []).some((evaluation) =>
-      (evaluation.program?.instructions ?? []).some((instruction) => instruction.kind === "load-resource")
-    )) {
-      throw new ResumeBootError("ResourceComputedReadUnsupported");
-    }
     const store = allocateResumeStateComputedStore(
       registry,
       manifest,
@@ -5470,7 +5557,9 @@ const RUNTIME_STUB: &str = r#"(() => {
       componentArtifact,
       diagnostics
     );
+    allocateResumeResources(store, registry, resourcesArtifact);
     executeResumeDecodeAndWrites(store, registry, snapshot, new Set(["R3", "R4"]));
+    finalizeRestoredResources(store);
     synchronizeRestoredComponentState(store, computedArtifact, componentArtifact);
     const recomputationRuns = executeResumeComputedRecomputation(store, registry);
     executeResumeDecodeAndWrites(store, registry, snapshot, new Set(["R6"]));
@@ -5509,6 +5598,11 @@ const RUNTIME_STUB: &str = r#"(() => {
         aggregate_valid: instance.aggregate_valid,
         submission: instance.submission
       })),
+      resources: [...store.resources.entries()].map(([id, resource]) => ({
+        id,
+        state: resource.state,
+        generation: resource.generation
+      })),
       slot_binding_runs: [],
       component_failures: []
     });
@@ -5534,6 +5628,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     component_initialization_runs = [],
     component_instance_tree = [],
     forms = [],
+    resources = [],
     slot_binding_runs = [],
     component_failures = [],
     diagnostics
@@ -5559,6 +5654,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       component_initialization_runs,
       component_instance_tree,
       forms,
+      resources,
       slot_binding_runs,
       component_failures
     };
@@ -5832,12 +5928,6 @@ const RUNTIME_STUB: &str = r#"(() => {
           if ((opaqueArtifact?.activations ?? []).length > 0) {
             throw new ResumeBootError("OpaqueTerminalColdFallback");
           }
-          // Resource snapshot/reload restoration is an authored lifecycle
-          // product. Until that registry is installed, resuming would omit
-          // live compiler-owned Resource state, so select one cold boot.
-          if ((resourcesArtifact?.activations ?? []).length > 0) {
-            throw new ResumeBootError("ResourceResumeUnsupported");
-          }
           return restoreResumeRuntimeThroughForms(
             resumeManifest,
             snapshot,
@@ -5848,6 +5938,7 @@ const RUNTIME_STUB: &str = r#"(() => {
             effectArtifact,
             componentArtifact,
             formsArtifact,
+            resourcesArtifact,
             diagnostics
           );
         },
@@ -6040,7 +6131,8 @@ mod tests {
         assert!(runtime.contains("async function activateBoundary"));
         assert!(runtime.contains("function decodeResumeValue"));
         assert!(runtime.contains("function restoreResumeRuntimeThroughForms"));
-        assert!(runtime.contains("ResourceComputedReadUnsupported"));
+        assert!(runtime.contains("function allocateResumeResources"));
+        assert!(runtime.contains("function finalizeRestoredResources"));
         assert!(runtime.contains("ResourceResumeUnsupported"));
         assert!(runtime.contains("executeResumeComputedRecomputation"));
         assert!(runtime.contains("function executeResumeContextBindings"));
