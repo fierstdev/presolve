@@ -825,6 +825,24 @@ impl ResourceActivationId {
         )
     }
 
+    /// Canonical completed-value resume storage for this activation.
+    #[must_use]
+    pub fn data_slot(&self) -> SemanticId {
+        self.0.child("resource-slot", "data")
+    }
+
+    /// Canonical completed-error resume storage for this activation.
+    #[must_use]
+    pub fn error_slot(&self) -> SemanticId {
+        self.0.child("resource-slot", "error")
+    }
+
+    /// Canonical lifecycle/generation resume storage for this activation.
+    #[must_use]
+    pub fn state_slot(&self) -> SemanticId {
+        self.0.child("resource-slot", "state")
+    }
+
     #[must_use]
     pub const fn as_semantic_id(&self) -> &SemanticId {
         &self.0
