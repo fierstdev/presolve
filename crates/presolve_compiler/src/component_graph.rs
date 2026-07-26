@@ -1436,6 +1436,47 @@ pub fn build_v2_component_graph_for_module(
             ));
         }
         provenance.insert(id.clone(), SourceProvenance::new(&parsed.path, class.span));
+        let state_fields = authored
+            .declarations
+            .iter()
+            .filter(|candidate| {
+                candidate.kind == crate::CanonicalAuthoredDeclarationKindV1::State
+                    && candidate.subject.starts_with(&format!("{}.", class.name))
+            })
+            .filter_map(|candidate| {
+                let name = candidate
+                    .subject
+                    .strip_prefix(&format!("{}.", class.name))?;
+                let property = class
+                    .properties
+                    .iter()
+                    .find(|property| property.name == name)?;
+                provenance.insert(
+                    id.state_field(name),
+                    SourceProvenance::new(&parsed.path, property.span),
+                );
+                Some(StateField {
+                    id: id.state_field(name),
+                    owner: SemanticOwner::entity(id.clone()),
+                    name: name.into(),
+                    initial_value: property
+                        .state_initial_value
+                        .as_ref()
+                        .map(serializable_value_from_parsed),
+                    initial_expression: property
+                        .state_initial_expression
+                        .as_ref()
+                        .map(constant_expression_from_parsed),
+                    declared_type: property.state_type_annotation.as_ref().map(|annotation| {
+                        DeclaredStateType {
+                            text: annotation.text.clone(),
+                            provenance: SourceProvenance::new(&parsed.path, annotation.span),
+                            kind: declared_state_type_kind(&annotation.text),
+                        }
+                    }),
+                })
+            })
+            .collect();
         components.push(ComponentNode {
             id: id.clone(),
             module_path: parsed.path.clone(),
@@ -1450,7 +1491,7 @@ pub fn build_v2_component_graph_for_module(
                     base: heritage.base.clone(),
                     provenance: SourceProvenance::new(&parsed.path, heritage.span),
                 }),
-            state_fields: Vec::new(),
+            state_fields,
             context_declarations: Vec::new(),
             provider_declarations: Vec::new(),
             consumer_declarations: Vec::new(),

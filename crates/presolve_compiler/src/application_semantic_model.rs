@@ -4652,22 +4652,35 @@ mod tests {
     fn file_route_assembly_projects_explicit_canonical_v2_components_without_decorators() {
         let unit = CompilationUnit::parse_sources([(
             "app/routes/index.tsx",
-            "import { Component } from \"presolve\"; export class Home extends Component { render() { return <main>Home</main>; } }",
+            "import { Component, state } from \"presolve\"; export class Home extends Component { count = state(0); render() { return <main>Home</main>; } }",
         )]);
         let model = CanonicalAuthoredSemanticModelV1 {
             schema_version: 1,
             source_path: "app/routes/index.tsx".into(),
-            declarations: vec![CanonicalAuthoredDeclarationV1 {
-                kind: CanonicalAuthoredDeclarationKindV1::Component,
-                subject: "Home".into(),
-                source: crate::AuthoredSourceRangeV1 {
-                    start: 37,
-                    end: 106,
-                    line: 1,
-                    column: 38,
+            declarations: vec![
+                CanonicalAuthoredDeclarationV1 {
+                    kind: CanonicalAuthoredDeclarationKindV1::Component,
+                    subject: "Home".into(),
+                    source: crate::AuthoredSourceRangeV1 {
+                        start: 37,
+                        end: 106,
+                        line: 1,
+                        column: 38,
+                    },
+                    intrinsic_identity: None,
                 },
-                intrinsic_identity: None,
-            }],
+                CanonicalAuthoredDeclarationV1 {
+                    kind: CanonicalAuthoredDeclarationKindV1::State,
+                    subject: "Home.count".into(),
+                    source: crate::AuthoredSourceRangeV1 {
+                        start: 83,
+                        end: 99,
+                        line: 1,
+                        column: 84,
+                    },
+                    intrinsic_identity: None,
+                },
+            ],
         };
         let asm =
             build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring(
@@ -4678,6 +4691,7 @@ mod tests {
             .expect("canonical V2 route assembly");
         assert_eq!(asm.components.len(), 1);
         assert_eq!(asm.components[0].class_name, "Home");
+        assert_eq!(asm.components[0].state_fields[0].name, "count");
         assert!(asm
             .diagnostics
             .iter()
