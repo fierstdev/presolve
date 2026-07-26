@@ -178,6 +178,7 @@ pub mod tooling_products;
 pub mod tooling_reader;
 pub mod tooling_schema;
 pub mod tsx_binding_projection;
+pub mod v2_authoring_lowering;
 pub mod validation_projection;
 pub use tooling_products::{
     build_tooling_artifact_graph_v1, build_tooling_build_trace_v1,
@@ -228,7 +229,8 @@ pub use application_semantic_model::{
 };
 pub use asm_validation::{validate_application_semantic_model, AsmValidationDiagnostic};
 pub use authored_semantics::{
-    normalize_authored_semantics_v1, AuthoredSemanticCandidateKindV1,
+    compose_authored_semantics_v1, normalize_authored_semantics_v1,
+    AuthoredSemanticCandidateKindV1, AuthoredSemanticCompositionErrorV1,
     AuthoredSemanticNormalizationErrorV1, AuthoredSourceRangeV1,
     CanonicalAuthoredDeclarationKindV1, CanonicalAuthoredDeclarationV1,
     CanonicalAuthoredSemanticModelV1, CanonicalIntrinsicKindV1,
@@ -985,6 +987,10 @@ pub use template_manifest::{
 pub use template_semantics::{
     build_template_semantic_entities, TemplateSemanticEntity, TemplateSemanticKind,
     TemplateSemanticScope,
+};
+pub use v2_authoring_lowering::{
+    lower_v2_authoring_v1, V2AuthoringLoweringErrorV1, V2AuthoringLoweringV1,
+    V2AuthoringResolutionsV1,
 };
 
 #[cfg(test)]

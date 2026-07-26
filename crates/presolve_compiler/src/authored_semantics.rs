@@ -157,6 +157,34 @@ impl std::fmt::Display for AuthoredSemanticNormalizationErrorV1 {
 
 impl std::error::Error for AuthoredSemanticNormalizationErrorV1 {}
 
+/// A boundary violation while composing independently lowered source forms.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AuthoredSemanticCompositionErrorV1 {
+    Empty,
+    SchemaVersion { actual: u32 },
+    SourcePathMismatch { expected: PathBuf, actual: PathBuf },
+}
+
+impl std::fmt::Display for AuthoredSemanticCompositionErrorV1 {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Empty => write!(formatter, "cannot compose zero authored semantic models"),
+            Self::SchemaVersion { actual } => write!(
+                formatter,
+                "cannot compose authored semantic schema version {actual}; expected {CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION}"
+            ),
+            Self::SourcePathMismatch { expected, actual } => write!(
+                formatter,
+                "cannot compose authored semantic models from {} and {}",
+                expected.display(),
+                actual.display()
+            ),
+        }
+    }
+}
+
+impl std::error::Error for AuthoredSemanticCompositionErrorV1 {}
+
 /// Normalize already-resolved syntax candidates for one parser product.
 ///
 /// This is intentionally the first point where the two V2 authorities meet:
@@ -199,6 +227,49 @@ pub fn normalize_authored_semantics_v1(
     Ok(CanonicalAuthoredSemanticModelV1 {
         schema_version: CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION,
         source_path: parsed.path.clone(),
+        declarations,
+    })
+}
+
+/// Compose independently lowered source forms for one source file.
+///
+/// Each input has already crossed the source-AST and TypeScript-authority
+/// boundary. This function only verifies a common schema/path and restores the
+/// canonical deterministic ordering and deduplication rule; it never assigns
+/// framework meaning from source spelling.
+pub fn compose_authored_semantics_v1(
+    models: impl IntoIterator<Item = CanonicalAuthoredSemanticModelV1>,
+) -> Result<CanonicalAuthoredSemanticModelV1, AuthoredSemanticCompositionErrorV1> {
+    let mut models = models.into_iter();
+    let first = models
+        .next()
+        .ok_or(AuthoredSemanticCompositionErrorV1::Empty)?;
+    if first.schema_version != CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION {
+        return Err(AuthoredSemanticCompositionErrorV1::SchemaVersion {
+            actual: first.schema_version,
+        });
+    }
+    let source_path = first.source_path.clone();
+    let mut declarations = first.declarations;
+    for model in models {
+        if model.schema_version != CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION {
+            return Err(AuthoredSemanticCompositionErrorV1::SchemaVersion {
+                actual: model.schema_version,
+            });
+        }
+        if model.source_path != source_path {
+            return Err(AuthoredSemanticCompositionErrorV1::SourcePathMismatch {
+                expected: source_path,
+                actual: model.source_path,
+            });
+        }
+        declarations.extend(model.declarations);
+    }
+    declarations.sort();
+    declarations.dedup();
+    Ok(CanonicalAuthoredSemanticModelV1 {
+        schema_version: CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION,
+        source_path,
         declarations,
     })
 }
@@ -253,7 +324,8 @@ mod tests {
     use presolve_parser::parse_file;
 
     use super::{
-        normalize_authored_semantics_v1, AuthoredSemanticCandidateKindV1,
+        compose_authored_semantics_v1, normalize_authored_semantics_v1,
+        AuthoredSemanticCandidateKindV1, AuthoredSemanticCompositionErrorV1,
         AuthoredSemanticNormalizationErrorV1, AuthoredSourceRangeV1,
         CanonicalAuthoredDeclarationKindV1, CanonicalIntrinsicKindV1,
         ResolvedAuthoredSemanticCandidateV1, ResolvedIntrinsicIdentityV1,
@@ -344,6 +416,33 @@ mod tests {
                 ]
             })
         );
+    }
+
+    #[test]
+    fn composes_same_source_models_and_rejects_cross_source_mixing() {
+        let parsed = parse_file("src/Card.tsx", "const Card = frameworkUse();");
+        let component = normalize_authored_semantics_v1(
+            &parsed,
+            [candidate("Card", 6, CanonicalIntrinsicKindV1::Component)],
+        )
+        .unwrap();
+        let state = normalize_authored_semantics_v1(
+            &parsed,
+            [candidate("Card.count", 20, CanonicalIntrinsicKindV1::State)],
+        )
+        .unwrap();
+        let composed = compose_authored_semantics_v1([component.clone(), state]).unwrap();
+        assert_eq!(composed.declarations.len(), 2);
+
+        let other = normalize_authored_semantics_v1(
+            &parse_file("src/Other.tsx", "const Other = frameworkUse();"),
+            [candidate("Other", 6, CanonicalIntrinsicKindV1::Component)],
+        )
+        .unwrap();
+        assert!(matches!(
+            compose_authored_semantics_v1([component, other]),
+            Err(AuthoredSemanticCompositionErrorV1::SourcePathMismatch { .. })
+        ));
     }
 
     #[test]

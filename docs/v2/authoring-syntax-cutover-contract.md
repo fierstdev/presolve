@@ -62,6 +62,8 @@ with before/after fixtures, source-location proof, and an amendment to
    has been proven. Action-field lowering applies the same component-ownership
    and resolved-callee rule to `action(handler)`; decorated methods remain in
    the legacy adapter.
+   `v2_authoring_lowering` composes these independently proven forms back into
+   one deterministic canonical authored model for the source file.
 3. Existing downstream products adopt that canonical model one at a time.
    A compatibility lowering never becomes evidence that the V2 source form
    works.
