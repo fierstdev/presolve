@@ -2123,6 +2123,14 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   if (!artifact.structural_programs.every((program) => JSON.stringify(runtime.store.componentRegions.get(program.region)) === JSON.stringify(program))) {
     fail("runtime structural regions were not keyed by compiler IDs");
   }
+  const occurrenceCount = artifact.structural_programs.reduce((count, program) => count + program.template_occurrences.length, 0);
+  if (runtime.store.structuralOccurrenceTemplatesByInvocation.size !== occurrenceCount) {
+    fail("runtime structural occurrence templates were not exactly preflighted");
+  }
+  const statefulOccurrence = [...runtime.store.structuralOccurrenceTemplatesByInvocation.values()].find((record) => record.occurrence.state_slots.length > 0);
+  if (statefulOccurrence !== undefined && (statefulOccurrence.targets.length === 0 || statefulOccurrence.bindings.length === 0 || statefulOccurrence.events.length === 0)) {
+    fail("stateful structural occurrence lost its compiler record pairs");
+  }
   const conditionalHost = artifact.structural_programs.find((program) => program.conditional_host_fragments.length > 0);
   if (conditionalHost === undefined || conditionalHost.conditional_host_fragments.length !== 1) fail("compiler conditional host fragments were missing");
   const fragments = conditionalHost.conditional_host_fragments[0];

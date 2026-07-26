@@ -1593,6 +1593,114 @@ const RUNTIME_STUB: &str = r#"(() => {
     return Object.freeze({ state_slots: stateSlots, computed_slots: computedSlots });
   }
 
+  function structuralOccurrenceTemplateRegistry(manifest, componentArtifact, computedArtifact) {
+    const components = new Map((manifest.components ?? []).map((component) => [component.component_id, component]));
+    if (components.size !== (manifest.components ?? []).length) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const targetRecords = new Map((componentArtifact.ordinary_template_targets ?? []).map((record) => [record.id, record]));
+    const bindingRecords = new Map((componentArtifact.ordinary_template_bindings ?? []).map((record) => [record.id, record]));
+    const manifestTargets = new Map((manifest.ordinary_targets ?? []).map((record) => [record.id, record]));
+    const manifestBindings = new Map((manifest.ordinary_bindings ?? []).map((record) => [record.instance_binding_id, record]));
+    if (targetRecords.size !== (componentArtifact.ordinary_template_targets ?? []).length
+      || bindingRecords.size !== (componentArtifact.ordinary_template_bindings ?? []).length
+      || manifestTargets.size !== (manifest.ordinary_targets ?? []).length
+      || manifestBindings.size !== (manifest.ordinary_bindings ?? []).length) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const recordsFor = (ids, table, templateInstance) => {
+      if (!Array.isArray(ids)) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      const records = ids.map((id) => table.get(id));
+      if (new Set(ids).size !== ids.length || records.some((record) => record === undefined
+        || record.component_instance_id !== templateInstance)) {
+        throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      }
+      return records;
+    };
+    const registry = new Map();
+    for (const program of componentArtifact.structural_programs ?? []) {
+      for (const occurrence of program.template_occurrences ?? []) {
+        if (registry.has(occurrence.invocation)) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        const definition = components.get(occurrence.component);
+        if (definition === undefined) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        const targets = recordsFor(occurrence.ordinary_template_targets, targetRecords, occurrence.template_instance);
+        const bindings = recordsFor(occurrence.ordinary_template_bindings, bindingRecords, occurrence.template_instance);
+        const events = (occurrence.ordinary_template_events ?? []).map((declarationEventId) => {
+          const matching = (componentArtifact.ordinary_template_events ?? []).filter((record) =>
+            record.component_instance_id === occurrence.template_instance
+            && record.declaration_event_id === declarationEventId
+          );
+          if (matching.length !== 1) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+          return matching[0];
+        });
+        if (new Set(occurrence.ordinary_template_events ?? []).size !== events.length) {
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        const targetPairs = targets.map((record) => {
+          const manifestRecord = manifestTargets.get(record.id);
+          if (manifestRecord === undefined
+            || manifestRecord.component_instance_id !== occurrence.template_instance
+            || manifestRecord.template_entity_id !== record.template_entity_id
+            || manifestRecord.kind !== record.kind) {
+            throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+          }
+          return Object.freeze({ artifact: record, manifest: manifestRecord });
+        });
+        const bindingPairs = bindings.map((record) => {
+          const manifestRecord = manifestBindings.get(record.id);
+          if (manifestRecord === undefined
+            || manifestRecord.component_instance_id !== occurrence.template_instance
+            || manifestRecord.instance_target_id !== record.target_id
+            || manifestRecord.declaration_binding_id !== record.declaration_binding_id
+            || manifestRecord.kind !== record.kind
+            || manifestRecord.program_id !== record.program_id
+            || manifestRecord.expression !== record.expression
+            || manifestRecord.attribute_name !== record.attribute_name) {
+            throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+          }
+          return Object.freeze({ artifact: record, manifest: manifestRecord });
+        });
+        const eventPairs = events.map((record) => {
+          const matching = (manifest.ordinary_events ?? []).filter((manifestRecord) =>
+            manifestRecord.component_instance_id === occurrence.template_instance
+            && manifestRecord.declaration_event_id === record.declaration_event_id
+          );
+          if (matching.length !== 1) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+          const manifestRecord = matching[0];
+          if (manifestRecord.component_id !== record.component_id
+            || manifestRecord.instance_target_id !== record.target_id
+            || manifestRecord.event_type !== record.event_type
+            || manifestRecord.handler_method_id !== record.handler_method_id
+            || manifestRecord.action_batch_id !== record.action_batch_id
+            || JSON.stringify(manifestRecord.arguments ?? []) !== JSON.stringify(record.arguments ?? [])
+            || manifestRecord.program_id !== record.program_id) {
+            throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+          }
+          return Object.freeze({ artifact: record, manifest: manifestRecord });
+        });
+        const expectedStateStorage = (computedArtifact?.state ?? [])
+          .filter((state) => state.component === definition.name)
+          .map((state) => state.storage);
+        const expectedComputed = (computedArtifact?.evaluations ?? [])
+          .filter((evaluation) => evaluation.component === definition.name)
+          .map((evaluation) => evaluation.computed);
+        if (JSON.stringify(occurrence.state_slots.map((slot) => slot.storage_id)) !== JSON.stringify(expectedStateStorage)
+          || JSON.stringify(occurrence.computed_slots.map((slot) => slot.computed_id)) !== JSON.stringify(expectedComputed)) {
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        registry.set(occurrence.invocation, Object.freeze({
+          structural_region: program.region,
+          occurrence,
+          definition,
+          targets: Object.freeze(targetPairs),
+          bindings: Object.freeze(bindingPairs),
+          events: Object.freeze(eventPairs)
+        }));
+      }
+    }
+    return registry;
+  }
+
   function escapeHtmlText(value) {
     return String(value)
       .replaceAll("&", "&amp;")
@@ -4309,18 +4417,20 @@ const RUNTIME_STUB: &str = r#"(() => {
     store.structuralOccurrences = new Map((componentArtifact?.structural_programs ?? []).map(
       (program) => [program.region, program.template_occurrences]
     ));
-    store.structuralOccurrencesByInvocation = new Map();
-    for (const [region, occurrences] of store.structuralOccurrences) {
-      for (const occurrence of occurrences) {
-        if (store.structuralOccurrencesByInvocation.has(occurrence.invocation)) {
-          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
-        }
-        store.structuralOccurrencesByInvocation.set(occurrence.invocation, Object.freeze({
-          ...occurrence,
-          structural_region: region,
-        }));
-      }
-    }
+    store.structuralOccurrenceTemplatesByInvocation = structuralOccurrenceTemplateRegistry(
+      manifest,
+      componentArtifact,
+      computedArtifact
+    );
+    store.structuralOccurrencesByInvocation = new Map(
+      [...store.structuralOccurrenceTemplatesByInvocation].map(([invocation, record]) => [
+        invocation,
+        Object.freeze({
+          ...record.occurrence,
+          structural_region: record.structural_region
+        })
+      ])
+    );
     const missingAnchors = manifest.schema_version === SUPPORTED_SCHEMA_VERSION
       ? []
       : collectMissingAnchors(
@@ -4649,6 +4759,8 @@ mod tests {
         assert!(runtime.contains("function structuralOccurrenceIdentity"));
         assert!(runtime.contains("function decodeStructuralOccurrenceIdentity"));
         assert!(runtime.contains("function instantiateStructuralTemplateSlots"));
+        assert!(runtime.contains("function structuralOccurrenceTemplateRegistry"));
+        assert!(runtime.contains("structuralOccurrenceTemplatesByInvocation"));
         assert!(runtime.contains("structuralStateSlots = new Set()"));
         assert!(runtime.contains("structuralComputedCacheSlots = new Set()"));
         assert!(runtime.contains("Conditional host fragments were attached to a keyed-list host"));

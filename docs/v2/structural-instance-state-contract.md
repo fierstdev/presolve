@@ -26,6 +26,12 @@ or duplicate `(template_instance, declaration/storage)` pair before any
 materializer code can consume the record. This validation creates no live
 occurrence, State, computed cache, binding, or event registration.
 
+The cold runtime may retain an inactive, invocation-keyed preflight table that
+pairs these validated template slots with their exact compiler artifact and
+manifest target, binding, and event records. Its entries retain the compiler
+template instance ID and are not a live state owner. A materializer must derive
+a separate opaque occurrence identity before it can create any live records.
+
 ## Runtime derivation
 
 After the materializer creates an opaque occurrence identity, it derives live
