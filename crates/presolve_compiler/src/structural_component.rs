@@ -204,9 +204,9 @@ mod tests {
             properties: BTreeMap::from([("title".into(), SemanticType::String)]),
         };
         let graph = build_structural_component_graph_v1(
-            &[card.clone()],
+            std::slice::from_ref(&card),
             &[StructuralComponentFactV1 {
-                component: card,
+                component: card.clone(),
                 inheritance: ComponentInheritanceStatusV1::ResolvedPresolveComponent,
                 props: ComponentPropsResolutionV1::Resolved(SemanticType::Object(props)),
                 route_root: false,
@@ -225,9 +225,9 @@ mod tests {
     fn rejects_unresolved_route_generic_props_at_the_component_boundary() {
         let page = SemanticId::component(None, "Page");
         let graph = build_structural_component_graph_v1(
-            &[page.clone()],
+            std::slice::from_ref(&page),
             &[StructuralComponentFactV1 {
-                component: page,
+                component: page.clone(),
                 inheritance: ComponentInheritanceStatusV1::ResolvedPresolveComponent,
                 props: ComponentPropsResolutionV1::UnresolvedGeneric,
                 route_root: true,
