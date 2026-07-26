@@ -48,7 +48,8 @@ error. Server publication and execution remain prohibited.
 1. The compiler registry emits deterministic instance-effect records for
    nested and repeated components, including parent/depth and field order.
 2. The generated browser runtime validates every record against the component
-   artifact before activation.
+   artifact before activation. (Implemented for identity, declaration,
+   parent/depth, and declaration-order integrity.)
 3. A repeated-child fixture proves independent cold runs, rerun cleanup, and
    cleanup storage for two instances of the same declaration.
 4. A nested fixture proves child-before-parent cleanup on structural removal

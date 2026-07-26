@@ -834,6 +834,33 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
+  function validateEffectArtifactInstances(effectArtifact, componentArtifact, diagnostics) {
+    if (effectArtifact === null) return;
+    if (!Array.isArray(effectArtifact.instances)) {
+      reportDiagnostic(diagnostics, "PSR_INVALID_EFFECT_INSTANCE_ARTIFACT", "Effect runtime metadata omitted instance ownership records", {}, true);
+      throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
+    }
+    if (effectArtifact.instances.length === 0) return;
+    if (componentArtifact === null) {
+      reportDiagnostic(diagnostics, "PSR_INVALID_EFFECT_INSTANCE_ARTIFACT", "Instance-owned effects require a component runtime artifact", {}, true);
+      throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
+    }
+    const declarations = new Set((effectArtifact.effects ?? []).map((effect) => effect.effect));
+    const instances = new Map((componentArtifact.instances ?? []).map((instance) => [instance.instance, instance]));
+    const identities = new Set();
+    for (const record of effectArtifact.instances) {
+      const component = instances.get(record.component_instance);
+      if (typeof record.effect_instance !== "string" || identities.has(record.effect_instance)
+        || !declarations.has(record.effect) || component === undefined
+        || record.parent_instance !== component.parent || record.depth !== component.depth
+        || !Number.isInteger(record.declaration_order) || record.declaration_order < 0) {
+        reportDiagnostic(diagnostics, "PSR_INVALID_EFFECT_INSTANCE_ARTIFACT", "Effect instance ownership did not match compiler component metadata", { effect_instance: record.effect_instance }, true);
+        throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
+      }
+      identities.add(record.effect_instance);
+    }
+  }
+
   function readComponentArtifact(diagnostics) {
     const element = document.getElementById(COMPONENT_ARTIFACT_ELEMENT_ID);
     if (element === null) return null;
@@ -4122,6 +4149,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       validateEffectArtifactSchema(effectArtifact, diagnostics);
       const componentArtifact = readComponentArtifact(diagnostics);
       validateComponentArtifactSchema(componentArtifact, diagnostics);
+      validateEffectArtifactInstances(effectArtifact, componentArtifact, diagnostics);
       const opaqueArtifact = readOpaqueArtifact(diagnostics);
       validateOpaqueArtifact(opaqueArtifact, diagnostics);
       validateManifestSchema(manifest, effectArtifact, componentArtifact, opaqueArtifact, diagnostics);
@@ -4339,6 +4367,7 @@ mod tests {
         assert!(runtime.contains("activeActionBatch"));
         assert!(runtime.contains("executeInitialEffects"));
         assert!(runtime.contains("function executeResumeEffects"));
+        assert!(runtime.contains("function validateEffectArtifactInstances"));
         assert!(runtime.contains("effect.run_on_resume !== true"));
         assert!(runtime.contains("dispatchEffectCapability"));
         assert!(!runtime.contains("const arguments ="));
