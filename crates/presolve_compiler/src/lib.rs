@@ -1029,9 +1029,10 @@ pub use v2_authoring_lowering::{
     V2AuthoringResolutionsV1,
 };
 pub use v2_authority_request::{
-    build_v2_authority_component_request_v1, build_v2_authority_request_v1, V2AuthorityCanonicalV1,
-    V2AuthorityMemberSiteV1, V2AuthorityPositionV1, V2AuthorityRequestErrorV1,
-    V2AuthorityRequestV1, V2AuthoritySiteV1, V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
+    build_v2_authority_component_request_v1, build_v2_authority_request_v1,
+    build_v2_environment_authority_request_v1, V2AuthorityCanonicalV1, V2AuthorityMemberSiteV1,
+    V2AuthorityPositionV1, V2AuthorityRequestErrorV1, V2AuthorityRequestV1, V2AuthoritySiteV1,
+    V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
 };
 pub use v2_authority_response::{
     v2_authoring_resolutions_from_response_v1, v2_environment_public_resolutions_from_response_v1,

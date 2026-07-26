@@ -12,7 +12,7 @@ use crate::{
     ResolvedStateInitializerV1, V2AuthoringResolutionsV1,
 };
 
-pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 3;
+pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -337,7 +337,7 @@ class Counter extends Component { count = state(0); increment = action(() => {})
         )
         .unwrap();
         let response = V2AuthorityResponseV1 {
-            schema_version: 3,
+            schema_version: 4,
             diagnostics: Vec::new(),
             components: vec![V2AuthorityResolutionV1 {
                 id: request.components[0].id.clone(),
@@ -451,7 +451,7 @@ const applicationName = environment.public("PRESOLVE_PUBLIC_APP_NAME");
             crate::build_v2_authority_request_v1(&parsed, PathBuf::from("tsconfig.json"), &model)
                 .unwrap();
         let response = V2AuthorityResponseV1 {
-            schema_version: 3,
+            schema_version: 4,
             diagnostics: Vec::new(),
             components: vec![V2AuthorityResolutionV1 {
                 id: request.components[0].id.clone(),

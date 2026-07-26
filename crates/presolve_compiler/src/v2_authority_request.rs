@@ -10,7 +10,7 @@ use crate::{
     AuthoredSourceRangeV1, CanonicalAuthoredSemanticModelV1,
 };
 
-pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 3;
+pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -43,7 +43,8 @@ pub struct V2AuthorityMemberSiteV1 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct V2AuthorityCanonicalV1 {
-    pub component: V2AuthorityPositionV1,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub component: Option<V2AuthorityPositionV1>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub state: Option<V2AuthorityPositionV1>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -101,9 +102,9 @@ pub fn build_v2_authority_request_v1(
     config_file: PathBuf,
     component_model: &CanonicalAuthoredSemanticModelV1,
 ) -> Result<V2AuthorityRequestV1, V2AuthorityRequestErrorV1> {
-    let component = canonical_import(parsed, "Component")?.ok_or(
+    let component = Some(canonical_import(parsed, "Component")?.ok_or(
         V2AuthorityRequestErrorV1::MissingCanonicalExport("Component"),
-    )?;
+    )?);
     let state = canonical_import(parsed, "state")?;
     let action = canonical_import(parsed, "action")?;
     let effect = canonical_import(parsed, "effect")?;
@@ -167,33 +168,7 @@ pub fn build_v2_authority_request_v1(
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let environment_public = environment
-        .is_some()
-        .then(|| {
-            parsed
-                .call_expressions
-                .iter()
-                .filter_map(|call| {
-                    Some((
-                        call.member_object_span?,
-                        call.member_property_span?,
-                        call.span,
-                    ))
-                })
-                .map(|(object, property, call)| {
-                    member_site_for(
-                        "environment-public",
-                        object,
-                        property,
-                        call,
-                        &parsed.path,
-                        &parsed.syntax.source,
-                    )
-                })
-                .collect::<Result<Vec<_>, _>>()
-        })
-        .transpose()?
-        .unwrap_or_default();
+    let environment_public = environment_public_member_sites(parsed, environment.is_some())?;
     Ok(V2AuthorityRequestV1 {
         schema_version: V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
         config_file,
@@ -219,9 +194,9 @@ pub fn build_v2_authority_component_request_v1(
     parsed: &ParsedFile,
     config_file: PathBuf,
 ) -> Result<V2AuthorityRequestV1, V2AuthorityRequestErrorV1> {
-    let component = canonical_import(parsed, "Component")?.ok_or(
+    let component = Some(canonical_import(parsed, "Component")?.ok_or(
         V2AuthorityRequestErrorV1::MissingCanonicalExport("Component"),
-    )?;
+    )?);
     let components = component_inheritance_sites_v1(parsed)
         .into_iter()
         .map(|site| {
@@ -249,6 +224,66 @@ pub fn build_v2_authority_component_request_v1(
         effects: Vec::new(),
         environment_public: Vec::new(),
     })
+}
+
+/// Builds an authority request for a plain V2 module that imports the
+/// environment intrinsic but does not declare a Component. The generic parser
+/// candidates retain no framework meaning; this request merely makes them
+/// available to TypeScript resolution.
+pub fn build_v2_environment_authority_request_v1(
+    parsed: &ParsedFile,
+    config_file: PathBuf,
+) -> Result<Option<V2AuthorityRequestV1>, V2AuthorityRequestErrorV1> {
+    let environment = canonical_import(parsed, "environment")?;
+    let Some(environment) = environment else {
+        return Ok(None);
+    };
+    Ok(Some(V2AuthorityRequestV1 {
+        schema_version: V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
+        config_file,
+        canonical: V2AuthorityCanonicalV1 {
+            component: None,
+            state: None,
+            action: None,
+            effect: None,
+            environment: Some(environment),
+        },
+        components: Vec::new(),
+        states: Vec::new(),
+        actions: Vec::new(),
+        effects: Vec::new(),
+        environment_public: environment_public_member_sites(parsed, true)?,
+    }))
+}
+
+fn environment_public_member_sites(
+    parsed: &ParsedFile,
+    enabled: bool,
+) -> Result<Vec<V2AuthorityMemberSiteV1>, V2AuthorityRequestErrorV1> {
+    if !enabled {
+        return Ok(Vec::new());
+    }
+    parsed
+        .call_expressions
+        .iter()
+        .filter_map(|call| {
+            Some((
+                call.member_object_span?,
+                call.member_property_span?,
+                call.span,
+            ))
+        })
+        .map(|(object, property, call)| {
+            member_site_for(
+                "environment-public",
+                object,
+                property,
+                call,
+                &parsed.path,
+                &parsed.syntax.source,
+            )
+        })
+        .collect()
 }
 
 fn canonical_import(
@@ -321,7 +356,7 @@ mod tests {
 
     use super::{
         build_v2_authority_component_request_v1, build_v2_authority_request_v1,
-        V2AuthorityRequestErrorV1,
+        build_v2_environment_authority_request_v1, V2AuthorityRequestErrorV1,
     };
 
     #[test]
@@ -349,7 +384,7 @@ class Counter extends FrameworkBase { count = reactiveCell(0); increment = activ
             build_v2_authority_request_v1(&parsed, PathBuf::from("tsconfig.json"), &components)
                 .unwrap();
         assert_eq!(
-            &source[request.canonical.component.position..][..13],
+            &source[request.canonical.component.as_ref().unwrap().position..][..13],
             "FrameworkBase"
         );
         assert_eq!(
@@ -416,10 +451,13 @@ class Counter extends FrameworkBase { count = state(0); increment = action(() =>
                 .unwrap();
         let byte_position = source.find("FrameworkBase").unwrap();
         assert_eq!(
-            request.canonical.component.position,
+            request.canonical.component.as_ref().unwrap().position,
             source[..byte_position].encode_utf16().count()
         );
-        assert_ne!(request.canonical.component.position, byte_position);
+        assert_ne!(
+            request.canonical.component.as_ref().unwrap().position,
+            byte_position
+        );
     }
 
     #[test]
@@ -436,6 +474,22 @@ class Counter extends FrameworkBase { count = state(0); increment = action(() =>
         assert!(request.canonical.action.is_none());
         assert!(request.states.is_empty());
         assert!(request.actions.is_empty());
+    }
+
+    #[test]
+    fn builds_environment_authority_for_plain_modules_without_component_imports() {
+        let source = r#"
+import { environment as runtimeEnvironment } from "presolve";
+const appName = runtimeEnvironment.public("PRESOLVE_PUBLIC_APP_NAME");
+const local = lookalike.public("PRESOLVE_PUBLIC_LOOKALIKE");
+"#;
+        let parsed = parse_file("src/environment.ts", source);
+        let request =
+            build_v2_environment_authority_request_v1(&parsed, PathBuf::from("tsconfig.json"))
+                .unwrap()
+                .unwrap();
+        assert!(request.canonical.component.is_none());
+        assert_eq!(request.environment_public.len(), 2);
     }
 
     #[test]

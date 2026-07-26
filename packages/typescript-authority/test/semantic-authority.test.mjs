@@ -187,6 +187,30 @@ test("the V2 authoring bridge supports a component-only discovery phase", async 
   assert.deepEqual(result.effects, []);
 });
 
+test("the V2 authoring bridge resolves environment evidence without a component query", async () => {
+  const frameworkFile = resolve(root, "tests/framework-public-api/src/V2Counter.tsx");
+  const frameworkSource = readFileSync(frameworkFile, "utf8");
+  const result = await analyzeV2Authoring({
+    schemaVersion: V2_AUTHORED_AUTHORITY_SCHEMA_VERSION,
+    configFile: resolve(root, "tests/framework-public-api/tsconfig.json"),
+    canonical: {
+      environment: { file: frameworkFile, position: frameworkSource.indexOf("runtimeEnvironment") },
+    },
+    components: [],
+    states: [],
+    actions: [],
+    effects: [],
+    environmentPublic: [{
+      id: "application-name",
+      file: frameworkFile,
+      objectPosition: frameworkSource.indexOf("runtimeEnvironment.public"),
+      propertyPosition: frameworkSource.indexOf("runtimeEnvironment.public") + "runtimeEnvironment.".length,
+    }],
+  });
+  assert.deepEqual(result.components, []);
+  assert.deepEqual(result.environmentPublic.map(entry => entry.id), ["application-name"]);
+});
+
 test("the V2 authoring executable speaks the versioned stdin/stdout bridge protocol", () => {
   const frameworkFile = resolve(root, "tests/framework-public-api/src/V2Counter.tsx");
   const frameworkSource = readFileSync(frameworkFile, "utf8");
