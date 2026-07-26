@@ -4586,7 +4586,15 @@ fn collect_ownership(
             ownership.insert(endpoint.id.clone(), endpoint.owner.clone());
         }
         for action in &component.actions {
-            ownership.insert(action.id.clone(), action.owner.clone());
+            // Legacy method actions derive their owner from the method graph,
+            // while decorator-free action fields retain their canonical endpoint owner.
+            let owner = component
+                .methods
+                .iter()
+                .find(|method| method.name == action.method)
+                .map(|method| SemanticOwner::entity(method.id.clone()))
+                .unwrap_or_else(|| action.owner.clone());
+            ownership.insert(action.id.clone(), owner);
         }
         if let Some(render) = &component.render {
             for handler in render_event_handlers(render) {
