@@ -114,7 +114,9 @@ fn main() {
         "asm" => l9_command_error("asm", "retired: use presolve explain", 6),
         "check" => {
             if args.is_empty() {
-                run_ergonomic_check(Path::new("."));
+                run_ergonomic_check(Path::new("."), None);
+            } else if let Some(manifest) = parse_ergonomic_environment_manifest(&args) {
+                run_ergonomic_check(Path::new("."), Some(manifest));
             } else if args.iter().any(|argument| argument == "--config") {
                 run_l9_build_or_check("check", &args);
             } else {
@@ -126,7 +128,17 @@ fn main() {
         "manifest" => run_manifest(args),
         "build" => {
             if args.is_empty() {
-                run_ergonomic_build(Path::new("."), ApplicationPublicationProfileV1::Production);
+                run_ergonomic_build(
+                    Path::new("."),
+                    ApplicationPublicationProfileV1::Production,
+                    None,
+                );
+            } else if let Some(manifest) = parse_ergonomic_environment_manifest(&args) {
+                run_ergonomic_build(
+                    Path::new("."),
+                    ApplicationPublicationProfileV1::Production,
+                    Some(manifest),
+                );
             } else if args.iter().any(|argument| argument == "--config") {
                 run_l9_build_or_check("build", &args);
             } else {
@@ -154,12 +166,14 @@ fn main() {
 fn run_ergonomic_build(
     root: &Path,
     profile: ApplicationPublicationProfileV1,
+    environment_manifest: Option<presolve_compiler::EnvironmentInputManifestV1>,
 ) -> FileRoutePublicationManifestV1 {
     let project = discover_project_v1(root)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
-    let v2_authoring = validate_v2_authoring_project(&project).unwrap_or_else(|message| {
-        application_cli_error("PSAUTH1001_V2_AUTHORITY_FAILED", &message)
-    });
+    let v2_products = validate_v2_authoring_project(&project, environment_manifest.as_ref())
+        .unwrap_or_else(|message| {
+            application_cli_error("PSAUTH1001_V2_AUTHORITY_FAILED", &message)
+        });
     let output_root = project.root.join("dist");
     validate_application_output_root(&output_root);
     let discovery_unit = CompilationUnit::parse_sources(
@@ -184,8 +198,8 @@ fn run_ergonomic_build(
         package_runtime_modules,
         profile,
         output_root: output_root.clone(),
-        environment_artifact: None,
-        v2_authoring,
+        environment_artifact: v2_products.environment_artifact,
+        v2_authoring: v2_products.models,
     };
     let mut product = build_file_route_publication_v1(request)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
@@ -201,23 +215,50 @@ fn run_ergonomic_build(
 /// before legacy application assembly starts.  This is intentionally an
 /// orchestration adapter: it selects no framework meaning and fails rather
 /// than routing an authority failure through the legacy decorator graph.
+struct V2AuthoringProjectProductsV1 {
+    models: BTreeMap<PathBuf, presolve_compiler::CanonicalAuthoredSemanticModelV1>,
+    environment_artifact: Option<presolve_compiler::EnvironmentPublicationArtifactV1>,
+}
+
 fn validate_v2_authoring_project(
     project: &DiscoveredProjectV1,
-) -> Result<BTreeMap<PathBuf, presolve_compiler::CanonicalAuthoredSemanticModelV1>, String> {
+    environment_manifest: Option<&presolve_compiler::EnvironmentInputManifestV1>,
+) -> Result<V2AuthoringProjectProductsV1, String> {
     let config_file = project.root.join("tsconfig.json");
     let executable = project
         .root
         .join("node_modules")
         .join(".bin")
         .join("presolve-typescript-authority");
-    let candidates = project
+    let parsed_sources = project
         .sources
         .iter()
         .map(|source| parse_file(&source.logical_path, &source.source))
-        .filter(is_decorator_free_v2_candidate)
         .collect::<Vec<_>>();
-    if candidates.is_empty() {
-        return Ok(BTreeMap::new());
+    let candidates = parsed_sources
+        .iter()
+        .filter(|parsed| is_decorator_free_v2_candidate(parsed))
+        .collect::<Vec<_>>();
+    let plain_environment_requests = parsed_sources
+        .iter()
+        .filter(|parsed| !is_decorator_free_v2_candidate(parsed))
+        .map(|parsed| {
+            presolve_compiler::build_v2_environment_authority_request_v1(
+                parsed,
+                PathBuf::from("tsconfig.json"),
+            )
+            .map(|request| request.map(|request| (parsed, request)))
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| error.to_string())?
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+    if candidates.is_empty() && plain_environment_requests.is_empty() {
+        return Ok(V2AuthoringProjectProductsV1 {
+            models: BTreeMap::new(),
+            environment_artifact: None,
+        });
     }
     if !config_file.is_file() {
         return Err(format!(
@@ -232,6 +273,7 @@ fn validate_v2_authoring_project(
         ));
     }
     let mut models = BTreeMap::new();
+    let mut environment_reads = Vec::new();
     for parsed in candidates {
         let component_request =
             build_v2_authority_component_request_v1(&parsed, PathBuf::from("tsconfig.json"))
@@ -261,13 +303,72 @@ fn validate_v2_authoring_project(
         )
         .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
         let response = invoke_v2_authority_bridge(&project.root, &executable, &request)?;
+        environment_reads.extend(collect_environment_reads(
+            parsed,
+            &request,
+            &response,
+            environment_manifest,
+        )?);
         let resolutions = v2_authoring_resolutions_from_response_v1(&parsed, &request, &response)
             .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
         let lowering = lower_v2_authoring_v1(&parsed, resolutions)
             .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
         models.insert(parsed.path.clone(), lowering.model);
     }
-    Ok(models)
+    for (parsed, request) in plain_environment_requests {
+        let response = invoke_v2_authority_bridge(&project.root, &executable, &request)?;
+        environment_reads.extend(collect_environment_reads(
+            parsed,
+            &request,
+            &response,
+            environment_manifest,
+        )?);
+    }
+    let environment_artifact = if environment_reads.is_empty() {
+        None
+    } else {
+        let lowering = presolve_compiler::EnvironmentReadLoweringV1 {
+            schema_version: presolve_compiler::ENVIRONMENT_READ_LOWERING_SCHEMA_VERSION,
+            reads: environment_reads,
+            diagnostics: Vec::new(),
+        };
+        presolve_compiler::build_environment_read_ownership_v1(&lowering)
+            .map_err(|error| error.to_string())?;
+        Some(
+            presolve_compiler::build_environment_publication_artifact_v1(&lowering)
+                .map_err(|error| error.to_string())?,
+        )
+    };
+    Ok(V2AuthoringProjectProductsV1 {
+        models,
+        environment_artifact,
+    })
+}
+
+fn collect_environment_reads(
+    parsed: &ParsedFile,
+    request: &presolve_compiler::V2AuthorityRequestV1,
+    response: &V2AuthorityResponseV1,
+    manifest: Option<&presolve_compiler::EnvironmentInputManifestV1>,
+) -> Result<Vec<presolve_compiler::EnvironmentReadRecordV1>, String> {
+    let evidence = presolve_compiler::v2_environment_public_resolutions_from_response_v1(
+        parsed, request, response,
+    )
+    .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
+    if evidence.is_empty() {
+        return Ok(Vec::new());
+    }
+    let lowering = presolve_compiler::lower_environment_reads_v1(parsed, evidence, manifest);
+    if let Some(diagnostic) = lowering.diagnostics.first() {
+        return Err(format!(
+            "{}: {} at {}:{}",
+            parsed.path.display(),
+            diagnostic.code.as_str(),
+            diagnostic.call_source.line,
+            diagnostic.call_source.column
+        ));
+    }
+    Ok(lowering.reads)
 }
 
 fn is_decorator_free_v2_candidate(parsed: &ParsedFile) -> bool {
@@ -410,8 +511,11 @@ fn run_ergonomic_dev(args: &[String]) {
             ),
         }
     }
-    let manifest =
-        run_ergonomic_build(Path::new("."), ApplicationPublicationProfileV1::Development);
+    let manifest = run_ergonomic_build(
+        Path::new("."),
+        ApplicationPublicationProfileV1::Development,
+        None,
+    );
     if once {
         return;
     }
@@ -441,7 +545,7 @@ fn run_ergonomic_deploy(args: &[String]) {
         run_cloudflare_rollback(root, version.as_deref());
         return;
     }
-    let manifest = run_ergonomic_build(root, ApplicationPublicationProfileV1::Production);
+    let manifest = run_ergonomic_build(root, ApplicationPublicationProfileV1::Production, None);
     let project = discover_project_v1(root)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
     let worker_name = arguments.worker_name.unwrap_or_else(|| {
@@ -514,7 +618,7 @@ fn run_ergonomic_node_deploy(args: &[String]) {
         application_cli_error("PSNODE1011_DEPLOY_ARGUMENT_INVALID", &message)
     });
     let root = Path::new(".");
-    let manifest = run_ergonomic_build(root, ApplicationPublicationProfileV1::Production);
+    let manifest = run_ergonomic_build(root, ApplicationPublicationProfileV1::Production, None);
     let project = discover_project_v1(root)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
     let output_root = project.root.join("dist");
@@ -872,12 +976,17 @@ fn write_development_response(
     let _ = stream.write_all(body);
 }
 
-fn run_ergonomic_check(root: &Path) {
+fn run_ergonomic_check(
+    root: &Path,
+    environment_manifest: Option<presolve_compiler::EnvironmentInputManifestV1>,
+) {
     let project = discover_project_v1(root)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
-    let v2_authoring = validate_v2_authoring_project(&project).unwrap_or_else(|message| {
-        application_cli_error("PSAUTH1001_V2_AUTHORITY_FAILED", &message)
-    });
+    let v2_products = validate_v2_authoring_project(&project, environment_manifest.as_ref())
+        .unwrap_or_else(|message| {
+            application_cli_error("PSAUTH1001_V2_AUTHORITY_FAILED", &message)
+        });
+    let v2_authoring = v2_products.models;
     let unit = CompilationUnit::parse_sources(
         project
             .sources
@@ -1579,6 +1688,36 @@ fn run_environment(args: &[String]) {
         "{}",
         presolve_compiler::environment_input_manifest_json_v1(&manifest)
     );
+}
+
+/// Loads only a caller-named manifest JSON. This intentionally does not look
+/// for `.env` files or consult ambient process state.
+fn parse_ergonomic_environment_manifest(
+    args: &[String],
+) -> Option<presolve_compiler::EnvironmentInputManifestV1> {
+    if args
+        .first()
+        .is_none_or(|argument| argument != "--environment-manifest")
+    {
+        return None;
+    }
+    if args.len() != 2 {
+        application_cli_error(
+            "PSENV1202_ARGUMENT_INVALID",
+            "usage: presolve <check|build> --environment-manifest <path>",
+        );
+    }
+    let path = Path::new(&args[1]);
+    let source = fs::read_to_string(path).unwrap_or_else(|error| {
+        application_cli_error(
+            "PSENV1203_MANIFEST_READ_FAILED",
+            &format!("{}: {error}", path.display()),
+        )
+    });
+    Some(
+        presolve_compiler::environment_input_manifest_from_json_v1(&source)
+            .unwrap_or_else(|error| application_cli_error(error.code, &error.message)),
+    )
 }
 
 fn parse_explicit_dotenv_v1(source: &str) -> Result<BTreeMap<String, String>, String> {

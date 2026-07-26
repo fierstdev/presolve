@@ -28,7 +28,8 @@ fn decorator_free_v2_source_uses_installed_authority_for_file_route_assembly() {
     let root = project_root("v2-authority");
     fs::write(
         root.join("app/routes/index.tsx"),
-        r#"import { Component, state, action } from "presolve";
+        r#"import { Component, state, action, environment } from "presolve";
+const applicationName = environment.public("PRESOLVE_PUBLIC_NAME");
 export class Home extends Component {
   count = state(0);
   increment = action(() => { this.count += 1; });
@@ -36,6 +37,11 @@ export class Home extends Component {
   render() { return <button onClick={() => this.increment()}>Home: {this.doubled}</button>; }
 }
 "#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("environment.manifest.json"),
+        r#"{"schemaVersion":1,"sourceLabel":".env","browserValues":{"PRESOLVE_PUBLIC_NAME":"Presolve"},"serverValueNames":[]}"#,
     )
     .unwrap();
     fs::write(
@@ -59,15 +65,27 @@ process.stdout.write(JSON.stringify({
   states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
   actions: request.actions.map(site => ({ id: site.id, identity: identity("action") })),
   effects: request.effects.map(site => ({ id: site.id, identity: identity("effect") })),
-  environmentPublic: request.environmentPublic.map(site => ({ id: site.id, identity: identity("public") })),
+  environmentPublic: request.environmentPublic.slice(0, 1).map(site => ({ id: site.id, identity: identity("public") })),
 }));
 "#,
     )
     .unwrap();
     fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
 
+    let missing_manifest = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("check")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(!missing_manifest.status.success());
+    assert!(
+        String::from_utf8_lossy(&missing_manifest.stderr).contains("PSENV1102_MANIFEST_REQUIRED")
+    );
+
     let output = Command::new(env!("CARGO_BIN_EXE_presolve"))
         .arg("check")
+        .arg("--environment-manifest")
+        .arg("environment.manifest.json")
         .current_dir(&root)
         .output()
         .unwrap();
@@ -81,6 +99,8 @@ process.stdout.write(JSON.stringify({
     assert!(String::from_utf8_lossy(&output.stdout).contains("Checked 1 source file(s)"));
     let build = Command::new(env!("CARGO_BIN_EXE_presolve"))
         .arg("build")
+        .arg("--environment-manifest")
+        .arg("environment.manifest.json")
         .current_dir(&root)
         .output()
         .unwrap();
@@ -90,6 +110,9 @@ process.stdout.write(JSON.stringify({
         String::from_utf8_lossy(&build.stderr)
     );
     assert!(root.join("dist/routes/root/index.html").is_file());
+    let environment = fs::read_to_string(root.join("dist/environment.browser.json")).unwrap();
+    assert!(environment.contains("PRESOLVE_PUBLIC_NAME"));
+    assert!(!environment.contains("DATABASE_URL"));
     fs::remove_dir_all(root).unwrap();
 }
 
