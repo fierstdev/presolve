@@ -370,6 +370,33 @@ pub fn generate_structural_keyed_host_fragments(
     let Some((list, path)) = list_at_span(template, entity.provenance.span) else {
         return Vec::new();
     };
+    let registry = build_ordinary_template_instance_registry(model);
+    let targets = registry
+        .targets
+        .iter()
+        .map(|record| {
+            (
+                (
+                    record.component_instance_id.clone(),
+                    record.template_entity_id.clone(),
+                ),
+                record.target_id.to_string(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let bindings = registry
+        .bindings
+        .iter()
+        .map(|record| {
+            (
+                (
+                    record.component_instance_id.clone(),
+                    record.declaration_binding_id.clone(),
+                ),
+                record.instance_binding_id.to_string(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
     let children = model
         .component_instance_plan
         .instances
@@ -382,6 +409,11 @@ pub fn generate_structural_keyed_host_fragments(
                     .map(|invocation| ((parent.clone(), invocation.clone()), child))
             })
         })
+        .collect::<BTreeMap<_, _>>();
+    let templates = model
+        .templates
+        .iter()
+        .map(|candidate| (candidate.id.clone(), candidate))
         .collect::<BTreeMap<_, _>>();
 
     model
@@ -400,12 +432,30 @@ pub fn generate_structural_keyed_host_fragments(
             } else {
                 StructuralConditionalHostScope::StructuralOccurrence
             };
-            if !model.slot_bindings.for_callee(&instance.id).is_empty() {
-                // Keyed host fragments need an item-aware Slot renderer; leave
-                // them fail-closed until the v19 renderer program supplies it.
+            let slot_projections =
+                structural_instance_slot_projections(model, &templates, instance);
+            if !model.slot_bindings.for_callee(&instance.id).is_empty()
+                && slot_projections.is_none()
+            {
                 return None;
             }
-            let mut html = crate::html_codegen::generate_list_item_template_html(list);
+            let slot_projections = slot_projections.unwrap_or_default();
+            let mut html = qualify_keyed_item_node_ids(&render_children(
+                model,
+                &templates,
+                &children,
+                &targets,
+                &bindings,
+                &ResumeHtmlMarkers::default(),
+                &instance.id,
+                template,
+                &list.item_template,
+                &format!("{path}.item"),
+                &slot_projections,
+            ));
+            if instance.status == ComponentInstanceStatus::StructuralTemplate {
+                html = html.replace(instance.id.as_str(), "__PRESOLVE_STRUCTURAL_OCCURRENCE__");
+            }
             for (node, invocation) in structural_list_invocations(
                 model,
                 &children,
@@ -429,6 +479,25 @@ pub fn generate_structural_keyed_host_fragments(
             })
         })
         .collect()
+}
+
+fn qualify_keyed_item_node_ids(html: &str) -> String {
+    const MARKER: &str = "data-presolve-node=\"";
+    let mut output = String::new();
+    let mut remaining = html;
+    while let Some(index) = remaining.find(MARKER) {
+        output.push_str(&remaining[..index + MARKER.len()]);
+        let value = &remaining[index + MARKER.len()..];
+        let Some(end) = value.find('"') else {
+            return html.to_string();
+        };
+        output.push_str(&value[..end]);
+        output.push_str(":__ez_list_key__");
+        output.push('"');
+        remaining = &value[end + 1..];
+    }
+    output.push_str(remaining);
+    output
 }
 
 fn structural_instance_slot_projections<'a>(
@@ -1517,6 +1586,44 @@ mod tests {
             })
             .expect("structural Panel host fragment is emitted");
         assert!(projected.when_true_html.contains("Projected"));
+    }
+
+    #[test]
+    fn renders_structural_keyed_slot_projection_from_the_canonical_binding() {
+        let model = build_application_semantic_model(&presolve_parser::parse_file(
+            "src/StructuralKeyedSlot.tsx",
+            r#"
+@component("x-panel") class Panel extends Component {
+  @slot() children!: SlotContent;
+  items = state([{ id: "a" }]);
+  render() { return <ul>{this.items.map(item => <li key={item.id}><slot /><Leaf /></li>)}</ul>; }
+}
+@component("x-leaf") class Leaf extends Component { render() { return <small>Leaf</small>; } }
+@component("x-page") class Page extends Component {
+  visible = state(true);
+  render() { return <main>{this.visible ? <Panel><button>Projected</button></Panel> : <aside>Hidden</aside>}</main>; }
+}
+"#,
+        ));
+        let region = model
+            .component_instance_plan
+            .instances
+            .values()
+            .find(|instance| instance.component.as_str().contains("component:x-leaf"))
+            .and_then(|instance| instance.structural_region.clone())
+            .expect("Panel keyed host has a structural region");
+        let fragments = generate_structural_keyed_host_fragments(&model, &region);
+        let projected = fragments
+            .iter()
+            .find(|fragment| {
+                fragment.host_scope == StructuralConditionalHostScope::StructuralOccurrence
+            })
+            .expect("structural Panel keyed host fragment is emitted");
+        assert!(projected.item_template_html.contains("Projected"));
+        assert!(projected
+            .item_template_html
+            .contains("data-presolve-node=\""));
+        assert!(projected.item_template_html.contains(":__ez_list_key__"));
     }
 
     #[test]
