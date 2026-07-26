@@ -9,6 +9,7 @@ import {
   createPresolveVirtualModuleRegistry,
   composeDevelopmentDiagnostics,
   PRESOLVE_HMR_EVENT,
+  PRESOLVE_ENVIRONMENT_PUBLICATION_ARTIFACT,
   readPresolveProductionAudit,
   translatePresolveSourceMap,
   PRESOLVE_VITE_ADAPTER_SCHEMA_VERSION,
@@ -18,6 +19,11 @@ import {
 
 const runtime = "export const runtime = 1;\n";
 const digest = createHash("sha256").update(runtime).digest("hex");
+const environmentArtifact = JSON.stringify({
+  schemaVersion: 1,
+  browserValues: { PRESOLVE_PUBLIC_NAME: "Presolve" },
+});
+const environmentDigest = createHash("sha256").update(environmentArtifact).digest("hex");
 const auditJson = JSON.stringify({
   schemaVersion: 1,
   buildId: "resume-build:fixture",
@@ -83,6 +89,39 @@ await assertAsyncRejects(
     readArtifact: () => runtime,
   }).load(`\0${virtualId}`),
   "registry must reject artifact content that differs from its compiler digest",
+);
+
+const environmentRegistry = createPresolveVirtualModuleRegistry({
+  compilerProduct: {
+    manifest: {
+      schema_version: 1,
+      compiler_contract: "presolve-application-publication:1",
+      workspace_snapshot_id: "fixture-snapshot",
+      artifacts: [{ path: PRESOLVE_ENVIRONMENT_PUBLICATION_ARTIFACT, digest: environmentDigest }],
+    },
+  },
+  readArtifact: path => path === PRESOLVE_ENVIRONMENT_PUBLICATION_ARTIFACT ? environmentArtifact : undefined,
+});
+const environmentSource = await environmentRegistry.load(
+  environmentRegistry.resolveId(`${PRESOLVE_VIRTUAL_MODULE_PREFIX}${PRESOLVE_ENVIRONMENT_PUBLICATION_ARTIFACT}`),
+);
+if (!environmentSource.includes('export const browserValues = Object.freeze({"PRESOLVE_PUBLIC_NAME":"Presolve"});')
+  || environmentSource.includes("process.env") || environmentSource.includes("import.meta.env")) {
+  throw new Error("Vite must expose only the compiler-published browser environment map");
+}
+await assertAsyncRejects(
+  () => createPresolveVirtualModuleRegistry({
+    compilerProduct: {
+      manifest: {
+        schema_version: 1,
+        compiler_contract: "presolve-application-publication:1",
+        workspace_snapshot_id: "fixture-snapshot",
+        artifacts: [{ path: PRESOLVE_ENVIRONMENT_PUBLICATION_ARTIFACT, digest: createHash("sha256").update('{"schemaVersion":1,"browserValues":{"DATABASE_URL":"secret"}}').digest("hex") }],
+      },
+    },
+    readArtifact: () => '{"schemaVersion":1,"browserValues":{"DATABASE_URL":"secret"}}',
+  }).load(`\0${PRESOLVE_VIRTUAL_MODULE_PREFIX}${PRESOLVE_ENVIRONMENT_PUBLICATION_ARTIFACT}`),
+  "Vite must reject server-owned values in a compiler environment artifact",
 );
 
 const audit = await readPresolveProductionAudit({

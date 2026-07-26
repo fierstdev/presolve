@@ -7,6 +7,8 @@ export const PRESOLVE_VITE_ADAPTER_SCHEMA_VERSION = 1;
 export const PRESOLVE_APPLICATION_PUBLICATION_CONTRACT_V1 = "presolve-application-publication:1";
 export const PRESOLVE_VIRTUAL_MODULE_SCHEMA_VERSION = 1;
 export const PRESOLVE_VIRTUAL_MODULE_PREFIX = "virtual:presolve/v1/";
+export const PRESOLVE_ENVIRONMENT_PUBLICATION_ARTIFACT = "environment.browser.json";
+export const PRESOLVE_ENVIRONMENT_PUBLICATION_SCHEMA_VERSION = 1;
 export const PRESOLVE_DEVELOPMENT_DIAGNOSTICS_SCHEMA_VERSION = 1;
 export const PRESOLVE_VITE_PRODUCTION_SCHEMA_VERSION = 1;
 export const PRESOLVE_HMR_UPDATE_SCHEMA_VERSION = 1;
@@ -524,10 +526,49 @@ function toBytes(value) {
 }
 
 function virtualModuleSource(artifactPath, content) {
+  if (artifactPath === PRESOLVE_ENVIRONMENT_PUBLICATION_ARTIFACT) {
+    return environmentVirtualModuleSource(artifactPath, content);
+  }
   return [
     `export const artifactPath = ${JSON.stringify(artifactPath)};`,
     `export const content = ${JSON.stringify(content)};`,
     "export default content;",
+    "",
+  ].join("\n");
+}
+
+/**
+ * Projects the compiler-published browser environment artifact into one Vite
+ * virtual module. This validates only the immutable compiler product: it never
+ * reads dotenv files, process state, or Vite's environment object.
+ */
+function environmentVirtualModuleSource(artifactPath, content) {
+  let artifact;
+  try {
+    artifact = JSON.parse(content);
+  } catch {
+    throw new TypeError("Presolve browser environment artifact must be UTF-8 JSON");
+  }
+  if (!artifact || typeof artifact !== "object" || Array.isArray(artifact)
+    || artifact.schemaVersion !== PRESOLVE_ENVIRONMENT_PUBLICATION_SCHEMA_VERSION
+    || !artifact.browserValues || typeof artifact.browserValues !== "object"
+    || Array.isArray(artifact.browserValues)) {
+    throw new TypeError("Presolve browser environment artifact must be a schema-v1 compiler product");
+  }
+  for (const [name, value] of Object.entries(artifact.browserValues)) {
+    if (!name.startsWith("PRESOLVE_PUBLIC_") || name.length === "PRESOLVE_PUBLIC_".length
+      || typeof value !== "string" || value.includes("\0")) {
+      throw new TypeError("Presolve browser environment artifact contained an invalid public value");
+    }
+  }
+  const browserValues = Object.fromEntries(Object.entries(artifact.browserValues).sort(
+    ([left], [right]) => left.localeCompare(right),
+  ));
+  return [
+    `export const artifactPath = ${JSON.stringify(artifactPath)};`,
+    `export const schemaVersion = ${PRESOLVE_ENVIRONMENT_PUBLICATION_SCHEMA_VERSION};`,
+    `export const browserValues = Object.freeze(${JSON.stringify(browserValues)});`,
+    "export default browserValues;",
     "",
   ].join("\n");
 }
