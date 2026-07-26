@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use presolve_parser::ParsedFile;
 use serde::{Deserialize, Serialize};
 
-pub const CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION: u32 = 2;
+pub const CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION: u32 = 3;
 
 /// A serializable source range shared by the syntax and semantic boundaries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -72,6 +72,7 @@ pub enum AuthoredSemanticCandidateKindV1 {
     /// analysis. Its evidence is explicit because no framework symbol exists.
     DerivedComputedGetter {
         state_dependencies: Vec<String>,
+        computed_dependencies: Vec<String>,
     },
     TsxBinding,
     TsxEventReference,
@@ -82,7 +83,10 @@ pub enum AuthoredSemanticCandidateKindV1 {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DerivedAuthoredEvidenceV2 {
-    ComputedGetter { state_dependencies: Vec<String> },
+    ComputedGetter {
+        state_dependencies: Vec<String>,
+        computed_dependencies: Vec<String>,
+    },
 }
 
 /// One candidate selected from the general source AST and checked by the
@@ -229,11 +233,15 @@ pub fn normalize_authored_semantics_v1(
                 identity.declaration_modules.sort();
                 identity.declaration_modules.dedup();
             }
-            if let Some(DerivedAuthoredEvidenceV2::ComputedGetter { state_dependencies }) =
-                &mut derived_evidence
+            if let Some(DerivedAuthoredEvidenceV2::ComputedGetter {
+                state_dependencies,
+                computed_dependencies,
+            }) = &mut derived_evidence
             {
                 state_dependencies.sort();
                 state_dependencies.dedup();
+                computed_dependencies.sort();
+                computed_dependencies.dedup();
             }
             Ok(CanonicalAuthoredDeclarationV1 {
                 kind,
@@ -310,10 +318,16 @@ fn declaration_kind(
     } = kind
     else {
         return match kind {
-            AuthoredSemanticCandidateKindV1::DerivedComputedGetter { state_dependencies } => (
+            AuthoredSemanticCandidateKindV1::DerivedComputedGetter {
+                state_dependencies,
+                computed_dependencies,
+            } => (
                 CanonicalAuthoredDeclarationKindV1::Computed,
                 None,
-                Some(DerivedAuthoredEvidenceV2::ComputedGetter { state_dependencies }),
+                Some(DerivedAuthoredEvidenceV2::ComputedGetter {
+                    state_dependencies,
+                    computed_dependencies,
+                }),
             ),
             AuthoredSemanticCandidateKindV1::TsxBinding => {
                 (CanonicalAuthoredDeclarationKindV1::TsxBinding, None, None)
@@ -398,7 +412,7 @@ mod tests {
             normalize_authored_semantics_v1(&parsed, [state.clone(), component.clone(), state])
                 .expect("valid resolved candidates");
 
-        assert_eq!(model.schema_version, 2);
+        assert_eq!(model.schema_version, 3);
         assert_eq!(model.declarations.len(), 2);
         assert_eq!(model.declarations[0].subject, "Card");
         assert_eq!(
@@ -421,7 +435,7 @@ mod tests {
         assert_eq!(
             serde_json::to_value(&model).expect("serializable model"),
             serde_json::json!({
-                "schema_version": 2,
+                "schema_version": 3,
                 "source_path": "src/Card.tsx",
                 "declarations": [
                     {

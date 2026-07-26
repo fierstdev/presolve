@@ -30,22 +30,24 @@ analysis-proven, non-intrinsic getter. Reusing
 `CanonicalIntrinsicKindV1::Computed` would falsely claim that a `computed()`
 intrinsic exists; classifying getters by method name would be equally invalid.
 
-The first implementation admits only its finite direct-State, call-free
-subset. Legacy `@computed()` lowering remains alpha compatibility only and is
-never a fallback for a V2 getter. Broader call, transitive-dependency, and
-cycle forms remain an intentional proof boundary.
+The first implementation admits its finite call-free subset, including
+analysis-proven transitive computed-to-computed State dependencies. Legacy
+`@computed()` lowering remains alpha compatibility only and is never a
+fallback for a V2 getter. Calls and unknown-call coverage remain an intentional
+proof boundary.
 
 ## Initial acceptance evidence
 
 - A reactive getter and ordinary getter in the same canonical component are
   distinguished without decorator recognition; only the direct-State getter is
   admitted.
+- A transitive getter chain receives explicit direct-computed and reachable
+  State evidence; a dependency cycle receives no candidate.
 - A static getter, unknown member read, and call expression receive no derived
   candidate in the initial subset.
 - A decorator-free route built through the installed authority bridge renders
   the derived getter in a real browser, invalidates it after a V2 action, and
   restores and invalidates it again on the resumed path.
 
-Transitive State dependencies, conditional dependency coverage, unknown-call
-proof, and computed dependency cycles remain required evidence for a later
-broader candidate amendment.
+Conditional dependency coverage and unknown-call proof remain required
+evidence for a later broader candidate amendment.

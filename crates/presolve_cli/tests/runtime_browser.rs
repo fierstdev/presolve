@@ -2416,7 +2416,8 @@ fn decorator_free_v2_action_field_runs_through_compiler_artifacts_in_a_real_brow
 export class Home extends Component {
   count = state(0);
   increment = action(() => { this.count += 1; });
-  get displayCount() { return this.count; }
+  get baseCount() { return this.count; }
+  get displayCount() { return this.baseCount; }
   render() { return <button onClick={() => this.increment()}>Count: {this.displayCount}</button>; }
 }
 "#,

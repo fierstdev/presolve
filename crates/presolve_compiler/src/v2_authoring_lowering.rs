@@ -111,6 +111,7 @@ class Counter extends AliasedBase {
   count = reactiveCell(0);
   increment = activate(() => { this.count += 1; });
   get doubled() { return this.count * 2; }
+  get quadrupled() { return this.doubled * 2; }
 }
 @component() class LegacyOnly { count = reactiveCell(0); }
 "#;
@@ -162,7 +163,7 @@ class Counter extends AliasedBase {
         assert_eq!(lowering.component_count, 1);
         assert_eq!(lowering.state_count, 1);
         assert_eq!(lowering.action_count, 1);
-        assert_eq!(lowering.computed_count, 1);
+        assert_eq!(lowering.computed_count, 2);
         assert_eq!(
             lowering
                 .model
@@ -175,6 +176,7 @@ class Counter extends AliasedBase {
                 CanonicalAuthoredDeclarationKindV1::State,
                 CanonicalAuthoredDeclarationKindV1::Action,
                 CanonicalAuthoredDeclarationKindV1::Computed,
+                CanonicalAuthoredDeclarationKindV1::Computed,
             ]
         );
         assert!(lowering
@@ -183,8 +185,10 @@ class Counter extends AliasedBase {
             .iter()
             .all(|declaration| declaration.subject != "LegacyOnly"));
         let graph = build_v2_component_graph_for_module(&parsed, &lowering.model);
-        assert_eq!(graph.components[0].methods.len(), 1);
+        assert_eq!(graph.components[0].methods.len(), 2);
         assert!(graph.components[0].methods[0].is_computed());
         assert_eq!(graph.components[0].methods[0].name, "doubled");
+        assert!(graph.components[0].methods[1].is_computed());
+        assert_eq!(graph.components[0].methods[1].name, "quadrupled");
     }
 }

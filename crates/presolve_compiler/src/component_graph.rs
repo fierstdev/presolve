@@ -1643,8 +1643,10 @@ pub fn build_v2_component_graph_for_module(
             candidate.kind == crate::CanonicalAuthoredDeclarationKindV1::Computed
                 && candidate.subject.starts_with(&format!("{}.", class.name))
         }) {
-            let Some(crate::DerivedAuthoredEvidenceV2::ComputedGetter { state_dependencies }) =
-                candidate.derived_evidence.as_ref()
+            let Some(crate::DerivedAuthoredEvidenceV2::ComputedGetter {
+                state_dependencies,
+                computed_dependencies,
+            }) = candidate.derived_evidence.as_ref()
             else {
                 continue;
             };
@@ -1655,6 +1657,7 @@ pub fn build_v2_component_graph_for_module(
                 site.subject == candidate.subject
                     && site.declaration_source == candidate.source
                     && site.state_dependencies == *state_dependencies
+                    && site.computed_dependencies == *computed_dependencies
             }) else {
                 diagnostics.push(ComponentDiagnostic::error(
                     "PSV2C1002",
