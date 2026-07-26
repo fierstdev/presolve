@@ -29,6 +29,9 @@ pub enum ResumeExistingSlot {
     FormFieldValidation(FormFieldValidationSlotId),
     FormValidationAggregate(FormValidationAggregateSlotId),
     FormSubmission(FormSubmissionStateSlotId),
+    ResourceState(SemanticId),
+    ResourceData(SemanticId),
+    ResourceError(SemanticId),
     EffectActivation(EffectActivationSlotId),
 }
 
@@ -46,6 +49,9 @@ impl ResumeExistingSlot {
             Self::FormFieldValidation(slot) => slot.as_str().to_string(),
             Self::FormValidationAggregate(slot) => slot.as_str().to_string(),
             Self::FormSubmission(slot) => slot.as_str().to_string(),
+            Self::ResourceState(slot) | Self::ResourceData(slot) | Self::ResourceError(slot) => {
+                slot.as_str().to_string()
+            }
             Self::EffectActivation(slot) => slot.as_str().to_string(),
         }
     }
@@ -78,6 +84,7 @@ pub enum ResumeRetentionReason {
     FormRuleResult,
     FormAggregateValidation,
     StableFormSubmission,
+    ResourceSnapshotValue,
     EffectSchedulerMetadata,
 }
 
@@ -342,6 +349,33 @@ pub fn build_resume_liveness_plan(model: &ApplicationSemanticModel) -> ResumeLiv
         }
     }
 
+    // Snapshot-policy Resources always reserve all three terminal slots. Data
+    // and error are nullable because exactly one is populated by the runtime
+    // according to the restored state; this keeps capture shape closed and
+    // instance-qualified without source or endpoint inference.
+    for activation in snapshot_resource_activations(model) {
+        let declaration = &model.resource_declarations[&activation.declaration];
+        let owner = ResumeLivenessOwner::ComponentInstance(activation.component_instance.clone());
+        let boundary = Some(ResumeBoundaryId::component_instance(
+            &activation.component_instance,
+        ));
+        for existing_slot in [
+            ResumeExistingSlot::ResourceState(activation.id.state_slot()),
+            ResumeExistingSlot::ResourceData(activation.id.data_slot()),
+            ResumeExistingSlot::ResourceError(activation.id.error_slot()),
+        ] {
+            retain_slot(
+                existing_slot,
+                owner.clone(),
+                boundary.clone(),
+                declaration.provenance.clone(),
+                ResumeRetentionReason::ResourceSnapshotValue,
+                &mut retained,
+                &mut evidence,
+            );
+        }
+    }
+
     let computed_by_pair = computed
         .records
         .iter()
@@ -396,6 +430,7 @@ pub fn build_resume_liveness_plan(model: &ApplicationSemanticModel) -> ResumeLiv
             &declaration.dependencies,
             &state,
             &computed,
+            &model.resource_activations,
         );
         let transitive_dependencies = transitive_dependencies(&direct_dependencies, &evidence);
         let dependency_ready = !unknown_dependency
@@ -566,6 +601,7 @@ pub fn build_resume_liveness_plan(model: &ApplicationSemanticModel) -> ResumeLiv
             &semantic_dependencies,
             &state,
             &computed,
+            &model.resource_activations,
         );
         let transitive_dependencies = transitive_dependencies(&direct_dependencies, &evidence);
         let slot = liveness_slot(
@@ -873,6 +909,7 @@ fn dependency_slots(
     dependencies: &[SemanticId],
     state: &crate::StateInstanceStorageRegistry,
     computed: &crate::ComputedInstanceSlotRegistry,
+    resources: &BTreeMap<crate::ResourceActivationId, crate::ResourceActivation>,
 ) -> (Vec<ResumeExistingSlot>, bool) {
     let mut slots = Vec::new();
     let mut unknown = false;
@@ -895,6 +932,19 @@ fn dependency_slots(
             slots.push(ResumeExistingSlot::ComputedCache(
                 record.cache_slot_id.clone(),
             ));
+        } else if let Some(resource) = model
+            .resource_declarations
+            .values()
+            .find(|resource| resource.id.as_semantic_id() == dependency)
+        {
+            if let Some(activation) = resources.values().find(|activation| {
+                activation.component_instance == *component_instance
+                    && activation.declaration == resource.id
+            }) {
+                slots.push(ResumeExistingSlot::ResourceData(activation.id.data_slot()));
+            } else {
+                unknown = true;
+            }
         } else {
             unknown = true;
         }
@@ -902,6 +952,35 @@ fn dependency_slots(
     slots.sort();
     slots.dedup();
     (slots, unknown)
+}
+
+fn snapshot_resource_activations(
+    model: &ApplicationSemanticModel,
+) -> Vec<&crate::ResourceActivation> {
+    model
+        .resource_activations
+        .values()
+        .filter(|activation| {
+            let Some(declaration) = model.resource_declarations.get(&activation.declaration) else {
+                return false;
+            };
+            model
+                .resource_endpoint_resolutions
+                .iter()
+                .any(|resolution| {
+                    resolution.owner_component == declaration.owner_component
+                        && resolution.field == declaration.name
+                        && matches!(
+                            resolution.outcome,
+                            crate::ResourceEndpointResolutionOutcome::Resolved(ref endpoint)
+                                if matches!(
+                                    endpoint.endpoint.resume,
+                                    crate::SemanticPackageResourceResumePolicy::Snapshot
+                                )
+                        )
+                })
+        })
+        .collect()
 }
 
 fn transitive_dependencies(

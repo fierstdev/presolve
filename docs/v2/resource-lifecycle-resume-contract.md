@@ -45,6 +45,13 @@ no source text. Resource restoration occurs before any computed read of that
 Resource; reload completion invalidates only the compiler-authored dependent
 computed records and bindings.
 
+The compiler resume products reserve three exact slots for each `snapshot`
+activation: terminal state plus nullable data and error. Both terminal values
+use the declaration codec under a nullable wrapper, allowing a single closed
+capture shape for either `ready` or `failed`. A Resource-reading computed
+depends on that activation's data slot, so its recomputation cannot precede
+Resource restoration. `reload` activations publish no snapshot slots.
+
 ## Acceptance
 
 - Browser tests prove ready snapshot restoration without endpoint execution,

@@ -314,6 +314,41 @@ impl ResumeSlotTypeAuthority {
                 record.semantic_type,
             );
         }
+        for activation in model.resource_activations.values() {
+            let Some(declaration) = model.resource_declarations.get(&activation.declaration) else {
+                continue;
+            };
+            let snapshot_policy = model
+                .resource_endpoint_resolutions
+                .iter()
+                .any(|resolution| {
+                    resolution.owner_component == declaration.owner_component
+                        && resolution.field == declaration.name
+                        && matches!(
+                            resolution.outcome,
+                            crate::ResourceEndpointResolutionOutcome::Resolved(ref endpoint)
+                                if matches!(
+                                    endpoint.endpoint.resume,
+                                    crate::SemanticPackageResourceResumePolicy::Snapshot
+                                )
+                        )
+                });
+            if !snapshot_policy {
+                continue;
+            }
+            types.insert(
+                ResumeExistingSlot::ResourceState(activation.id.state_slot()),
+                SemanticType::String,
+            );
+            types.insert(
+                ResumeExistingSlot::ResourceData(activation.id.data_slot()),
+                SemanticType::Union(vec![SemanticType::Null, declaration.data_type.clone()]),
+            );
+            types.insert(
+                ResumeExistingSlot::ResourceError(activation.id.error_slot()),
+                SemanticType::Union(vec![SemanticType::Null, declaration.error_type.clone()]),
+            );
+        }
         for record in build_computed_instance_slot_registry(model, &ir).records {
             if let Some(semantic_type) = model.semantic_type_of(&record.computed_id) {
                 types.insert(
@@ -544,13 +579,37 @@ fn diagnostic(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ObjectType;
+    use crate::{
+        build_application_semantic_model_for_unit_with_packages, parse_semantic_package_contract,
+        CompilationUnit, ObjectType, SemanticPackageResolutionTable,
+    };
 
     fn model(source: &str) -> ApplicationSemanticModel {
         crate::build_application_semantic_model(&presolve_parser::parse_file(
             "src/ResumeSchema.tsx",
             source,
         ))
+    }
+
+    fn resource_model(resume_policy: &str) -> ApplicationSemanticModel {
+        let unit = CompilationUnit::parse_sources([(
+            "src/Profile.tsx",
+            r#"
+import { loadProfile } from "profile-service";
+@component("x-profile") @route("/") class Profile extends Component {
+  @resource("loadProfile") profile!: Resource<string, string>;
+  @computed() get profileName(): string | null { return this.profile.data; }
+  render() { return <main>{this.profileName}</main>; }
+}
+"#,
+        )]);
+        let contract = parse_semantic_package_contract(&format!(
+            r#"{{"schema_version":1,"package":"profile-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{{"loadProfile":{{"kind":"resource","type_signature":"() -> Resource<string, string>","runtime_module":"dist/load-profile.js","resume_policy":"{resume_policy}","resource_endpoint":{{"execution_boundary":"shared","cancellation":"abort","resume":"{resume_policy}"}}}}}}}}"#
+        ))
+        .expect("resource contract");
+        let mut packages = SemanticPackageResolutionTable::default();
+        packages.insert("profile-service".into(), contract).unwrap();
+        build_application_semantic_model_for_unit_with_packages(&unit, &packages)
     }
 
     #[test]
@@ -660,6 +719,138 @@ mod tests {
                 ResumeValueCodec::StringCodec
             )
         )));
+    }
+
+    #[test]
+    fn snapshot_resources_publish_instance_qualified_terminal_slots_before_computed_recompute() {
+        let model = resource_model("snapshot");
+        let liveness = build_resume_liveness_plan(&model);
+        let resource_slots =
+            liveness.slots_for_reason(crate::ResumeRetentionReason::ResourceSnapshotValue);
+        assert_eq!(resource_slots.len(), 3);
+        assert!(resource_slots.iter().all(|slot| matches!(
+            slot.existing_slot,
+            ResumeExistingSlot::ResourceState(_)
+                | ResumeExistingSlot::ResourceData(_)
+                | ResumeExistingSlot::ResourceError(_)
+        )));
+        let computed = liveness
+            .recomputable
+            .iter()
+            .find(|record| {
+                matches!(
+                    record.slot.existing_slot,
+                    ResumeExistingSlot::ComputedCache(_)
+                )
+            })
+            .expect("profile computed cache");
+        assert!(matches!(
+            computed.slot.direct_dependencies.as_slice(),
+            [ResumeExistingSlot::ResourceData(_)]
+        ));
+
+        let registry = build_resume_schema_registry(&model);
+        let codecs = registry
+            .schemas
+            .iter()
+            .flat_map(|schema| &schema.slots)
+            .map(|slot| (&slot.existing_slot, &slot.codec))
+            .collect::<BTreeMap<_, _>>();
+        assert!(codecs.iter().any(|(slot, codec)| matches!(
+            (slot, codec),
+            (
+                ResumeExistingSlot::ResourceState(_),
+                ResumeValueCodec::StringCodec
+            )
+        )));
+        assert_eq!(
+            codecs
+                .iter()
+                .filter(|(slot, codec)| matches!(
+                    (slot, codec),
+                    (ResumeExistingSlot::ResourceData(_), ResumeValueCodec::NullableCodec(inner))
+                        if **inner == ResumeValueCodec::StringCodec
+                ) || matches!(
+                    (slot, codec),
+                    (ResumeExistingSlot::ResourceError(_), ResumeValueCodec::NullableCodec(inner))
+                        if **inner == ResumeValueCodec::StringCodec
+                ))
+                .count(),
+            2
+        );
+        let resource_slot_ids = registry
+            .schemas
+            .iter()
+            .flat_map(|schema| &schema.slots)
+            .filter(|slot| {
+                matches!(
+                    slot.existing_slot,
+                    ResumeExistingSlot::ResourceState(_)
+                        | ResumeExistingSlot::ResourceData(_)
+                        | ResumeExistingSlot::ResourceError(_)
+                )
+            })
+            .map(|slot| slot.resume_slot_id.clone())
+            .collect::<BTreeSet<_>>();
+        let capture = crate::build_resume_capture_plan(&model);
+        let captured = capture
+            .programs
+            .iter()
+            .flat_map(|program| &program.instructions)
+            .filter_map(|instruction| match instruction {
+                crate::ResumeCaptureInstruction::ReadSlot { slot_id } => Some(slot_id.clone()),
+                _ => None,
+            })
+            .collect::<BTreeSet<_>>();
+        assert!(resource_slot_ids.is_subset(&captured));
+        let restore = crate::build_resume_restore_plan(&model);
+        assert_eq!(
+            restore
+                .programs
+                .iter()
+                .flat_map(|program| &program.slot_assignments)
+                .filter(|assignment| matches!(
+                    assignment.slot,
+                    ResumeExistingSlot::ResourceState(_)
+                        | ResumeExistingSlot::ResourceData(_)
+                        | ResumeExistingSlot::ResourceError(_)
+                ))
+                .map(|assignment| assignment.phase)
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from([crate::ResumeRestorePhase::R3RestoreMutableStateAndResources])
+        );
+        let manifest = crate::build_resume_manifest(&model);
+        assert_eq!(
+            manifest
+                .slot_schemas
+                .iter()
+                .filter(|slot| matches!(
+                    slot.retention_reason,
+                    crate::resume_manifest::ResumeManifestRetentionReason::SerializableResourceValue
+                ))
+                .count(),
+            3
+        );
+        assert!(validate_resume_schema_registry(&model, &registry).is_ok());
+    }
+
+    #[test]
+    fn reload_resources_do_not_publish_snapshot_slots() {
+        let model = resource_model("reload");
+        let liveness = build_resume_liveness_plan(&model);
+        assert!(liveness
+            .slots_for_reason(crate::ResumeRetentionReason::ResourceSnapshotValue)
+            .is_empty());
+        assert!(build_resume_schema_registry(&model)
+            .schemas
+            .iter()
+            .flat_map(|schema| &schema.slots)
+            .all(|slot| !matches!(
+                slot.existing_slot,
+                ResumeExistingSlot::ResourceState(_)
+                    | ResumeExistingSlot::ResourceData(_)
+                    | ResumeExistingSlot::ResourceError(_)
+            )));
     }
 
     #[test]

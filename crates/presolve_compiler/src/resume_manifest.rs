@@ -1232,6 +1232,9 @@ fn manifest_provenance(provenance: &SourceProvenance) -> ResumeManifestProvenanc
 fn manifest_retention_reason(reason: ResumeRetentionReason) -> ResumeManifestRetentionReason {
     match reason {
         ResumeRetentionReason::MutableState => ResumeManifestRetentionReason::MutableState,
+        ResumeRetentionReason::ResourceSnapshotValue => {
+            ResumeManifestRetentionReason::SerializableResourceValue
+        }
         ResumeRetentionReason::NonRecomputableComputedCache
         | ResumeRetentionReason::ComputedDirtyState
         | ResumeRetentionReason::PureEagerComputedCache
