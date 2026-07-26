@@ -2020,6 +2020,16 @@ const RUNTIME_STUB: &str = r#"(() => {
     });
   }
 
+  function effectInstanceTargets(effectArtifact, effect, actionInstanceId = null) {
+    const records = (effectArtifact?.instances ?? [])
+      .filter((record) => record.effect === effect.effect)
+      .filter((record) => actionInstanceId === null || record.component_instance === actionInstanceId)
+      .sort((left, right) => left.depth - right.depth
+        || left.declaration_order - right.declaration_order
+        || left.effect_instance.localeCompare(right.effect_instance));
+    return records.length === 0 ? [null] : records;
+  }
+
   function executeEffectProgram(store, effect, evidence, program = effect.program) {
     const values = new Map();
 
@@ -2042,30 +2052,40 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
-  function runEffect(store, effect, evidence) {
-    const cleanup = store.effectCleanups.get(effect.effect);
-    if (cleanup !== undefined) {
-      const cleanupEvidence = { capability_operations: [] };
-      executeEffectProgram(store, effect, cleanupEvidence, cleanup);
-      evidence.cleanup_capability_operations = cleanupEvidence.capability_operations;
-      store.effectCleanups.delete(effect.effect);
-    }
-    executeEffectProgram(store, effect, evidence);
-    if (effect.cleanup_program !== null && effect.cleanup_program !== undefined) {
-      store.effectCleanups.set(effect.effect, effect.cleanup_program);
+  function runEffect(store, effect, evidence, instance = null) {
+    const key = instance?.effect_instance ?? effect.effect;
+    const priorExecutionContext = store.activeExecutionContext;
+    if (instance !== null) store.activeExecutionContext = { component_instance_id: instance.component_instance };
+    try {
+      const cleanup = store.effectCleanups.get(key);
+      if (cleanup !== undefined) {
+        const cleanupEvidence = { capability_operations: [] };
+        executeEffectProgram(store, effect, cleanupEvidence, cleanup);
+        evidence.cleanup_capability_operations = cleanupEvidence.capability_operations;
+        store.effectCleanups.delete(key);
+      }
+      executeEffectProgram(store, effect, evidence);
+      if (effect.cleanup_program !== null && effect.cleanup_program !== undefined) {
+        store.effectCleanups.set(key, effect.cleanup_program);
+      }
+    } finally {
+      store.activeExecutionContext = priorExecutionContext;
     }
   }
 
   function executeInitialEffects(store) {
     for (const [effectBatchIndex, effects] of initialEffectBatches(store.effectArtifact)) {
       for (const effect of effects) {
-        const evidence = {
-          effect: effect.effect,
-          effect_batch_index: effectBatchIndex,
-          capability_operations: []
-        };
-        runEffect(store, effect, evidence);
-        store.initialEffectRuns.push(evidence);
+        for (const instance of effectInstanceTargets(store.effectArtifact, effect)) {
+          const evidence = {
+            effect: effect.effect,
+            effect_instance: instance?.effect_instance,
+            effect_batch_index: effectBatchIndex,
+            capability_operations: []
+          };
+          runEffect(store, effect, evidence, instance);
+          store.initialEffectRuns.push(evidence);
+        }
       }
     }
   }
@@ -2077,13 +2097,16 @@ const RUNTIME_STUB: &str = r#"(() => {
     for (const [effectBatchIndex, effects] of initialEffectBatches(store.effectArtifact)) {
       for (const effect of effects) {
         if (effect.run_on_resume !== true) continue;
-        const evidence = {
-          effect: effect.effect,
-          effect_batch_index: effectBatchIndex,
-          capability_operations: []
-        };
-        runEffect(store, effect, evidence);
-        store.initialEffectRuns.push(evidence);
+        for (const instance of effectInstanceTargets(store.effectArtifact, effect)) {
+          const evidence = {
+            effect: effect.effect,
+            effect_instance: instance?.effect_instance,
+            effect_batch_index: effectBatchIndex,
+            capability_operations: []
+          };
+          runEffect(store, effect, evidence, instance);
+          store.initialEffectRuns.push(evidence);
+        }
       }
     }
   }
@@ -2123,14 +2146,18 @@ const RUNTIME_STUB: &str = r#"(() => {
       actionBatchId
     )) {
       for (const effect of effects) {
-        const evidence = {
-          action_batch_id: actionBatchId,
-          effect: effect.effect,
-          effect_batch_index: effectBatchIndex,
-          capability_operations: []
-        };
-        runEffect(store, effect, evidence);
-        store.completedActionEffectRuns.push(evidence);
+        const actionInstanceId = store.activeExecutionContext?.component_instance_id ?? null;
+        for (const instance of effectInstanceTargets(store.effectArtifact, effect, actionInstanceId)) {
+          const evidence = {
+            action_batch_id: actionBatchId,
+            effect: effect.effect,
+            effect_instance: instance?.effect_instance,
+            effect_batch_index: effectBatchIndex,
+            capability_operations: []
+          };
+          runEffect(store, effect, evidence, instance);
+          store.completedActionEffectRuns.push(evidence);
+        }
       }
     }
   }

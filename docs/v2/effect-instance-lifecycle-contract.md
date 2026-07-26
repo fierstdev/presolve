@@ -33,6 +33,10 @@ effect names, or source text.
 
 The browser runtime must key subscriptions, cleanup registrations, evidence,
 and capability execution context by the instance-qualified effect identity.
+The current runtime executes serialized V2 instance records under their
+component-instance execution context and stores cleanup programs by that
+identity; legacy decorator records remain on their frozen declaration-level
+compatibility path.
 Initial activation follows parent-before-child component initialization.
 Structural removal and explicit application disposal use the component
 artifact's child-before-parent destroy order; within one component instance,
