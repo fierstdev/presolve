@@ -1681,6 +1681,81 @@ const RUNTIME_STUB: &str = r#"(() => {
     });
   }
 
+  function stageStructuralOccurrenceRecords(store, records) {
+    const instanceId = String(records?.occurrence_identity ?? "");
+    const componentId = String(records?.component ?? "");
+    const definition = records?.definition;
+    if (instanceId.length === 0 || componentId.length === 0 || definition === undefined
+      || store.components.has(instanceId) || store.componentInstances.has(instanceId)) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const statePairs = [];
+    const computedPairs = [];
+    let component = null;
+    let staged = false;
+    const rollback = () => {
+      if (!staged) return;
+      for (const [pair, slot] of statePairs) {
+        store.stateSlotsByInstanceStorage.delete(pair);
+        store.storageValues.delete(slot.slot_id);
+        store.bindingsByStateSlot.delete(slot.slot_id);
+      }
+      for (const [pair, slot] of computedPairs) {
+        store.computedSlotsByInstanceComputed.delete(pair);
+        store.computedDirtySlots.delete(slot.dirty_slot_id);
+        store.computedCaches.delete(slot.cache_slot_id);
+        store.bindingsByInstanceComputed.delete(pair);
+      }
+      store.components.delete(instanceId);
+      store.componentInstances.delete(instanceId);
+      staged = false;
+    };
+    try {
+      for (const slot of records.state_slots ?? []) {
+        const pair = `${instanceId}|${slot.storage_id}`;
+        if (store.stateSlotsByInstanceStorage.has(pair) || store.storageValues.has(slot.slot_id)) {
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        store.stateSlotsByInstanceStorage.set(pair, slot);
+        store.storageValues.set(slot.slot_id, initialStateSlotValue(slot));
+        statePairs.push([pair, slot]);
+      }
+      for (const slot of records.computed_slots ?? []) {
+        const pair = `${instanceId}|${slot.computed_id}`;
+        if (store.computedSlotsByInstanceComputed.has(pair)
+          || store.computedDirtySlots.has(slot.dirty_slot_id)
+          || store.computedCaches.has(slot.cache_slot_id)) {
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        store.computedSlotsByInstanceComputed.set(pair, slot);
+        store.computedDirtySlots.set(slot.dirty_slot_id, slot.dirty_initial_value === true);
+        computedPairs.push([pair, slot]);
+      }
+      component = { instance_id: instanceId, name: definition.name, manifest: definition, state: {} };
+      for (const state of store.computedArtifact?.state ?? []) {
+        if (state.component !== definition.name) continue;
+        const slot = store.stateSlotsByInstanceStorage.get(`${instanceId}|${state.storage}`);
+        if (slot === undefined) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        component.state[state.field] = store.storageValues.get(slot.slot_id);
+      }
+      store.components.set(instanceId, component);
+      store.componentInstances.set(instanceId, {
+        instance: instanceId,
+        component: componentId,
+        parent: records.parent_scope,
+        structural_region: records.structural_region,
+        status: "staged"
+      });
+      registerActions(store, component, definition);
+      staged = true;
+    } catch (error) {
+      staged = true;
+      rollback();
+      throw error;
+    }
+    return Object.freeze({ ...records, component, rollback });
+  }
+
   function structuralOccurrenceTemplateRegistry(manifest, componentArtifact, computedArtifact) {
     const components = new Map((manifest.components ?? []).map((component) => [component.component_id, component]));
     if (components.size !== (manifest.components ?? []).length) {
@@ -4849,6 +4924,7 @@ mod tests {
         assert!(runtime.contains("function instantiateStructuralTemplateSlots"));
         assert!(runtime.contains("function rewriteStructuralTemplateIdentity"));
         assert!(runtime.contains("function deriveStructuralOccurrenceRecords"));
+        assert!(runtime.contains("function stageStructuralOccurrenceRecords"));
         assert!(runtime.contains("function structuralOccurrenceTemplateRegistry"));
         assert!(runtime.contains("structuralOccurrenceTemplatesByInvocation"));
         assert!(runtime.contains("structuralStateSlots = new Set()"));

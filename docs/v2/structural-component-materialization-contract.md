@@ -104,6 +104,13 @@ walking for matching application markup. The runtime must roll back all records
 created for an occurrence if any validation, render, marker, or registration
 step fails.
 
+The transaction's first phase derives and stages only occurrence-owned
+State/Computed slots and the component execution record under the opaque
+identity. It is atomic and exposes idempotent rollback; it does not yet make a
+binding, event, DOM node, effect, or resume record live. Later transaction
+phases may proceed only after this stage succeeds, and any later failure must
+invoke the same rollback before touching the host range.
+
 ## Teardown boundary
 
 The materializer exposes one shared, idempotent occurrence-disposal operation.
