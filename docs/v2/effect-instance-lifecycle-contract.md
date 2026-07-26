@@ -43,6 +43,9 @@ artifact's child-before-parent destroy order; within one component instance,
 cleanups run in reverse V2 field declaration order. Application/page disposal
 is now installed and uses this ordering. Structural removal remains fail-closed
 until its component-runtime destroy hook is connected to the same function.
+Structural templates are not active instances; their compiler/runtime
+activation boundary is defined by
+[`structural-effect-instance-contract.md`](structural-effect-instance-contract.md).
 
 An effect program that reads State, computed values, Context, or Slots must
 receive its owning instance context explicitly. Until that execution context
