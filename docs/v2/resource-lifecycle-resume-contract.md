@@ -69,6 +69,11 @@ Browser acceptance covers malformed, `pending`, and `cancelled` Resource
 snapshots: each produces `ResourceSnapshotMismatch`, one cold boot, a cleared
 resume registry, and no retained partial Resource state.
 
+Cold browser teardown dispatches `pagehide` into a pending endpoint and proves
+the compiler-owned `AbortSignal` transitions that activation to `cancelled`.
+Resource artifact JSON and the complete resume manifest are byte-identical
+when the same Resource-bearing source files are supplied in reverse order.
+
 ## Acceptance
 
 - Browser tests prove ready snapshot restoration without endpoint execution,

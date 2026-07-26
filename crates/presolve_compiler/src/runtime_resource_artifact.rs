@@ -373,6 +373,38 @@ class Profile extends Component {
         build_application_semantic_model_for_unit_with_packages(&unit, &packages)
     }
 
+    fn ordered_model(reverse: bool) -> crate::ApplicationSemanticModel {
+        let first = (
+            "src/Account.tsx",
+            r#"import { loadAccount } from "profile-service";
+@component("x-account") @route("/account") class Account extends Component {
+  @resource("loadAccount") account!: Resource<string, string>;
+  render() { return <main>Account</main>; }
+}"#,
+        );
+        let second = (
+            "src/Profile.tsx",
+            r#"import { loadProfile } from "profile-service";
+@component("x-profile") @route("/profile") class Profile extends Component {
+  @resource("loadProfile") profile!: Resource<string, string>;
+  render() { return <main>Profile</main>; }
+}"#,
+        );
+        let files = if reverse {
+            [second, first]
+        } else {
+            [first, second]
+        };
+        let unit = CompilationUnit::parse_sources(files);
+        let contract = parse_semantic_package_contract(
+            r#"{"schema_version":1,"package":"profile-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadAccount":{"kind":"resource","type_signature":"() -> Resource<string, string>","runtime_module":"dist/load-account.js","resume_policy":"snapshot","resource_endpoint":{"execution_boundary":"shared","cancellation":"abort","resume":"snapshot"}},"loadProfile":{"kind":"resource","type_signature":"() -> Resource<string, string>","runtime_module":"dist/load-profile.js","resume_policy":"snapshot","resource_endpoint":{"execution_boundary":"shared","cancellation":"abort","resume":"snapshot"}}}}"#,
+        )
+        .expect("resource contract");
+        let mut packages = SemanticPackageResolutionTable::default();
+        packages.insert("profile-service".into(), contract).unwrap();
+        build_application_semantic_model_for_unit_with_packages(&unit, &packages)
+    }
+
     #[test]
     fn projects_resolved_resource_declaration_and_idle_activation_deterministically() {
         let model = model();
@@ -446,6 +478,20 @@ class Profile extends Component {
             error,
             crate::RuntimeResourceArtifactValidationError::InvalidResumeSlotIdentity { .. }
         )));
+    }
+
+    #[test]
+    fn resource_artifact_and_resume_manifest_are_deterministic_under_source_reversal() {
+        let forward = ordered_model(false);
+        let reverse = ordered_model(true);
+        assert_eq!(
+            runtime_resource_artifact_json(&build_runtime_resource_artifact(&forward)),
+            runtime_resource_artifact_json(&build_runtime_resource_artifact(&reverse))
+        );
+        assert_eq!(
+            crate::resume_manifest_json(&crate::build_resume_manifest(&forward)),
+            crate::resume_manifest_json(&crate::build_resume_manifest(&reverse))
+        );
     }
 
     #[test]

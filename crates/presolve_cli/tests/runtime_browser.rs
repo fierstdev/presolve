@@ -494,6 +494,55 @@ const wait = setInterval(() => {{
 
     fs::write(
         out_dir.join("resource-endpoint.js"),
+        "export function loadProfile({ signal }) { window.__PRESOLVE_RESOURCE_PENDING__ = true; return new Promise((resolve) => signal.addEventListener('abort', () => { window.__PRESOLVE_RESOURCE_ABORTED__ = true; resolve('late'); }, { once: true })); }\n",
+    )
+    .expect("failed to write teardown Resource endpoint module");
+    let teardown_probe = reload_index.replace(
+        "</body>",
+        r#"<script>
+const deadline = Date.now() + 4000;
+const trigger = setInterval(() => {
+  if (window.__PRESOLVE_RESOURCE_PENDING__ === true) {
+    clearInterval(trigger);
+    window.dispatchEvent(new Event("pagehide"));
+  } else if (Date.now() > deadline) {
+    clearInterval(trigger);
+  }
+}, 20);
+const wait = setInterval(() => {
+  const runtime = window.__PRESOLVE__;
+  const resource = runtime?.resources?.find((record) => record.id.includes("resource:profile"));
+  if (window.__PRESOLVE_RESOURCE_ABORTED__ === true && resource?.state === "cancelled") {
+    clearInterval(wait);
+    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_RESOURCE_TEARDOWN_BROWSER_TEST_PASS</div>");
+  } else if (Date.now() > deadline) {
+    clearInterval(wait);
+    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_RESOURCE_TEARDOWN_BROWSER_TEST_FAIL</div>");
+  }
+}, 20);
+</script></body>"#,
+    );
+    fs::write(out_dir.join("teardown-probe.html"), teardown_probe)
+        .expect("failed to write Resource teardown probe");
+    let server = StaticServer::start(out_dir.clone());
+    let profile_dir = out_dir.join(format!("chrome-teardown-profile-{}", std::process::id()));
+    fs::create_dir_all(&profile_dir).expect("failed to create Resource teardown Chrome profile");
+    let output = run_chrome_probe(
+        chrome.clone(),
+        &format!("--user-data-dir={}", profile_dir.display()),
+        &format!("http://127.0.0.1:{}/teardown-probe.html", server.port),
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("PRESOLVE_RESOURCE_TEARDOWN_BROWSER_TEST_PASS"),
+        "Resource teardown browser probe failed\nstdout:\n{}\nstderr:\n{}",
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    fs::write(
+        out_dir.join("resource-endpoint.js"),
         "export async function loadProfile() { return { name: 'Ada' }; }\n",
     )
     .expect("failed to write codec-invalid Resource endpoint module");
