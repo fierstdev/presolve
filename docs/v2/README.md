@@ -61,6 +61,9 @@ normative source for this handoff.
 - [Resource lifecycle and resume contract](resource-lifecycle-resume-contract.md)
   defines compiler-owned cold, snapshot, reload, cancellation, and fallback
   behavior for declared Resource endpoints.
+- [Route-loader handoff contract](route-loader-handoff-contract.md) fixes the
+  integrity-bound compiler publication boundary and the explicit no-executor
+  rule for server route loaders.
 - [V2 effect-field source contract](effect-field-source-contract.md) defines
   the authority-backed, decorator-free effect declaration boundary before
   lifecycle runtime adoption.
