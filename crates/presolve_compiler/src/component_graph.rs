@@ -710,6 +710,15 @@ pub enum BuiltinPureOperation {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EffectBodySyntax {
     pub statements: Vec<EffectStatementSyntax>,
+    pub cleanup: Option<EffectCleanupSyntax>,
+}
+
+/// A retained cleanup callback owned by a V2 effect field or legacy effect body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EffectCleanupSyntax {
+    pub is_async: bool,
+    pub body: Box<EffectBodySyntax>,
+    pub span: SourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -4248,6 +4257,11 @@ fn effect_body_from_parsed(body: &ParsedEffectBody) -> EffectBodySyntax {
                 span: statement.span,
             })
             .collect(),
+        cleanup: body.cleanup.as_ref().map(|cleanup| EffectCleanupSyntax {
+            is_async: cleanup.is_async,
+            body: Box::new(effect_body_from_parsed(&cleanup.body)),
+            span: cleanup.span,
+        }),
     }
 }
 

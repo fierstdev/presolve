@@ -246,6 +246,29 @@ class Counter {
     }
 
     #[test]
+    fn retains_inline_effect_cleanup_without_recognizing_the_callee() {
+        let source = r#"
+class Counter {
+  sync = observe(() => {
+    document.title = this.title;
+    return () => { document.title = ""; };
+  });
+}
+"#;
+        let parsed = parse_file("src/Counter.tsx", source);
+        let body = parsed.classes[0].properties[0]
+            .initializer_call
+            .as_ref()
+            .and_then(|call| call.inline_handler.as_ref())
+            .and_then(|handler| handler.effect_body.as_ref())
+            .expect("general inline block body");
+        assert_eq!(body.statements.len(), 1);
+        let cleanup = body.cleanup.as_ref().expect("cleanup callback");
+        assert!(!cleanup.is_async);
+        assert_eq!(cleanup.body.statements.len(), 1);
+    }
+
+    #[test]
     fn retains_decorated_context_field_declaration_facts() {
         let source = r#"
 @component("x-app-shell")

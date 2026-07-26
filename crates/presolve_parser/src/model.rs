@@ -401,6 +401,15 @@ pub struct ParsedMethod {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedEffectBody {
     pub statements: Vec<ParsedEffectStatement>,
+    pub cleanup: Option<ParsedEffectCleanup>,
+}
+
+/// A synchronous cleanup callback returned from a retained inline effect body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedEffectCleanup {
+    pub span: SourceSpan,
+    pub is_async: bool,
+    pub body: Box<ParsedEffectBody>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

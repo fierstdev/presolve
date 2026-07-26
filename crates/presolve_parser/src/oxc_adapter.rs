@@ -19,7 +19,7 @@ use crate::model::{
     ParsedArithmeticExpressionKind, ParsedArithmeticOperator, ParsedClass, ParsedClassHeritage,
     ParsedComparisonOperator, ParsedComputedExpression, ParsedComputedExpressionKind,
     ParsedConstantExpression, ParsedConstantExpressionKind, ParsedDecorator, ParsedEffectBody,
-    ParsedEffectExpression, ParsedEffectExpressionKind, ParsedEffectStatement,
+    ParsedEffectCleanup, ParsedEffectExpression, ParsedEffectExpressionKind, ParsedEffectStatement,
     ParsedEffectStatementKind, ParsedEventHandler, ParsedExport, ParsedExportKind,
     ParsedExportSpecifier, ParsedFile, ParsedImport, ParsedImportSpecifier, ParsedInitializerCall,
     ParsedInlineHandler, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild,
@@ -732,7 +732,7 @@ fn parsed_inline_handler_body(
         is_expression_body,
         state_updates,
         unsupported_statement_spans,
-        effect_body: (!is_expression_body).then(|| parsed_effect_body(body, source)),
+        effect_body: (!is_expression_body).then(|| parsed_inline_effect_body(body, source)),
     }
 }
 
@@ -852,17 +852,59 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
 }
 
 fn parsed_effect_body(body: &oxc_ast::ast::FunctionBody<'_>, source: &str) -> ParsedEffectBody {
+    parsed_effect_body_with_cleanup(body, source, false)
+}
+
+fn parsed_inline_effect_body(
+    body: &oxc_ast::ast::FunctionBody<'_>,
+    source: &str,
+) -> ParsedEffectBody {
+    parsed_effect_body_with_cleanup(body, source, true)
+}
+
+fn parsed_effect_body_with_cleanup(
+    body: &oxc_ast::ast::FunctionBody<'_>,
+    source: &str,
+    allow_cleanup: bool,
+) -> ParsedEffectBody {
     let final_statement = body.statements.len().saturating_sub(1);
+    let cleanup = allow_cleanup
+        .then(|| body.statements.last())
+        .flatten()
+        .and_then(|statement| parsed_effect_cleanup(statement, source));
     ParsedEffectBody {
         statements: body
             .statements
             .iter()
             .enumerate()
+            .filter(|(index, _)| cleanup.is_none() || *index != final_statement)
             .map(|(index, statement)| {
                 parsed_effect_statement(statement, index == final_statement, source)
             })
             .collect(),
+        cleanup,
     }
+}
+
+fn parsed_effect_cleanup(statement: &Statement<'_>, source: &str) -> Option<ParsedEffectCleanup> {
+    let Statement::ReturnStatement(return_statement) = statement else {
+        return None;
+    };
+    let expression = return_statement.argument.as_ref()?;
+    let (span, is_async, body) = match expression {
+        Expression::ArrowFunctionExpression(handler) if !handler.expression => {
+            (handler.span, handler.r#async, handler.body.as_ref())
+        }
+        Expression::FunctionExpression(handler) => {
+            (handler.span, handler.r#async, handler.body.as_deref()?)
+        }
+        _ => return None,
+    };
+    Some(ParsedEffectCleanup {
+        span: source_span(source, span),
+        is_async,
+        body: Box::new(parsed_effect_body(body, source)),
+    })
 }
 
 fn parsed_effect_statement(
