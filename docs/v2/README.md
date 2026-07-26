@@ -40,6 +40,9 @@ normative source for this handoff.
 - [V2 authoring build-adoption contract](authoring-build-adoption-contract.md)
   records the required authority bridge and downstream path for decorator-free
   projects.
+- [V2 canonical ASM adapter contract](canonical-asm-adapter-contract.md)
+  fixes the no-fallback boundary for canonical authoring records entering route
+  and publication products.
 - [Vite adapter boundary](vite-adapter.md) records the compiler-product-only
   integration seam for the required external backend.
 - [Presolve-aware HMR contract](hmr-contract.md) records the compiler-selected
