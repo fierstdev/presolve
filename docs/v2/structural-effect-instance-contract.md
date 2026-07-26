@@ -14,6 +14,14 @@ declaration ID, structural-region ID, parent template/instance, depth, field
 declaration order, and existing main/cleanup program references. It contains
 no DOM selector, callback, source spelling, or user-controlled list key.
 
+Each structural-region program must additionally publish its exact renderer
+address: the canonical owning component ID and the generated conditional or
+keyed-list template-node ID. The compiler derives that pair from the same
+semantic template entity that issued the structural-region ID. The browser
+validates the pair against the template manifest before it may use the program;
+it must never search the DOM for a matching shape or infer an address from a
+selector.
+
 Static planned instances remain ordinary effect-instance records. A structural
 effect template is inactive metadata and must not execute or register cleanup.
 

@@ -7,8 +7,9 @@ use crate::{
     OptimizedComponentIrReport, OrdinaryTemplateBindingKind, OrdinaryTemplateTargetKind,
     RuntimeComponentRegistry, SerializationCompatibility,
 };
+use crate::{TemplateChild, TemplateNode, TemplateSemanticKind};
 
-pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 4;
+pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 5;
 
 /// Public H14 compiler artifact. All executable references are canonical IDs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -134,6 +135,10 @@ pub struct SerializedDestructionMetadata {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SerializedStructuralComponentProgram {
     pub region: String,
+    /// Canonical component that owns the conditional or keyed-list host.
+    pub host_component: String,
+    /// Exact compiler-generated template node ID for the structural host.
+    pub host_node: String,
     pub template_instances: Vec<String>,
     pub destroy_order: Vec<String>,
     pub create_order: Vec<String>,
@@ -268,29 +273,130 @@ pub fn build_runtime_component_artifact(
             })
             .collect();
     }
-    let mut programs = std::collections::BTreeMap::<String, Vec<String>>::new();
+    let mut programs = std::collections::BTreeMap::<String, StructuralProgramBuild>::new();
     for instance in model.component_instance_plan.instances.values() {
         if instance.status == crate::ComponentInstanceStatus::StructuralTemplate {
             if let Some(region) = &instance.structural_region {
                 programs
                     .entry(region.to_string())
-                    .or_default()
+                    .or_insert_with(|| structural_program_build(model, region))
+                    .template_instances
                     .push(instance.id.to_string());
             }
         }
     }
     artifact.structural_programs = programs
         .into_iter()
-        .map(
-            |(region, template_instances)| SerializedStructuralComponentProgram {
-                region,
-                create_order: template_instances.clone(),
-                destroy_order: template_instances.iter().rev().cloned().collect(),
-                template_instances,
-            },
-        )
+        .map(|(region, program)| SerializedStructuralComponentProgram {
+            region,
+            host_component: program.host_component,
+            host_node: program.host_node,
+            create_order: program.template_instances.clone(),
+            destroy_order: program.template_instances.iter().rev().cloned().collect(),
+            template_instances: program.template_instances,
+        })
         .collect();
     artifact
+}
+
+#[derive(Debug, Clone)]
+struct StructuralProgramBuild {
+    host_component: String,
+    host_node: String,
+    template_instances: Vec<String>,
+}
+
+/// Resolve a structural-region ID back to its exact compiler-authored host.
+///
+/// A region ID is derived from the semantic template entity, while the DOM
+/// renderer addresses the same construct by its generated template node ID.
+/// This is the only compiler join between those domains; runtime code must not
+/// infer it from DOM shape, selectors, or user data.
+fn structural_program_build(
+    model: &ApplicationSemanticModel,
+    region: &crate::ComponentStructuralRegionId,
+) -> StructuralProgramBuild {
+    let entity = crate::structural_template_entity_for_region(region, &model.template_entities)
+        .expect("structural component instance references a semantic template host");
+    let template_id = entity
+        .owner
+        .entity_id()
+        .expect("structural template host has a template owner");
+    let template = model
+        .templates
+        .iter()
+        .find(|template| &template.id == template_id)
+        .expect("structural template host has an emitted template");
+    let component = template
+        .owner
+        .entity_id()
+        .expect("emitted template has a component owner");
+    let host_node = structural_host_node(template, entity.kind, entity.provenance.span)
+        .expect("structural template host has an emitted runtime node");
+
+    StructuralProgramBuild {
+        host_component: component.to_string(),
+        host_node,
+        template_instances: Vec::new(),
+    }
+}
+
+fn structural_host_node(
+    template: &TemplateNode,
+    kind: TemplateSemanticKind,
+    span: presolve_parser::SourceSpan,
+) -> Option<String> {
+    fn visit(
+        children: &[TemplateChild],
+        kind: TemplateSemanticKind,
+        span: presolve_parser::SourceSpan,
+    ) -> Option<String> {
+        for child in children {
+            match child {
+                TemplateChild::Element(element) => {
+                    if let Some(id) = visit(&element.children, kind, span) {
+                        return Some(id);
+                    }
+                }
+                TemplateChild::Fragment(fragment) => {
+                    if let Some(id) = visit(&fragment.children, kind, span) {
+                        return Some(id);
+                    }
+                }
+                TemplateChild::Conditional(conditional) => {
+                    if kind == TemplateSemanticKind::Conditional && conditional.span == span {
+                        return Some(conditional.id.0.clone());
+                    }
+                    if let Some(id) = visit(&conditional.when_true, kind, span)
+                        .or_else(|| visit(&conditional.when_false, kind, span))
+                    {
+                        return Some(id);
+                    }
+                }
+                TemplateChild::List(list) => {
+                    if kind == TemplateSemanticKind::List && list.span == span {
+                        return Some(list.id.0.clone());
+                    }
+                    if let Some(id) = visit(&list.item_template, kind, span) {
+                        return Some(id);
+                    }
+                }
+                TemplateChild::Text { .. } | TemplateChild::Binding { .. } => {}
+            }
+        }
+        None
+    }
+
+    template
+        .root
+        .as_ref()
+        .and_then(|root| visit(&root.children, kind, span))
+        .or_else(|| {
+            template
+                .root_fragment
+                .as_ref()
+                .and_then(|fragment| visit(&fragment.children, kind, span))
+        })
 }
 
 #[must_use]
@@ -390,7 +496,10 @@ pub fn validate_runtime_component_artifact(
         return Err("unsupported component runtime artifact schema version".to_string());
     }
     if artifact.structural_programs.iter().any(|program| {
-        program.create_order != program.template_instances
+        program.region.is_empty()
+            || program.host_component.is_empty()
+            || program.host_node.is_empty()
+            || program.create_order != program.template_instances
             || program
                 .destroy_order
                 .iter()
@@ -401,10 +510,30 @@ pub fn validate_runtime_component_artifact(
     }) {
         return Err("component artifact has invalid structural program ordering".to_string());
     }
+    let structural_regions = artifact
+        .structural_programs
+        .iter()
+        .map(|program| program.region.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    let structural_hosts = artifact
+        .structural_programs
+        .iter()
+        .map(|program| (program.host_component.as_str(), program.host_node.as_str()))
+        .collect::<std::collections::BTreeSet<_>>();
+    if structural_regions.len() != artifact.structural_programs.len()
+        || structural_hosts.len() != artifact.structural_programs.len()
+    {
+        return Err("component artifact has duplicate structural program addresses".to_string());
+    }
     let instances = artifact
         .instances
         .iter()
         .map(|r| r.instance.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    let structural_template_instances = artifact
+        .structural_programs
+        .iter()
+        .flat_map(|program| program.template_instances.iter().map(String::as_str))
         .collect::<std::collections::BTreeSet<_>>();
     let target_ids = artifact
         .ordinary_template_targets
@@ -509,9 +638,9 @@ pub fn validate_runtime_component_artifact(
         return Err("component artifact has invalid ordinary template projection".to_string());
     }
     if artifact.instances.iter().any(|r| {
-        r.parent
-            .as_deref()
-            .is_some_and(|parent| !instances.contains(parent))
+        r.parent.as_deref().is_some_and(|parent| {
+            !instances.contains(parent) && !structural_template_instances.contains(parent)
+        })
     }) {
         return Err("component artifact has an unknown parent instance".to_string());
     }
@@ -527,10 +656,10 @@ pub fn validate_runtime_component_artifact(
         .enumerate()
         .any(|(index, batch)| {
             batch.index != index
-                || batch
-                    .instances
-                    .iter()
-                    .any(|id| !instances.contains(id.as_str()))
+                || batch.instances.iter().any(|id| {
+                    !instances.contains(id.as_str())
+                        && !structural_template_instances.contains(id.as_str())
+                })
         })
     {
         return Err("component artifact has invalid initialization ordering".to_string());
@@ -633,5 +762,44 @@ mod tests {
 
         artifact.instances[state_instances[1]].state_slots[0].slot_id = first.slot_id.clone();
         assert!(validate_runtime_component_artifact(&artifact).is_err());
+    }
+
+    #[test]
+    fn structural_programs_name_the_exact_compiler_owned_runtime_hosts() {
+        let model = build_application_semantic_model(&presolve_parser::parse_file(
+            "src/StructuralHostArtifact.tsx",
+            r#"
+@component("x-leaf") class Leaf extends Component { render() { return <strong>Leaf</strong>; } }
+@component("x-page") class Page extends Component {
+  visible = state(true);
+  items = state([{ id: "a" }]);
+  render() { return <main>{this.visible ? <Leaf /> : <span>Hidden</span>}<ul>{this.items.map(item => <li key={item.id}><Leaf /></li>)}</ul></main>; }
+}
+"#,
+        ));
+        let artifact = build_runtime_component_artifact(&model, &model.component_ir_optimization);
+        let manifest = crate::build_template_manifest_from_asm(&model);
+
+        assert_eq!(artifact.structural_programs.len(), 2);
+        assert!(
+            validate_runtime_component_artifact(&artifact).is_ok(),
+            "{:?}",
+            validate_runtime_component_artifact(&artifact)
+        );
+        for program in &artifact.structural_programs {
+            let component = manifest
+                .components
+                .iter()
+                .find(|component| component.component_id == program.host_component)
+                .expect("structural program host component");
+            assert!(component.template.nodes.iter().any(|node| {
+                matches!(
+                    node,
+                    crate::template_manifest::ManifestNode::Conditional { id, .. }
+                        | crate::template_manifest::ManifestNode::List { id, .. }
+                        if id == &program.host_node
+                )
+            }));
+        }
     }
 }

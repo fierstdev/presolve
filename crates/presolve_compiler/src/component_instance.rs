@@ -330,6 +330,25 @@ fn enclosing_structural_region(
         })
 }
 
+/// Return the compiler semantic template entity that issued `region`.
+///
+/// Structural-region identity derivation remains centralized here so artifact
+/// producers can join the renderer address without re-creating semantic IDs.
+#[must_use]
+pub fn structural_template_entity_for_region<'a>(
+    region: &ComponentStructuralRegionId,
+    template_entities: &'a [TemplateSemanticEntity],
+) -> Option<&'a TemplateSemanticEntity> {
+    template_entities.iter().find(|entity| {
+        let kind = match entity.kind {
+            TemplateSemanticKind::Conditional => "conditional",
+            TemplateSemanticKind::List => "keyed-list",
+            _ => return false,
+        };
+        ComponentStructuralRegionId::for_template_entity(&entity.id, kind) == *region
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{

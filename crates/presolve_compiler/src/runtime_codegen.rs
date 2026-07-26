@@ -563,6 +563,26 @@ const RUNTIME_STUB: &str = r#"(() => {
       throw new PresolveBootError("PSR_UNSUPPORTED_SCHEMA");
     }
 
+    if (isOrdinaryInstancePair) {
+      for (const program of componentArtifact.structural_programs ?? []) {
+        const component = (manifest.components ?? []).find(
+          (candidate) => candidate.component_id === program.host_component
+        );
+        const host = component?.template?.nodes?.find((node) => node.id === program.host_node);
+        if (component === undefined || host === undefined
+          || (host.kind !== "conditional" && host.kind !== "list")) {
+          reportDiagnostic(
+            diagnostics,
+            "PSR_INVALID_COMPONENT_ARTIFACT",
+            "Structural component metadata did not resolve to an emitted conditional or keyed-list host",
+            { region: program.region, host_component: program.host_component, host_node: program.host_node },
+            true
+          );
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+      }
+    }
+
     if (
       manifest.schema_version === LEGACY_MANIFEST_SCHEMA_VERSION &&
       effectArtifactHasActionPlans(effectArtifact)
@@ -922,6 +942,25 @@ const RUNTIME_STUB: &str = r#"(() => {
       throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
     }
     if (artifact.schema_version === SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION) {
+      if (!Array.isArray(artifact.structural_programs)) {
+        throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      }
+      const structuralRegions = new Set();
+      const structuralHosts = new Set();
+      for (const program of artifact.structural_programs) {
+        const host = `${String(program.host_component)}\u001f${String(program.host_node)}`;
+        if (typeof program.region !== "string" || program.region.length === 0
+          || typeof program.host_component !== "string" || program.host_component.length === 0
+          || typeof program.host_node !== "string" || program.host_node.length === 0
+          || structuralRegions.has(program.region) || structuralHosts.has(host)
+          || !Array.isArray(program.template_instances)
+          || JSON.stringify(program.create_order) !== JSON.stringify(program.template_instances)
+          || JSON.stringify([...(program.destroy_order ?? [])].reverse()) !== JSON.stringify(program.template_instances)) {
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        structuralRegions.add(program.region);
+        structuralHosts.add(host);
+      }
       for (const instance of artifact.instances) {
         if (!Array.isArray(instance.state_slots)) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
         for (const slot of instance.state_slots) {

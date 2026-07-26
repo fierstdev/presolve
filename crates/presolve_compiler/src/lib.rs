@@ -307,8 +307,9 @@ pub use component_initialization::{
 };
 pub use component_instance::{
     plan_component_instances, plan_component_instances_with_virtual_invocations,
-    BlockedComponentInstancePlan, BlockedComponentInstanceReason, ComponentBuildRoot,
-    ComponentBuildRootKind, ComponentInstance, ComponentInstancePlan, ComponentInstanceStatus,
+    structural_template_entity_for_region, BlockedComponentInstancePlan,
+    BlockedComponentInstanceReason, ComponentBuildRoot, ComponentBuildRootKind, ComponentInstance,
+    ComponentInstancePlan, ComponentInstanceStatus,
 };
 pub use component_instance_scope::{
     build_component_instance_scope_graph, validate_component_instance_scope_graph,
