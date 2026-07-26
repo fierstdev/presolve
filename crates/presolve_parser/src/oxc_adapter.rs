@@ -21,14 +21,14 @@ use crate::model::{
     ParsedConstantExpression, ParsedConstantExpressionKind, ParsedDecorator, ParsedEffectBody,
     ParsedEffectExpression, ParsedEffectExpressionKind, ParsedEffectStatement,
     ParsedEffectStatementKind, ParsedEventHandler, ParsedExport, ParsedExportKind,
-    ParsedExportSpecifier, ParsedFile, ParsedImport, ParsedImportSpecifier, ParsedJsxAttribute,
-    ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional, ParsedJsxElement,
-    ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLocalVariable, ParsedLogicalOperator,
-    ParsedMethod, ParsedMethodCall, ParsedMethodParameter, ParsedProperty, ParsedSerializableValue,
-    ParsedSourceAst, ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator,
-    ParsedThisMemberDesignator, ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator,
-    ParsedUnsupportedEffectStatementKind, ParsedValidationRuleArgument,
-    ParsedValidationRuleArgumentKind, ParsedValidationRuleExpression,
+    ParsedExportSpecifier, ParsedFile, ParsedImport, ParsedImportSpecifier, ParsedInitializerCall,
+    ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional,
+    ParsedJsxElement, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLocalVariable,
+    ParsedLogicalOperator, ParsedMethod, ParsedMethodCall, ParsedMethodParameter, ParsedProperty,
+    ParsedSerializableValue, ParsedSourceAst, ParsedStateOperation, ParsedStateUpdate,
+    ParsedStaticMemberDesignator, ParsedThisMemberDesignator, ParsedTypeAlias,
+    ParsedTypeAnnotation, ParsedUnaryOperator, ParsedUnsupportedEffectStatementKind,
+    ParsedValidationRuleArgument, ParsedValidationRuleArgumentKind, ParsedValidationRuleExpression,
     ParsedValidationRuleExpressionKind, SourceSpan,
 };
 
@@ -610,6 +610,15 @@ fn parse_property(
     };
 
     let initializer = property.value.as_ref().and_then(expression_summary);
+    let initializer_call = property.value.as_ref().and_then(|expression| {
+        let Expression::CallExpression(call) = expression else {
+            return None;
+        };
+        Some(ParsedInitializerCall {
+            callee_span: source_span(source, call.callee.span()),
+            span: source_span(source, call.span),
+        })
+    });
     let initializer_literal = property
         .value
         .as_ref()
@@ -649,6 +658,7 @@ fn parse_property(
         name,
         is_identifier_name,
         decorators,
+        initializer_call,
         initializer,
         initializer_literal,
         initializer_expression,

@@ -164,6 +164,9 @@ pub struct ParsedProperty {
     pub name: String,
     pub is_identifier_name: bool,
     pub decorators: Vec<ParsedDecorator>,
+    /// A direct initializer call selected from the general source AST. Its
+    /// callee has no framework meaning until a semantic authority resolves it.
+    pub initializer_call: Option<ParsedInitializerCall>,
     pub initializer: Option<String>,
     pub initializer_literal: Option<ParsedSerializableValue>,
     pub initializer_expression: Option<ParsedComputedExpression>,
@@ -177,6 +180,13 @@ pub struct ParsedProperty {
     pub is_static: bool,
     pub is_definite_assignment: bool,
     pub is_declare: bool,
+    pub span: SourceSpan,
+}
+
+/// Source-faithful facts for a direct class-field initializer call.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedInitializerCall {
+    pub callee_span: SourceSpan,
     pub span: SourceSpan,
 }
 

@@ -164,6 +164,7 @@ pub mod slot;
 pub mod slot_binding;
 pub mod slot_content;
 pub mod slot_projection;
+pub mod state_initializer_lowering;
 pub mod state_instance_storage;
 pub mod state_projection;
 pub mod structural_component;
@@ -941,6 +942,10 @@ pub use slot_content::{
 pub use slot_projection::{
     build_slot_projection_graph_v1, SlotProjectionGraphV1, SlotProjectionRecordV1,
     SlotProjectionStatusV1, SlotResumabilityCoverageV1, SLOT_PROJECTION_SCHEMA_VERSION,
+};
+pub use state_initializer_lowering::{
+    lower_state_initializers_v1, state_initializer_sites_v1, ResolvedStateInitializerV1,
+    StateInitializerLoweringErrorV1, StateInitializerLoweringV1, StateInitializerSiteV1,
 };
 pub use state_instance_storage::{
     build_state_instance_storage_registry, validate_state_instance_storage_registry,

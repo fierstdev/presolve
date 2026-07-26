@@ -171,6 +171,23 @@ class Profile {
     }
 
     #[test]
+    fn retains_direct_initializer_call_spans_without_intrinsic_classification() {
+        let source = "class Counter { count = reactiveCell(0); plain = 1; }";
+        let parsed = parse_file("src/Counter.tsx", source);
+        let property = &parsed.classes[0].properties[0];
+        let call = property
+            .initializer_call
+            .as_ref()
+            .expect("direct calls are retained as syntax facts");
+        assert_eq!(
+            &source[call.callee_span.start..call.callee_span.end],
+            "reactiveCell"
+        );
+        assert_eq!(&source[call.span.start..call.span.end], "reactiveCell(0)");
+        assert!(parsed.classes[0].properties[1].initializer_call.is_none());
+    }
+
+    #[test]
     fn retains_decorated_context_field_declaration_facts() {
         let source = r#"
 @component("x-app-shell")
