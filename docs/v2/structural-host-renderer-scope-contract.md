@@ -45,8 +45,9 @@ a keyed fragment cannot be attached to a conditional host.
 
 Schema v11 `conditional_host_fragments` began with the `static-instance`
 subset. Schema v12 additionally carries `structural-occurrence` fragments for
-nested hosts with no caller-owned Slot projection. Its absence for a Slot-bound
-or keyed host is intentional and must keep materialization inactive.
+nested hosts with no caller-owned Slot projection. Schema v13 adds keyed item
+fragments with the same parent scope. Their absence for a Slot-bound host is
+intentional and must keep materialization inactive.
 
 ## Slot ownership
 

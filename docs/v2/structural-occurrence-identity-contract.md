@@ -8,7 +8,7 @@ the current cold-only structural boundary.
 ## Inputs
 
 The runtime may create an occurrence identity only after it has validated the
-matching schema-v12 structural program and occurrence record. Its four inputs
+matching schema-v13 structural program and occurrence record. Its four inputs
 are:
 
 1. `parent_scope`: the static parent component-instance ID for a top-level

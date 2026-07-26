@@ -590,6 +590,16 @@ const RUNTIME_STUB: &str = r#"(() => {
           );
           throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
         }
+        if (host.kind === "conditional" && program.keyed_host_fragments.length !== 0) {
+          reportDiagnostic(
+            diagnostics,
+            "PSR_INVALID_COMPONENT_ARTIFACT",
+            "Keyed host fragments were attached to a conditional host",
+            { region: program.region, host_component: program.host_component, host_node: program.host_node },
+            true
+          );
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
       }
     }
 
@@ -978,6 +988,7 @@ const RUNTIME_STUB: &str = r#"(() => {
           || typeof program.host_template_entity !== "string" || program.host_template_entity.length === 0
           || structuralRegions.has(program.region) || structuralHosts.has(host)
           || !Array.isArray(program.conditional_host_fragments)
+          || !Array.isArray(program.keyed_host_fragments)
           || !Array.isArray(program.template_instances)
           || !Array.isArray(program.template_occurrences)
           || program.template_occurrences.length !== program.template_instances.length
@@ -991,6 +1002,15 @@ const RUNTIME_STUB: &str = r#"(() => {
                 : true)
             || typeof fragments.when_true_html !== "string" || fragments.when_true_html.length === 0
             || typeof fragments.when_false_html !== "string" || fragments.when_false_html.length === 0)
+          || new Set(program.keyed_host_fragments.map((fragments) => fragments?.host_instance)).size !== program.keyed_host_fragments.length
+          || program.keyed_host_fragments.some((fragments) => typeof fragments?.host_instance !== "string"
+            || typeof fragments.host_scope !== "string"
+            || (fragments.host_scope === "static-instance"
+              ? instancesById.get(fragments.host_instance)?.component !== program.host_component
+              : fragments.host_scope === "structural-occurrence"
+                ? structuralTemplateComponents.get(fragments.host_instance) !== program.host_component
+                : true)
+            || typeof fragments.item_template_html !== "string" || fragments.item_template_html.length === 0)
           || program.template_occurrences.some((occurrence, index) => typeof occurrence?.template_instance !== "string"
             || occurrence.template_instance !== program.template_instances[index]
             || typeof occurrence.invocation !== "string" || typeof occurrence.invocation_template_entity !== "string"

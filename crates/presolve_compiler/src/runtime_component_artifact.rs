@@ -9,7 +9,7 @@ use crate::{
 };
 use crate::{TemplateChild, TemplateNode, TemplateSemanticKind};
 
-pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 12;
+pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 13;
 
 /// Public H14 compiler artifact. All executable references are canonical IDs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -145,6 +145,9 @@ pub struct SerializedStructuralComponentProgram {
     /// instances. Keyed-list and nested host scopes remain absent until their
     /// complete compiler input scopes have an authored product.
     pub conditional_host_fragments: Vec<SerializedStructuralConditionalHostFragments>,
+    /// Compiler-rendered keyed item fragments with exact structural invocation
+    /// anchors. They remain inactive until keyed materialization is admitted.
+    pub keyed_host_fragments: Vec<SerializedStructuralKeyedHostFragment>,
     pub template_occurrences: Vec<SerializedStructuralTemplateOccurrence>,
     pub template_instances: Vec<String>,
     pub destroy_order: Vec<String>,
@@ -159,6 +162,12 @@ pub struct SerializedStructuralConditionalHostFragments {
     pub host_instance: String,
     pub when_true_html: String,
     pub when_false_html: String,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SerializedStructuralKeyedHostFragment {
+    pub host_scope: String,
+    pub host_instance: String,
+    pub item_template_html: String,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SerializedStructuralTemplateOccurrence {
@@ -383,6 +392,17 @@ pub fn build_runtime_component_artifact(
                 host_instance: fragments.host_instance.to_string(),
                 when_true_html: fragments.when_true_html,
                 when_false_html: fragments.when_false_html,
+            })
+            .collect(),
+            keyed_host_fragments: crate::generate_structural_keyed_host_fragments(
+                model,
+                &program.region,
+            )
+            .into_iter()
+            .map(|fragments| SerializedStructuralKeyedHostFragment {
+                host_scope: fragments.host_scope.artifact_text().to_string(),
+                host_instance: fragments.host_instance.to_string(),
+                item_template_html: fragments.item_template_html,
             })
             .collect(),
             template_occurrences: program.template_occurrences,
@@ -610,6 +630,14 @@ pub fn validate_runtime_component_artifact(
                     || fragments.when_true_html.is_empty()
                     || fragments.when_false_html.is_empty()
             })
+            || program.keyed_host_fragments.iter().any(|fragments| {
+                fragments.host_instance.is_empty()
+                    || !matches!(
+                        fragments.host_scope.as_str(),
+                        "static-instance" | "structural-occurrence"
+                    )
+                    || fragments.item_template_html.is_empty()
+            })
             || program.template_occurrences.len() != program.template_instances.len()
             || program.template_occurrences.iter().any(|occurrence| {
                 occurrence.template_html.is_empty()
@@ -700,6 +728,33 @@ pub fn validate_runtime_component_artifact(
             })
     }) {
         return Err("component artifact has invalid conditional host fragments".to_string());
+    }
+    if artifact.structural_programs.iter().any(|program| {
+        let host_instances = program
+            .keyed_host_fragments
+            .iter()
+            .map(|fragments| fragments.host_instance.as_str())
+            .collect::<std::collections::BTreeSet<_>>();
+        host_instances.len() != program.keyed_host_fragments.len()
+            || program.keyed_host_fragments.iter().any(|fragments| {
+                match fragments.host_scope.as_str() {
+                    "static-instance" => {
+                        !instances.contains(fragments.host_instance.as_str())
+                            || instance_components
+                                .get(fragments.host_instance.as_str())
+                                .is_none_or(|component| *component != program.host_component)
+                    }
+                    "structural-occurrence" => {
+                        !structural_template_instances.contains(fragments.host_instance.as_str())
+                            || structural_template_components
+                                .get(fragments.host_instance.as_str())
+                                .is_none_or(|component| *component != program.host_component)
+                    }
+                    _ => true,
+                }
+            })
+    }) {
+        return Err("component artifact has invalid keyed host fragments".to_string());
     }
     let target_ids = artifact
         .ordinary_template_targets
@@ -1098,6 +1153,19 @@ mod tests {
             .contains("data-presolve-structural-invocation="));
         assert!(fragments.when_false_html.contains("Hidden"));
 
+        let keyed = artifact
+            .structural_programs
+            .iter()
+            .find(|program| !program.keyed_host_fragments.is_empty())
+            .expect("keyed host has compiler-authored fragments");
+        let keyed_fragments = &keyed.keyed_host_fragments[0];
+        assert!(keyed_fragments
+            .item_template_html
+            .contains("__ez_list_key__"));
+        assert!(keyed_fragments
+            .item_template_html
+            .contains("data-presolve-structural-invocation="));
+
         let mut invalid_fragments = artifact.clone();
         invalid_fragments
             .structural_programs
@@ -1108,6 +1176,17 @@ mod tests {
             .when_false_html
             .clear();
         assert!(validate_runtime_component_artifact(&invalid_fragments).is_err());
+
+        let mut invalid_keyed = artifact.clone();
+        invalid_keyed
+            .structural_programs
+            .iter_mut()
+            .find(|program| !program.keyed_host_fragments.is_empty())
+            .expect("keyed host has compiler-authored fragments")
+            .keyed_host_fragments[0]
+            .item_template_html
+            .clear();
+        assert!(validate_runtime_component_artifact(&invalid_keyed).is_err());
 
         let mut invalid_host = artifact.clone();
         let idle = invalid_host

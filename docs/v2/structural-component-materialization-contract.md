@@ -53,11 +53,14 @@ ordinary markers and exact structural-invocation anchors. Schema v12 adds the
 compiler-selected `host_scope`: `static-instance` keeps the exact static
 instance ID, while `structural-occurrence` substitutes the already-authorized
 opaque parent occurrence placeholder. A nested host with caller-owned Slot
-projection and every keyed-list host remain absent rather than approximated.
-A runtime must reject a missing fragment and must not use this field for a
-list or a different scope as a fallback.
+projection remains absent rather than approximated. Schema v13 adds
+`keyed_host_fragments`: compiler-rendered keyed item templates that retain the
+existing compiler item/key/index tokens and add exact structural invocation
+anchors. They use the same validated parent host scope, but keyed
+materialization remains inactive. A runtime must reject a missing fragment or
+use of a different host kind or scope as a fallback.
 
-Schemas v10 through v12 are not runtime materializers. They establish the
+Schemas v10 through v13 are not runtime materializers. They establish the
 validated compiler template, membership set, and initial conditional-host
 fragments from which the later complete program must be constructed; the
 runtime must not activate, infer, or partially use them for dynamic component
