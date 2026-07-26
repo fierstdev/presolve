@@ -232,6 +232,7 @@ class Profile {
             "reactiveCell"
         );
         assert_eq!(&source[call.span.start..call.span.end], "reactiveCell(0)");
+        assert_eq!(call.argument_count, 1);
         assert!(parsed.classes[0].properties[1].initializer_call.is_none());
     }
 

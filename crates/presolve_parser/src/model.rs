@@ -212,6 +212,9 @@ pub struct ParsedProperty {
 pub struct ParsedInitializerCall {
     pub callee_span: SourceSpan,
     pub span: SourceSpan,
+    /// The parser records call arity without assigning framework meaning to
+    /// the callee. Semantic lowering uses this to reject malformed intrinsics.
+    pub argument_count: usize,
     /// An inline function argument selected from a general initializer call.
     /// This remains syntax only: a later semantic authority decides whether
     /// the surrounding call is a framework action or some unrelated helper.

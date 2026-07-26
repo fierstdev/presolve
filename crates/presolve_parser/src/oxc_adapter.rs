@@ -674,6 +674,7 @@ fn parse_property(
         Some(ParsedInitializerCall {
             callee_span: source_span(source, call.callee.span()),
             span: source_span(source, call.span),
+            argument_count: call.arguments.len(),
             inline_handler: parsed_inline_handler(call, source),
         })
     });

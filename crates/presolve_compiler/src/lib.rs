@@ -171,6 +171,7 @@ pub mod slot;
 pub mod slot_binding;
 pub mod slot_content;
 pub mod slot_projection;
+pub mod slot_field_lowering;
 pub mod state_initializer_lowering;
 pub mod state_instance_storage;
 pub mod state_projection;
@@ -1005,6 +1006,10 @@ pub use state_instance_storage::{
 pub use state_projection::{
     build_state_projection_v1, StateProjectionRecordV1, StateProjectionV1, StateResumeAdmissionV1,
     StateUpdateCoverageV1, STATE_PROJECTION_SCHEMA_VERSION,
+};
+pub use slot_field_lowering::{
+    lower_slot_fields_v1, slot_field_sites_v1, ResolvedSlotFieldV1, SlotFieldLoweringErrorV1,
+    SlotFieldLoweringV1, SlotFieldSiteV1,
 };
 pub use structural_component::{
     build_structural_component_graph_v1, ComponentInheritanceStatusV1, ComponentPropsResolutionV1,

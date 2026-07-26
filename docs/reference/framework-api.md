@@ -20,7 +20,7 @@ All decorators are compiler intrinsics with no runtime registration authority.
 | `action()` | Method decorator for a transactional interaction boundary. |
 | `computed()` | Getter decorator for a pure synchronous derived value. |
 | `effect()` | Method decorator for a synchronous terminal effect. |
-| `slot()` / `SlotContent` | Field decorator and type for default/named slots. |
+| `slot()` / `SlotContent` | V2 field initializer and type for default/named slots; `@slot()` is legacy compatibility. |
 | `context()` | Field decorator that declares a Context identity. |
 | `provide("Class.field")` | Field decorator that exposes a Context value. |
 | `consume("Class.field")` | Field decorator that receives a Context value. |

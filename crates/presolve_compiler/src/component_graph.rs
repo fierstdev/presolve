@@ -1554,6 +1554,45 @@ pub fn build_v2_component_graph_for_module(
             .iter()
             .map(|field| field.name.as_str())
             .collect::<BTreeSet<_>>();
+        let mut slot_declarations = Vec::new();
+        for candidate in authored.declarations.iter().filter(|candidate| {
+            candidate.kind == crate::CanonicalAuthoredDeclarationKindV1::Slot
+                && candidate.subject.starts_with(&format!("{}.", class.name))
+        }) {
+            let Some(name) = candidate.subject.strip_prefix(&format!("{}.", class.name)) else {
+                continue;
+            };
+            let Some(property) = class.properties.iter().find(|property| property.name == name) else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2S1001",
+                    format!("canonical V2 Slot `{}` has no source field", candidate.subject),
+                ));
+                continue;
+            };
+            let Some(annotation) = property.type_annotation.as_ref().filter(|annotation| annotation.text == "SlotContent") else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2S1002",
+                    format!("canonical V2 Slot `{}` requires the exact SlotContent type", candidate.subject),
+                ));
+                continue;
+            };
+            let declared_type = DeclaredStateType {
+                kind: declared_state_type_kind(&annotation.text),
+                text: annotation.text.clone(),
+                provenance: SourceProvenance::new(&parsed.path, annotation.span),
+            };
+            let slot_provenance = SourceProvenance::new(&parsed.path, property.span);
+            provenance.insert(id.slot_field(name), slot_provenance.clone());
+            slot_declarations.push(SlotDeclaration {
+                authored_field: id.slot_field(name),
+                name: name.to_owned(),
+                kind: if name == "children" { SlotKind::Default } else { SlotKind::Named },
+                declared_type,
+                decorator_provenance: slot_provenance.clone(),
+                name_provenance: SourceProvenance::new(&parsed.path, property.name_span),
+                provenance: slot_provenance,
+            });
+        }
         let mut action_endpoints = Vec::new();
         let mut actions = Vec::new();
         for candidate in authored.declarations.iter().filter(|candidate| {
@@ -1805,7 +1844,7 @@ pub fn build_v2_component_graph_for_module(
             context_declarations: Vec::new(),
             provider_declarations: Vec::new(),
             consumer_declarations: Vec::new(),
-            slot_declarations: Vec::new(),
+            slot_declarations,
             context_declaration_candidates: Vec::new(),
             slot_declaration_candidates: Vec::new(),
             form_declaration_candidates: Vec::new(),
@@ -3453,20 +3492,24 @@ fn slot_declaration_candidates_from_class(
     let mut candidates = Vec::new();
 
     for property in &class.properties {
-        for decorator in property
+        let legacy_decorators = property
             .decorators
             .iter()
             .filter(|decorator| decorator.name == "slot")
-        {
+            .collect::<Vec<_>>();
+        let declaration_sources = legacy_decorators
+            .into_iter()
+            .map(|decorator| (decorator.span, decorator.argument_count, true));
+        for (declaration_span, argument_count, legacy_declaration) in declaration_sources {
             let declaration_kind = if property.is_static {
                 AuthoredDeclarationKind::StaticField
             } else {
                 AuthoredDeclarationKind::InstanceField
             };
             let mut violations = Vec::new();
-            if decorator.argument_count != 0 {
+            if argument_count != 0 {
                 violations.push(SlotDeclarationViolation::DecoratorArity {
-                    actual: decorator.argument_count,
+                    actual: argument_count,
                     expected: 0,
                 });
             }
@@ -3475,7 +3518,7 @@ fn slot_declaration_candidates_from_class(
             }
             let has_conflict = property.initializer.as_deref() == Some("state(...)")
                 || property.decorators.iter().any(|other| {
-                    other.name != "slot"
+                    (legacy_declaration || other.name != "slot")
                         && matches!(
                             other.name.as_str(),
                             "context"
@@ -3509,24 +3552,24 @@ fn slot_declaration_candidates_from_class(
                     actual: declared_type.as_ref().map(|declared| declared.text.clone()),
                 });
             }
-            if property.initializer.is_some() {
+            if legacy_declaration && property.initializer.is_some() {
                 violations.push(SlotDeclarationViolation::ForbiddenInitializer);
             }
-            if !property.is_definite_assignment {
+            if legacy_declaration && !property.is_definite_assignment {
                 violations.push(SlotDeclarationViolation::DefiniteAssignmentRequired);
             }
             candidates.push(AuthoredSlotDeclarationCandidate {
                 id: SlotDeclarationCandidateId::for_component_position(
                     component,
-                    decorator.span.start,
+                    declaration_span.start,
                 ),
                 owner_component: component.clone(),
                 authored_declaration: component.slot_field(&property.name),
                 declaration_kind,
                 field_name: Some(property.name.clone()),
                 declared_type,
-                decorator_argument_count: decorator.argument_count,
-                decorator_provenance: SourceProvenance::new(path, decorator.span),
+                decorator_argument_count: argument_count,
+                decorator_provenance: SourceProvenance::new(path, declaration_span),
                 name_provenance: Some(SourceProvenance::new(path, property.name_span)),
                 provenance: SourceProvenance::new(path, property.span),
                 static_modifier_provenance: property

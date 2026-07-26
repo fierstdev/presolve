@@ -7,7 +7,7 @@ use serde::Serialize;
 
 use crate::{
     action_field_sites_v1, component_inheritance_sites_v1, effect_field_sites_v1,
-    AuthoredSourceRangeV1, CanonicalAuthoredSemanticModelV1,
+    slot_field_sites_v1, AuthoredSourceRangeV1, CanonicalAuthoredSemanticModelV1,
 };
 
 pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 4;
@@ -52,6 +52,8 @@ pub struct V2AuthorityCanonicalV1 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub effect: Option<V2AuthorityPositionV1>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub slot: Option<V2AuthorityPositionV1>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub environment: Option<V2AuthorityPositionV1>,
 }
 
@@ -65,6 +67,7 @@ pub struct V2AuthorityRequestV1 {
     pub states: Vec<V2AuthoritySiteV1>,
     pub actions: Vec<V2AuthoritySiteV1>,
     pub effects: Vec<V2AuthoritySiteV1>,
+    pub slots: Vec<V2AuthoritySiteV1>,
     pub environment_public: Vec<V2AuthorityMemberSiteV1>,
 }
 
@@ -108,6 +111,7 @@ pub fn build_v2_authority_request_v1(
     let state = canonical_import(parsed, "state")?;
     let action = canonical_import(parsed, "action")?;
     let effect = canonical_import(parsed, "effect")?;
+    let slot = canonical_import(parsed, "slot")?;
     let environment = canonical_import(parsed, "environment")?;
     let components = component_inheritance_sites_v1(parsed)
         .into_iter()
@@ -168,6 +172,15 @@ pub fn build_v2_authority_request_v1(
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
+    let slots = slot
+        .is_some()
+        .then(|| slot_field_sites_v1(parsed, component_model))
+        .transpose()
+        .map_err(|error| V2AuthorityRequestErrorV1::FieldSiteSelection(error.to_string()))?
+        .unwrap_or_default()
+        .into_iter()
+        .map(|site| site_for("slot", site.callee_source, &parsed.path, &parsed.syntax.source))
+        .collect::<Result<Vec<_>, _>>()?;
     let environment_public = environment_public_member_sites(parsed, environment.is_some())?;
     Ok(V2AuthorityRequestV1 {
         schema_version: V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
@@ -177,12 +190,14 @@ pub fn build_v2_authority_request_v1(
             state,
             action,
             effect,
+            slot,
             environment,
         },
         components,
         states,
         actions,
         effects,
+        slots,
         environment_public,
     })
 }
@@ -216,12 +231,14 @@ pub fn build_v2_authority_component_request_v1(
             state: canonical_import(parsed, "state")?,
             action: canonical_import(parsed, "action")?,
             effect: canonical_import(parsed, "effect")?,
+            slot: canonical_import(parsed, "slot")?,
             environment: canonical_import(parsed, "environment")?,
         },
         components,
         states: Vec::new(),
         actions: Vec::new(),
         effects: Vec::new(),
+        slots: Vec::new(),
         environment_public: Vec::new(),
     })
 }
@@ -246,12 +263,14 @@ pub fn build_v2_environment_authority_request_v1(
             state: None,
             action: None,
             effect: None,
+            slot: None,
             environment: Some(environment),
         },
         components: Vec::new(),
         states: Vec::new(),
         actions: Vec::new(),
         effects: Vec::new(),
+        slots: Vec::new(),
         environment_public: environment_public_member_sites(parsed, true)?,
     }))
 }
