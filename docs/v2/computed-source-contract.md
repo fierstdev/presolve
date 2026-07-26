@@ -25,7 +25,7 @@ products may consume that output only after it is produced.
 ## Canonical-model amendment
 
 The [derived computed-candidate contract](computed-derived-candidate-contract.md)
-defines the schema-v2 candidate and evidence required to represent an
+defines the schema-v3 candidate and evidence required to represent an
 analysis-proven, non-intrinsic getter. Reusing
 `CanonicalIntrinsicKindV1::Computed` would falsely claim that a `computed()`
 intrinsic exists; classifying getters by method name would be equally invalid.
