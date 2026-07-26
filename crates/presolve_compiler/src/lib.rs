@@ -606,7 +606,8 @@ pub use module_graph::{
 pub use opaque::{OpaqueActionResolution, OpaqueActionResolutionOutcome, OpaqueTerminalBinding};
 pub use ordinary_html_codegen::{
     generate_ordinary_instance_html, generate_ordinary_instance_html_for_component,
-    generate_structural_conditional_host_fragments, generate_structural_template_instance_html,
+    generate_structural_conditional_host_fragments, generate_structural_keyed_host_fragments,
+    generate_structural_template_instance_html,
 };
 pub use ordinary_template_instance::{
     build_ordinary_template_instance_registry, validate_ordinary_template_instance_registry,
