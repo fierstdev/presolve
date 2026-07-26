@@ -33,7 +33,11 @@ fn copy_tree(source: &Path, destination: &Path) {
     for entry in std::fs::read_dir(source).expect("representative source directory") {
         let entry = entry.expect("representative source entry");
         let target = destination.join(entry.file_name());
-        if entry.file_type().expect("representative entry type").is_dir() {
+        if entry
+            .file_type()
+            .expect("representative entry type")
+            .is_dir()
+        {
             copy_tree(&entry.path(), &target);
         } else {
             std::fs::copy(entry.path(), target).expect("copy representative source file");
@@ -68,7 +72,9 @@ fn representative_applications_publish_routes_resume_and_production_audits() {
     assert_eq!(corpus.suite, "presolve-representative-applications");
     assert_eq!(corpus.applications.len(), 2);
     for application in corpus.applications {
-        assert!(application.evidence.contains(&"production-build".to_string()));
+        assert!(application
+            .evidence
+            .contains(&"production-build".to_string()));
         let temporary_root = std::env::temp_dir().join(format!(
             "presolve-representative-{}-{}-{}",
             application.name,
@@ -89,12 +95,11 @@ fn representative_applications_publish_routes_resume_and_production_audits() {
             String::from_utf8_lossy(&result.stderr)
         );
         assert!(find_artifact(&output, "resume.runtime.json").is_some());
-        let audit_path = find_artifact(&output, "production-audit.json")
-            .expect("route-scoped production audit");
-        let audit: serde_json::Value = serde_json::from_slice(
-            &std::fs::read(audit_path).expect("production audit"),
-        )
-        .expect("production audit JSON");
+        let audit_path =
+            find_artifact(&output, "production-audit.json").expect("route-scoped production audit");
+        let audit: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(audit_path).expect("production audit"))
+                .expect("production audit JSON");
         assert_eq!(audit["status"], "passed");
         std::fs::remove_dir_all(temporary_root).expect("remove representative project");
     }

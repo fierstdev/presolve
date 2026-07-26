@@ -190,9 +190,17 @@ fn environment_command_publishes_only_explicit_public_values() {
         String::from_utf8_lossy(&output.stderr)
     );
     let manifest: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(manifest["browserValues"]["PRESOLVE_PUBLIC_NAME"], "Presolve");
-    assert_eq!(manifest["serverValueNames"], serde_json::json!(["DATABASE_URL"]));
-    assert!(!String::from_utf8(output.stdout).unwrap().contains("postgres://secret"));
+    assert_eq!(
+        manifest["browserValues"]["PRESOLVE_PUBLIC_NAME"],
+        "Presolve"
+    );
+    assert_eq!(
+        manifest["serverValueNames"],
+        serde_json::json!(["DATABASE_URL"])
+    );
+    assert!(!String::from_utf8(output.stdout)
+        .unwrap()
+        .contains("postgres://secret"));
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -261,11 +269,28 @@ fn default_build_composes_a_conventional_layout_without_framework_wrapping() {
 #[test]
 fn default_build_publishes_compiler_joined_route_metadata() {
     let root = project_root("route-metadata");
-    fs::write(root.join("app/routes/index.tsx"), r#"@component() class Home extends Component { render() { return <main>Home</main>; } }"#).unwrap();
-    fs::write(root.join("app/routes/index.metadata.json"), r#"{"title":"Home","description":"Welcome"}"#).unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_presolve")).arg("build").current_dir(&root).output().unwrap();
-    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
-    let metadata: serde_json::Value = serde_json::from_slice(&fs::read(root.join("dist/route-metadata.json")).unwrap()).unwrap();
+    fs::write(
+        root.join("app/routes/index.tsx"),
+        r#"@component() class Home extends Component { render() { return <main>Home</main>; } }"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("app/routes/index.metadata.json"),
+        r#"{"title":"Home","description":"Welcome"}"#,
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("build")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let metadata: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("dist/route-metadata.json")).unwrap()).unwrap();
     assert_eq!(metadata["routes"][0]["path"], "/");
     assert_eq!(metadata["routes"][0]["title"], "Home");
     fs::remove_dir_all(root).unwrap();

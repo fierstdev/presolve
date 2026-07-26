@@ -29,8 +29,8 @@ use presolve_compiler::{
     build_application_publication_product_v1, build_application_semantic_model_for_unit,
     build_application_semantic_model_for_unit_with_packages, build_binding_table_with_packages,
     build_component_graph, build_context_inspection_registry, build_effect_inspection_registry,
-    build_file_route_publication_v1, build_form_inspection_registry, build_module_graph,
     build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring,
+    build_file_route_publication_v1, build_form_inspection_registry, build_module_graph,
     build_production_audit_report_v1, build_production_reachability_graph,
     build_production_reports, build_production_runtime_artifact, build_resume_chunk_graph,
     build_resume_manifest, build_route_loader_plan_v1, build_route_server_action_plan_v1,
@@ -333,25 +333,54 @@ fn invoke_v2_authority_bridge(
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct RouteMetadataSidecar { title: String, description: Option<String> }
+struct RouteMetadataSidecar {
+    title: String,
+    description: Option<String>,
+}
 
-fn attach_route_metadata(root: &Path, product: &mut presolve_compiler::FileRoutePublicationProductV1) -> Result<(), String> {
+fn attach_route_metadata(
+    root: &Path,
+    product: &mut presolve_compiler::FileRoutePublicationProductV1,
+) -> Result<(), String> {
     let mut inputs = Vec::new();
     for (route_path, source_path) in &product.route_source_paths {
         let sidecar = root.join(source_path).with_extension("metadata.json");
-        if !sidecar.is_file() { continue; }
-        let source = fs::read_to_string(&sidecar).map_err(|error| format!("{}: {error}", sidecar.display()))?;
-        let sidecar: RouteMetadataSidecar = serde_json::from_str(&source).map_err(|error| format!("{}: {error}", sidecar.display()))?;
-        inputs.push(presolve_compiler::RouteMetadataInputV1 { route_path: route_path.clone(), title: sidecar.title, description: sidecar.description });
+        if !sidecar.is_file() {
+            continue;
+        }
+        let source = fs::read_to_string(&sidecar)
+            .map_err(|error| format!("{}: {error}", sidecar.display()))?;
+        let sidecar: RouteMetadataSidecar = serde_json::from_str(&source)
+            .map_err(|error| format!("{}: {error}", sidecar.display()))?;
+        inputs.push(presolve_compiler::RouteMetadataInputV1 {
+            route_path: route_path.clone(),
+            title: sidecar.title,
+            description: sidecar.description,
+        });
     }
-    if inputs.is_empty() { return Ok(()); }
-    let metadata = presolve_compiler::build_route_metadata_manifest_v1(&product.manifest, &inputs).map_err(|error| format!("{}: {}", error.code, error.message))?;
+    if inputs.is_empty() {
+        return Ok(());
+    }
+    let metadata = presolve_compiler::build_route_metadata_manifest_v1(&product.manifest, &inputs)
+        .map_err(|error| format!("{}: {}", error.code, error.message))?;
     let path = PathBuf::from("route-metadata.json");
     let bytes = presolve_compiler::route_metadata_manifest_json_v1(&metadata).into_bytes();
-    product.manifest.artifacts.push(presolve_compiler::ApplicationPublicationArtifactV1 { path: path.to_string_lossy().into_owned(), digest: format!("sha256:{:x}", Sha256::digest(&bytes)) });
-    product.manifest.artifacts.sort_by(|left, right| left.path.cmp(&right.path));
+    product
+        .manifest
+        .artifacts
+        .push(presolve_compiler::ApplicationPublicationArtifactV1 {
+            path: path.to_string_lossy().into_owned(),
+            digest: format!("sha256:{:x}", Sha256::digest(&bytes)),
+        });
+    product
+        .manifest
+        .artifacts
+        .sort_by(|left, right| left.path.cmp(&right.path));
     product.artifacts.insert(path, bytes);
-    product.artifacts.insert(PathBuf::from("file-routes.manifest.json"), presolve_compiler::file_route_publication_manifest_json_v1(&product.manifest).into_bytes());
+    product.artifacts.insert(
+        PathBuf::from("file-routes.manifest.json"),
+        presolve_compiler::file_route_publication_manifest_json_v1(&product.manifest).into_bytes(),
+    );
     Ok(())
 }
 
@@ -859,8 +888,11 @@ fn run_ergonomic_check(root: &Path) {
         build_application_semantic_model_for_unit_with_packages(&unit, &package_contracts)
     } else {
         build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring(
-            &unit, &package_contracts, &v2_authoring,
-        ).unwrap_or_else(|error| application_cli_error(error.code, &error.message))
+            &unit,
+            &package_contracts,
+            &v2_authoring,
+        )
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message))
     };
     let graph = presolve_compiler::build_validated_file_route_graph_v1(&asm)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
