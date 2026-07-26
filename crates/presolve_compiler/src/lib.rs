@@ -175,6 +175,7 @@ pub mod state_initializer_lowering;
 pub mod state_instance_storage;
 pub mod state_projection;
 pub mod structural_component;
+pub mod structural_occurrence_identity;
 pub mod summarize;
 pub mod symbol_table;
 pub mod template_graph;
@@ -1009,6 +1010,10 @@ pub use structural_component::{
     StructuralComponentDiagnosticReasonV1, StructuralComponentDiagnosticV1,
     StructuralComponentFactV1, StructuralComponentGraphV1, StructuralComponentPropV1,
     StructuralComponentRecordV1, STRUCTURAL_COMPONENT_SCHEMA_VERSION,
+};
+pub use structural_occurrence_identity::{
+    decode_structural_occurrence_identity, encode_structural_occurrence_identity,
+    StructuralOccurrenceIdentity,
 };
 pub use summarize::summarize_source;
 pub use symbol_table::{
