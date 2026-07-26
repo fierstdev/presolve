@@ -60,7 +60,8 @@ to resolve through the same endpoint lookup.
 
 - A canonical V2 `action(() => { this.count += 1; })` bound from render emits
   the same ordered write/batch behavior as a legacy decorated action, without
-  adding a method record.
+  adding a method record. The focused compiler and CLI fixtures exercise this
+  projection with an installed TypeScript authority bridge.
 - The V2 endpoint, individual writes, state storage ID, action batch, event
   binding, and resume boundary remain identical across cold execution and
   resumed execution.
@@ -69,3 +70,9 @@ to resolve through the same endpoint lookup.
   inadmissible authority facts fail before publication.
 - Existing decorated-action fixtures retain their method IDs and generated
   products unchanged.
+
+The real-browser fixture builds a decorator-free component, confirms its cold
+event update, restores a compiler-authored resume snapshot, confirms the
+`action-endpoint:increment` binding identity, and performs the resumed update.
+It is acceptance evidence for the closed synchronous subset only, not a
+translation authority for broader JavaScript handlers.

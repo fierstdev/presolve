@@ -39,9 +39,9 @@ source text or treat an empty unsupported list as capture proof.
 
 ## Product
 
-A versioned action-field projection maps admitted handler operations to the
-existing `ComponentAction` runtime product while retaining the canonical
-component and field identities. It must not synthesize a legacy
+A versioned action-field projection maps the admitted synchronous closed
+subset to the existing `ComponentAction` runtime product while retaining the
+canonical component and field identities. It does not synthesize a legacy
 `ComponentMethod`, alter state semantics, or parse JavaScript independently.
 The endpoint identity and downstream action-batch migration are governed by
 the [action endpoint identity contract](action-endpoint-identity-contract.md).
@@ -49,13 +49,16 @@ the [action endpoint identity contract](action-endpoint-identity-contract.md).
 ## Acceptance
 
 - An aliased canonical `action` field updates canonical V2 State with exact
-  source provenance in cold execution.
+  source provenance in cold execution. The focused browser build fixture
+  proves this for `action(() => { this.count += 1; })`.
 - The resumed path retains the same component/state/action identities and
-  observes the same update result.
+  observes the same update result. The same fixture restores `count` to `7`,
+  invokes the endpoint, and observes `8` without a fatal diagnostic.
 - Unsupported handler syntax, missing capture evidence, server imports,
   lookalike calls, and malformed authority output fail before publication.
 - Decorated methods remain alpha compatibility evidence and are not invoked by
   the V2 action-field projection.
-- Parser retention alone is not runtime adoption: the action projection and
-  its cold/resume browser evidence remain required before this contract's
-  runtime acceptance is met.
+- Parser retention alone is not runtime adoption. This contract's initial
+  closed subset is accepted only because the action projection and its
+  cold/resume browser evidence are present; broader handler forms remain
+  outside this contract until their analysis and lowering are authored.
