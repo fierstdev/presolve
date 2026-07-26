@@ -1822,17 +1822,17 @@ fn validate_template_action_bindings(
                 });
                 continue;
             };
-            let method = component
-                .methods
-                .iter()
-                .find(|method| method.id.as_str() == event.handler_method_id);
-            let batch = method.and_then(|method| {
-                model
-                    .effect_trigger_plan
-                    .action_batches
-                    .values()
-                    .find(|batch| batch.authored_action_method == method.id)
-            });
+            let batch = model
+                .effect_trigger_plan
+                .action_batches
+                .values()
+                .find(|batch| {
+                    batch.authored_action_endpoint.as_str() == event.handler_method_id
+                        && component
+                            .action_endpoint_ids()
+                            .into_iter()
+                            .any(|(_, endpoint)| endpoint == batch.authored_action_endpoint)
+                });
             if batch.is_none_or(|batch| Some(batch.id.as_str()) != event.action_batch_id.as_deref())
             {
                 diagnostics.push(AsmValidationDiagnostic {
@@ -1870,16 +1870,18 @@ fn validate_template_action_bindings(
                 });
                 continue;
             }
-            let method = component
-                .methods
-                .iter()
-                .find(|method| Some(method.id.as_str()) == event.method_id.as_deref());
-            let batch = method.and_then(|method| {
+            let batch = event.method_id.as_deref().and_then(|endpoint| {
                 model
                     .effect_trigger_plan
                     .action_batches
                     .values()
-                    .find(|batch| batch.authored_action_method == method.id)
+                    .find(|batch| {
+                        batch.authored_action_endpoint.as_str() == endpoint
+                            && component
+                                .action_endpoint_ids()
+                                .into_iter()
+                                .any(|(_, id)| id == batch.authored_action_endpoint)
+                    })
             });
             if batch.is_none_or(|batch| Some(batch.id.as_str()) != event.action_batch_id.as_deref())
             {

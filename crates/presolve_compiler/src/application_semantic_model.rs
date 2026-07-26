@@ -7,9 +7,9 @@ use crate::compilation_unit::CompilationUnit;
 use crate::component_composition::{analyze_component_composition, ComponentCompositionAnalysis};
 use crate::component_graph::{
     build_component_graph_for_module, build_v2_component_graph_for_module, render_event_handlers,
-    ComponentAction, ComponentDiagnostic, ComponentDiagnosticSeverity, ComponentMethod,
-    ComponentNode, ComputedExpression, ComputedExpressionKind, MethodLocalVariable,
-    RenderEventHandler, StateField,
+    ActionEndpoint, ComponentAction, ComponentDiagnostic, ComponentDiagnosticSeverity,
+    ComponentMethod, ComponentNode, ComputedExpression, ComputedExpressionKind,
+    MethodLocalVariable, RenderEventHandler, StateField,
 };
 use crate::component_initialization::{plan_component_initialization, ComponentInitializationPlan};
 use crate::component_instance::{
@@ -190,6 +190,7 @@ pub enum SemanticEntity<'a> {
     Component(&'a ComponentNode),
     StateField(&'a StateField),
     Method(&'a ComponentMethod),
+    ActionEndpoint(&'a ActionEndpoint),
     Context(&'a ContextEntity),
     Provider(&'a ProviderEntity),
     Consumer(&'a ConsumerEntity),
@@ -218,6 +219,7 @@ pub enum SemanticEntityKind {
     Component,
     StateField,
     Method,
+    ActionEndpoint,
     Context,
     Provider,
     Consumer,
@@ -248,6 +250,7 @@ impl SemanticEntity<'_> {
             Self::Component(_) => SemanticEntityKind::Component,
             Self::StateField(_) => SemanticEntityKind::StateField,
             Self::Method(_) => SemanticEntityKind::Method,
+            Self::ActionEndpoint(_) => SemanticEntityKind::ActionEndpoint,
             Self::Context(_) => SemanticEntityKind::Context,
             Self::Provider(_) => SemanticEntityKind::Provider,
             Self::Consumer(_) => SemanticEntityKind::Consumer,
@@ -286,6 +289,13 @@ impl ApplicationSemanticModel {
             }
             if let Some(method) = component.methods.iter().find(|method| method.id == *id) {
                 return Some(SemanticEntity::Method(method));
+            }
+            if let Some(endpoint) = component
+                .action_endpoints
+                .iter()
+                .find(|endpoint| endpoint.id == *id)
+            {
+                return Some(SemanticEntity::ActionEndpoint(endpoint));
             }
             if let Some(parameter) = component
                 .methods
@@ -4572,11 +4582,11 @@ fn collect_ownership(
         {
             ownership.insert(effect.id.clone(), effect.owner.clone());
         }
+        for endpoint in &component.action_endpoints {
+            ownership.insert(endpoint.id.clone(), endpoint.owner.clone());
+        }
         for action in &component.actions {
-            ownership.insert(
-                action.id.clone(),
-                SemanticOwner::entity(component.id.method(&action.method)),
-            );
+            ownership.insert(action.id.clone(), action.owner.clone());
         }
         if let Some(render) = &component.render {
             for handler in render_event_handlers(render) {
@@ -4642,7 +4652,8 @@ mod tests {
         collect_ownership,
     };
     use crate::{
-        build_component_graph_for_module, build_template_graph, build_template_semantic_entities,
+        build_component_graph_for_module, build_template_graph, build_template_manifest_from_asm,
+        build_template_semantic_entities, build_v2_component_graph_for_module,
         CanonicalAuthoredDeclarationKindV1, CanonicalAuthoredDeclarationV1,
         CanonicalAuthoredSemanticModelV1, CompilationUnit, ComponentInstancePlan, SemanticEntity,
         SemanticEntityKind, SemanticOwner, SemanticReferenceKind, TemplateSemanticKind,
@@ -4652,7 +4663,7 @@ mod tests {
     fn file_route_assembly_projects_explicit_canonical_v2_components_without_decorators() {
         let unit = CompilationUnit::parse_sources([(
             "app/routes/index.tsx",
-            "import { Component, state } from \"presolve\"; export class Home extends Component { count = state(0); render() { return <main>Home</main>; } }",
+            "import { Component, state, action } from \"presolve\"; export class Home extends Component { count = state(0); increment = action(() => { this.count += 1; }); render() { return <button onClick={() => this.increment()}>Home</button>; } }",
         )]);
         let model = CanonicalAuthoredSemanticModelV1 {
             schema_version: 1,
@@ -4680,6 +4691,17 @@ mod tests {
                     },
                     intrinsic_identity: None,
                 },
+                CanonicalAuthoredDeclarationV1 {
+                    kind: CanonicalAuthoredDeclarationKindV1::Action,
+                    subject: "Home.increment".into(),
+                    source: crate::AuthoredSourceRangeV1 {
+                        start: 100,
+                        end: 148,
+                        line: 1,
+                        column: 101,
+                    },
+                    intrinsic_identity: None,
+                },
             ],
         };
         let asm =
@@ -4692,10 +4714,93 @@ mod tests {
         assert_eq!(asm.components.len(), 1);
         assert_eq!(asm.components[0].class_name, "Home");
         assert_eq!(asm.components[0].state_fields[0].name, "count");
+        assert!(asm.components[0].methods.is_empty());
+        let endpoint = &asm.components[0].action_endpoints[0];
+        assert_eq!(endpoint.name, "increment");
+        assert_eq!(
+            endpoint.id,
+            asm.components[0].id.action_endpoint("increment")
+        );
+        assert_eq!(
+            asm.components[0].actions[0].owner,
+            SemanticOwner::entity(endpoint.id.clone())
+        );
+        let batch = asm
+            .effect_trigger_plan
+            .action_batches
+            .values()
+            .find(|batch| batch.authored_action_endpoint == endpoint.id)
+            .expect("V2 field endpoint action batch");
+        let manifest = build_template_manifest_from_asm(&asm);
+        assert_eq!(
+            manifest.components[0].template.events[0]
+                .method_id
+                .as_deref(),
+            Some(endpoint.id.as_str())
+        );
+        assert_eq!(
+            manifest.components[0].template.events[0]
+                .action_batch_id
+                .as_deref(),
+            Some(batch.id.as_str())
+        );
         assert!(asm
             .diagnostics
             .iter()
             .all(|diagnostic| diagnostic.code != "PSC1001"));
+    }
+
+    #[test]
+    fn canonical_v2_action_rejects_unsupported_handler_before_publication() {
+        let parsed = presolve_parser::parse_file(
+            "app/routes/index.tsx",
+            "import { Component, state, action } from \"presolve\"; export class Home extends Component { count = state(0); increment = action(() => { unrelated(); }); render() { return <main>Home</main>; } }",
+        );
+        let model = CanonicalAuthoredSemanticModelV1 {
+            schema_version: 1,
+            source_path: parsed.path.clone(),
+            declarations: vec![
+                CanonicalAuthoredDeclarationV1 {
+                    kind: CanonicalAuthoredDeclarationKindV1::Component,
+                    subject: "Home".into(),
+                    source: crate::AuthoredSourceRangeV1 {
+                        start: 0,
+                        end: parsed.syntax.source.len(),
+                        line: 1,
+                        column: 1,
+                    },
+                    intrinsic_identity: None,
+                },
+                CanonicalAuthoredDeclarationV1 {
+                    kind: CanonicalAuthoredDeclarationKindV1::State,
+                    subject: "Home.count".into(),
+                    source: crate::AuthoredSourceRangeV1 {
+                        start: 0,
+                        end: 1,
+                        line: 1,
+                        column: 1,
+                    },
+                    intrinsic_identity: None,
+                },
+                CanonicalAuthoredDeclarationV1 {
+                    kind: CanonicalAuthoredDeclarationKindV1::Action,
+                    subject: "Home.increment".into(),
+                    source: crate::AuthoredSourceRangeV1 {
+                        start: 0,
+                        end: 1,
+                        line: 1,
+                        column: 1,
+                    },
+                    intrinsic_identity: None,
+                },
+            ],
+        };
+        let graph = build_v2_component_graph_for_module(&parsed, &model);
+        assert!(graph.components[0].action_endpoints.is_empty());
+        assert!(graph
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "PSV2A1004"));
     }
 
     #[test]

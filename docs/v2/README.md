@@ -46,6 +46,9 @@ normative source for this handoff.
 - [V2 action-field runtime adoption contract](action-field-runtime-adoption-contract.md)
   defines the source/authority evidence required before V2 action fields reach
   the existing runtime product.
+- [V2 action endpoint identity contract](action-endpoint-identity-contract.md)
+  defines the no-synthetic-method migration from V2 action fields into the
+  existing action-batch and runtime binding products.
 - [Vite adapter boundary](vite-adapter.md) records the compiler-product-only
   integration seam for the required external backend.
 - [Presolve-aware HMR contract](hmr-contract.md) records the compiler-selected

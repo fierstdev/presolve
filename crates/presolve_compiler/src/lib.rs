@@ -269,7 +269,7 @@ pub use component_diagnostics::{
 };
 pub use component_graph::{
     build_component_graph, build_component_graph_for_module, build_v2_component_graph_for_module,
-    is_valid_opaque_action_fact, ArithmeticEvaluationError, ArithmeticExpression,
+    is_valid_opaque_action_fact, ActionEndpoint, ArithmeticEvaluationError, ArithmeticExpression,
     ArithmeticExpressionKind, ArithmeticOperator, AuthoredComponentHeritage,
     AuthoredContextDeclarationCandidate, AuthoredDeclarationKind, AuthoredOpaqueActionFact,
     AuthoredRouteLoaderDeclarationFact, AuthoredServerActionFact, AuthoredSlotDeclarationCandidate,

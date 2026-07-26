@@ -642,18 +642,18 @@ fn action_bindings(
     component: &ComponentNode,
 ) -> BTreeMap<String, ActionBinding> {
     component
-        .methods
-        .iter()
-        .filter_map(|method| {
+        .action_endpoint_ids()
+        .into_iter()
+        .filter_map(|(name, endpoint)| {
             let batch = model
                 .effect_trigger_plan
                 .action_batches
                 .values()
-                .find(|batch| batch.authored_action_method == method.id)?;
+                .find(|batch| batch.authored_action_endpoint == endpoint)?;
             Some((
-                method.name.clone(),
+                name,
                 ActionBinding {
-                    method_id: method.id.to_string(),
+                    method_id: endpoint.to_string(),
                     action_batch_id: batch.id.to_string(),
                 },
             ))
@@ -896,7 +896,7 @@ class TemplateActionBatch extends Component {
             .effect_trigger_plan
             .action_batches
             .values()
-            .find(|batch| batch.authored_action_method == method)
+            .find(|batch| batch.authored_action_endpoint == method)
             .expect("canonical F8 batch");
         let manifest = build_template_manifest_from_asm(&model);
         let component_manifest = &manifest.components[0];

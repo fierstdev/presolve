@@ -569,6 +569,14 @@ impl SemanticId {
         self.child("action", &format!("{method}:{index}"))
     }
 
+    /// Stable identity for one authored action entry point. Legacy decorated
+    /// methods keep their method identity; V2 action fields use this distinct
+    /// endpoint identity and never synthesize a method.
+    #[must_use]
+    pub fn action_endpoint(&self, name: &str) -> Self {
+        self.child("action-endpoint", name)
+    }
+
     #[must_use]
     pub fn action_batch(&self, method: &str) -> Self {
         self.child("action-batch", method)

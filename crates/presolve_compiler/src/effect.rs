@@ -62,7 +62,7 @@ pub struct EffectReactiveAnalysis {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionBatch {
     pub id: SemanticId,
-    pub authored_action_method: SemanticId,
+    pub authored_action_endpoint: SemanticId,
     pub ordered_write_records: Vec<SemanticId>,
     pub written_states: Vec<SemanticId>,
     pub provenance: SourceProvenance,
@@ -425,18 +425,18 @@ pub fn derive_effect_trigger_plan(
         .collect::<Vec<_>>();
     let mut action_batches = BTreeMap::new();
     for component in components {
-        for method in component.methods.iter().filter(|method| method.is_action()) {
+        for (name, endpoint) in component.action_endpoint_ids() {
             let writes = component
                 .actions
                 .iter()
-                .filter(|action| action.method == method.name)
+                .filter(|action| action.method == name)
                 .collect::<Vec<_>>();
-            let id = component.id.action_batch(&method.name);
+            let id = component.id.action_batch(&name);
             action_batches.insert(
                 id.clone(),
                 ActionBatch {
                     id,
-                    authored_action_method: method.id.clone(),
+                    authored_action_endpoint: endpoint.clone(),
                     ordered_write_records: writes.iter().map(|action| action.id.clone()).collect(),
                     written_states: writes
                         .iter()
@@ -445,8 +445,8 @@ pub fn derive_effect_trigger_plan(
                         .into_iter()
                         .collect(),
                     provenance: provenance
-                        .get(&method.id)
-                        .expect("action methods should have canonical provenance")
+                        .get(&endpoint)
+                        .expect("action endpoints should have canonical provenance")
                         .clone(),
                 },
             );

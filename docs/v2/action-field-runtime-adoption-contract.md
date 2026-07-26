@@ -43,6 +43,8 @@ A versioned action-field projection maps admitted handler operations to the
 existing `ComponentAction` runtime product while retaining the canonical
 component and field identities. It must not synthesize a legacy
 `ComponentMethod`, alter state semantics, or parse JavaScript independently.
+The endpoint identity and downstream action-batch migration are governed by
+the [action endpoint identity contract](action-endpoint-identity-contract.md).
 
 ## Acceptance
 

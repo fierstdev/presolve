@@ -86,8 +86,37 @@ pub struct ComponentNode {
     /// Module imports that shadow compiler-owned validation intrinsic names.
     pub shadowed_validation_intrinsics: BTreeSet<String>,
     pub methods: Vec<ComponentMethod>,
+    /// Decorator-free action-field endpoints. Legacy action methods retain
+    /// their method identity and are exposed through `action_endpoint_ids`.
+    pub action_endpoints: Vec<ActionEndpoint>,
     pub actions: Vec<ComponentAction>,
     pub render: Option<RenderModel>,
+}
+
+impl ComponentNode {
+    /// Resolves the executable action endpoint for an authored binding name.
+    /// A legacy decorated action exposes its existing method ID; a V2 action
+    /// field exposes its separately owned endpoint ID.
+    #[must_use]
+    pub fn action_endpoint_ids(&self) -> Vec<(String, SemanticId)> {
+        let mut endpoints = self
+            .methods
+            .iter()
+            .filter(|method| method.is_action())
+            .map(|method| (method.name.clone(), method.id.clone()))
+            .collect::<BTreeMap<_, _>>();
+        for endpoint in &self.action_endpoints {
+            endpoints.insert(endpoint.name.clone(), endpoint.id.clone());
+        }
+        endpoints.into_iter().collect()
+    }
+
+    #[must_use]
+    pub fn action_endpoint_id(&self, name: &str) -> Option<SemanticId> {
+        self.action_endpoint_ids()
+            .into_iter()
+            .find_map(|(candidate, id)| (candidate == name).then_some(id))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1209,6 +1238,14 @@ pub struct ComponentAction {
     pub field: String,
 }
 
+/// One non-method action source that can own ordinary action write records.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionEndpoint {
+    pub id: SemanticId,
+    pub owner: SemanticOwner,
+    pub name: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StateOperation {
     Increment,
@@ -1436,7 +1473,7 @@ pub fn build_v2_component_graph_for_module(
             ));
         }
         provenance.insert(id.clone(), SourceProvenance::new(&parsed.path, class.span));
-        let state_fields = authored
+        let state_fields: Vec<StateField> = authored
             .declarations
             .iter()
             .filter(|candidate| {
@@ -1477,6 +1514,120 @@ pub fn build_v2_component_graph_for_module(
                 })
             })
             .collect();
+        let canonical_state_names = state_fields
+            .iter()
+            .map(|field| field.name.as_str())
+            .collect::<BTreeSet<_>>();
+        let mut action_endpoints = Vec::new();
+        let mut actions = Vec::new();
+        for candidate in authored.declarations.iter().filter(|candidate| {
+            candidate.kind == crate::CanonicalAuthoredDeclarationKindV1::Action
+                && candidate.subject.starts_with(&format!("{}.", class.name))
+        }) {
+            let Some(name) = candidate.subject.strip_prefix(&format!("{}.", class.name)) else {
+                continue;
+            };
+            let Some(property) = class
+                .properties
+                .iter()
+                .find(|property| property.name == name)
+            else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2A1002",
+                    format!(
+                        "canonical V2 Action `{}` has no source field",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            };
+            let Some(handler) = property
+                .initializer_call
+                .as_ref()
+                .and_then(|call| call.inline_handler.as_ref())
+            else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2A1003",
+                    format!(
+                        "canonical V2 Action `{}` requires one inline handler",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            };
+            if handler.is_expression_body
+                || handler.is_async
+                || !handler.unsupported_statement_spans.is_empty()
+                || handler.state_updates.iter().any(|update| {
+                    matches!(update.operation, ParsedStateOperation::AssignParameter(_))
+                })
+                || handler
+                    .state_updates
+                    .iter()
+                    .any(|update| !canonical_state_names.contains(update.field.as_str()))
+            {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2A1004",
+                    format!(
+                        "canonical V2 Action `{}` has unsupported handler or State ownership evidence",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            }
+            let endpoint_id = id.action_endpoint(name);
+            let authority = crate::build_action_authority_v1(&[crate::ActionFactV1 {
+                id: endpoint_id.to_string(),
+                component: id.to_string(),
+                asynchronous: handler.is_async,
+                accepts_abort_signal: false,
+                capture_coverage: crate::ActionCaptureCoverageV1::Complete,
+                environment: crate::ActionEnvironmentV1::Browser,
+            }]);
+            if authority
+                .actions
+                .first()
+                .is_none_or(|record| record.admission != crate::ActionAdmissionV1::Admissible)
+            {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2A1005",
+                    format!(
+                        "canonical V2 Action `{}` was not admitted",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            }
+            provenance.insert(
+                endpoint_id.clone(),
+                SourceProvenance::new(&parsed.path, property.span),
+            );
+            action_endpoints.push(ActionEndpoint {
+                id: endpoint_id.clone(),
+                owner: SemanticOwner::entity(id.clone()),
+                name: name.to_owned(),
+            });
+            actions.extend(
+                handler
+                    .state_updates
+                    .iter()
+                    .enumerate()
+                    .map(|(index, update)| {
+                        let action_id = id.action(name, index);
+                        provenance.insert(
+                            action_id.clone(),
+                            SourceProvenance::new(&parsed.path, update.span),
+                        );
+                        ComponentAction {
+                            id: action_id,
+                            owner: SemanticOwner::entity(endpoint_id.clone()),
+                            method: name.to_owned(),
+                            operation: state_operation_from_parsed(&update.operation),
+                            field: update.field.clone(),
+                        }
+                    }),
+            );
+        }
         components.push(ComponentNode {
             id: id.clone(),
             module_path: parsed.path.clone(),
@@ -1509,7 +1660,8 @@ pub fn build_v2_component_graph_for_module(
             server_action_facts: Vec::new(),
             shadowed_validation_intrinsics: BTreeSet::new(),
             methods: Vec::new(),
-            actions: Vec::new(),
+            action_endpoints,
+            actions,
             render: class
                 .methods
                 .iter()
@@ -1733,6 +1885,7 @@ fn build_component_node(
         server_action_facts,
         shadowed_validation_intrinsics,
         methods,
+        action_endpoints: Vec::new(),
         actions,
         render,
     }
