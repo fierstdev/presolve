@@ -1,7 +1,7 @@
 export const CANONICAL_INTRINSIC_KINDS = Object.freeze([
   "component", "state", "action", "computed", "effect", "slot", "context",
   "provide", "consume", "form", "serialize", "field", "validate", "submit",
-  "resource", "loader", "server_action", "opaque",
+  "resource", "loader", "server_action", "opaque", "environment_public",
 ]);
 
 /** Builds a registry exclusively from TypeScript-resolved canonical targets. */

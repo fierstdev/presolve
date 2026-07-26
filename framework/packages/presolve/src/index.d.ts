@@ -39,6 +39,15 @@ export declare function effect<This>(
 export declare function effect(): PresolveMethodDecorator;
 export declare function state<T>(initialValue: T): T;
 
+/**
+ * Manifest-backed browser environment access for decorator-free V2 source.
+ * Values are admitted only when a matching compiler environment manifest
+ * classifies the requested name as `PRESOLVE_PUBLIC_*`.
+ */
+export declare const environment: {
+  public(name: string): string;
+};
+
 export declare function slot(): PresolveFieldDecorator;
 export interface SlotContent {
   readonly __presolveSlotContentBrand: unique symbol;
