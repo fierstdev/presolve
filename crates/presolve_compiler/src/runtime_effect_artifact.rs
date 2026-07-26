@@ -521,4 +521,45 @@ class RuntimeEffectArtifact extends Component {
             .iter()
             .all(|instruction| instruction.get("static_path").is_none()));
     }
+
+    #[test]
+    fn emits_distinct_v2_effect_instances_for_repeated_component_instances() {
+        let parsed = presolve_parser::parse_file(
+            "src/RepeatedEffectArtifact.tsx",
+            r#"
+@component("x-card") class Card extends Component {
+  @effect() report() { document.title = "card"; }
+  render() { return <article />; }
+}
+@component("x-page") class Page extends Component {
+  render() { return <main><Card /><Card /></main>; }
+}
+"#,
+        );
+        let mut model = build_application_semantic_model(&parsed);
+        let effect_id = model.components[0].id.effect("report");
+        let effect = model.effects.get_mut(&effect_id).expect("Card effect");
+        effect.declaration = crate::EffectDeclaration::V2Field;
+        effect.declaration_order = Some(0);
+        let artifact = build_runtime_effect_artifact(
+            &model,
+            &optimize_effect_ir(&lower_components_to_ir(&model)).output,
+        );
+
+        assert_eq!(artifact.effects.len(), 1);
+        assert_eq!(artifact.instances.len(), 2);
+        assert!(artifact
+            .instances
+            .iter()
+            .all(|record| record.effect == effect_id.as_str()));
+        assert_ne!(
+            artifact.instances[0].effect_instance,
+            artifact.instances[1].effect_instance
+        );
+        assert!(artifact
+            .instances
+            .iter()
+            .all(|record| record.parent_instance.is_some()));
+        assert!(artifact.instances.iter().all(|record| record.depth == 1));
+    }
 }
