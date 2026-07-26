@@ -275,15 +275,22 @@ pub fn generate_structural_conditional_host_fragments(
                 instance.status,
                 ComponentInstanceStatus::Planned | ComponentInstanceStatus::StructuralTemplate
             ) && instance.component == *component
-                && model.slot_bindings.for_callee(&instance.id).is_empty()
         })
-        .map(|instance| {
+        .filter_map(|instance| {
             let host_scope = match instance.status {
                 ComponentInstanceStatus::Planned => StructuralConditionalHostScope::StaticInstance,
                 ComponentInstanceStatus::StructuralTemplate => {
                     StructuralConditionalHostScope::StructuralOccurrence
                 }
             };
+            let slot_projections =
+                structural_instance_slot_projections(model, &templates, instance);
+            if !model.slot_bindings.for_callee(&instance.id).is_empty()
+                && slot_projections.is_none()
+            {
+                return None;
+            }
+            let slot_projections = slot_projections.unwrap_or_default();
             let when_true_html = render_children(
                 model,
                 &templates,
@@ -295,7 +302,7 @@ pub fn generate_structural_conditional_host_fragments(
                 template,
                 &conditional.when_true,
                 &format!("{path}.true"),
-                &[],
+                &slot_projections,
             );
             let when_false_html = render_children(
                 model,
@@ -308,7 +315,7 @@ pub fn generate_structural_conditional_host_fragments(
                 template,
                 &conditional.when_false,
                 &format!("{path}.false"),
-                &[],
+                &slot_projections,
             );
             let (when_true_html, when_false_html) = match host_scope {
                 StructuralConditionalHostScope::StaticInstance => (when_true_html, when_false_html),
@@ -319,14 +326,14 @@ pub fn generate_structural_conditional_host_fragments(
                         .replace(instance.id.as_str(), "__PRESOLVE_STRUCTURAL_OCCURRENCE__"),
                 ),
             };
-            StructuralConditionalHostFragments {
+            Some(StructuralConditionalHostFragments {
                 host_scope,
                 host_instance: instance.id.clone(),
                 when_true_invocations: structural_invocations_in_compiler_html(&when_true_html),
                 when_false_invocations: structural_invocations_in_compiler_html(&when_false_html),
                 when_true_html,
                 when_false_html,
-            }
+            })
         })
         .collect()
 }
@@ -386,14 +393,18 @@ pub fn generate_structural_keyed_host_fragments(
                 instance.status,
                 ComponentInstanceStatus::Planned | ComponentInstanceStatus::StructuralTemplate
             ) && instance.component == *component
-                && model.slot_bindings.for_callee(&instance.id).is_empty()
         })
-        .map(|instance| {
+        .filter_map(|instance| {
             let host_scope = if instance.status == ComponentInstanceStatus::Planned {
                 StructuralConditionalHostScope::StaticInstance
             } else {
                 StructuralConditionalHostScope::StructuralOccurrence
             };
+            if !model.slot_bindings.for_callee(&instance.id).is_empty() {
+                // Keyed host fragments need an item-aware Slot renderer; leave
+                // them fail-closed until the v19 renderer program supplies it.
+                return None;
+            }
             let mut html = crate::html_codegen::generate_list_item_template_html(list);
             for (node, invocation) in structural_list_invocations(
                 model,
@@ -410,14 +421,114 @@ pub fn generate_structural_keyed_host_fragments(
                 );
                 html = html.replacen(&marker, &anchored, 1);
             }
-            StructuralKeyedHostFragment {
+            Some(StructuralKeyedHostFragment {
                 host_scope,
                 host_instance: instance.id.clone(),
                 item_invocations: structural_invocations_in_compiler_html(&html),
                 item_template_html: html,
-            }
+            })
         })
         .collect()
+}
+
+fn structural_instance_slot_projections<'a>(
+    model: &'a ApplicationSemanticModel,
+    templates: &'a BTreeMap<crate::SemanticId, &'a TemplateNode>,
+    instance: &'a crate::ComponentInstance,
+) -> Option<Vec<SlotProjection<'a>>> {
+    if model.slot_bindings.for_callee(&instance.id).is_empty() {
+        return Some(Vec::new());
+    }
+    let parent = instance.parent_instance.as_ref()?;
+    let invocation = instance.invocation.as_ref()?;
+    let parent_instance = model.component_instance_plan.instances.get(parent)?;
+    let parent_template = templates.get(&parent_instance.component.template())?;
+    let invocation_entity = model
+        .component_invocations
+        .get(invocation)?
+        .template_entity
+        .clone();
+    let (element, path) = element_for_template_entity(parent_template, &invocation_entity)?;
+    Some(slot_projections_for_invocation(
+        model,
+        &instance.id,
+        parent,
+        parent_template,
+        element,
+        &path,
+        &[],
+    ))
+}
+
+fn element_for_template_entity<'a>(
+    template: &'a TemplateNode,
+    target: &crate::SemanticId,
+) -> Option<(&'a ElementNode, String)> {
+    fn visit<'a>(
+        template: &'a TemplateNode,
+        target: &crate::SemanticId,
+        nodes: &'a [TemplateChild],
+        parent_path: &str,
+    ) -> Option<(&'a ElementNode, String)> {
+        for (index, node) in nodes.iter().enumerate() {
+            let path = format!("{parent_path}.{index}");
+            match node {
+                TemplateChild::Element(element) => {
+                    if template.id.template_entity("element", &path) == *target {
+                        return Some((element, path));
+                    }
+                    if let Some(found) = visit(template, target, &element.children, &path) {
+                        return Some(found);
+                    }
+                }
+                TemplateChild::Fragment(fragment) => {
+                    if let Some(found) = visit(template, target, &fragment.children, &path) {
+                        return Some(found);
+                    }
+                }
+                TemplateChild::Conditional(conditional) => {
+                    if let Some(found) = visit(
+                        template,
+                        target,
+                        &conditional.when_true,
+                        &format!("{path}.true"),
+                    )
+                    .or_else(|| {
+                        visit(
+                            template,
+                            target,
+                            &conditional.when_false,
+                            &format!("{path}.false"),
+                        )
+                    }) {
+                        return Some(found);
+                    }
+                }
+                TemplateChild::List(list) => {
+                    if let Some(found) = visit(
+                        template,
+                        target,
+                        &list.item_template,
+                        &format!("{path}.item"),
+                    ) {
+                        return Some(found);
+                    }
+                }
+                TemplateChild::Text { .. } | TemplateChild::Binding { .. } => {}
+            }
+        }
+        None
+    }
+    if let Some(root) = &template.root {
+        if template.id.template_entity("element", "root") == *target {
+            return Some((root, "root".to_string()));
+        }
+        return visit(template, target, &root.children, "root");
+    }
+    template
+        .root_fragment
+        .as_ref()
+        .and_then(|fragment| visit(template, target, &fragment.children, "root"))
 }
 
 fn structural_list_invocations(
@@ -1372,6 +1483,40 @@ mod tests {
         assert_eq!(html.matches("data-presolve-r=").count(), 4);
         assert_eq!(html.matches("data-presolve-e=").count(), 2);
         assert_eq!(html, generate_ordinary_instance_html(&model));
+    }
+
+    #[test]
+    fn renders_structural_conditional_slot_projection_from_the_canonical_binding() {
+        let model = build_application_semantic_model(&presolve_parser::parse_file(
+            "src/StructuralSlot.tsx",
+            r#"
+@component("x-panel") class Panel extends Component {
+  @slot() children!: SlotContent;
+  open = state(true);
+  render() { return <section>{this.open ? <><slot /><Leaf /></> : <aside>Closed</aside>}</section>; }
+}
+@component("x-leaf") class Leaf extends Component { render() { return <small>Leaf</small>; } }
+@component("x-page") class Page extends Component {
+  visible = state(true);
+  render() { return <main>{this.visible ? <Panel><button>Projected</button></Panel> : <aside>Hidden</aside>}</main>; }
+}
+"#,
+        ));
+        let region = model
+            .component_instance_plan
+            .instances
+            .values()
+            .find(|instance| instance.component.as_str().contains("component:x-leaf"))
+            .and_then(|instance| instance.structural_region.clone())
+            .expect("Panel conditional has a structural region");
+        let fragments = generate_structural_conditional_host_fragments(&model, &region);
+        let projected = fragments
+            .iter()
+            .find(|fragment| {
+                fragment.host_scope == StructuralConditionalHostScope::StructuralOccurrence
+            })
+            .expect("structural Panel host fragment is emitted");
+        assert!(projected.when_true_html.contains("Projected"));
     }
 
     #[test]
