@@ -66,7 +66,12 @@ beta authority: structural compiler and browser acceptance evidence must use
 the decorator-free V2 authoring surface and its installed TypeScript-authority
 proof. Legacy decorator fixtures remain compatibility-only characterization.
 
-Schemas v10 through v14 are not runtime materializers. They establish the
+Schema v15 adds exact per-branch structural invocation membership to each
+conditional host fragment. It closes the integrity boundary needed for
+activation: a renderer can reject a missing, duplicate, or substituted marker
+instead of treating a modified branch as an empty structural selection.
+
+Schemas v10 through v15 are not general runtime materializers. They establish the
 validated compiler template, membership set, and initial conditional-host
 fragments from which the later complete program must be constructed; the
 runtime must not activate, infer, or partially use them for dynamic component

@@ -31,6 +31,19 @@ pub struct StructuralConditionalHostFragments {
     pub host_instance: ComponentInstanceId,
     pub when_true_html: String,
     pub when_false_html: String,
+    pub when_true_invocations: Vec<String>,
+    pub when_false_invocations: Vec<String>,
+}
+
+#[must_use]
+pub fn structural_invocations_in_compiler_html(html: &str) -> Vec<String> {
+    const MARKER: &str = "data-presolve-structural-invocation=\"";
+    html.match_indices(MARKER)
+        .filter_map(|(start, _)| {
+            let value = &html[start + MARKER.len()..];
+            value.find('"').map(|end| value[..end].to_string())
+        })
+        .collect()
 }
 
 /// Compiler-rendered keyed item fragment for one exact component host scope.
@@ -308,6 +321,8 @@ pub fn generate_structural_conditional_host_fragments(
             StructuralConditionalHostFragments {
                 host_scope,
                 host_instance: instance.id.clone(),
+                when_true_invocations: structural_invocations_in_compiler_html(&when_true_html),
+                when_false_invocations: structural_invocations_in_compiler_html(&when_false_html),
                 when_true_html,
                 when_false_html,
             }

@@ -73,6 +73,9 @@ normative source for this handoff.
 - [Structural host renderer scope contract](structural-host-renderer-scope-contract.md)
   defines the exact static, nested, and keyed renderer inputs required before
   structural host fragments can be published or activated.
+- [Structural static-conditional activation contract](structural-static-conditional-activation-contract.md)
+  admits the first compiler-authoritative dynamic slice while keyed, nested,
+  Slot, Effect, and resume paths remain fail-closed.
 - [Environment-read lowering contract](environment-read-lowering-contract.md)
   defines the manifest-backed source boundary for browser-visible environment
   values.

@@ -1896,7 +1896,7 @@ fn component_structural_programs_preserve_host_dom_identity_in_a_real_browser() 
         String::from_utf8_lossy(&output.stderr)
     );
 
-    write_component_structural_probe_page(&out_dir);
+    write_component_structural_probe_page(&out_dir, false);
 
     let server = StaticServer::start(out_dir.clone());
     let chrome = chrome_bin().expect("headless Chrome was not found");
@@ -2033,7 +2033,7 @@ process.stdout.write(JSON.stringify({
     );
     let artifact = fs::read_to_string(output_root.join("component.runtime.json"))
         .expect("failed to read V2 structural component artifact");
-    assert!(artifact.contains("\"schema_version\": 14"));
+    assert!(artifact.contains("\"schema_version\": 15"));
     assert!(artifact.contains("structural_programs"));
     assert!(artifact.contains("state_slots"));
     assert!(artifact.contains("computed_slots"));
@@ -2067,7 +2067,7 @@ process.stdout.write(JSON.stringify({
         "a structural V2 Leaf must retain its State, binding, and event templates"
     );
 
-    write_component_structural_probe_page(&output_root);
+    write_component_structural_probe_page(&output_root, true);
     let server = StaticServer::start(output_root.clone());
     let chrome = chrome_bin().expect("headless Chrome was not found");
     let profile_dir = project_root.join("chrome-profile");
@@ -2090,11 +2090,78 @@ process.stdout.write(JSON.stringify({
         stdout,
         String::from_utf8_lossy(&output.stderr)
     );
+
+    let index = fs::read_to_string(output_root.join("index.html"))
+        .expect("failed to read V2 structural output page");
+    let rejected = replace_json_script(&index, "presolve-component-runtime", |value| {
+        let fragment = value["structural_programs"]
+            .as_array_mut()
+            .expect("structural programs should be an array")
+            .iter_mut()
+            .flat_map(|program| {
+                program["conditional_host_fragments"]
+                    .as_array_mut()
+                    .expect("conditional host fragments should be an array")
+            })
+            .find(|fragment| {
+                fragment["when_true_invocations"]
+                    .as_array()
+                    .is_some_and(|invocations| !invocations.is_empty())
+            })
+            .expect("V2 structural fixture should have a non-empty conditional membership");
+        fragment["when_true_invocations"] = serde_json::json!([]);
+    });
+    let rejected = rejected.replace(
+        "</body>",
+        r#"<script>
+const wait = setInterval(() => {
+  const state = document.documentElement.dataset.presolveRuntime;
+  if (state === "pending" || state === undefined) return;
+  clearInterval(wait);
+  const codes = window.__PRESOLVE__?.diagnostics?.map((diagnostic) => diagnostic.code) ?? [];
+  if (state === "error" && codes.includes("PSR_INVALID_COMPONENT_ARTIFACT")) {
+    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_STRUCTURAL_ANCHOR_REJECTION_PASS</div>");
+  } else {
+    document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_STRUCTURAL_ANCHOR_REJECTION_FAIL: ${state}:${codes.join(",")}</div>`);
+  }
+}, 20);
+</script>
+</body>"#,
+    );
+    fs::write(output_root.join("invalid-structural-anchor.html"), rejected)
+        .expect("failed to write invalid structural anchor probe");
+    let server = StaticServer::start(output_root.clone());
+    let invalid_profile_dir = project_root.join("invalid-structural-anchor-profile");
+    fs::create_dir_all(&invalid_profile_dir).expect("failed to create invalid anchor profile dir");
+    let invalid_user_data_dir = format!(
+        "--user-data-dir={}",
+        invalid_profile_dir
+            .to_str()
+            .expect("invalid anchor profile path was not valid UTF-8")
+    );
+    let invalid_url = format!(
+        "http://127.0.0.1:{}/invalid-structural-anchor.html",
+        server.port
+    );
+    let invalid_output = run_chrome_probe(
+        chrome_bin().expect("headless Chrome was not found"),
+        &invalid_user_data_dir,
+        &invalid_url,
+    );
+    let invalid_stdout = String::from_utf8_lossy(&invalid_output.stdout);
+    server.stop();
+    assert!(
+        invalid_stdout.contains("PRESOLVE_STRUCTURAL_ANCHOR_REJECTION_PASS"),
+        "malformed structural anchor membership was not rejected\\nstatus: {}\\nstdout:\\n{}\\nstderr:\\n{}",
+        invalid_output.status,
+        invalid_stdout,
+        String::from_utf8_lossy(&invalid_output.stderr)
+    );
     fs::remove_dir_all(project_root).expect("failed to remove V2 structural browser project");
 }
 
 #[allow(clippy::too_many_lines)]
-fn write_component_structural_probe_page(out_dir: &Path) {
+fn write_component_structural_probe_page(out_dir: &Path, expect_materialization: bool) {
     let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
     let probe = index.replace(
         "</body>",
@@ -2115,10 +2182,11 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   tick();
 });
 (async () => {
+  const expectStructuralMaterialization = __PRESOLVE_EXPECT_STRUCTURAL_MATERIALIZATION__;
   await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
   const runtime = window.__PRESOLVE__;
   const artifact = JSON.parse(document.getElementById("presolve-component-runtime").textContent);
-  if (artifact.schema_version !== 14 || artifact.structural_programs.length !== 2) fail("structural component programs were missing");
+  if (artifact.schema_version !== 15 || artifact.structural_programs.length !== 2) fail("structural component programs were missing");
   if (runtime.store.componentRegions.size !== artifact.structural_programs.length) fail("closed structural region table diverged from the artifact");
   if (!artifact.structural_programs.every((program) => JSON.stringify(runtime.store.componentRegions.get(program.region)) === JSON.stringify(program))) {
     fail("runtime structural regions were not keyed by compiler IDs");
@@ -2175,8 +2243,6 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   const conditional = manifest.template.nodes.find((node) => node.kind === "conditional");
   const list = manifest.template.nodes.find((node) => node.kind === "list");
   if (conditional === undefined || list === undefined) fail("structural host plans were missing");
-  const buttons = [...document.querySelectorAll("main button")];
-  if (buttons.length !== 3) fail("structural controls were missing");
   const main = document.querySelector("main");
   const listParent = document.querySelector("main ul");
   const row = (key) => document.querySelector(`[data-presolve-node='${list.item_root}:${key}']`);
@@ -2185,19 +2251,37 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   const c = row("c");
   if (main === null || listParent === null || a === null || b === null || c === null) fail("initial structural DOM was incomplete");
 
-  buttons[0].click();
+  const control = (label) => [...main.querySelectorAll("button")].find((button) => button.textContent === label);
+  const toggle = control("Toggle");
+  const reconcile = control("Reconcile");
+  const trim = control("Trim");
+  if (toggle === undefined || reconcile === undefined || trim === undefined) fail("structural controls were missing");
+  if (expectStructuralMaterialization) {
+    const leaf = [...main.querySelectorAll("button")].find((button) => button.textContent === "Leaf: 0");
+    const dynamicLeaf = [...runtime.store.components.values()].find((component) =>
+      component.name === "StructuralLeaf" && component.instance_id.startsWith("presolve-structural-occurrence:v1:")
+    );
+    if (leaf === undefined || dynamicLeaf === undefined) fail("static conditional host did not materialize a live structural Leaf");
+    leaf.click();
+    await waitFor(() => leaf.textContent === "Leaf: 1", "materialized structural leaf action");
+  }
+
+  toggle.click();
   await waitFor(() => document.querySelector("main aside") !== null, "conditional subtree swap");
   if (document.querySelector("main div") !== null) fail("outgoing conditional subtree survived");
   if (document.querySelector("main") !== main || document.querySelector("main ul") !== listParent) fail("unaffected sibling identity changed");
   if (row("a") !== a || row("b") !== b || row("c") !== c) fail("conditional swap recreated unaffected keyed rows");
+  if (expectStructuralMaterialization && [...runtime.store.components.keys()].some((id) => id.startsWith("presolve-structural-occurrence:v1:"))) {
+    fail("conditional removal leaked a structural component instance");
+  }
 
-  buttons[1].click();
+  reconcile.click();
   await waitFor(() => row("d") !== null && row("b") === null, "keyed component reconciliation");
   const d = row("d");
   if (row("a") !== a || row("c") !== c) fail("moved keyed component rows were recreated");
   if (d === null) fail("new keyed component row was not created");
 
-  buttons[2].click();
+  trim.click();
   await waitFor(() => row("a") === null && row("c") === null, "nested keyed destruction");
   if (row("d") !== d) fail("retained keyed component row was recreated");
   if (document.querySelector("main") !== main || document.querySelector("main ul") !== listParent) fail("unaffected host identity changed after list destruction");
@@ -2209,7 +2293,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 });
 </script>
 </body>"#,
-    );
+    ).replace("__PRESOLVE_EXPECT_STRUCTURAL_MATERIALIZATION__", if expect_materialization { "true" } else { "false" });
 
     fs::write(out_dir.join("probe.html"), probe).expect("failed to write browser probe page");
 }

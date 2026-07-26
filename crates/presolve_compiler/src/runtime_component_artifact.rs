@@ -9,7 +9,7 @@ use crate::{
 };
 use crate::{TemplateChild, TemplateNode, TemplateSemanticKind};
 
-pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 14;
+pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 15;
 
 /// Public H14 compiler artifact. All executable references are canonical IDs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -162,6 +162,9 @@ pub struct SerializedStructuralConditionalHostFragments {
     pub host_instance: String,
     pub when_true_html: String,
     pub when_false_html: String,
+    /// Exact compiler-issued occurrence invocations anchored by each branch.
+    pub when_true_invocations: Vec<String>,
+    pub when_false_invocations: Vec<String>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SerializedStructuralKeyedHostFragment {
@@ -421,6 +424,8 @@ pub fn build_runtime_component_artifact(
                 host_instance: fragments.host_instance.to_string(),
                 when_true_html: fragments.when_true_html,
                 when_false_html: fragments.when_false_html,
+                when_true_invocations: fragments.when_true_invocations,
+                when_false_invocations: fragments.when_false_invocations,
             })
             .collect(),
             keyed_host_fragments: crate::generate_structural_keyed_host_fragments(
@@ -651,6 +656,11 @@ pub fn validate_runtime_component_artifact(
             || program.host_node.is_empty()
             || program.host_template_entity.is_empty()
             || program.conditional_host_fragments.iter().any(|fragments| {
+                let known_invocations = program
+                    .template_occurrences
+                    .iter()
+                    .map(|occurrence| occurrence.invocation.as_str())
+                    .collect::<std::collections::BTreeSet<_>>();
                 fragments.host_instance.is_empty()
                     || !matches!(
                         fragments.host_scope.as_str(),
@@ -658,6 +668,23 @@ pub fn validate_runtime_component_artifact(
                     )
                     || fragments.when_true_html.is_empty()
                     || fragments.when_false_html.is_empty()
+                    || fragments.when_true_invocations.len()
+                        != fragments
+                            .when_true_invocations
+                            .iter()
+                            .collect::<std::collections::BTreeSet<_>>()
+                            .len()
+                    || fragments.when_false_invocations.len()
+                        != fragments
+                            .when_false_invocations
+                            .iter()
+                            .collect::<std::collections::BTreeSet<_>>()
+                            .len()
+                    || fragments
+                        .when_true_invocations
+                        .iter()
+                        .chain(&fragments.when_false_invocations)
+                        .any(|invocation| !known_invocations.contains(invocation.as_str()))
             })
             || program.keyed_host_fragments.iter().any(|fragments| {
                 fragments.host_instance.is_empty()
@@ -1233,6 +1260,18 @@ mod tests {
         assert!(fragments
             .when_true_html
             .contains("data-presolve-structural-invocation="));
+        assert_eq!(
+            fragments.when_true_invocations,
+            crate::ordinary_html_codegen::structural_invocations_in_compiler_html(
+                &fragments.when_true_html
+            )
+        );
+        assert_eq!(
+            fragments.when_false_invocations,
+            crate::ordinary_html_codegen::structural_invocations_in_compiler_html(
+                &fragments.when_false_html
+            )
+        );
         assert!(fragments.when_false_html.contains("Hidden"));
 
         let keyed = artifact
@@ -1258,6 +1297,17 @@ mod tests {
             .when_false_html
             .clear();
         assert!(validate_runtime_component_artifact(&invalid_fragments).is_err());
+
+        let mut invalid_membership = artifact.clone();
+        invalid_membership
+            .structural_programs
+            .iter_mut()
+            .find(|program| !program.conditional_host_fragments.is_empty())
+            .expect("conditional host has compiler-authored fragments")
+            .conditional_host_fragments[0]
+            .when_true_invocations
+            .push("fabricated-invocation".to_string());
+        assert!(validate_runtime_component_artifact(&invalid_membership).is_err());
 
         let mut invalid_keyed = artifact.clone();
         invalid_keyed

@@ -1006,7 +1006,14 @@ const RUNTIME_STUB: &str = r#"(() => {
                 ? structuralTemplateComponents.get(fragments.host_instance) !== program.host_component
                 : true)
             || typeof fragments.when_true_html !== "string" || fragments.when_true_html.length === 0
-            || typeof fragments.when_false_html !== "string" || fragments.when_false_html.length === 0)
+            || typeof fragments.when_false_html !== "string" || fragments.when_false_html.length === 0
+            || !Array.isArray(fragments.when_true_invocations)
+            || !Array.isArray(fragments.when_false_invocations)
+            || new Set(fragments.when_true_invocations).size !== fragments.when_true_invocations.length
+            || new Set(fragments.when_false_invocations).size !== fragments.when_false_invocations.length
+            || [...fragments.when_true_invocations, ...fragments.when_false_invocations].some((invocation) =>
+              !program.template_occurrences.some((occurrence) => occurrence.invocation === invocation)
+            ))
           || new Set(program.keyed_host_fragments.map((fragments) => fragments?.host_instance)).size !== program.keyed_host_fragments.length
           || program.keyed_host_fragments.some((fragments) => typeof fragments?.host_instance !== "string"
             || typeof fragments.host_scope !== "string"
@@ -1810,6 +1817,12 @@ const RUNTIME_STUB: &str = r#"(() => {
       throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
     }
     const anchors = collectOrdinaryTargetAnchors();
+    for (const pair of staged.bindings) {
+      const binding = pair.manifest;
+      if (binding.kind !== "text" || anchors.targets.has(binding.instance_target_id)) continue;
+      const text = ordinaryTextBindingNode(binding.instance_binding_id);
+      if (text !== null) anchors.targets.set(binding.instance_target_id, text);
+    }
     const targetIds = [];
     const bindingIds = [];
     const eventKeys = [];
@@ -1918,6 +1931,117 @@ const RUNTIME_STUB: &str = r#"(() => {
     );
     if (fragments.length !== 1) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
     return fragments[0];
+  }
+
+  function compilerFragmentInvocationAnchors(fragment, program, expectedInvocations) {
+    if (!(fragment instanceof DocumentFragment)
+      || !Array.isArray(program?.template_occurrences)
+      || !Array.isArray(program?.create_order)
+      || !Array.isArray(expectedInvocations)
+      || program.create_order.length !== program.template_occurrences.length) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const occurrencesByInvocation = new Map();
+    const occurrencesByTemplate = new Map();
+    for (const occurrence of program.template_occurrences) {
+      if (typeof occurrence?.invocation !== "string" || typeof occurrence?.template_instance !== "string"
+        || occurrencesByInvocation.has(occurrence.invocation)
+        || occurrencesByTemplate.has(occurrence.template_instance)) {
+        throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      }
+      occurrencesByInvocation.set(occurrence.invocation, occurrence);
+      occurrencesByTemplate.set(occurrence.template_instance, occurrence);
+    }
+    if (new Set(program.create_order).size !== program.create_order.length
+      || program.create_order.some((templateInstance) => !occurrencesByTemplate.has(templateInstance))) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    if (new Set(expectedInvocations).size !== expectedInvocations.length
+      || expectedInvocations.some((invocation) => !occurrencesByInvocation.has(invocation))) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const anchorsByInvocation = new Map();
+    const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_ELEMENT);
+    while (walker.nextNode()) {
+      const marker = walker.currentNode;
+      const invocation = marker.getAttribute("data-presolve-structural-invocation");
+      if (invocation === null) continue;
+      if (!occurrencesByInvocation.has(invocation) || anchorsByInvocation.has(invocation)) {
+        throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      }
+      anchorsByInvocation.set(invocation, marker);
+    }
+    if (anchorsByInvocation.size !== expectedInvocations.length
+      || expectedInvocations.some((invocation) => !anchorsByInvocation.has(invocation))) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    return Object.freeze(program.create_order
+      .map((templateInstance) => occurrencesByTemplate.get(templateInstance))
+      .filter((occurrence) => expectedInvocations.includes(occurrence.invocation))
+      .map((occurrence) => Object.freeze({
+        invocation: occurrence.invocation,
+        marker: anchorsByInvocation.get(occurrence.invocation)
+      })));
+  }
+
+  function replaceStructuralConditionalBranch(store, target, component, node, fragmentRecord, value) {
+    if (fragmentRecord?.host_scope !== "static-instance"
+      || fragmentRecord.host_instance !== component?.instance_id
+      || target?.start?.parentNode === null
+      || target?.end?.parentNode === null
+      || target.start.parentNode !== target.end.parentNode) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const program = [...(store.componentRegions?.values() ?? [])].filter((candidate) =>
+      candidate.host_component === component.manifest?.component_id && candidate.host_node === node?.id
+    );
+    if (program.length !== 1) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    const branch = value === true ? "true" : "false";
+    const html = branch === "true" ? fragmentRecord.when_true_html : fragmentRecord.when_false_html;
+    if (typeof html !== "string" || html.length === 0) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const template = document.createElement("template");
+    template.innerHTML = html;
+    if (!template.content.hasChildNodes()) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    const expectedInvocations = branch === "true"
+      ? fragmentRecord.when_true_invocations
+      : fragmentRecord.when_false_invocations;
+    const anchors = compilerFragmentInvocationAnchors(template.content, program[0], expectedInvocations);
+    const previous = document.createDocumentFragment();
+    let current = target.start.nextSibling;
+    while (current !== null && current !== target.end) {
+      const next = current.nextSibling;
+      previous.appendChild(current);
+      current = next;
+    }
+    const prior = target.structural_occurrences ?? [];
+    const created = [];
+    try {
+      target.end.parentNode.insertBefore(template.content, target.end);
+      for (const anchor of anchors) {
+        created.push(materializeStructuralOccurrence(
+          store,
+          anchor.marker,
+          component.instance_id,
+          `conditional:${branch}`
+        ));
+      }
+      for (const occurrence of [...prior].reverse()) occurrence.dispose();
+      target.structural_occurrences = Object.freeze(created);
+      target.structural_branch = branch;
+      store.elementsByNode = collectElementAnchors();
+    } catch (error) {
+      for (const occurrence of [...created].reverse()) occurrence.dispose();
+      current = target.start.nextSibling;
+      while (current !== null && current !== target.end) {
+        const next = current.nextSibling;
+        current.remove();
+        current = next;
+      }
+      target.end.parentNode.insertBefore(previous, target.end);
+      throw error;
+    }
   }
 
   function structuralOccurrenceTemplateRegistry(manifest, componentArtifact, computedArtifact) {
@@ -3632,14 +3756,23 @@ const RUNTIME_STUB: &str = r#"(() => {
       );
       if (nodes.length === 1) {
         const node = nodes[0];
-        update = (value) => {
-          replaceConditionalBranch(
-            store,
-            target.start,
-            target.end,
-            value === true ? node.when_true_html : node.when_false_html
-          );
-        };
+        const fragment = structuralConditionalHostFragment(store, component, node);
+        if (fragment === null) {
+          update = (value) => {
+            replaceConditionalBranch(
+              store,
+              target.start,
+              target.end,
+              value === true ? node.when_true_html : node.when_false_html
+            );
+          };
+        } else {
+          update = (value) => {
+            const branch = value === true ? "true" : "false";
+            if (target.structural_branch === branch) return;
+            replaceStructuralConditionalBranch(store, target, component, node, fragment, value);
+          };
+        }
       }
     } else if (binding.kind === "list" && target?.kind === "list") {
       if (slot === null) throw new PresolveBootError("PSR_INVALID_ORDINARY_BINDING");
@@ -5120,6 +5253,8 @@ mod tests {
         assert!(runtime.contains("function registerStructuralOccurrenceRecords"));
         assert!(runtime.contains("function materializeStructuralOccurrence"));
         assert!(runtime.contains("function structuralConditionalHostFragment"));
+        assert!(runtime.contains("function compilerFragmentInvocationAnchors"));
+        assert!(runtime.contains("function replaceStructuralConditionalBranch"));
         assert!(runtime.contains("active.indexOf(updateBinding)"));
         assert!(runtime.contains("function structuralOccurrenceTemplateRegistry"));
         assert!(runtime.contains("structuralOccurrenceTemplatesByInvocation"));
