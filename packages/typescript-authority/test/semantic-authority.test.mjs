@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 
 import {
   analyzeTypeScriptProject,
+  classifyResolvedComponentHeritage,
   classifyResolvedIntrinsic,
   createCanonicalIntrinsicRegistry,
   PRIMARY_TYPESCRIPT_VERSION,
@@ -96,4 +97,22 @@ test("canonical intrinsics classify resolved exports rather than local spellings
   ]);
   assert.equal(classifyResolvedIntrinsic(registry, frameworkResult.symbols[1].symbol)?.kind, "component");
   assert.equal(classifyResolvedIntrinsic(registry, { identity: { name: "component", flags: 0, declarationModules: [] } }), undefined);
+});
+
+test("component heritage preserves aliases and indirect bases for registry classification", async () => {
+  const frameworkFile = resolve(root, "tests/framework-public-api/src/V2Counter.tsx");
+  const frameworkSource = readFileSync(frameworkFile, "utf8");
+  const result = await analyzeTypeScriptProject({
+    configFile: resolve(root, "tests/framework-public-api/tsconfig.json"),
+    queries: {
+      symbols: [{ id: "component-import", file: frameworkFile, position: frameworkSource.indexOf("Component") }],
+      componentHeritage: [{ id: "counter", file: frameworkFile, position: frameworkSource.indexOf("V2Counter extends") }],
+    },
+  });
+  const registry = createCanonicalIntrinsicRegistry([
+    { kind: "component", symbol: result.symbols[0].symbol },
+  ]);
+  const heritage = result.componentHeritage[0];
+  assert.deepEqual(heritage.bases.map(base => base.name), ["V2CounterBase", "Component"]);
+  assert.equal(classifyResolvedComponentHeritage(registry, heritage.bases)?.kind, "component");
 });

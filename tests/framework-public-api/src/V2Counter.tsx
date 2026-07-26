@@ -1,6 +1,8 @@
 import { action, state, Component } from "presolve";
 
-export class V2Counter extends Component<{ initialCount?: number }> {
+export abstract class V2CounterBase extends Component {}
+
+export class V2Counter extends V2CounterBase {
   count = state(0);
 
   increment = action(() => {

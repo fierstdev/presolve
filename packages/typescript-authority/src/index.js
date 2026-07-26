@@ -1,8 +1,13 @@
 import { API, SymbolFlags } from "@typescript/native/unstable/async";
-import { getTokenAtPosition } from "@typescript/native/unstable/ast";
+import { getTokenAtPosition, SyntaxKind } from "@typescript/native/unstable/ast";
 import { dirname, relative, resolve, sep } from "node:path";
 
-export { CANONICAL_INTRINSIC_KINDS, classifyResolvedIntrinsic, createCanonicalIntrinsicRegistry } from "./intrinsics.js";
+export {
+  CANONICAL_INTRINSIC_KINDS,
+  classifyResolvedComponentHeritage,
+  classifyResolvedIntrinsic,
+  createCanonicalIntrinsicRegistry,
+} from "./intrinsics.js";
 
 export const TYPESCRIPT_SEMANTIC_AUTHORITY_SCHEMA_VERSION = 1;
 export const PRIMARY_TYPESCRIPT_VERSION = "7.0.2";
@@ -34,6 +39,7 @@ export async function analyzeTypeScriptProject(request) {
       },
       diagnostics,
       symbols: await querySymbols(project, queries.symbols ?? []),
+      componentHeritage: await queryComponentHeritage(project, queries.componentHeritage ?? []),
       types: await queryTypes(project, queries.types ?? []),
       contextualTypes: await queryContextualTypes(project, queries.contextualTypes ?? []),
       signatures: await querySignatures(project, queries.signatures ?? []),
@@ -64,6 +70,22 @@ async function querySymbols(project, queries) {
   return Promise.all(queries.map(async query => {
     const symbol = await symbolAt(project, query);
     return { id: query.id, symbol: await serializeSymbol(project, symbol) };
+  }));
+}
+
+/**
+ * Serializes the resolved direct-and-indirect base chain for a class symbol.
+ * It assigns no framework meaning: callers must classify these symbols through
+ * the canonical intrinsic registry.
+ */
+async function queryComponentHeritage(project, queries) {
+  return Promise.all(queries.map(async query => {
+    const symbol = await symbolAt(project, query);
+    return {
+      id: query.id,
+      symbol: await serializeSymbol(project, symbol),
+      bases: await resolvedBaseSymbols(project, symbol),
+    };
   }));
 }
 
@@ -122,6 +144,41 @@ async function queryModules(project, queries) {
 async function symbolAt(project, query) {
   const { file } = await tokenAt(project, query);
   return project.checker.getSymbolAtPosition(file.fileName, query.position);
+}
+
+async function resolvedBaseSymbols(project, symbol) {
+  const bases = [];
+  const seen = new Set();
+  let current = await resolvedSymbol(project.checker, symbol);
+  while (current && !seen.has(current.id)) {
+    seen.add(current.id);
+    const base = await directBaseSymbol(project, current);
+    if (!base) break;
+    bases.push(await serializeSymbol(project, base));
+    current = await resolvedSymbol(project.checker, base);
+  }
+  return bases;
+}
+
+async function resolvedSymbol(checker, symbol) {
+  if (!symbol) return undefined;
+  return (symbol.flags & SymbolFlags.Alias) === 0
+    ? symbol
+    : checker.getAliasedSymbol(symbol);
+}
+
+async function directBaseSymbol(project, symbol) {
+  for (const declarationHandle of symbol.declarations ?? []) {
+    const declaration = await declarationHandle.resolve();
+    for (const clause of declaration.heritageClauses ?? []) {
+      if (clause.token !== SyntaxKind.ExtendsKeyword) continue;
+      const base = clause.types?.[0]?.expression;
+      if (!base) continue;
+      const source = declaration.getSourceFile();
+      return project.checker.getSymbolAtPosition(source.fileName, base.getStart(source));
+    }
+  }
+  return undefined;
 }
 
 async function typeAt(project, query) {

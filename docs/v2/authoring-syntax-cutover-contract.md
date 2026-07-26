@@ -32,6 +32,12 @@ by resolved TypeScript symbol identity.  It produces the existing canonical
 authored semantic model; it must not add a parser subset, text recognizer, or
 parallel semantic pipeline.
 
+`typescript-authority` serializes an ordered `componentHeritage` base-symbol
+chain for a queried class. It resolves aliases and walks indirect class bases,
+but assigns no framework meaning. The canonical intrinsic registry classifies
+that chain, and only a matching resolved `Component` identity may be supplied
+to component-inheritance lowering.
+
 `legacy_decorator_lowering` remains an alpha compatibility adapter.  It may
 lower a resolved legacy decorator into that same canonical model, but it must
 not be used to recognize canonical V2 source, drive generated source, or

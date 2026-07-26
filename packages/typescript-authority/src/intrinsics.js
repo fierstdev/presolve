@@ -26,6 +26,19 @@ export function classifyResolvedIntrinsic(registry, symbol) {
   return identity ? registry.get(identityKey(identity)) : undefined;
 }
 
+/**
+ * Classifies a resolved base-class chain without relying on the local spelling
+ * of a component base. The TypeScript adapter supplies the chain, including
+ * aliases and indirect bases; the registry supplies framework meaning.
+ */
+export function classifyResolvedComponentHeritage(registry, bases) {
+  for (const base of bases) {
+    const intrinsic = classifyResolvedIntrinsic(registry, base);
+    if (intrinsic?.kind === "component") return intrinsic;
+  }
+  return undefined;
+}
+
 function targetIdentity(symbol) {
   return symbol?.aliasTarget?.identity ?? symbol?.identity;
 }

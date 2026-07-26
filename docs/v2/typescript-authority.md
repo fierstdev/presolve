@@ -22,7 +22,8 @@ the following schema-v1 products:
 - resolved call signatures with parameter and return types;
 - TypeScript assignability results for requested source/target positions; and
 - module symbols obtained at import, export, or package-specifier positions,
-  including their resolved declaration modules.
+  including their resolved declaration modules; and
+- ordered class base-symbol chains for explicit component-heritage queries.
 
 The request carries a configuration file plus explicit file/UTF-16 positions.
 Returned symbols and modules expose declaration paths, not TypeScript process
@@ -34,6 +35,12 @@ name and flags. It deliberately is not a durable Presolve semantic ID; stable
 cross-edit IDs are a later incremental-compilation product. Consumers that need
 the canonical target of an import must use `aliasTarget.identity`, not the
 author's local spelling.
+
+Component-heritage queries serialize each direct and indirect base symbol after
+TypeScript alias resolution. They do not classify framework meaning. The
+canonical intrinsic registry compares the serialized identities with the
+resolved `Component` export; this preserves the beta rule that aliases and
+indirect subclasses are components without spelling-based recognition.
 
 ## Ownership
 
@@ -47,6 +54,7 @@ for compiler-owned modules and diagnose divergence.
 
 The adapter test uses the versioned compatibility corpus to prove package
 exports, aliases, generic types, contextual typing, call overload resolution,
-assignability, and native diagnostic preservation. The package is included in
+assignability, native diagnostic preservation, and indirect component
+inheritance. The package is included in
 the workspace test graph, so its boundary test runs with ordinary package
 verification.
