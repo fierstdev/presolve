@@ -48,7 +48,9 @@ with before/after fixtures, source-location proof, and an amendment to
 1. Public declarations, README examples, and `create-presolve` emit only
    canonical V2 source.  The scaffold test asserts the absence of `@` syntax.
 2. Each canonical source form receives an AST-selected, resolved-symbol
-   candidate path and a focused fixture.  Component inheritance is first.
+   candidate path and a focused fixture.  Component inheritance is first and
+   is implemented by `component_inheritance_lowering`: it joins only
+   TypeScript-proven heritage clauses to the canonical authored model.
 3. Existing downstream products adopt that canonical model one at a time.
    A compatibility lowering never becomes evidence that the V2 source form
    works.

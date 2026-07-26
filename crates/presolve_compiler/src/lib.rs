@@ -18,6 +18,7 @@ pub mod compiler_pass;
 pub mod component_composition;
 pub mod component_diagnostics;
 pub mod component_graph;
+pub mod component_inheritance_lowering;
 pub mod component_initialization;
 pub mod component_instance;
 pub mod component_instance_scope;
@@ -275,6 +276,11 @@ pub use component_graph::{
     RenderEventHandler, RenderFragment, RenderList, RenderModel, SerializableValue,
     SlotDeclaration, SlotDeclarationViolation, SlotKind, StateField, StateOperation,
     UnsupportedEffectStatementKind, UnsupportedFormDesignatorFact,
+};
+pub use component_inheritance_lowering::{
+    component_inheritance_sites_v1, lower_component_inheritance_v1,
+    ComponentInheritanceLoweringErrorV1, ComponentInheritanceLoweringV1,
+    ComponentInheritanceSiteV1, ResolvedComponentInheritanceV1,
 };
 pub use component_initialization::{
     plan_component_initialization, ComponentInitializationPlan, ComponentInstanceBatch,
