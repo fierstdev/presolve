@@ -4406,7 +4406,7 @@ fn build_command_writes_page_manifest_and_runtime_artifacts() {
         .expect("failed to read built resume manifest");
     let parsed_resume: serde_json::Value =
         serde_json::from_str(&actual_resume).expect("resume manifest JSON");
-    assert_eq!(parsed_resume["schema_version"], 6);
+    assert_eq!(parsed_resume["schema_version"], 7);
     assert_eq!(parsed_resume["snapshot_schema_version"], 1);
     assert_eq!(parsed_resume["runtime_protocol_version"], 1);
     assert!(parsed_resume["build_id"]

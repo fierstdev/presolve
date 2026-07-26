@@ -54,9 +54,11 @@ them after child occurrences and registrations, before removing the DOM range.
 Reinsertion creates new records even if a keyed local key recurs later.
 Retention and keyed reordering preserve the exact same occurrence records.
 
-Structural State/Computed records are cold-only. They are not written into a
-resume snapshot until a separate resume product proves occurrence restoration
-without DOM discovery.
+Structural State/Computed records are cold-only until the
+[structural occurrence resume contract](structural-resume-contract.md) admits
+their occurrence-qualified snapshot product. That product serializes only
+compiler-codec-authorized State values and recomputes computed caches; it does
+not discover occurrences from DOM.
 
 ## Required proof
 

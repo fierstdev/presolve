@@ -1782,12 +1782,13 @@ fn resume_bootstrap_snapshot(manifest: &serde_json::Value) -> serde_json::Value 
         })
         .collect::<Vec<_>>();
     serde_json::json!({
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "buildId": manifest["build_id"],
         "snapshotId": format!("resume-snapshot:{}", manifest["build_id"].as_str().expect("build ID")),
-        "manifestVersion": 6,
+        "manifestVersion": 7,
         "capturedAt": null,
-        "boundaries": boundaries
+        "boundaries": boundaries,
+        "structuralOccurrences": []
     })
 }
 
@@ -1922,6 +1923,191 @@ fn component_structural_programs_preserve_host_dom_identity_in_a_real_browser() 
     );
 }
 
+fn write_v2_structural_resume_probe_page(output_root: &Path, cold_dump: &str) {
+    let index = fs::read_to_string(output_root.join("index.html"))
+        .expect("failed to read V2 structural index");
+    let manifest_marker = "<script type=\"application/json\" id=\"presolve-template-manifest\">";
+    let cold_body_start = cold_dump
+        .find("<body")
+        .and_then(|start| {
+            cold_dump[start..]
+                .find('>')
+                .map(|offset| start + offset + 1)
+        })
+        .expect("cold browser dump body start");
+    let cold_body_end = cold_dump
+        .find(manifest_marker)
+        .expect("cold browser dump template manifest");
+    let index_body_start = index
+        .find("<body")
+        .and_then(|start| index[start..].find('>').map(|offset| start + offset + 1))
+        .expect("V2 structural index body start");
+    let index_body_end = index
+        .find(manifest_marker)
+        .expect("V2 structural index template manifest");
+    let mut page = format!(
+        "{}{}{}",
+        &index[..index_body_start],
+        &cold_dump[cold_body_start..cold_body_end],
+        &index[index_body_end..]
+    );
+    page = page.replacen(" data-presolve-runtime=\"ready\"", "", 1);
+    let bootstrap = r#"<script>
+(() => {
+  const component = JSON.parse(document.getElementById("presolve-component-runtime").textContent);
+  const manifest = JSON.parse(document.getElementById("presolve-resume-runtime").textContent);
+  const prefix = "presolve-structural-occurrence:v1:";
+  const decode = (identity) => {
+    if (typeof identity !== "string" || !identity.startsWith(prefix)) throw new Error("missing structural occurrence identity");
+    const fields = identity.slice(prefix.length).split(".");
+    if (fields.length !== 4) throw new Error("malformed structural occurrence identity");
+    const text = new TextDecoder("utf-8", { fatal: true });
+    const value = fields.map((field) => text.decode(Uint8Array.from(field.match(/../g).map((pair) => Number.parseInt(pair, 16)))));
+    return { parentScope: value[0], structuralRegion: value[1], templateInstance: value[2], localOccurrence: value[3] };
+  };
+  const defaultValue = (codec) => {
+    switch (codec?.kind) {
+      case "null_codec": case "nullable_codec": return null;
+      case "boolean_codec": return false;
+      case "number_codec": return 0;
+      case "string_codec": return "";
+      case "array_codec": return [];
+      case "object_codec": return Object.fromEntries((codec.value ?? []).map((property) => [property.name, defaultValue(property.codec)]));
+      default: throw new Error("unknown resume codec");
+    }
+  };
+  const initial = (slot) => slot.semantic_type === "number" ? Number(slot.initial_value) : slot.initial_value;
+  const staticSlots = new Map((component.instances ?? []).flatMap((instance) => instance.state_slots ?? []).map((slot) => [slot.slot_id, initial(slot)]));
+  const snapshot = {
+    schemaVersion: 2,
+    buildId: manifest.build_id,
+    snapshotId: `resume-snapshot:${manifest.build_id}`,
+    manifestVersion: 7,
+    capturedAt: null,
+    boundaries: (manifest.boundaries ?? []).map((boundary) => ({
+      boundaryId: boundary.boundary_id,
+      schemaId: boundary.schema_id,
+      values: (manifest.slot_schemas ?? []).filter((slot) => slot.owner_boundary_id === boundary.boundary_id && slot.restore_phase !== "R5").map((slot) => ({
+        valueRecordId: `resume-value:${slot.slot_id}`,
+        slotId: slot.slot_id,
+        value: staticSlots.has(slot.existing_storage_slot_id) ? staticSlots.get(slot.existing_storage_slot_id) : defaultValue(slot.value_codec)
+      }))
+    })),
+    structuralOccurrences: []
+  };
+  const templates = new Map((component.structural_programs ?? []).flatMap((program) => (program.template_occurrences ?? []).map((occurrence) => [occurrence.template_instance, occurrence])));
+  const identities = new Set();
+  const add = (identity) => {
+    if (!identity.startsWith(prefix) || identities.has(identity)) return;
+    identities.add(identity);
+    const decoded = decode(identity);
+    add(decoded.parentScope);
+  };
+  for (const target of document.querySelectorAll("[data-presolve-ti]")) {
+    const value = target.getAttribute("data-presolve-ti") ?? "";
+    const marker = "/template-target:";
+    const index = value.indexOf(marker);
+    if (index !== -1) add(value.slice(0, index));
+  }
+  const depth = (identity) => {
+    let count = 0;
+    let cursor = decode(identity).parentScope;
+    while (cursor.startsWith(prefix)) { count += 1; cursor = decode(cursor).parentScope; }
+    return count;
+  };
+  snapshot.structuralOccurrences = [...identities].sort((left, right) => depth(left) - depth(right) || left.localeCompare(right)).map((identity) => {
+    const decoded = decode(identity);
+    const template = templates.get(decoded.templateInstance);
+    if (template === undefined) throw new Error("unknown structural template");
+    return {
+      occurrenceIdentity: identity,
+      templateInstance: decoded.templateInstance,
+      parentScope: decoded.parentScope,
+      structuralRegion: decoded.structuralRegion,
+      localOccurrence: decoded.localOccurrence,
+      state: (template.state_slots ?? []).map((slot) => ({
+        slotId: `${identity}/${slot.slot_id.slice(`${decoded.templateInstance}/`.length)}`,
+        value: initial(slot)
+      }))
+    };
+  });
+  window.__PRESOLVE_RESUME_SNAPSHOT__ = snapshot;
+  window.__PRESOLVE_STRUCTURAL_RESUME_DOM__ = document.querySelector("main").innerHTML;
+})();
+</script>"#;
+    page = page.replace(
+        "<script src=\"./runtime.js\" defer></script>",
+        &format!("{bootstrap}<script src=\"./runtime.js\" defer></script>"),
+    );
+    page = page.replace(
+        "</body>",
+        r#"<script>
+const waitForStructuralResume = () => new Promise((resolve, reject) => {
+  const deadline = Date.now() + 5000;
+  const check = () => {
+    if (document.documentElement.dataset.presolveRuntime === "ready") return resolve();
+    if (document.documentElement.dataset.presolveRuntime === "error") return reject(new Error("resume runtime failed"));
+    if (Date.now() > deadline) return reject(new Error("resume runtime timed out"));
+    setTimeout(check, 20);
+  };
+  check();
+});
+(async () => {
+  await waitForStructuralResume();
+  const runtime = window.__PRESOLVE__;
+  if (runtime.resume?.mode !== "resume") throw new Error(`did not resume: ${JSON.stringify(runtime.resume)}`);
+  if (runtime.resume_registry.structural_occurrences.size !== window.__PRESOLVE_RESUME_SNAPSHOT__.structuralOccurrences.length) throw new Error("structural occurrences were not restored exactly");
+  if (document.querySelector("main").innerHTML !== window.__PRESOLVE_STRUCTURAL_RESUME_DOM__) throw new Error("resume reconstructed structural DOM");
+  const leaf = [...document.querySelectorAll("button")].find((button) => button.textContent === "Leaf:0");
+  if (leaf === undefined) throw new Error("restored Leaf target was missing");
+  leaf.click();
+  if (leaf.textContent !== "Leaf:1") throw new Error("restored Leaf action/binding did not execute");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_STRUCTURAL_RESUME_BROWSER_PASS</div>");
+})().catch((error) => document.body.insertAdjacentHTML("beforeend", `<pre>PRESOLVE_STRUCTURAL_RESUME_BROWSER_FAIL: ${error.message}</pre>`));
+</script></body>"#,
+    );
+    fs::write(output_root.join("structural-resume.html"), page)
+        .expect("failed to write V2 structural resume probe");
+}
+
+fn write_v2_structural_resume_fallback_probe(output_root: &Path, name: &str, injection: &str) {
+    let page = fs::read_to_string(output_root.join("structural-resume.html"))
+        .expect("failed to read V2 structural resume probe");
+    let page = page.replacen(
+        "window.__PRESOLVE_RESUME_SNAPSHOT__ = snapshot;",
+        &format!("window.__PRESOLVE_RESUME_SNAPSHOT__ = snapshot;{injection}"),
+        1,
+    );
+    let page = page.replace(
+        "</body>",
+        &format!(
+            r#"<script>
+const structuralFallbackObserve = () => {{
+  const state = document.documentElement.dataset.presolveRuntime;
+  if (state !== "ready") return;
+  structuralFallbackObserver.disconnect();
+  if (window.__PRESOLVE__?.resume?.mode === "cold") {{
+    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_STRUCTURAL_RESUME_{name}_FALLBACK_PASS</div>");
+  }} else {{
+    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_STRUCTURAL_RESUME_{name}_FALLBACK_FAIL</div>");
+  }}
+}};
+const structuralFallbackObserver = new MutationObserver(structuralFallbackObserve);
+structuralFallbackObserver.observe(document.documentElement, {{ attributes: true, attributeFilter: ["data-presolve-runtime"] }});
+structuralFallbackObserve();
+</script></body>"#
+        ),
+    );
+    fs::write(
+        output_root.join(format!(
+            "structural-resume-{}.html",
+            name.to_ascii_lowercase()
+        )),
+        page,
+    )
+    .expect("failed to write V2 structural resume fallback probe");
+}
+
 #[cfg(unix)]
 #[test]
 fn decorator_free_v2_structural_component_artifacts_preserve_host_dom_identity_in_a_real_browser() {
@@ -2042,7 +2228,7 @@ process.stdout.write(JSON.stringify({
     );
     let artifact = fs::read_to_string(output_root.join("component.runtime.json"))
         .expect("failed to read V2 structural component artifact");
-    assert!(artifact.contains("\"schema_version\": 17"));
+    assert!(artifact.contains("\"schema_version\": 18"));
     assert!(artifact.contains("structural_programs"));
     assert!(artifact.contains("state_slots"));
     assert!(artifact.contains("computed_slots"));
@@ -2099,6 +2285,65 @@ process.stdout.write(JSON.stringify({
         stdout,
         String::from_utf8_lossy(&output.stderr)
     );
+
+    write_v2_structural_resume_probe_page(&output_root, &stdout);
+    let server = StaticServer::start(output_root.clone());
+    let profile_dir = project_root.join("structural-resume-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create structural resume profile dir");
+    let resume_output = run_chrome_probe(
+        chrome_bin().expect("headless Chrome was not found"),
+        &format!("--user-data-dir={}", profile_dir.display()),
+        &format!("http://127.0.0.1:{}/structural-resume.html", server.port),
+    );
+    server.stop();
+    let resume_stdout = String::from_utf8_lossy(&resume_output.stdout);
+    assert!(
+        resume_stdout.contains("PRESOLVE_STRUCTURAL_RESUME_BROWSER_PASS"),
+        "structural resume browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        resume_output.status,
+        resume_stdout,
+        String::from_utf8_lossy(&resume_output.stderr)
+    );
+
+    write_v2_structural_resume_fallback_probe(
+        &output_root,
+        "IDENTITY",
+        r#"const identityRecord = snapshot.structuralOccurrences[0]; identityRecord.templateInstance = "fabricated:template";"#,
+    );
+    write_v2_structural_resume_fallback_probe(
+        &output_root,
+        "STATE",
+        r#"const stateRecord = snapshot.structuralOccurrences.find((record) => record.state.length > 0); if (stateRecord === undefined) throw new Error("missing structural State record"); stateRecord.state[0].value = "not-a-number";"#,
+    );
+    write_v2_structural_resume_fallback_probe(
+        &output_root,
+        "ANCHOR",
+        r#"const anchorRecord = snapshot.structuralOccurrences.find((record) => record.state.length > 0); if (anchorRecord === undefined) throw new Error("missing structural anchor record"); const anchor = document.querySelector(`[data-presolve-ti^="${anchorRecord.occurrenceIdentity}/"]`); if (anchor === null) throw new Error("missing structural target anchor"); anchor.setAttribute("data-presolve-ti", "broken-structural-anchor");"#,
+    );
+    let server = StaticServer::start(output_root.clone());
+    for (index, name) in ["IDENTITY", "STATE", "ANCHOR"].into_iter().enumerate() {
+        let profile_dir = project_root.join(format!("structural-resume-{name}-profile"));
+        fs::create_dir_all(&profile_dir).expect("failed to create structural fallback profile dir");
+        let fallback_output = run_chrome_probe(
+            chrome_bin().expect("headless Chrome was not found"),
+            &format!("--user-data-dir={}", profile_dir.display()),
+            &format!(
+                "http://127.0.0.1:{}/structural-resume-{}.html",
+                server.port,
+                name.to_ascii_lowercase()
+            ),
+        );
+        let fallback_stdout = String::from_utf8_lossy(&fallback_output.stdout);
+        let marker = format!("PRESOLVE_STRUCTURAL_RESUME_{name}_FALLBACK_PASS");
+        assert!(
+            fallback_stdout.contains(&marker),
+            "structural resume {name} fallback did not pass (profile {index})\\nstatus: {}\\nstdout:\\n{}\\nstderr:\\n{}",
+            fallback_output.status,
+            fallback_stdout,
+            String::from_utf8_lossy(&fallback_output.stderr)
+        );
+    }
+    server.stop();
 
     let index = fs::read_to_string(output_root.join("index.html"))
         .expect("failed to read V2 structural output page");
@@ -2268,7 +2513,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   const runtime = window.__PRESOLVE__;
   const artifact = JSON.parse(document.getElementById("presolve-component-runtime").textContent);
   const effectArtifact = JSON.parse(document.getElementById("presolve-effect-runtime").textContent);
-  if (artifact.schema_version !== 17 || artifact.structural_programs.length !== 2) fail("structural component programs were missing");
+  if (artifact.schema_version !== 18 || artifact.structural_programs.length !== 2) fail("structural component programs were missing");
   if (runtime.store.componentRegions.size !== artifact.structural_programs.length) fail("closed structural region table diverged from the artifact");
   if (!artifact.structural_programs.every((program) => JSON.stringify(runtime.store.componentRegions.get(program.region)) === JSON.stringify(program))) {
     fail("runtime structural regions were not keyed by compiler IDs");

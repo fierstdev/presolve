@@ -25,8 +25,8 @@ const RUNTIME_STUB: &str = r#"(() => {
   const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_RESOURCES_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_OPAQUE_ARTIFACT_SCHEMA_VERSION = 1;
-  const SUPPORTED_RESUME_MANIFEST_SCHEMA_VERSION = 6;
-  const SUPPORTED_RESUME_SNAPSHOT_SCHEMA_VERSION = 1;
+  const SUPPORTED_RESUME_MANIFEST_SCHEMA_VERSION = 7;
+  const SUPPORTED_RESUME_SNAPSHOT_SCHEMA_VERSION = 2;
   const SUPPORTED_RESUME_RUNTIME_PROTOCOL_VERSION = 1;
   const RESUME_REGISTRY_CONTRACT_VERSION = 1;
 
@@ -82,13 +82,13 @@ const RUNTIME_STUB: &str = r#"(() => {
   function readResumeManifest(diagnostics) {
     const element = document.getElementById(RESUME_MANIFEST_ELEMENT_ID);
     if (!(element instanceof HTMLScriptElement)) {
-      reportDiagnostic(diagnostics, "PSR_RESUME_MANIFEST_MISSING", "Resume manifest v6 is missing", { artifactElementId: RESUME_MANIFEST_ELEMENT_ID });
+      reportDiagnostic(diagnostics, "PSR_RESUME_MANIFEST_MISSING", "Resume manifest v7 is missing", { artifactElementId: RESUME_MANIFEST_ELEMENT_ID });
       throw new ResumeBootError("ManifestVersionMismatch");
     }
     try {
       return JSON.parse(element.textContent ?? "");
     } catch (error) {
-      reportDiagnostic(diagnostics, "PSR_RESUME_MANIFEST_PARSE", "Resume manifest v6 could not be parsed", { message: error instanceof Error ? error.message : String(error) });
+      reportDiagnostic(diagnostics, "PSR_RESUME_MANIFEST_PARSE", "Resume manifest v7 could not be parsed", { message: error instanceof Error ? error.message : String(error) });
       throw new ResumeBootError("ManifestVersionMismatch");
     }
   }
@@ -144,7 +144,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     try {
       return JSON.parse(element.textContent ?? "");
     } catch (error) {
-      reportDiagnostic(diagnostics, "PSR_RESUME_SNAPSHOT_PARSE", "Resume snapshot v1 could not be parsed", { message: error instanceof Error ? error.message : String(error) });
+      reportDiagnostic(diagnostics, "PSR_RESUME_SNAPSHOT_PARSE", "Resume snapshot v2 could not be parsed", { message: error instanceof Error ? error.message : String(error) });
       throw new ResumeBootError("SnapshotParseFailure");
     }
   }
@@ -226,7 +226,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   }
 
   function validateResumeSnapshot(snapshot, manifest, definitions) {
-    if (!exactObjectKeys(snapshot, ["schemaVersion", "buildId", "snapshotId", "manifestVersion", "capturedAt", "boundaries"])) {
+    if (!exactObjectKeys(snapshot, ["schemaVersion", "buildId", "snapshotId", "manifestVersion", "capturedAt", "boundaries", "structuralOccurrences"])) {
       throw new ResumeBootError("SnapshotSchemaMismatch");
     }
     if (snapshot.schemaVersion !== SUPPORTED_RESUME_SNAPSHOT_SCHEMA_VERSION
@@ -238,7 +238,9 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (snapshot.buildId !== manifest.build_id) throw new ResumeBootError("BuildIdMismatch");
     const seenBoundaries = new Set();
     const seenSlots = new Set();
-    if (!Array.isArray(snapshot.boundaries)) throw new ResumeBootError("SnapshotSchemaMismatch");
+    if (!Array.isArray(snapshot.boundaries) || !Array.isArray(snapshot.structuralOccurrences)) {
+      throw new ResumeBootError("SnapshotSchemaMismatch");
+    }
     for (const boundary of snapshot.boundaries) {
       if (!exactObjectKeys(boundary, ["boundaryId", "schemaId", "values"])) {
         throw new ResumeBootError("SnapshotSchemaMismatch");
@@ -262,7 +264,30 @@ const RUNTIME_STUB: &str = r#"(() => {
         seenSlots.add(value.slotId);
       }
     }
-    return { seenBoundaries, seenSlots };
+    const structuralOccurrences = new Map();
+    for (const occurrence of snapshot.structuralOccurrences) {
+      if (!exactObjectKeys(occurrence, ["occurrenceIdentity", "templateInstance", "parentScope", "structuralRegion", "localOccurrence", "state"])
+        || typeof occurrence.occurrenceIdentity !== "string"
+        || typeof occurrence.templateInstance !== "string"
+        || typeof occurrence.parentScope !== "string"
+        || typeof occurrence.structuralRegion !== "string"
+        || typeof occurrence.localOccurrence !== "string"
+        || !Array.isArray(occurrence.state)
+        || structuralOccurrences.has(occurrence.occurrenceIdentity)) {
+        throw new ResumeBootError("SnapshotSchemaMismatch");
+      }
+      const stateSlots = new Set();
+      for (const state of occurrence.state) {
+        if (!exactObjectKeys(state, ["slotId", "value"])
+          || typeof state.slotId !== "string"
+          || stateSlots.has(state.slotId)) {
+          throw new ResumeBootError("SnapshotSchemaMismatch");
+        }
+        stateSlots.add(state.slotId);
+      }
+      structuralOccurrences.set(occurrence.occurrenceIdentity, occurrence);
+    }
+    return { seenBoundaries, seenSlots, structuralOccurrences };
   }
 
   function allocateResumeRegistry(manifest, definitions) {
@@ -276,6 +301,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       component_records: new Map(),
       form_records: new Map(),
       structural_records: new Map(),
+      structural_occurrences: new Map(),
       effect_subscriptions: new Map(),
       activation_states: new Map(),
       debug: []
@@ -1941,7 +1967,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     return Object.freeze(instances);
   }
 
-  function activateStructuralEffectInstances(store, records) {
+  function activateStructuralEffectInstances(store, records, resumeOnly = false) {
     const instances = structuralEffectInstances(store, records);
     const effects = new Map((store.effectArtifact?.effects ?? []).map((effect) => [effect.effect, effect]));
     const activated = [];
@@ -1949,6 +1975,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       for (const instance of instances) {
         const effect = effects.get(instance.effect);
         if (effect === undefined) throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
+        if (resumeOnly && effect.run_on_resume !== true) continue;
         store.activeEffectInstances.set(instance.effect_instance, instance);
         activated.push(instance);
         const evidence = {
@@ -2523,7 +2550,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     return nextInstances;
   }
 
-  function initialListInstances(store, node, items) {
+  function initialListInstances(store, component, node, items) {
     const instances = new Map();
 
     for (const [index, item] of items.entries()) {
@@ -2531,7 +2558,12 @@ const RUNTIME_STUB: &str = r#"(() => {
       const element = store.elementsByNode.get(`${node.item_root}:${key}`);
 
       if (element !== undefined) {
-        instances.set(key, { element, item, index, key });
+        const restored = store.restoredStructuralOccurrencesByParentLocal?.get(
+          `${component?.instance_id ?? ""}\u001fkeyed:${key}`
+        );
+        const instance = { element, item, index, key };
+        if (restored !== undefined) instance.structural_occurrences = Object.freeze(restored);
+        instances.set(key, instance);
       }
     }
 
@@ -3610,6 +3642,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
         let instances = initialListInstances(
           store,
+          component,
           node,
           listItems(component.state[field])
         );
@@ -4033,6 +4066,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         const fragment = structuralKeyedHostFragment(store, component, node);
         let instances = initialListInstances(
           store,
+          component,
           node,
           listItems(store.storageValues.get(slot.slot_id))
         );
@@ -4069,9 +4103,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     const artifactTargets = new Map((componentArtifact.ordinary_template_targets ?? []).map((target) => [target.id, target]));
     const artifactBindings = new Map((componentArtifact.ordinary_template_bindings ?? []).map((binding) => [binding.id, binding]));
     const artifactEvents = new Map((componentArtifact.ordinary_template_events ?? []).map((event) => [ordinaryEventKey(event.target_id, event.event_type), event]));
+    const preserveStructuralRegistry = store.resumeStructuralRegistryPrepared === true;
     store.templateTargetsById = anchors.targets;
-    store.ordinaryBindingsById = new Map();
-    store.ordinaryEventsByTargetAndType = new Map();
+    if (!preserveStructuralRegistry) {
+      store.ordinaryBindingsById = new Map();
+      store.ordinaryEventsByTargetAndType = new Map();
+    }
     for (const target of targets) {
       const artifactTarget = artifactTargets.get(target.id);
       if (artifactTarget === undefined || artifactTarget.component_instance_id !== target.component_instance_id || anchors.duplicates.has(target.id) || !anchors.targets.has(target.id)) {
@@ -4081,6 +4118,9 @@ const RUNTIME_STUB: &str = r#"(() => {
     for (const binding of bindings) {
       const artifactBinding = artifactBindings.get(binding.instance_binding_id);
       if (artifactBinding === undefined || artifactBinding.component_instance_id !== binding.component_instance_id || artifactBinding.target_id !== binding.instance_target_id) {
+        throw new PresolveBootError("PSR_INVALID_ORDINARY_BINDING");
+      }
+      if (store.ordinaryBindingsById.has(binding.instance_binding_id)) {
         throw new PresolveBootError("PSR_INVALID_ORDINARY_BINDING");
       }
       store.ordinaryBindingsById.set(binding.instance_binding_id, {
@@ -4112,7 +4152,9 @@ const RUNTIME_STUB: &str = r#"(() => {
     );
     const bindings = (manifest.ordinary_bindings ?? []).filter((binding) =>
       stateBindingIds.has(binding.instance_binding_id)
-      && (binding.kind === "text" || binding.kind === "attribute" || binding.kind === "property")
+      && (binding.kind === "text" || binding.kind === "attribute" || binding.kind === "property"
+        || (store.structuralOccurrenceResumeActive === true
+          && (binding.kind === "conditional" || binding.kind === "list")))
     );
     const targetIds = new Set(bindings.map((binding) => binding.instance_target_id));
     for (const event of manifest.ordinary_events ?? []) targetIds.add(event.instance_target_id);
@@ -4508,7 +4550,14 @@ const RUNTIME_STUB: &str = r#"(() => {
     store.componentArtifact = componentArtifact;
     store.componentInstances = new Map();
     store.slotBindings = new Map();
-    store.componentRegions = new Map();
+    store.componentRegions = new Map((componentArtifact?.structural_programs ?? []).map(
+      (program) => [program.region, program]
+    ));
+    store.structuralOccurrenceTemplatesByInvocation = structuralOccurrenceTemplateRegistry(
+      templateManifest,
+      componentArtifact,
+      computedArtifact
+    );
     store.instanceContextBindings = new Map(
       (componentArtifact?.instance_context_bindings ?? [])
         .map((binding) => [binding.consumer_instance, binding])
@@ -4830,7 +4879,6 @@ const RUNTIME_STUB: &str = r#"(() => {
       }
       const runtimeRecord = { ...record, program, selection_value: undefined };
       registry.structural_records.set(record.region, runtimeRecord);
-      store.componentRegions.set(record.region, runtimeRecord);
     }
 
     const restoredRegions = new Set();
@@ -4864,6 +4912,147 @@ const RUNTIME_STUB: &str = r#"(() => {
       throw new ResumeBootError("ResumeArtifactMismatch");
     }
     store.resumeAnchors = collectExactResumeAnchors(manifest);
+  }
+
+  function restoreResumeStructuralOccurrences(snapshot, registry, store, templateManifest, computedArtifact, componentArtifact) {
+    if (!(store.structuralOccurrenceTemplatesByInvocation instanceof Map)
+      || !(store.componentRegions instanceof Map)) {
+      throw new ResumeBootError("ResumeArtifactMismatch");
+    }
+    const templatesByInstance = new Map();
+    for (const template of store.structuralOccurrenceTemplatesByInvocation.values()) {
+      const templateInstance = template?.occurrence?.template_instance;
+      if (typeof templateInstance !== "string" || templatesByInstance.has(templateInstance)) {
+        throw new ResumeBootError("ResumeArtifactMismatch");
+      }
+      templatesByInstance.set(templateInstance, template);
+    }
+    const staticInstances = new Set((componentArtifact.instances ?? []).map((instance) => instance.instance));
+    const snapshotOccurrences = snapshot.structuralOccurrences ?? [];
+    store.structuralOccurrenceResumeActive = snapshotOccurrences.length > 0;
+    const snapshotIdentities = new Set(snapshotOccurrences.map((record) => record.occurrenceIdentity));
+    const domIdentities = new Set();
+    const addDomIdentity = (identity) => {
+      if (typeof identity !== "string" || !identity.startsWith(STRUCTURAL_OCCURRENCE_IDENTITY_PREFIX)
+        || domIdentities.has(identity)) return;
+      domIdentities.add(identity);
+      addDomIdentity(decodeStructuralOccurrenceIdentity(identity).parent_scope);
+    };
+    for (const target of document.querySelectorAll("[data-presolve-ti]")) {
+      const value = target.getAttribute("data-presolve-ti") ?? "";
+      const marker = "/template-target:";
+      const index = value.indexOf(marker);
+      if (index !== -1) addDomIdentity(value.slice(0, index));
+    }
+    if (domIdentities.size !== snapshotIdentities.size
+      || [...domIdentities].some((identity) => !snapshotIdentities.has(identity))) {
+      throw new ResumeBootError("StructuralOccurrenceAnchorMismatch");
+    }
+    const restored = new Map();
+    const byParentLocal = new Map();
+    const fieldsByComponentStorage = new Map();
+    for (const state of computedArtifact?.state ?? []) {
+      fieldsByComponentStorage.set(`${state.component}\u001f${state.storage}`, state.field);
+    }
+    store.templateTargetsById = new Map();
+    store.ordinaryBindingsById = new Map();
+    store.ordinaryEventsByTargetAndType = new Map();
+    store.resumeStructuralRegistryPrepared = true;
+    for (const record of snapshotOccurrences) {
+        const decoded = decodeStructuralOccurrenceIdentity(record.occurrenceIdentity);
+        if (decoded.template_instance !== record.templateInstance
+          || decoded.parent_scope !== record.parentScope
+          || decoded.region !== record.structuralRegion
+          || decoded.local_occurrence !== record.localOccurrence) {
+          throw new ResumeBootError("StructuralOccurrenceIdentityMismatch");
+        }
+        const template = templatesByInstance.get(record.templateInstance);
+        if (template === undefined || template.structural_region !== record.structuralRegion) {
+          throw new ResumeBootError("StructuralOccurrenceIdentityMismatch");
+        }
+        const parentIsStatic = staticInstances.has(record.parentScope);
+        const parent = restored.get(record.parentScope);
+        if (!parentIsStatic && parent === undefined) {
+          throw new ResumeBootError("StructuralOccurrenceParentMismatch");
+        }
+        if (parent !== undefined && template.occurrence.parent_template_instance !== parent.template_instance) {
+          throw new ResumeBootError("StructuralOccurrenceIdentityMismatch");
+        }
+        if (parentIsStatic && template.occurrence.parent_template_instance !== record.parentScope) {
+          throw new ResumeBootError("StructuralOccurrenceIdentityMismatch");
+        }
+        const records = deriveStructuralOccurrenceRecords(template, record.occurrenceIdentity);
+        const expectedState = new Map();
+        for (const slot of records.state_slots) {
+          if (slot.serializable !== true || slot.resume_codec === undefined) {
+            throw new ResumeBootError("StructuralStateUnsupported");
+          }
+          expectedState.set(slot.slot_id, slot);
+        }
+        if (expectedState.size !== record.state.length) throw new ResumeBootError("StructuralStateMismatch");
+        const staged = stageStructuralOccurrenceRecords(store, records);
+        let registration = null;
+        let effects = null;
+        try {
+          for (const state of record.state) {
+            const slot = expectedState.get(state.slotId);
+            if (slot === undefined) throw new ResumeBootError("StructuralStateMismatch");
+            const value = decodeResumeValue(state.value, slot.resume_codec);
+            store.storageValues.set(slot.slot_id, value);
+            const field = fieldsByComponentStorage.get(`${records.definition.name}\u001f${slot.storage_id}`);
+            const component = store.components.get(record.occurrenceIdentity);
+            if (field === undefined || component === undefined) throw new ResumeBootError("StructuralStateMismatch");
+            component.state[field] = value;
+          }
+          registration = registerStructuralOccurrenceRecords(store, staged);
+          effects = activateStructuralEffectInstances(store, staged, true);
+          const transaction = Object.freeze({ ...staged, registration, effects, dispose: () => {
+            for (const child of [...(transaction.children ?? [])].reverse()) child.dispose();
+            effects?.dispose();
+            registration?.rollback();
+            staged.rollback();
+          }, children: [] });
+          restored.set(record.occurrenceIdentity, transaction);
+          registry.structural_occurrences.set(record.occurrenceIdentity, transaction);
+          const key = `${record.parentScope}\u001f${record.localOccurrence}`;
+          const siblings = byParentLocal.get(key) ?? [];
+          siblings.push(transaction);
+          byParentLocal.set(key, siblings);
+          if (parent !== undefined) parent.children.push(transaction);
+        } catch (error) {
+          effects?.dispose();
+          registration?.rollback();
+          staged.rollback();
+          throw error;
+        }
+    }
+    for (const [key, transactions] of byParentLocal) {
+      store.restoredStructuralOccurrencesByParentLocal ??= new Map();
+      store.restoredStructuralOccurrencesByParentLocal.set(key, Object.freeze(transactions));
+    }
+    const anchors = collectOrdinaryTargetAnchors();
+    for (const target of templateManifest.ordinary_targets ?? []) {
+      const artifact = (componentArtifact.ordinary_template_targets ?? []).find((candidate) => candidate.id === target.id);
+      if (artifact === undefined || artifact.template_entity_id !== target.template_entity_id) continue;
+      const host = anchors.targets.get(target.id);
+      if (host?.kind !== "conditional") continue;
+      const program = [...store.componentRegions.values()].find((candidate) =>
+        candidate.host_template_entity === artifact.template_entity_id
+        && candidate.host_component === artifact.component_id
+      );
+      const component = store.components.get(target.component_instance_id);
+      const binding = (templateManifest.ordinary_bindings ?? []).find((candidate) =>
+        candidate.instance_target_id === target.id && candidate.kind === "conditional"
+      );
+      const field = fieldNameFromThisMember(binding?.expression);
+      if (program === undefined || component === undefined || field === null) {
+        throw new ResumeBootError("ResumeArtifactMismatch");
+      }
+      host.structural_branch = component.state[field] === true ? "true" : "false";
+      host.structural_occurrences = store.restoredStructuralOccurrencesByParentLocal.get(
+        `${target.component_instance_id}\u001fconditional:${host.structural_branch}`
+      ) ?? Object.freeze([]);
+    }
   }
 
   function restoreResumeForms(templateManifest, snapshot, registry, store, formsArtifact) {
@@ -5004,6 +5193,14 @@ const RUNTIME_STUB: &str = r#"(() => {
     executeResumeDecodeAndWrites(store, registry, snapshot, new Set(["R6"]));
     executeResumeContextBindings(store, registry, componentArtifact);
     restoreResumeComponentsSlotsAndStructure(manifest, registry, store, componentArtifact);
+    restoreResumeStructuralOccurrences(
+      snapshot,
+      registry,
+      store,
+      templateManifest,
+      computedArtifact,
+      componentArtifact
+    );
     restoreResumeForms(templateManifest, snapshot, registry, store, formsArtifact);
     installResumeDomBindings(store, templateManifest, componentArtifact);
     establishResumeEffects(registry, store, effectArtifact);

@@ -2,8 +2,9 @@
 
 This contract defines the opaque runtime identity required to materialize a
 compiler-issued structural component template. It is an execution-local key,
-not a `SemanticId`, and it is never serialized into a resume snapshot under
-the current cold-only structural boundary.
+not a `SemanticId`. It is cold-only under the original materialization gate;
+the schema-v2 structural-resume amendment serializes it only alongside its
+four codec inputs and requires exact decode/re-encode validation.
 
 ## Inputs
 

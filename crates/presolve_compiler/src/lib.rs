@@ -752,9 +752,10 @@ pub use resume_capture::{
     ResumeCaptureBlock, ResumeCaptureBlockReason, ResumeCaptureError, ResumeCaptureErrorKind,
     ResumeCaptureInstruction, ResumeCaptureIntegrityCode, ResumeCaptureIntegrityDiagnostic,
     ResumeCapturePlan, ResumeCaptureProgram, ResumeEncodedValue, ResumeEnvelopeWriterPlan,
-    ResumeSnapshotBoundaryV1, ResumeSnapshotV1, ResumeSnapshotValueRecordV1,
-    RuntimeQuiescenceState, RESUME_CAPTURE_MANIFEST_VERSION, RESUME_CAPTURE_PLAN_VERSION,
-    RESUME_SNAPSHOT_SCHEMA_VERSION,
+    ResumeSnapshotBoundaryV1, ResumeSnapshotStructuralOccurrenceV2,
+    ResumeSnapshotStructuralStateV2, ResumeSnapshotV1, ResumeSnapshotV2,
+    ResumeSnapshotValueRecordV1, RuntimeQuiescenceState, RESUME_CAPTURE_MANIFEST_VERSION,
+    RESUME_CAPTURE_PLAN_VERSION, RESUME_SNAPSHOT_SCHEMA_VERSION,
 };
 pub use resume_chunk::{
     build_resume_chunk_graph, validate_resume_chunk_graph, ResumeChunk, ResumeChunkBlock,
@@ -785,16 +786,16 @@ pub use resume_liveness::{
     RESUME_LIVENESS_PLAN_VERSION,
 };
 pub use resume_manifest::{
-    build_resume_manifest, compute_resume_build_id, parse_resume_manifest_v6, resume_manifest_json,
-    validate_resume_manifest, ResumeManifest, ResumeManifestActivationPolicy,
-    ResumeManifestActivationRecord, ResumeManifestAnchorRecord, ResumeManifestBoundaryKind,
-    ResumeManifestBoundaryRecord, ResumeManifestCaptureInstruction, ResumeManifestCaptureProgram,
-    ResumeManifestChunkRecord, ResumeManifestContextSlotRecord, ResumeManifestEffectRecord,
-    ResumeManifestEventRecord, ResumeManifestPhaseIComponentResumeRecord,
-    ResumeManifestRestoreInstruction, ResumeManifestRestoreInstructionRecord,
-    ResumeManifestRestoreProgram, ResumeManifestSlotSchemaRecord,
-    ResumeManifestValidationDiagnostic, RESUME_MANIFEST_SCHEMA_VERSION,
-    RESUME_RUNTIME_PROTOCOL_VERSION,
+    build_resume_manifest, compute_resume_build_id, parse_resume_manifest_v6,
+    parse_resume_manifest_v7, resume_manifest_json, validate_resume_manifest, ResumeManifest,
+    ResumeManifestActivationPolicy, ResumeManifestActivationRecord, ResumeManifestAnchorRecord,
+    ResumeManifestBoundaryKind, ResumeManifestBoundaryRecord, ResumeManifestCaptureInstruction,
+    ResumeManifestCaptureProgram, ResumeManifestChunkRecord, ResumeManifestContextSlotRecord,
+    ResumeManifestEffectRecord, ResumeManifestEventRecord,
+    ResumeManifestPhaseIComponentResumeRecord, ResumeManifestRestoreInstruction,
+    ResumeManifestRestoreInstructionRecord, ResumeManifestRestoreProgram,
+    ResumeManifestSlotSchemaRecord, ResumeManifestValidationDiagnostic,
+    RESUME_MANIFEST_SCHEMA_VERSION, RESUME_RUNTIME_PROTOCOL_VERSION,
 };
 pub use resume_plan::{
     build_resume_plan, ComponentInstanceResumePlan, FormFieldResumePlan, FormInstanceResumePlan,

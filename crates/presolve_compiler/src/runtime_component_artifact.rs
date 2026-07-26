@@ -3,13 +3,13 @@ use serde::{Deserialize, Serialize};
 use crate::{
     build_computed_instance_slot_registry, build_ordinary_template_instance_registry,
     build_runtime_component_registry, build_state_instance_storage_registry,
-    lower_components_to_ir, semantic_type_text, ApplicationSemanticModel,
+    lower_components_to_ir, resume_value_codec, semantic_type_text, ApplicationSemanticModel,
     OptimizedComponentIrReport, OrdinaryTemplateBindingKind, OrdinaryTemplateTargetKind,
-    RuntimeComponentRegistry, SerializationCompatibility,
+    ResumeValueCodec, RuntimeComponentRegistry, SerializationCompatibility,
 };
 use crate::{TemplateChild, TemplateNode, TemplateSemanticKind};
 
-pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 17;
+pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 18;
 
 /// Public H14 compiler artifact. All executable references are canonical IDs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,6 +60,11 @@ pub struct SerializedRuntimeStateSlot {
     pub initial_value: crate::SerializableValue,
     pub semantic_type: String,
     pub serializable: bool,
+    /// The compiler-issued closed resume codec for a serializable structural
+    /// occurrence slot. Static boundary schemas remain the authority for
+    /// static-instance capture.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resume_codec: Option<ResumeValueCodec>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SerializedRuntimeComputedSlot {
@@ -180,6 +185,9 @@ pub struct SerializedStructuralTemplateOccurrence {
     /// Exact semantic template entity for this invocation marker.
     pub invocation_template_entity: String,
     pub component: String,
+    /// Compiler template parent. The runtime substitutes only the opaque
+    /// occurrence identity prefix when restoring a dynamic descendant.
+    pub parent_template_instance: String,
     /// Compiler template slots; runtime occurrence identity replaces only the
     /// template-instance prefix when materialization is later admitted.
     pub state_slots: Vec<SerializedRuntimeStateSlot>,
@@ -310,6 +318,9 @@ pub fn build_runtime_component_artifact(
                 initial_value: slot.initial_value.clone(),
                 semantic_type: semantic_type_text(&slot.semantic_type),
                 serializable: slot.serialization == SerializationCompatibility::Serializable,
+                resume_codec: (slot.serialization == SerializationCompatibility::Serializable)
+                    .then(|| resume_value_codec(&slot.semantic_type).ok())
+                    .flatten(),
             })
             .collect();
         instance.computed_slots = computed_slots
@@ -353,6 +364,11 @@ pub fn build_runtime_component_artifact(
                             .template_entity
                             .to_string(),
                         component: instance.component.to_string(),
+                        parent_template_instance: instance
+                            .parent_instance
+                            .as_ref()
+                            .expect("structural template parent")
+                            .to_string(),
                         state_slots: state_slots
                             .records
                             .iter()
@@ -365,6 +381,10 @@ pub fn build_runtime_component_artifact(
                                 semantic_type: semantic_type_text(&slot.semantic_type),
                                 serializable: slot.serialization
                                     == SerializationCompatibility::Serializable,
+                                resume_codec: (slot.serialization
+                                    == SerializationCompatibility::Serializable)
+                                    .then(|| resume_value_codec(&slot.semantic_type).ok())
+                                    .flatten(),
                             })
                             .collect(),
                         computed_slots: computed_slots
@@ -927,6 +947,7 @@ pub fn validate_runtime_component_artifact(
                     || slot.storage_id != format!("storage:{}", slot.state_id)
                     || slot.state_id.is_empty()
                     || slot.semantic_type.is_empty()
+                    || (!slot.serializable && slot.resume_codec.is_some())
                     || !structural_state_slots.insert(slot.slot_id.as_str())
                     || !structural_state_instance_pairs.insert((
                         occurrence.template_instance.as_str(),
@@ -1041,6 +1062,19 @@ pub fn validate_runtime_component_artifact(
         })
     }) {
         return Err("component artifact has an unknown parent instance".to_string());
+    }
+    if artifact
+        .structural_programs
+        .iter()
+        .flat_map(|program| &program.template_occurrences)
+        .any(|occurrence| {
+            occurrence.parent_template_instance.is_empty()
+                || (!instances.contains(occurrence.parent_template_instance.as_str())
+                    && !structural_template_instances
+                        .contains(occurrence.parent_template_instance.as_str()))
+        })
+    {
+        return Err("component artifact has an unknown structural template parent".to_string());
     }
     if artifact.slot_binding_programs.iter().any(|r| {
         !instances.contains(r.caller_instance.as_str())
