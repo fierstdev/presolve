@@ -53,7 +53,9 @@ with before/after fixtures, source-location proof, and an amendment to
    TypeScript-proven heritage clauses to the canonical authored model. State
    initializer lowering follows the same rule: a parser-selected direct field
    call joins an exact resolved `state` callee only after its owning component
-   has been proven.
+   has been proven. Action-field lowering applies the same component-ownership
+   and resolved-callee rule to `action(handler)`; decorated methods remain in
+   the legacy adapter.
 3. Existing downstream products adopt that canonical model one at a time.
    A compatibility lowering never becomes evidence that the V2 source form
    works.

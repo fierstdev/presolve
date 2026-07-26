@@ -5,6 +5,7 @@
 //! place to learn compiler fundamentals before choosing a real parser backend.
 
 pub mod action_authority;
+pub mod action_field_lowering;
 pub mod application_publication;
 pub mod application_semantic_model;
 pub mod asm_validation;
@@ -202,6 +203,10 @@ mod wasm_binding;
 pub use action_authority::{
     build_action_authority_v1, ActionAdmissionV1, ActionAuthorityV1, ActionCaptureCoverageV1,
     ActionEnvironmentV1, ActionFactV1, ActionRecordV1, ACTION_AUTHORITY_SCHEMA_VERSION,
+};
+pub use action_field_lowering::{
+    action_field_sites_v1, lower_action_fields_v1, ActionFieldLoweringErrorV1,
+    ActionFieldLoweringV1, ActionFieldSiteV1, ResolvedActionFieldV1,
 };
 pub use application_publication::{
     application_publication_manifest_json_v1, build_application_publication_product_from_asm_v1,
