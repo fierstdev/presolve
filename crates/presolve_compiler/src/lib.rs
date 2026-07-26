@@ -58,6 +58,7 @@ pub mod effect_projection;
 pub mod effect_resume;
 pub mod environment_input;
 pub mod environment_ownership;
+pub mod environment_publication;
 pub mod environment_read_lowering;
 pub mod explain;
 pub mod expression_graph;
@@ -453,6 +454,11 @@ pub use environment_ownership::{
     EnvironmentOwnershipEdgeKindV1, EnvironmentOwnershipEdgeV1, EnvironmentOwnershipErrorV1,
     EnvironmentOwnershipFactsV1, EnvironmentOwnershipGraphV1, EnvironmentOwnershipNodeV1,
     EnvironmentOwnershipViolationV1, LifetimeClassV1, ENVIRONMENT_OWNERSHIP_SCHEMA_VERSION,
+};
+pub use environment_publication::{
+    build_environment_publication_artifact_v1, environment_publication_artifact_json_v1,
+    EnvironmentPublicationArtifactV1, EnvironmentPublicationErrorV1,
+    ENVIRONMENT_PUBLICATION_SCHEMA_VERSION,
 };
 pub use environment_read_lowering::{
     lower_environment_reads_v1, EnvironmentReadDiagnosticCodeV1, EnvironmentReadDiagnosticV1,
