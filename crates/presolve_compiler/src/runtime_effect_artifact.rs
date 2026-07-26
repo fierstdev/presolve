@@ -11,7 +11,7 @@ use crate::{
     IrInstructionKind, IrValueId, RuntimeEffectRecord, EFFECT_CAPABILITY_REGISTRY,
 };
 
-pub const RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION: u32 = 1;
+pub const RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION: u32 = 2;
 
 /// Versioned compiler-generated runtime metadata and effect programs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -31,6 +31,8 @@ pub struct RuntimeEffectArtifactEffect {
     pub capability_operations: Vec<RuntimeEffectArtifactCapabilityOperation>,
     pub execution_boundary: RuntimeEffectArtifactExecutionBoundary,
     pub program: RuntimeEffectArtifactProgram,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cleanup_program: Option<RuntimeEffectArtifactProgram>,
 }
 
 /// Explicit initial-render trigger metadata for one emitted effect.
@@ -137,8 +139,8 @@ pub fn build_runtime_effect_artifact(
         .records
         .values()
         .filter_map(|record| {
-            let program = programs.get(&record.effect)?.clone();
-            runtime_effect(record, program)
+            let programs = programs.get(&record.effect)?;
+            runtime_effect(record, programs.main.clone(), programs.cleanup.clone())
         })
         .collect();
     RuntimeEffectArtifact {
@@ -160,6 +162,7 @@ pub fn runtime_effect_artifact_json(artifact: &RuntimeEffectArtifact) -> String 
 fn runtime_effect(
     record: &RuntimeEffectRecord,
     program: RuntimeEffectArtifactProgram,
+    cleanup_program: Option<RuntimeEffectArtifactProgram>,
 ) -> Option<RuntimeEffectArtifactEffect> {
     Some(RuntimeEffectArtifactEffect {
         effect: record.effect.as_str().to_string(),
@@ -187,12 +190,17 @@ fn runtime_effect(
         capability_operations: capability_operations(&record.capability_operations)?,
         execution_boundary: execution_boundary(record.execution_boundary),
         program,
+        cleanup_program,
     })
 }
 
-fn effect_programs(
-    ir: &IntermediateRepresentation,
-) -> BTreeMap<crate::SemanticId, RuntimeEffectArtifactProgram> {
+#[derive(Debug, Clone)]
+struct EffectPrograms {
+    main: RuntimeEffectArtifactProgram,
+    cleanup: Option<RuntimeEffectArtifactProgram>,
+}
+
+fn effect_programs(ir: &IntermediateRepresentation) -> BTreeMap<crate::SemanticId, EffectPrograms> {
     ir.modules
         .iter()
         .flat_map(|module| {
@@ -201,19 +209,36 @@ fn effect_programs(
                     .functions
                     .iter()
                     .find(|function| function.id == execution.function)?;
-                let instructions = function
-                    .blocks
-                    .iter()
-                    .flat_map(|block| block.instructions.iter())
-                    .map(runtime_instruction)
-                    .collect::<Option<Vec<_>>>()?;
+                let program = runtime_effect_program(function)?;
+                let cleanup = if let Some(cleanup_id) = &execution.cleanup_function {
+                    let function = module
+                        .functions
+                        .iter()
+                        .find(|function| function.id == *cleanup_id)?;
+                    Some(runtime_effect_program(function)?)
+                } else {
+                    None
+                };
                 Some((
                     execution.effect.clone(),
-                    RuntimeEffectArtifactProgram { instructions },
+                    EffectPrograms {
+                        main: program,
+                        cleanup,
+                    },
                 ))
             })
         })
         .collect()
+}
+
+fn runtime_effect_program(function: &crate::IrFunction) -> Option<RuntimeEffectArtifactProgram> {
+    let instructions = function
+        .blocks
+        .iter()
+        .flat_map(|block| block.instructions.iter())
+        .map(runtime_instruction)
+        .collect::<Option<Vec<_>>>()?;
+    Some(RuntimeEffectArtifactProgram { instructions })
 }
 
 fn runtime_instruction(instruction: &IrInstruction) -> Option<RuntimeEffectArtifactInstruction> {
@@ -377,6 +402,7 @@ class RuntimeEffectArtifact extends Component {
             RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION
         );
         assert_eq!(artifact.effects.len(), 1);
+        assert!(effect.cleanup_program.is_none());
         assert_eq!(effect.effect, report.as_str());
         assert_eq!(effect.execution_function, report.as_str());
         assert_eq!(
@@ -446,7 +472,7 @@ class RuntimeEffectArtifact extends Component {
         ));
         assert_eq!(first, second);
         let json: serde_json::Value = serde_json::from_str(&first).expect("artifact JSON");
-        assert_eq!(json["schema_version"], 1);
+        assert_eq!(json["schema_version"], 2);
         assert_eq!(
             json["effects"][0]["program"]["instructions"][2]["kind"],
             "capability-call"
