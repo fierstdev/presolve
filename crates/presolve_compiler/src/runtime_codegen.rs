@@ -1521,6 +1521,41 @@ const RUNTIME_STUB: &str = r#"(() => {
     });
   }
 
+  function instantiateStructuralTemplateSlots(occurrence, occurrenceIdentity) {
+    decodeStructuralOccurrenceIdentity(occurrenceIdentity);
+    const templateInstance = String(occurrence?.template_instance ?? "");
+    const prefix = `${templateInstance}/`;
+    if (templateInstance.length === 0
+      || !Array.isArray(occurrence?.state_slots)
+      || !Array.isArray(occurrence?.computed_slots)) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const ids = new Set();
+    const stateSlots = occurrence.state_slots.map((slot) => {
+      if (typeof slot?.slot_id !== "string" || !slot.slot_id.startsWith(`${prefix}state-slot:`)
+        || typeof slot.storage_id !== "string" || !slot.storage_id.startsWith("storage:")) {
+        throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      }
+      const slotId = `${occurrenceIdentity}/${slot.slot_id.slice(prefix.length)}`;
+      if (ids.has(slotId)) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      ids.add(slotId);
+      return Object.freeze({ ...slot, slot_id: slotId });
+    });
+    const computedSlots = occurrence.computed_slots.map((slot) => {
+      if (typeof slot?.cache_slot_id !== "string" || !slot.cache_slot_id.startsWith(`${prefix}computed-cache:`)
+        || typeof slot.dirty_slot_id !== "string" || !slot.dirty_slot_id.startsWith(`${prefix}computed-dirty:`)) {
+        throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      }
+      const cacheSlotId = `${occurrenceIdentity}/${slot.cache_slot_id.slice(prefix.length)}`;
+      const dirtySlotId = `${occurrenceIdentity}/${slot.dirty_slot_id.slice(prefix.length)}`;
+      if (ids.has(cacheSlotId) || ids.has(dirtySlotId)) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      ids.add(cacheSlotId);
+      ids.add(dirtySlotId);
+      return Object.freeze({ ...slot, cache_slot_id: cacheSlotId, dirty_slot_id: dirtySlotId });
+    });
+    return Object.freeze({ state_slots: stateSlots, computed_slots: computedSlots });
+  }
+
   function escapeHtmlText(value) {
     return String(value)
       .replaceAll("&", "&amp;")
@@ -4576,6 +4611,7 @@ mod tests {
         assert!(runtime.contains("structuralOccurrencesByInvocation"));
         assert!(runtime.contains("function structuralOccurrenceIdentity"));
         assert!(runtime.contains("function decodeStructuralOccurrenceIdentity"));
+        assert!(runtime.contains("function instantiateStructuralTemplateSlots"));
         assert!(runtime.contains("Conditional host fragments were attached to a keyed-list host"));
         assert!(runtime.contains("occurrence.ordinary_template_targets"));
         assert!(runtime.contains("occurrence.ordinary_template_bindings"));
