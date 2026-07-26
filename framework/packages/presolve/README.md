@@ -6,14 +6,12 @@ the Presolve compiler is the sole authority that gives those forms semantic
 meaning.
 
 ```tsx
-import { action, component, state, Component } from "presolve";
+import { action, state, Component } from "presolve";
 
-@component()
 export class Counter extends Component {
   count = state(0);
 
-  @action()
-  increment() { this.count++; }
+  increment = action(() => { this.count++; });
 
   render() { return <button onClick={this.increment}>{this.count}</button>; }
 }

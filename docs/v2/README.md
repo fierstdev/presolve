@@ -34,6 +34,9 @@ normative source for this handoff.
   product and the compatibility role of the existing derived facts.
 - [Canonical authored semantics](authored-semantics.md) records the normalized
   source-AST and TypeScript-identity boundary.
+- [V2 authoring-syntax cutover contract](authoring-syntax-cutover-contract.md)
+  records the decorator-free canonical source surface and the bounded alpha
+  compatibility path.
 - [Vite adapter boundary](vite-adapter.md) records the compiler-product-only
   integration seam for the required external backend.
 - [Presolve-aware HMR contract](hmr-contract.md) records the compiler-selected

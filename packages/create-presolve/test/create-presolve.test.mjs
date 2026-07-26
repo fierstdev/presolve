@@ -14,6 +14,11 @@ const result = spawnSync(process.execPath, ["bin/create-presolve.mjs", target], 
 assert.equal(result.status, 0, result.stderr);
 assert.ok(existsSync(join(target, "app/routes/index.tsx")));
 assert.ok(existsSync(join(target, "app/routes/docs/getting-started.tsx")));
+for (const route of ["app/routes/index.tsx", "app/routes/docs/index.tsx", "app/routes/docs/getting-started.tsx"]) {
+  const source = readFileSync(join(target, route), "utf8");
+  assert.match(source, /extends Component/);
+  assert.doesNotMatch(source, /@component|@action|@computed|@form|@resource|@slot|@loader|@serverAction/);
+}
 for (const path of ["app/components/README.md", "server/README.md", "styles/app.css", "assets/README.md", "public/robots.txt", "tests/README.md", ".env.example"]) {
   assert.ok(existsSync(join(target, path)), `missing conventional platform path ${path}`);
 }

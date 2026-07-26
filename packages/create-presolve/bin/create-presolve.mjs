@@ -80,8 +80,8 @@ function template(name) {
     "assets/README.md": "Imported Vite asset inputs belong here.\n",
     "public/robots.txt": "User-agent: *\nAllow: /\n",
     "tests/README.md": "Application tests belong here; Vitest and Playwright adapters consume published products.\n",
-    "app/routes/index.tsx": `import { component, Component } from "presolve";\n\n@component()\nexport class Home extends Component {\n  render() {\n    return <main><h1>${name}</h1><p>Built by the Presolve compiler.</p><a href="/docs/">Read the docs</a></main>;\n  }\n}\n`,
-    "app/routes/docs/index.tsx": `import { component, Component } from "presolve";\n\n@component()\nexport class Docs extends Component {\n  render() {\n    return <main><h1>Presolve documentation</h1><p>Start with compiler-owned components, routes, and deployment.</p><a href="/docs/getting-started/">Getting started</a></main>;\n  }\n}\n`,
-    "app/routes/docs/getting-started.tsx": `import { component, Component } from "presolve";\n\n@component()\nexport class GettingStarted extends Component {\n  render() {\n    return <main><h1>Getting started</h1><p>Author components. Presolve publishes static HTML and the minimal runtime artifacts required by your application.</p></main>;\n  }\n}\n`,
+    "app/routes/index.tsx": `import { Component } from "presolve";\n\nexport class Home extends Component {\n  render() {\n    return <main><h1>${name}</h1><p>Built by the Presolve compiler.</p><a href="/docs/">Read the docs</a></main>;\n  }\n}\n`,
+    "app/routes/docs/index.tsx": `import { Component } from "presolve";\n\nexport class Docs extends Component {\n  render() {\n    return <main><h1>Presolve documentation</h1><p>Start with compiler-owned components, routes, and deployment.</p><a href="/docs/getting-started/">Getting started</a></main>;\n  }\n}\n`,
+    "app/routes/docs/getting-started.tsx": `import { Component } from "presolve";\n\nexport class GettingStarted extends Component {\n  render() {\n    return <main><h1>Getting started</h1><p>Author components. Presolve publishes static HTML and the minimal runtime artifacts required by your application.</p></main>;\n  }\n}\n`,
   };
 }
