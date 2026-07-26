@@ -3249,6 +3249,7 @@ fn semantic_entity_kind(entity: SemanticEntity<'_>) -> &'static str {
         SemanticEntity::Component(_) => "component",
         SemanticEntity::StateField(_) => "state-field",
         SemanticEntity::Method(_) => "method",
+        SemanticEntity::ActionEndpoint(_) => "action-endpoint",
         SemanticEntity::Context(_) => "context",
         SemanticEntity::Provider(_) => "provider",
         SemanticEntity::Consumer(_) => "consumer",

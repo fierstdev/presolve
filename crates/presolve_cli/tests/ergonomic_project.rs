@@ -28,8 +28,12 @@ fn decorator_free_v2_source_uses_installed_authority_for_file_route_assembly() {
     let root = project_root("v2-authority");
     fs::write(
         root.join("app/routes/index.tsx"),
-        r#"import { Component } from "presolve";
-export class Home extends Component { render() { return <main>Home</main>; } }
+        r#"import { Component, state, action } from "presolve";
+export class Home extends Component {
+  count = state(0);
+  increment = action(() => { this.count += 1; });
+  render() { return <button onClick={() => this.increment()}>Home</button>; }
+}
 "#,
     )
     .unwrap();
@@ -46,8 +50,14 @@ export class Home extends Component { render() { return <main>Home</main>; } }
 import { readFileSync, writeFileSync } from "node:fs";
 const request = JSON.parse(readFileSync(0, "utf8"));
 writeFileSync("authority-ran", "yes");
-const identity = { name: "Component", flags: 32, declarationModules: ["presolve"] };
-process.stdout.write(JSON.stringify({ schemaVersion: 1, diagnostics: [], components: request.components.map(site => ({ id: site.id, identity })), states: [], actions: [] }));
+const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
+process.stdout.write(JSON.stringify({
+  schemaVersion: 1,
+  diagnostics: [],
+  components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
+  states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
+  actions: request.actions.map(site => ({ id: site.id, identity: identity("action") })),
+}));
 "#,
     )
     .unwrap();
