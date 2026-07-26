@@ -6,9 +6,10 @@ use presolve_parser::ParsedFile;
 use crate::compilation_unit::CompilationUnit;
 use crate::component_composition::{analyze_component_composition, ComponentCompositionAnalysis};
 use crate::component_graph::{
-    build_component_graph_for_module, render_event_handlers, ComponentAction, ComponentDiagnostic,
-    ComponentDiagnosticSeverity, ComponentMethod, ComponentNode, ComputedExpression,
-    ComputedExpressionKind, MethodLocalVariable, RenderEventHandler, StateField,
+    build_component_graph_for_module, build_v2_component_graph_for_module, render_event_handlers,
+    ComponentAction, ComponentDiagnostic, ComponentDiagnosticSeverity, ComponentMethod,
+    ComponentNode, ComputedExpression, ComputedExpressionKind, MethodLocalVariable,
+    RenderEventHandler, StateField,
 };
 use crate::component_initialization::{plan_component_initialization, ComponentInitializationPlan};
 use crate::component_instance::{
@@ -1853,6 +1854,26 @@ pub fn build_file_route_application_semantic_model_for_unit_with_packages(
     )
 }
 
+/// File-route assembly with explicit canonical V2 authoring evidence. Entries
+/// absent from `v2_authoring` remain on the named legacy compatibility path;
+/// entries present in the map are projected through the V2 graph adapter.
+pub fn build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring(
+    unit: &CompilationUnit,
+    packages: &crate::semantic_package::SemanticPackageResolutionTable,
+    v2_authoring: &BTreeMap<std::path::PathBuf, crate::CanonicalAuthoredSemanticModelV1>,
+) -> Result<ApplicationSemanticModel, FileRouteApplicationModelErrorV1> {
+    let symbols = crate::build_symbol_table(unit);
+    let modules = crate::build_module_graph(unit);
+    let bindings =
+        crate::binding_table::build_binding_table_with_packages(unit, &symbols, &modules, packages);
+    build_application_semantic_model_from_files_with_bindings_mode_and_v2(
+        unit.files(),
+        Some(&bindings),
+        ApplicationAssemblyMode::FileRoutes,
+        Some(v2_authoring),
+    )
+}
+
 /// Builds the canonical composed model for one already-resolved file-route
 /// page. Publication uses this route-scoped entry so shared layouts never
 /// project sibling pages into the same default Slot.
@@ -1907,12 +1928,29 @@ fn build_application_semantic_model_from_files_with_bindings_mode(
     bindings: Option<&crate::BindingTable>,
     mode: ApplicationAssemblyMode,
 ) -> Result<ApplicationSemanticModel, FileRouteApplicationModelErrorV1> {
+    build_application_semantic_model_from_files_with_bindings_mode_and_v2(
+        files, bindings, mode, None,
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn build_application_semantic_model_from_files_with_bindings_mode_and_v2(
+    files: &[ParsedFile],
+    bindings: Option<&crate::BindingTable>,
+    mode: ApplicationAssemblyMode,
+    v2_authoring: Option<&BTreeMap<std::path::PathBuf, crate::CanonicalAuthoredSemanticModelV1>>,
+) -> Result<ApplicationSemanticModel, FileRouteApplicationModelErrorV1> {
     let (mut components, mut templates, mut diagnostics, mut references) =
         (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     let (mut provenance, mut template_entities, mut type_aliases) =
         (BTreeMap::new(), Vec::new(), Vec::new());
     for parsed in files {
-        let component_graph = build_component_graph_for_module(parsed);
+        let component_graph = v2_authoring
+            .and_then(|models| models.get(&parsed.path))
+            .map_or_else(
+                || build_component_graph_for_module(parsed),
+                |model| build_v2_component_graph_for_module(parsed, model),
+            );
         let template_graph = build_template_graph(&component_graph);
         let file_template_entities = build_template_semantic_entities(&template_graph.templates);
 
@@ -4575,15 +4613,56 @@ fn collect_ownership(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use super::{
         build_application_semantic_model, build_application_semantic_model_for_unit,
-        build_file_route_application_semantic_model_for_unit_with_packages, collect_ownership,
+        build_file_route_application_semantic_model_for_unit_with_packages,
+        build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring,
+        collect_ownership,
     };
     use crate::{
         build_component_graph_for_module, build_template_graph, build_template_semantic_entities,
-        CompilationUnit, ComponentInstancePlan, SemanticEntity, SemanticEntityKind, SemanticOwner,
-        SemanticReferenceKind, TemplateSemanticKind,
+        CanonicalAuthoredDeclarationKindV1, CanonicalAuthoredDeclarationV1,
+        CanonicalAuthoredSemanticModelV1, CompilationUnit, ComponentInstancePlan, SemanticEntity,
+        SemanticEntityKind, SemanticOwner, SemanticReferenceKind, TemplateSemanticKind,
     };
+
+    #[test]
+    fn file_route_assembly_projects_explicit_canonical_v2_components_without_decorators() {
+        let unit = CompilationUnit::parse_sources([(
+            "app/routes/index.tsx",
+            "import { Component } from \"presolve\"; export class Home extends Component { render() { return <main>Home</main>; } }",
+        )]);
+        let model = CanonicalAuthoredSemanticModelV1 {
+            schema_version: 1,
+            source_path: "app/routes/index.tsx".into(),
+            declarations: vec![CanonicalAuthoredDeclarationV1 {
+                kind: CanonicalAuthoredDeclarationKindV1::Component,
+                subject: "Home".into(),
+                source: crate::AuthoredSourceRangeV1 {
+                    start: 37,
+                    end: 106,
+                    line: 1,
+                    column: 38,
+                },
+                intrinsic_identity: None,
+            }],
+        };
+        let asm =
+            build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring(
+                &unit,
+                &crate::SemanticPackageResolutionTable::default(),
+                &BTreeMap::from([("app/routes/index.tsx".into(), model)]),
+            )
+            .expect("canonical V2 route assembly");
+        assert_eq!(asm.components.len(), 1);
+        assert_eq!(asm.components[0].class_name, "Home");
+        assert!(asm
+            .diagnostics
+            .iter()
+            .all(|diagnostic| diagnostic.code != "PSC1001"));
+    }
 
     #[test]
     fn lowers_supported_primitive_state_annotations_into_canonical_types() {
