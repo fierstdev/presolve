@@ -1593,6 +1593,94 @@ const RUNTIME_STUB: &str = r#"(() => {
     return Object.freeze({ state_slots: stateSlots, computed_slots: computedSlots });
   }
 
+  function rewriteStructuralTemplateIdentity(templateInstance, occurrenceIdentity, value) {
+    if (typeof templateInstance !== "string" || templateInstance.length === 0
+      || typeof occurrenceIdentity !== "string" || typeof value !== "string") {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const prefix = `${templateInstance}/`;
+    if (!value.startsWith(prefix)) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    return `${occurrenceIdentity}/${value.slice(prefix.length)}`;
+  }
+
+  function deriveStructuralOccurrenceRecords(templateRecord, occurrenceIdentity) {
+    const decoded = decodeStructuralOccurrenceIdentity(occurrenceIdentity);
+    const occurrence = templateRecord?.occurrence;
+    const templateInstance = String(occurrence?.template_instance ?? "");
+    if (templateInstance.length === 0
+      || decoded.template_instance !== templateInstance
+      || typeof templateRecord?.structural_region !== "string"
+      || decoded.region !== templateRecord.structural_region
+      || !Array.isArray(templateRecord?.targets)
+      || !Array.isArray(templateRecord?.bindings)
+      || !Array.isArray(templateRecord?.events)) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const slots = instantiateStructuralTemplateSlots(occurrence, occurrenceIdentity);
+    const targetIds = new Set();
+    const bindingIds = new Set();
+    const eventKeys = new Set();
+    const targets = templateRecord.targets.map((pair) => {
+      const artifact = pair?.artifact;
+      const manifest = pair?.manifest;
+      const id = rewriteStructuralTemplateIdentity(templateInstance, occurrenceIdentity, artifact?.id);
+      if (manifest?.id !== artifact?.id || targetIds.has(id)) {
+        throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      }
+      targetIds.add(id);
+      return Object.freeze({
+        artifact: Object.freeze({ ...artifact, id, component_instance_id: occurrenceIdentity }),
+        manifest: Object.freeze({ ...manifest, id, component_instance_id: occurrenceIdentity })
+      });
+    });
+    const bindings = templateRecord.bindings.map((pair) => {
+      const artifact = pair?.artifact;
+      const manifest = pair?.manifest;
+      const id = rewriteStructuralTemplateIdentity(templateInstance, occurrenceIdentity, artifact?.id);
+      const targetId = rewriteStructuralTemplateIdentity(templateInstance, occurrenceIdentity, artifact?.target_id);
+      if (manifest?.instance_binding_id !== artifact?.id
+        || manifest?.instance_target_id !== artifact?.target_id
+        || !targetIds.has(targetId)
+        || bindingIds.has(id)) {
+        throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      }
+      bindingIds.add(id);
+      return Object.freeze({
+        artifact: Object.freeze({ ...artifact, id, target_id: targetId, component_instance_id: occurrenceIdentity }),
+        manifest: Object.freeze({ ...manifest, instance_binding_id: id, instance_target_id: targetId, component_instance_id: occurrenceIdentity })
+      });
+    });
+    const events = templateRecord.events.map((pair) => {
+      const artifact = pair?.artifact;
+      const manifest = pair?.manifest;
+      const targetId = rewriteStructuralTemplateIdentity(templateInstance, occurrenceIdentity, artifact?.target_id);
+      const key = ordinaryEventKey(targetId, artifact?.event_type);
+      if (manifest?.instance_target_id !== artifact?.target_id
+        || !targetIds.has(targetId)
+        || eventKeys.has(key)) {
+        throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      }
+      eventKeys.add(key);
+      return Object.freeze({
+        artifact: Object.freeze({ ...artifact, target_id: targetId, component_instance_id: occurrenceIdentity }),
+        manifest: Object.freeze({ ...manifest, instance_target_id: targetId, component_instance_id: occurrenceIdentity })
+      });
+    });
+    return Object.freeze({
+      occurrence_identity: occurrenceIdentity,
+      parent_scope: decoded.parent_scope,
+      structural_region: templateRecord.structural_region,
+      template_instance: templateInstance,
+      component: occurrence.component,
+      definition: templateRecord.definition,
+      state_slots: slots.state_slots,
+      computed_slots: slots.computed_slots,
+      targets: Object.freeze(targets),
+      bindings: Object.freeze(bindings),
+      events: Object.freeze(events)
+    });
+  }
+
   function structuralOccurrenceTemplateRegistry(manifest, componentArtifact, computedArtifact) {
     const components = new Map((manifest.components ?? []).map((component) => [component.component_id, component]));
     if (components.size !== (manifest.components ?? []).length) {
@@ -4759,6 +4847,8 @@ mod tests {
         assert!(runtime.contains("function structuralOccurrenceIdentity"));
         assert!(runtime.contains("function decodeStructuralOccurrenceIdentity"));
         assert!(runtime.contains("function instantiateStructuralTemplateSlots"));
+        assert!(runtime.contains("function rewriteStructuralTemplateIdentity"));
+        assert!(runtime.contains("function deriveStructuralOccurrenceRecords"));
         assert!(runtime.contains("function structuralOccurrenceTemplateRegistry"));
         assert!(runtime.contains("structuralOccurrenceTemplatesByInvocation"));
         assert!(runtime.contains("structuralStateSlots = new Set()"));
