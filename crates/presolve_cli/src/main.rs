@@ -156,7 +156,7 @@ fn run_ergonomic_build(
 ) -> FileRoutePublicationManifestV1 {
     let project = discover_project_v1(root)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
-    validate_v2_authoring_project(&project).unwrap_or_else(|message| {
+    let v2_authoring = validate_v2_authoring_project(&project).unwrap_or_else(|message| {
         application_cli_error("PSAUTH1001_V2_AUTHORITY_FAILED", &message)
     });
     let output_root = project.root.join("dist");
@@ -183,6 +183,7 @@ fn run_ergonomic_build(
         package_runtime_modules,
         profile,
         output_root: output_root.clone(),
+        v2_authoring,
     };
     let mut product = build_file_route_publication_v1(request)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
@@ -198,7 +199,9 @@ fn run_ergonomic_build(
 /// before legacy application assembly starts.  This is intentionally an
 /// orchestration adapter: it selects no framework meaning and fails rather
 /// than routing an authority failure through the legacy decorator graph.
-fn validate_v2_authoring_project(project: &DiscoveredProjectV1) -> Result<(), String> {
+fn validate_v2_authoring_project(
+    project: &DiscoveredProjectV1,
+) -> Result<BTreeMap<PathBuf, presolve_compiler::CanonicalAuthoredSemanticModelV1>, String> {
     let config_file = project.root.join("tsconfig.json");
     let executable = project
         .root
@@ -212,7 +215,7 @@ fn validate_v2_authoring_project(project: &DiscoveredProjectV1) -> Result<(), St
         .filter(is_decorator_free_v2_candidate)
         .collect::<Vec<_>>();
     if candidates.is_empty() {
-        return Ok(());
+        return Ok(BTreeMap::new());
     }
     if !config_file.is_file() {
         return Err(format!(
@@ -226,6 +229,7 @@ fn validate_v2_authoring_project(project: &DiscoveredProjectV1) -> Result<(), St
             executable.display()
         ));
     }
+    let mut models = BTreeMap::new();
     for parsed in candidates {
         let component_request =
             build_v2_authority_component_request_v1(&parsed, PathBuf::from("tsconfig.json"))
@@ -257,10 +261,11 @@ fn validate_v2_authoring_project(project: &DiscoveredProjectV1) -> Result<(), St
         let response = invoke_v2_authority_bridge(&project.root, &executable, &request)?;
         let resolutions = v2_authoring_resolutions_from_response_v1(&parsed, &request, &response)
             .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
-        lower_v2_authoring_v1(&parsed, resolutions)
+        let lowering = lower_v2_authoring_v1(&parsed, resolutions)
             .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
+        models.insert(parsed.path.clone(), lowering.model);
     }
-    Ok(())
+    Ok(models)
 }
 
 fn is_decorator_free_v2_candidate(parsed: &ParsedFile) -> bool {

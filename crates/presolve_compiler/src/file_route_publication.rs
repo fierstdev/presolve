@@ -10,6 +10,8 @@ use crate::{
     build_application_publication_product_from_asm_v1,
     build_application_semantic_model_for_unit_with_packages, build_binding_table_with_packages,
     build_file_route_application_semantic_model_for_route_with_packages,
+    build_file_route_application_semantic_model_for_route_with_packages_and_v2_authoring,
+    build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring,
     build_layout_composition_plan_v1, build_module_graph, build_route_loader_plan_v1,
     build_route_server_action_plan_v1, build_symbol_table, build_validated_file_route_graph_v1,
     route_loader_plan_json_v1, route_server_action_plan_json_v1,
@@ -31,6 +33,8 @@ pub struct FileRoutePublicationRequestV1 {
     pub package_runtime_modules: SemanticPackageRuntimeModuleTable,
     pub profile: ApplicationPublicationProfileV1,
     pub output_root: PathBuf,
+    /// Compiler-validated V2 authoring evidence keyed by source path.
+    pub v2_authoring: BTreeMap<PathBuf, crate::CanonicalAuthoredSemanticModelV1>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -113,8 +117,19 @@ pub fn build_file_route_publication_v1(
             .iter()
             .map(|source| (&source.logical_path, source.source.as_str())),
     );
-    let model =
-        build_application_semantic_model_for_unit_with_packages(&unit, &request.package_contracts);
+    let model = if request.v2_authoring.is_empty() {
+        build_application_semantic_model_for_unit_with_packages(&unit, &request.package_contracts)
+    } else {
+        build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring(
+            &unit,
+            &request.package_contracts,
+            &request.v2_authoring,
+        )
+        .map_err(|error| FileRoutePublicationErrorV1 {
+            code: error.code,
+            message: error.message,
+        })?
+    };
     let graph = build_validated_file_route_graph_v1(&model).map_err(route_error)?;
     build_layout_composition_plan_v1(&model, &graph).map_err(|error| {
         FileRoutePublicationErrorV1 {
@@ -172,17 +187,25 @@ pub fn build_file_route_publication_v1(
                 output_root: request.output_root.clone(),
             })
             .map_err(application_request_error)?;
-        let composed = ConstantFoldingPass.transform(
-            &build_file_route_application_semantic_model_for_route_with_packages(
+        let route_model = if request.v2_authoring.is_empty() {
+            build_file_route_application_semantic_model_for_route_with_packages(
                 &unit,
                 &request.package_contracts,
                 &route.component,
             )
-            .map_err(|error| FileRoutePublicationErrorV1 {
-                code: error.code,
-                message: error.message,
-            })?,
-        );
+        } else {
+            build_file_route_application_semantic_model_for_route_with_packages_and_v2_authoring(
+                &unit,
+                &request.package_contracts,
+                &route.component,
+                &request.v2_authoring,
+            )
+        }
+        .map_err(|error| FileRoutePublicationErrorV1 {
+            code: error.code,
+            message: error.message,
+        })?;
+        let composed = ConstantFoldingPass.transform(&route_model);
         validated.render_root_component = route
             .layouts
             .first()
@@ -412,6 +435,7 @@ mod tests {
             package_runtime_modules: SemanticPackageRuntimeModuleTable::default(),
             profile: ApplicationPublicationProfileV1::Development,
             output_root: "dist".into(),
+            v2_authoring: BTreeMap::new(),
         })
         .unwrap();
 
@@ -455,6 +479,7 @@ mod tests {
             package_runtime_modules: SemanticPackageRuntimeModuleTable::default(),
             profile: ApplicationPublicationProfileV1::Development,
             output_root: "dist".into(),
+            v2_authoring: BTreeMap::new(),
         })
         .expect("valid route layout publication");
 
@@ -491,6 +516,7 @@ import { loadPost } from "post-service";
             package_runtime_modules: SemanticPackageRuntimeModuleTable::default(),
             profile: ApplicationPublicationProfileV1::Development,
             output_root: "dist".into(),
+            v2_authoring: BTreeMap::new(),
         })
         .expect("route loader handoff publication");
 
@@ -528,6 +554,7 @@ import { savePost } from "post-service";
             package_runtime_modules: SemanticPackageRuntimeModuleTable::default(),
             profile: ApplicationPublicationProfileV1::Development,
             output_root: "dist".into(),
+            v2_authoring: BTreeMap::new(),
         })
         .expect("route server-action handoff publication");
 

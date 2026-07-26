@@ -226,6 +226,7 @@ pub use application_semantic_model::{
     build_application_semantic_model_for_unit_with_packages,
     build_application_semantic_model_from_component_graph,
     build_file_route_application_semantic_model_for_route_with_packages,
+    build_file_route_application_semantic_model_for_route_with_packages_and_v2_authoring,
     build_file_route_application_semantic_model_for_unit_with_packages,
     build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring,
     ApplicationSemanticModel, FileRouteApplicationModelErrorV1, SemanticEntity, SemanticEntityKind,

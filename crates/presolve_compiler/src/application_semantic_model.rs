@@ -1898,6 +1898,26 @@ pub fn build_file_route_application_semantic_model_for_route_with_packages(
     )
 }
 
+/// Route-scoped V2-aware counterpart to
+/// [`build_file_route_application_semantic_model_for_route_with_packages`].
+pub fn build_file_route_application_semantic_model_for_route_with_packages_and_v2_authoring(
+    unit: &CompilationUnit,
+    packages: &crate::semantic_package::SemanticPackageResolutionTable,
+    route_component: &SemanticId,
+    v2_authoring: &BTreeMap<std::path::PathBuf, crate::CanonicalAuthoredSemanticModelV1>,
+) -> Result<ApplicationSemanticModel, FileRouteApplicationModelErrorV1> {
+    let symbols = crate::build_symbol_table(unit);
+    let modules = crate::build_module_graph(unit);
+    let bindings =
+        crate::binding_table::build_binding_table_with_packages(unit, &symbols, &modules, packages);
+    build_application_semantic_model_from_files_with_bindings_mode_and_v2(
+        unit.files(),
+        Some(&bindings),
+        ApplicationAssemblyMode::FileRoute(route_component.clone()),
+        Some(v2_authoring),
+    )
+}
+
 fn build_application_semantic_model_from_files(files: &[ParsedFile]) -> ApplicationSemanticModel {
     build_application_semantic_model_from_files_with_bindings(files, None)
 }
