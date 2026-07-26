@@ -65,3 +65,10 @@ diagnostics and artifact comparisons remain the source of truth. The
 Application Platform gate requires route/layout, CSS/assets, public and
 server-environment isolation, HMR, Node deployment, static eligibility, a
 scaffold snapshot, and representative cold/resume applications.
+
+`just application-platform-check` is the executable beta-gate entrypoint. It
+combines the Vite transport/assets/HMR smoke proof, the scaffold proof, the
+representative production-build corpus, the environment and Node/static-host
+ergonomic fixtures, and the decorator-free cold/resume browser fixture. It
+does not replace the underlying fixtures: each remains the authority for its
+own product assertion.

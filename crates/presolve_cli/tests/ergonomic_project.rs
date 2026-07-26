@@ -556,6 +556,7 @@ fn explain_projects_compiler_route_and_prepared_deployment_facts() {
     fs::remove_dir_all(root).unwrap();
 }
 
+#[cfg(unix)]
 #[test]
 fn fresh_scaffold_needs_no_configuration_source_list_or_component_identity() {
     let root = std::env::temp_dir().join(format!(
@@ -576,6 +577,25 @@ fn fresh_scaffold_needs_no_configuration_source_list_or_component_identity() {
         "stderr: {}",
         String::from_utf8_lossy(&created.stderr)
     );
+    let executable = application.join("node_modules/.bin/presolve-typescript-authority");
+    fs::create_dir_all(executable.parent().unwrap()).unwrap();
+    fs::write(
+        &executable,
+        r#"#!/usr/bin/env node
+import { readFileSync } from "node:fs";
+const request = JSON.parse(readFileSync(0, "utf8"));
+const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
+process.stdout.write(JSON.stringify({
+  schemaVersion: 1,
+  diagnostics: [],
+  components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
+  states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
+  actions: request.actions.map(site => ({ id: site.id, identity: identity("action") })),
+}));
+"#,
+    )
+    .unwrap();
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
     let check = Command::new(env!("CARGO_BIN_EXE_presolve"))
         .arg("check")
         .current_dir(&application)

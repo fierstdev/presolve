@@ -99,7 +99,7 @@ pull-request plan; their complete ownership boundary is
 | AP3 | Vite CSS, assets, PostCSS, and Tailwind | `packages/vite`, production manifest adapter | Implemented explicit Vite-owned physical entries alongside the compiler virtual entry; smoke proof covers CSS Modules, imported SVGs, and public assets while retaining compiler identity only for compiler output. |
 | AP4 | Testing integrations | `packages/testing`, Vite integration, browser harness | Implemented immutable Vitest Vite-config and Playwright project adapters over the existing compiler-product plugin; caller-owned test execution and compiler artifact/diagnostic authority remain explicit. |
 | AP5 | Node deployment and static export | `node_deployment`, file-route publication, CLI | Implemented schema-v1 Node release inventory and static-host preparation; exact loader/action handoffs classify routes as `static` or `node`. A server executor remains explicitly pending. |
-| AP6 | Production scaffold and representative applications | `create-presolve`, application fixtures, release scripts | Full platform scaffold, cold/resume/HMR application evidence, and platform gate. |
+| AP6 | Production scaffold and representative applications | `create-presolve`, application fixtures, `justfile` | `just application-platform-check` composes the existing Vite HMR/assets, scaffold, representative-build, environment/Node-static, and decorator-free cold/resume browser gates without inventing a parallel fixture format. |
 
 ## Sequencing guardrails
 
