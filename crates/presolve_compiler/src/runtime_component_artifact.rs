@@ -866,7 +866,11 @@ mod tests {
         let model = build_application_semantic_model(&presolve_parser::parse_file(
             "src/StructuralHostArtifact.tsx",
             r#"
-@component("x-leaf") class Leaf extends Component { render() { return <strong>Leaf</strong>; } }
+@component("x-leaf") class Leaf extends Component {
+  count = state(0);
+  @action() increment() { this.count++; }
+  render() { return <button onClick={() => this.increment()}>{this.count}</button>; }
+}
 @component("x-page") class Page extends Component {
   visible = state(true);
   items = state([{ id: "a" }]);
@@ -947,6 +951,16 @@ mod tests {
                 )
             }));
         }
+
+        assert!(artifact
+            .structural_programs
+            .iter()
+            .flat_map(|program| &program.template_occurrences)
+            .any(|occurrence| {
+                !occurrence.ordinary_template_targets.is_empty()
+                    && !occurrence.ordinary_template_bindings.is_empty()
+                    && !occurrence.ordinary_template_events.is_empty()
+            }));
 
         let first = &mut artifact.structural_programs[0].template_occurrences[0];
         first
