@@ -65,6 +65,10 @@ DOM-binding restoration has completed, then invokes the exact client/shared
 endpoint once at generation one. Snapshot-policy endpoints are excluded from
 that call path.
 
+Browser acceptance covers malformed, `pending`, and `cancelled` Resource
+snapshots: each produces `ResourceSnapshotMismatch`, one cold boot, a cleared
+resume registry, and no retained partial Resource state.
+
 ## Acceptance
 
 - Browser tests prove ready snapshot restoration without endpoint execution,

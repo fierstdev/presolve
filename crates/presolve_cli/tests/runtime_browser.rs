@@ -344,6 +344,68 @@ const wait = setInterval(() => {{
         String::from_utf8_lossy(&output.stderr)
     );
 
+    let resource_state_slot = manifest["slot_schemas"]
+        .as_array()
+        .expect("manifest slots")
+        .iter()
+        .find(|slot| slot["existing_storage_slot_id"] == activation["state_slot"])
+        .and_then(|slot| slot["slot_id"].as_str())
+        .expect("Resource state resume slot")
+        .to_string();
+    for state in ["pending", "cancelled", "fabricated"] {
+        let name = state;
+        let mut invalid_snapshot = snapshot.clone();
+        for value in invalid_snapshot["boundaries"]
+            .as_array_mut()
+            .expect("invalid snapshot boundaries")
+            .iter_mut()
+            .flat_map(|boundary| boundary["values"].as_array_mut().expect("invalid snapshot values"))
+        {
+            if value["slotId"] == resource_state_slot {
+                value["value"] = serde_json::json!({"state": state, "generation": 1});
+            }
+        }
+        let invalid_json = serde_json::to_string(&invalid_snapshot)
+            .expect("invalid Resource snapshot JSON");
+        let invalid_probe = index.replace(
+            "</body>",
+            &format!(r#"<script>
+window.__PRESOLVE_RESUME_SNAPSHOT__ = {invalid_json};
+const deadline = Date.now() + 4000;
+const wait = setInterval(() => {{
+  const runtime = window.__PRESOLVE__;
+  if (runtime?.resume?.mode === "cold" && runtime?.resume?.failure === "ResourceSnapshotMismatch"
+    && runtime?.resume_registry === null && window.__PRESOLVE_RESOURCE_ENDPOINT_CALLED__ === true) {{
+    clearInterval(wait);
+    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_RESOURCE_{name}_FALLBACK_PASS</div>");
+  }} else if (Date.now() > deadline) {{
+    clearInterval(wait);
+    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_RESOURCE_{name}_FALLBACK_FAIL</div>");
+  }}
+}}, 20);
+</script></body>"#),
+        );
+        let page_name = format!("resource-{name}-fallback.html");
+        fs::write(out_dir.join(&page_name), invalid_probe)
+            .expect("failed to write Resource fallback probe");
+        let server = StaticServer::start(out_dir.clone());
+        let profile_dir = out_dir.join(format!("chrome-resource-{name}-profile-{}", std::process::id()));
+        fs::create_dir_all(&profile_dir).expect("failed to create Resource fallback Chrome profile");
+        let output = run_chrome_probe(
+            chrome.clone(),
+            &format!("--user-data-dir={}", profile_dir.display()),
+            &format!("http://127.0.0.1:{}/{page_name}", server.port),
+        );
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        server.stop();
+        assert!(
+            stdout.contains(&format!("PRESOLVE_RESOURCE_{name}_FALLBACK_PASS")),
+            "Resource {name} fallback probe failed\nstdout:\n{}\nstderr:\n{}",
+            stdout,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
     fs::write(
         &contract,
         r#"{"schema_version":1,"package":"profile-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadProfile":{"kind":"resource","type_signature":"() -> Resource<string, string>","runtime_module":"dist/load-profile.js","resume_policy":"reload","resource_endpoint":{"execution_boundary":"shared","cancellation":"abort","resume":"reload"}}}}"#,
