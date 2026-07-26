@@ -30,6 +30,12 @@ render that occurrence. Runtime code may not reconstruct that program from
 source text, tag names, DOM shape, selector searches, or a second component
 graph.
 
+Structural lifetime propagates through every descendant component edge of a
+structural template. A nested invocation is therefore a structural template
+under the same enclosing region even when its own declaration appears outside
+the conditional or keyed-list source span. It must not be reclassified as an
+eager instance merely because its local source template has no structural node.
+
 Existing `when_true_html` and `item_template_html` are plain-template products.
 They are not authority to render a component invocation as a raw custom HTML
 element. A structural program containing a component occurrence must remain
