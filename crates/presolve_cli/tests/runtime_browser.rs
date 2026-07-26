@@ -1947,13 +1947,19 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
   const runtime = window.__PRESOLVE__;
   const artifact = JSON.parse(document.getElementById("presolve-component-runtime").textContent);
-  if (artifact.schema_version !== 9 || artifact.structural_programs.length !== 2) fail("structural component programs were missing");
+  if (artifact.schema_version !== 10 || artifact.structural_programs.length !== 2) fail("structural component programs were missing");
   if (runtime.store.componentRegions.size !== artifact.structural_programs.length) fail("closed structural region table diverged from the artifact");
   if (!artifact.structural_programs.every((program) => JSON.stringify(runtime.store.componentRegions.get(program.region)) === JSON.stringify(program))) {
     fail("runtime structural regions were not keyed by compiler IDs");
   }
   for (const program of artifact.structural_programs) {
+    if (typeof program.host_template_entity !== "string" || program.host_template_entity.length === 0) {
+      fail("structural host semantic entity was missing");
+    }
     for (const occurrence of program.template_occurrences) {
+      if (typeof occurrence.invocation_template_entity !== "string" || occurrence.invocation_template_entity.length === 0) {
+        fail("structural invocation semantic entity was missing");
+      }
       const targets = artifact.ordinary_template_targets
         .filter((target) => target.component_instance_id === occurrence.template_instance)
         .map((target) => target.id);

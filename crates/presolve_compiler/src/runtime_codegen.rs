@@ -957,13 +957,15 @@ const RUNTIME_STUB: &str = r#"(() => {
         if (typeof program.region !== "string" || program.region.length === 0
           || typeof program.host_component !== "string" || program.host_component.length === 0
           || typeof program.host_node !== "string" || program.host_node.length === 0
+          || typeof program.host_template_entity !== "string" || program.host_template_entity.length === 0
           || structuralRegions.has(program.region) || structuralHosts.has(host)
           || !Array.isArray(program.template_instances)
           || !Array.isArray(program.template_occurrences)
           || program.template_occurrences.length !== program.template_instances.length
           || program.template_occurrences.some((occurrence, index) => typeof occurrence?.template_instance !== "string"
             || occurrence.template_instance !== program.template_instances[index]
-            || typeof occurrence.invocation !== "string" || typeof occurrence.component !== "string"
+            || typeof occurrence.invocation !== "string" || typeof occurrence.invocation_template_entity !== "string"
+            || occurrence.invocation_template_entity.length === 0 || typeof occurrence.component !== "string"
             || typeof occurrence.template_html !== "string" || occurrence.template_html.length === 0
             || !Array.isArray(occurrence.ordinary_template_targets)
             || !Array.isArray(occurrence.ordinary_template_bindings)

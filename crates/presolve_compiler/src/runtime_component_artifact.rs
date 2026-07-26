@@ -9,7 +9,7 @@ use crate::{
 };
 use crate::{TemplateChild, TemplateNode, TemplateSemanticKind};
 
-pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 9;
+pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 10;
 
 /// Public H14 compiler artifact. All executable references are canonical IDs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -139,6 +139,8 @@ pub struct SerializedStructuralComponentProgram {
     pub host_component: String,
     /// Exact compiler-generated template node ID for the structural host.
     pub host_node: String,
+    /// Exact semantic template entity for the conditional or keyed-list host.
+    pub host_template_entity: String,
     pub template_occurrences: Vec<SerializedStructuralTemplateOccurrence>,
     pub template_instances: Vec<String>,
     pub destroy_order: Vec<String>,
@@ -148,6 +150,8 @@ pub struct SerializedStructuralComponentProgram {
 pub struct SerializedStructuralTemplateOccurrence {
     pub template_instance: String,
     pub invocation: String,
+    /// Exact semantic template entity for this invocation marker.
+    pub invocation_template_entity: String,
     pub component: String,
     /// Compiler-rendered target component template. It remains inactive until
     /// the materializer consumes it under an opaque occurrence identity.
@@ -305,6 +309,17 @@ pub fn build_runtime_component_artifact(
                             .as_ref()
                             .expect("structural template invocation")
                             .to_string(),
+                        invocation_template_entity: model
+                            .component_invocations
+                            .get(
+                                instance
+                                    .invocation
+                                    .as_ref()
+                                    .expect("structural template invocation"),
+                            )
+                            .expect("structural template invocation is compiler-owned")
+                            .template_entity
+                            .to_string(),
                         component: instance.component.to_string(),
                         template_html: crate::generate_structural_template_instance_html(
                             model,
@@ -343,6 +358,7 @@ pub fn build_runtime_component_artifact(
             region,
             host_component: program.host_component,
             host_node: program.host_node,
+            host_template_entity: program.host_template_entity,
             template_occurrences: program.template_occurrences,
             create_order: program.template_instances.clone(),
             destroy_order: program.template_instances.iter().rev().cloned().collect(),
@@ -356,6 +372,7 @@ pub fn build_runtime_component_artifact(
 struct StructuralProgramBuild {
     host_component: String,
     host_node: String,
+    host_template_entity: String,
     template_instances: Vec<String>,
     template_occurrences: Vec<SerializedStructuralTemplateOccurrence>,
 }
@@ -391,6 +408,7 @@ fn structural_program_build(
     StructuralProgramBuild {
         host_component: component.to_string(),
         host_node,
+        host_template_entity: entity.id.to_string(),
         template_instances: Vec::new(),
         template_occurrences: Vec::new(),
     }
@@ -554,11 +572,12 @@ pub fn validate_runtime_component_artifact(
         program.region.is_empty()
             || program.host_component.is_empty()
             || program.host_node.is_empty()
+            || program.host_template_entity.is_empty()
             || program.template_occurrences.len() != program.template_instances.len()
-            || program
-                .template_occurrences
-                .iter()
-                .any(|occurrence| occurrence.template_html.is_empty())
+            || program.template_occurrences.iter().any(|occurrence| {
+                occurrence.template_html.is_empty()
+                    || occurrence.invocation_template_entity.is_empty()
+            })
             || program
                 .template_occurrences
                 .iter()
@@ -901,6 +920,7 @@ mod tests {
             validate_runtime_component_artifact(&artifact)
         );
         for program in &artifact.structural_programs {
+            assert!(!program.host_template_entity.is_empty());
             assert_eq!(
                 program
                     .template_occurrences
@@ -914,7 +934,9 @@ mod tests {
                     .collect::<Vec<_>>()
             );
             assert!(program.template_occurrences.iter().all(|occurrence| {
-                !occurrence.invocation.is_empty() && !occurrence.component.is_empty()
+                !occurrence.invocation.is_empty()
+                    && !occurrence.invocation_template_entity.is_empty()
+                    && !occurrence.component.is_empty()
             }));
             for occurrence in &program.template_occurrences {
                 assert_eq!(
