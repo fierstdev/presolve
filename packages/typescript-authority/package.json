@@ -16,6 +16,9 @@
   "exports": {
     ".": "./src/index.js"
   },
+  "bin": {
+    "presolve-typescript-authority": "./bin/presolve-typescript-authority.mjs"
+  },
   "dependencies": {
     "@typescript/native": "npm:typescript@^7.0.2"
   },

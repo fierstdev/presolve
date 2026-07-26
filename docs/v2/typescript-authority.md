@@ -47,6 +47,8 @@ Its caller supplies parser-selected positions for the canonical framework
 exports and candidate component heritage, State, and Action sites. The bridge
 returns only registry-classified resolved evidence plus native diagnostics; it
 does not parse source, create compiler identities, or lower runtime behavior.
+The installed `presolve-typescript-authority` executable exposes that same
+schema as one JSON request on stdin and one JSON response on stdout.
 
 ## Ownership
 

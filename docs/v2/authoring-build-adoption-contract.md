@@ -29,7 +29,9 @@ caller must never substitute the legacy decorator graph after such a failure.
 ## Adoption sequence
 
 1. Add a versioned stdin/stdout authority bridge and a compiler-owned request
-   schema with source path and UTF-16 offset validation.
+   schema with source path and UTF-16 offset validation. Implemented by the
+   `presolve-typescript-authority` package executable; the Rust CLI adapter
+   remains the next step.
 2. Add the CLI adapter and prove a generated project has the declared TypeScript
    dependency/configuration available before the compiler begins publication.
 3. Adopt resolved V2 components into the file-route graph while preserving

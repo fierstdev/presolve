@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { resolve } from "node:path";
+import { spawnSync } from "node:child_process";
 
 import {
   analyzeTypeScriptProject,
@@ -141,4 +142,31 @@ test("the V2 authoring bridge resolves canonical component, State, and Action ev
   assert.equal(result.components[0].identity.name, "Component");
   assert.equal(result.states[0].identity.name, "state");
   assert.equal(result.actions[0].identity.name, "action");
+});
+
+test("the V2 authoring executable speaks the versioned stdin/stdout bridge protocol", () => {
+  const frameworkFile = resolve(root, "tests/framework-public-api/src/V2Counter.tsx");
+  const frameworkSource = readFileSync(frameworkFile, "utf8");
+  const result = spawnSync(
+    process.execPath,
+    [resolve(import.meta.dirname, "../bin/presolve-typescript-authority.mjs")],
+    {
+      input: JSON.stringify({
+        configFile: resolve(root, "tests/framework-public-api/tsconfig.json"),
+        canonical: {
+          component: { file: frameworkFile, position: frameworkSource.indexOf("Component") },
+          state: { file: frameworkFile, position: frameworkSource.indexOf("state") },
+          action: { file: frameworkFile, position: frameworkSource.indexOf("action") },
+        },
+        components: [{ id: "counter", file: frameworkFile, position: frameworkSource.indexOf("V2Counter extends") }],
+        states: [{ id: "count", file: frameworkFile, position: frameworkSource.indexOf("state(0)") }],
+        actions: [{ id: "increment", file: frameworkFile, position: frameworkSource.indexOf("action(()") }],
+      }),
+      encoding: "utf8",
+    },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  const response = JSON.parse(result.stdout);
+  assert.equal(response.schemaVersion, V2_AUTHORED_AUTHORITY_SCHEMA_VERSION);
+  assert.deepEqual(response.components.map(entry => entry.id), ["counter"]);
 });
