@@ -862,9 +862,10 @@ pub use runtime_effect_artifact::{
     RuntimeEffectArtifactActionTrigger, RuntimeEffectArtifactCapabilityInstructionKind,
     RuntimeEffectArtifactCapabilityOperation, RuntimeEffectArtifactEffect,
     RuntimeEffectArtifactExecutionBoundary, RuntimeEffectArtifactExecutionPolicy,
-    RuntimeEffectArtifactInitialTrigger, RuntimeEffectArtifactInstruction,
-    RuntimeEffectArtifactPrerequisiteBatch, RuntimeEffectArtifactProgram,
-    RuntimeEffectArtifactRenderBoundary, RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION,
+    RuntimeEffectArtifactInitialTrigger, RuntimeEffectArtifactInstance,
+    RuntimeEffectArtifactInstruction, RuntimeEffectArtifactPrerequisiteBatch,
+    RuntimeEffectArtifactProgram, RuntimeEffectArtifactRenderBoundary,
+    RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION,
 };
 pub use runtime_effect_instance::{
     build_runtime_effect_instance_registry, RuntimeEffectInstanceRecord,

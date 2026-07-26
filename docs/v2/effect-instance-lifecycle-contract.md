@@ -16,7 +16,7 @@ instances. It must therefore remain unavailable for cleanup-bearing V2 fields.
 
 The compiler instance-effect registry now adds one canonical
 instance-execution record per planned component instance and matching V2 effect
-declaration. The next effect artifact schema serializes those records. Each record
+declaration. Effect artifact schema v5 serializes those records. Each record
 must contain:
 
 - an instance-qualified effect execution identity;

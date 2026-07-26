@@ -6,18 +6,33 @@ use crate::runtime_computed_artifact::{
     RuntimeComputedArtifactInstruction, RuntimeComputedArtifactOperand,
 };
 use crate::{
-    build_runtime_effect_registry, ApplicationSemanticModel, EffectExecutionPolicy,
-    EffectRenderBoundary, ExecutionBoundary, IntermediateRepresentation, IrInstruction,
-    IrInstructionKind, IrValueId, RuntimeEffectRecord, EFFECT_CAPABILITY_REGISTRY,
+    build_runtime_effect_instance_registry, build_runtime_effect_registry,
+    ApplicationSemanticModel, EffectExecutionPolicy, EffectRenderBoundary, ExecutionBoundary,
+    IntermediateRepresentation, IrInstruction, IrInstructionKind, IrValueId, RuntimeEffectRecord,
+    EFFECT_CAPABILITY_REGISTRY,
 };
 
-pub const RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION: u32 = 4;
+pub const RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION: u32 = 5;
 
 /// Versioned compiler-generated runtime metadata and effect programs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RuntimeEffectArtifact {
     pub schema_version: u32,
     pub effects: Vec<RuntimeEffectArtifactEffect>,
+    pub instances: Vec<RuntimeEffectArtifactInstance>,
+}
+
+/// One instance-qualified V2 effect ownership record. Programs remain on the
+/// declaration record until instance execution context is available.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RuntimeEffectArtifactInstance {
+    pub effect_instance: String,
+    pub effect: String,
+    pub component_instance: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_instance: Option<String>,
+    pub depth: usize,
+    pub declaration_order: u32,
 }
 
 /// Runtime metadata and executable capability program for one lowered effect.
@@ -150,6 +165,20 @@ pub fn build_runtime_effect_artifact(
     RuntimeEffectArtifact {
         schema_version: RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION,
         effects,
+        instances: build_runtime_effect_instance_registry(model)
+            .records
+            .into_iter()
+            .map(|record| RuntimeEffectArtifactInstance {
+                effect_instance: record.id.as_str().to_owned(),
+                effect: record.effect.to_string(),
+                component_instance: record.component_instance.as_str().to_owned(),
+                parent_instance: record
+                    .parent_instance
+                    .map(|parent| parent.as_str().to_owned()),
+                depth: record.depth,
+                declaration_order: record.declaration_order,
+            })
+            .collect(),
     }
 }
 
@@ -408,6 +437,7 @@ class RuntimeEffectArtifact extends Component {
             RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION
         );
         assert_eq!(artifact.effects.len(), 1);
+        assert!(artifact.instances.is_empty());
         assert!(effect.cleanup_program.is_none());
         assert!(!effect.run_on_resume);
         assert_eq!(effect.effect, report.as_str());
@@ -479,7 +509,7 @@ class RuntimeEffectArtifact extends Component {
         ));
         assert_eq!(first, second);
         let json: serde_json::Value = serde_json::from_str(&first).expect("artifact JSON");
-        assert_eq!(json["schema_version"], 4);
+        assert_eq!(json["schema_version"], 5);
         assert_eq!(
             json["effects"][0]["program"]["instructions"][2]["kind"],
             "capability-call"
