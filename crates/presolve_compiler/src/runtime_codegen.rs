@@ -18,7 +18,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const FORMS_MANIFEST_SCHEMA_VERSION = 3;
   const LEGACY_MANIFEST_SCHEMA_VERSION = 1;
   const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 12;
-  const SUPPORTED_EFFECT_ARTIFACT_SCHEMA_VERSION = 1;
+  const SUPPORTED_EFFECT_ARTIFACT_SCHEMA_VERSION = __EZ_EFFECT_SCHEMA_VERSION__;
   const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = __EZ_COMPONENT_SCHEMA_VERSION__;
   const LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2;
@@ -1630,6 +1630,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       initialEffectRuns: [],
       completedActionEffectRuns: [],
       effectSubscriptions: new Map(),
+      effectCleanups: new Map(),
       resources: new Map(),
       resourceActivationsByInstanceDeclaration: new Map(),
       activeActionBatch: null
@@ -1983,10 +1984,10 @@ const RUNTIME_STUB: &str = r#"(() => {
     });
   }
 
-  function executeEffectProgram(store, effect, evidence) {
+  function executeEffectProgram(store, effect, evidence, program = effect.program) {
     const values = new Map();
 
-    for (const instruction of effect.program?.instructions ?? []) {
+    for (const instruction of program?.instructions ?? []) {
       if (executePureProgramInstruction(store, values, instruction, effect.effect)) {
         continue;
       }
@@ -2005,6 +2006,20 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
+  function runEffect(store, effect, evidence) {
+    const cleanup = store.effectCleanups.get(effect.effect);
+    if (cleanup !== undefined) {
+      const cleanupEvidence = { capability_operations: [] };
+      executeEffectProgram(store, effect, cleanupEvidence, cleanup);
+      evidence.cleanup_capability_operations = cleanupEvidence.capability_operations;
+      store.effectCleanups.delete(effect.effect);
+    }
+    executeEffectProgram(store, effect, evidence);
+    if (effect.cleanup_program !== null && effect.cleanup_program !== undefined) {
+      store.effectCleanups.set(effect.effect, effect.cleanup_program);
+    }
+  }
+
   function executeInitialEffects(store) {
     for (const [effectBatchIndex, effects] of initialEffectBatches(store.effectArtifact)) {
       for (const effect of effects) {
@@ -2013,7 +2028,25 @@ const RUNTIME_STUB: &str = r#"(() => {
           effect_batch_index: effectBatchIndex,
           capability_operations: []
         };
-        executeEffectProgram(store, effect, evidence);
+        runEffect(store, effect, evidence);
+        store.initialEffectRuns.push(evidence);
+      }
+    }
+  }
+
+  // Resume is an explicit V2 lifecycle phase. It intentionally excludes the
+  // legacy decorator effects whose restore boundary is frozen by the existing
+  // resumability contract.
+  function executeResumeEffects(store) {
+    for (const [effectBatchIndex, effects] of initialEffectBatches(store.effectArtifact)) {
+      for (const effect of effects) {
+        if (effect.run_on_resume !== true) continue;
+        const evidence = {
+          effect: effect.effect,
+          effect_batch_index: effectBatchIndex,
+          capability_operations: []
+        };
+        runEffect(store, effect, evidence);
         store.initialEffectRuns.push(evidence);
       }
     }
@@ -2051,7 +2084,7 @@ const RUNTIME_STUB: &str = r#"(() => {
           effect_batch_index: effectBatchIndex,
           capability_operations: []
         };
-        executeEffectProgram(store, effect, evidence);
+        runEffect(store, effect, evidence);
         store.completedActionEffectRuns.push(evidence);
       }
     }
@@ -2909,11 +2942,12 @@ const RUNTIME_STUB: &str = r#"(() => {
         effect_instance_id: effect.effect,
         scheduler_order: effect.initial_trigger?.effect_batch_index ?? null,
         active_after_restore: true,
-        run_on_restore: false
+        run_on_restore: effect.run_on_resume === true
       };
       store.effectSubscriptions.set(effect.effect, subscription);
       registry.effect_subscriptions.set(effect.effect, subscription);
     }
+    executeResumeEffects(store);
   }
 
   function ordinaryTargetFromEvent(target) {
@@ -4188,10 +4222,15 @@ const RUNTIME_STUB: &str = r#"(() => {
 
 #[must_use]
 pub fn generate_runtime_stub() -> String {
-    RUNTIME_STUB.replace(
-        "__EZ_COMPONENT_SCHEMA_VERSION__",
-        &crate::RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION.to_string(),
-    )
+    RUNTIME_STUB
+        .replace(
+            "__EZ_COMPONENT_SCHEMA_VERSION__",
+            &crate::RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION.to_string(),
+        )
+        .replace(
+            "__EZ_EFFECT_SCHEMA_VERSION__",
+            &crate::RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION.to_string(),
+        )
 }
 
 #[cfg(test)]
@@ -4281,6 +4320,8 @@ mod tests {
         assert!(runtime.contains("executeCompletedActionEffects"));
         assert!(runtime.contains("activeActionBatch"));
         assert!(runtime.contains("executeInitialEffects"));
+        assert!(runtime.contains("function executeResumeEffects"));
+        assert!(runtime.contains("effect.run_on_resume !== true"));
         assert!(runtime.contains("dispatchEffectCapability"));
         assert!(!runtime.contains("const arguments ="));
         assert!(runtime.contains("formatBindingValue"));

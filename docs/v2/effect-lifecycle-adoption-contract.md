@@ -23,10 +23,12 @@ value: its body becomes a separately identified cleanup program. A malformed
 cleanup, async callback, unsupported operation, or unavailable program rejects
 publication before runtime execution.
 
-`RuntimeEffectArtifact` advances to schema v2 with an optional cleanup program
-for each effect. The artifact keeps stable effect IDs and declaration-order
-scheduling; it contains executable compiler instructions only, never raw
-source or callback objects.
+`RuntimeEffectArtifact` schema v3 carries an optional cleanup program and the
+explicit `run_on_resume` eligibility fact for each effect. That fact is true
+only for `EffectDeclaration::V2Field`: the generated runtime preserves the
+frozen legacy decorator resume boundary instead of silently changing it. The
+artifact keeps stable effect IDs and declaration-order scheduling; it contains
+executable compiler instructions only, never raw source or callback objects.
 
 ## Browser lifecycle
 
@@ -43,6 +45,15 @@ effect ID. It must:
 Parent activation precedes child activation; child cleanup precedes parent
 cleanup. The compiler supplies declaration ordering rather than relying on
 object-key iteration.
+
+## Adopted boundary
+
+The current implementation emits cleanup programs, retains a browser cleanup
+registry, invokes a registered cleanup before a same-effect action rerun, and
+executes eligible V2 fields once after successful resume restoration. Cleanup
+fields remain fail-closed until the pending declaration-order and component
+disposal programs are emitted and browser-proven. This prevents publishing a
+partially correct cleanup lifecycle as if it satisfied the full contract.
 
 ## Acceptance
 

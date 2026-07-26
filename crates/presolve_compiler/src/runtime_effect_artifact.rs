@@ -11,7 +11,7 @@ use crate::{
     IrInstructionKind, IrValueId, RuntimeEffectRecord, EFFECT_CAPABILITY_REGISTRY,
 };
 
-pub const RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION: u32 = 2;
+pub const RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION: u32 = 3;
 
 /// Versioned compiler-generated runtime metadata and effect programs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -30,6 +30,8 @@ pub struct RuntimeEffectArtifactEffect {
     pub action_batch_triggers: Vec<RuntimeEffectArtifactActionTrigger>,
     pub capability_operations: Vec<RuntimeEffectArtifactCapabilityOperation>,
     pub execution_boundary: RuntimeEffectArtifactExecutionBoundary,
+    /// Whether this V2 field effect is eligible for its single post-resume run.
+    pub run_on_resume: bool,
     pub program: RuntimeEffectArtifactProgram,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cleanup_program: Option<RuntimeEffectArtifactProgram>,
@@ -189,6 +191,7 @@ fn runtime_effect(
             .collect(),
         capability_operations: capability_operations(&record.capability_operations)?,
         execution_boundary: execution_boundary(record.execution_boundary),
+        run_on_resume: record.run_on_resume,
         program,
         cleanup_program,
     })
@@ -403,6 +406,7 @@ class RuntimeEffectArtifact extends Component {
         );
         assert_eq!(artifact.effects.len(), 1);
         assert!(effect.cleanup_program.is_none());
+        assert!(!effect.run_on_resume);
         assert_eq!(effect.effect, report.as_str());
         assert_eq!(effect.execution_function, report.as_str());
         assert_eq!(
@@ -472,7 +476,7 @@ class RuntimeEffectArtifact extends Component {
         ));
         assert_eq!(first, second);
         let json: serde_json::Value = serde_json::from_str(&first).expect("artifact JSON");
-        assert_eq!(json["schema_version"], 2);
+        assert_eq!(json["schema_version"], 3);
         assert_eq!(
             json["effects"][0]["program"]["instructions"][2]["kind"],
             "capability-call"
