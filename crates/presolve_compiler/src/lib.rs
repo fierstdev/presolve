@@ -60,6 +60,7 @@ pub mod environment_input;
 pub mod environment_ownership;
 pub mod environment_publication;
 pub mod environment_read_lowering;
+pub mod environment_read_ownership;
 pub mod explain;
 pub mod expression_graph;
 pub mod file_route_publication;
@@ -463,6 +464,9 @@ pub use environment_publication::{
 pub use environment_read_lowering::{
     lower_environment_reads_v1, EnvironmentReadDiagnosticCodeV1, EnvironmentReadDiagnosticV1,
     EnvironmentReadLoweringV1, EnvironmentReadRecordV1, ENVIRONMENT_READ_LOWERING_SCHEMA_VERSION,
+};
+pub use environment_read_ownership::{
+    build_environment_read_ownership_v1, EnvironmentReadOwnershipErrorV1,
 };
 pub use explain::{explain_json, explain_text};
 pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};

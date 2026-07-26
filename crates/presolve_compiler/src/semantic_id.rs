@@ -331,6 +331,16 @@ impl SemanticId {
         ))
     }
 
+    /// Stable identity for one authority-proven environment call selected by
+    /// its immutable source position, never by a user-controlled value name.
+    #[must_use]
+    pub fn environment_read_in_module(module_path: impl AsRef<Path>, position: usize) -> Self {
+        Self(format!(
+            "module:{}/environment-read:{position}",
+            normalized_module_path(module_path.as_ref())
+        ))
+    }
+
     #[must_use]
     pub fn state_field(&self, name: &str) -> Self {
         self.child("state", name)
@@ -1842,6 +1852,10 @@ mod tests {
         assert_eq!(
             component.state_field("count").as_str(),
             "module:src/Counter.tsx/component:x-counter/state:count"
+        );
+        assert_eq!(
+            SemanticId::environment_read_in_module("src/../src/environment.ts", 41).as_str(),
+            "module:src/environment.ts/environment-read:41"
         );
     }
 

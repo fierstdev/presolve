@@ -40,7 +40,10 @@ This product does not read dotenv files, process state, Vite environment
 objects, or source text beyond the parser-selected literal. It does not
 authorize server reads; server runtime configuration remains a separate
 capability-specific product. Existing environment-ownership analysis consumes
-the record rather than rediscovering names.
+the record rather than rediscovering names. Every admitted record is projected
+as a browser/application-lifetime ownership node using its source-qualified
+call identity; a lowering with diagnostics cannot be reclassified or
+published.
 
 ## Acceptance
 
