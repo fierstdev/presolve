@@ -66,6 +66,17 @@ process.stdout.write(JSON.stringify({ schemaVersion: 1, diagnostics: [], compone
     );
     assert!(root.join("authority-ran").is_file());
     assert!(String::from_utf8_lossy(&output.stdout).contains("Checked 1 source file(s)"));
+    let build = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("build")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    assert!(root.join("dist/routes/root/index.html").is_file());
     fs::remove_dir_all(root).unwrap();
 }
 

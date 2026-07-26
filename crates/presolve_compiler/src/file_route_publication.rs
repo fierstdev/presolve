@@ -20,6 +20,7 @@ use crate::{
     ApplicationPublicationRequestErrorV1, ApplicationPublicationRequestV1,
     ApplicationPublicationSourceV1, CompilationUnit, ConstantFoldingPass, ImmutableAsmPass,
     SemanticPackageResolutionTable, SemanticPackageRuntimeModuleTable,
+    ValidatedApplicationPublicationRequestV1,
 };
 
 pub const FILE_ROUTE_PUBLICATION_MANIFEST_SCHEMA_VERSION: u32 = 1;
@@ -176,17 +177,26 @@ pub fn build_file_route_publication_v1(
                     code: "PSROUTE2003_ROUTE_COMPONENT_MODULE_MISSING",
                     message: route.component.to_string(),
                 })?;
-        let mut validated =
-            validate_application_publication_request_v1(ApplicationPublicationRequestV1 {
-                configuration: request.configuration.clone(),
-                sources: request.sources.clone(),
-                entry_path: entry_path.clone(),
-                package_contracts: request.package_contracts.clone(),
-                package_runtime_modules: request.package_runtime_modules.clone(),
-                profile: request.profile,
-                output_root: request.output_root.clone(),
-            })
-            .map_err(application_request_error)?;
+        let publication_request = ApplicationPublicationRequestV1 {
+            configuration: request.configuration.clone(),
+            sources: request.sources.clone(),
+            entry_path: entry_path.clone(),
+            package_contracts: request.package_contracts.clone(),
+            package_runtime_modules: request.package_runtime_modules.clone(),
+            profile: request.profile,
+            output_root: request.output_root.clone(),
+        };
+        let mut validated = if request.v2_authoring.is_empty() {
+            validate_application_publication_request_v1(publication_request)
+                .map_err(application_request_error)?
+        } else {
+            ValidatedApplicationPublicationRequestV1 {
+                request: publication_request,
+                unit: unit.clone(),
+                entry_component: route.component.clone(),
+                render_root_component: route.component.clone(),
+            }
+        };
         let route_model = if request.v2_authoring.is_empty() {
             build_file_route_application_semantic_model_for_route_with_packages(
                 &unit,

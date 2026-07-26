@@ -1428,7 +1428,7 @@ pub fn build_v2_component_graph_for_module(
             ));
             continue;
         };
-        let id = SemanticId::component_in_module(&parsed.path, None, &class.name);
+        let id = SemanticId::component_in_module(&parsed.path, Some(&class.name), &class.name);
         if class.methods.iter().all(|method| method.name != "render") {
             diagnostics.push(ComponentDiagnostic::error(
                 "PSC1002",
@@ -1441,7 +1441,7 @@ pub fn build_v2_component_graph_for_module(
             module_path: parsed.path.clone(),
             owner: SemanticOwner::Application,
             class_name: class.name.clone(),
-            element_name: None,
+            element_name: Some(class.name.clone()),
             route_path: None,
             heritage: class
                 .heritage
