@@ -1399,6 +1399,91 @@ pub fn build_component_graph_for_module(parsed: &ParsedFile) -> ComponentGraph {
     build_component_graph_with_identity(parsed, true)
 }
 
+/// Projects already-proven V2 component declarations into the legacy-shaped
+/// graph consumed by route and publication products.  This function performs
+/// no decorator or spelling recognition: its only component selection input
+/// is the canonical authored model.
+#[must_use]
+pub fn build_v2_component_graph_for_module(
+    parsed: &ParsedFile,
+    authored: &crate::CanonicalAuthoredSemanticModelV1,
+) -> ComponentGraph {
+    let mut components = Vec::new();
+    let mut diagnostics = Vec::new();
+    let mut provenance = BTreeMap::new();
+    for declaration in authored.declarations.iter().filter(|declaration| {
+        declaration.kind == crate::CanonicalAuthoredDeclarationKindV1::Component
+    }) {
+        let Some(class) = parsed
+            .classes
+            .iter()
+            .find(|class| class.name == declaration.subject)
+        else {
+            diagnostics.push(ComponentDiagnostic::error(
+                "PSV2A1001",
+                format!(
+                    "canonical V2 component `{}` has no source class",
+                    declaration.subject
+                ),
+            ));
+            continue;
+        };
+        let id = SemanticId::component_in_module(&parsed.path, None, &class.name);
+        if class.methods.iter().all(|method| method.name != "render") {
+            diagnostics.push(ComponentDiagnostic::error(
+                "PSC1002",
+                format!("class `{}` is missing render()", class.name),
+            ));
+        }
+        provenance.insert(id.clone(), SourceProvenance::new(&parsed.path, class.span));
+        components.push(ComponentNode {
+            id: id.clone(),
+            module_path: parsed.path.clone(),
+            owner: SemanticOwner::Application,
+            class_name: class.name.clone(),
+            element_name: None,
+            route_path: None,
+            heritage: class
+                .heritage
+                .as_ref()
+                .map(|heritage| AuthoredComponentHeritage {
+                    base: heritage.base.clone(),
+                    provenance: SourceProvenance::new(&parsed.path, heritage.span),
+                }),
+            state_fields: Vec::new(),
+            context_declarations: Vec::new(),
+            provider_declarations: Vec::new(),
+            consumer_declarations: Vec::new(),
+            slot_declarations: Vec::new(),
+            context_declaration_candidates: Vec::new(),
+            slot_declaration_candidates: Vec::new(),
+            form_declaration_candidates: Vec::new(),
+            resource_declaration_candidates: Vec::new(),
+            route_loader_declaration_candidates: Vec::new(),
+            form_field_declaration_candidates: Vec::new(),
+            validation_rule_declaration_facts: Vec::new(),
+            submission_declaration_facts: Vec::new(),
+            serialization_declaration_facts: Vec::new(),
+            opaque_action_facts: Vec::new(),
+            server_action_facts: Vec::new(),
+            shadowed_validation_intrinsics: BTreeSet::new(),
+            methods: Vec::new(),
+            actions: Vec::new(),
+            render: class
+                .methods
+                .iter()
+                .find(|method| method.name == "render")
+                .map(|method| render_model_from_parsed_method(method, &id)),
+        });
+    }
+    ComponentGraph {
+        components,
+        diagnostics,
+        references: Vec::new(),
+        provenance,
+    }
+}
+
 fn build_component_graph_with_identity(
     parsed: &ParsedFile,
     module_qualified_identity: bool,
