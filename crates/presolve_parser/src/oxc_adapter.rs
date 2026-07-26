@@ -9,6 +9,7 @@ use oxc_ast::ast::{
     JSXMemberExpression, JSXMemberExpressionObject, ModuleExportName, ObjectPropertyKind, Program,
     PropertyKey, PropertyKind, SimpleAssignmentTarget, Statement,
 };
+use oxc_ast_visit::{walk, Visit};
 use oxc_diagnostics::Severity as OxcSeverity;
 use oxc_estree::{CompactTSSerializer, ESTree};
 use oxc_parser::Parser;
@@ -16,10 +17,11 @@ use oxc_span::{GetSpan, SourceType, Span};
 
 use crate::model::{
     ParseDiagnostic, ParseLabel, ParseSeverity, ParsedArithmeticExpression,
-    ParsedArithmeticExpressionKind, ParsedArithmeticOperator, ParsedClass, ParsedClassHeritage,
-    ParsedComparisonOperator, ParsedComputedExpression, ParsedComputedExpressionKind,
-    ParsedConstantExpression, ParsedConstantExpressionKind, ParsedDecorator, ParsedEffectBody,
-    ParsedEffectCleanup, ParsedEffectExpression, ParsedEffectExpressionKind, ParsedEffectStatement,
+    ParsedArithmeticExpressionKind, ParsedArithmeticOperator, ParsedCallArgument,
+    ParsedCallExpression, ParsedClass, ParsedClassHeritage, ParsedComparisonOperator,
+    ParsedComputedExpression, ParsedComputedExpressionKind, ParsedConstantExpression,
+    ParsedConstantExpressionKind, ParsedDecorator, ParsedEffectBody, ParsedEffectCleanup,
+    ParsedEffectExpression, ParsedEffectExpressionKind, ParsedEffectStatement,
     ParsedEffectStatementKind, ParsedEventHandler, ParsedExport, ParsedExportKind,
     ParsedExportSpecifier, ParsedFile, ParsedImport, ParsedImportSpecifier, ParsedInitializerCall,
     ParsedInlineHandler, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild,
@@ -43,6 +45,7 @@ pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
     let allocator = Allocator::default();
     let ret = Parser::new(&allocator, source, source_type).parse();
     let syntax = parse_source_ast(&ret.program, source);
+    let call_expressions = collect_call_expressions(&ret.program, source);
 
     let ParsedProgramFacts {
         classes,
@@ -67,8 +70,49 @@ pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
         local_value_bindings,
         imports,
         exports,
+        call_expressions,
         diagnostics,
     }
+}
+
+fn collect_call_expressions(program: &Program<'_>, source: &str) -> Vec<ParsedCallExpression> {
+    struct Collector<'a> {
+        source: &'a str,
+        calls: Vec<ParsedCallExpression>,
+    }
+
+    impl<'a> Visit<'a> for Collector<'a> {
+        fn visit_call_expression(&mut self, call: &oxc_ast::ast::CallExpression<'a>) {
+            self.calls.push(ParsedCallExpression {
+                callee_span: source_span(self.source, call.callee.span()),
+                span: source_span(self.source, call.span),
+                arguments: call
+                    .arguments
+                    .iter()
+                    .map(|argument| match argument {
+                        Argument::StringLiteral(value) => ParsedCallArgument::StringLiteral {
+                            value: value.value.to_string(),
+                            span: source_span(self.source, value.span),
+                        },
+                        _ => ParsedCallArgument::Other {
+                            span: source_span(self.source, argument.span()),
+                        },
+                    })
+                    .collect(),
+            });
+            walk::walk_call_expression(self, call);
+        }
+    }
+
+    let mut collector = Collector {
+        source,
+        calls: Vec::new(),
+    };
+    collector.visit_program(program);
+    collector
+        .calls
+        .sort_by_key(|call| (call.span.start, call.span.end));
+    collector.calls
 }
 
 fn parse_source_ast(program: &Program<'_>, source: &str) -> ParsedSourceAst {

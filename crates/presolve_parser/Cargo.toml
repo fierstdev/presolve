@@ -15,6 +15,7 @@ name = "presolve_parser"
 [dependencies]
 oxc_allocator = "0.87"
 oxc_ast = { version = "0.87", features = ["serialize"] }
+oxc_ast_visit = "0.87"
 oxc_diagnostics = "0.87"
 oxc_estree = { version = "0.87", features = ["serialize"] }
 oxc_parser = "0.87"

@@ -20,6 +20,9 @@ pub struct ParsedFile {
     pub local_value_bindings: Vec<String>,
     pub imports: Vec<ParsedImport>,
     pub exports: Vec<ParsedExport>,
+    /// General-AST call sites. These facts intentionally carry no framework
+    /// meaning; downstream authorities select and classify them.
+    pub call_expressions: Vec<ParsedCallExpression>,
     pub diagnostics: Vec<ParseDiagnostic>,
 }
 
@@ -52,6 +55,21 @@ pub struct ParsedImportSpecifier {
     pub local: String,
     /// The exact local binding span selected from the general source AST.
     pub local_span: SourceSpan,
+}
+
+/// A source-faithful call expression selected from the general OXC AST.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedCallExpression {
+    pub callee_span: SourceSpan,
+    pub span: SourceSpan,
+    pub arguments: Vec<ParsedCallArgument>,
+}
+
+/// Argument fact retained without interpreting the called function.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParsedCallArgument {
+    StringLiteral { value: String, span: SourceSpan },
+    Other { span: SourceSpan },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

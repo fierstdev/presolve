@@ -3,19 +3,20 @@ mod oxc_adapter;
 
 pub use model::{
     ParseDiagnostic, ParseLabel, ParseSeverity, ParsedArithmeticExpression,
-    ParsedArithmeticExpressionKind, ParsedArithmeticOperator, ParsedClass, ParsedClassHeritage,
-    ParsedComparisonOperator, ParsedComputedExpression, ParsedComputedExpressionKind,
-    ParsedConstantExpression, ParsedConstantExpressionKind, ParsedDecorator, ParsedEffectBody,
-    ParsedEffectExpression, ParsedEffectExpressionKind, ParsedEffectStatement,
-    ParsedEffectStatementKind, ParsedEventHandler, ParsedExport, ParsedExportKind,
-    ParsedExportSpecifier, ParsedFile, ParsedImport, ParsedImportSpecifier, ParsedInlineHandler,
-    ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional,
-    ParsedJsxElement, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLocalVariable,
-    ParsedLogicalOperator, ParsedMethod, ParsedMethodCall, ParsedMethodParameter, ParsedProperty,
-    ParsedSerializableValue, ParsedSourceAst, ParsedStateOperation, ParsedStateUpdate,
-    ParsedStaticMemberDesignator, ParsedThisMemberDesignator, ParsedTypeAlias,
-    ParsedTypeAnnotation, ParsedUnaryOperator, ParsedUnsupportedEffectStatementKind,
-    ParsedValidationRuleArgument, ParsedValidationRuleArgumentKind, ParsedValidationRuleExpression,
+    ParsedArithmeticExpressionKind, ParsedArithmeticOperator, ParsedCallArgument,
+    ParsedCallExpression, ParsedClass, ParsedClassHeritage, ParsedComparisonOperator,
+    ParsedComputedExpression, ParsedComputedExpressionKind, ParsedConstantExpression,
+    ParsedConstantExpressionKind, ParsedDecorator, ParsedEffectBody, ParsedEffectExpression,
+    ParsedEffectExpressionKind, ParsedEffectStatement, ParsedEffectStatementKind,
+    ParsedEventHandler, ParsedExport, ParsedExportKind, ParsedExportSpecifier, ParsedFile,
+    ParsedImport, ParsedImportSpecifier, ParsedInlineHandler, ParsedJsxAttribute,
+    ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional, ParsedJsxElement,
+    ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLocalVariable, ParsedLogicalOperator,
+    ParsedMethod, ParsedMethodCall, ParsedMethodParameter, ParsedProperty, ParsedSerializableValue,
+    ParsedSourceAst, ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator,
+    ParsedThisMemberDesignator, ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator,
+    ParsedUnsupportedEffectStatementKind, ParsedValidationRuleArgument,
+    ParsedValidationRuleArgumentKind, ParsedValidationRuleExpression,
     ParsedValidationRuleExpressionKind, SourceSpan,
 };
 pub use oxc_adapter::parse_file;
@@ -122,6 +123,33 @@ export const Card = <section aria-label="card">{1 + 2}</section>;
                     .estree_json
                     .contains("\"importKind\":\"type\"")
         );
+    }
+
+    #[test]
+    fn retains_general_call_sites_without_framework_classification() {
+        let source = r#"
+const name = environment.public("PRESOLVE_PUBLIC_APP_NAME");
+const dynamic = environment.public(getName());
+"#;
+        let parsed = parse_file("src/environment.ts", source);
+        assert_eq!(parsed.call_expressions.len(), 3);
+        let public_calls = parsed
+            .call_expressions
+            .iter()
+            .filter(|call| {
+                &source[call.callee_span.start..call.callee_span.end] == "environment.public"
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(public_calls.len(), 2);
+        assert!(matches!(
+            &public_calls[0].arguments[0],
+            super::ParsedCallArgument::StringLiteral { value, .. }
+                if value == "PRESOLVE_PUBLIC_APP_NAME"
+        ));
+        assert!(matches!(
+            public_calls[1].arguments[0],
+            super::ParsedCallArgument::Other { .. }
+        ));
     }
 
     #[test]
