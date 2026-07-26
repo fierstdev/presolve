@@ -23,7 +23,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = __EZ_COMPONENT_SCHEMA_VERSION__;
   const LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 2;
-  const SUPPORTED_RESOURCES_ARTIFACT_SCHEMA_VERSION = 1;
+  const SUPPORTED_RESOURCES_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_OPAQUE_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_RESUME_MANIFEST_SCHEMA_VERSION = 7;
   const SUPPORTED_RESUME_SNAPSHOT_SCHEMA_VERSION = 2;
@@ -727,7 +727,9 @@ const RUNTIME_STUB: &str = r#"(() => {
       if (typeof declaration?.id !== "string" || declarations.has(declaration.id)
         || typeof endpoint?.package !== "string" || typeof endpoint?.version !== "string"
         || typeof endpoint?.integrity !== "string" || typeof endpoint?.export !== "string"
-        || typeof endpoint?.runtime_module !== "string" || typeof endpoint?.runtime_location !== "string") {
+        || typeof endpoint?.runtime_module !== "string" || typeof endpoint?.runtime_location !== "string"
+        || !isValidResourceValueCodec(declaration?.data_codec)
+        || !isValidResourceValueCodec(declaration?.error_codec)) {
         reportDiagnostic(diagnostics, "PSR_INVALID_RESOURCES_ARTIFACT", "Resource declaration did not retain one exact executable endpoint", { declaration }, true);
         throw new PresolveBootError("PSR_INVALID_RESOURCES_ARTIFACT");
       }
@@ -743,6 +745,33 @@ const RUNTIME_STUB: &str = r#"(() => {
         throw new PresolveBootError("PSR_INVALID_RESOURCES_ARTIFACT");
       }
       activations.add(activation.id);
+    }
+  }
+
+  function isValidResourceValueCodec(codec, depth = 0) {
+    if (depth > 32 || codec === null || typeof codec !== "object" || Array.isArray(codec)) return false;
+    switch (codec.kind) {
+      case "null_codec":
+      case "boolean_codec":
+      case "number_codec":
+      case "string_codec":
+        return exactObjectKeys(codec, ["kind"]);
+      case "array_codec":
+      case "nullable_codec":
+        return exactObjectKeys(codec, ["kind", "value"])
+          && isValidResourceValueCodec(codec.value, depth + 1);
+      case "object_codec": {
+        if (!exactObjectKeys(codec, ["kind", "value"]) || !Array.isArray(codec.value)) return false;
+        const names = new Set();
+        return codec.value.every((property) => property !== null
+          && typeof property === "object" && !Array.isArray(property)
+          && exactObjectKeys(property, ["name", "codec"])
+          && typeof property.name === "string" && property.name.length > 0
+          && !names.has(property.name) && names.add(property.name)
+          && isValidResourceValueCodec(property.codec, depth + 1));
+      }
+      default:
+        return false;
     }
   }
 
@@ -4766,6 +4795,14 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
+  function decodeResourceValue(value, codec) {
+    try {
+      return decodeResumeValue(value, codec);
+    } catch (_) {
+      throw new PresolveBootError("PSR_RESOURCE_VALUE_CODEC_FAILURE");
+    }
+  }
+
   function snapshotValuesBySlot(snapshot) {
     const values = new Map();
     for (const boundary of snapshot.boundaries) {
@@ -5560,17 +5597,31 @@ const RUNTIME_STUB: &str = r#"(() => {
         if (record.controller.signal.aborted) {
           record.state = "cancelled";
         } else {
-          JSON.stringify(result);
-          record.state = "ready";
-          record.data = result;
+          try {
+            record.data = decodeResourceValue(result, record.declaration.data_codec);
+            record.state = "ready";
+          } catch (_) {
+            record.state = "failed";
+            record.data = null;
+            record.error = null;
+            reportDiagnostic(diagnostics, "PSR_RESOURCE_VALUE_CODEC_FAILURE", "A Resource endpoint result did not match its compiler-issued data codec", { activation: record.activation.id });
+          }
         }
       } catch (error) {
         if (record.controller.signal.aborted) {
           record.state = "cancelled";
         } else {
-          record.state = "failed";
-          record.error = error instanceof Error ? error.message : String(error);
-          reportDiagnostic(diagnostics, "PSR_RESOURCE_ENDPOINT_FAILURE", "A compiler-authorized Resource endpoint failed", { activation: record.activation.id, error: record.error });
+          const endpointError = error instanceof Error ? error.message : error;
+          try {
+            record.error = decodeResourceValue(endpointError, record.declaration.error_codec);
+            record.state = "failed";
+            reportDiagnostic(diagnostics, "PSR_RESOURCE_ENDPOINT_FAILURE", "A compiler-authorized Resource endpoint failed", { activation: record.activation.id, error: record.error });
+          } catch (_) {
+            record.state = "failed";
+            record.data = null;
+            record.error = null;
+            reportDiagnostic(diagnostics, "PSR_RESOURCE_VALUE_CODEC_FAILURE", "A Resource endpoint error did not match its compiler-issued error codec", { activation: record.activation.id });
+          }
         }
       }
       invalidateResourceComputeds(store, record.activation);

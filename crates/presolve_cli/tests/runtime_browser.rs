@@ -218,7 +218,7 @@ class Profile extends Component {
     );
     fs::write(
         out_dir.join("resource-endpoint.js"),
-        "export async function loadProfile({ signal, inputs }) { if (signal.aborted || Object.keys(inputs).length !== 0) throw new Error('invalid-input'); return { name: 'Ada' }; }\n",
+        "export async function loadProfile({ signal, inputs }) { if (signal.aborted || Object.keys(inputs).length !== 0) throw new Error('invalid-input'); return 'Ada'; }\n",
     )
     .expect("failed to write deterministic Resource endpoint module");
     let index =
@@ -252,7 +252,7 @@ const wait = setInterval(() => {
     fs::create_dir_all(&profile_dir).expect("failed to create Resource Chrome profile");
     let user_data_dir = format!("--user-data-dir={}", profile_dir.display());
     let output = run_chrome_probe(
-        chrome,
+        chrome.clone(),
         &user_data_dir,
         &format!("http://127.0.0.1:{}/probe.html", server.port),
     );
@@ -261,6 +261,48 @@ const wait = setInterval(() => {
     assert!(
         stdout.contains("PRESOLVE_RESOURCE_BROWSER_TEST_PASS"),
         "Resource browser probe failed\nstdout:\n{}\nstderr:\n{}",
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    fs::write(
+        out_dir.join("resource-endpoint.js"),
+        "export async function loadProfile() { return { name: 'Ada' }; }\n",
+    )
+    .expect("failed to write codec-invalid Resource endpoint module");
+    let invalid_probe = index.replace(
+        "</body>",
+        r#"<script>
+const deadline = Date.now() + 4000;
+const wait = setInterval(() => {
+  const runtime = window.__PRESOLVE__;
+  const resource = runtime?.resources?.find((record) => record.id.includes("resource:profile"));
+  if (resource?.state === "failed" && runtime?.diagnostics?.some((item) => item.code === "PSR_RESOURCE_VALUE_CODEC_FAILURE")) {
+    clearInterval(wait);
+    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_RESOURCE_CODEC_BROWSER_TEST_PASS</div>");
+  } else if (Date.now() > deadline) {
+    clearInterval(wait);
+    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_RESOURCE_CODEC_BROWSER_TEST_FAIL</div>");
+  }
+}, 20);
+</script></body>"#,
+    );
+    fs::write(out_dir.join("codec-invalid-probe.html"), invalid_probe)
+        .expect("failed to write codec-invalid Resource probe");
+    let server = StaticServer::start(out_dir.clone());
+    let profile_dir = out_dir.join(format!("chrome-codec-profile-{}", std::process::id()));
+    fs::create_dir_all(&profile_dir)
+        .expect("failed to create codec-invalid Resource Chrome profile");
+    let output = run_chrome_probe(
+        chrome,
+        &format!("--user-data-dir={}", profile_dir.display()),
+        &format!("http://127.0.0.1:{}/codec-invalid-probe.html", server.port),
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("PRESOLVE_RESOURCE_CODEC_BROWSER_TEST_PASS"),
+        "Resource codec browser probe failed\nstdout:\n{}\nstderr:\n{}",
         stdout,
         String::from_utf8_lossy(&output.stderr)
     );

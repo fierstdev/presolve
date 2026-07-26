@@ -34,12 +34,16 @@ same cold fallback rather than attempting a browser call.
 
 ## Artifact and ordering
 
-The resource artifact publishes the exact endpoint coordinate, runtime
-location, policy, cancellation mode, lifecycle generation, and input
-dependencies. The resume manifest publishes one instance-qualified Resource
-record per resumable activation and no source text. Resource restoration occurs
-before any computed read of that Resource; reload completion invalidates only
-the compiler-authored dependent computed records and bindings.
+The resource artifact (schema v2) publishes the exact endpoint coordinate,
+runtime location, policy, cancellation mode, lifecycle generation, input
+dependencies, and compiler-issued closed codecs for the declaration's data and
+error types. The browser validates that codec grammar before executing an
+endpoint, then validates every completed data/error value against it; it never
+uses JSON stringification as a serialization proof. The resume manifest
+publishes one instance-qualified Resource record per resumable activation and
+no source text. Resource restoration occurs before any computed read of that
+Resource; reload completion invalidates only the compiler-authored dependent
+computed records and bindings.
 
 ## Acceptance
 

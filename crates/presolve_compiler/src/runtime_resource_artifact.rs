@@ -9,11 +9,13 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    semantic_type_text, ApplicationSemanticModel, ResourceEndpointResolutionOutcome,
-    ResourceLifecycleState, SemanticPackageRuntimeModuleKey, SemanticPackageRuntimeModuleTable,
+    resume_value_codec, semantic_type_text, ApplicationSemanticModel,
+    ResourceEndpointResolutionOutcome, ResourceLifecycleState, ResumeValueCodec,
+    SemanticPackageRuntimeModuleKey, SemanticPackageRuntimeModuleTable,
 };
 
-pub const RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION: u32 = 1;
+/// Version 2 adds compiler-issued data and error codecs for opaque endpoint values.
+pub const RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -31,6 +33,8 @@ pub struct RuntimeResourceArtifactDeclaration {
     pub key: String,
     pub data_type: String,
     pub error_type: String,
+    pub data_codec: ResumeValueCodec,
+    pub error_codec: ResumeValueCodec,
     pub execution_boundary: String,
     pub input_dependencies: Vec<String>,
     pub retry_policy: String,
@@ -85,6 +89,9 @@ pub enum RuntimeResourceArtifactValidationError {
         activation: String,
         declaration: String,
     },
+    InvalidValueCodec {
+        declaration: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -124,6 +131,12 @@ pub fn build_runtime_resource_artifact(
                 key: declaration.key.clone(),
                 data_type: semantic_type_text(&declaration.data_type),
                 error_type: semantic_type_text(&declaration.error_type),
+                data_codec: resume_value_codec(&declaration.data_type).expect(
+                    "Resource declarations must use the compiler's closed runtime value codec vocabulary",
+                ),
+                error_codec: resume_value_codec(&declaration.error_type).expect(
+                    "Resource declarations must use the compiler's closed runtime value codec vocabulary",
+                ),
                 execution_boundary: format!("{:?}", declaration.execution_boundary),
                 input_dependencies: declaration
                     .input_dependencies
@@ -235,6 +248,13 @@ pub fn validate_runtime_resource_artifact(
                 },
             );
         }
+        if !is_valid_value_codec(&declaration.data_codec)
+            || !is_valid_value_codec(&declaration.error_codec)
+        {
+            errors.push(RuntimeResourceArtifactValidationError::InvalidValueCodec {
+                declaration: declaration.id.clone(),
+            });
+        }
     }
     let mut activations = BTreeSet::new();
     for activation in &artifact.activations {
@@ -266,6 +286,26 @@ pub fn validate_runtime_resource_artifact(
         }
     }
     errors
+}
+
+fn is_valid_value_codec(codec: &ResumeValueCodec) -> bool {
+    match codec {
+        ResumeValueCodec::NullCodec
+        | ResumeValueCodec::BooleanCodec
+        | ResumeValueCodec::NumberCodec
+        | ResumeValueCodec::StringCodec => true,
+        ResumeValueCodec::ArrayCodec(element) | ResumeValueCodec::NullableCodec(element) => {
+            is_valid_value_codec(element)
+        }
+        ResumeValueCodec::ObjectCodec(properties) => {
+            let mut names = BTreeSet::new();
+            properties.iter().all(|property| {
+                !property.name.is_empty()
+                    && names.insert(property.name.as_str())
+                    && is_valid_value_codec(&property.codec)
+            })
+        }
+    }
 }
 
 fn resource_lifecycle_artifact_state(state: ResourceLifecycleState) -> (&'static str, Option<u64>) {
@@ -320,6 +360,14 @@ class Profile extends Component {
         assert_eq!(artifact.declarations.len(), 1);
         assert_eq!(artifact.declarations[0].endpoint.package, "profile-service");
         assert_eq!(artifact.declarations[0].endpoint.export, "loadProfile");
+        assert_eq!(
+            artifact.declarations[0].data_codec,
+            crate::ResumeValueCodec::StringCodec
+        );
+        assert_eq!(
+            artifact.declarations[0].error_codec,
+            crate::ResumeValueCodec::StringCodec
+        );
         assert_eq!(artifact.activations.len(), 1);
         assert_eq!(artifact.activations[0].state, "idle");
         assert!(validate_runtime_resource_artifact(&artifact).is_empty());
@@ -335,6 +383,16 @@ class Profile extends Component {
         let mut artifact = build_runtime_resource_artifact(&model);
         artifact.schema_version = 9;
         artifact.declarations[0].endpoint.integrity.clear();
+        artifact.declarations[0].data_codec = crate::ResumeValueCodec::ObjectCodec(vec![
+            crate::ResumeObjectPropertyCodec {
+                name: "duplicate".to_string(),
+                codec: crate::ResumeValueCodec::StringCodec,
+            },
+            crate::ResumeObjectPropertyCodec {
+                name: "duplicate".to_string(),
+                codec: crate::ResumeValueCodec::StringCodec,
+            },
+        ]);
         artifact.activations[0].declaration = "resource:missing".to_string();
         artifact.activations[0].state = "ready".to_string();
 
@@ -346,6 +404,10 @@ class Profile extends Component {
         assert!(errors.iter().any(|error| matches!(
             error,
             crate::RuntimeResourceArtifactValidationError::MissingEndpointCoordinate { .. }
+        )));
+        assert!(errors.iter().any(|error| matches!(
+            error,
+            crate::RuntimeResourceArtifactValidationError::InvalidValueCodec { .. }
         )));
         assert!(errors.iter().any(|error| matches!(
             error,
