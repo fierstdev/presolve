@@ -12,7 +12,7 @@ use crate::{
     ResolvedStateInitializerV1, V2AuthoringResolutionsV1,
 };
 
-pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 2;
+pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -23,6 +23,7 @@ pub struct V2AuthorityResponseV1 {
     pub states: Vec<V2AuthorityResolutionV1>,
     pub actions: Vec<V2AuthorityResolutionV1>,
     pub effects: Vec<V2AuthorityResolutionV1>,
+    pub environment_public: Vec<V2AuthorityResolutionV1>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -81,7 +82,8 @@ pub fn validate_v2_authority_response_v1(
     validate_family(&request.components, &response.components)?;
     validate_family(&request.states, &response.states)?;
     validate_family(&request.actions, &response.actions)?;
-    validate_family(&request.effects, &response.effects)
+    validate_family(&request.effects, &response.effects)?;
+    validate_member_family(&request.environment_public, &response.environment_public)
 }
 
 /// Converts a validated authority response into the exact syntax joins consumed
@@ -215,6 +217,30 @@ fn validate_family(
     Ok(())
 }
 
+fn validate_member_family(
+    request: &[crate::v2_authority_request::V2AuthorityMemberSiteV1],
+    response: &[V2AuthorityResolutionV1],
+) -> Result<(), V2AuthorityResponseErrorV1> {
+    let allowed = request
+        .iter()
+        .map(|site| site.id.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut seen = BTreeSet::new();
+    for resolution in response {
+        if !allowed.contains(resolution.id.as_str()) {
+            return Err(V2AuthorityResponseErrorV1::UnknownSite(
+                resolution.id.clone(),
+            ));
+        }
+        if !seen.insert(resolution.id.as_str()) {
+            return Err(V2AuthorityResponseErrorV1::DuplicateSite(
+                resolution.id.clone(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -275,7 +301,7 @@ class Counter extends Component { count = state(0); increment = action(() => {})
         )
         .unwrap();
         let response = V2AuthorityResponseV1 {
-            schema_version: 2,
+            schema_version: 3,
             diagnostics: Vec::new(),
             components: vec![V2AuthorityResolutionV1 {
                 id: request.components[0].id.clone(),
@@ -290,6 +316,7 @@ class Counter extends Component { count = state(0); increment = action(() => {})
                 identity: identity("action"),
             }],
             effects: Vec::new(),
+            environment_public: Vec::new(),
         };
         (parsed, request, response)
     }

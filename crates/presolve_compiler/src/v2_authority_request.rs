@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use presolve_parser::ParsedFile;
+use presolve_parser::{ParsedFile, SourceSpan};
 use serde::Serialize;
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
     AuthoredSourceRangeV1, CanonicalAuthoredSemanticModelV1,
 };
 
-pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 2;
+pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,6 +28,18 @@ pub struct V2AuthoritySiteV1 {
     pub position: usize,
 }
 
+/// A syntactic member-call candidate.  Rust deliberately records only the
+/// structural object and property positions; the TypeScript authority decides
+/// whether either resolved symbol has framework meaning.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct V2AuthorityMemberSiteV1 {
+    pub id: String,
+    pub file: PathBuf,
+    pub object_position: usize,
+    pub property_position: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct V2AuthorityCanonicalV1 {
@@ -38,6 +50,8 @@ pub struct V2AuthorityCanonicalV1 {
     pub action: Option<V2AuthorityPositionV1>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub effect: Option<V2AuthorityPositionV1>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub environment: Option<V2AuthorityPositionV1>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -50,6 +64,7 @@ pub struct V2AuthorityRequestV1 {
     pub states: Vec<V2AuthoritySiteV1>,
     pub actions: Vec<V2AuthoritySiteV1>,
     pub effects: Vec<V2AuthoritySiteV1>,
+    pub environment_public: Vec<V2AuthorityMemberSiteV1>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,6 +107,7 @@ pub fn build_v2_authority_request_v1(
     let state = canonical_import(parsed, "state")?;
     let action = canonical_import(parsed, "action")?;
     let effect = canonical_import(parsed, "effect")?;
+    let environment = canonical_import(parsed, "environment")?;
     let components = component_inheritance_sites_v1(parsed)
         .into_iter()
         .map(|site| {
@@ -151,6 +167,33 @@ pub fn build_v2_authority_request_v1(
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
+    let environment_public = environment
+        .is_some()
+        .then(|| {
+            parsed
+                .call_expressions
+                .iter()
+                .filter_map(|call| {
+                    Some((
+                        call.member_object_span?,
+                        call.member_property_span?,
+                        call.span,
+                    ))
+                })
+                .map(|(object, property, call)| {
+                    member_site_for(
+                        "environment-public",
+                        object,
+                        property,
+                        call,
+                        &parsed.path,
+                        &parsed.syntax.source,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .transpose()?
+        .unwrap_or_default();
     Ok(V2AuthorityRequestV1 {
         schema_version: V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
         config_file,
@@ -159,11 +202,13 @@ pub fn build_v2_authority_request_v1(
             state,
             action,
             effect,
+            environment,
         },
         components,
         states,
         actions,
         effects,
+        environment_public,
     })
 }
 
@@ -196,11 +241,13 @@ pub fn build_v2_authority_component_request_v1(
             state: canonical_import(parsed, "state")?,
             action: canonical_import(parsed, "action")?,
             effect: canonical_import(parsed, "effect")?,
+            environment: canonical_import(parsed, "environment")?,
         },
         components,
         states: Vec::new(),
         actions: Vec::new(),
         effects: Vec::new(),
+        environment_public: Vec::new(),
     })
 }
 
@@ -235,6 +282,22 @@ fn site_for(
         id: format!("{kind}:{}:{}", range.start, range.end),
         file: path.to_path_buf(),
         position: utf16_position(source, range.start)?,
+    })
+}
+
+fn member_site_for(
+    kind: &str,
+    object: SourceSpan,
+    property: SourceSpan,
+    call: SourceSpan,
+    path: &std::path::Path,
+    source: &str,
+) -> Result<V2AuthorityMemberSiteV1, V2AuthorityRequestErrorV1> {
+    Ok(V2AuthorityMemberSiteV1 {
+        id: format!("{kind}:{}:{}", call.start, call.end),
+        file: path.to_path_buf(),
+        object_position: utf16_position(source, object.start)?,
+        property_position: utf16_position(source, property.start)?,
     })
 }
 
@@ -373,5 +436,48 @@ class Counter extends FrameworkBase { count = state(0); increment = action(() =>
         assert!(request.canonical.action.is_none());
         assert!(request.states.is_empty());
         assert!(request.actions.is_empty());
+    }
+
+    #[test]
+    fn forwards_all_static_member_calls_as_environment_authority_candidates() {
+        let source = r#"
+import { Component, environment as runtimeEnvironment } from "presolve";
+class Counter extends Component {}
+const canonical = runtimeEnvironment.public("PRESOLVE_PUBLIC_APP_NAME");
+const lookalike = localConfig.public("PRESOLVE_PUBLIC_LOOKALIKE");
+"#;
+        let parsed = parse_file("src/Counter.tsx", source);
+        let heritage = component_inheritance_sites_v1(&parsed).pop().unwrap();
+        let components = lower_component_inheritance_v1(
+            &parsed,
+            [ResolvedComponentInheritanceV1 {
+                heritage_source: heritage.heritage_source,
+                component_identity: ResolvedIntrinsicIdentityV1 {
+                    name: "Component".into(),
+                    flags: 32,
+                    declaration_modules: vec!["presolve".into()],
+                },
+            }],
+        )
+        .unwrap()
+        .model;
+        let request =
+            build_v2_authority_request_v1(&parsed, PathBuf::from("tsconfig.json"), &components)
+                .unwrap();
+
+        assert_eq!(request.environment_public.len(), 2);
+        assert_eq!(
+            &source[request.canonical.environment.unwrap().position..][..18],
+            "runtimeEnvironment"
+        );
+        assert_eq!(
+            request
+                .environment_public
+                .iter()
+                .map(|site| &source[site.object_position..])
+                .map(|suffix| &suffix[..suffix.find('.').unwrap()])
+                .collect::<Vec<_>>(),
+            vec!["runtimeEnvironment", "localConfig"]
+        );
     }
 }

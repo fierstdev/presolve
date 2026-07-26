@@ -53,12 +53,13 @@ const request = JSON.parse(readFileSync(0, "utf8"));
 writeFileSync("authority-ran", "yes");
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 process.stdout.write(JSON.stringify({
-  schemaVersion: 2,
+  schemaVersion: 3,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
   actions: request.actions.map(site => ({ id: site.id, identity: identity("action") })),
   effects: request.effects.map(site => ({ id: site.id, identity: identity("effect") })),
+  environmentPublic: request.environmentPublic.map(site => ({ id: site.id, identity: identity("public") })),
 }));
 "#,
     )
@@ -612,12 +613,13 @@ import { readFileSync } from "node:fs";
 const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 process.stdout.write(JSON.stringify({
-  schemaVersion: 2,
+  schemaVersion: 3,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
   actions: request.actions.map(site => ({ id: site.id, identity: identity("action") })),
   effects: request.effects.map(site => ({ id: site.id, identity: identity("effect") })),
+  environmentPublic: request.environmentPublic.map(site => ({ id: site.id, identity: identity("public") })),
 }));
 "#,
     )

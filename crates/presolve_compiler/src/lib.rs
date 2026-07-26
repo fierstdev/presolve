@@ -2555,6 +2555,7 @@ class ChainedProfile extends Component {
             diagnostics: Vec::new(),
             imports: Vec::new(),
             exports: Vec::new(),
+            call_expressions: Vec::new(),
             type_aliases: Vec::new(),
             local_type_bindings: Vec::new(),
             local_value_bindings: Vec::new(),

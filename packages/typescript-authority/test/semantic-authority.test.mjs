@@ -120,7 +120,7 @@ test("component heritage preserves aliases and indirect bases for registry class
   assert.equal(classifyResolvedComponentHeritage(registry, heritage.bases)?.kind, "component");
 });
 
-test("the V2 authoring bridge resolves canonical component, State, Action, and Effect evidence", async () => {
+test("the V2 authoring bridge resolves canonical component, State, Action, Effect, and Environment evidence", async () => {
   const frameworkFile = resolve(root, "tests/framework-public-api/src/V2Counter.tsx");
   const frameworkSource = readFileSync(frameworkFile, "utf8");
   const result = await analyzeV2Authoring({
@@ -131,11 +131,26 @@ test("the V2 authoring bridge resolves canonical component, State, Action, and E
       state: { file: frameworkFile, position: frameworkSource.indexOf("state") },
       action: { file: frameworkFile, position: frameworkSource.indexOf("action") },
       effect: { file: frameworkFile, position: frameworkSource.indexOf("effect") },
+      environment: { file: frameworkFile, position: frameworkSource.indexOf("runtimeEnvironment") },
     },
     components: [{ id: "counter", file: frameworkFile, position: frameworkSource.indexOf("V2Counter extends") }],
     states: [{ id: "count", file: frameworkFile, position: frameworkSource.indexOf("state(0)") }],
     actions: [{ id: "increment", file: frameworkFile, position: frameworkSource.indexOf("action(()") }],
     effects: [{ id: "syncTitle", file: frameworkFile, position: frameworkSource.indexOf("effect(()") }],
+    environmentPublic: [
+      {
+        id: "application-name",
+        file: frameworkFile,
+        objectPosition: frameworkSource.indexOf("runtimeEnvironment.public"),
+        propertyPosition: frameworkSource.indexOf("runtimeEnvironment.public") + "runtimeEnvironment.".length,
+      },
+      {
+        id: "lookalike",
+        file: frameworkFile,
+        objectPosition: frameworkSource.indexOf("lookalikeEnvironment.public"),
+        propertyPosition: frameworkSource.indexOf("lookalikeEnvironment.public") + "lookalikeEnvironment.".length,
+      },
+    ],
   });
   assert.equal(result.schemaVersion, V2_AUTHORED_AUTHORITY_SCHEMA_VERSION);
   assert.equal(result.diagnostics.length, 0);
@@ -143,10 +158,12 @@ test("the V2 authoring bridge resolves canonical component, State, Action, and E
   assert.deepEqual(result.states.map(entry => entry.id), ["count"]);
   assert.deepEqual(result.actions.map(entry => entry.id), ["increment"]);
   assert.deepEqual(result.effects.map(entry => entry.id), ["syncTitle"]);
+  assert.deepEqual(result.environmentPublic.map(entry => entry.id), ["application-name"]);
   assert.equal(result.components[0].identity.name, "Component");
   assert.equal(result.states[0].identity.name, "state");
   assert.equal(result.actions[0].identity.name, "action");
   assert.equal(result.effects[0].identity.name, "effect");
+  assert.equal(result.environmentPublic[0].identity.name, "public");
 });
 
 test("the V2 authoring bridge supports a component-only discovery phase", async () => {
@@ -162,6 +179,7 @@ test("the V2 authoring bridge supports a component-only discovery phase", async 
     states: [],
     actions: [],
     effects: [],
+    environmentPublic: [],
   });
   assert.deepEqual(result.components.map(entry => entry.id), ["counter"]);
   assert.deepEqual(result.states, []);
@@ -184,11 +202,13 @@ test("the V2 authoring executable speaks the versioned stdin/stdout bridge proto
           state: { file: frameworkFile, position: frameworkSource.indexOf("state") },
           action: { file: frameworkFile, position: frameworkSource.indexOf("action") },
           effect: { file: frameworkFile, position: frameworkSource.indexOf("effect") },
+          environment: { file: frameworkFile, position: frameworkSource.indexOf("runtimeEnvironment") },
         },
         components: [{ id: "counter", file: frameworkFile, position: frameworkSource.indexOf("V2Counter extends") }],
         states: [{ id: "count", file: frameworkFile, position: frameworkSource.indexOf("state(0)") }],
         actions: [{ id: "increment", file: frameworkFile, position: frameworkSource.indexOf("action(()") }],
         effects: [{ id: "syncTitle", file: frameworkFile, position: frameworkSource.indexOf("effect(()") }],
+        environmentPublic: [],
       }),
       encoding: "utf8",
     },

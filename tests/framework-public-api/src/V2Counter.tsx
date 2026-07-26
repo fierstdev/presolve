@@ -1,4 +1,8 @@
-import { action, effect, state, Component } from "presolve";
+import { action, effect, state, Component, environment as runtimeEnvironment } from "presolve";
+
+const lookalikeEnvironment = { public: (name: string) => name };
+const applicationName = runtimeEnvironment.public("PRESOLVE_PUBLIC_APP_NAME");
+const rejectedLookalikeName = lookalikeEnvironment.public("PRESOLVE_PUBLIC_REJECTED");
 
 export abstract class V2CounterBase extends Component {}
 

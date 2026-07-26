@@ -5,7 +5,7 @@ import {
   createCanonicalIntrinsicRegistry,
 } from "./index.js";
 
-export const V2_AUTHORED_AUTHORITY_SCHEMA_VERSION = 2;
+export const V2_AUTHORED_AUTHORITY_SCHEMA_VERSION = 3;
 
 /**
  * Resolves explicit source positions for the implemented decorator-free V2
@@ -20,9 +20,14 @@ export async function analyzeV2Authoring(request) {
       ...(request.canonical.state ? [{ id: "canonical:state", ...request.canonical.state }] : []),
       ...(request.canonical.action ? [{ id: "canonical:action", ...request.canonical.action }] : []),
       ...(request.canonical.effect ? [{ id: "canonical:effect", ...request.canonical.effect }] : []),
+      ...(request.canonical.environment ? [{ id: "canonical:environment", ...request.canonical.environment }] : []),
       ...request.states.map(site => ({ id: `state:${site.id}`, file: site.file, position: site.position })),
       ...request.actions.map(site => ({ id: `action:${site.id}`, file: site.file, position: site.position })),
       ...request.effects.map(site => ({ id: `effect:${site.id}`, file: site.file, position: site.position })),
+      ...request.environmentPublic.flatMap(site => [
+        { id: `environment-object:${site.id}`, file: site.file, position: site.objectPosition },
+        { id: `environment-property:${site.id}`, file: site.file, position: site.propertyPosition },
+      ]),
     ],
     componentHeritage: request.components.map(site => ({
       id: `component:${site.id}`,
@@ -41,6 +46,7 @@ export async function analyzeV2Authoring(request) {
     ...(request.canonical.state ? [{ kind: "state", symbol: symbols.get("canonical:state") }] : []),
     ...(request.canonical.action ? [{ kind: "action", symbol: symbols.get("canonical:action") }] : []),
     ...(request.canonical.effect ? [{ kind: "effect", symbol: symbols.get("canonical:effect") }] : []),
+    ...(request.canonical.environment ? [{ kind: "environment_public", symbol: symbols.get("canonical:environment") }] : []),
   ]);
   return {
     schemaVersion: V2_AUTHORED_AUTHORITY_SCHEMA_VERSION,
@@ -61,6 +67,14 @@ export async function analyzeV2Authoring(request) {
       const intrinsic = classifyResolvedIntrinsic(registry, symbols.get(`effect:${site.id}`));
       return intrinsic?.kind === "effect" ? [{ id: site.id, identity: intrinsic.identity }] : [];
     }),
+    environmentPublic: request.environmentPublic.flatMap(site => {
+      const receiver = classifyResolvedIntrinsic(registry, symbols.get(`environment-object:${site.id}`));
+      const member = resolvedIdentity(symbols.get(`environment-property:${site.id}`));
+      return receiver?.kind === "environment_public" && member?.name === "public"
+        && sameDeclarationModules(member, receiver.identity)
+        ? [{ id: site.id, identity: member }]
+        : [];
+    }),
   };
 }
 
@@ -75,7 +89,7 @@ function validateV2AuthoringRequest(request) {
   if (request.schemaVersion !== V2_AUTHORED_AUTHORITY_SCHEMA_VERSION) {
     throw new TypeError(`unsupported V2 authoring authority schema version ${request.schemaVersion}`);
   }
-  for (const kind of ["state", "action", "effect"]) {
+  for (const kind of ["state", "action", "effect", "environment"]) {
     if (request.canonical[kind] !== undefined) {
       validatePosition(request.canonical[kind], `canonical ${kind}`);
     }
@@ -94,6 +108,21 @@ function validateV2AuthoringRequest(request) {
       validatePosition(site, `${kind} site`);
     }
   }
+  if (!Array.isArray(request.environmentPublic)) {
+    throw new TypeError("V2 authoring environment public sites must be an array");
+  }
+  if (request.environmentPublic.length > 0 && request.canonical.environment === undefined) {
+    throw new TypeError("V2 authoring environment public sites require a canonical environment position");
+  }
+  const ids = new Set();
+  for (const site of request.environmentPublic) {
+    if (!site || typeof site.id !== "string" || !site.id || ids.has(site.id)) {
+      throw new TypeError("V2 authoring environment public sites require unique non-empty ids");
+    }
+    ids.add(site.id);
+    validatePosition({ file: site.file, position: site.objectPosition }, "environment public object site");
+    validatePosition({ file: site.file, position: site.propertyPosition }, "environment public property site");
+  }
 }
 
 function validatePosition(value, label) {
@@ -104,4 +133,14 @@ function validatePosition(value, label) {
 
 function stripPrefix(value, prefix) {
   return value.startsWith(prefix) ? value.slice(prefix.length) : value;
+}
+
+function resolvedIdentity(symbol) {
+  return symbol?.aliasTarget?.identity ?? symbol?.identity;
+}
+
+function sameDeclarationModules(left, right) {
+  if (!left || !right) return false;
+  return JSON.stringify([...left.declarationModules].sort())
+    === JSON.stringify([...right.declarationModules].sort());
 }
