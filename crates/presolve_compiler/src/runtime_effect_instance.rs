@@ -47,21 +47,24 @@ pub fn build_runtime_effect_structural_template_registry(
         .filter(|instance| instance.status == ComponentInstanceStatus::StructuralTemplate)
         .filter_map(|instance| Some((instance, instance.structural_region.as_ref()?)))
         .flat_map(|(instance, region)| {
-            model.effects.values().filter_map(move |effect| {
-                (matches!(effect.declaration, EffectDeclaration::V2Field)
-                    && effect.owner.entity_id() == Some(&instance.component)
-                    && effect.validation == EffectValidation::Valid)
-                    .then(|| RuntimeEffectStructuralTemplateRecord {
-                        template_instance: instance.id.clone(),
-                        effect: effect.id.clone(),
-                        parent_instance: instance.parent_instance.clone(),
-                        structural_region: region.clone(),
-                        depth: instance.depth,
-                        declaration_order: effect
-                            .declaration_order
-                            .expect("V2 effect fields retain declaration order"),
-                    })
-            })
+            model
+                .effects
+                .values()
+                .filter(move |effect| {
+                    matches!(effect.declaration, EffectDeclaration::V2Field)
+                        && effect.owner.entity_id() == Some(&instance.component)
+                        && effect.validation == EffectValidation::Valid
+                })
+                .map(move |effect| RuntimeEffectStructuralTemplateRecord {
+                    template_instance: instance.id.clone(),
+                    effect: effect.id.clone(),
+                    parent_instance: instance.parent_instance.clone(),
+                    structural_region: region.clone(),
+                    depth: instance.depth,
+                    declaration_order: effect
+                        .declaration_order
+                        .expect("V2 effect fields retain declaration order"),
+                })
         })
         .collect::<Vec<_>>();
     records.sort_by(|left, right| {
@@ -95,21 +98,24 @@ pub fn build_runtime_effect_instance_registry(
         .values()
         .filter(|instance| instance.status == ComponentInstanceStatus::Planned)
         .flat_map(|instance| {
-            model.effects.values().filter_map(move |effect| {
-                (matches!(effect.declaration, EffectDeclaration::V2Field)
-                    && effect.owner.entity_id() == Some(&instance.component)
-                    && effect.validation == EffectValidation::Valid)
-                    .then(|| RuntimeEffectInstanceRecord {
-                        id: EffectInstanceId::for_component_instance(&instance.id, &effect.id),
-                        effect: effect.id.clone(),
-                        component_instance: instance.id.clone(),
-                        parent_instance: instance.parent_instance.clone(),
-                        depth: instance.depth,
-                        declaration_order: effect
-                            .declaration_order
-                            .expect("V2 effect fields should retain declaration order"),
-                    })
-            })
+            model
+                .effects
+                .values()
+                .filter(move |effect| {
+                    matches!(effect.declaration, EffectDeclaration::V2Field)
+                        && effect.owner.entity_id() == Some(&instance.component)
+                        && effect.validation == EffectValidation::Valid
+                })
+                .map(move |effect| RuntimeEffectInstanceRecord {
+                    id: EffectInstanceId::for_component_instance(&instance.id, &effect.id),
+                    effect: effect.id.clone(),
+                    component_instance: instance.id.clone(),
+                    parent_instance: instance.parent_instance.clone(),
+                    depth: instance.depth,
+                    declaration_order: effect
+                        .declaration_order
+                        .expect("V2 effect fields should retain declaration order"),
+                })
         })
         .collect::<Vec<_>>();
     records.sort_by(|left, right| {

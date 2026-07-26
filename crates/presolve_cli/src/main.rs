@@ -276,18 +276,18 @@ fn validate_v2_authoring_project(
     let mut environment_reads = Vec::new();
     for parsed in candidates {
         let component_request =
-            build_v2_authority_component_request_v1(&parsed, PathBuf::from("tsconfig.json"))
+            build_v2_authority_component_request_v1(parsed, PathBuf::from("tsconfig.json"))
                 .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
         let component_response =
             invoke_v2_authority_bridge(&project.root, &executable, &component_request)?;
         let component_resolutions = v2_authoring_resolutions_from_response_v1(
-            &parsed,
+            parsed,
             &component_request,
             &component_response,
         )
         .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
         let component_model =
-            lower_component_inheritance_v1(&parsed, component_resolutions.components)
+            lower_component_inheritance_v1(parsed, component_resolutions.components)
                 .map_err(|error| format!("{}: {error}", parsed.path.display()))?
                 .model;
         if component_model.declarations.is_empty() {
@@ -296,12 +296,9 @@ fn validate_v2_authoring_project(
                 parsed.path.display()
             ));
         }
-        let request = build_v2_authority_request_v1(
-            &parsed,
-            PathBuf::from("tsconfig.json"),
-            &component_model,
-        )
-        .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
+        let request =
+            build_v2_authority_request_v1(parsed, PathBuf::from("tsconfig.json"), &component_model)
+                .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
         let response = invoke_v2_authority_bridge(&project.root, &executable, &request)?;
         environment_reads.extend(collect_environment_reads(
             parsed,
@@ -309,9 +306,9 @@ fn validate_v2_authoring_project(
             &response,
             environment_manifest,
         )?);
-        let resolutions = v2_authoring_resolutions_from_response_v1(&parsed, &request, &response)
+        let resolutions = v2_authoring_resolutions_from_response_v1(parsed, &request, &response)
             .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
-        let lowering = lower_v2_authoring_v1(&parsed, resolutions)
+        let lowering = lower_v2_authoring_v1(parsed, resolutions)
             .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
         models.insert(parsed.path.clone(), lowering.model);
     }

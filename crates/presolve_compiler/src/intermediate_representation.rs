@@ -1358,6 +1358,7 @@ fn lower_effect_execution(
     ))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn lower_effect_program(
     model: &ApplicationSemanticModel,
     component: &ComponentNode,
