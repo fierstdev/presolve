@@ -111,6 +111,12 @@ binding, event, DOM node, effect, or resume record live. Later transaction
 phases may proceed only after this stage succeeds, and any later failure must
 invoke the same rollback before touching the host range.
 
+The following render phase consumes only the occurrence's compiler-rendered
+`template_html`, replacing the opaque placeholder exactly and producing a
+detached fragment. A missing template, unresolved placeholder, or empty result
+rejects the transaction. Detached rendering is not host insertion and may not
+activate registrations or use selectors to discover component structure.
+
 ## Teardown boundary
 
 The materializer exposes one shared, idempotent occurrence-disposal operation.

@@ -1756,6 +1756,25 @@ const RUNTIME_STUB: &str = r#"(() => {
     return Object.freeze({ ...records, component, rollback });
   }
 
+  function renderStructuralOccurrenceTemplate(records) {
+    const occurrenceIdentity = String(records?.occurrence_identity ?? "");
+    const templateHtml = records?.occurrence?.template_html;
+    decodeStructuralOccurrenceIdentity(occurrenceIdentity);
+    if (typeof templateHtml !== "string" || templateHtml.length === 0) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const html = templateHtml.replaceAll("__PRESOLVE_STRUCTURAL_OCCURRENCE__", occurrenceIdentity);
+    if (html.includes("__PRESOLVE_STRUCTURAL_OCCURRENCE__")) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const template = document.createElement("template");
+    template.innerHTML = html;
+    if (!template.content.hasChildNodes()) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    return template.content;
+  }
+
   function structuralOccurrenceTemplateRegistry(manifest, componentArtifact, computedArtifact) {
     const components = new Map((manifest.components ?? []).map((component) => [component.component_id, component]));
     if (components.size !== (manifest.components ?? []).length) {
@@ -4925,6 +4944,7 @@ mod tests {
         assert!(runtime.contains("function rewriteStructuralTemplateIdentity"));
         assert!(runtime.contains("function deriveStructuralOccurrenceRecords"));
         assert!(runtime.contains("function stageStructuralOccurrenceRecords"));
+        assert!(runtime.contains("function renderStructuralOccurrenceTemplate"));
         assert!(runtime.contains("function structuralOccurrenceTemplateRegistry"));
         assert!(runtime.contains("structuralOccurrenceTemplatesByInvocation"));
         assert!(runtime.contains("structuralStateSlots = new Set()"));
