@@ -214,6 +214,7 @@ class Counter extends AliasedBase {
         let graph = build_v2_component_graph_for_module(&parsed, &lowering.model);
         assert_eq!(graph.components[0].effect_fields.len(), 1);
         assert_eq!(graph.components[0].effect_fields[0].name, "sync");
+        assert_eq!(graph.components[0].effect_fields[0].declaration_order, 2);
         assert_eq!(
             graph.components[0].effect_fields[0].body.statements.len(),
             1

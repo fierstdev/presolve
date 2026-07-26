@@ -162,6 +162,8 @@ pub struct Effect {
     pub owner: SemanticOwner,
     pub declaration: EffectDeclaration,
     pub name: String,
+    /// V2 field source order, when an effect originated from a class field.
+    pub declaration_order: Option<u32>,
     pub execution_boundary: ExecutionBoundary,
     pub execution_policy: EffectExecutionPolicy,
     pub validation: EffectValidation,
@@ -233,6 +235,7 @@ pub fn collect_effects(
                     owner: SemanticOwner::entity(component.id.clone()),
                     declaration: EffectDeclaration::LegacyMethod(method.id.clone()),
                     name: method.name.clone(),
+                    declaration_order: None,
                     execution_boundary: ExecutionBoundary::Client,
                     execution_policy:
                         EffectExecutionPolicy::AfterInitialRenderAndCompletedActionBatch,
@@ -251,6 +254,7 @@ pub fn collect_effects(
                     owner: field.owner.clone(),
                     declaration: EffectDeclaration::V2Field,
                     name: field.name.clone(),
+                    declaration_order: Some(field.declaration_order),
                     execution_boundary: ExecutionBoundary::Client,
                     execution_policy:
                         EffectExecutionPolicy::AfterInitialRenderAndCompletedActionBatch,
@@ -750,7 +754,7 @@ fn schedule_terminal_effects(
         .into_iter()
         .enumerate()
         .filter_map(|(index, batch)| {
-            let effects = batch
+            let mut effects = batch
                 .into_iter()
                 .filter_map(|id| {
                     canonical_effects
@@ -759,6 +763,18 @@ fn schedule_terminal_effects(
                         .cloned()
                 })
                 .collect::<Vec<_>>();
+            effects.sort_by(|left, right| {
+                let left_effect = canonical_effects
+                    .get(left)
+                    .expect("scheduled effect should remain canonical");
+                let right_effect = canonical_effects
+                    .get(right)
+                    .expect("scheduled effect should remain canonical");
+                left_effect
+                    .declaration_order
+                    .cmp(&right_effect.declaration_order)
+                    .then_with(|| left.cmp(right))
+            });
             (!effects.is_empty()).then_some(EffectExecutionBatch {
                 index: u32::try_from(index).expect("effect scheduler batch index should fit u32"),
                 effects,
@@ -931,12 +947,14 @@ fn assert_effect_statement_expressions_exist(kind: &EffectStatementKind, graph: 
 
 #[cfg(test)]
 mod tests {
+    use super::{schedule_terminal_effects, Effect, EffectExecutionBatch};
+
     use crate::{
         build_application_semantic_model, build_component_graph, build_semantic_graph,
         collect_effects, validate_application_semantic_model, EffectDeclaration,
         EffectExecutionPolicy, EffectSemanticViolationKind, EffectStatementKind, EffectValidation,
-        ExecutionBoundary, ExpressionNodeKind, SemanticEntity, SemanticEntityKind, SemanticOwner,
-        SemanticReferenceKind, UnsupportedEffectStatementKind,
+        ExecutionBoundary, ExpressionNodeKind, SemanticEntity, SemanticEntityKind, SemanticId,
+        SemanticOwner, SemanticReferenceKind, SourceProvenance, UnsupportedEffectStatementKind,
     };
 
     #[test]
@@ -970,6 +988,48 @@ class Effects extends Component {
         assert_eq!(
             effect.execution_policy,
             EffectExecutionPolicy::AfterInitialRenderAndCompletedActionBatch
+        );
+    }
+
+    #[test]
+    fn schedules_v2_effects_by_field_declaration_order() {
+        let component = SemanticId::component(Some("x-v2-order"), "V2Order");
+        let early = component.effect("zEarly");
+        let late = component.effect("aLate");
+        let provenance = SourceProvenance::new(
+            "src/V2Order.tsx",
+            presolve_parser::SourceSpan {
+                start: 0,
+                end: 0,
+                line: 1,
+                column: 1,
+            },
+        );
+        let effect = |id: SemanticId, name: &str, declaration_order| Effect {
+            id,
+            owner: SemanticOwner::entity(component.clone()),
+            declaration: EffectDeclaration::V2Field,
+            name: name.to_owned(),
+            declaration_order: Some(declaration_order),
+            execution_boundary: ExecutionBoundary::Client,
+            execution_policy: EffectExecutionPolicy::AfterInitialRenderAndCompletedActionBatch,
+            validation: EffectValidation::Valid,
+            semantic_violations: Vec::new(),
+            provenance: provenance.clone(),
+        };
+        let effects = [
+            (late.clone(), effect(late.clone(), "aLate", 4)),
+            (early.clone(), effect(early.clone(), "zEarly", 1)),
+        ]
+        .into_iter()
+        .collect();
+
+        assert_eq!(
+            schedule_terminal_effects(&[late, early.clone()], &effects),
+            vec![EffectExecutionBatch {
+                index: 0,
+                effects: vec![early, component.effect("aLate")],
+            }]
         );
     }
 

@@ -1930,7 +1930,16 @@ const RUNTIME_STUB: &str = r#"(() => {
       batches.set(trigger.effect_batch_index, effects);
     }
 
-    return [...batches.entries()].sort(([left], [right]) => left - right);
+    return [...batches.entries()]
+      .sort(([left], [right]) => left - right)
+      .map(([batchIndex, effects]) => [
+        batchIndex,
+        effects.sort((left, right) =>
+          (left.declaration_order ?? Number.MAX_SAFE_INTEGER)
+            - (right.declaration_order ?? Number.MAX_SAFE_INTEGER)
+          || left.effect.localeCompare(right.effect)
+        )
+      ]);
   }
 
   function dispatchEffectCapability(store, effect, instruction, values, evidence) {
@@ -2069,7 +2078,16 @@ const RUNTIME_STUB: &str = r#"(() => {
       batches.set(trigger.effect_batch_index, effects);
     }
 
-    return [...batches.entries()].sort(([left], [right]) => left - right);
+    return [...batches.entries()]
+      .sort(([left], [right]) => left - right)
+      .map(([batchIndex, effects]) => [
+        batchIndex,
+        effects.sort((left, right) =>
+          (left.declaration_order ?? Number.MAX_SAFE_INTEGER)
+            - (right.declaration_order ?? Number.MAX_SAFE_INTEGER)
+          || left.effect.localeCompare(right.effect)
+        )
+      ]);
   }
 
   function executeCompletedActionEffects(store, actionBatchId) {

@@ -1195,6 +1195,9 @@ pub struct ComponentMethod {
 pub struct ComponentEffectField {
     pub owner: SemanticOwner,
     pub name: String,
+    /// Source field order within the declaring component. This is carried into
+    /// runtime scheduling rather than recovered from semantic-map iteration.
+    pub declaration_order: u32,
     pub is_async: bool,
     pub body: EffectBodySyntax,
     pub provenance: SourceProvenance,
@@ -1683,6 +1686,14 @@ pub fn build_v2_component_graph_for_module(
                 ));
                 continue;
             };
+            let declaration_order = u32::try_from(
+                class
+                    .properties
+                    .iter()
+                    .position(|candidate| candidate.span == property.span)
+                    .expect("matched effect field should retain source position"),
+            )
+            .expect("component field position should fit u32");
             let Some(handler) = property
                 .initializer_call
                 .as_ref()
@@ -1714,6 +1725,7 @@ pub fn build_v2_component_graph_for_module(
             effect_fields.push(ComponentEffectField {
                 owner: SemanticOwner::entity(id.clone()),
                 name: name.to_owned(),
+                declaration_order,
                 is_async: handler.is_async,
                 body: effect_body_from_parsed(body),
                 provenance: SourceProvenance::new(&parsed.path, property.span),
