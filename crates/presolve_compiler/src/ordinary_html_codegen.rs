@@ -20,16 +20,34 @@ struct ResumeHtmlMarkers {
     events: BTreeMap<String, String>,
 }
 
-/// Compiler-rendered branches for one initially static conditional host.
+/// Compiler-rendered branches for one compiler-addressed conditional host.
 ///
 /// These fragments deliberately carry the same target, binding, and exact
 /// structural-invocation markers as the ordinary initial renderer. They are
 /// artifact data only: runtime materialization remains separately gated.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StructuralConditionalHostFragments {
+    pub host_scope: StructuralConditionalHostScope,
     pub host_instance: ComponentInstanceId,
     pub when_true_html: String,
     pub when_false_html: String,
+}
+
+/// The only host scopes the compiler currently renders exactly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StructuralConditionalHostScope {
+    StaticInstance,
+    StructuralOccurrence,
+}
+
+impl StructuralConditionalHostScope {
+    #[must_use]
+    pub const fn artifact_text(self) -> &'static str {
+        match self {
+            Self::StaticInstance => "static-instance",
+            Self::StructuralOccurrence => "structural-occurrence",
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -146,11 +164,10 @@ pub fn generate_structural_template_instance_html(
 
 /// Render both branches for a compiler-issued conditional structural region.
 ///
-/// Only initially static root instances are admitted at this boundary. A
-/// nested host can require caller-owned slot projection or an opaque parent
-/// occurrence scope; publishing a partial fragment for it would create a
-/// second renderer authority. Those hosts remain absent until their complete
-/// renderer input is represented in the structural materialization artifact.
+/// Instances with caller-owned Slot projection remain absent: publishing an
+/// incomplete fragment would create a second renderer authority. A structural
+/// host that has no such projection uses the already-authorized opaque
+/// occurrence placeholder rather than a fabricated static instance ID.
 #[must_use]
 pub fn generate_structural_conditional_host_fragments(
     model: &ApplicationSemanticModel,
@@ -232,13 +249,20 @@ pub fn generate_structural_conditional_host_fragments(
         .instances
         .values()
         .filter(|instance| {
-            instance.status == ComponentInstanceStatus::Planned
-                && instance.parent_instance.is_none()
-                && instance.component == *component
+            matches!(
+                instance.status,
+                ComponentInstanceStatus::Planned | ComponentInstanceStatus::StructuralTemplate
+            ) && instance.component == *component
+                && model.slot_bindings.for_callee(&instance.id).is_empty()
         })
-        .map(|instance| StructuralConditionalHostFragments {
-            host_instance: instance.id.clone(),
-            when_true_html: render_children(
+        .map(|instance| {
+            let host_scope = match instance.status {
+                ComponentInstanceStatus::Planned => StructuralConditionalHostScope::StaticInstance,
+                ComponentInstanceStatus::StructuralTemplate => {
+                    StructuralConditionalHostScope::StructuralOccurrence
+                }
+            };
+            let when_true_html = render_children(
                 model,
                 &templates,
                 &children,
@@ -250,8 +274,8 @@ pub fn generate_structural_conditional_host_fragments(
                 &conditional.when_true,
                 &format!("{path}.true"),
                 &[],
-            ),
-            when_false_html: render_children(
+            );
+            let when_false_html = render_children(
                 model,
                 &templates,
                 &children,
@@ -263,7 +287,22 @@ pub fn generate_structural_conditional_host_fragments(
                 &conditional.when_false,
                 &format!("{path}.false"),
                 &[],
-            ),
+            );
+            let (when_true_html, when_false_html) = match host_scope {
+                StructuralConditionalHostScope::StaticInstance => (when_true_html, when_false_html),
+                StructuralConditionalHostScope::StructuralOccurrence => (
+                    when_true_html
+                        .replace(instance.id.as_str(), "__PRESOLVE_STRUCTURAL_OCCURRENCE__"),
+                    when_false_html
+                        .replace(instance.id.as_str(), "__PRESOLVE_STRUCTURAL_OCCURRENCE__"),
+                ),
+            };
+            StructuralConditionalHostFragments {
+                host_scope,
+                host_instance: instance.id.clone(),
+                when_true_html,
+                when_false_html,
+            }
         })
         .collect()
 }
@@ -1025,7 +1064,7 @@ fn escape_text(value: &str) -> String {
 mod tests {
     use super::{
         generate_ordinary_instance_html, generate_ordinary_instance_html_for_component,
-        generate_structural_conditional_host_fragments,
+        generate_structural_conditional_host_fragments, StructuralConditionalHostScope,
     };
     use crate::{
         build_application_semantic_model, build_resume_anchor_plan, validate_resume_marker_html,
@@ -1147,5 +1186,42 @@ mod tests {
             .contains("data-presolve-structural-invocation="));
         assert!(fragments[0].when_false_html.contains("Hidden"));
         assert!(fragments[0].when_true_html.contains("data-presolve-node"));
+    }
+
+    #[test]
+    fn renders_nested_conditional_hosts_against_the_opaque_parent_occurrence() {
+        let model = build_application_semantic_model(&presolve_parser::parse_file(
+            "src/NestedStructuralHostFragments.tsx",
+            r#"
+@component("x-leaf") class Leaf { render() { return <small />; } }
+@component("x-card") class Card {
+  expanded = state(true);
+  render() { return <article>{this.expanded ? <section><Leaf />{this.expanded}</section> : <em>Collapsed</em>}</article>; }
+}
+@component("x-page") class Page {
+  shown = state(true);
+  render() { return <main>{this.shown ? <Card /> : <span>Hidden</span>}</main>; }
+}
+"#,
+        ));
+
+        let fragments = model
+            .component_instance_plan
+            .instances
+            .values()
+            .filter_map(|instance| instance.structural_region.clone())
+            .flat_map(|region| generate_structural_conditional_host_fragments(&model, &region))
+            .find(|fragments| {
+                fragments.host_scope == StructuralConditionalHostScope::StructuralOccurrence
+            })
+            .expect("nested structural host fragments");
+
+        assert!(fragments
+            .when_true_html
+            .contains("__PRESOLVE_STRUCTURAL_OCCURRENCE__"));
+        assert!(fragments
+            .when_true_html
+            .contains("data-presolve-structural-invocation="));
+        assert!(fragments.when_false_html.contains("Collapsed"));
     }
 }

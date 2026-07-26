@@ -936,9 +936,17 @@ const RUNTIME_STUB: &str = r#"(() => {
       throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
     }
     const instances = new Set(artifact.instances.map((instance) => instance.instance));
+    const instancesById = new Map(artifact.instances.map((instance) => [instance.instance, instance]));
     const structuralTemplates = new Set(
       (artifact.structural_programs ?? [])
         .flatMap((program) => program.template_instances ?? [])
+    );
+    const structuralTemplateComponents = new Map(
+      (artifact.structural_programs ?? [])
+        .flatMap((program) => (program.template_occurrences ?? []).map((occurrence) => [
+          occurrence.template_instance,
+          occurrence.component
+        ]))
     );
     const stateSlots = new Set();
     const statePairs = new Set();
@@ -975,7 +983,12 @@ const RUNTIME_STUB: &str = r#"(() => {
           || program.template_occurrences.length !== program.template_instances.length
           || new Set(program.conditional_host_fragments.map((fragments) => fragments?.host_instance)).size !== program.conditional_host_fragments.length
           || program.conditional_host_fragments.some((fragments) => typeof fragments?.host_instance !== "string"
-            || !instances.has(fragments.host_instance)
+            || typeof fragments.host_scope !== "string"
+            || (fragments.host_scope === "static-instance"
+              ? instancesById.get(fragments.host_instance)?.component !== program.host_component
+              : fragments.host_scope === "structural-occurrence"
+                ? structuralTemplateComponents.get(fragments.host_instance) !== program.host_component
+                : true)
             || typeof fragments.when_true_html !== "string" || fragments.when_true_html.length === 0
             || typeof fragments.when_false_html !== "string" || fragments.when_false_html.length === 0)
           || program.template_occurrences.some((occurrence, index) => typeof occurrence?.template_instance !== "string"

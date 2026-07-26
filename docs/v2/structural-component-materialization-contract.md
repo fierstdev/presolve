@@ -48,16 +48,16 @@ fragment anchor, not a tag lookup: a materializer must reject a missing or
 duplicate marker and may never substitute a same-named element.
 
 Schema v11 adds `conditional_host_fragments`: both compiler-rendered branch
-fragments, keyed by the exact initially-static root host instance, with normal
-ordinary markers and exact structural-invocation anchors. It is a narrow
-compiler-product slice, not activation authority. Nested host instances can
-need caller-owned Slot projection or an opaque parent occurrence scope; keyed
-list items also need a keyed renderer scope. Neither is represented by this
-field, so those cases are absent rather than approximated. A runtime must
-reject a missing fragment and must not use this field for a list or nested host
-as a fallback.
+fragments, keyed by the exact initially-static host instance, with normal
+ordinary markers and exact structural-invocation anchors. Schema v12 adds the
+compiler-selected `host_scope`: `static-instance` keeps the exact static
+instance ID, while `structural-occurrence` substitutes the already-authorized
+opaque parent occurrence placeholder. A nested host with caller-owned Slot
+projection and every keyed-list host remain absent rather than approximated.
+A runtime must reject a missing fragment and must not use this field for a
+list or a different scope as a fallback.
 
-Schemas v10 and v11 are not runtime materializers. They establish the
+Schemas v10 through v12 are not runtime materializers. They establish the
 validated compiler template, membership set, and initial conditional-host
 fragments from which the later complete program must be constructed; the
 runtime must not activate, infer, or partially use them for dynamic component

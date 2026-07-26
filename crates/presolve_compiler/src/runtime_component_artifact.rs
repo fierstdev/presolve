@@ -9,7 +9,7 @@ use crate::{
 };
 use crate::{TemplateChild, TemplateNode, TemplateSemanticKind};
 
-pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 11;
+pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 12;
 
 /// Public H14 compiler artifact. All executable references are canonical IDs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -152,7 +152,10 @@ pub struct SerializedStructuralComponentProgram {
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SerializedStructuralConditionalHostFragments {
-    /// Exact initially-static component instance that owns the conditional.
+    /// `static-instance` or `structural-occurrence`; selected by the compiler.
+    pub host_scope: String,
+    /// Exact static component instance or structural template instance that
+    /// owns the conditional according to `host_scope`.
     pub host_instance: String,
     pub when_true_html: String,
     pub when_false_html: String,
@@ -376,6 +379,7 @@ pub fn build_runtime_component_artifact(
             )
             .into_iter()
             .map(|fragments| SerializedStructuralConditionalHostFragments {
+                host_scope: fragments.host_scope.artifact_text().to_string(),
                 host_instance: fragments.host_instance.to_string(),
                 when_true_html: fragments.when_true_html,
                 when_false_html: fragments.when_false_html,
@@ -599,6 +603,10 @@ pub fn validate_runtime_component_artifact(
             || program.host_template_entity.is_empty()
             || program.conditional_host_fragments.iter().any(|fragments| {
                 fragments.host_instance.is_empty()
+                    || !matches!(
+                        fragments.host_scope.as_str(),
+                        "static-instance" | "structural-occurrence"
+                    )
                     || fragments.when_true_html.is_empty()
                     || fragments.when_false_html.is_empty()
             })
@@ -649,6 +657,23 @@ pub fn validate_runtime_component_artifact(
         .iter()
         .map(|instance| (instance.instance.as_str(), instance.component.as_str()))
         .collect::<std::collections::BTreeMap<_, _>>();
+    let structural_template_instances = artifact
+        .structural_programs
+        .iter()
+        .flat_map(|program| program.template_instances.iter().map(String::as_str))
+        .collect::<std::collections::BTreeSet<_>>();
+    let structural_template_components = artifact
+        .structural_programs
+        .iter()
+        .flat_map(|program| {
+            program.template_occurrences.iter().map(|occurrence| {
+                (
+                    occurrence.template_instance.as_str(),
+                    occurrence.component.as_str(),
+                )
+            })
+        })
+        .collect::<std::collections::BTreeMap<_, _>>();
     if artifact.structural_programs.iter().any(|program| {
         let host_instances = program
             .conditional_host_fragments
@@ -657,19 +682,25 @@ pub fn validate_runtime_component_artifact(
             .collect::<std::collections::BTreeSet<_>>();
         host_instances.len() != program.conditional_host_fragments.len()
             || program.conditional_host_fragments.iter().any(|fragments| {
-                !instances.contains(fragments.host_instance.as_str())
-                    || instance_components
-                        .get(fragments.host_instance.as_str())
-                        .is_none_or(|component| *component != program.host_component)
+                match fragments.host_scope.as_str() {
+                    "static-instance" => {
+                        !instances.contains(fragments.host_instance.as_str())
+                            || instance_components
+                                .get(fragments.host_instance.as_str())
+                                .is_none_or(|component| *component != program.host_component)
+                    }
+                    "structural-occurrence" => {
+                        !structural_template_instances.contains(fragments.host_instance.as_str())
+                            || structural_template_components
+                                .get(fragments.host_instance.as_str())
+                                .is_none_or(|component| *component != program.host_component)
+                    }
+                    _ => true,
+                }
             })
     }) {
         return Err("component artifact has invalid conditional host fragments".to_string());
     }
-    let structural_template_instances = artifact
-        .structural_programs
-        .iter()
-        .flat_map(|program| program.template_instances.iter().map(String::as_str))
-        .collect::<std::collections::BTreeSet<_>>();
     let target_ids = artifact
         .ordinary_template_targets
         .iter()
@@ -1100,5 +1131,36 @@ mod tests {
             .ordinary_template_targets
             .push("fabricated-target".to_string());
         assert!(validate_runtime_component_artifact(&artifact).is_err());
+    }
+
+    #[test]
+    fn structural_host_fragments_preserve_their_compiler_scope() {
+        let model = build_application_semantic_model(&presolve_parser::parse_file(
+            "src/NestedStructuralHostArtifact.tsx",
+            r#"
+@component("x-leaf") class Leaf { render() { return <small />; } }
+@component("x-card") class Card {
+  expanded = state(true);
+  render() { return <article>{this.expanded ? <section><Leaf />{this.expanded}</section> : <em>Collapsed</em>}</article>; }
+}
+@component("x-page") class Page {
+  shown = state(true);
+  render() { return <main>{this.shown ? <Card /> : <span>Hidden</span>}</main>; }
+}
+"#,
+        ));
+        let artifact = build_runtime_component_artifact(&model, &model.component_ir_optimization);
+
+        assert!(validate_runtime_component_artifact(&artifact).is_ok());
+        let fragments = artifact
+            .structural_programs
+            .iter()
+            .flat_map(|program| &program.conditional_host_fragments)
+            .find(|fragments| fragments.host_scope == "structural-occurrence")
+            .expect("nested structural occurrence host fragments");
+        assert!(fragments
+            .when_true_html
+            .contains("__PRESOLVE_STRUCTURAL_OCCURRENCE__"));
+        assert!(fragments.when_false_html.contains("Collapsed"));
     }
 }

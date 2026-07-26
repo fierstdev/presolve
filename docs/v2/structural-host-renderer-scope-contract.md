@@ -43,9 +43,10 @@ membership record is absent, duplicated, or inconsistent with the component
 artifact. A conditional fragment cannot be attached to a keyed-list host, and
 a keyed fragment cannot be attached to a conditional host.
 
-The existing schema-v11 `conditional_host_fragments` field is only the
-`static-instance` subset for initially static root hosts. Its absence for a
-nested or keyed host is intentional and must keep materialization inactive.
+Schema v11 `conditional_host_fragments` began with the `static-instance`
+subset. Schema v12 additionally carries `structural-occurrence` fragments for
+nested hosts with no caller-owned Slot projection. Its absence for a Slot-bound
+or keyed host is intentional and must keep materialization inactive.
 
 ## Slot ownership
 
