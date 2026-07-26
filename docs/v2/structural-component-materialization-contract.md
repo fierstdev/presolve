@@ -71,6 +71,10 @@ defines the additional compiler input required for nested and keyed hosts,
 including caller-owned Slot projection. It is the only path by which this
 static-root subset may expand.
 
+The [structural instance state contract](structural-instance-state-contract.md)
+defines the occurrence-qualified State and computed product required before a
+validated fragment may register live bindings, events, or effects.
+
 ## Runtime identity and reconciliation
 
 For each successful insertion, the structural runtime creates one opaque
