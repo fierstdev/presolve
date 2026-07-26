@@ -33,8 +33,10 @@ unresolved calls remain ordinary JavaScript.
 ## Product and scope
 
 The lowering records the canonical field subject, source provenance, and
-resolved intrinsic identity in `CanonicalAuthoredSemanticModelV1`. It adds no
-legacy decorator, method, execution carrier, or source translation.
+resolved intrinsic identity in `CanonicalAuthoredSemanticModelV1`. The V2
+component graph retains the matching field as `ComponentEffectField`, including
+its ordered parser-owned body and async fact. It adds no legacy decorator,
+method, execution carrier, or source translation.
 
 The parser's generic inline-handler facts include a restricted ordered-body
 view for block-bodied inline functions. That view remains syntax only until an

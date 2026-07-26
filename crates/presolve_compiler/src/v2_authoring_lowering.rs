@@ -212,6 +212,12 @@ class Counter extends AliasedBase {
             .iter()
             .all(|declaration| declaration.subject != "LegacyOnly"));
         let graph = build_v2_component_graph_for_module(&parsed, &lowering.model);
+        assert_eq!(graph.components[0].effect_fields.len(), 1);
+        assert_eq!(graph.components[0].effect_fields[0].name, "sync");
+        assert!(graph.components[0].effect_fields[0]
+            .body
+            .statements
+            .is_empty());
         assert_eq!(graph.components[0].methods.len(), 2);
         assert!(graph.components[0].methods[0].is_computed());
         assert_eq!(graph.components[0].methods[0].name, "doubled");

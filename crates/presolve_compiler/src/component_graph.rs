@@ -86,6 +86,9 @@ pub struct ComponentNode {
     /// Module imports that shadow compiler-owned validation intrinsic names.
     pub shadowed_validation_intrinsics: BTreeSet<String>,
     pub methods: Vec<ComponentMethod>,
+    /// Decorator-free effect fields retain their field source and ordered body
+    /// without being represented as legacy methods.
+    pub effect_fields: Vec<ComponentEffectField>,
     /// Decorator-free action-field endpoints. Legacy action methods retain
     /// their method identity and are exposed through `action_endpoint_ids`.
     pub action_endpoints: Vec<ActionEndpoint>,
@@ -1177,6 +1180,17 @@ pub struct ComponentMethod {
     pub calls: Vec<MethodCall>,
 }
 
+/// An authority-backed V2 `effect(handler)` field retained before lifecycle
+/// scheduling and runtime lowering.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ComponentEffectField {
+    pub owner: SemanticOwner,
+    pub name: String,
+    pub is_async: bool,
+    pub body: EffectBodySyntax,
+    pub provenance: SourceProvenance,
+}
+
 /// A compiler-owned call fact retained for computed-purity analysis.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MethodCall {
@@ -1638,6 +1652,64 @@ pub fn build_v2_component_graph_for_module(
                     }),
             );
         }
+        let mut effect_fields = Vec::new();
+        for candidate in authored.declarations.iter().filter(|candidate| {
+            candidate.kind == crate::CanonicalAuthoredDeclarationKindV1::Effect
+                && candidate.subject.starts_with(&format!("{}.", class.name))
+        }) {
+            let Some(name) = candidate.subject.strip_prefix(&format!("{}.", class.name)) else {
+                continue;
+            };
+            let Some(property) = class
+                .properties
+                .iter()
+                .find(|property| property.name == name)
+            else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2E1001",
+                    format!(
+                        "canonical V2 Effect `{}` has no source field",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            };
+            let Some(handler) = property
+                .initializer_call
+                .as_ref()
+                .and_then(|call| call.inline_handler.as_ref())
+            else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2E1002",
+                    format!(
+                        "canonical V2 Effect `{}` requires one inline handler",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            };
+            let Some(body) = handler.effect_body.as_ref() else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2E1003",
+                    format!(
+                        "canonical V2 Effect `{}` requires a block-bodied handler",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            };
+            provenance.insert(
+                id.effect(name),
+                SourceProvenance::new(&parsed.path, property.span),
+            );
+            effect_fields.push(ComponentEffectField {
+                owner: SemanticOwner::entity(id.clone()),
+                name: name.to_owned(),
+                is_async: handler.is_async,
+                body: effect_body_from_parsed(body),
+                provenance: SourceProvenance::new(&parsed.path, property.span),
+            });
+        }
         let mut methods = Vec::new();
         for candidate in authored.declarations.iter().filter(|candidate| {
             candidate.kind == crate::CanonicalAuthoredDeclarationKindV1::Computed
@@ -1726,6 +1798,7 @@ pub fn build_v2_component_graph_for_module(
             server_action_facts: Vec::new(),
             shadowed_validation_intrinsics: BTreeSet::new(),
             methods,
+            effect_fields,
             action_endpoints,
             actions,
             render: class
@@ -1960,6 +2033,7 @@ fn build_component_node(
         server_action_facts,
         shadowed_validation_intrinsics,
         methods,
+        effect_fields: Vec::new(),
         action_endpoints: Vec::new(),
         actions,
         render,
