@@ -27,6 +27,8 @@ structural component instance: its template-instance ID, resolved invocation
 ID, and target component ID. This is inactive compiler metadata, not a DOM
 lookup or an active instance. A later materializer must use it to stamp the
 compiler-issued occurrence marker at successful insertion.
+The runtime indexes those records by invocation ID at boot and rejects a
+duplicate before rendering begins.
 
 Static planned instances remain ordinary effect-instance records. A structural
 effect template is inactive metadata and must not execute or register cleanup.

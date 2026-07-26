@@ -4118,6 +4118,18 @@ const RUNTIME_STUB: &str = r#"(() => {
     store.structuralOccurrences = new Map((componentArtifact?.structural_programs ?? []).map(
       (program) => [program.region, program.template_occurrences]
     ));
+    store.structuralOccurrencesByInvocation = new Map();
+    for (const [region, occurrences] of store.structuralOccurrences) {
+      for (const occurrence of occurrences) {
+        if (store.structuralOccurrencesByInvocation.has(occurrence.invocation)) {
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        store.structuralOccurrencesByInvocation.set(occurrence.invocation, Object.freeze({
+          ...occurrence,
+          structural_region: region,
+        }));
+      }
+    }
     const missingAnchors = manifest.schema_version === SUPPORTED_SCHEMA_VERSION
       ? []
       : collectMissingAnchors(
@@ -4442,6 +4454,7 @@ mod tests {
         assert!(runtime.contains("dispatchFormSubmit"));
         assert!(runtime.contains("form_hosts"));
         assert!(runtime.contains("structuralOccurrences = new Map"));
+        assert!(runtime.contains("structuralOccurrencesByInvocation"));
         assert!(!runtime.contains("FormData(formElement)"));
         assert!(runtime.contains("PSR_MISSING_MANIFEST"));
         assert!(runtime.contains("PSR_INVALID_MANIFEST_JSON"));
