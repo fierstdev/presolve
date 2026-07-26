@@ -29,6 +29,7 @@ pub enum EffectValidation {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum EffectSemanticViolationKind {
     Async,
+    CleanupLifecycleUnavailable,
     ReactiveStateMutation,
     ActionInvocation,
     EffectInvocation,
@@ -277,6 +278,13 @@ pub fn validate_effects(
         if effect_is_async(components, effect) {
             violations.push(EffectSemanticViolation {
                 kind: EffectSemanticViolationKind::Async,
+                statement: None,
+                provenance: effect.provenance.clone(),
+            });
+        }
+        if effect_has_cleanup(components, effect) {
+            violations.push(EffectSemanticViolation {
+                kind: EffectSemanticViolationKind::CleanupLifecycleUnavailable,
                 statement: None,
                 provenance: effect.provenance.clone(),
             });
@@ -879,6 +887,10 @@ fn effect_is_async(components: &[ComponentNode], effect: &Effect) -> bool {
             .find(|field| field.name == effect.name)
             .is_some_and(|field| field.is_async),
     }
+}
+
+fn effect_has_cleanup(components: &[ComponentNode], effect: &Effect) -> bool {
+    effect_body_syntax(components, effect).is_some_and(|body| body.cleanup.is_some())
 }
 
 fn effect_body_syntax<'a>(

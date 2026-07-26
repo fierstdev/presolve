@@ -523,6 +523,7 @@ fn provenance(provenance: &SourceProvenance) -> EffectInspectionProvenance {
 fn violation_category(kind: EffectSemanticViolationKind) -> &'static str {
     match kind {
         EffectSemanticViolationKind::Async => "async",
+        EffectSemanticViolationKind::CleanupLifecycleUnavailable => "cleanup_lifecycle_unavailable",
         EffectSemanticViolationKind::ReactiveStateMutation => "reactive_state_mutation",
         EffectSemanticViolationKind::ActionInvocation => "action_invocation",
         EffectSemanticViolationKind::EffectInvocation => "effect_invocation",

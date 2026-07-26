@@ -245,6 +245,7 @@ fn cascade_precedence(kind: EffectSemanticViolationKind) -> u8 {
     match kind {
         EffectSemanticViolationKind::UnsupportedStatement => 1,
         EffectSemanticViolationKind::Async
+        | EffectSemanticViolationKind::CleanupLifecycleUnavailable
         | EffectSemanticViolationKind::ReactiveStateMutation
         | EffectSemanticViolationKind::ActionInvocation
         | EffectSemanticViolationKind::EffectInvocation
@@ -274,7 +275,9 @@ fn violation_code(kind: EffectSemanticViolationKind) -> EffectDiagnosticCode {
         | EffectSemanticViolationKind::UnresolvedComponentCall => {
             EffectDiagnosticCode::InvalidComponentInvocation
         }
-        EffectSemanticViolationKind::Async | EffectSemanticViolationKind::ValueReturn => {
+        EffectSemanticViolationKind::Async
+        | EffectSemanticViolationKind::CleanupLifecycleUnavailable
+        | EffectSemanticViolationKind::ValueReturn => {
             EffectDiagnosticCode::AsyncOrCleanupUnsupported
         }
         EffectSemanticViolationKind::UnknownExternalCapability => {
@@ -314,6 +317,10 @@ fn violation_message(
         EffectDiagnosticCode::AsyncOrCleanupUnsupported => match violation.kind {
             EffectSemanticViolationKind::Async => format!(
                 "Effect `{}` is async. Effects are synchronous and do not support async or cleanup semantics.",
+                effect.name
+            ),
+            EffectSemanticViolationKind::CleanupLifecycleUnavailable => format!(
+                "Effect `{}` returns a cleanup callback, but its lifecycle runtime program is unavailable.",
                 effect.name
             ),
             _ => format!(
@@ -611,6 +618,10 @@ class EffectDiagnostics extends Component {
                 "PSC1045",
             ),
             (EffectSemanticViolationKind::Async, "PSC1046"),
+            (
+                EffectSemanticViolationKind::CleanupLifecycleUnavailable,
+                "PSC1046",
+            ),
             (EffectSemanticViolationKind::ValueReturn, "PSC1046"),
             (
                 EffectSemanticViolationKind::UnknownExternalCapability,
