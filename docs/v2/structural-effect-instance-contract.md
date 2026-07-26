@@ -22,6 +22,12 @@ validates the pair against the template manifest before it may use the program;
 it must never search the DOM for a matching shape or infer an address from a
 selector.
 
+The same structural program carries one ordered occurrence template for every
+structural component instance: its template-instance ID, resolved invocation
+ID, and target component ID. This is inactive compiler metadata, not a DOM
+lookup or an active instance. A later materializer must use it to stamp the
+compiler-issued occurrence marker at successful insertion.
+
 Static planned instances remain ordinary effect-instance records. A structural
 effect template is inactive metadata and must not execute or register cleanup.
 

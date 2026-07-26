@@ -954,6 +954,11 @@ const RUNTIME_STUB: &str = r#"(() => {
           || typeof program.host_node !== "string" || program.host_node.length === 0
           || structuralRegions.has(program.region) || structuralHosts.has(host)
           || !Array.isArray(program.template_instances)
+          || !Array.isArray(program.template_occurrences)
+          || program.template_occurrences.length !== program.template_instances.length
+          || program.template_occurrences.some((occurrence, index) => typeof occurrence?.template_instance !== "string"
+            || occurrence.template_instance !== program.template_instances[index]
+            || typeof occurrence.invocation !== "string" || typeof occurrence.component !== "string")
           || JSON.stringify(program.create_order) !== JSON.stringify(program.template_instances)
           || JSON.stringify([...(program.destroy_order ?? [])].reverse()) !== JSON.stringify(program.template_instances)) {
           throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");

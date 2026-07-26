@@ -9,7 +9,7 @@ use crate::{
 };
 use crate::{TemplateChild, TemplateNode, TemplateSemanticKind};
 
-pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 5;
+pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 6;
 
 /// Public H14 compiler artifact. All executable references are canonical IDs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -139,9 +139,16 @@ pub struct SerializedStructuralComponentProgram {
     pub host_component: String,
     /// Exact compiler-generated template node ID for the structural host.
     pub host_node: String,
+    pub template_occurrences: Vec<SerializedStructuralTemplateOccurrence>,
     pub template_instances: Vec<String>,
     pub destroy_order: Vec<String>,
     pub create_order: Vec<String>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SerializedStructuralTemplateOccurrence {
+    pub template_instance: String,
+    pub invocation: String,
+    pub component: String,
 }
 
 const fn target_kind_text(kind: OrdinaryTemplateTargetKind) -> &'static str {
@@ -277,11 +284,21 @@ pub fn build_runtime_component_artifact(
     for instance in model.component_instance_plan.instances.values() {
         if instance.status == crate::ComponentInstanceStatus::StructuralTemplate {
             if let Some(region) = &instance.structural_region {
-                programs
+                let program = programs
                     .entry(region.to_string())
-                    .or_insert_with(|| structural_program_build(model, region))
-                    .template_instances
-                    .push(instance.id.to_string());
+                    .or_insert_with(|| structural_program_build(model, region));
+                program.template_instances.push(instance.id.to_string());
+                program
+                    .template_occurrences
+                    .push(SerializedStructuralTemplateOccurrence {
+                        template_instance: instance.id.to_string(),
+                        invocation: instance
+                            .invocation
+                            .as_ref()
+                            .expect("structural template invocation")
+                            .to_string(),
+                        component: instance.component.to_string(),
+                    });
             }
         }
     }
@@ -291,6 +308,7 @@ pub fn build_runtime_component_artifact(
             region,
             host_component: program.host_component,
             host_node: program.host_node,
+            template_occurrences: program.template_occurrences,
             create_order: program.template_instances.clone(),
             destroy_order: program.template_instances.iter().rev().cloned().collect(),
             template_instances: program.template_instances,
@@ -304,6 +322,7 @@ struct StructuralProgramBuild {
     host_component: String,
     host_node: String,
     template_instances: Vec<String>,
+    template_occurrences: Vec<SerializedStructuralTemplateOccurrence>,
 }
 
 /// Resolve a structural-region ID back to its exact compiler-authored host.
@@ -338,6 +357,7 @@ fn structural_program_build(
         host_component: component.to_string(),
         host_node,
         template_instances: Vec::new(),
+        template_occurrences: Vec::new(),
     }
 }
 
@@ -499,6 +519,13 @@ pub fn validate_runtime_component_artifact(
         program.region.is_empty()
             || program.host_component.is_empty()
             || program.host_node.is_empty()
+            || program.template_occurrences.len() != program.template_instances.len()
+            || program
+                .template_occurrences
+                .iter()
+                .map(|occurrence| occurrence.template_instance.as_str())
+                .collect::<Vec<_>>()
+                != program.template_instances
             || program.create_order != program.template_instances
             || program
                 .destroy_order
@@ -787,6 +814,21 @@ mod tests {
             validate_runtime_component_artifact(&artifact)
         );
         for program in &artifact.structural_programs {
+            assert_eq!(
+                program
+                    .template_occurrences
+                    .iter()
+                    .map(|occurrence| occurrence.template_instance.as_str())
+                    .collect::<Vec<_>>(),
+                program
+                    .template_instances
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>()
+            );
+            assert!(program.template_occurrences.iter().all(|occurrence| {
+                !occurrence.invocation.is_empty() && !occurrence.component.is_empty()
+            }));
             let component = manifest
                 .components
                 .iter()
