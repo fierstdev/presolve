@@ -9,7 +9,7 @@ use crate::{
 };
 use crate::{TemplateChild, TemplateNode, TemplateSemanticKind};
 
-pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 8;
+pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 9;
 
 /// Public H14 compiler artifact. All executable references are canonical IDs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -306,11 +306,11 @@ pub fn build_runtime_component_artifact(
                             .expect("structural template invocation")
                             .to_string(),
                         component: instance.component.to_string(),
-                        template_html: model
-                            .templates
-                            .iter()
-                            .find(|template| template.id == instance.component.template())
-                            .map_or_else(String::new, crate::html_codegen::generate_template_html),
+                        template_html: crate::generate_structural_template_instance_html(
+                            model,
+                            &instance.id,
+                        )
+                        .unwrap_or_default(),
                         ordinary_template_targets: artifact
                             .ordinary_template_targets
                             .iter()
@@ -973,6 +973,9 @@ mod tests {
                 !occurrence.ordinary_template_targets.is_empty()
                     && !occurrence.ordinary_template_bindings.is_empty()
                     && !occurrence.ordinary_template_events.is_empty()
+                    && occurrence
+                        .template_html
+                        .contains("__PRESOLVE_STRUCTURAL_OCCURRENCE__")
             }));
 
         let first = &mut artifact.structural_programs[0].template_occurrences[0];

@@ -1,7 +1,7 @@
 use crate::component_graph::SerializableValue;
 use crate::template_graph::{
     AttributeValue, ConditionalNode, ElementNode, FragmentNode, ListNode, TemplateAttribute,
-    TemplateChild, TemplateGraph, TemplateNode,
+    TemplateChild, TemplateGraph,
 };
 
 struct ListRenderScope<'a> {
@@ -31,22 +31,6 @@ pub fn generate_static_html(template_graph: &TemplateGraph) -> String {
     }
 
     output
-}
-
-/// Renders one compiler-selected component template without selecting or
-/// resolving component invocations at runtime.
-#[must_use]
-pub(crate) fn generate_template_html(template: &TemplateNode) -> String {
-    if let Some(root) = &template.root {
-        generate_element_html(root, None)
-    } else {
-        template
-            .root_fragment
-            .as_ref()
-            .map_or_else(String::new, |fragment| {
-                generate_fragment_html(fragment, None)
-            })
-    }
 }
 
 fn generate_fragment_html(fragment: &FragmentNode, scope: Option<&ListRenderScope<'_>>) -> String {

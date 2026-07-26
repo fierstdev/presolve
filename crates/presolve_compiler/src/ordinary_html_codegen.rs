@@ -53,6 +53,83 @@ pub fn generate_ordinary_instance_html_for_component(
     generate_ordinary_instance_html_for_roots(model, Some(root_component))
 }
 
+/// Renders one compiler-planned structural template with the same exact
+/// ordinary target and binding markers as an initial instance. The static
+/// template-instance prefix is replaced by an opaque runtime-occurrence token;
+/// only the later structural materializer may substitute that token.
+#[must_use]
+pub fn generate_structural_template_instance_html(
+    model: &ApplicationSemanticModel,
+    template_instance: &ComponentInstanceId,
+) -> Option<String> {
+    let instance = model
+        .component_instance_plan
+        .instances
+        .get(template_instance)?;
+    if instance.status != ComponentInstanceStatus::StructuralTemplate {
+        return None;
+    }
+    let registry = build_ordinary_template_instance_registry(model);
+    let targets = registry
+        .targets
+        .iter()
+        .map(|record| {
+            (
+                (
+                    record.component_instance_id.clone(),
+                    record.template_entity_id.clone(),
+                ),
+                record.target_id.to_string(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let bindings = registry
+        .bindings
+        .iter()
+        .map(|record| {
+            (
+                (
+                    record.component_instance_id.clone(),
+                    record.declaration_binding_id.clone(),
+                ),
+                record.instance_binding_id.to_string(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let children = model
+        .component_instance_plan
+        .instances
+        .values()
+        .filter_map(|child| {
+            child.parent_instance.as_ref().and_then(|parent| {
+                child
+                    .invocation
+                    .as_ref()
+                    .map(|invocation| ((parent.clone(), invocation.clone()), child))
+            })
+        })
+        .collect::<BTreeMap<_, _>>();
+    let templates = model
+        .templates
+        .iter()
+        .map(|template| (template.id.clone(), template))
+        .collect::<BTreeMap<_, _>>();
+    Some(
+        render_instance(
+            model,
+            &templates,
+            &children,
+            &targets,
+            &bindings,
+            &ResumeHtmlMarkers::default(),
+            &instance.id,
+            &instance.component,
+            &[],
+        )
+        .replace(instance.id.as_str(), "__PRESOLVE_STRUCTURAL_OCCURRENCE__"),
+    )
+}
+
 fn generate_ordinary_instance_html_for_roots(
     model: &ApplicationSemanticModel,
     root_component: Option<&crate::SemanticId>,
