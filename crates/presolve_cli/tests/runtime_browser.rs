@@ -2267,6 +2267,12 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     leaf.click();
     await waitFor(() => leaf.textContent === "Leaf: 1", "materialized structural leaf action");
   }
+  const listLeafA = a.querySelector("button");
+  if (expectStructuralMaterialization) {
+    if (listLeafA === null || listLeafA.textContent !== "Leaf: 0") fail("initial keyed row did not materialize a structural Leaf");
+    listLeafA.click();
+    await waitFor(() => listLeafA.textContent === "Leaf: 1", "materialized keyed leaf action");
+  }
 
   toggle.click();
   await waitFor(() => document.querySelector("main aside") !== null, "conditional subtree swap");
@@ -2282,11 +2288,17 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   const d = row("d");
   if (row("a") !== a || row("c") !== c) fail("moved keyed component rows were recreated");
   if (d === null) fail("new keyed component row was not created");
+  if (expectStructuralMaterialization && (a.querySelector("button") !== listLeafA || listLeafA.textContent !== "Leaf: 1" || d.querySelector("button")?.textContent !== "Leaf: 0")) {
+    fail("keyed structural occurrence was not retained or created exactly");
+  }
 
   trim.click();
   await waitFor(() => row("a") === null && row("c") === null, "nested keyed destruction");
   if (row("d") !== d) fail("retained keyed component row was recreated");
   if (document.querySelector("main") !== main || document.querySelector("main ul") !== listParent) fail("unaffected host identity changed after list destruction");
+  if (expectStructuralMaterialization && [...runtime.store.components.keys()].filter((id) => id.startsWith("presolve-structural-occurrence:v1:")).length !== 1) {
+    fail("keyed structural removal leaked a component occurrence");
+  }
   if (runtime.component_failures.length !== 0) fail("structural component runtime reported failures");
   document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_COMPONENT_STRUCTURAL_BROWSER_TEST_PASS</div>");
 })().catch((error) => {

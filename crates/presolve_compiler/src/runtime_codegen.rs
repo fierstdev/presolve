@@ -2324,6 +2324,88 @@ const RUNTIME_STUB: &str = r#"(() => {
     return template.content.firstElementChild;
   }
 
+  function renderStructuralKeyedListItem(store, component, node, fragmentRecord, item, index, key) {
+    if (fragmentRecord?.host_scope !== "static-instance"
+      || fragmentRecord.host_instance !== component?.instance_id
+      || typeof fragmentRecord.item_template_html !== "string") {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const programs = [...(store.componentRegions?.values() ?? [])].filter((program) =>
+      program.host_component === component.manifest?.component_id && program.host_node === node?.id
+    );
+    if (programs.length !== 1) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    const template = document.createElement("template");
+    template.innerHTML = renderListItemHtml({ item_template_html: fragmentRecord.item_template_html }, item, index, key);
+    populateListItemMemberBindings(node, item, template.content);
+    const anchors = compilerFragmentInvocationAnchors(template.content, programs[0], fragmentRecord.item_invocations);
+    const element = template.content.firstElementChild;
+    if (element === null || template.content.childElementCount !== 1
+      || [...template.content.childNodes].some((child) => child !== element)) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    return Object.freeze({ element, anchors });
+  }
+
+  function disposeStructuralKeyedListItem(store, instance) {
+    for (const occurrence of [...(instance.structural_occurrences ?? [])].reverse()) occurrence.dispose();
+    unregisterListItemEvents(store, instance);
+    instance.element.remove();
+  }
+
+  function reconcileStructuralKeyedList(store, component, node, fragmentRecord, startMarker, endMarker, instances, value) {
+    if (startMarker.parentNode === null || endMarker.parentNode === null || startMarker.parentNode !== endMarker.parentNode) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const parent = startMarker.parentNode;
+    const nextInstances = new Map();
+    const ordered = [];
+    for (const [index, item] of listItems(value).entries()) {
+      const key = listItemKey(node, item, index);
+      if (nextInstances.has(key)) {
+        reportDiagnostic(store.diagnostics, "PSR_DUPLICATE_LIST_KEY", "List update produced a duplicate key", { id: node.id, key });
+        continue;
+      }
+      let instance = instances.get(key);
+      if (instance === undefined || !Array.isArray(instance.structural_occurrences)) {
+        const prior = instance;
+        const rendered = renderStructuralKeyedListItem(store, component, node, fragmentRecord, item, index, key);
+        const created = [];
+        try {
+          parent.insertBefore(rendered.element, endMarker);
+          for (const anchor of rendered.anchors) {
+            created.push(materializeStructuralOccurrence(store, anchor.marker, component.instance_id, `keyed:${key}`));
+          }
+          instance = { element: rendered.element, item, index, key, structural_occurrences: Object.freeze(created) };
+          registerListItemEvents(store, component, instance);
+          if (prior !== undefined) {
+            unregisterListItemEvents(store, prior);
+            prior.element.remove();
+          }
+        } catch (error) {
+          for (const occurrence of [...created].reverse()) occurrence.dispose();
+          rendered.element.remove();
+          throw error;
+        }
+      }
+      instance.item = item;
+      instance.index = index;
+      updateListItemTextBindings(node, instance);
+      updateListItemAttributes(node, instance);
+      nextInstances.set(key, instance);
+      ordered.push(instance);
+    }
+    for (const [key, instance] of instances) {
+      if (!nextInstances.has(key)) disposeStructuralKeyedListItem(store, instance);
+    }
+    let cursor = startMarker.nextSibling;
+    for (const instance of ordered) {
+      if (instance.element !== cursor) parent.insertBefore(instance.element, cursor);
+      cursor = instance.element.nextSibling;
+    }
+    store.elementsByNode = collectElementAnchors();
+    return nextInstances;
+  }
+
   function initialListInstances(store, node, items) {
     const instances = new Map();
 
@@ -3802,24 +3884,17 @@ const RUNTIME_STUB: &str = r#"(() => {
       );
       if (nodes.length === 1) {
         const node = nodes[0];
+        const fragment = structuralKeyedHostFragment(store, component, node);
         let instances = initialListInstances(
           store,
           node,
           listItems(store.storageValues.get(slot.slot_id))
         );
-        for (const instance of instances.values()) {
-          registerListItemEvents(store, component, instance);
-        }
+        if (fragment === null) for (const instance of instances.values()) registerListItemEvents(store, component, instance);
         update = (value) => {
-          instances = reconcileKeyedList(
-            store,
-            component,
-            node,
-            target.start,
-            target.end,
-            instances,
-            value
-          );
+          instances = fragment === null
+            ? reconcileKeyedList(store, component, node, target.start, target.end, instances, value)
+            : reconcileStructuralKeyedList(store, component, node, fragment, target.start, target.end, instances, value);
         };
       }
     }
@@ -5275,6 +5350,8 @@ mod tests {
         assert!(runtime.contains("function materializeStructuralOccurrence"));
         assert!(runtime.contains("function structuralConditionalHostFragment"));
         assert!(runtime.contains("function structuralKeyedHostFragment"));
+        assert!(runtime.contains("function renderStructuralKeyedListItem"));
+        assert!(runtime.contains("function reconcileStructuralKeyedList"));
         assert!(runtime.contains("function compilerFragmentInvocationAnchors"));
         assert!(runtime.contains("function replaceStructuralConditionalBranch"));
         assert!(runtime.contains("active.indexOf(updateBinding)"));
