@@ -1865,6 +1865,45 @@ const RUNTIME_STUB: &str = r#"(() => {
     return Object.freeze({ rollback });
   }
 
+  function materializeStructuralOccurrence(store, marker, parentScope, localOccurrence) {
+    const invocation = marker?.getAttribute?.("data-presolve-structural-invocation");
+    const template = store.structuralOccurrenceTemplatesByInvocation?.get(invocation);
+    if (typeof invocation !== "string" || template === undefined
+      || typeof parentScope !== "string" || parentScope.length === 0
+      || typeof localOccurrence !== "string" || localOccurrence.length === 0) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const identity = structuralOccurrenceIdentity(
+      parentScope,
+      template.structural_region,
+      template.occurrence.template_instance,
+      localOccurrence
+    );
+    const records = deriveStructuralOccurrenceRecords(template, identity);
+    let staged = null;
+    let attachment = null;
+    let registration = null;
+    try {
+      staged = stageStructuralOccurrenceRecords(store, records);
+      attachment = attachStructuralOccurrenceFragment(
+        marker,
+        invocation,
+        renderStructuralOccurrenceTemplate(records)
+      );
+      registration = registerStructuralOccurrenceRecords(store, staged);
+      return Object.freeze({ ...staged, attachment, registration, dispose: () => {
+        registration.rollback();
+        attachment.rollback();
+        staged.rollback();
+      }});
+    } catch (error) {
+      registration?.rollback();
+      attachment?.rollback();
+      staged?.rollback();
+      throw error;
+    }
+  }
+
   function structuralOccurrenceTemplateRegistry(manifest, componentArtifact, computedArtifact) {
     const components = new Map((manifest.components ?? []).map((component) => [component.component_id, component]));
     if (components.size !== (manifest.components ?? []).length) {
@@ -5063,6 +5102,7 @@ mod tests {
         assert!(runtime.contains("function renderStructuralOccurrenceTemplate"));
         assert!(runtime.contains("function attachStructuralOccurrenceFragment"));
         assert!(runtime.contains("function registerStructuralOccurrenceRecords"));
+        assert!(runtime.contains("function materializeStructuralOccurrence"));
         assert!(runtime.contains("active.indexOf(updateBinding)"));
         assert!(runtime.contains("function structuralOccurrenceTemplateRegistry"));
         assert!(runtime.contains("structuralOccurrenceTemplatesByInvocation"));
