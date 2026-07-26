@@ -33,6 +33,14 @@ pub struct V2AuthorityResolutionV1 {
     pub identity: V2AuthorityIdentityV1,
 }
 
+/// Exact TypeScript-authoritative evidence for one environment member call.
+/// The source range is recovered only from the request that selected it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedEnvironmentPublicReadV1 {
+    pub call_source: AuthoredSourceRangeV1,
+    pub environment_public_identity: ResolvedIntrinsicIdentityV1,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct V2AuthorityIdentityV1 {
@@ -132,6 +140,33 @@ pub fn v2_authoring_resolutions_from_response_v1(
                 effect_identity: identity,
             })
             .collect(),
+    })
+}
+
+/// Recovers validated environment-public evidence without widening the V2
+/// component authoring model. Environment reads are expression products, not
+/// component declarations, so their manifest join is owned separately.
+pub fn v2_environment_public_resolutions_from_response_v1(
+    parsed: &ParsedFile,
+    request: &V2AuthorityRequestV1,
+    response: &V2AuthorityResponseV1,
+) -> Result<Vec<ResolvedEnvironmentPublicReadV1>, V2AuthorityResponseErrorV1> {
+    validate_v2_authority_response_v1(request, response)?;
+    if !response.diagnostics.is_empty() {
+        return Err(V2AuthorityResponseErrorV1::DiagnosticsPresent(
+            response.diagnostics.len(),
+        ));
+    }
+    resolutions_for(&response.environment_public, "environment-public", parsed).map(|resolutions| {
+        resolutions
+            .into_iter()
+            .map(
+                |(call_source, environment_public_identity)| ResolvedEnvironmentPublicReadV1 {
+                    call_source,
+                    environment_public_identity,
+                },
+            )
+            .collect()
     })
 }
 
@@ -253,7 +288,8 @@ mod tests {
     };
 
     use super::{
-        v2_authoring_resolutions_from_response_v1, validate_v2_authority_response_v1,
+        v2_authoring_resolutions_from_response_v1,
+        v2_environment_public_resolutions_from_response_v1, validate_v2_authority_response_v1,
         V2AuthorityIdentityV1, V2AuthorityResolutionV1, V2AuthorityResponseErrorV1,
         V2AuthorityResponseV1,
     };
@@ -391,5 +427,53 @@ class Counter extends Component { count = state(0); increment = action(() => {})
             v2_authoring_resolutions_from_response_v1(&parsed, &request, &response),
             Err(V2AuthorityResponseErrorV1::UnknownSite(_))
         ));
+    }
+
+    #[test]
+    fn recovers_environment_evidence_only_from_known_member_request_ids() {
+        let source = r#"
+import { Component, environment } from "presolve";
+class Counter extends Component {}
+const applicationName = environment.public("PRESOLVE_PUBLIC_APP_NAME");
+"#;
+        let parsed = parse_file("src/Counter.tsx", source);
+        let heritage = component_inheritance_sites_v1(&parsed).pop().unwrap();
+        let model = lower_component_inheritance_v1(
+            &parsed,
+            [ResolvedComponentInheritanceV1 {
+                heritage_source: heritage.heritage_source,
+                component_identity: component_identity(),
+            }],
+        )
+        .unwrap()
+        .model;
+        let request =
+            crate::build_v2_authority_request_v1(&parsed, PathBuf::from("tsconfig.json"), &model)
+                .unwrap();
+        let response = V2AuthorityResponseV1 {
+            schema_version: 3,
+            diagnostics: Vec::new(),
+            components: vec![V2AuthorityResolutionV1 {
+                id: request.components[0].id.clone(),
+                identity: identity("Component"),
+            }],
+            states: Vec::new(),
+            actions: Vec::new(),
+            effects: Vec::new(),
+            environment_public: vec![V2AuthorityResolutionV1 {
+                id: request.environment_public[0].id.clone(),
+                identity: identity("public"),
+            }],
+        };
+
+        let evidence =
+            v2_environment_public_resolutions_from_response_v1(&parsed, &request, &response)
+                .unwrap();
+        assert_eq!(evidence.len(), 1);
+        assert_eq!(evidence[0].environment_public_identity.name, "public");
+        assert_eq!(
+            &source[evidence[0].call_source.start..evidence[0].call_source.end],
+            "environment.public(\"PRESOLVE_PUBLIC_APP_NAME\")"
+        );
     }
 }

@@ -58,6 +58,7 @@ pub mod effect_projection;
 pub mod effect_resume;
 pub mod environment_input;
 pub mod environment_ownership;
+pub mod environment_read_lowering;
 pub mod explain;
 pub mod expression_graph;
 pub mod file_route_publication;
@@ -452,6 +453,10 @@ pub use environment_ownership::{
     EnvironmentOwnershipEdgeKindV1, EnvironmentOwnershipEdgeV1, EnvironmentOwnershipErrorV1,
     EnvironmentOwnershipFactsV1, EnvironmentOwnershipGraphV1, EnvironmentOwnershipNodeV1,
     EnvironmentOwnershipViolationV1, LifetimeClassV1, ENVIRONMENT_OWNERSHIP_SCHEMA_VERSION,
+};
+pub use environment_read_lowering::{
+    lower_environment_reads_v1, EnvironmentReadDiagnosticCodeV1, EnvironmentReadDiagnosticV1,
+    EnvironmentReadLoweringV1, EnvironmentReadRecordV1, ENVIRONMENT_READ_LOWERING_SCHEMA_VERSION,
 };
 pub use explain::{explain_json, explain_text};
 pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
@@ -1015,13 +1020,14 @@ pub use v2_authoring_lowering::{
 };
 pub use v2_authority_request::{
     build_v2_authority_component_request_v1, build_v2_authority_request_v1, V2AuthorityCanonicalV1,
-    V2AuthorityPositionV1, V2AuthorityRequestErrorV1, V2AuthorityRequestV1, V2AuthoritySiteV1,
-    V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
+    V2AuthorityMemberSiteV1, V2AuthorityPositionV1, V2AuthorityRequestErrorV1,
+    V2AuthorityRequestV1, V2AuthoritySiteV1, V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
 };
 pub use v2_authority_response::{
-    v2_authoring_resolutions_from_response_v1, validate_v2_authority_response_v1,
-    V2AuthorityIdentityV1, V2AuthorityResolutionV1, V2AuthorityResponseErrorV1,
-    V2AuthorityResponseV1, V2_AUTHORITY_RESPONSE_SCHEMA_VERSION,
+    v2_authoring_resolutions_from_response_v1, v2_environment_public_resolutions_from_response_v1,
+    validate_v2_authority_response_v1, ResolvedEnvironmentPublicReadV1, V2AuthorityIdentityV1,
+    V2AuthorityResolutionV1, V2AuthorityResponseErrorV1, V2AuthorityResponseV1,
+    V2_AUTHORITY_RESPONSE_SCHEMA_VERSION,
 };
 
 #[cfg(test)]
