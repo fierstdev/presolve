@@ -2194,6 +2194,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       bindingsByField: new Map(),
       bindingsByStateSlot: new Map(),
       bindingsByInstanceComputed: new Map(),
+      ordinaryEventListenerTypes: new Set(),
       actionsByMethod: new Map(),
       opaqueTerminalsByMethod: new Map((opaqueArtifact?.activations ?? []).map((activation) => [activation.method, activation])),
       opaqueActivations: [],
@@ -3681,6 +3682,8 @@ const RUNTIME_STUB: &str = r#"(() => {
   function installOrdinaryInstanceEventListeners(store) {
     for (const key of store.ordinaryEventsByTargetAndType.keys()) {
       const eventType = key.slice(key.lastIndexOf("\u001f") + 1);
+      if (store.ordinaryEventListenerTypes.has(eventType)) continue;
+      store.ordinaryEventListenerTypes.add(eventType);
       document.addEventListener(eventType, (event) => dispatchOrdinaryInstanceEvent(store, event));
     }
   }
@@ -5012,6 +5015,7 @@ mod tests {
         assert!(runtime.contains("PSR_UNSUPPORTED_SCHEMA"));
         assert!(runtime.contains("data-presolve-node"));
         assert!(runtime.contains("ordinaryEventsByTargetAndType"));
+        assert!(runtime.contains("ordinaryEventListenerTypes: new Set()"));
         assert!(runtime.contains("component_instance_id: record.component_instance_id"));
         assert!(runtime.contains("computedSlotsByInstanceComputed: new Map()"));
         assert!(runtime.contains("computedDirtySlots: new Map()"));
