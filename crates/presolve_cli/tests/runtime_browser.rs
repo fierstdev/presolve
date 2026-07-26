@@ -2206,7 +2206,9 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     fail("conditional host fragments lost compiler-issued branch anchors");
   }
   const keyedHost = artifact.structural_programs.find((program) => program.keyed_host_fragments.length > 0);
-  if (keyedHost === undefined || !keyedHost.keyed_host_fragments[0].item_template_html.includes("data-presolve-structural-invocation=")) {
+  if (keyedHost === undefined || !keyedHost.keyed_host_fragments[0].item_template_html.includes("data-presolve-structural-invocation=")
+    || !Array.isArray(keyedHost.keyed_host_fragments[0].item_invocations)
+    || keyedHost.keyed_host_fragments[0].item_invocations.length === 0) {
     fail("compiler keyed host fragments were missing invocation anchors");
   }
   for (const program of artifact.structural_programs) {

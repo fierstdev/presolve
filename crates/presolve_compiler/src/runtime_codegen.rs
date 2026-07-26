@@ -1938,6 +1938,22 @@ const RUNTIME_STUB: &str = r#"(() => {
     return fragments[0];
   }
 
+  function structuralKeyedHostFragment(store, component, node) {
+    const programs = [...(store.componentRegions?.values() ?? [])].filter((program) =>
+      program.host_component === component?.manifest?.component_id
+      && program.host_node === node?.id
+    );
+    if (programs.length === 0) return null;
+    if (programs.length !== 1 || typeof component?.instance_id !== "string") {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const fragments = programs[0].keyed_host_fragments.filter((fragment) =>
+      fragment.host_scope === "static-instance" && fragment.host_instance === component.instance_id
+    );
+    if (fragments.length !== 1) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    return fragments[0];
+  }
+
   function compilerFragmentInvocationAnchors(fragment, program, expectedInvocations) {
     if (!(fragment instanceof DocumentFragment)
       || !Array.isArray(program?.template_occurrences)
@@ -5258,6 +5274,7 @@ mod tests {
         assert!(runtime.contains("function registerStructuralOccurrenceRecords"));
         assert!(runtime.contains("function materializeStructuralOccurrence"));
         assert!(runtime.contains("function structuralConditionalHostFragment"));
+        assert!(runtime.contains("function structuralKeyedHostFragment"));
         assert!(runtime.contains("function compilerFragmentInvocationAnchors"));
         assert!(runtime.contains("function replaceStructuralConditionalBranch"));
         assert!(runtime.contains("active.indexOf(updateBinding)"));
