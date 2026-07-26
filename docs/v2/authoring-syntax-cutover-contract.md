@@ -61,7 +61,10 @@ with before/after fixtures, source-location proof, and an amendment to
    call joins an exact resolved `state` callee only after its owning component
    has been proven. Action-field lowering applies the same component-ownership
    and resolved-callee rule to `action(handler)`; decorated methods remain in
-   the legacy adapter.
+   the legacy adapter. Computed getter lowering is instead an analysis-derived,
+   non-intrinsic candidate with explicit canonical State dependency evidence;
+   its initial direct-State subset is defined by
+   `computed-derived-candidate-contract.md`.
    `v2_authoring_lowering` composes these independently proven forms back into
    one deterministic canonical authored model for the source file.
 3. Existing downstream products adopt that canonical model one at a time.

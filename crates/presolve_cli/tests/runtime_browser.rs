@@ -2416,7 +2416,8 @@ fn decorator_free_v2_action_field_runs_through_compiler_artifacts_in_a_real_brow
 export class Home extends Component {
   count = state(0);
   increment = action(() => { this.count += 1; });
-  render() { return <button onClick={() => this.increment()}>Count: {this.count}</button>; }
+  get displayCount() { return this.count; }
+  render() { return <button onClick={() => this.increment()}>Count: {this.displayCount}</button>; }
 }
 "#,
     )
@@ -5308,6 +5309,7 @@ fn write_v2_action_resume_probe_page(out_dir: &Path) {
         r#"
 if (runtime.resume.mode !== "resume") fail("V2 snapshot was not resumed");
 if (runtime.components[0].state.count !== 7) fail("V2 State slot did not restore");
+if (!document.body.textContent.includes("Count: 7")) fail("V2 computed getter did not render resumed State");
 const template = JSON.parse(document.getElementById("presolve-template-manifest").textContent);
 const endpoint = template.components[0]?.actions?.[0]?.method_id;
 if (typeof endpoint !== "string" || !endpoint.includes("/action-endpoint:increment")) fail("V2 action endpoint identity was not retained");
@@ -5315,6 +5317,7 @@ const button = document.querySelector("button");
 if (button === null) fail("V2 action button was not emitted");
 button.click();
 await waitFor(() => runtime.components[0].state.count === 8, "resumed V2 action update");
+await waitFor(() => document.body.textContent.includes("Count: 8"), "resumed V2 computed update");
 if (runtime.diagnostics.some((diagnostic) => diagnostic.fatal)) fail("V2 resume reported a fatal diagnostic");"#,
         "PRESOLVE_V2_ACTION_RESUME_PASS",
     );

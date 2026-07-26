@@ -4,8 +4,9 @@ use presolve_parser::ParsedFile;
 
 use crate::{
     compose_authored_semantics_v1, lower_action_fields_v1, lower_component_inheritance_v1,
-    lower_state_initializers_v1, ActionFieldLoweringErrorV1, AuthoredSemanticCompositionErrorV1,
-    CanonicalAuthoredSemanticModelV1, ComponentInheritanceLoweringErrorV1, ResolvedActionFieldV1,
+    lower_computed_getters_v1, lower_state_initializers_v1, ActionFieldLoweringErrorV1,
+    AuthoredSemanticCompositionErrorV1, CanonicalAuthoredSemanticModelV1,
+    ComponentInheritanceLoweringErrorV1, ComputedGetterLoweringErrorV1, ResolvedActionFieldV1,
     ResolvedComponentInheritanceV1, ResolvedStateInitializerV1, StateInitializerLoweringErrorV1,
 };
 
@@ -24,6 +25,7 @@ pub struct V2AuthoringLoweringV1 {
     pub component_count: usize,
     pub state_count: usize,
     pub action_count: usize,
+    pub computed_count: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,6 +33,7 @@ pub enum V2AuthoringLoweringErrorV1 {
     Component(ComponentInheritanceLoweringErrorV1),
     State(StateInitializerLoweringErrorV1),
     Action(ActionFieldLoweringErrorV1),
+    Computed(ComputedGetterLoweringErrorV1),
     Composition(AuthoredSemanticCompositionErrorV1),
 }
 
@@ -40,6 +43,7 @@ impl std::fmt::Display for V2AuthoringLoweringErrorV1 {
             Self::Component(error) => error.fmt(formatter),
             Self::State(error) => error.fmt(formatter),
             Self::Action(error) => error.fmt(formatter),
+            Self::Computed(error) => error.fmt(formatter),
             Self::Composition(error) => error.fmt(formatter),
         }
     }
@@ -58,15 +62,25 @@ pub fn lower_v2_authoring_v1(
         .map_err(V2AuthoringLoweringErrorV1::State)?;
     let actions = lower_action_fields_v1(parsed, &components.model, resolutions.actions)
         .map_err(V2AuthoringLoweringErrorV1::Action)?;
+    let input = compose_authored_semantics_v1([
+        components.model.clone(),
+        states.model.clone(),
+        actions.model.clone(),
+    ])
+    .map_err(V2AuthoringLoweringErrorV1::Composition)?;
+    let computed =
+        lower_computed_getters_v1(parsed, &input).map_err(V2AuthoringLoweringErrorV1::Computed)?;
     let component_count = components.sites.len();
     let state_count = states.model.declarations.len();
     let action_count = actions.model.declarations.len();
-    let model = compose_authored_semantics_v1([components.model, states.model, actions.model])
+    let computed_count = computed.model.declarations.len();
+    let model = compose_authored_semantics_v1([input, computed.model])
         .map_err(V2AuthoringLoweringErrorV1::Composition)?;
     Ok(V2AuthoringLoweringV1 {
         component_count,
         state_count,
         action_count,
+        computed_count,
         model,
     })
 }
@@ -76,8 +90,8 @@ mod tests {
     use presolve_parser::parse_file;
 
     use crate::{
-        component_inheritance_sites_v1, CanonicalAuthoredDeclarationKindV1,
-        ResolvedIntrinsicIdentityV1,
+        build_v2_component_graph_for_module, component_inheritance_sites_v1,
+        CanonicalAuthoredDeclarationKindV1, ResolvedIntrinsicIdentityV1,
     };
 
     use super::{lower_v2_authoring_v1, V2AuthoringResolutionsV1};
@@ -96,6 +110,7 @@ mod tests {
 class Counter extends AliasedBase {
   count = reactiveCell(0);
   increment = activate(() => { this.count += 1; });
+  get doubled() { return this.count * 2; }
 }
 @component() class LegacyOnly { count = reactiveCell(0); }
 "#;
@@ -147,6 +162,7 @@ class Counter extends AliasedBase {
         assert_eq!(lowering.component_count, 1);
         assert_eq!(lowering.state_count, 1);
         assert_eq!(lowering.action_count, 1);
+        assert_eq!(lowering.computed_count, 1);
         assert_eq!(
             lowering
                 .model
@@ -158,6 +174,7 @@ class Counter extends AliasedBase {
                 CanonicalAuthoredDeclarationKindV1::Component,
                 CanonicalAuthoredDeclarationKindV1::State,
                 CanonicalAuthoredDeclarationKindV1::Action,
+                CanonicalAuthoredDeclarationKindV1::Computed,
             ]
         );
         assert!(lowering
@@ -165,5 +182,9 @@ class Counter extends AliasedBase {
             .declarations
             .iter()
             .all(|declaration| declaration.subject != "LegacyOnly"));
+        let graph = build_v2_component_graph_for_module(&parsed, &lowering.model);
+        assert_eq!(graph.components[0].methods.len(), 1);
+        assert!(graph.components[0].methods[0].is_computed());
+        assert_eq!(graph.components[0].methods[0].name, "doubled");
     }
 }

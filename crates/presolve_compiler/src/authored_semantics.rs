@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use presolve_parser::ParsedFile;
 use serde::{Deserialize, Serialize};
 
-pub const CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION: u32 = 1;
+pub const CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION: u32 = 2;
 
 /// A serializable source range shared by the syntax and semantic boundaries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -68,8 +68,21 @@ pub enum AuthoredSemanticCandidateKindV1 {
         intrinsic_kind: CanonicalIntrinsicKindV1,
         intrinsic_identity: ResolvedIntrinsicIdentityV1,
     },
+    /// A non-intrinsic getter admitted by compiler-owned reactive/purity
+    /// analysis. Its evidence is explicit because no framework symbol exists.
+    DerivedComputedGetter {
+        state_dependencies: Vec<String>,
+    },
     TsxBinding,
     TsxEventReference,
+}
+
+/// Evidence retained for a non-intrinsic declaration admitted by compiler
+/// analysis rather than resolved framework-symbol identity.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DerivedAuthoredEvidenceV2 {
+    ComputedGetter { state_dependencies: Vec<String> },
 }
 
 /// One candidate selected from the general source AST and checked by the
@@ -91,6 +104,8 @@ pub struct CanonicalAuthoredDeclarationV1 {
     pub source: AuthoredSourceRangeV1,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub intrinsic_identity: Option<ResolvedIntrinsicIdentityV1>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub derived_evidence: Option<DerivedAuthoredEvidenceV2>,
 }
 
 /// The source-independent vocabulary emitted at the authored-semantics
@@ -208,16 +223,24 @@ pub fn normalize_authored_semantics_v1(
                     source_length,
                 });
             }
-            let (kind, mut intrinsic_identity) = declaration_kind(candidate.kind);
+            let (kind, mut intrinsic_identity, mut derived_evidence) =
+                declaration_kind(candidate.kind);
             if let Some(identity) = &mut intrinsic_identity {
                 identity.declaration_modules.sort();
                 identity.declaration_modules.dedup();
+            }
+            if let Some(DerivedAuthoredEvidenceV2::ComputedGetter { state_dependencies }) =
+                &mut derived_evidence
+            {
+                state_dependencies.sort();
+                state_dependencies.dedup();
             }
             Ok(CanonicalAuthoredDeclarationV1 {
                 kind,
                 subject: candidate.subject,
                 source: candidate.source,
                 intrinsic_identity,
+                derived_evidence,
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -279,6 +302,7 @@ fn declaration_kind(
 ) -> (
     CanonicalAuthoredDeclarationKindV1,
     Option<ResolvedIntrinsicIdentityV1>,
+    Option<DerivedAuthoredEvidenceV2>,
 ) {
     let AuthoredSemanticCandidateKindV1::ResolvedIntrinsic {
         intrinsic_kind,
@@ -286,12 +310,19 @@ fn declaration_kind(
     } = kind
     else {
         return match kind {
+            AuthoredSemanticCandidateKindV1::DerivedComputedGetter { state_dependencies } => (
+                CanonicalAuthoredDeclarationKindV1::Computed,
+                None,
+                Some(DerivedAuthoredEvidenceV2::ComputedGetter { state_dependencies }),
+            ),
             AuthoredSemanticCandidateKindV1::TsxBinding => {
-                (CanonicalAuthoredDeclarationKindV1::TsxBinding, None)
+                (CanonicalAuthoredDeclarationKindV1::TsxBinding, None, None)
             }
-            AuthoredSemanticCandidateKindV1::TsxEventReference => {
-                (CanonicalAuthoredDeclarationKindV1::TsxEventReference, None)
-            }
+            AuthoredSemanticCandidateKindV1::TsxEventReference => (
+                CanonicalAuthoredDeclarationKindV1::TsxEventReference,
+                None,
+                None,
+            ),
             AuthoredSemanticCandidateKindV1::ResolvedIntrinsic { .. } => unreachable!(),
         };
     };
@@ -316,7 +347,7 @@ fn declaration_kind(
         CanonicalIntrinsicKindV1::ServerAction => CanonicalAuthoredDeclarationKindV1::ServerAction,
         CanonicalIntrinsicKindV1::Opaque => CanonicalAuthoredDeclarationKindV1::Capability,
     };
-    (declaration_kind, Some(intrinsic_identity))
+    (declaration_kind, Some(intrinsic_identity), None)
 }
 
 #[cfg(test)]
@@ -367,7 +398,7 @@ mod tests {
             normalize_authored_semantics_v1(&parsed, [state.clone(), component.clone(), state])
                 .expect("valid resolved candidates");
 
-        assert_eq!(model.schema_version, 1);
+        assert_eq!(model.schema_version, 2);
         assert_eq!(model.declarations.len(), 2);
         assert_eq!(model.declarations[0].subject, "Card");
         assert_eq!(
@@ -390,7 +421,7 @@ mod tests {
         assert_eq!(
             serde_json::to_value(&model).expect("serializable model"),
             serde_json::json!({
-                "schema_version": 1,
+                "schema_version": 2,
                 "source_path": "src/Card.tsx",
                 "declarations": [
                     {

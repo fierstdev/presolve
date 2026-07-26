@@ -32,7 +32,8 @@ fn decorator_free_v2_source_uses_installed_authority_for_file_route_assembly() {
 export class Home extends Component {
   count = state(0);
   increment = action(() => { this.count += 1; });
-  render() { return <button onClick={() => this.increment()}>Home</button>; }
+  get doubled() { return this.count * 2; }
+  render() { return <button onClick={() => this.increment()}>Home: {this.doubled}</button>; }
 }
 "#,
     )

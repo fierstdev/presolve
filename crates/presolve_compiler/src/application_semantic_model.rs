@@ -4666,7 +4666,7 @@ mod tests {
             "import { Component, state, action } from \"presolve\"; export class Home extends Component { count = state(0); increment = action(() => { this.count += 1; }); render() { return <button onClick={() => this.increment()}>Home</button>; } }",
         )]);
         let model = CanonicalAuthoredSemanticModelV1 {
-            schema_version: 1,
+            schema_version: crate::CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION,
             source_path: "app/routes/index.tsx".into(),
             declarations: vec![
                 CanonicalAuthoredDeclarationV1 {
@@ -4679,6 +4679,7 @@ mod tests {
                         column: 38,
                     },
                     intrinsic_identity: None,
+                    derived_evidence: None,
                 },
                 CanonicalAuthoredDeclarationV1 {
                     kind: CanonicalAuthoredDeclarationKindV1::State,
@@ -4690,6 +4691,7 @@ mod tests {
                         column: 84,
                     },
                     intrinsic_identity: None,
+                    derived_evidence: None,
                 },
                 CanonicalAuthoredDeclarationV1 {
                     kind: CanonicalAuthoredDeclarationKindV1::Action,
@@ -4701,6 +4703,7 @@ mod tests {
                         column: 101,
                     },
                     intrinsic_identity: None,
+                    derived_evidence: None,
                 },
             ],
         };
@@ -4757,7 +4760,7 @@ mod tests {
             "import { Component, state, action } from \"presolve\"; export class Home extends Component { count = state(0); increment = action(() => { unrelated(); }); render() { return <main>Home</main>; } }",
         );
         let model = CanonicalAuthoredSemanticModelV1 {
-            schema_version: 1,
+            schema_version: crate::CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION,
             source_path: parsed.path.clone(),
             declarations: vec![
                 CanonicalAuthoredDeclarationV1 {
@@ -4770,6 +4773,7 @@ mod tests {
                         column: 1,
                     },
                     intrinsic_identity: None,
+                    derived_evidence: None,
                 },
                 CanonicalAuthoredDeclarationV1 {
                     kind: CanonicalAuthoredDeclarationKindV1::State,
@@ -4781,6 +4785,7 @@ mod tests {
                         column: 1,
                     },
                     intrinsic_identity: None,
+                    derived_evidence: None,
                 },
                 CanonicalAuthoredDeclarationV1 {
                     kind: CanonicalAuthoredDeclarationKindV1::Action,
@@ -4792,6 +4797,7 @@ mod tests {
                         column: 1,
                     },
                     intrinsic_identity: None,
+                    derived_evidence: None,
                 },
             ],
         };

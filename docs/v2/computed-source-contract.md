@@ -22,26 +22,30 @@ The output keeps getter provenance, state dependency IDs, purity evidence, and
 cycle status. Existing memoization, cache, dirty-flag, runtime, and resume
 products may consume that output only after it is produced.
 
-## Canonical-model amendment required
+## Canonical-model amendment
 
-`CanonicalAuthoredSemanticModelV1` currently accepts framework intrinsics plus
-TSX syntax candidates. It has no candidate form for an analysis-proven,
-non-intrinsic getter. A computed source lowering must therefore introduce a
-versioned derived-candidate variant and an explicit schema migration before
-writing to the canonical model. Reusing `CanonicalIntrinsicKindV1::Computed`
-would falsely claim that a `computed()` intrinsic exists; classifying getters
-by method name would be equally invalid.
+The [derived computed-candidate contract](computed-derived-candidate-contract.md)
+defines the schema-v2 candidate and evidence required to represent an
+analysis-proven, non-intrinsic getter. Reusing
+`CanonicalIntrinsicKindV1::Computed` would falsely claim that a `computed()`
+intrinsic exists; classifying getters by method name would be equally invalid.
 
-Until that amendment is implemented, legacy `@computed()` lowering remains
-alpha compatibility only and the V2 beta path must not claim decorator-free
-computed publication. This is an intentional proof boundary, not permission to
-fall back to decorators.
+The first implementation admits only its finite direct-State, call-free
+subset. Legacy `@computed()` lowering remains alpha compatibility only and is
+never a fallback for a V2 getter. Broader call, transitive-dependency, and
+cycle forms remain an intentional proof boundary.
 
-## Required evidence
+## Initial acceptance evidence
 
-- a reactive getter and an ordinary getter in the same canonical component;
-- a getter with an observable effect, async suspension, and an unknown call;
-- direct and transitive State dependencies, conditional dependencies, and a
-  dependency cycle;
-- cold and resumed cache/dirty-flag evidence once the runtime adopts the
-  derived candidate.
+- A reactive getter and ordinary getter in the same canonical component are
+  distinguished without decorator recognition; only the direct-State getter is
+  admitted.
+- A static getter, unknown member read, and call expression receive no derived
+  candidate in the initial subset.
+- A decorator-free route built through the installed authority bridge renders
+  the derived getter in a real browser, invalidates it after a V2 action, and
+  restores and invalidates it again on the resumed path.
+
+Transitive State dependencies, conditional dependency coverage, unknown-call
+proof, and computed dependency cycles remain required evidence for a later
+broader candidate amendment.

@@ -1448,6 +1448,16 @@ pub fn build_v2_component_graph_for_module(
     let mut components = Vec::new();
     let mut diagnostics = Vec::new();
     let mut provenance = BTreeMap::new();
+    let computed_sites = match crate::computed_getter_sites_v1(parsed, authored) {
+        Ok(sites) => sites,
+        Err(error) => {
+            diagnostics.push(ComponentDiagnostic::error(
+                "PSV2C1001",
+                format!("canonical V2 computed candidate selection failed: {error}"),
+            ));
+            Vec::new()
+        }
+    };
     for declaration in authored.declarations.iter().filter(|declaration| {
         declaration.kind == crate::CanonicalAuthoredDeclarationKindV1::Component
     }) {
@@ -1628,6 +1638,59 @@ pub fn build_v2_component_graph_for_module(
                     }),
             );
         }
+        let mut methods = Vec::new();
+        for candidate in authored.declarations.iter().filter(|candidate| {
+            candidate.kind == crate::CanonicalAuthoredDeclarationKindV1::Computed
+                && candidate.subject.starts_with(&format!("{}.", class.name))
+        }) {
+            let Some(crate::DerivedAuthoredEvidenceV2::ComputedGetter { state_dependencies }) =
+                candidate.derived_evidence.as_ref()
+            else {
+                continue;
+            };
+            let Some(name) = candidate.subject.strip_prefix(&format!("{}.", class.name)) else {
+                continue;
+            };
+            let Some(site) = computed_sites.iter().find(|site| {
+                site.subject == candidate.subject
+                    && site.declaration_source == candidate.source
+                    && site.state_dependencies == *state_dependencies
+            }) else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2C1002",
+                    format!(
+                        "canonical V2 Computed `{}` lacks matching derived getter evidence",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            };
+            let Some(method) = class.methods.iter().find(|method| {
+                method.name == name
+                    && range_from_span(method.span) == site.declaration_source
+                    && method.is_getter
+            }) else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2C1003",
+                    format!(
+                        "canonical V2 Computed `{}` has no matching source getter",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            };
+            let mut computed = component_method_from_parsed(method, &parsed.path, &id);
+            computed.semantic_role = MethodSemanticRole::Computed;
+            computed.computed_expression = method
+                .computed_expression
+                .as_ref()
+                .map(computed_expression_from_parsed);
+            provenance.insert(
+                computed.id.clone(),
+                SourceProvenance::new(&parsed.path, method.span),
+            );
+            methods.push(computed);
+        }
         components.push(ComponentNode {
             id: id.clone(),
             module_path: parsed.path.clone(),
@@ -1659,7 +1722,7 @@ pub fn build_v2_component_graph_for_module(
             opaque_action_facts: Vec::new(),
             server_action_facts: Vec::new(),
             shadowed_validation_intrinsics: BTreeSet::new(),
-            methods: Vec::new(),
+            methods,
             action_endpoints,
             actions,
             render: class
@@ -1674,6 +1737,15 @@ pub fn build_v2_component_graph_for_module(
         diagnostics,
         references: Vec::new(),
         provenance,
+    }
+}
+
+fn range_from_span(span: SourceSpan) -> crate::AuthoredSourceRangeV1 {
+    crate::AuthoredSourceRangeV1 {
+        start: span.start,
+        end: span.end,
+        line: span.line,
+        column: span.column,
     }
 }
 

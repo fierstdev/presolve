@@ -801,18 +801,18 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
         }
     }
 
-    let computed_expression = (method.kind == oxc_ast::ast::MethodDefinitionKind::Get
-        && decorators
-            .iter()
-            .any(|decorator| decorator.name == "computed"))
-    .then(|| {
-        let body = method.value.body.as_ref()?;
-        let [Statement::ReturnStatement(return_statement)] = body.statements.as_slice() else {
-            return None;
-        };
-        parsed_computed_expression(return_statement.argument.as_ref()?, source)
-    })
-    .flatten();
+    // Getter expression retention is syntax only. A later canonical V2
+    // analysis decides whether a getter is computed; decorators are not a
+    // parser recognition condition.
+    let computed_expression = (method.kind == oxc_ast::ast::MethodDefinitionKind::Get)
+        .then(|| {
+            let body = method.value.body.as_ref()?;
+            let [Statement::ReturnStatement(return_statement)] = body.statements.as_slice() else {
+                return None;
+            };
+            parsed_computed_expression(return_statement.argument.as_ref()?, source)
+        })
+        .flatten();
     let effect_body = decorators
         .iter()
         .any(|decorator| decorator.name == "effect")

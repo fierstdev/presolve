@@ -28,6 +28,7 @@ pub mod component_ir;
 pub mod component_ir_optimization;
 pub mod component_scope;
 pub mod composition_typing;
+pub mod computed_getter_lowering;
 pub mod computed_instance_slots;
 pub mod computed_projection;
 pub mod computed_value;
@@ -237,7 +238,7 @@ pub use authored_semantics::{
     AuthoredSemanticCandidateKindV1, AuthoredSemanticCompositionErrorV1,
     AuthoredSemanticNormalizationErrorV1, AuthoredSourceRangeV1,
     CanonicalAuthoredDeclarationKindV1, CanonicalAuthoredDeclarationV1,
-    CanonicalAuthoredSemanticModelV1, CanonicalIntrinsicKindV1,
+    CanonicalAuthoredSemanticModelV1, CanonicalIntrinsicKindV1, DerivedAuthoredEvidenceV2,
     ResolvedAuthoredSemanticCandidateV1, ResolvedIntrinsicIdentityV1,
     CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION,
 };
@@ -323,6 +324,10 @@ pub use component_scope::{ComponentScopeDiagnostic, ComponentScopeGraph};
 pub use composition_typing::{
     collect_composition_type_products, ComponentInvocationTypeRecord, CompositionCompatibility,
     CompositionTypeProducts, InstanceContextBindingTypeRecord, SlotBindingTypeRecord,
+};
+pub use computed_getter_lowering::{
+    computed_getter_sites_v1, lower_computed_getters_v1, ComputedGetterLoweringErrorV1,
+    ComputedGetterLoweringV1, ComputedGetterSiteV1,
 };
 pub use computed_instance_slots::{
     build_computed_instance_slot_registry, validate_computed_instance_slot_registry,

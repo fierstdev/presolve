@@ -40,6 +40,9 @@ normative source for this handoff.
 - [V2 authoring build-adoption contract](authoring-build-adoption-contract.md)
   records the required authority bridge and downstream path for decorator-free
   projects.
+- [Derived computed candidates](computed-derived-candidate-contract.md)
+  defines the schema-v2 canonical-model amendment for analysis-proven,
+  decorator-free computed getters.
 - [V2 canonical ASM adapter contract](canonical-asm-adapter-contract.md)
   fixes the no-fallback boundary for canonical authoring records entering route
   and publication products.
