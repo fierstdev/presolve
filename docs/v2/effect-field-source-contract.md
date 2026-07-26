@@ -38,6 +38,11 @@ component graph retains the matching field as `ComponentEffectField`, including
 its ordered parser-owned body and async fact. It adds no legacy decorator,
 method, execution carrier, or source translation.
 
+The shared effect model retains an explicit declaration origin: a legacy
+method keeps its method identity, while a V2 field is recorded as a V2 field.
+Both use the stable effect semantic ID, but no V2 field is fabricated as a
+`ComponentMethod` to reuse lifecycle products.
+
 The parser's generic inline-handler facts include a restricted ordered-body
 view for block-bodied inline functions. That view remains syntax only until an
 authority-backed consumer selects the surrounding call; this recognition slice

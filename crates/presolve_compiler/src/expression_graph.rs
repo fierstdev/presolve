@@ -195,52 +195,11 @@ impl ExpressionGraph {
                 let provenance = provenance
                     .get(&method.id)
                     .expect("effect methods should have canonical provenance");
-                for (index, statement) in body.statements.iter().enumerate() {
-                    let path = format!("statement:{index}");
-                    match &statement.kind {
-                        EffectStatementSyntaxKind::StaticMemberAssignment { target, value } => {
-                            graph.insert_effect_expression(
-                                &effect,
-                                &format!("{path}/target"),
-                                target,
-                                provenance,
-                            );
-                            graph.insert_effect_expression(
-                                &effect,
-                                &format!("{path}/value"),
-                                value,
-                                provenance,
-                            );
-                        }
-                        EffectStatementSyntaxKind::CapabilityCall { callee, arguments } => {
-                            graph.insert_effect_expression(
-                                &effect,
-                                &format!("{path}/callee"),
-                                callee,
-                                provenance,
-                            );
-                            for (argument_index, argument) in arguments.iter().enumerate() {
-                                graph.insert_effect_expression(
-                                    &effect,
-                                    &format!("{path}/argument:{argument_index}"),
-                                    argument,
-                                    provenance,
-                                );
-                            }
-                        }
-                        EffectStatementSyntaxKind::EffectReturn { value: Some(value) } => {
-                            graph.insert_effect_expression(
-                                &effect,
-                                &format!("{path}/return"),
-                                value,
-                                provenance,
-                            );
-                        }
-                        EffectStatementSyntaxKind::EffectReturn { value: None }
-                        | EffectStatementSyntaxKind::Empty
-                        | EffectStatementSyntaxKind::Unsupported(_) => {}
-                    }
-                }
+                insert_effect_body_expressions(&mut graph, &effect, body, provenance);
+            }
+            for field in &component.effect_fields {
+                let effect = component.id.effect(&field.name);
+                insert_effect_body_expressions(&mut graph, &effect, &field.body, &field.provenance);
             }
         }
         graph
@@ -720,6 +679,55 @@ impl ExpressionGraph {
             kind,
             span: node.provenance.span,
         })
+    }
+}
+
+fn insert_effect_body_expressions(
+    graph: &mut ExpressionGraph,
+    effect: &SemanticId,
+    body: &crate::EffectBodySyntax,
+    provenance: &SourceProvenance,
+) {
+    for (index, statement) in body.statements.iter().enumerate() {
+        let path = format!("statement:{index}");
+        match &statement.kind {
+            EffectStatementSyntaxKind::StaticMemberAssignment { target, value } => {
+                graph.insert_effect_expression(
+                    effect,
+                    &format!("{path}/target"),
+                    target,
+                    provenance,
+                );
+                graph.insert_effect_expression(effect, &format!("{path}/value"), value, provenance);
+            }
+            EffectStatementSyntaxKind::CapabilityCall { callee, arguments } => {
+                graph.insert_effect_expression(
+                    effect,
+                    &format!("{path}/callee"),
+                    callee,
+                    provenance,
+                );
+                for (argument_index, argument) in arguments.iter().enumerate() {
+                    graph.insert_effect_expression(
+                        effect,
+                        &format!("{path}/argument:{argument_index}"),
+                        argument,
+                        provenance,
+                    );
+                }
+            }
+            EffectStatementSyntaxKind::EffectReturn { value: Some(value) } => {
+                graph.insert_effect_expression(
+                    effect,
+                    &format!("{path}/return"),
+                    value,
+                    provenance,
+                );
+            }
+            EffectStatementSyntaxKind::EffectReturn { value: None }
+            | EffectStatementSyntaxKind::Empty
+            | EffectStatementSyntaxKind::Unsupported(_) => {}
+        }
     }
 }
 

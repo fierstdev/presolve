@@ -218,6 +218,11 @@ class Counter extends AliasedBase {
             .body
             .statements
             .is_empty());
+        let effects = crate::collect_effects(&graph.components, &graph.provenance);
+        let effect = effects
+            .get(&graph.components[0].id.effect("sync"))
+            .expect("canonical V2 effect field is collected");
+        assert_eq!(effect.declaration, crate::EffectDeclaration::V2Field);
         assert_eq!(graph.components[0].methods.len(), 2);
         assert!(graph.components[0].methods[0].is_computed());
         assert_eq!(graph.components[0].methods[0].name, "doubled");

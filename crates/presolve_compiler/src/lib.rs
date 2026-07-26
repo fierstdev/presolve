@@ -407,10 +407,10 @@ pub use effect::{
     analyze_effect_reactivity, collect_effects, derive_effect_trigger_plan, lower_effect_bodies,
     plan_effect_execution, validate_effects, ActionBatch, ActionBatchEffectTrigger,
     ActionEffectExecutionPlan, Effect, EffectBody, EffectComputedPrerequisiteBatch,
-    EffectExecutionBatch, EffectExecutionPlan, EffectExecutionPolicy, EffectReactiveAnalysis,
-    EffectRenderBoundary, EffectSemanticViolation, EffectSemanticViolationKind, EffectStatement,
-    EffectStatementKind, EffectTriggerPlan, EffectValidation, InitialEffectExecutionPlan,
-    UnplannedEffect, UnplannedEffectReason,
+    EffectDeclaration, EffectExecutionBatch, EffectExecutionPlan, EffectExecutionPolicy,
+    EffectReactiveAnalysis, EffectRenderBoundary, EffectSemanticViolation,
+    EffectSemanticViolationKind, EffectStatement, EffectStatementKind, EffectTriggerPlan,
+    EffectValidation, InitialEffectExecutionPlan, UnplannedEffect, UnplannedEffectReason,
 };
 pub use effect_capability::{
     ArgumentSerializationPolicy, BuiltinCapabilityProvenance, CapabilityDefinition, CapabilityId,

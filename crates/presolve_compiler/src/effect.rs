@@ -147,12 +147,19 @@ pub struct EffectExecutionPlan {
     pub actions: Vec<ActionEffectExecutionPlan>,
 }
 
-/// A first-class compiler semantic entity for one `@effect()` method.
+/// The source declaration carrying one compiler effect body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EffectDeclaration {
+    LegacyMethod(SemanticId),
+    V2Field,
+}
+
+/// A first-class compiler semantic entity for one legacy or V2 effect.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Effect {
     pub id: SemanticId,
     pub owner: SemanticOwner,
-    pub method: SemanticId,
+    pub declaration: EffectDeclaration,
     pub name: String,
     pub execution_boundary: ExecutionBoundary,
     pub execution_policy: EffectExecutionPolicy,
@@ -197,45 +204,55 @@ pub enum EffectStatementKind {
 
 /// Collect canonical effect entities in stable semantic-ID order.
 ///
-/// # Panics
-///
-/// Panics when an effect method has no canonical source provenance.
 #[must_use]
 pub fn collect_effects(
     components: &[ComponentNode],
     provenance: &BTreeMap<SemanticId, SourceProvenance>,
 ) -> BTreeMap<SemanticId, Effect> {
-    components
-        .iter()
-        .flat_map(|component| {
-            component
-                .methods
-                .iter()
-                .filter(|method| method.is_effect())
-                .map(move |method| {
-                    let id = component.id.effect(&method.name);
-                    let provenance = provenance
-                        .get(&method.id)
-                        .expect("effect methods should have canonical provenance")
-                        .clone();
-                    (
-                        id.clone(),
-                        Effect {
-                            id,
-                            owner: SemanticOwner::entity(component.id.clone()),
-                            method: method.id.clone(),
-                            name: method.name.clone(),
-                            execution_boundary: ExecutionBoundary::Client,
-                            execution_policy:
-                                EffectExecutionPolicy::AfterInitialRenderAndCompletedActionBatch,
-                            validation: EffectValidation::Unvalidated,
-                            semantic_violations: Vec::new(),
-                            provenance,
-                        },
-                    )
-                })
-        })
-        .collect()
+    let mut effects = BTreeMap::new();
+    for component in components {
+        for method in component.methods.iter().filter(|method| method.is_effect()) {
+            let id = component.id.effect(&method.name);
+            let method_provenance = provenance
+                .get(&method.id)
+                .expect("effect methods should have canonical provenance")
+                .clone();
+            effects.insert(
+                id.clone(),
+                Effect {
+                    id,
+                    owner: SemanticOwner::entity(component.id.clone()),
+                    declaration: EffectDeclaration::LegacyMethod(method.id.clone()),
+                    name: method.name.clone(),
+                    execution_boundary: ExecutionBoundary::Client,
+                    execution_policy:
+                        EffectExecutionPolicy::AfterInitialRenderAndCompletedActionBatch,
+                    validation: EffectValidation::Unvalidated,
+                    semantic_violations: Vec::new(),
+                    provenance: method_provenance,
+                },
+            );
+        }
+        for field in &component.effect_fields {
+            let id = component.id.effect(&field.name);
+            effects.insert(
+                id.clone(),
+                Effect {
+                    id,
+                    owner: field.owner.clone(),
+                    declaration: EffectDeclaration::V2Field,
+                    name: field.name.clone(),
+                    execution_boundary: ExecutionBoundary::Client,
+                    execution_policy:
+                        EffectExecutionPolicy::AfterInitialRenderAndCompletedActionBatch,
+                    validation: EffectValidation::Unvalidated,
+                    semantic_violations: Vec::new(),
+                    provenance: field.provenance.clone(),
+                },
+            );
+        }
+    }
+    effects
 }
 
 /// Classifies effect legality from F4 statement facts without adding diagnostics.
@@ -249,21 +266,7 @@ pub fn validate_effects(
 ) -> BTreeMap<SemanticId, Effect> {
     for effect in effects.values_mut() {
         let mut violations = Vec::new();
-        let method = effect
-            .owner
-            .entity_id()
-            .and_then(|component_id| {
-                components
-                    .iter()
-                    .find(|component| component.id == *component_id)
-            })
-            .and_then(|component| {
-                component
-                    .methods
-                    .iter()
-                    .find(|method| method.id == effect.method)
-            });
-        if method.is_some_and(|method| method.is_async) {
+        if effect_is_async(components, effect) {
             violations.push(EffectSemanticViolation {
                 kind: EffectSemanticViolationKind::Async,
                 statement: None,
@@ -761,22 +764,7 @@ pub fn lower_effect_bodies(
     let mut bodies = BTreeMap::new();
     let mut statements = BTreeMap::new();
     for effect in effects.values() {
-        let Some(component_id) = effect.owner.entity_id() else {
-            continue;
-        };
-        let Some(method) = components
-            .iter()
-            .find(|component| component.id == *component_id)
-            .and_then(|component| {
-                component
-                    .methods
-                    .iter()
-                    .find(|method| method.id == effect.method)
-            })
-        else {
-            continue;
-        };
-        let Some(syntax) = &method.effect_body else {
+        let Some(syntax) = effect_body_syntax(components, effect) else {
             continue;
         };
         let mut body_statement_ids = Vec::new();
@@ -833,6 +821,52 @@ pub fn lower_effect_bodies(
     (bodies, statements)
 }
 
+fn effect_is_async(components: &[ComponentNode], effect: &Effect) -> bool {
+    let Some(component_id) = effect.owner.entity_id() else {
+        return false;
+    };
+    let Some(component) = components
+        .iter()
+        .find(|component| component.id == *component_id)
+    else {
+        return false;
+    };
+    match &effect.declaration {
+        EffectDeclaration::LegacyMethod(method_id) => component
+            .methods
+            .iter()
+            .find(|method| method.id == *method_id)
+            .is_some_and(|method| method.is_async),
+        EffectDeclaration::V2Field => component
+            .effect_fields
+            .iter()
+            .find(|field| field.name == effect.name)
+            .is_some_and(|field| field.is_async),
+    }
+}
+
+fn effect_body_syntax<'a>(
+    components: &'a [ComponentNode],
+    effect: &Effect,
+) -> Option<&'a crate::EffectBodySyntax> {
+    let component_id = effect.owner.entity_id()?;
+    let component = components
+        .iter()
+        .find(|component| component.id == *component_id)?;
+    match &effect.declaration {
+        EffectDeclaration::LegacyMethod(method_id) => component
+            .methods
+            .iter()
+            .find(|method| method.id == *method_id)
+            .and_then(|method| method.effect_body.as_ref()),
+        EffectDeclaration::V2Field => component
+            .effect_fields
+            .iter()
+            .find(|field| field.name == effect.name)
+            .map(|field| &field.body),
+    }
+}
+
 fn assert_effect_statement_expressions_exist(kind: &EffectStatementKind, graph: &ExpressionGraph) {
     let expressions = match kind {
         EffectStatementKind::ExternalMemberAssignment { target, value } => vec![target, value],
@@ -851,9 +885,9 @@ fn assert_effect_statement_expressions_exist(kind: &EffectStatementKind, graph: 
 mod tests {
     use crate::{
         build_application_semantic_model, build_component_graph, build_semantic_graph,
-        collect_effects, validate_application_semantic_model, EffectExecutionPolicy,
-        EffectSemanticViolationKind, EffectStatementKind, EffectValidation, ExecutionBoundary,
-        ExpressionNodeKind, SemanticEntity, SemanticEntityKind, SemanticOwner,
+        collect_effects, validate_application_semantic_model, EffectDeclaration,
+        EffectExecutionPolicy, EffectSemanticViolationKind, EffectStatementKind, EffectValidation,
+        ExecutionBoundary, ExpressionNodeKind, SemanticEntity, SemanticEntityKind, SemanticOwner,
         SemanticReferenceKind, UnsupportedEffectStatementKind,
     };
 
@@ -879,7 +913,10 @@ class Effects extends Component {
             .expect("effect entity");
 
         assert_eq!(effect.id.as_str(), "component:x-effects/effect:syncTitle");
-        assert_eq!(effect.method, component.methods[0].id);
+        assert_eq!(
+            effect.declaration,
+            EffectDeclaration::LegacyMethod(component.methods[0].id.clone())
+        );
         assert_eq!(effect.owner, component.methods[0].owner);
         assert_eq!(effect.execution_boundary, ExecutionBoundary::Client);
         assert_eq!(
@@ -913,10 +950,16 @@ class Effects extends Component {
         let effect_id = component.id.effect("syncTitle");
         let effect = asm.effect(&effect_id).expect("effect entity");
 
-        assert_eq!(effect.method, component.id.method("syncTitle"));
+        assert_eq!(
+            effect.declaration,
+            EffectDeclaration::LegacyMethod(component.id.method("syncTitle"))
+        );
         assert_eq!(effect.owner, SemanticOwner::entity(component.id.clone()));
         assert_eq!(asm.owner(&effect_id), Some(&effect.owner));
-        assert_eq!(asm.provenance(&effect_id), asm.provenance(&effect.method));
+        assert_eq!(
+            asm.provenance(&effect_id),
+            asm.provenance(&component.id.method("syncTitle"))
+        );
         assert_eq!(
             asm.entity(&effect_id).map(SemanticEntity::kind),
             Some(SemanticEntityKind::Effect)
