@@ -33,6 +33,8 @@ pub struct StructuralConditionalHostFragments {
     pub when_false_html: String,
     pub when_true_invocations: Vec<String>,
     pub when_false_invocations: Vec<String>,
+    /// Exact canonical Slot bindings consumed while rendering this host.
+    pub slot_projection_bindings: Vec<String>,
 }
 
 #[must_use]
@@ -53,6 +55,8 @@ pub struct StructuralKeyedHostFragment {
     pub host_instance: ComponentInstanceId,
     pub item_template_html: String,
     pub item_invocations: Vec<String>,
+    /// Exact canonical Slot bindings consumed while rendering this host.
+    pub slot_projection_bindings: Vec<String>,
 }
 
 /// The only host scopes the compiler currently renders exactly.
@@ -331,6 +335,13 @@ pub fn generate_structural_conditional_host_fragments(
                 host_instance: instance.id.clone(),
                 when_true_invocations: structural_invocations_in_compiler_html(&when_true_html),
                 when_false_invocations: structural_invocations_in_compiler_html(&when_false_html),
+                slot_projection_bindings: model
+                    .slot_bindings
+                    .for_callee(&instance.id)
+                    .into_iter()
+                    .filter(|binding| binding.status == SlotBindingStatus::Bound)
+                    .map(|binding| binding.id.to_string())
+                    .collect(),
                 when_true_html,
                 when_false_html,
             })
@@ -475,6 +486,13 @@ pub fn generate_structural_keyed_host_fragments(
                 host_scope,
                 host_instance: instance.id.clone(),
                 item_invocations: structural_invocations_in_compiler_html(&html),
+                slot_projection_bindings: model
+                    .slot_bindings
+                    .for_callee(&instance.id)
+                    .into_iter()
+                    .filter(|binding| binding.status == SlotBindingStatus::Bound)
+                    .map(|binding| binding.id.to_string())
+                    .collect(),
                 item_template_html: html,
             })
         })

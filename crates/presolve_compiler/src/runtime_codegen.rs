@@ -1023,6 +1023,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       }
       const structuralRegions = new Set();
       const structuralHosts = new Set();
+      const slotBindingCallees = new Map((artifact.slot_binding_programs ?? []).map((binding) => [binding.binding, binding.callee_instance]));
       for (const program of artifact.structural_programs) {
         const host = `${String(program.host_component)}\u001f${String(program.host_node)}`;
         if (typeof program.region !== "string" || program.region.length === 0
@@ -1047,6 +1048,9 @@ const RUNTIME_STUB: &str = r#"(() => {
             || typeof fragments.when_false_html !== "string" || fragments.when_false_html.length === 0
             || !Array.isArray(fragments.when_true_invocations)
             || !Array.isArray(fragments.when_false_invocations)
+            || !Array.isArray(fragments.slot_projection_bindings)
+            || new Set(fragments.slot_projection_bindings).size !== fragments.slot_projection_bindings.length
+            || fragments.slot_projection_bindings.some((binding) => slotBindingCallees.get(binding) !== fragments.host_instance)
             || new Set(fragments.when_true_invocations).size !== fragments.when_true_invocations.length
             || new Set(fragments.when_false_invocations).size !== fragments.when_false_invocations.length
             || [...fragments.when_true_invocations, ...fragments.when_false_invocations].some((invocation) =>
@@ -1062,6 +1066,9 @@ const RUNTIME_STUB: &str = r#"(() => {
                 : true)
             || typeof fragments.item_template_html !== "string" || fragments.item_template_html.length === 0
             || !Array.isArray(fragments.item_invocations)
+            || !Array.isArray(fragments.slot_projection_bindings)
+            || new Set(fragments.slot_projection_bindings).size !== fragments.slot_projection_bindings.length
+            || fragments.slot_projection_bindings.some((binding) => slotBindingCallees.get(binding) !== fragments.host_instance)
             || new Set(fragments.item_invocations).size !== fragments.item_invocations.length
             || fragments.item_invocations.some((invocation) =>
               !program.template_occurrences.some((occurrence) => occurrence.invocation === invocation)

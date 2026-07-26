@@ -656,11 +656,11 @@ fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
     let component_artifact =
         build_runtime_component_artifact(&model, &model.component_ir_optimization);
     assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 6);
-    assert_eq!(RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION, 18);
+    assert_eq!(RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION, 19);
     assert_eq!(RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, 2);
     assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 7);
     assert_eq!(TEMPLATE_MANIFEST_SCHEMA_VERSION, 5);
-    assert_eq!(component_artifact.schema_version, 18);
+    assert_eq!(component_artifact.schema_version, 19);
     assert!(validate_runtime_component_artifact(&component_artifact).is_ok());
     assert_eq!(build_semantic_graph(&model).schema_version, 6);
     assert_eq!(build_resume_manifest(&model).schema_version, 7);

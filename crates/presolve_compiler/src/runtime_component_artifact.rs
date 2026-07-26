@@ -9,7 +9,7 @@ use crate::{
 };
 use crate::{TemplateChild, TemplateNode, TemplateSemanticKind};
 
-pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 18;
+pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 19;
 
 /// Public H14 compiler artifact. All executable references are canonical IDs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -170,6 +170,7 @@ pub struct SerializedStructuralConditionalHostFragments {
     /// Exact compiler-issued occurrence invocations anchored by each branch.
     pub when_true_invocations: Vec<String>,
     pub when_false_invocations: Vec<String>,
+    pub slot_projection_bindings: Vec<String>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SerializedStructuralKeyedHostFragment {
@@ -177,6 +178,7 @@ pub struct SerializedStructuralKeyedHostFragment {
     pub host_instance: String,
     pub item_template_html: String,
     pub item_invocations: Vec<String>,
+    pub slot_projection_bindings: Vec<String>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SerializedStructuralTemplateOccurrence {
@@ -456,6 +458,7 @@ pub fn build_runtime_component_artifact(
                 when_false_html: fragments.when_false_html,
                 when_true_invocations: fragments.when_true_invocations,
                 when_false_invocations: fragments.when_false_invocations,
+                slot_projection_bindings: fragments.slot_projection_bindings,
             })
             .collect(),
             keyed_host_fragments: crate::generate_structural_keyed_host_fragments(
@@ -468,6 +471,7 @@ pub fn build_runtime_component_artifact(
                 host_instance: fragments.host_instance.to_string(),
                 item_template_html: fragments.item_template_html,
                 item_invocations: fragments.item_invocations,
+                slot_projection_bindings: fragments.slot_projection_bindings,
             })
             .collect(),
             template_occurrences: program.template_occurrences,
@@ -816,6 +820,11 @@ pub fn validate_runtime_component_artifact(
             })
         })
         .collect::<std::collections::BTreeMap<_, _>>();
+    let slot_binding_callees = artifact
+        .slot_binding_programs
+        .iter()
+        .map(|binding| (binding.binding.as_str(), binding.callee_instance.as_str()))
+        .collect::<std::collections::BTreeMap<_, _>>();
     if artifact.structural_programs.iter().any(|program| {
         let host_instances = program
             .conditional_host_fragments
@@ -824,7 +833,7 @@ pub fn validate_runtime_component_artifact(
             .collect::<std::collections::BTreeSet<_>>();
         host_instances.len() != program.conditional_host_fragments.len()
             || program.conditional_host_fragments.iter().any(|fragments| {
-                match fragments.host_scope.as_str() {
+                (match fragments.host_scope.as_str() {
                     "static-instance" => {
                         !instances.contains(fragments.host_instance.as_str())
                             || instance_components
@@ -838,6 +847,18 @@ pub fn validate_runtime_component_artifact(
                                 .is_none_or(|component| *component != program.host_component)
                     }
                     _ => true,
+                }) || {
+                    fragments.slot_projection_bindings.len()
+                        != fragments
+                            .slot_projection_bindings
+                            .iter()
+                            .collect::<std::collections::BTreeSet<_>>()
+                            .len()
+                        || fragments.slot_projection_bindings.iter().any(|binding| {
+                            slot_binding_callees
+                                .get(binding.as_str())
+                                .is_none_or(|callee| *callee != fragments.host_instance)
+                        })
                 }
             })
     }) {
@@ -851,7 +872,7 @@ pub fn validate_runtime_component_artifact(
             .collect::<std::collections::BTreeSet<_>>();
         host_instances.len() != program.keyed_host_fragments.len()
             || program.keyed_host_fragments.iter().any(|fragments| {
-                match fragments.host_scope.as_str() {
+                (match fragments.host_scope.as_str() {
                     "static-instance" => {
                         !instances.contains(fragments.host_instance.as_str())
                             || instance_components
@@ -865,6 +886,18 @@ pub fn validate_runtime_component_artifact(
                                 .is_none_or(|component| *component != program.host_component)
                     }
                     _ => true,
+                }) || {
+                    fragments.slot_projection_bindings.len()
+                        != fragments
+                            .slot_projection_bindings
+                            .iter()
+                            .collect::<std::collections::BTreeSet<_>>()
+                            .len()
+                        || fragments.slot_projection_bindings.iter().any(|binding| {
+                            slot_binding_callees
+                                .get(binding.as_str())
+                                .is_none_or(|callee| *callee != fragments.host_instance)
+                        })
                 }
             })
     }) {
