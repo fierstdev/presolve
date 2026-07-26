@@ -429,14 +429,16 @@ fn render_child(
                 .structural_ends
                 .get(marker)
                 .map_or("", String::as_str);
-            let selected = if matches!(
+            let selected_true = matches!(
                 conditional.initial_value,
                 Some(SerializableValue::Boolean(true))
-            ) {
+            );
+            let selected = if selected_true {
                 &conditional.when_true
             } else {
                 &conditional.when_false
             };
+            let selected_path = format!("{path}.{}", if selected_true { "true" } else { "false" });
             format!(
                 "<!--presolve-r-start:{}--><!--presolve-conditional-start:{}:ti:{}-->{}<!--presolve-conditional-end:{}:ti:{}--><!--presolve-r-end:{}-->",
                 escape_comment(resume_start),
@@ -452,7 +454,7 @@ fn render_child(
                     instance,
                     template,
                     selected,
-                    path,
+                    &selected_path,
                     slot_projections,
                 ),
                 conditional.end_id.0,
@@ -564,6 +566,16 @@ fn render_element(
             }
         }
     }
+    let structural_invocation = model
+        .component_invocations
+        .values()
+        .find(|candidate| candidate.template_entity == entity)
+        .and_then(|invocation| {
+            children
+                .get(&(instance.clone(), invocation.id.clone()))
+                .filter(|child| child.status == ComponentInstanceStatus::StructuralTemplate)
+                .map(|_| invocation.id.as_str())
+        });
     let mut html = format!(
         "<{} data-presolve-node=\"{}\"",
         element.tag_name,
@@ -583,6 +595,11 @@ fn render_element(
             html.push_str(&escape_attr(event));
             html.push('"');
         }
+    }
+    if let Some(invocation) = structural_invocation {
+        html.push_str(" data-presolve-structural-invocation=\"");
+        html.push_str(&escape_attr(invocation));
+        html.push('"');
     }
     for attribute in &element.attributes {
         html.push(' ');
@@ -885,5 +902,23 @@ mod tests {
 
         assert!(html.contains("Home"));
         assert!(!html.contains("About"));
+    }
+
+    #[test]
+    fn preserves_conditional_template_paths_for_structural_invocations() {
+        let model = build_application_semantic_model(&presolve_parser::parse_file(
+            "src/StructuralMarker.tsx",
+            r#"
+@component("x-leaf") class Leaf { count = state(0); render() { return <strong>{this.count}</strong>; } }
+@component("x-page") class Page {
+  visible = state(true);
+  render() { return <main>{this.visible ? <Leaf /> : <span>Hidden</span>}</main>; }
+}
+"#,
+        ));
+        let html = generate_ordinary_instance_html(&model);
+        assert!(html.contains("data-presolve-node"));
+        assert!(!html.contains("componentByTag"));
+        assert!(html.contains("data-presolve-structural-invocation="));
     }
 }

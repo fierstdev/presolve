@@ -42,6 +42,11 @@ element. A structural program containing a component occurrence must remain
 inactive until its compiler-issued materializer program is present and
 validated.
 
+The ordinary compiler renderer stamps each structural invocation element with
+its exact compiler-issued invocation ID. This marker is an integrity-checked
+fragment anchor, not a tag lookup: a materializer must reject a missing or
+duplicate marker and may never substitute a same-named element.
+
 Schema v10 is not a runtime materializer. It establishes the validated compiler
 template and membership set from which the later program must be constructed;
 the runtime must not activate, infer, or partially use it for dynamic component
