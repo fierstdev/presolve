@@ -2083,7 +2083,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
     }
     const fragments = programs[0].conditional_host_fragments.filter((fragment) =>
-      fragment.host_scope === "static-instance" && fragment.host_instance === component.instance_id
+      structuralHostScopeMatches(fragment, component)
     );
     if (fragments.length !== 1) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
     return fragments[0];
@@ -2099,10 +2099,23 @@ const RUNTIME_STUB: &str = r#"(() => {
       throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
     }
     const fragments = programs[0].keyed_host_fragments.filter((fragment) =>
-      fragment.host_scope === "static-instance" && fragment.host_instance === component.instance_id
+      structuralHostScopeMatches(fragment, component)
     );
     if (fragments.length !== 1) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
     return fragments[0];
+  }
+
+  function structuralHostScopeMatches(fragment, component) {
+    if (typeof component?.instance_id !== "string" || typeof fragment?.host_instance !== "string") {
+      return false;
+    }
+    if (fragment.host_scope === "static-instance") {
+      return fragment.host_instance === component.instance_id;
+    }
+    if (fragment.host_scope === "structural-occurrence") {
+      return decodeStructuralOccurrenceIdentity(component.instance_id).template_instance === fragment.host_instance;
+    }
+    return false;
   }
 
   function compilerFragmentInvocationAnchors(fragment, program, expectedInvocations) {
@@ -2157,8 +2170,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   }
 
   function replaceStructuralConditionalBranch(store, target, component, node, fragmentRecord, value) {
-    if (fragmentRecord?.host_scope !== "static-instance"
-      || fragmentRecord.host_instance !== component?.instance_id
+    if (!structuralHostScopeMatches(fragmentRecord, component)
       || target?.start?.parentNode === null
       || target?.end?.parentNode === null
       || target.start.parentNode !== target.end.parentNode) {
@@ -2476,8 +2488,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   }
 
   function renderStructuralKeyedListItem(store, component, node, fragmentRecord, item, index, key) {
-    if (fragmentRecord?.host_scope !== "static-instance"
-      || fragmentRecord.host_instance !== component?.instance_id
+    if (!structuralHostScopeMatches(fragmentRecord, component)
       || typeof fragmentRecord.item_template_html !== "string") {
       throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
     }
