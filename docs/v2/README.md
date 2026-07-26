@@ -58,6 +58,9 @@ normative source for this handoff.
 - [V2 synchronous Action-local-literal contract](action-local-literal-contract.md)
   projects compiler-retained local primitives to ordinary literal assignments
   without runtime source evaluation.
+- [Resource lifecycle and resume contract](resource-lifecycle-resume-contract.md)
+  defines compiler-owned cold, snapshot, reload, cancellation, and fallback
+  behavior for declared Resource endpoints.
 - [V2 effect-field source contract](effect-field-source-contract.md) defines
   the authority-backed, decorator-free effect declaration boundary before
   lifecycle runtime adoption.
