@@ -726,7 +726,13 @@ fn manifest_actions(component: &ComponentNode) -> Vec<ManifestAction> {
                             .iter()
                             .position(|item| item.name == *parameter)
                     })
-                    .map(|index| SerializableValue::Number(index.to_string())),
+                    .map(|index| SerializableValue::Number(index.to_string()))
+                    .or_else(|| {
+                        parameter
+                            .parse::<usize>()
+                            .ok()
+                            .map(|index| SerializableValue::Number(index.to_string()))
+                    }),
                 _ => manifest_operand(&action.operation),
             },
         })

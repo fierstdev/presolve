@@ -232,6 +232,10 @@ pub struct ParsedInlineHandler {
     pub body_span: SourceSpan,
     pub is_async: bool,
     pub is_expression_body: bool,
+    /// Ordered, source-owned parameters of the inline function. These remain
+    /// syntax facts; later semantic lowering decides whether a handler form
+    /// may consume them.
+    pub parameters: Vec<ParsedMethodParameter>,
     pub state_updates: Vec<ParsedStateUpdate>,
     pub unsupported_statement_spans: Vec<SourceSpan>,
     /// A restricted ordered-body view retained from a general inline function.

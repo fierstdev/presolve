@@ -750,6 +750,7 @@ fn parsed_inline_handler(
             &handler.body,
             handler.r#async,
             handler.expression,
+            parsed_inline_handler_parameters(&handler.params, source),
             source,
         )),
         Argument::FunctionExpression(handler) => Some(parsed_inline_handler_body(
@@ -757,6 +758,7 @@ fn parsed_inline_handler(
             handler.body.as_deref()?,
             handler.r#async,
             false,
+            parsed_inline_handler_parameters(&handler.params, source),
             source,
         )),
         _ => None,
@@ -768,6 +770,7 @@ fn parsed_inline_handler_body(
     body: &oxc_ast::ast::FunctionBody<'_>,
     is_async: bool,
     is_expression_body: bool,
+    parameters: Vec<ParsedMethodParameter>,
     source: &str,
 ) -> ParsedInlineHandler {
     let mut state_updates = Vec::new();
@@ -784,10 +787,39 @@ fn parsed_inline_handler_body(
         body_span: source_span(source, body.span),
         is_async,
         is_expression_body,
+        parameters,
         state_updates,
         unsupported_statement_spans,
         effect_body: (!is_expression_body).then(|| parsed_inline_effect_body(body, source)),
     }
+}
+
+fn parsed_inline_handler_parameters(
+    parameters: &oxc_ast::ast::FormalParameters<'_>,
+    source: &str,
+) -> Vec<ParsedMethodParameter> {
+    parameters
+        .items
+        .iter()
+        .filter_map(|parameter| {
+            Some(ParsedMethodParameter {
+                name: binding_identifier_name(&parameter.pattern.kind)?,
+                decorators: normalized_decorators(
+                    parameter
+                        .decorators
+                        .iter()
+                        .filter_map(|decorator| parse_decorator(decorator, source))
+                        .collect(),
+                ),
+                span: source_span(source, parameter.span),
+                type_annotation: parameter
+                    .pattern
+                    .type_annotation
+                    .as_ref()
+                    .map(|annotation| parsed_type_annotation(annotation.span, source)),
+            })
+        })
+        .collect()
 }
 
 fn parsed_type_annotation(span: Span, source: &str) -> ParsedTypeAnnotation {

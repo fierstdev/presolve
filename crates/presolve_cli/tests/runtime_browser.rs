@@ -3559,9 +3559,10 @@ fn decorator_free_v2_action_field_runs_through_compiler_artifacts_in_a_real_brow
 export class Home extends Component {
   count = state(0);
   increment = action(() => { this.count += 1; });
+  setExact = action((value: number) => { this.count = value; });
   get baseCount() { return this.count; }
   get displayCount() { return this.baseCount; }
-  render() { return <button onClick={() => this.increment()}>Count: {this.displayCount}</button>; }
+  render() { return <main><button onClick={() => this.increment()}>Count: {this.displayCount}</button><button onClick={() => this.setExact(41)}>Set exact</button></main>; }
 }
 "#,
     )
@@ -6424,6 +6425,11 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   button.click();
   await waitFor(() => document.body.textContent.includes("Count: 1"), "Counter action binding");
   if (window.__PRESOLVE__.components[0].state.count !== 1) fail("compiler state did not update");
+  const exact = [...document.querySelectorAll("button")].find((candidate) => candidate.textContent === "Set exact");
+  if (exact === undefined) fail("V2 parameter action button was not emitted");
+  exact.click();
+  await waitFor(() => document.body.textContent.includes("Count: 41"), "V2 parameter action binding");
+  if (window.__PRESOLVE__.components[0].state.count !== 41) fail("compiler parameter action did not update");
   if (window.__PRESOLVE__.diagnostics.length !== 0) fail("runtime reported diagnostics");
   document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_FRAMEWORK_COUNTER_BROWSER_TEST_PASS</div>");
 })().catch((error) => {

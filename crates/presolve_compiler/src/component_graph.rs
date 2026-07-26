@@ -1595,6 +1595,7 @@ pub fn build_v2_component_graph_for_module(
         }
         let mut action_endpoints = Vec::new();
         let mut actions = Vec::new();
+        let mut v2_action_parameter_kinds = BTreeMap::new();
         for candidate in authored.declarations.iter().filter(|candidate| {
             candidate.kind == crate::CanonicalAuthoredDeclarationKindV1::Action
                 && candidate.subject.starts_with(&format!("{}.", class.name))
@@ -1633,9 +1634,6 @@ pub fn build_v2_component_graph_for_module(
             if handler.is_expression_body
                 || handler.is_async
                 || !handler.unsupported_statement_spans.is_empty()
-                || handler.state_updates.iter().any(|update| {
-                    matches!(update.operation, ParsedStateOperation::AssignParameter(_))
-                })
                 || handler
                     .state_updates
                     .iter()
@@ -1650,6 +1648,16 @@ pub fn build_v2_component_graph_for_module(
                 ));
                 continue;
             }
+            let Some(parameter_indices) = v2_action_parameter_indices(handler, class) else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2A1004",
+                    format!(
+                        "canonical V2 Action `{}` has unsupported handler parameter or State ownership evidence",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            };
             let endpoint_id = id.action_endpoint(name);
             let authority = crate::build_action_authority_v1(&[crate::ActionFactV1 {
                 id: endpoint_id.to_string(),
@@ -1682,6 +1690,23 @@ pub fn build_v2_component_graph_for_module(
                 owner: SemanticOwner::entity(id.clone()),
                 name: name.to_owned(),
             });
+            v2_action_parameter_kinds.insert(
+                name.to_owned(),
+                handler
+                    .parameters
+                    .iter()
+                    .map(|parameter| {
+                        declared_state_type_kind(
+                            &parameter
+                                .type_annotation
+                                .as_ref()
+                                .expect("validated V2 action parameter should be typed")
+                                .text,
+                        )
+                        .expect("validated V2 action parameter should be primitive")
+                    })
+                    .collect::<Vec<_>>(),
+            );
             actions.extend(
                 handler
                     .state_updates
@@ -1697,7 +1722,10 @@ pub fn build_v2_component_graph_for_module(
                             id: action_id,
                             owner: SemanticOwner::entity(endpoint_id.clone()),
                             method: name.to_owned(),
-                            operation: state_operation_from_parsed(&update.operation),
+                            operation: state_operation_from_v2_parsed(
+                                &update.operation,
+                                &parameter_indices,
+                            ),
                             field: update.field.clone(),
                         }
                     }),
@@ -1826,6 +1854,19 @@ pub fn build_v2_component_graph_for_module(
             );
             methods.push(computed);
         }
+        let render = class
+            .methods
+            .iter()
+            .find(|method| method.name == "render")
+            .map(|method| render_model_from_parsed_method(method, &id));
+        if let Some(render) = &render {
+            collect_v2_action_parameter_event_diagnostics(
+                class,
+                render,
+                &v2_action_parameter_kinds,
+                &mut diagnostics,
+            );
+        }
         components.push(ComponentNode {
             id: id.clone(),
             module_path: parsed.path.clone(),
@@ -1861,11 +1902,7 @@ pub fn build_v2_component_graph_for_module(
             effect_fields,
             action_endpoints,
             actions,
-            render: class
-                .methods
-                .iter()
-                .find(|method| method.name == "render")
-                .map(|method| render_model_from_parsed_method(method, &id)),
+            render,
         });
     }
     ComponentGraph {
@@ -4884,6 +4921,115 @@ fn static_argument_matches_annotation(
         Some("boolean") => matches!(argument, SerializableValue::Boolean(_)),
         Some("null") => matches!(argument, SerializableValue::Null),
         Some(_) | None => false,
+    }
+}
+
+/// Admit the only V2 parameter form whose execution is already represented by
+/// the runtime action product: a typed handler parameter assigned directly to
+/// a same-typed canonical State field. The returned ordinal is the compiler
+/// projection used by `assign_parameter`; source parameter names never reach
+/// the runtime artifact.
+fn v2_action_parameter_indices(
+    handler: &presolve_parser::ParsedInlineHandler,
+    class: &ParsedClass,
+) -> Option<BTreeMap<String, usize>> {
+    let parameter_indices = handler
+        .parameters
+        .iter()
+        .enumerate()
+        .map(|(index, parameter)| {
+            let kind = parameter
+                .type_annotation
+                .as_ref()
+                .and_then(|annotation| declared_state_type_kind(&annotation.text))?;
+            Some((parameter.name.clone(), (index, kind)))
+        })
+        .collect::<Option<BTreeMap<_, _>>>()?;
+    if parameter_indices.len() != handler.parameters.len() {
+        return None;
+    }
+    let used_parameters = handler
+        .state_updates
+        .iter()
+        .filter_map(|update| match &update.operation {
+            ParsedStateOperation::AssignParameter(name) => Some((name, update.field.as_str())),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    if used_parameters.len() != handler.parameters.len()
+        || used_parameters.iter().any(|(name, field)| {
+            let Some((_, parameter_kind)) = parameter_indices.get(*name) else {
+                return true;
+            };
+            state_field_primitive_kind(class, field) != Some(*parameter_kind)
+        })
+    {
+        return None;
+    }
+    Some(
+        parameter_indices
+            .into_iter()
+            .map(|(name, (index, _))| (name, index))
+            .collect(),
+    )
+}
+
+fn state_operation_from_v2_parsed(
+    operation: &ParsedStateOperation,
+    parameter_indices: &BTreeMap<String, usize>,
+) -> StateOperation {
+    match operation {
+        ParsedStateOperation::AssignParameter(name) => StateOperation::AssignParameter(
+            parameter_indices
+                .get(name)
+                .expect("validated V2 action parameter should have an ordinal")
+                .to_string(),
+        ),
+        _ => state_operation_from_parsed(operation),
+    }
+}
+
+fn collect_v2_action_parameter_event_diagnostics(
+    class: &ParsedClass,
+    render: &RenderModel,
+    parameter_kinds: &BTreeMap<String, Vec<DeclaredStateTypeKind>>,
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+) {
+    for event in render_event_handlers(render) {
+        let name = event
+            .handler
+            .strip_prefix("this.")
+            .unwrap_or(&event.handler);
+        let Some(expected_kinds) = parameter_kinds.get(name) else {
+            continue;
+        };
+        if event.arguments.len() != expected_kinds.len()
+            || event
+                .arguments
+                .iter()
+                .zip(expected_kinds)
+                .any(|(argument, expected)| {
+                    serializable_value_primitive_kind(argument) != Some(*expected)
+                })
+        {
+            diagnostics.push(ComponentDiagnostic::error(
+                "PSV2A1006",
+                format!(
+                    "event handler `{}` supplies arguments incompatible with canonical V2 Action `{name}` in class `{}`",
+                    event.handler, class.name,
+                ),
+            ));
+        }
+    }
+}
+
+fn serializable_value_primitive_kind(value: &SerializableValue) -> Option<DeclaredStateTypeKind> {
+    match value {
+        SerializableValue::Null => Some(DeclaredStateTypeKind::Null),
+        SerializableValue::Number(_) => Some(DeclaredStateTypeKind::Number),
+        SerializableValue::String(_) => Some(DeclaredStateTypeKind::String),
+        SerializableValue::Boolean(_) => Some(DeclaredStateTypeKind::Boolean),
+        SerializableValue::Array(_) | SerializableValue::Object(_) => None,
     }
 }
 
