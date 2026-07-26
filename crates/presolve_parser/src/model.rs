@@ -190,6 +190,25 @@ pub struct ParsedProperty {
 pub struct ParsedInitializerCall {
     pub callee_span: SourceSpan,
     pub span: SourceSpan,
+    /// An inline function argument selected from a general initializer call.
+    /// This remains syntax only: a later semantic authority decides whether
+    /// the surrounding call is a framework action or some unrelated helper.
+    pub inline_handler: Option<ParsedInlineHandler>,
+}
+
+/// Parser-owned facts for an inline function supplied to a class-field call.
+///
+/// The body retains only state updates supported by the existing compiler
+/// action semantics, plus exact spans for every other non-empty statement.
+/// Consumers must reject unsupported bodies rather than guessing a lowering.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedInlineHandler {
+    pub span: SourceSpan,
+    pub body_span: SourceSpan,
+    pub is_async: bool,
+    pub is_expression_body: bool,
+    pub state_updates: Vec<ParsedStateUpdate>,
+    pub unsupported_statement_spans: Vec<SourceSpan>,
 }
 
 /// Authored TypeScript annotation retained for a state field without type checking.

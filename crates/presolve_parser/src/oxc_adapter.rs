@@ -22,13 +22,14 @@ use crate::model::{
     ParsedEffectExpression, ParsedEffectExpressionKind, ParsedEffectStatement,
     ParsedEffectStatementKind, ParsedEventHandler, ParsedExport, ParsedExportKind,
     ParsedExportSpecifier, ParsedFile, ParsedImport, ParsedImportSpecifier, ParsedInitializerCall,
-    ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional,
-    ParsedJsxElement, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLocalVariable,
-    ParsedLogicalOperator, ParsedMethod, ParsedMethodCall, ParsedMethodParameter, ParsedProperty,
-    ParsedSerializableValue, ParsedSourceAst, ParsedStateOperation, ParsedStateUpdate,
-    ParsedStaticMemberDesignator, ParsedThisMemberDesignator, ParsedTypeAlias,
-    ParsedTypeAnnotation, ParsedUnaryOperator, ParsedUnsupportedEffectStatementKind,
-    ParsedValidationRuleArgument, ParsedValidationRuleArgumentKind, ParsedValidationRuleExpression,
+    ParsedInlineHandler, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild,
+    ParsedJsxConditional, ParsedJsxElement, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode,
+    ParsedLocalVariable, ParsedLogicalOperator, ParsedMethod, ParsedMethodCall,
+    ParsedMethodParameter, ParsedProperty, ParsedSerializableValue, ParsedSourceAst,
+    ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator,
+    ParsedThisMemberDesignator, ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator,
+    ParsedUnsupportedEffectStatementKind, ParsedValidationRuleArgument,
+    ParsedValidationRuleArgumentKind, ParsedValidationRuleExpression,
     ParsedValidationRuleExpressionKind, SourceSpan,
 };
 
@@ -620,6 +621,7 @@ fn parse_property(
         Some(ParsedInitializerCall {
             callee_span: source_span(source, call.callee.span()),
             span: source_span(source, call.span),
+            inline_handler: parsed_inline_handler(call, source),
         })
     });
     let initializer_literal = property
@@ -677,6 +679,60 @@ fn parse_property(
         is_declare: property.declare,
         span: source_span_from_offsets(source, declaration_start, property.span.end as usize),
     })
+}
+
+/// Retain general syntax facts for a single inline function argument.  This
+/// deliberately makes no inference from the callee spelling or field name.
+fn parsed_inline_handler(
+    call: &oxc_ast::ast::CallExpression<'_>,
+    source: &str,
+) -> Option<ParsedInlineHandler> {
+    let [argument] = call.arguments.as_slice() else {
+        return None;
+    };
+    match argument {
+        Argument::ArrowFunctionExpression(handler) => Some(parsed_inline_handler_body(
+            handler.span,
+            &handler.body,
+            handler.r#async,
+            handler.expression,
+            source,
+        )),
+        Argument::FunctionExpression(handler) => Some(parsed_inline_handler_body(
+            handler.span,
+            handler.body.as_deref()?,
+            handler.r#async,
+            false,
+            source,
+        )),
+        _ => None,
+    }
+}
+
+fn parsed_inline_handler_body(
+    span: Span,
+    body: &oxc_ast::ast::FunctionBody<'_>,
+    is_async: bool,
+    is_expression_body: bool,
+    source: &str,
+) -> ParsedInlineHandler {
+    let mut state_updates = Vec::new();
+    let mut unsupported_statement_spans = Vec::new();
+    for statement in &body.statements {
+        if let Some(update) = parsed_state_update(statement, source) {
+            state_updates.push(update);
+        } else if !matches!(statement, Statement::EmptyStatement(_)) {
+            unsupported_statement_spans.push(source_span(source, statement.span()));
+        }
+    }
+    ParsedInlineHandler {
+        span: source_span(source, span),
+        body_span: source_span(source, body.span),
+        is_async,
+        is_expression_body,
+        state_updates,
+        unsupported_statement_spans,
+    }
 }
 
 fn parsed_type_annotation(span: Span, source: &str) -> ParsedTypeAnnotation {

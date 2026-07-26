@@ -8,14 +8,14 @@ pub use model::{
     ParsedConstantExpression, ParsedConstantExpressionKind, ParsedDecorator, ParsedEffectBody,
     ParsedEffectExpression, ParsedEffectExpressionKind, ParsedEffectStatement,
     ParsedEffectStatementKind, ParsedEventHandler, ParsedExport, ParsedExportKind,
-    ParsedExportSpecifier, ParsedFile, ParsedImport, ParsedImportSpecifier, ParsedJsxAttribute,
-    ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional, ParsedJsxElement,
-    ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLocalVariable, ParsedLogicalOperator,
-    ParsedMethod, ParsedMethodCall, ParsedMethodParameter, ParsedProperty, ParsedSerializableValue,
-    ParsedSourceAst, ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator,
-    ParsedThisMemberDesignator, ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator,
-    ParsedUnsupportedEffectStatementKind, ParsedValidationRuleArgument,
-    ParsedValidationRuleArgumentKind, ParsedValidationRuleExpression,
+    ParsedExportSpecifier, ParsedFile, ParsedImport, ParsedImportSpecifier, ParsedInlineHandler,
+    ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional,
+    ParsedJsxElement, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLocalVariable,
+    ParsedLogicalOperator, ParsedMethod, ParsedMethodCall, ParsedMethodParameter, ParsedProperty,
+    ParsedSerializableValue, ParsedSourceAst, ParsedStateOperation, ParsedStateUpdate,
+    ParsedStaticMemberDesignator, ParsedThisMemberDesignator, ParsedTypeAlias,
+    ParsedTypeAnnotation, ParsedUnaryOperator, ParsedUnsupportedEffectStatementKind,
+    ParsedValidationRuleArgument, ParsedValidationRuleArgumentKind, ParsedValidationRuleExpression,
     ParsedValidationRuleExpressionKind, SourceSpan,
 };
 pub use oxc_adapter::parse_file;
@@ -198,6 +198,41 @@ class Profile {
         );
         assert_eq!(&source[call.span.start..call.span.end], "reactiveCell(0)");
         assert!(parsed.classes[0].properties[1].initializer_call.is_none());
+    }
+
+    #[test]
+    fn retains_inline_initializer_handler_updates_without_classifying_the_call() {
+        let source = r#"
+class Counter {
+  increment = activate(() => { this.count += 1; unrelated(); });
+  reset = activate(async function () { this.count = 0; });
+}
+"#;
+        let parsed = parse_file("src/Counter.tsx", source);
+        let increment = parsed.classes[0].properties[0]
+            .initializer_call
+            .as_ref()
+            .and_then(|call| call.inline_handler.as_ref())
+            .expect("inline arrow handler should remain a syntax fact");
+        assert!(!increment.is_async);
+        assert!(!increment.is_expression_body);
+        assert_eq!(increment.state_updates.len(), 1);
+        assert_eq!(increment.state_updates[0].field, "count");
+        assert_eq!(increment.unsupported_statement_spans.len(), 1);
+        assert_eq!(
+            &source[increment.unsupported_statement_spans[0].start
+                ..increment.unsupported_statement_spans[0].end],
+            "unrelated();"
+        );
+
+        let reset = parsed.classes[0].properties[1]
+            .initializer_call
+            .as_ref()
+            .and_then(|call| call.inline_handler.as_ref())
+            .expect("inline function handler should remain a syntax fact");
+        assert!(reset.is_async);
+        assert_eq!(reset.state_updates.len(), 1);
+        assert!(reset.unsupported_statement_spans.is_empty());
     }
 
     #[test]

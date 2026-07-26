@@ -22,6 +22,21 @@ No adapter may infer an action from a property name, initializer spelling, or
 decorator. A handler whose body lacks the required parser/authority evidence
 is rejected before runtime or publication.
 
+## Parser handler boundary
+
+`presolve_parser::ParsedInitializerCall::inline_handler` is the sole
+parser-owned input for the handler-body condition above. It is emitted only
+for a direct initializer call with exactly one inline arrow or function
+argument. It records the function and body spans, async and expression-body
+form, each existing `ParsedStateUpdate`, and the span of every other non-empty
+statement.
+
+The parser never treats the call as `action` and never lowers a handler. An
+expression-bodied handler, an unsupported statement, a missing handler, or a
+handler with no later authority admission is rejection evidence. The later
+projection may consume the retained update sequence, but must not reparse
+source text or treat an empty unsupported list as capture proof.
+
 ## Product
 
 A versioned action-field projection maps admitted handler operations to the
@@ -39,3 +54,6 @@ component and field identities. It must not synthesize a legacy
   lookalike calls, and malformed authority output fail before publication.
 - Decorated methods remain alpha compatibility evidence and are not invoked by
   the V2 action-field projection.
+- Parser retention alone is not runtime adoption: the action projection and
+  its cold/resume browser evidence remain required before this contract's
+  runtime acceptance is met.
