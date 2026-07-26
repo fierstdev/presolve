@@ -3560,9 +3560,10 @@ export class Home extends Component {
   count = state(0);
   increment = action(() => { this.count += 1; });
   setExact = action((value: number) => { this.count = value; });
+  setLocal = action(() => { const exact = 23; this.count = exact; });
   get baseCount() { return this.count; }
   get displayCount() { return this.baseCount; }
-  render() { return <main><button onClick={() => this.increment()}>Count: {this.displayCount}</button><button onClick={() => this.setExact(41)}>Set exact</button></main>; }
+  render() { return <main><button onClick={() => this.increment()}>Count: {this.displayCount}</button><button onClick={() => this.setExact(41)}>Set exact</button><button onClick={() => this.setLocal()}>Set local</button></main>; }
 }
 "#,
     )
@@ -6430,6 +6431,11 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   exact.click();
   await waitFor(() => document.body.textContent.includes("Count: 41"), "V2 parameter action binding");
   if (window.__PRESOLVE__.components[0].state.count !== 41) fail("compiler parameter action did not update");
+  const local = [...document.querySelectorAll("button")].find((candidate) => candidate.textContent === "Set local");
+  if (local === undefined) fail("V2 local action button was not emitted");
+  local.click();
+  await waitFor(() => document.body.textContent.includes("Count: 23"), "V2 local action binding");
+  if (window.__PRESOLVE__.components[0].state.count !== 23) fail("compiler local action did not update");
   if (window.__PRESOLVE__.diagnostics.length !== 0) fail("runtime reported diagnostics");
   document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_FRAMEWORK_COUNTER_BROWSER_TEST_PASS</div>");
 })().catch((error) => {

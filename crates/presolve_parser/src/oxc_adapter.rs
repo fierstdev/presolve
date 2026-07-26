@@ -773,11 +773,14 @@ fn parsed_inline_handler_body(
     parameters: Vec<ParsedMethodParameter>,
     source: &str,
 ) -> ParsedInlineHandler {
+    let mut local_variables = Vec::new();
     let mut state_updates = Vec::new();
     let mut unsupported_statement_spans = Vec::new();
     for statement in &body.statements {
         if let Some(update) = parsed_state_update(statement, source) {
             state_updates.push(update);
+        } else if let locals @ [.., _] = parsed_local_variables(statement, source).as_slice() {
+            local_variables.extend_from_slice(locals);
         } else if !matches!(statement, Statement::EmptyStatement(_)) {
             unsupported_statement_spans.push(source_span(source, statement.span()));
         }
@@ -788,6 +791,7 @@ fn parsed_inline_handler_body(
         is_async,
         is_expression_body,
         parameters,
+        local_variables,
         state_updates,
         unsupported_statement_spans,
         effect_body: (!is_expression_body).then(|| parsed_inline_effect_body(body, source)),

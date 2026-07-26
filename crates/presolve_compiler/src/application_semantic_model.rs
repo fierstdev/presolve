@@ -4867,7 +4867,7 @@ mod tests {
     fn canonical_v2_action_projects_typed_parameter_ordinals_and_rejects_bad_events() {
         let parsed = presolve_parser::parse_file(
             "app/routes/index.tsx",
-            "import { Component, state, action } from \"presolve\"; export class Home extends Component { count: number = state(0); setExact = action((value: number) => { this.count = value; }); render() { return <button onClick={() => this.setExact(\"wrong\")}>Set</button>; } }",
+            "import { Component, state, action } from \"presolve\"; export class Home extends Component { count: number = state(0); setExact = action((value: number) => { this.count = value; }); setLocal = action(() => { const exact = 23; this.count = exact; }); render() { return <button onClick={() => this.setExact(\"wrong\")}>Set</button>; } }",
         );
         let model = CanonicalAuthoredSemanticModelV1 {
             schema_version: crate::CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION,
@@ -4909,13 +4909,29 @@ mod tests {
                     intrinsic_identity: None,
                     derived_evidence: None,
                 },
+                CanonicalAuthoredDeclarationV1 {
+                    kind: CanonicalAuthoredDeclarationKindV1::Action,
+                    subject: "Home.setLocal".into(),
+                    source: crate::AuthoredSourceRangeV1 {
+                        start: 0,
+                        end: 1,
+                        line: 1,
+                        column: 1,
+                    },
+                    intrinsic_identity: None,
+                    derived_evidence: None,
+                },
             ],
         };
         let graph = build_v2_component_graph_for_module(&parsed, &model);
-        assert_eq!(graph.components[0].actions.len(), 1);
+        assert_eq!(graph.components[0].actions.len(), 2);
         assert!(matches!(
             graph.components[0].actions[0].operation,
             crate::StateOperation::AssignParameter(ref ordinal) if ordinal == "0"
+        ));
+        assert!(matches!(
+            graph.components[0].actions[1].operation,
+            crate::StateOperation::Assign(crate::SerializableValue::Number(ref value)) if value == "23"
         ));
         assert!(graph
             .diagnostics

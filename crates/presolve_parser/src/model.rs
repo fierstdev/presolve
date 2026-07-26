@@ -236,6 +236,10 @@ pub struct ParsedInlineHandler {
     /// syntax facts; later semantic lowering decides whether a handler form
     /// may consume them.
     pub parameters: Vec<ParsedMethodParameter>,
+    /// Serializable local declarations retained in source order. They have no
+    /// framework meaning until a later, authority-backed action projection
+    /// validates their use.
+    pub local_variables: Vec<ParsedLocalVariable>,
     pub state_updates: Vec<ParsedStateUpdate>,
     pub unsupported_statement_spans: Vec<SourceSpan>,
     /// A restricted ordered-body view retained from a general inline function.

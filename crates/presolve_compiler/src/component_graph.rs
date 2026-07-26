@@ -1648,7 +1648,7 @@ pub fn build_v2_component_graph_for_module(
                 ));
                 continue;
             }
-            let Some(parameter_indices) = v2_action_parameter_indices(handler, class) else {
+            let Some(operands) = v2_action_operands(handler, class) else {
                 diagnostics.push(ComponentDiagnostic::error(
                     "PSV2A1004",
                     format!(
@@ -1724,7 +1724,7 @@ pub fn build_v2_component_graph_for_module(
                             method: name.to_owned(),
                             operation: state_operation_from_v2_parsed(
                                 &update.operation,
-                                &parameter_indices,
+                                &operands,
                             ),
                             field: update.field.clone(),
                         }
@@ -4924,15 +4924,20 @@ fn static_argument_matches_annotation(
     }
 }
 
-/// Admit the only V2 parameter form whose execution is already represented by
-/// the runtime action product: a typed handler parameter assigned directly to
-/// a same-typed canonical State field. The returned ordinal is the compiler
-/// projection used by `assign_parameter`; source parameter names never reach
-/// the runtime artifact.
-fn v2_action_parameter_indices(
+#[derive(Debug, Clone)]
+enum V2ActionOperand {
+    Parameter(usize),
+    Local(SerializableValue),
+}
+
+/// Admit only inline operands already represented by the runtime action
+/// product: typed parameters or serializable local literals assigned directly
+/// to matching canonical State. Parameter names and local declarations never
+/// reach the artifact.
+fn v2_action_operands(
     handler: &presolve_parser::ParsedInlineHandler,
     class: &ParsedClass,
-) -> Option<BTreeMap<String, usize>> {
+) -> Option<BTreeMap<String, V2ActionOperand>> {
     let parameter_indices = handler
         .parameters
         .iter()
@@ -4948,43 +4953,60 @@ fn v2_action_parameter_indices(
     if parameter_indices.len() != handler.parameters.len() {
         return None;
     }
-    let used_parameters = handler
-        .state_updates
+    let locals = handler
+        .local_variables
         .iter()
-        .filter_map(|update| match &update.operation {
-            ParsedStateOperation::AssignParameter(name) => Some((name, update.field.as_str())),
-            _ => None,
+        .map(|local| {
+            let kind = serializable_primitive_kind(&local.value)?;
+            Some((local.name.clone(), (local.span, kind, &local.value)))
         })
-        .collect::<Vec<_>>();
-    if used_parameters.len() != handler.parameters.len()
-        || used_parameters.iter().any(|(name, field)| {
-            let Some((_, parameter_kind)) = parameter_indices.get(*name) else {
-                return true;
-            };
-            state_field_primitive_kind(class, field) != Some(*parameter_kind)
-        })
+        .collect::<Option<BTreeMap<_, _>>>()?;
+    if locals.len() != handler.local_variables.len()
+        || parameter_indices.keys().any(|name| locals.contains_key(name))
     {
         return None;
     }
-    Some(
-        parameter_indices
-            .into_iter()
-            .map(|(name, (index, _))| (name, index))
-            .collect(),
-    )
+    let uses = handler
+        .state_updates
+        .iter()
+        .filter_map(|update| match &update.operation {
+            ParsedStateOperation::AssignParameter(name) => Some((name, update)),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    if uses.len() != handler.parameters.len() + handler.local_variables.len() {
+        return None;
+    }
+    let mut operands = BTreeMap::new();
+    for (name, update) in uses {
+        let state_kind = state_field_primitive_kind(class, &update.field);
+        let operand = if let Some((index, parameter_kind)) = parameter_indices.get(name) {
+            (state_kind == Some(*parameter_kind)).then_some(V2ActionOperand::Parameter(*index))
+        } else if let Some((local_span, local_kind, local_value)) = locals.get(name) {
+            (local_span.start < update.span.start && state_kind == Some(*local_kind))
+                .then_some(V2ActionOperand::Local(serializable_value_from_parsed(local_value)))
+        } else {
+            None
+        }?;
+        if operands.insert(name.clone(), operand).is_some() {
+            return None;
+        }
+    }
+    Some(operands)
 }
 
 fn state_operation_from_v2_parsed(
     operation: &ParsedStateOperation,
-    parameter_indices: &BTreeMap<String, usize>,
+    operands: &BTreeMap<String, V2ActionOperand>,
 ) -> StateOperation {
     match operation {
-        ParsedStateOperation::AssignParameter(name) => StateOperation::AssignParameter(
-            parameter_indices
+        ParsedStateOperation::AssignParameter(name) => match operands
                 .get(name)
-                .expect("validated V2 action parameter should have an ordinal")
-                .to_string(),
-        ),
+                .expect("validated V2 action operand should be available")
+            {
+                V2ActionOperand::Parameter(index) => StateOperation::AssignParameter(index.to_string()),
+                V2ActionOperand::Local(value) => StateOperation::Assign(value.clone()),
+            },
         _ => state_operation_from_parsed(operation),
     }
 }

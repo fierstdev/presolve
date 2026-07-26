@@ -55,6 +55,9 @@ normative source for this handoff.
 - [V2 synchronous Action-parameter contract](action-parameter-contract.md)
   admits only typed static event arguments assigned directly to matching
   canonical State, using the existing ordinal runtime operation.
+- [V2 synchronous Action-local-literal contract](action-local-literal-contract.md)
+  projects compiler-retained local primitives to ordinary literal assignments
+  without runtime source evaluation.
 - [V2 effect-field source contract](effect-field-source-contract.md) defines
   the authority-backed, decorator-free effect declaration boundary before
   lifecycle runtime adoption.
