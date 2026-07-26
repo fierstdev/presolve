@@ -2220,7 +2220,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     let projectionRegistration = null;
     try {
       target.end.parentNode.insertBefore(template.content, target.end);
-      const projection = structuralHostProjectionRecords(store, fragmentRecord, component);
+      const projection = structuralHostProjectionRecords(store, fragmentRecord, component, html);
       projectionRegistration = registerStructuralOccurrenceRecords(store, {
         ...projection,
         occurrence_identity: component.instance_id
@@ -2249,7 +2249,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       }
       target.end.parentNode.insertBefore(previous, target.end);
       if (priorProjection !== null) {
-        const projection = structuralHostProjectionRecords(store, fragmentRecord, component);
+        const projection = structuralHostProjectionRecords(store, fragmentRecord, component, html);
         target.structural_projection_registration = registerStructuralOccurrenceRecords(store, {
           ...projection,
           occurrence_identity: component.instance_id
@@ -2463,12 +2463,15 @@ const RUNTIME_STUB: &str = r#"(() => {
     throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
   }
 
-  function structuralHostProjectionRecords(store, fragment, component, itemKey = null) {
+  function structuralHostProjectionRecords(store, fragment, component, compilerHtml, itemKey = null) {
+    if (typeof compilerHtml !== "string") throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
     const records = [];
     const ids = new Set();
     for (const binding of fragment?.slot_projection_bindings ?? []) {
       const source = store.structuralSlotProjectionPrograms?.get(binding);
       if (source === undefined) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      const emitted = [...source.targets, ...source.bindings].some((pair) => compilerHtml.includes(pair.artifact.id));
+      if (!emitted) continue;
       const owner = structuralProjectionOwnerScope(store, component, source.caller_instance);
       const rewrite = (value) => {
         const base = owner === source.caller_instance ? value
@@ -2698,7 +2701,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         let projectionRegistration = null;
         try {
           parent.insertBefore(rendered.element, endMarker);
-          const projection = structuralHostProjectionRecords(store, fragmentRecord, component, key);
+          const projection = structuralHostProjectionRecords(store, fragmentRecord, component, fragmentRecord.item_template_html, key);
           projectionRegistration = registerStructuralOccurrenceRecords(store, {
             ...projection,
             occurrence_identity: component.instance_id
