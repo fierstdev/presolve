@@ -50,6 +50,8 @@ pub struct ParsedImport {
 pub struct ParsedImportSpecifier {
     pub imported: String,
     pub local: String,
+    /// The exact local binding span selected from the general source AST.
+    pub local_span: SourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

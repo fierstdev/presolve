@@ -232,18 +232,21 @@ fn parse_import_declaration(
                         ParsedImportSpecifier {
                             imported: module_export_name(&specifier.imported),
                             local: specifier.local.name.to_string(),
+                            local_span: source_span(source, specifier.local.span),
                         }
                     }
                     ImportDeclarationSpecifier::ImportDefaultSpecifier(specifier) => {
                         ParsedImportSpecifier {
                             imported: "default".to_string(),
                             local: specifier.local.name.to_string(),
+                            local_span: source_span(source, specifier.local.span),
                         }
                     }
                     ImportDeclarationSpecifier::ImportNamespaceSpecifier(specifier) => {
                         ParsedImportSpecifier {
                             imported: "*".to_string(),
                             local: specifier.local.name.to_string(),
+                            local_span: source_span(source, specifier.local.span),
                         }
                     }
                 })

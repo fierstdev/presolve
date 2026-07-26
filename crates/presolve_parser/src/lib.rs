@@ -171,6 +171,19 @@ class Profile {
     }
 
     #[test]
+    fn retains_source_faithful_import_binding_spans() {
+        let source = "import { Component as FrameworkBase } from \"presolve\";";
+        let parsed = parse_file("src/Card.tsx", source);
+        let specifier = &parsed.imports[0].specifiers[0];
+        assert_eq!(specifier.imported, "Component");
+        assert_eq!(specifier.local, "FrameworkBase");
+        assert_eq!(
+            &source[specifier.local_span.start..specifier.local_span.end],
+            "FrameworkBase"
+        );
+    }
+
+    #[test]
     fn retains_direct_initializer_call_spans_without_intrinsic_classification() {
         let source = "class Counter { count = reactiveCell(0); plain = 1; }";
         let parsed = parse_file("src/Counter.tsx", source);
