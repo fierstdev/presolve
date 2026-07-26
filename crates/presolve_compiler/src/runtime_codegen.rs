@@ -2294,6 +2294,14 @@ const RUNTIME_STUB: &str = r#"(() => {
     const bindings = store.bindingsByInstanceComputed.get(key) ?? [];
     bindings.push(updateBinding);
     store.bindingsByInstanceComputed.set(key, bindings);
+    return () => {
+      const active = store.bindingsByInstanceComputed.get(key);
+      if (active === undefined) return;
+      const index = active.indexOf(updateBinding);
+      if (index < 0) return;
+      active.splice(index, 1);
+      if (active.length === 0) store.bindingsByInstanceComputed.delete(key);
+    };
   }
 
   function storeComputedValue(store, evaluation, value) {
@@ -2992,12 +3000,27 @@ const RUNTIME_STUB: &str = r#"(() => {
       const bindings = store.bindingsByStateSlot.get(slot.slot_id) ?? [];
       bindings.push(updateBinding);
       store.bindingsByStateSlot.set(slot.slot_id, bindings);
-      return;
+      return () => {
+        const active = store.bindingsByStateSlot.get(slot.slot_id);
+        if (active === undefined) return;
+        const index = active.indexOf(updateBinding);
+        if (index < 0) return;
+        active.splice(index, 1);
+        if (active.length === 0) store.bindingsByStateSlot.delete(slot.slot_id);
+      };
     }
     const key = componentFieldKey(component.name, field);
     const bindings = store.bindingsByField.get(key) ?? [];
     bindings.push(updateBinding);
     store.bindingsByField.set(key, bindings);
+    return () => {
+      const active = store.bindingsByField.get(key);
+      if (active === undefined) return;
+      const index = active.indexOf(updateBinding);
+      if (index < 0) return;
+      active.splice(index, 1);
+      if (active.length === 0) store.bindingsByField.delete(key);
+    };
   }
 
   function registerActions(store, component, manifestComponent) {
@@ -3531,10 +3554,10 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (update === null) throw new PresolveBootError("PSR_INVALID_ORDINARY_BINDING");
     if (slot !== null) {
       update(store.storageValues.get(slot.slot_id));
-      registerBinding(store, component, field, update, storageId);
+      return registerBinding(store, component, field, update, storageId);
     } else {
       update(computedValueForInstance(store, binding.component_instance_id, computedId));
-      registerComputedBinding(store, binding.component_instance_id, computedId, update);
+      return registerComputedBinding(store, binding.component_instance_id, computedId, update);
     }
   }
 
@@ -4974,6 +4997,7 @@ mod tests {
         assert!(runtime.contains("function stageStructuralOccurrenceRecords"));
         assert!(runtime.contains("function renderStructuralOccurrenceTemplate"));
         assert!(runtime.contains("function attachStructuralOccurrenceFragment"));
+        assert!(runtime.contains("active.indexOf(updateBinding)"));
         assert!(runtime.contains("function structuralOccurrenceTemplateRegistry"));
         assert!(runtime.contains("structuralOccurrenceTemplatesByInvocation"));
         assert!(runtime.contains("structuralStateSlots = new Set()"));
