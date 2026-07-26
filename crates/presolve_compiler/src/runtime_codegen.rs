@@ -5471,7 +5471,13 @@ const RUNTIME_STUB: &str = r#"(() => {
     const staged = [];
     for (const activation of resourcesArtifact.activations ?? []) {
       const declaration = declarations.get(activation.declaration);
-      if (declaration === undefined || declaration.endpoint?.resume_policy !== "snapshot") {
+      if (declaration === undefined) {
+        throw new ResumeBootError("ResourceArtifactMismatch");
+      }
+      if (declaration.endpoint?.resume_policy === "reload") {
+        continue;
+      }
+      if (declaration.endpoint?.resume_policy !== "snapshot") {
         throw new ResumeBootError("ResourceResumeUnsupported");
       }
       const slotIds = [activation.state_slot, activation.data_slot, activation.error_slot];
@@ -5534,7 +5540,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
-  function restoreResumeRuntimeThroughForms(
+  async function restoreResumeRuntimeThroughForms(
     manifest,
     snapshot,
     registry,
@@ -5575,6 +5581,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     );
     restoreResumeForms(templateManifest, snapshot, registry, store, formsArtifact);
     installResumeDomBindings(store, templateManifest, componentArtifact);
+    await initializeResourcesRuntime(store, resourcesArtifact, diagnostics, "reload");
     establishResumeEffects(registry, store, effectArtifact);
     installEffectDisposal(store);
     installResumeActivationListeners(registry, store);
@@ -5660,7 +5667,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     };
   }
 
-  async function initializeResourcesRuntime(store, resourcesArtifact, diagnostics) {
+  async function initializeResourcesRuntime(store, resourcesArtifact, diagnostics, resumePolicy = null) {
     if (resourcesArtifact === null) return;
     window.addEventListener("pagehide", () => {
       for (const resource of store.resources.values()) resource.controller.abort();
@@ -5670,6 +5677,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     for (const activation of resourcesArtifact.activations) {
       const declaration = declarations.get(activation.declaration);
       if (declaration === undefined) throw new PresolveBootError("PSR_INVALID_RESOURCES_ARTIFACT");
+      if (resumePolicy !== null && declaration.endpoint.resume_policy !== resumePolicy) continue;
       if (!["Client", "Shared"].includes(declaration.execution_boundary)) {
         reportDiagnostic(diagnostics, "PSR_RESOURCE_SERVER_UNAVAILABLE", "A server-only Resource cannot activate in the browser runtime", { activation, declaration }, true);
         throw new PresolveBootError("PSR_RESOURCE_SERVER_UNAVAILABLE");
@@ -6130,7 +6138,7 @@ mod tests {
         assert!(runtime.contains("async function activateByEvent"));
         assert!(runtime.contains("async function activateBoundary"));
         assert!(runtime.contains("function decodeResumeValue"));
-        assert!(runtime.contains("function restoreResumeRuntimeThroughForms"));
+        assert!(runtime.contains("async function restoreResumeRuntimeThroughForms"));
         assert!(runtime.contains("function allocateResumeResources"));
         assert!(runtime.contains("function finalizeRestoredResources"));
         assert!(runtime.contains("ResourceResumeUnsupported"));

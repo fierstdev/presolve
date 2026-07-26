@@ -59,6 +59,12 @@ with the opposite terminal value null. Any missing slot, wrong linkage, bad
 codec value, pending/cancelled state, or cross-terminal value causes one cold
 fallback; snapshot restore never imports or invokes the endpoint.
 
+For `reload`, the browser restores no Resource value and publishes no Resource
+snapshot slot. It waits until State, computed, Context, component, Form, and
+DOM-binding restoration has completed, then invokes the exact client/shared
+endpoint once at generation one. Snapshot-policy endpoints are excluded from
+that call path.
+
 ## Acceptance
 
 - Browser tests prove ready snapshot restoration without endpoint execution,

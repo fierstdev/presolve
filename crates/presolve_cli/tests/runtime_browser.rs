@@ -345,6 +345,92 @@ const wait = setInterval(() => {{
     );
 
     fs::write(
+        &contract,
+        r#"{"schema_version":1,"package":"profile-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadProfile":{"kind":"resource","type_signature":"() -> Resource<string, string>","runtime_module":"dist/load-profile.js","resume_policy":"reload","resource_endpoint":{"execution_boundary":"shared","cancellation":"abort","resume":"reload"}}}}"#,
+    )
+    .expect("failed to write reload Resource package contract");
+    let output = Command::new(presolve_cli_bin())
+        .current_dir(&repo_root)
+        .args([
+            "build",
+            source.to_str().expect("Resource source path was not UTF-8"),
+            "--package-contract",
+            &format!("profile-service={}", contract.display()),
+            "--package-runtime",
+            "profile-service=./resource-endpoint.js",
+            "--out",
+            out_dir
+                .to_str()
+                .expect("Resource browser output path was not UTF-8"),
+        ])
+        .output()
+        .expect("failed to build reload Resource browser fixture");
+    assert!(
+        output.status.success(),
+        "reload Resource fixture build failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    fs::write(
+        out_dir.join("resource-endpoint.js"),
+        "export async function loadProfile() { window.__PRESOLVE_RESOURCE_RELOAD_CALLS__ = (window.__PRESOLVE_RESOURCE_RELOAD_CALLS__ ?? 0) + 1; return 'Reloaded'; }\n",
+    )
+    .expect("failed to write reload Resource endpoint module");
+    let reload_index = fs::read_to_string(out_dir.join("index.html"))
+        .expect("failed to read reload Resource page");
+    let reload_manifest: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(out_dir.join("resume.runtime.json"))
+            .expect("reload Resource resume manifest"),
+    )
+    .expect("reload Resource resume manifest JSON");
+    assert!(reload_manifest["slot_schemas"]
+        .as_array()
+        .expect("reload manifest slots")
+        .iter()
+        .all(|slot| !slot["existing_storage_slot_id"]
+            .as_str()
+            .is_some_and(|id| id.contains("resource-slot"))));
+    let reload_snapshot = resume_bootstrap_snapshot(&reload_manifest);
+    let reload_snapshot_json = serde_json::to_string(&reload_snapshot)
+        .expect("reload Resource snapshot JSON");
+    let reload_probe = reload_index.replace(
+        "</body>",
+        &format!(r#"<script>
+window.__PRESOLVE_RESUME_SNAPSHOT__ = {reload_snapshot_json};
+const deadline = Date.now() + 4000;
+const wait = setInterval(() => {{
+  const runtime = window.__PRESOLVE__;
+  const resource = runtime?.resources?.find((record) => record.id.includes("resource:profile"));
+  if (runtime?.resume?.mode === "resume" && resource?.state === "ready" && resource?.generation === 1
+    && document.querySelector("main")?.textContent === "Reloaded" && window.__PRESOLVE_RESOURCE_RELOAD_CALLS__ === 1) {{
+    clearInterval(wait);
+    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_RESOURCE_RELOAD_BROWSER_TEST_PASS</div>");
+  }} else if (Date.now() > deadline) {{
+    clearInterval(wait);
+    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_RESOURCE_RELOAD_BROWSER_TEST_FAIL</div>");
+  }}
+}}, 20);
+</script></body>"#),
+    );
+    fs::write(out_dir.join("reload-probe.html"), reload_probe)
+        .expect("failed to write Resource reload probe");
+    let server = StaticServer::start(out_dir.clone());
+    let profile_dir = out_dir.join(format!("chrome-reload-profile-{}", std::process::id()));
+    fs::create_dir_all(&profile_dir).expect("failed to create Resource reload Chrome profile");
+    let output = run_chrome_probe(
+        chrome.clone(),
+        &format!("--user-data-dir={}", profile_dir.display()),
+        &format!("http://127.0.0.1:{}/reload-probe.html", server.port),
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("PRESOLVE_RESOURCE_RELOAD_BROWSER_TEST_PASS"),
+        "Resource reload browser probe failed\nstdout:\n{}\nstderr:\n{}",
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    fs::write(
         out_dir.join("resource-endpoint.js"),
         "export async function loadProfile() { return { name: 'Ada' }; }\n",
     )
