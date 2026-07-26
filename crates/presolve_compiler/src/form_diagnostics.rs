@@ -379,7 +379,7 @@ mod tests {
 
     #[test]
     fn phase_i_i17_updates_the_forms_inspection_schema_versions() {
-        assert_eq!(RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION, 15);
+        assert_eq!(RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION, 16);
         assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 6);
         assert_eq!(TEMPLATE_MANIFEST_SCHEMA_VERSION, 5);
         assert_eq!(RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, 2);

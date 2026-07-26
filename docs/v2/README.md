@@ -76,6 +76,8 @@ normative source for this handoff.
 - [Structural static-conditional activation contract](structural-static-conditional-activation-contract.md)
   admits the first compiler-authoritative dynamic slice while keyed, nested,
   Slot, Effect, and resume paths remain fail-closed.
+- [Structural keyed-host activation contract](structural-keyed-activation-contract.md)
+  fixes per-item compiler membership before keyed reconciliation may activate.
 - [Environment-read lowering contract](environment-read-lowering-contract.md)
   defines the manifest-backed source boundary for browser-visible environment
   values.

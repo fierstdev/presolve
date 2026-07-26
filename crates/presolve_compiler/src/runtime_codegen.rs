@@ -1022,7 +1022,12 @@ const RUNTIME_STUB: &str = r#"(() => {
               : fragments.host_scope === "structural-occurrence"
                 ? structuralTemplateComponents.get(fragments.host_instance) !== program.host_component
                 : true)
-            || typeof fragments.item_template_html !== "string" || fragments.item_template_html.length === 0)
+            || typeof fragments.item_template_html !== "string" || fragments.item_template_html.length === 0
+            || !Array.isArray(fragments.item_invocations)
+            || new Set(fragments.item_invocations).size !== fragments.item_invocations.length
+            || fragments.item_invocations.some((invocation) =>
+              !program.template_occurrences.some((occurrence) => occurrence.invocation === invocation)
+            ))
           || program.template_occurrences.some((occurrence, index) => typeof occurrence?.template_instance !== "string"
             || occurrence.template_instance !== program.template_instances[index]
             || typeof occurrence.invocation !== "string" || typeof occurrence.invocation_template_entity !== "string"

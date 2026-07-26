@@ -9,7 +9,7 @@ Effects, cleanup, or resume.
 
 ## Authority and eligibility
 
-The runtime may enter this slice only for one validated schema-v15 structural
+The runtime may enter this slice only for one validated schema-v16 structural
 program whose host is a conditional template node and whose selected
 `conditional_host_fragments` record has:
 

@@ -9,7 +9,7 @@ use crate::{
 };
 use crate::{TemplateChild, TemplateNode, TemplateSemanticKind};
 
-pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 15;
+pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 16;
 
 /// Public H14 compiler artifact. All executable references are canonical IDs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -171,6 +171,7 @@ pub struct SerializedStructuralKeyedHostFragment {
     pub host_scope: String,
     pub host_instance: String,
     pub item_template_html: String,
+    pub item_invocations: Vec<String>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SerializedStructuralTemplateOccurrence {
@@ -437,6 +438,7 @@ pub fn build_runtime_component_artifact(
                 host_scope: fragments.host_scope.artifact_text().to_string(),
                 host_instance: fragments.host_instance.to_string(),
                 item_template_html: fragments.item_template_html,
+                item_invocations: fragments.item_invocations,
             })
             .collect(),
             template_occurrences: program.template_occurrences,
@@ -687,12 +689,27 @@ pub fn validate_runtime_component_artifact(
                         .any(|invocation| !known_invocations.contains(invocation.as_str()))
             })
             || program.keyed_host_fragments.iter().any(|fragments| {
+                let known_invocations = program
+                    .template_occurrences
+                    .iter()
+                    .map(|occurrence| occurrence.invocation.as_str())
+                    .collect::<std::collections::BTreeSet<_>>();
                 fragments.host_instance.is_empty()
                     || !matches!(
                         fragments.host_scope.as_str(),
                         "static-instance" | "structural-occurrence"
                     )
                     || fragments.item_template_html.is_empty()
+                    || fragments.item_invocations.len()
+                        != fragments
+                            .item_invocations
+                            .iter()
+                            .collect::<std::collections::BTreeSet<_>>()
+                            .len()
+                    || fragments
+                        .item_invocations
+                        .iter()
+                        .any(|invocation| !known_invocations.contains(invocation.as_str()))
             })
             || program.template_occurrences.len() != program.template_instances.len()
             || program.template_occurrences.iter().any(|occurrence| {
@@ -1286,6 +1303,12 @@ mod tests {
         assert!(keyed_fragments
             .item_template_html
             .contains("data-presolve-structural-invocation="));
+        assert_eq!(
+            keyed_fragments.item_invocations,
+            crate::ordinary_html_codegen::structural_invocations_in_compiler_html(
+                &keyed_fragments.item_template_html
+            )
+        );
 
         let mut invalid_fragments = artifact.clone();
         invalid_fragments
@@ -1319,6 +1342,17 @@ mod tests {
             .item_template_html
             .clear();
         assert!(validate_runtime_component_artifact(&invalid_keyed).is_err());
+
+        let mut invalid_keyed_membership = artifact.clone();
+        invalid_keyed_membership
+            .structural_programs
+            .iter_mut()
+            .find(|program| !program.keyed_host_fragments.is_empty())
+            .expect("keyed host has compiler-authored fragments")
+            .keyed_host_fragments[0]
+            .item_invocations
+            .push("fabricated-invocation".to_string());
+        assert!(validate_runtime_component_artifact(&invalid_keyed_membership).is_err());
 
         let mut invalid_host = artifact.clone();
         let idle = invalid_host

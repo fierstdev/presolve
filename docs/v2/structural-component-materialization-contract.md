@@ -71,7 +71,11 @@ conditional host fragment. It closes the integrity boundary needed for
 activation: a renderer can reject a missing, duplicate, or substituted marker
 instead of treating a modified branch as an empty structural selection.
 
-Schemas v10 through v15 are not general runtime materializers. They establish the
+Schema v16 adds the corresponding exact invocation membership to each keyed
+item fragment. It is prerequisite data only: keyed materialization remains
+inactive until retention, reorder, and removal transactions consume it.
+
+Schemas v10 through v16 are not general runtime materializers. They establish the
 validated compiler template, membership set, and initial conditional-host
 fragments from which the later complete program must be constructed; the
 runtime must not activate, infer, or partially use them for dynamic component

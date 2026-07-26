@@ -52,6 +52,7 @@ pub struct StructuralKeyedHostFragment {
     pub host_scope: StructuralConditionalHostScope,
     pub host_instance: ComponentInstanceId,
     pub item_template_html: String,
+    pub item_invocations: Vec<String>,
 }
 
 /// The only host scopes the compiler currently renders exactly.
@@ -412,6 +413,7 @@ pub fn generate_structural_keyed_host_fragments(
             StructuralKeyedHostFragment {
                 host_scope,
                 host_instance: instance.id.clone(),
+                item_invocations: structural_invocations_in_compiler_html(&html),
                 item_template_html: html,
             }
         })
