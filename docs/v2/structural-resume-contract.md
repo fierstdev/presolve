@@ -7,7 +7,7 @@ Effect ownership can be proven without selector or source recovery.
 
 ## Versioned products
 
-Component artifact schema v18 (carried forward by schema v19) adds the compiler-issued resume codec to every
+Component artifact schema v18 (carried forward by schema v20) adds the compiler-issued resume codec to every
 serializable occurrence State slot and the exact parent template-instance ID to
 every structural occurrence template. Resume manifest v7 requires snapshot
 schema v2. A schema-v2 snapshot retains the existing fixed boundary values and

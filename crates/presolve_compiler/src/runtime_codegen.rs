@@ -1049,8 +1049,15 @@ const RUNTIME_STUB: &str = r#"(() => {
             || !Array.isArray(fragments.when_true_invocations)
             || !Array.isArray(fragments.when_false_invocations)
             || !Array.isArray(fragments.slot_projection_bindings)
+            || !Array.isArray(fragments.slot_projection_programs)
+            || fragments.slot_projection_programs.length !== fragments.slot_projection_bindings.length
             || new Set(fragments.slot_projection_bindings).size !== fragments.slot_projection_bindings.length
             || fragments.slot_projection_bindings.some((binding) => slotBindingCallees.get(binding) !== fragments.host_instance)
+            || fragments.slot_projection_programs.some((projection) => typeof projection?.binding !== "string"
+              || !fragments.slot_projection_bindings.includes(projection.binding)
+              || typeof projection.caller_instance !== "string" || typeof projection.content_owner_instance !== "string"
+              || !Array.isArray(projection.target_ids) || !Array.isArray(projection.binding_ids)
+              || !Array.isArray(projection.event_ids) || !Array.isArray(projection.nested_invocations))
             || new Set(fragments.when_true_invocations).size !== fragments.when_true_invocations.length
             || new Set(fragments.when_false_invocations).size !== fragments.when_false_invocations.length
             || [...fragments.when_true_invocations, ...fragments.when_false_invocations].some((invocation) =>
@@ -1067,8 +1074,15 @@ const RUNTIME_STUB: &str = r#"(() => {
             || typeof fragments.item_template_html !== "string" || fragments.item_template_html.length === 0
             || !Array.isArray(fragments.item_invocations)
             || !Array.isArray(fragments.slot_projection_bindings)
+            || !Array.isArray(fragments.slot_projection_programs)
+            || fragments.slot_projection_programs.length !== fragments.slot_projection_bindings.length
             || new Set(fragments.slot_projection_bindings).size !== fragments.slot_projection_bindings.length
             || fragments.slot_projection_bindings.some((binding) => slotBindingCallees.get(binding) !== fragments.host_instance)
+            || fragments.slot_projection_programs.some((projection) => typeof projection?.binding !== "string"
+              || !fragments.slot_projection_bindings.includes(projection.binding)
+              || typeof projection.caller_instance !== "string" || typeof projection.content_owner_instance !== "string"
+              || !Array.isArray(projection.target_ids) || !Array.isArray(projection.binding_ids)
+              || !Array.isArray(projection.event_ids) || !Array.isArray(projection.nested_invocations))
             || new Set(fragments.item_invocations).size !== fragments.item_invocations.length
             || fragments.item_invocations.some((invocation) =>
               !program.template_occurrences.some((occurrence) => occurrence.invocation === invocation)
@@ -2200,9 +2214,17 @@ const RUNTIME_STUB: &str = r#"(() => {
       current = next;
     }
     const prior = target.structural_occurrences ?? [];
+    const priorProjection = target.structural_projection_registration ?? null;
+    priorProjection?.rollback();
     const created = [];
+    let projectionRegistration = null;
     try {
       target.end.parentNode.insertBefore(template.content, target.end);
+      const projection = structuralHostProjectionRecords(store, fragmentRecord, component);
+      projectionRegistration = registerStructuralOccurrenceRecords(store, {
+        ...projection,
+        occurrence_identity: component.instance_id
+      });
       for (const anchor of anchors) {
         created.push(materializeStructuralOccurrence(
           store,
@@ -2213,10 +2235,12 @@ const RUNTIME_STUB: &str = r#"(() => {
       }
       for (const occurrence of [...prior].reverse()) occurrence.dispose();
       target.structural_occurrences = Object.freeze(created);
+      target.structural_projection_registration = projectionRegistration;
       target.structural_branch = branch;
       store.elementsByNode = collectElementAnchors();
     } catch (error) {
       for (const occurrence of [...created].reverse()) occurrence.dispose();
+      projectionRegistration?.rollback();
       current = target.start.nextSibling;
       while (current !== null && current !== target.end) {
         const next = current.nextSibling;
@@ -2224,6 +2248,13 @@ const RUNTIME_STUB: &str = r#"(() => {
         current = next;
       }
       target.end.parentNode.insertBefore(previous, target.end);
+      if (priorProjection !== null) {
+        const projection = structuralHostProjectionRecords(store, fragmentRecord, component);
+        target.structural_projection_registration = registerStructuralOccurrenceRecords(store, {
+          ...projection,
+          occurrence_identity: component.instance_id
+        });
+      }
       throw error;
     }
   }
@@ -2334,6 +2365,137 @@ const RUNTIME_STUB: &str = r#"(() => {
       }
     }
     return registry;
+  }
+
+  function structuralSlotProjectionRegistry(manifest, componentArtifact) {
+    const targets = new Map((componentArtifact?.ordinary_template_targets ?? []).map((record) => [record.id, record]));
+    const bindings = new Map((componentArtifact?.ordinary_template_bindings ?? []).map((record) => [record.id, record]));
+    const manifestTargets = new Map((manifest?.ordinary_targets ?? []).map((record) => [record.id, record]));
+    const manifestBindings = new Map((manifest?.ordinary_bindings ?? []).map((record) => [record.instance_binding_id, record]));
+    const slotBindings = new Map((componentArtifact?.slot_binding_programs ?? []).map((record) => [record.binding, record]));
+    if (targets.size !== (componentArtifact?.ordinary_template_targets ?? []).length
+      || bindings.size !== (componentArtifact?.ordinary_template_bindings ?? []).length
+      || manifestTargets.size !== (manifest?.ordinary_targets ?? []).length
+      || manifestBindings.size !== (manifest?.ordinary_bindings ?? []).length
+      || slotBindings.size !== (componentArtifact?.slot_binding_programs ?? []).length) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const registry = new Map();
+    for (const program of componentArtifact?.structural_programs ?? []) {
+      for (const fragment of [...(program.conditional_host_fragments ?? []), ...(program.keyed_host_fragments ?? [])]) {
+        const programs = fragment?.slot_projection_programs;
+        if (!Array.isArray(programs) || !Array.isArray(fragment.slot_projection_bindings)
+          || programs.length !== fragment.slot_projection_bindings.length) {
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        for (const projection of programs) {
+          const slotBinding = slotBindings.get(projection?.binding);
+          if (slotBinding === undefined || slotBinding.binding !== projection.binding
+            || slotBinding.callee_instance !== fragment.host_instance
+            || slotBinding.caller_instance !== projection.caller_instance
+            || slotBinding.content_owner_instance !== projection.content_owner_instance
+            || !fragment.slot_projection_bindings.includes(projection.binding)
+            || !Array.isArray(projection.target_ids) || !Array.isArray(projection.binding_ids)
+            || !Array.isArray(projection.event_ids) || !Array.isArray(projection.nested_invocations)
+            || new Set(projection.target_ids).size !== projection.target_ids.length
+            || new Set(projection.binding_ids).size !== projection.binding_ids.length
+            || new Set(projection.event_ids).size !== projection.event_ids.length
+            || new Set(projection.nested_invocations).size !== projection.nested_invocations.length) {
+            throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+          }
+          const targetPairs = projection.target_ids.map((id) => {
+            const artifact = targets.get(id); const manifestRecord = manifestTargets.get(id);
+            if (artifact === undefined || manifestRecord === undefined
+              || artifact.component_instance_id !== projection.caller_instance
+              || manifestRecord.component_instance_id !== projection.caller_instance) {
+              throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+            }
+            return Object.freeze({ artifact, manifest: manifestRecord });
+          });
+          const targetIds = new Set(projection.target_ids);
+          const bindingPairs = projection.binding_ids.map((id) => {
+            const artifact = bindings.get(id); const manifestRecord = manifestBindings.get(id);
+            if (artifact === undefined || manifestRecord === undefined
+              || artifact.component_instance_id !== projection.caller_instance
+              || !targetIds.has(artifact.target_id) || manifestRecord.instance_target_id !== artifact.target_id) {
+              throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+            }
+            return Object.freeze({ artifact, manifest: manifestRecord });
+          });
+          const eventPairs = projection.event_ids.map((id) => {
+            const matches = (componentArtifact?.ordinary_template_events ?? []).filter((event) =>
+              event.component_instance_id === projection.caller_instance && event.declaration_event_id === id
+            );
+            const manifestMatches = (manifest?.ordinary_events ?? []).filter((event) =>
+              event.component_instance_id === projection.caller_instance && event.declaration_event_id === id
+            );
+            if (matches.length !== 1 || manifestMatches.length !== 1 || !targetIds.has(matches[0].target_id)
+              || manifestMatches[0].instance_target_id !== matches[0].target_id) {
+              throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+            }
+            return Object.freeze({ artifact: matches[0], manifest: manifestMatches[0] });
+          });
+          const record = Object.freeze({
+            binding: projection.binding,
+            caller_instance: projection.caller_instance,
+            targets: Object.freeze(targetPairs), bindings: Object.freeze(bindingPairs), events: Object.freeze(eventPairs),
+            nested_invocations: Object.freeze([...projection.nested_invocations])
+          });
+          const prior = registry.get(record.binding);
+          if (prior !== undefined && JSON.stringify(prior) !== JSON.stringify(record)) {
+            throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+          }
+          registry.set(record.binding, record);
+        }
+      }
+    }
+    return registry;
+  }
+
+  function structuralProjectionOwnerScope(store, component, callerInstance) {
+    const parent = store.componentInstances?.get(component?.instance_id)?.parent;
+    if (typeof parent !== "string" || parent.length === 0 || typeof callerInstance !== "string") {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    if (callerInstance === parent) return parent;
+    if (parent.startsWith(STRUCTURAL_OCCURRENCE_IDENTITY_PREFIX)
+      && decodeStructuralOccurrenceIdentity(parent).template_instance === callerInstance) return parent;
+    throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+  }
+
+  function structuralHostProjectionRecords(store, fragment, component, itemKey = null) {
+    const records = [];
+    const ids = new Set();
+    for (const binding of fragment?.slot_projection_bindings ?? []) {
+      const source = store.structuralSlotProjectionPrograms?.get(binding);
+      if (source === undefined) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      const owner = structuralProjectionOwnerScope(store, component, source.caller_instance);
+      const rewrite = (value) => {
+        const base = owner === source.caller_instance ? value
+          : rewriteStructuralTemplateIdentity(source.caller_instance, owner, value);
+        return itemKey === null ? base : `${base}:${itemKey}`;
+      };
+      const targets = source.targets.map((pair) => Object.freeze({
+        artifact: Object.freeze({ ...pair.artifact, id: rewrite(pair.artifact.id), component_instance_id: owner }),
+        manifest: Object.freeze({ ...pair.manifest, id: rewrite(pair.manifest.id), component_instance_id: owner })
+      }));
+      const targetIds = new Set(targets.map((pair) => pair.manifest.id));
+      const bindings = source.bindings.map((pair) => Object.freeze({
+        artifact: Object.freeze({ ...pair.artifact, id: rewrite(pair.artifact.id), target_id: rewrite(pair.artifact.target_id), component_instance_id: owner }),
+        manifest: Object.freeze({ ...pair.manifest, instance_binding_id: rewrite(pair.manifest.instance_binding_id), instance_target_id: rewrite(pair.manifest.instance_target_id), component_instance_id: owner })
+      }));
+      const events = source.events.map((pair) => Object.freeze({
+        artifact: Object.freeze({ ...pair.artifact, target_id: rewrite(pair.artifact.target_id), component_instance_id: owner }),
+        manifest: Object.freeze({ ...pair.manifest, instance_target_id: rewrite(pair.manifest.instance_target_id), component_instance_id: owner })
+      }));
+      for (const target of targets) if (ids.has(target.manifest.id) || !ids.add(target.manifest.id)) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      if (bindings.some((pair) => !targetIds.has(pair.manifest.instance_target_id))) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      records.push(...targets, ...bindings, ...events);
+    }
+    const targets = records.filter((pair) => pair.artifact?.template_entity_id !== undefined);
+    const bindings = records.filter((pair) => pair.artifact?.declaration_binding_id !== undefined);
+    const events = records.filter((pair) => pair.artifact?.declaration_event_id !== undefined);
+    return Object.freeze({ targets, bindings, events });
   }
 
   function escapeHtmlText(value) {
@@ -2510,6 +2672,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
   function disposeStructuralKeyedListItem(store, instance) {
     for (const occurrence of [...(instance.structural_occurrences ?? [])].reverse()) occurrence.dispose();
+    instance.structural_projection_registration?.rollback();
     unregisterListItemEvents(store, instance);
     instance.element.remove();
   }
@@ -2532,12 +2695,18 @@ const RUNTIME_STUB: &str = r#"(() => {
         const prior = instance;
         const rendered = renderStructuralKeyedListItem(store, component, node, fragmentRecord, item, index, key);
         const created = [];
+        let projectionRegistration = null;
         try {
           parent.insertBefore(rendered.element, endMarker);
+          const projection = structuralHostProjectionRecords(store, fragmentRecord, component, key);
+          projectionRegistration = registerStructuralOccurrenceRecords(store, {
+            ...projection,
+            occurrence_identity: component.instance_id
+          });
           for (const anchor of rendered.anchors) {
             created.push(materializeStructuralOccurrence(store, anchor.marker, component.instance_id, `keyed:${key}`));
           }
-          instance = { element: rendered.element, item, index, key, structural_occurrences: Object.freeze(created) };
+          instance = { element: rendered.element, item, index, key, structural_occurrences: Object.freeze(created), structural_projection_registration: projectionRegistration };
           registerListItemEvents(store, component, instance);
           if (prior !== undefined) {
             unregisterListItemEvents(store, prior);
@@ -2545,6 +2714,7 @@ const RUNTIME_STUB: &str = r#"(() => {
           }
         } catch (error) {
           for (const occurrence of [...created].reverse()) occurrence.dispose();
+          projectionRegistration?.rollback();
           rendered.element.remove();
           throw error;
         }
@@ -4576,6 +4746,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       componentArtifact,
       computedArtifact
     );
+    store.structuralSlotProjectionPrograms = structuralSlotProjectionRegistry(templateManifest, componentArtifact);
     store.instanceContextBindings = new Map(
       (componentArtifact?.instance_context_bindings ?? [])
         .map((binding) => [binding.consumer_instance, binding])
@@ -5371,6 +5542,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       componentArtifact,
       computedArtifact
     );
+    store.structuralSlotProjectionPrograms = structuralSlotProjectionRegistry(manifest, componentArtifact);
     store.structuralOccurrencesByInvocation = new Map(
       [...store.structuralOccurrenceTemplatesByInvocation].map(([invocation, record]) => [
         invocation,

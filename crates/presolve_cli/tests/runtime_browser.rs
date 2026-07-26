@@ -2228,7 +2228,7 @@ process.stdout.write(JSON.stringify({
     );
     let artifact = fs::read_to_string(output_root.join("component.runtime.json"))
         .expect("failed to read V2 structural component artifact");
-    assert!(artifact.contains("\"schema_version\": 19"));
+    assert!(artifact.contains("\"schema_version\": 20"));
     assert!(artifact.contains("structural_programs"));
     assert!(artifact.contains("state_slots"));
     assert!(artifact.contains("computed_slots"));
@@ -2513,7 +2513,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   const runtime = window.__PRESOLVE__;
   const artifact = JSON.parse(document.getElementById("presolve-component-runtime").textContent);
   const effectArtifact = JSON.parse(document.getElementById("presolve-effect-runtime").textContent);
-  if (artifact.schema_version !== 19 || artifact.structural_programs.length !== 2) fail("structural component programs were missing");
+  if (artifact.schema_version !== 20 || artifact.structural_programs.length !== 2) fail("structural component programs were missing");
   if (runtime.store.componentRegions.size !== artifact.structural_programs.length) fail("closed structural region table diverged from the artifact");
   if (!artifact.structural_programs.every((program) => JSON.stringify(runtime.store.componentRegions.get(program.region)) === JSON.stringify(program))) {
     fail("runtime structural regions were not keyed by compiler IDs");

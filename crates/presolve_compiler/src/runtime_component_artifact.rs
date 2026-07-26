@@ -9,7 +9,7 @@ use crate::{
 };
 use crate::{TemplateChild, TemplateNode, TemplateSemanticKind};
 
-pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 19;
+pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 20;
 
 /// Public H14 compiler artifact. All executable references are canonical IDs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -171,6 +171,9 @@ pub struct SerializedStructuralConditionalHostFragments {
     pub when_true_invocations: Vec<String>,
     pub when_false_invocations: Vec<String>,
     pub slot_projection_bindings: Vec<String>,
+    /// Exact compiler-selected caller-owned ordinary members rendered into
+    /// this host's Slot outlets. The runtime never discovers these from DOM.
+    pub slot_projection_programs: Vec<SerializedStructuralSlotProjectionProgram>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SerializedStructuralKeyedHostFragment {
@@ -179,6 +182,20 @@ pub struct SerializedStructuralKeyedHostFragment {
     pub item_template_html: String,
     pub item_invocations: Vec<String>,
     pub slot_projection_bindings: Vec<String>,
+    /// Exact compiler-selected caller-owned ordinary members rendered into
+    /// this host's Slot outlets. The runtime never discovers these from DOM.
+    pub slot_projection_programs: Vec<SerializedStructuralSlotProjectionProgram>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SerializedStructuralSlotProjectionProgram {
+    pub binding: String,
+    pub caller_instance: String,
+    pub content_owner_instance: String,
+    pub target_ids: Vec<String>,
+    pub binding_ids: Vec<String>,
+    pub event_ids: Vec<String>,
+    pub nested_invocations: Vec<String>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SerializedStructuralTemplateOccurrence {
@@ -458,6 +475,11 @@ pub fn build_runtime_component_artifact(
                 when_false_html: fragments.when_false_html,
                 when_true_invocations: fragments.when_true_invocations,
                 when_false_invocations: fragments.when_false_invocations,
+                slot_projection_programs: structural_slot_projection_programs(
+                    model,
+                    &ordinary,
+                    &fragments.slot_projection_bindings,
+                ),
                 slot_projection_bindings: fragments.slot_projection_bindings,
             })
             .collect(),
@@ -471,6 +493,11 @@ pub fn build_runtime_component_artifact(
                 host_instance: fragments.host_instance.to_string(),
                 item_template_html: fragments.item_template_html,
                 item_invocations: fragments.item_invocations,
+                slot_projection_programs: structural_slot_projection_programs(
+                    model,
+                    &ordinary,
+                    &fragments.slot_projection_bindings,
+                ),
                 slot_projection_bindings: fragments.slot_projection_bindings,
             })
             .collect(),
@@ -481,6 +508,67 @@ pub fn build_runtime_component_artifact(
         })
         .collect();
     artifact
+}
+
+fn structural_slot_projection_programs(
+    model: &ApplicationSemanticModel,
+    ordinary: &crate::OrdinaryTemplateInstanceRegistry,
+    bindings: &[String],
+) -> Vec<SerializedStructuralSlotProjectionProgram> {
+    bindings
+        .iter()
+        .filter_map(|binding_id| {
+            let binding = model
+                .slot_bindings
+                .bindings
+                .values()
+                .find(|binding| binding.id.as_str() == binding_id)?;
+            let fragment = model
+                .slot_content_fragments
+                .get(binding.content_fragment.as_ref()?)?;
+            let entities = fragment
+                .content_template_entities
+                .iter()
+                .collect::<std::collections::BTreeSet<_>>();
+            let target_ids = ordinary
+                .targets
+                .iter()
+                .filter(|target| {
+                    target.component_instance_id == binding.caller_instance
+                        && entities.contains(&target.template_entity_id)
+                })
+                .map(|target| target.target_id.to_string())
+                .collect::<Vec<_>>();
+            let target_set = target_ids.iter().collect::<std::collections::BTreeSet<_>>();
+            let binding_ids = ordinary
+                .bindings
+                .iter()
+                .filter(|record| {
+                    record.component_instance_id == binding.caller_instance
+                        && target_set.contains(&record.target_id.to_string())
+                })
+                .map(|record| record.instance_binding_id.to_string())
+                .collect::<Vec<_>>();
+            let event_ids = ordinary
+                .events
+                .iter()
+                .filter(|event| {
+                    event.component_instance_id == binding.caller_instance
+                        && target_set.contains(&event.target_id.to_string())
+                })
+                .map(|event| event.declaration_event_id.to_string())
+                .collect::<Vec<_>>();
+            Some(SerializedStructuralSlotProjectionProgram {
+                binding: binding_id.clone(),
+                caller_instance: binding.caller_instance.to_string(),
+                content_owner_instance: binding.content_owner_instance.to_string(),
+                target_ids,
+                binding_ids,
+                event_ids,
+                nested_invocations: Vec::new(),
+            })
+        })
+        .collect()
 }
 
 #[derive(Debug, Clone)]
@@ -825,6 +913,74 @@ pub fn validate_runtime_component_artifact(
         .iter()
         .map(|binding| (binding.binding.as_str(), binding.callee_instance.as_str()))
         .collect::<std::collections::BTreeMap<_, _>>();
+    let slot_projection_programs_valid = |bindings: &[String],
+                                         programs: &[SerializedStructuralSlotProjectionProgram],
+                                         host: &str| {
+        bindings.len() == programs.len()
+            && bindings.iter().collect::<std::collections::BTreeSet<_>>().len()
+                == bindings.len()
+            && programs
+                .iter()
+                .map(|program| program.binding.as_str())
+                .collect::<std::collections::BTreeSet<_>>()
+                .len()
+                == programs.len()
+            && programs.iter().all(|program| {
+                let Some(slot_binding) = artifact
+                    .slot_binding_programs
+                    .iter()
+                    .find(|binding| binding.binding == program.binding)
+                else {
+                    return false;
+                };
+                let targets = program
+                    .target_ids
+                    .iter()
+                    .collect::<std::collections::BTreeSet<_>>();
+                bindings.contains(&program.binding)
+                    && slot_binding.callee_instance == host
+                    && slot_binding.caller_instance == program.caller_instance
+                    && slot_binding.content_owner_instance == program.content_owner_instance
+                    && targets.len() == program.target_ids.len()
+                    && program
+                        .binding_ids
+                        .iter()
+                        .collect::<std::collections::BTreeSet<_>>()
+                        .len()
+                        == program.binding_ids.len()
+                    && program
+                        .event_ids
+                        .iter()
+                        .collect::<std::collections::BTreeSet<_>>()
+                        .len()
+                        == program.event_ids.len()
+                    && program
+                        .nested_invocations
+                        .iter()
+                        .collect::<std::collections::BTreeSet<_>>()
+                        .len()
+                        == program.nested_invocations.len()
+                    && program.target_ids.iter().all(|id| {
+                        artifact.ordinary_template_targets.iter().any(|target| {
+                            target.id == *id && target.component_instance_id == program.caller_instance
+                        })
+                    })
+                    && program.binding_ids.iter().all(|id| {
+                        artifact.ordinary_template_bindings.iter().any(|binding| {
+                            binding.id == *id
+                                && binding.component_instance_id == program.caller_instance
+                                && targets.contains(&binding.target_id)
+                        })
+                    })
+                    && program.event_ids.iter().all(|id| {
+                        artifact.ordinary_template_events.iter().any(|event| {
+                            event.declaration_event_id == *id
+                                && event.component_instance_id == program.caller_instance
+                                && targets.contains(&event.target_id)
+                        })
+                    })
+            })
+    };
     if artifact.structural_programs.iter().any(|program| {
         let host_instances = program
             .conditional_host_fragments
@@ -859,6 +1015,11 @@ pub fn validate_runtime_component_artifact(
                                 .get(binding.as_str())
                                 .is_none_or(|callee| *callee != fragments.host_instance)
                         })
+                        || !slot_projection_programs_valid(
+                            &fragments.slot_projection_bindings,
+                            &fragments.slot_projection_programs,
+                            &fragments.host_instance,
+                        )
                 }
             })
     }) {
@@ -898,6 +1059,11 @@ pub fn validate_runtime_component_artifact(
                                 .get(binding.as_str())
                                 .is_none_or(|callee| *callee != fragments.host_instance)
                         })
+                        || !slot_projection_programs_valid(
+                            &fragments.slot_projection_bindings,
+                            &fragments.slot_projection_programs,
+                            &fragments.host_instance,
+                        )
                 }
             })
     }) {

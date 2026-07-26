@@ -7,13 +7,14 @@ structural host renderer scope contract.
 
 ## Product
 
-Component artifact schema v19 adds `slot_projection_programs` to every
-conditional or keyed host fragment with `host_scope: "structural-occurrence"`.
-Each program is selected by one canonical Slot-binding ID and includes the
-exact caller instance/template, callee structural-template instance, lexical
-content owner, outlet, content fragment or compiler-issued direct child,
-compiler-rendered projected HTML, and ordered target/binding/event/nested
-invocation membership reachable only through that projection.
+Component artifact schema v20 adds `slot_projection_programs` to every
+eligible conditional or keyed host fragment. Each program is selected by one
+canonical Slot-binding ID and includes the exact caller instance, lexical
+content owner, and ordered caller-owned target/binding/event/nested-invocation
+membership reachable only through that projection. The canonical Slot-binding
+product remains the authority for the callee, outlet, content fragment, and
+direct-child facts; the host fragment remains the authority for the
+compiler-rendered HTML that contains the projection.
 
 The program is present only for a canonical `Bound` Slot binding. `Empty` is
 represented by an exact empty projection; blocked, invalid, missing-outlet,
@@ -54,3 +55,13 @@ keyed retention/reorder, child-first cleanup, and rejection of a fabricated
 binding, substituted projection marker, or caller/callee ownership mismatch.
 No source translation, selector-based DOM discovery, virtual DOM, or parallel
 Slot decoder is permitted.
+
+## Current acceptance boundary
+
+The v20 slice publishes and validates the compiler-selected membership and
+registers it transactionally for eligible structural host replacement. The
+required end-to-end browser fixture remains blocked on an authored V2,
+decorator-free Slot declaration/authority contract: current canonical Slot
+declarations use `@slot()`, so introducing a replacement spelling here would
+invent source semantics. Resume remains fail-closed for all Slot-projected
+structural hosts.
