@@ -117,6 +117,12 @@ detached fragment. A missing template, unresolved placeholder, or empty result
 rejects the transaction. Detached rendering is not host insertion and may not
 activate registrations or use selectors to discover component structure.
 
+Attachment receives one caller-supplied element stamped with the exact
+compiler invocation ID and replaces only that element with the detached
+fragment. It records the original parent and sibling position and returns an
+idempotent rollback that restores the marker exactly. The attachment primitive
+does not select a tag, scan a host, or choose an occurrence itself.
+
 ## Teardown boundary
 
 The materializer exposes one shared, idempotent occurrence-disposal operation.

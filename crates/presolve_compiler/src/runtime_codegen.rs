@@ -1775,6 +1775,34 @@ const RUNTIME_STUB: &str = r#"(() => {
     return template.content;
   }
 
+  function attachStructuralOccurrenceFragment(marker, invocation, fragment) {
+    if (!(marker instanceof Element)
+      || marker.getAttribute("data-presolve-structural-invocation") !== invocation
+      || marker.parentNode === null
+      || !(fragment instanceof DocumentFragment)
+      || !fragment.hasChildNodes()) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const parent = marker.parentNode;
+    const nextSibling = marker.nextSibling;
+    const nodes = [...fragment.childNodes];
+    marker.replaceWith(fragment);
+    let attached = true;
+    const rollback = () => {
+      if (!attached) return;
+      for (const node of nodes) {
+        if (node.parentNode !== null) node.remove();
+      }
+      if (nextSibling !== null && nextSibling.parentNode === parent) {
+        parent.insertBefore(marker, nextSibling);
+      } else {
+        parent.appendChild(marker);
+      }
+      attached = false;
+    };
+    return Object.freeze({ nodes: Object.freeze(nodes), rollback });
+  }
+
   function structuralOccurrenceTemplateRegistry(manifest, componentArtifact, computedArtifact) {
     const components = new Map((manifest.components ?? []).map((component) => [component.component_id, component]));
     if (components.size !== (manifest.components ?? []).length) {
@@ -4945,6 +4973,7 @@ mod tests {
         assert!(runtime.contains("function deriveStructuralOccurrenceRecords"));
         assert!(runtime.contains("function stageStructuralOccurrenceRecords"));
         assert!(runtime.contains("function renderStructuralOccurrenceTemplate"));
+        assert!(runtime.contains("function attachStructuralOccurrenceFragment"));
         assert!(runtime.contains("function structuralOccurrenceTemplateRegistry"));
         assert!(runtime.contains("structuralOccurrenceTemplatesByInvocation"));
         assert!(runtime.contains("structuralStateSlots = new Set()"));
