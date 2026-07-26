@@ -1477,6 +1477,48 @@ const RUNTIME_STUB: &str = r#"(() => {
     return String(index);
   }
 
+  const STRUCTURAL_OCCURRENCE_IDENTITY_PREFIX = "presolve-structural-occurrence:v1:";
+
+  function structuralOccurrenceHex(value) {
+    if (typeof value !== "string" || value.length === 0) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    return [...new TextEncoder().encode(value)]
+      .map((byte) => byte.toString(16).toUpperCase().padStart(2, "0"))
+      .join("");
+  }
+
+  function structuralOccurrenceIdentity(parentScope, region, templateInstance, localOccurrence) {
+    return `${STRUCTURAL_OCCURRENCE_IDENTITY_PREFIX}${structuralOccurrenceHex(parentScope)}.${structuralOccurrenceHex(region)}.${structuralOccurrenceHex(templateInstance)}.${structuralOccurrenceHex(localOccurrence)}`;
+  }
+
+  function decodeStructuralOccurrenceIdentity(value) {
+    if (typeof value !== "string" || !value.startsWith(STRUCTURAL_OCCURRENCE_IDENTITY_PREFIX)) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const fields = value.slice(STRUCTURAL_OCCURRENCE_IDENTITY_PREFIX.length).split(".");
+    if (fields.length !== 4 || fields.some((field) => field.length === 0 || field.length % 2 !== 0 || !/^[0-9a-f]+$/i.test(field))) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    let decoded;
+    try {
+      decoded = fields.map((field) => new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(
+        field.match(/../g).map((pair) => Number.parseInt(pair, 16))
+      )));
+    } catch (_) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    if (decoded.some((field) => field.length === 0)) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    return Object.freeze({
+      parent_scope: decoded[0],
+      region: decoded[1],
+      template_instance: decoded[2],
+      local_occurrence: decoded[3]
+    });
+  }
+
   function escapeHtmlText(value) {
     return String(value)
       .replaceAll("&", "&amp;")
@@ -4530,6 +4572,8 @@ mod tests {
         assert!(runtime.contains("form_hosts"));
         assert!(runtime.contains("structuralOccurrences = new Map"));
         assert!(runtime.contains("structuralOccurrencesByInvocation"));
+        assert!(runtime.contains("function structuralOccurrenceIdentity"));
+        assert!(runtime.contains("function decodeStructuralOccurrenceIdentity"));
         assert!(runtime.contains("Conditional host fragments were attached to a keyed-list host"));
         assert!(runtime.contains("occurrence.ordinary_template_targets"));
         assert!(runtime.contains("occurrence.ordinary_template_bindings"));
