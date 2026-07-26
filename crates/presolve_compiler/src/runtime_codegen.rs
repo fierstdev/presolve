@@ -960,6 +960,11 @@ const RUNTIME_STUB: &str = r#"(() => {
     );
     const stateSlots = new Set();
     const statePairs = new Set();
+    const structuralStateSlots = new Set();
+    const structuralStatePairs = new Set();
+    const structuralComputedCacheSlots = new Set();
+    const structuralComputedDirtySlots = new Set();
+    const structuralComputedPairs = new Set();
     for (const instance of artifact.instances) if (
       instance.parent !== null
       && instance.parent !== undefined
@@ -1021,6 +1026,38 @@ const RUNTIME_STUB: &str = r#"(() => {
             || !Array.isArray(occurrence.ordinary_template_targets)
             || !Array.isArray(occurrence.ordinary_template_bindings)
             || !Array.isArray(occurrence.ordinary_template_events)
+            || occurrence.state_slots.some((slot) => {
+              const pair = `${occurrence.template_instance}|${slot?.storage_id}`;
+              return typeof slot?.slot_id !== "string"
+                || slot.slot_id !== canonicalStateSlotId(occurrence.template_instance, slot.storage_id)
+                || typeof slot.state_id !== "string"
+                || slot.state_id.length === 0
+                || typeof slot.storage_id !== "string"
+                || slot.storage_id !== `storage:${slot.state_id}`
+                || typeof slot.semantic_type !== "string"
+                || slot.semantic_type.length === 0
+                || typeof slot.serializable !== "boolean"
+                || structuralStateSlots.has(slot.slot_id)
+                || structuralStatePairs.has(pair)
+                || !structuralStateSlots.add(slot.slot_id)
+                || !structuralStatePairs.add(pair);
+            })
+            || occurrence.computed_slots.some((slot) => {
+              const pair = `${occurrence.template_instance}|${slot?.computed_id}`;
+              return typeof slot?.computed_id !== "string"
+                || slot.computed_id.length === 0
+                || typeof slot?.cache_slot_id !== "string"
+                || typeof slot?.dirty_slot_id !== "string"
+                || !slot.cache_slot_id.startsWith(`${occurrence.template_instance}/computed-cache:`)
+                || !slot.dirty_slot_id.startsWith(`${occurrence.template_instance}/computed-dirty:`)
+                || typeof slot.dirty_initial_value !== "boolean"
+                || structuralComputedCacheSlots.has(slot.cache_slot_id)
+                || structuralComputedDirtySlots.has(slot.dirty_slot_id)
+                || structuralComputedPairs.has(pair)
+                || !structuralComputedCacheSlots.add(slot.cache_slot_id)
+                || !structuralComputedDirtySlots.add(slot.dirty_slot_id)
+                || !structuralComputedPairs.add(pair);
+            })
             || JSON.stringify(occurrence.ordinary_template_targets) !== JSON.stringify(
               artifact.ordinary_template_targets
                 .filter((target) => target.component_instance_id === occurrence.template_instance)
@@ -4612,6 +4649,8 @@ mod tests {
         assert!(runtime.contains("function structuralOccurrenceIdentity"));
         assert!(runtime.contains("function decodeStructuralOccurrenceIdentity"));
         assert!(runtime.contains("function instantiateStructuralTemplateSlots"));
+        assert!(runtime.contains("structuralStateSlots = new Set()"));
+        assert!(runtime.contains("structuralComputedCacheSlots = new Set()"));
         assert!(runtime.contains("Conditional host fragments were attached to a keyed-list host"));
         assert!(runtime.contains("occurrence.ordinary_template_targets"));
         assert!(runtime.contains("occurrence.ordinary_template_bindings"));

@@ -2041,7 +2041,8 @@ process.stdout.write(JSON.stringify({
         serde_json::from_str(&artifact).expect("V2 structural component artifact JSON");
     let occurrences = artifact["structural_programs"]
         .as_array()
-        .expect("V2 structural programs").iter()
+        .expect("V2 structural programs")
+        .iter()
         .flat_map(|program| {
             program["template_occurrences"]
                 .as_array()

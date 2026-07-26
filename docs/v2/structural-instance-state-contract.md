@@ -20,6 +20,12 @@ structural template. A missing State/Computed record is invalid whenever the
 target component declares that record; an extra or mismatched record is also
 invalid.
 
+Both the compiler artifact validator and the browser artifact reader reject an
+empty or mismatched template State/Computed identity, duplicate template slot,
+or duplicate `(template_instance, declaration/storage)` pair before any
+materializer code can consume the record. This validation creates no live
+occurrence, State, computed cache, binding, or event registration.
+
 ## Runtime derivation
 
 After the materializer creates an opaque occurrence identity, it derives live

@@ -846,6 +846,46 @@ pub fn validate_runtime_component_artifact(
     {
         return Err("component artifact has invalid structural template projection".to_string());
     }
+    let mut structural_computed_cache_slots = std::collections::BTreeSet::new();
+    let mut structural_computed_dirty_slots = std::collections::BTreeSet::new();
+    let mut structural_computed_instance_pairs = std::collections::BTreeSet::new();
+    let mut structural_state_slots = std::collections::BTreeSet::new();
+    let mut structural_state_instance_pairs = std::collections::BTreeSet::new();
+    if artifact
+        .structural_programs
+        .iter()
+        .flat_map(|program| &program.template_occurrences)
+        .any(|occurrence| {
+            occurrence.state_slots.iter().any(|slot| {
+                slot.slot_id
+                    != canonical_state_slot_text(&occurrence.template_instance, &slot.storage_id)
+                    || slot.storage_id != format!("storage:{}", slot.state_id)
+                    || slot.state_id.is_empty()
+                    || slot.semantic_type.is_empty()
+                    || !structural_state_slots.insert(slot.slot_id.as_str())
+                    || !structural_state_instance_pairs.insert((
+                        occurrence.template_instance.as_str(),
+                        slot.storage_id.as_str(),
+                    ))
+            }) || occurrence.computed_slots.iter().any(|slot| {
+                !slot
+                    .cache_slot_id
+                    .starts_with(&format!("{}/computed-cache:", occurrence.template_instance))
+                    || !slot
+                        .dirty_slot_id
+                        .starts_with(&format!("{}/computed-dirty:", occurrence.template_instance))
+                    || slot.computed_id.is_empty()
+                    || !structural_computed_cache_slots.insert(slot.cache_slot_id.as_str())
+                    || !structural_computed_dirty_slots.insert(slot.dirty_slot_id.as_str())
+                    || !structural_computed_instance_pairs.insert((
+                        occurrence.template_instance.as_str(),
+                        slot.computed_id.as_str(),
+                    ))
+            })
+        })
+    {
+        return Err("component artifact has invalid structural instance slots".to_string());
+    }
     let mut computed_cache_slots = std::collections::BTreeSet::new();
     let mut computed_dirty_slots = std::collections::BTreeSet::new();
     let mut computed_instance_pairs = std::collections::BTreeSet::new();
@@ -1065,7 +1105,8 @@ mod tests {
 @component("x-leaf") class Leaf extends Component {
   count = state(0);
   @action() increment() { this.count++; }
-  render() { return <button onClick={() => this.increment()}>{this.count}</button>; }
+  @computed() get doubled() { return this.count * 2; }
+  render() { return <button onClick={() => this.increment()}>{this.doubled}</button>; }
 }
 @component("x-page") class Page extends Component {
   visible = state(true);
@@ -1245,6 +1286,16 @@ mod tests {
             .conditional_host_fragments[0]
             .host_instance = idle;
         assert!(validate_runtime_component_artifact(&invalid_host).is_err());
+
+        let mut invalid_state_slot = artifact.clone();
+        invalid_state_slot.structural_programs[0].template_occurrences[0].state_slots[0]
+            .storage_id = "storage:fabricated".to_string();
+        assert!(validate_runtime_component_artifact(&invalid_state_slot).is_err());
+
+        let mut invalid_computed_slot = artifact.clone();
+        invalid_computed_slot.structural_programs[0].template_occurrences[0].computed_slots[0]
+            .cache_slot_id = "fabricated-cache".to_string();
+        assert!(validate_runtime_component_artifact(&invalid_computed_slot).is_err());
 
         let first = &mut artifact.structural_programs[0].template_occurrences[0];
         first
