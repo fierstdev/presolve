@@ -14,3 +14,8 @@ declarations, and NUL-bearing values fail closed.
 This product establishes proven value admission and source provenance. A later
 source-lowering product must bind authored environment reads to this manifest
 before browser/server read diagnostics can claim complete coverage.
+
+The manifest JSON is also a strict compiler input: decoding accepts only this
+schema, the original source-label rules, public-prefixed `browserValues`, and
+sorted unique non-public `serverValueNames`. Decoding it does not cause any
+dotenv or ambient-process read.

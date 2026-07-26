@@ -447,7 +447,8 @@ pub use effect_resume::{
     EffectResumeValidationDiagnostic,
 };
 pub use environment_input::{
-    build_environment_input_manifest_v1, environment_input_manifest_json_v1,
+    build_environment_input_manifest_v1, environment_input_manifest_from_json_v1,
+    environment_input_manifest_json_v1, validate_environment_input_manifest_v1,
     EnvironmentInputErrorV1, EnvironmentInputManifestV1, ENVIRONMENT_INPUT_SCHEMA_VERSION,
 };
 pub use environment_ownership::{
