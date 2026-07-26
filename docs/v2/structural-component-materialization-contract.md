@@ -63,6 +63,11 @@ fragments from which the later complete program must be constructed; the
 runtime must not activate, infer, or partially use them for dynamic component
 rendering.
 
+The [structural host renderer scope contract](structural-host-renderer-scope-contract.md)
+defines the additional compiler input required for nested and keyed hosts,
+including caller-owned Slot projection. It is the only path by which this
+static-root subset may expand.
+
 ## Runtime identity and reconciliation
 
 For each successful insertion, the structural runtime creates one opaque

@@ -67,6 +67,9 @@ normative source for this handoff.
 - [Structural occurrence identity contract](structural-occurrence-identity-contract.md)
   fixes the parent-scoped runtime codec required for nested conditional and
   keyed component materialization.
+- [Structural host renderer scope contract](structural-host-renderer-scope-contract.md)
+  defines the exact static, nested, and keyed renderer inputs required before
+  structural host fragments can be published or activated.
 - [Environment-read lowering contract](environment-read-lowering-contract.md)
   defines the manifest-backed source boundary for browser-visible environment
   values.
