@@ -42,10 +42,22 @@ pub enum SlotFieldLoweringErrorV1 {
 impl std::fmt::Display for SlotFieldLoweringErrorV1 {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ComponentSourcePathMismatch => write!(formatter, "component and Slot authored-semantic products must describe the same source file"),
-            Self::UnknownComponentDeclaration { start, end } => write!(formatter, "canonical component declaration has no source class at {start}..{end}"),
-            Self::DuplicateResolution { start, end } => write!(formatter, "duplicate Slot field resolution at {start}..{end}"),
-            Self::UnknownSlotResolution { start, end } => write!(formatter, "Slot field resolution has no source field callee at {start}..{end}"),
+            Self::ComponentSourcePathMismatch => write!(
+                formatter,
+                "component and Slot authored-semantic products must describe the same source file"
+            ),
+            Self::UnknownComponentDeclaration { start, end } => write!(
+                formatter,
+                "canonical component declaration has no source class at {start}..{end}"
+            ),
+            Self::DuplicateResolution { start, end } => write!(
+                formatter,
+                "duplicate Slot field resolution at {start}..{end}"
+            ),
+            Self::UnknownSlotResolution { start, end } => write!(
+                formatter,
+                "Slot field resolution has no source field callee at {start}..{end}"
+            ),
             Self::InvalidAuthoredSemantics(error) => error.fmt(formatter),
         }
     }
@@ -69,23 +81,42 @@ pub fn slot_field_sites_v1(
         .map(|declaration| (declaration.subject.clone(), range_key(declaration.source)))
         .collect::<BTreeSet<_>>();
     for (subject, declaration_key) in &components {
-        if !parsed.classes.iter().any(|class| class.name == *subject && range_key(range(class.span)) == *declaration_key) {
-            return Err(SlotFieldLoweringErrorV1::UnknownComponentDeclaration { start: declaration_key.0, end: declaration_key.1 });
+        if !parsed
+            .classes
+            .iter()
+            .any(|class| class.name == *subject && range_key(range(class.span)) == *declaration_key)
+        {
+            return Err(SlotFieldLoweringErrorV1::UnknownComponentDeclaration {
+                start: declaration_key.0,
+                end: declaration_key.1,
+            });
         }
     }
-    let mut sites = parsed.classes.iter()
+    let mut sites = parsed
+        .classes
+        .iter()
         .filter(|class| components.contains(&(class.name.clone(), range_key(range(class.span)))))
-        .flat_map(|class| class.properties.iter().filter_map(move |property| {
-            let call = property.initializer_call.as_ref()?;
-            (!property.is_static && property.initializer.as_deref() == Some("slot(...)") && call.argument_count == 0)
-                .then_some(SlotFieldSiteV1 {
-                    subject: format!("{}.{}", class.name, property.name),
-                    declaration_source: range(property.span),
-                    callee_source: range(call.callee_span),
-                })
-        }))
+        .flat_map(|class| {
+            class.properties.iter().filter_map(move |property| {
+                let call = property.initializer_call.as_ref()?;
+                (!property.is_static
+                    && property.initializer.as_deref() == Some("slot(...)")
+                    && call.argument_count == 0)
+                    .then_some(SlotFieldSiteV1 {
+                        subject: format!("{}.{}", class.name, property.name),
+                        declaration_source: range(property.span),
+                        callee_source: range(call.callee_span),
+                    })
+            })
+        })
         .collect::<Vec<_>>();
-    sites.sort_by_key(|site| (site.callee_source.start, site.callee_source.end, site.subject.clone()));
+    sites.sort_by_key(|site| {
+        (
+            site.callee_source.start,
+            site.callee_source.end,
+            site.subject.clone(),
+        )
+    });
     Ok(sites)
 }
 
@@ -95,15 +126,24 @@ pub fn lower_slot_fields_v1(
     resolutions: impl IntoIterator<Item = ResolvedSlotFieldV1>,
 ) -> Result<SlotFieldLoweringV1, SlotFieldLoweringErrorV1> {
     let sites = slot_field_sites_v1(parsed, component_model)?;
-    let known_sites = sites.iter().map(|site| range_key(site.callee_source)).collect::<BTreeSet<_>>();
+    let known_sites = sites
+        .iter()
+        .map(|site| range_key(site.callee_source))
+        .collect::<BTreeSet<_>>();
     let mut resolution_by_site = BTreeMap::new();
     for resolution in resolutions {
         let key = range_key(resolution.callee_source);
         if !known_sites.contains(&key) {
-            return Err(SlotFieldLoweringErrorV1::UnknownSlotResolution { start: key.0, end: key.1 });
+            return Err(SlotFieldLoweringErrorV1::UnknownSlotResolution {
+                start: key.0,
+                end: key.1,
+            });
         }
         if resolution_by_site.insert(key, resolution).is_some() {
-            return Err(SlotFieldLoweringErrorV1::DuplicateResolution { start: key.0, end: key.1 });
+            return Err(SlotFieldLoweringErrorV1::DuplicateResolution {
+                start: key.0,
+                end: key.1,
+            });
         }
     }
     let candidates = sites.iter().filter_map(|site| {
@@ -123,9 +163,16 @@ pub fn lower_slot_fields_v1(
 }
 
 fn range(span: SourceSpan) -> AuthoredSourceRangeV1 {
-    AuthoredSourceRangeV1 { start: span.start, end: span.end, line: span.line, column: span.column }
+    AuthoredSourceRangeV1 {
+        start: span.start,
+        end: span.end,
+        line: span.line,
+        column: span.column,
+    }
 }
-fn range_key(range: AuthoredSourceRangeV1) -> (usize, usize) { (range.start, range.end) }
+fn range_key(range: AuthoredSourceRangeV1) -> (usize, usize) {
+    (range.start, range.end)
+}
 
 #[cfg(test)]
 mod tests {
@@ -140,34 +187,51 @@ mod tests {
 
     fn identity(name: &str) -> ResolvedIntrinsicIdentityV1 {
         ResolvedIntrinsicIdentityV1 {
-            name: name.to_owned(), flags: 32,
+            name: name.to_owned(),
+            flags: 32,
             declaration_modules: vec!["node_modules/presolve/src/index.d.ts".to_owned()],
         }
     }
 
     #[test]
     fn lowers_only_authority_proven_zero_argument_slot_fields() {
-        let parsed = parse_file("src/Panel.tsx", r#"
+        let parsed = parse_file(
+            "src/Panel.tsx",
+            r#"
 class Panel extends Component {
   children: SlotContent = slot();
   ignored = unrelated();
   malformed: SlotContent = slot("header");
   static invalid: SlotContent = slot();
 }
-"#);
+"#,
+        );
         let component_site = crate::component_inheritance_sites_v1(&parsed).remove(0);
-        let components = lower_component_inheritance_v1(&parsed, [ResolvedComponentInheritanceV1 {
-            heritage_source: component_site.heritage_source,
-            component_identity: identity("Component"),
-        }]).unwrap().model;
+        let components = lower_component_inheritance_v1(
+            &parsed,
+            [ResolvedComponentInheritanceV1 {
+                heritage_source: component_site.heritage_source,
+                component_identity: identity("Component"),
+            }],
+        )
+        .unwrap()
+        .model;
         let sites = slot_field_sites_v1(&parsed, &components).unwrap();
         assert_eq!(sites.len(), 1);
         assert_eq!(sites[0].subject, "Panel.children");
-        let lowered = lower_slot_fields_v1(&parsed, &components, [ResolvedSlotFieldV1 {
-            callee_source: sites[0].callee_source,
-            slot_identity: identity("slot"),
-        }]).unwrap();
-        assert_eq!(lowered.model.declarations[0].kind, CanonicalAuthoredDeclarationKindV1::Slot);
+        let lowered = lower_slot_fields_v1(
+            &parsed,
+            &components,
+            [ResolvedSlotFieldV1 {
+                callee_source: sites[0].callee_source,
+                slot_identity: identity("slot"),
+            }],
+        )
+        .unwrap();
+        assert_eq!(
+            lowered.model.declarations[0].kind,
+            CanonicalAuthoredDeclarationKindV1::Slot
+        );
         assert_eq!(lowered.model.declarations[0].subject, "Panel.children");
     }
 }

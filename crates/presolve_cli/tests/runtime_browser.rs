@@ -265,15 +265,14 @@ const wait = setInterval(() => {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    let resources: serde_json::Value = serde_json::from_str(&artifact)
-        .expect("Resource artifact JSON");
+    let resources: serde_json::Value =
+        serde_json::from_str(&artifact).expect("Resource artifact JSON");
     let activation = resources["activations"]
         .as_array()
         .and_then(|activations| activations.first())
         .expect("one Resource activation");
     let manifest: serde_json::Value = serde_json::from_str(
-        &fs::read_to_string(out_dir.join("resume.runtime.json"))
-            .expect("Resource resume manifest"),
+        &fs::read_to_string(out_dir.join("resume.runtime.json")).expect("Resource resume manifest"),
     )
     .expect("Resource resume manifest JSON");
     let mut snapshot = resume_bootstrap_snapshot(&manifest);
@@ -284,7 +283,10 @@ const wait = setInterval(() => {
         .flat_map(|boundary| boundary["values"].as_array_mut().expect("snapshot values"))
         .collect::<Vec<_>>();
     for (storage_slot, value) in [
-        (&activation["state_slot"], serde_json::json!({"state": "ready", "generation": 1})),
+        (
+            &activation["state_slot"],
+            serde_json::json!({"state": "ready", "generation": 1}),
+        ),
         (&activation["data_slot"], serde_json::json!("Ada")),
         (&activation["error_slot"], serde_json::Value::Null),
     ] {
@@ -359,14 +361,18 @@ const wait = setInterval(() => {{
             .as_array_mut()
             .expect("invalid snapshot boundaries")
             .iter_mut()
-            .flat_map(|boundary| boundary["values"].as_array_mut().expect("invalid snapshot values"))
+            .flat_map(|boundary| {
+                boundary["values"]
+                    .as_array_mut()
+                    .expect("invalid snapshot values")
+            })
         {
             if value["slotId"] == resource_state_slot {
                 value["value"] = serde_json::json!({"state": state, "generation": 1});
             }
         }
-        let invalid_json = serde_json::to_string(&invalid_snapshot)
-            .expect("invalid Resource snapshot JSON");
+        let invalid_json =
+            serde_json::to_string(&invalid_snapshot).expect("invalid Resource snapshot JSON");
         let invalid_probe = index.replace(
             "</body>",
             &format!(r#"<script>
@@ -389,8 +395,12 @@ const wait = setInterval(() => {{
         fs::write(out_dir.join(&page_name), invalid_probe)
             .expect("failed to write Resource fallback probe");
         let server = StaticServer::start(out_dir.clone());
-        let profile_dir = out_dir.join(format!("chrome-resource-{name}-profile-{}", std::process::id()));
-        fs::create_dir_all(&profile_dir).expect("failed to create Resource fallback Chrome profile");
+        let profile_dir = out_dir.join(format!(
+            "chrome-resource-{name}-profile-{}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&profile_dir)
+            .expect("failed to create Resource fallback Chrome profile");
         let output = run_chrome_probe(
             chrome.clone(),
             &format!("--user-data-dir={}", profile_dir.display()),
@@ -452,8 +462,8 @@ const wait = setInterval(() => {{
             .as_str()
             .is_some_and(|id| id.contains("resource-slot"))));
     let reload_snapshot = resume_bootstrap_snapshot(&reload_manifest);
-    let reload_snapshot_json = serde_json::to_string(&reload_snapshot)
-        .expect("reload Resource snapshot JSON");
+    let reload_snapshot_json =
+        serde_json::to_string(&reload_snapshot).expect("reload Resource snapshot JSON");
     let reload_probe = reload_index.replace(
         "</body>",
         &format!(r#"<script>

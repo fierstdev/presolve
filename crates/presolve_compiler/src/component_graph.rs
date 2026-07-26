@@ -1562,17 +1562,31 @@ pub fn build_v2_component_graph_for_module(
             let Some(name) = candidate.subject.strip_prefix(&format!("{}.", class.name)) else {
                 continue;
             };
-            let Some(property) = class.properties.iter().find(|property| property.name == name) else {
+            let Some(property) = class
+                .properties
+                .iter()
+                .find(|property| property.name == name)
+            else {
                 diagnostics.push(ComponentDiagnostic::error(
                     "PSV2S1001",
-                    format!("canonical V2 Slot `{}` has no source field", candidate.subject),
+                    format!(
+                        "canonical V2 Slot `{}` has no source field",
+                        candidate.subject
+                    ),
                 ));
                 continue;
             };
-            let Some(annotation) = property.type_annotation.as_ref().filter(|annotation| annotation.text == "SlotContent") else {
+            let Some(annotation) = property
+                .type_annotation
+                .as_ref()
+                .filter(|annotation| annotation.text == "SlotContent")
+            else {
                 diagnostics.push(ComponentDiagnostic::error(
                     "PSV2S1002",
-                    format!("canonical V2 Slot `{}` requires the exact SlotContent type", candidate.subject),
+                    format!(
+                        "canonical V2 Slot `{}` requires the exact SlotContent type",
+                        candidate.subject
+                    ),
                 ));
                 continue;
             };
@@ -1586,7 +1600,11 @@ pub fn build_v2_component_graph_for_module(
             slot_declarations.push(SlotDeclaration {
                 authored_field: id.slot_field(name),
                 name: name.to_owned(),
-                kind: if name == "children" { SlotKind::Default } else { SlotKind::Named },
+                kind: if name == "children" {
+                    SlotKind::Default
+                } else {
+                    SlotKind::Named
+                },
                 declared_type,
                 decorator_provenance: slot_provenance.clone(),
                 name_provenance: SourceProvenance::new(&parsed.path, property.name_span),
@@ -1722,10 +1740,7 @@ pub fn build_v2_component_graph_for_module(
                             id: action_id,
                             owner: SemanticOwner::entity(endpoint_id.clone()),
                             method: name.to_owned(),
-                            operation: state_operation_from_v2_parsed(
-                                &update.operation,
-                                &operands,
-                            ),
+                            operation: state_operation_from_v2_parsed(&update.operation, &operands),
                             field: update.field.clone(),
                         }
                     }),
@@ -4962,7 +4977,9 @@ fn v2_action_operands(
         })
         .collect::<Option<BTreeMap<_, _>>>()?;
     if locals.len() != handler.local_variables.len()
-        || parameter_indices.keys().any(|name| locals.contains_key(name))
+        || parameter_indices
+            .keys()
+            .any(|name| locals.contains_key(name))
     {
         return None;
     }
@@ -4983,8 +5000,9 @@ fn v2_action_operands(
         let operand = if let Some((index, parameter_kind)) = parameter_indices.get(name) {
             (state_kind == Some(*parameter_kind)).then_some(V2ActionOperand::Parameter(*index))
         } else if let Some((local_span, local_kind, local_value)) = locals.get(name) {
-            (local_span.start < update.span.start && state_kind == Some(*local_kind))
-                .then_some(V2ActionOperand::Local(serializable_value_from_parsed(local_value)))
+            (local_span.start < update.span.start && state_kind == Some(*local_kind)).then_some(
+                V2ActionOperand::Local(serializable_value_from_parsed(local_value)),
+            )
         } else {
             None
         }?;
@@ -5001,12 +5019,12 @@ fn state_operation_from_v2_parsed(
 ) -> StateOperation {
     match operation {
         ParsedStateOperation::AssignParameter(name) => match operands
-                .get(name)
-                .expect("validated V2 action operand should be available")
-            {
-                V2ActionOperand::Parameter(index) => StateOperation::AssignParameter(index.to_string()),
-                V2ActionOperand::Local(value) => StateOperation::Assign(value.clone()),
-            },
+            .get(name)
+            .expect("validated V2 action operand should be available")
+        {
+            V2ActionOperand::Parameter(index) => StateOperation::AssignParameter(index.to_string()),
+            V2ActionOperand::Local(value) => StateOperation::Assign(value.clone()),
+        },
         _ => state_operation_from_parsed(operation),
     }
 }

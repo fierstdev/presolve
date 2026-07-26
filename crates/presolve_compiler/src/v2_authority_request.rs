@@ -179,7 +179,14 @@ pub fn build_v2_authority_request_v1(
         .map_err(|error| V2AuthorityRequestErrorV1::FieldSiteSelection(error.to_string()))?
         .unwrap_or_default()
         .into_iter()
-        .map(|site| site_for("slot", site.callee_source, &parsed.path, &parsed.syntax.source))
+        .map(|site| {
+            site_for(
+                "slot",
+                site.callee_source,
+                &parsed.path,
+                &parsed.syntax.source,
+            )
+        })
         .collect::<Result<Vec<_>, _>>()?;
     let environment_public = environment_public_member_sites(parsed, environment.is_some())?;
     Ok(V2AuthorityRequestV1 {

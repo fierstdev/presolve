@@ -972,74 +972,79 @@ pub fn validate_runtime_component_artifact(
         .iter()
         .map(|binding| (binding.binding.as_str(), binding.callee_instance.as_str()))
         .collect::<std::collections::BTreeMap<_, _>>();
-    let slot_projection_programs_valid = |bindings: &[String],
-                                         programs: &[SerializedStructuralSlotProjectionProgram],
-                                         host: &str| {
-        bindings.len() == programs.len()
-            && bindings.iter().collect::<std::collections::BTreeSet<_>>().len()
-                == bindings.len()
-            && programs
-                .iter()
-                .map(|program| program.binding.as_str())
-                .collect::<std::collections::BTreeSet<_>>()
-                .len()
-                == programs.len()
-            && programs.iter().all(|program| {
-                let Some(slot_binding) = artifact
-                    .slot_binding_programs
+    let slot_projection_programs_valid =
+        |bindings: &[String],
+         programs: &[SerializedStructuralSlotProjectionProgram],
+         host: &str| {
+            bindings.len() == programs.len()
+                && bindings
                     .iter()
-                    .find(|binding| binding.binding == program.binding)
-                else {
-                    return false;
-                };
-                let targets = program
-                    .target_ids
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len()
+                    == bindings.len()
+                && programs
                     .iter()
-                    .collect::<std::collections::BTreeSet<_>>();
-                bindings.contains(&program.binding)
-                    && slot_binding.callee_instance == host
-                    && slot_binding.caller_instance == program.caller_instance
-                    && slot_binding.content_owner_instance == program.content_owner_instance
-                    && targets.len() == program.target_ids.len()
-                    && program
-                        .binding_ids
+                    .map(|program| program.binding.as_str())
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len()
+                    == programs.len()
+                && programs.iter().all(|program| {
+                    let Some(slot_binding) = artifact
+                        .slot_binding_programs
                         .iter()
-                        .collect::<std::collections::BTreeSet<_>>()
-                        .len()
-                        == program.binding_ids.len()
-                    && program
-                        .event_ids
+                        .find(|binding| binding.binding == program.binding)
+                    else {
+                        return false;
+                    };
+                    let targets = program
+                        .target_ids
                         .iter()
-                        .collect::<std::collections::BTreeSet<_>>()
-                        .len()
-                        == program.event_ids.len()
-                    && program
-                        .nested_invocations
-                        .iter()
-                        .collect::<std::collections::BTreeSet<_>>()
-                        .len()
-                        == program.nested_invocations.len()
-                    && program.target_ids.iter().all(|id| {
-                        artifact.ordinary_template_targets.iter().any(|target| {
-                            target.id == *id && target.component_instance_id == program.caller_instance
+                        .collect::<std::collections::BTreeSet<_>>();
+                    bindings.contains(&program.binding)
+                        && slot_binding.callee_instance == host
+                        && slot_binding.caller_instance == program.caller_instance
+                        && slot_binding.content_owner_instance == program.content_owner_instance
+                        && targets.len() == program.target_ids.len()
+                        && program
+                            .binding_ids
+                            .iter()
+                            .collect::<std::collections::BTreeSet<_>>()
+                            .len()
+                            == program.binding_ids.len()
+                        && program
+                            .event_ids
+                            .iter()
+                            .collect::<std::collections::BTreeSet<_>>()
+                            .len()
+                            == program.event_ids.len()
+                        && program
+                            .nested_invocations
+                            .iter()
+                            .collect::<std::collections::BTreeSet<_>>()
+                            .len()
+                            == program.nested_invocations.len()
+                        && program.target_ids.iter().all(|id| {
+                            artifact.ordinary_template_targets.iter().any(|target| {
+                                target.id == *id
+                                    && target.component_instance_id == program.caller_instance
+                            })
                         })
-                    })
-                    && program.binding_ids.iter().all(|id| {
-                        artifact.ordinary_template_bindings.iter().any(|binding| {
-                            binding.id == *id
-                                && binding.component_instance_id == program.caller_instance
-                                && targets.contains(&binding.target_id)
+                        && program.binding_ids.iter().all(|id| {
+                            artifact.ordinary_template_bindings.iter().any(|binding| {
+                                binding.id == *id
+                                    && binding.component_instance_id == program.caller_instance
+                                    && targets.contains(&binding.target_id)
+                            })
                         })
-                    })
-                    && program.event_ids.iter().all(|id| {
-                        artifact.ordinary_template_events.iter().any(|event| {
-                            event.declaration_event_id == *id
-                                && event.component_instance_id == program.caller_instance
-                                && targets.contains(&event.target_id)
+                        && program.event_ids.iter().all(|id| {
+                            artifact.ordinary_template_events.iter().any(|event| {
+                                event.declaration_event_id == *id
+                                    && event.component_instance_id == program.caller_instance
+                                    && targets.contains(&event.target_id)
+                            })
                         })
-                    })
-            })
-    };
+                })
+        };
     if artifact.structural_programs.iter().any(|program| {
         let host_instances = program
             .conditional_host_fragments

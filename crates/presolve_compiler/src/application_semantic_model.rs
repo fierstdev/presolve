@@ -4773,35 +4773,68 @@ mod tests {
                 "import { Component } from \"presolve\"; import { Panel } from \"../components/Panel\"; export class Index extends Component { render() { return <main><Panel><button>Projected</button></Panel></main>; } }",
             ),
         ]);
-        let models = unit.files().iter().map(|parsed| {
-            let component_sites = crate::component_inheritance_sites_v1(parsed);
-            let components = crate::lower_component_inheritance_v1(
-                parsed,
-                component_sites.into_iter().map(|site| crate::ResolvedComponentInheritanceV1 {
-                    heritage_source: site.heritage_source,
-                    component_identity: crate::ResolvedIntrinsicIdentityV1 {
-                        name: "Component".into(), flags: 32,
-                        declaration_modules: vec!["presolve".into()],
+        let models = unit
+            .files()
+            .iter()
+            .map(|parsed| {
+                let component_sites = crate::component_inheritance_sites_v1(parsed);
+                let components = crate::lower_component_inheritance_v1(
+                    parsed,
+                    component_sites
+                        .into_iter()
+                        .map(|site| crate::ResolvedComponentInheritanceV1 {
+                            heritage_source: site.heritage_source,
+                            component_identity: crate::ResolvedIntrinsicIdentityV1 {
+                                name: "Component".into(),
+                                flags: 32,
+                                declaration_modules: vec!["presolve".into()],
+                            },
+                        }),
+                )
+                .expect("V2 component authority")
+                .model;
+                let slots = crate::slot_field_sites_v1(parsed, &components).expect("V2 Slot sites");
+                let lowering = crate::lower_v2_authoring_v1(
+                    parsed,
+                    crate::V2AuthoringResolutionsV1 {
+                        components: crate::component_inheritance_sites_v1(parsed)
+                            .into_iter()
+                            .map(|site| crate::ResolvedComponentInheritanceV1 {
+                                heritage_source: site.heritage_source,
+                                component_identity: crate::ResolvedIntrinsicIdentityV1 {
+                                    name: "Component".into(),
+                                    flags: 32,
+                                    declaration_modules: vec!["presolve".into()],
+                                },
+                            })
+                            .collect(),
+                        states: Vec::new(),
+                        actions: Vec::new(),
+                        effects: Vec::new(),
+                        slots: slots
+                            .into_iter()
+                            .map(|site| crate::ResolvedSlotFieldV1 {
+                                callee_source: site.callee_source,
+                                slot_identity: crate::ResolvedIntrinsicIdentityV1 {
+                                    name: "slot".into(),
+                                    flags: 32,
+                                    declaration_modules: vec!["presolve".into()],
+                                },
+                            })
+                            .collect(),
                     },
-                }),
-            ).expect("V2 component authority").model;
-            let slots = crate::slot_field_sites_v1(parsed, &components).expect("V2 Slot sites");
-            let lowering = crate::lower_v2_authoring_v1(parsed, crate::V2AuthoringResolutionsV1 {
-                components: crate::component_inheritance_sites_v1(parsed).into_iter().map(|site| crate::ResolvedComponentInheritanceV1 {
-                    heritage_source: site.heritage_source,
-                    component_identity: crate::ResolvedIntrinsicIdentityV1 { name: "Component".into(), flags: 32, declaration_modules: vec!["presolve".into()] },
-                }).collect(),
-                states: Vec::new(), actions: Vec::new(), effects: Vec::new(),
-                slots: slots.into_iter().map(|site| crate::ResolvedSlotFieldV1 {
-                    callee_source: site.callee_source,
-                    slot_identity: crate::ResolvedIntrinsicIdentityV1 { name: "slot".into(), flags: 32, declaration_modules: vec!["presolve".into()] },
-                }).collect(),
-            }).expect("V2 Slot lowering");
-            (parsed.path.clone(), lowering.model)
-        }).collect::<BTreeMap<_, _>>();
-        let asm = build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring(
-            &unit, &crate::SemanticPackageResolutionTable::default(), &models,
-        ).expect("V2 Slot route assembly");
+                )
+                .expect("V2 Slot lowering");
+                (parsed.path.clone(), lowering.model)
+            })
+            .collect::<BTreeMap<_, _>>();
+        let asm =
+            build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring(
+                &unit,
+                &crate::SemanticPackageResolutionTable::default(),
+                &models,
+            )
+            .expect("V2 Slot route assembly");
         assert_eq!(asm.slots().len(), 1);
         assert_eq!(asm.slot_content_fragments().len(), 1);
         assert_eq!(asm.slot_binding_registry().bindings.len(), 1);
