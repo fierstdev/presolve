@@ -1803,6 +1803,68 @@ const RUNTIME_STUB: &str = r#"(() => {
     return Object.freeze({ nodes: Object.freeze(nodes), rollback });
   }
 
+  function registerStructuralOccurrenceRecords(store, staged) {
+    if (!(store.templateTargetsById instanceof Map)
+      || !(store.ordinaryBindingsById instanceof Map)
+      || !(store.ordinaryEventsByTargetAndType instanceof Map)) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const anchors = collectOrdinaryTargetAnchors();
+    const targetIds = [];
+    const bindingIds = [];
+    const eventKeys = [];
+    const unsubscribes = [];
+    let registered = false;
+    const rollback = () => {
+      if (!registered) return;
+      for (const unsubscribe of unsubscribes.reverse()) unsubscribe();
+      for (const key of eventKeys) store.ordinaryEventsByTargetAndType.delete(key);
+      for (const id of bindingIds) store.ordinaryBindingsById.delete(id);
+      for (const id of targetIds) store.templateTargetsById.delete(id);
+      registered = false;
+    };
+    try {
+      for (const pair of staged.targets) {
+        const target = pair.manifest;
+        if (anchors.duplicates.has(target.id) || !anchors.targets.has(target.id)
+          || store.templateTargetsById.has(target.id)) {
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        store.templateTargetsById.set(target.id, anchors.targets.get(target.id));
+        targetIds.push(target.id);
+      }
+      for (const pair of staged.bindings) {
+        const binding = pair.manifest;
+        if (store.ordinaryBindingsById.has(binding.instance_binding_id)) {
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        store.ordinaryBindingsById.set(binding.instance_binding_id, {
+          ...binding,
+          execution_context: { component_instance_id: binding.component_instance_id }
+        });
+        bindingIds.push(binding.instance_binding_id);
+        unsubscribes.push(registerOrdinaryBinding(store, binding, pair.artifact));
+      }
+      for (const pair of staged.events) {
+        const event = pair.manifest;
+        const key = ordinaryEventKey(event.instance_target_id, event.event_type);
+        if (store.ordinaryEventsByTargetAndType.has(key)) {
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        store.ordinaryEventsByTargetAndType.set(key, event);
+        eventKeys.push(key);
+      }
+      executeComputedPlan(store, staged.occurrence_identity);
+      installOrdinaryInstanceEventListeners(store);
+      registered = true;
+    } catch (error) {
+      registered = true;
+      rollback();
+      throw error;
+    }
+    return Object.freeze({ rollback });
+  }
+
   function structuralOccurrenceTemplateRegistry(manifest, componentArtifact, computedArtifact) {
     const components = new Map((manifest.components ?? []).map((component) => [component.component_id, component]));
     if (components.size !== (manifest.components ?? []).length) {
@@ -5000,6 +5062,7 @@ mod tests {
         assert!(runtime.contains("function stageStructuralOccurrenceRecords"));
         assert!(runtime.contains("function renderStructuralOccurrenceTemplate"));
         assert!(runtime.contains("function attachStructuralOccurrenceFragment"));
+        assert!(runtime.contains("function registerStructuralOccurrenceRecords"));
         assert!(runtime.contains("active.indexOf(updateBinding)"));
         assert!(runtime.contains("function structuralOccurrenceTemplateRegistry"));
         assert!(runtime.contains("structuralOccurrenceTemplatesByInvocation"));
