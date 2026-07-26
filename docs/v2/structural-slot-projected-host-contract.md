@@ -25,10 +25,11 @@ does not read source or inspect caller DOM to determine content.
 
 At materialization, the callee host uses its already-authorized opaque
 occurrence identity. Every projected member remains owned by the compiler
-declared lexical content owner. A projected child that is itself structural
-uses an occurrence identity derived from that owner scope and the exact
-compiler template instance; no caller, callee, Slot name, or DOM position is
-substituted at runtime.
+declared lexical content owner. Projected component invocations are published
+as exact membership but remain activation-ineligible until a separate
+State/Effect identity contract defines their clone semantics. A non-empty
+`nested_invocations` projection therefore fails closed; no caller, callee,
+Slot name, or DOM position is substituted at runtime.
 
 The runtime may replace only compiler-declared structural occurrence and keyed
 local-occurrence placeholders. It must validate the exact projection binding,
@@ -39,8 +40,8 @@ caller nodes.
 ## Transaction and lifecycle
 
 Projection rendering is one phase of the enclosing structural materialization
-transaction. A projection failure rolls back its staged component records,
-bindings, events, Effects, nested occurrences, and DOM nodes with the same
+transaction. A projection failure rolls back its staged targets, bindings,
+events, enclosing structural occurrences, Effects, and DOM nodes with the same
 child-before-parent order used by ordinary structural removal. A successful
 keyed reorder retains the same projection transaction and all occurrence
 identities. Resume remains fail-closed for slot-projected hosts until a
@@ -58,10 +59,17 @@ Slot decoder is permitted.
 
 ## Current acceptance boundary
 
-The v20 slice publishes and validates the compiler-selected membership and
-registers it transactionally for eligible structural host replacement. The
-required end-to-end browser fixture remains blocked on an authored V2,
-decorator-free Slot declaration/authority contract: current canonical Slot
-declarations use `@slot()`, so introducing a replacement spelling here would
-invent source semantics. Resume remains fail-closed for all Slot-projected
-structural hosts.
+The v20 gate is active for authority-proven V2 `slot()` fields. Compiler
+semantic-span ownership plus exact emitted IDs partition default and named
+Slot targets, text bindings, and events into the conditional or keyed fragment
+that actually renders them. Ordinary cold boot excludes those dormant caller
+records; structural materialization registers them transactionally, qualifies
+keyed identities, retains them across reorder, and removes their subscriptions
+on trim or branch cleanup.
+
+The decorator-free browser fixture proves conditional reveal/hide, keyed
+materialization/reorder/trim, shared caller State/action/binding/event
+behavior, callee structural lifecycle cleanup, and fail-closed rejection for
+fabricated binding, ownership, and renderer-marker evidence. Projected
+component invocation cloning and Slot capture/resume remain fail-closed
+follow-on contracts.

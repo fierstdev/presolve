@@ -2215,6 +2215,10 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
     const prior = target.structural_occurrences ?? [];
     const priorProjection = target.structural_projection_registration ?? null;
+    const priorBranch = target.structural_branch ?? null;
+    const priorHtml = priorBranch === "true" ? fragmentRecord.when_true_html
+      : priorBranch === "false" ? fragmentRecord.when_false_html
+      : null;
     priorProjection?.rollback();
     const created = [];
     let projectionRegistration = null;
@@ -2249,7 +2253,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       }
       target.end.parentNode.insertBefore(previous, target.end);
       if (priorProjection !== null) {
-        const projection = structuralHostProjectionRecords(store, fragmentRecord, component, html);
+        if (typeof priorHtml !== "string") throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        const projection = structuralHostProjectionRecords(store, fragmentRecord, component, priorHtml);
         target.structural_projection_registration = registerStructuralOccurrenceRecords(store, {
           ...projection,
           occurrence_identity: component.instance_id
@@ -2400,7 +2405,11 @@ const RUNTIME_STUB: &str = r#"(() => {
             || new Set(projection.target_ids).size !== projection.target_ids.length
             || new Set(projection.binding_ids).size !== projection.binding_ids.length
             || new Set(projection.event_ids).size !== projection.event_ids.length
-            || new Set(projection.nested_invocations).size !== projection.nested_invocations.length) {
+            || new Set(projection.nested_invocations).size !== projection.nested_invocations.length
+            // This amendment activates ordinary caller-owned projection
+            // members. Projected component invocation cloning needs its own
+            // State/Effect identity contract and therefore remains fail-closed.
+            || projection.nested_invocations.length !== 0) {
             throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
           }
           const targetPairs = projection.target_ids.map((id) => {
@@ -2441,15 +2450,32 @@ const RUNTIME_STUB: &str = r#"(() => {
             targets: Object.freeze(targetPairs), bindings: Object.freeze(bindingPairs), events: Object.freeze(eventPairs),
             nested_invocations: Object.freeze([...projection.nested_invocations])
           });
-          const prior = registry.get(record.binding);
-          if (prior !== undefined && JSON.stringify(prior) !== JSON.stringify(record)) {
-            throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
-          }
-          registry.set(record.binding, record);
+          // A binding may be listed by more than one host fragment while only
+          // one exact outlet is emitted by a given conditional branch or keyed
+          // item template. Key the preflight result by the compiler program
+          // object, preserving fragment-local membership without merging it.
+          registry.set(projection, record);
         }
       }
     }
     return registry;
+  }
+
+  function structuralSlotProjectionTargetIds(componentArtifact) {
+    const ids = new Set();
+    for (const program of componentArtifact?.structural_programs ?? []) {
+      for (const fragment of [...(program.conditional_host_fragments ?? []), ...(program.keyed_host_fragments ?? [])]) {
+        for (const projection of fragment?.slot_projection_programs ?? []) {
+          for (const id of projection?.target_ids ?? []) {
+            if (typeof id !== "string" || id.length === 0) {
+              throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+            }
+            ids.add(id);
+          }
+        }
+      }
+    }
+    return ids;
   }
 
   function structuralProjectionOwnerScope(store, component, callerInstance) {
@@ -2467,8 +2493,8 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (typeof compilerHtml !== "string") throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
     const records = [];
     const ids = new Set();
-    for (const binding of fragment?.slot_projection_bindings ?? []) {
-      const source = store.structuralSlotProjectionPrograms?.get(binding);
+    for (const projection of fragment?.slot_projection_programs ?? []) {
+      const source = store.structuralSlotProjectionPrograms?.get(projection);
       if (source === undefined) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
       const emitted = [...source.targets, ...source.bindings].some((pair) => compilerHtml.includes(pair.artifact.id));
       if (!emitted) continue;
@@ -2517,6 +2543,19 @@ const RUNTIME_STUB: &str = r#"(() => {
       .replaceAll("__ez_list_key__", escapeHtmlAttribute(key))
       .replaceAll("__ez_list_item__", escapeHtmlText(formatBindingValue(item)))
       .replaceAll("__ez_list_index__", String(index));
+  }
+
+  function qualifyStructuralSlotProjectionItemHtml(fragment, html, key) {
+    let qualified = html;
+    for (const projection of fragment?.slot_projection_programs ?? []) {
+      for (const id of [...(projection.target_ids ?? []), ...(projection.binding_ids ?? [])]) {
+        if (typeof id !== "string" || id.length === 0) {
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        qualified = qualified.replaceAll(id, `${id}:${escapeHtmlAttribute(key)}`);
+      }
+    }
+    return qualified;
   }
 
   function populateListItemMemberBindings(node, item, fragment) {
@@ -2662,7 +2701,11 @@ const RUNTIME_STUB: &str = r#"(() => {
     );
     if (programs.length !== 1) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
     const template = document.createElement("template");
-    template.innerHTML = renderListItemHtml({ item_template_html: fragmentRecord.item_template_html }, item, index, key);
+    template.innerHTML = qualifyStructuralSlotProjectionItemHtml(
+      fragmentRecord,
+      renderListItemHtml({ item_template_html: fragmentRecord.item_template_html }, item, index, key),
+      key
+    );
     populateListItemMemberBindings(node, item, template.content);
     const anchors = compilerFragmentInvocationAnchors(template.content, programs[0], fragmentRecord.item_invocations);
     const element = template.content.firstElementChild;
@@ -4282,9 +4325,20 @@ const RUNTIME_STUB: &str = r#"(() => {
   function initializeOrdinaryInstanceRuntime(store, manifest, componentArtifact) {
     if (manifest.schema_version !== SUPPORTED_SCHEMA_VERSION) return;
     const activeInstances = new Set((componentArtifact.instances ?? []).map((instance) => instance.instance));
-    const targets = (manifest.ordinary_targets ?? []).filter((target) => activeInstances.has(target.component_instance_id));
-    const bindings = (manifest.ordinary_bindings ?? []).filter((binding) => activeInstances.has(binding.component_instance_id));
-    const events = (manifest.ordinary_events ?? []).filter((event) => activeInstances.has(event.component_instance_id));
+    // Caller-owned Slot records selected by a structural host are absent until
+    // that compiler-issued fragment materializes. Registering them during
+    // ordinary boot would require anchors that the selected branch/list item
+    // has not attached yet; structuralHostProjectionRecords owns that staging.
+    const structuralSlotTargets = structuralSlotProjectionTargetIds(componentArtifact);
+    const targets = (manifest.ordinary_targets ?? []).filter((target) =>
+      activeInstances.has(target.component_instance_id) && !structuralSlotTargets.has(target.id)
+    );
+    const bindings = (manifest.ordinary_bindings ?? []).filter((binding) =>
+      activeInstances.has(binding.component_instance_id) && !structuralSlotTargets.has(binding.instance_target_id)
+    );
+    const events = (manifest.ordinary_events ?? []).filter((event) =>
+      activeInstances.has(event.component_instance_id) && !structuralSlotTargets.has(event.instance_target_id)
+    );
     const anchors = collectOrdinaryTargetAnchors();
     for (const binding of bindings) {
       if (binding.kind !== "text" || anchors.targets.has(binding.instance_target_id)) continue;

@@ -468,19 +468,24 @@ pub fn build_runtime_component_artifact(
                 &program.region,
             )
             .into_iter()
-            .map(|fragments| SerializedStructuralConditionalHostFragments {
-                host_scope: fragments.host_scope.artifact_text().to_string(),
-                host_instance: fragments.host_instance.to_string(),
-                when_true_html: fragments.when_true_html,
-                when_false_html: fragments.when_false_html,
-                when_true_invocations: fragments.when_true_invocations,
-                when_false_invocations: fragments.when_false_invocations,
-                slot_projection_programs: structural_slot_projection_programs(
-                    model,
-                    &ordinary,
-                    &fragments.slot_projection_bindings,
-                ),
-                slot_projection_bindings: fragments.slot_projection_bindings,
+            .map(|fragments| {
+                let compiler_html =
+                    format!("{}{}", fragments.when_true_html, fragments.when_false_html);
+                SerializedStructuralConditionalHostFragments {
+                    host_scope: fragments.host_scope.artifact_text().to_string(),
+                    host_instance: fragments.host_instance.to_string(),
+                    when_true_html: fragments.when_true_html,
+                    when_false_html: fragments.when_false_html,
+                    when_true_invocations: fragments.when_true_invocations,
+                    when_false_invocations: fragments.when_false_invocations,
+                    slot_projection_programs: structural_slot_projection_programs(
+                        model,
+                        &ordinary,
+                        &fragments.slot_projection_bindings,
+                        &compiler_html,
+                    ),
+                    slot_projection_bindings: fragments.slot_projection_bindings,
+                }
             })
             .collect(),
             keyed_host_fragments: crate::generate_structural_keyed_host_fragments(
@@ -488,17 +493,21 @@ pub fn build_runtime_component_artifact(
                 &program.region,
             )
             .into_iter()
-            .map(|fragments| SerializedStructuralKeyedHostFragment {
-                host_scope: fragments.host_scope.artifact_text().to_string(),
-                host_instance: fragments.host_instance.to_string(),
-                item_template_html: fragments.item_template_html,
-                item_invocations: fragments.item_invocations,
-                slot_projection_programs: structural_slot_projection_programs(
+            .map(|fragments| {
+                let slot_projection_programs = structural_slot_projection_programs(
                     model,
                     &ordinary,
                     &fragments.slot_projection_bindings,
-                ),
-                slot_projection_bindings: fragments.slot_projection_bindings,
+                    &fragments.item_template_html,
+                );
+                SerializedStructuralKeyedHostFragment {
+                    host_scope: fragments.host_scope.artifact_text().to_string(),
+                    host_instance: fragments.host_instance.to_string(),
+                    item_template_html: fragments.item_template_html,
+                    item_invocations: fragments.item_invocations,
+                    slot_projection_programs,
+                    slot_projection_bindings: fragments.slot_projection_bindings,
+                }
             })
             .collect(),
             template_occurrences: program.template_occurrences,
@@ -514,7 +523,13 @@ fn structural_slot_projection_programs(
     model: &ApplicationSemanticModel,
     ordinary: &crate::OrdinaryTemplateInstanceRegistry,
     bindings: &[String],
+    compiler_html: &str,
 ) -> Vec<SerializedStructuralSlotProjectionProgram> {
+    let semantic_entities = crate::build_template_semantic_entities(&model.templates);
+    let semantic_entities = semantic_entities
+        .iter()
+        .map(|entity| (&entity.id, entity))
+        .collect::<std::collections::BTreeMap<_, _>>();
     bindings
         .iter()
         .filter_map(|binding_id| {
@@ -526,16 +541,38 @@ fn structural_slot_projection_programs(
             let fragment = model
                 .slot_content_fragments
                 .get(binding.content_fragment.as_ref()?)?;
-            let entities = fragment
+            let roots = fragment
                 .content_template_entities
                 .iter()
+                .filter_map(|entity| semantic_entities.get(entity).copied())
+                .collect::<Vec<_>>();
+            let owns_entity = |entity_id: &crate::SemanticId| {
+                let Some(entity) = semantic_entities.get(entity_id).copied() else {
+                    return false;
+                };
+                roots.iter().any(|root| {
+                    root.provenance.path == entity.provenance.path
+                        && root.provenance.span.start <= entity.provenance.span.start
+                        && entity.provenance.span.end <= root.provenance.span.end
+                })
+            };
+            let rendered_binding_targets = ordinary
+                .bindings
+                .iter()
+                .filter(|record| {
+                    record.component_instance_id == binding.caller_instance
+                        && compiler_html.contains(&record.instance_binding_id.to_string())
+                })
+                .map(|record| record.target_id.to_string())
                 .collect::<std::collections::BTreeSet<_>>();
             let target_ids = ordinary
                 .targets
                 .iter()
                 .filter(|target| {
                     target.component_instance_id == binding.caller_instance
-                        && entities.contains(&target.template_entity_id)
+                        && owns_entity(&target.template_entity_id)
+                        && (compiler_html.contains(&target.target_id.to_string())
+                            || rendered_binding_targets.contains(&target.target_id.to_string()))
                 })
                 .map(|target| target.target_id.to_string())
                 .collect::<Vec<_>>();
@@ -558,6 +595,25 @@ fn structural_slot_projection_programs(
                 })
                 .map(|event| event.declaration_event_id.to_string())
                 .collect::<Vec<_>>();
+            let caller_component = &model
+                .component_instance_plan
+                .instances
+                .get(&binding.caller_instance)?
+                .component;
+            let nested_invocations = model
+                .component_invocations_owned_by(caller_component)
+                .into_iter()
+                .filter(|invocation| {
+                    model
+                        .component_invocations
+                        .get(invocation)
+                        .is_some_and(|record| {
+                            owns_entity(&record.template_entity)
+                                && compiler_html.contains(invocation.as_str())
+                        })
+                })
+                .map(ToString::to_string)
+                .collect();
             Some(SerializedStructuralSlotProjectionProgram {
                 binding: binding_id.clone(),
                 caller_instance: binding.caller_instance.to_string(),
@@ -565,7 +621,7 @@ fn structural_slot_projection_programs(
                 target_ids,
                 binding_ids,
                 event_ids,
-                nested_invocations: Vec::new(),
+                nested_invocations,
             })
         })
         .collect()
@@ -773,6 +829,12 @@ pub fn validate_runtime_component_artifact(
     if artifact.schema_version != RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION {
         return Err("unsupported component runtime artifact schema version".to_string());
     }
+    let structural_occurrence_invocations = artifact
+        .structural_programs
+        .iter()
+        .flat_map(|program| &program.template_occurrences)
+        .map(|occurrence| occurrence.invocation.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
     if artifact.structural_programs.iter().any(|program| {
         program.region.is_empty()
             || program.host_component.is_empty()
@@ -843,10 +905,7 @@ pub fn validate_runtime_component_artifact(
                             .collect::<std::collections::BTreeSet<_>>()
                             .len()
                     || occurrence.nested_invocations.iter().any(|invocation| {
-                        !program
-                            .template_occurrences
-                            .iter()
-                            .any(|candidate| candidate.invocation == *invocation)
+                        !structural_occurrence_invocations.contains(invocation.as_str())
                     })
             })
             || program
