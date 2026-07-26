@@ -7,8 +7,9 @@ static NEXT_ROOT: AtomicU64 = AtomicU64::new(1);
 
 fn setup() -> (PathBuf, PathBuf, PathBuf) {
     let root = std::env::temp_dir().join(format!(
-        "presolve-application-publication-{}",
-        NEXT_ROOT.fetch_add(1, Ordering::Relaxed)
+        "presolve-application-publication-{}-{}",
+        std::process::id(),
+        NEXT_ROOT.fetch_add(1, Ordering::Relaxed),
     ));
     fs::create_dir_all(root.join("src")).unwrap();
     let config = root.join("presolve.json");
