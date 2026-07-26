@@ -959,9 +959,15 @@ const RUNTIME_STUB: &str = r#"(() => {
           || typeof program.host_node !== "string" || program.host_node.length === 0
           || typeof program.host_template_entity !== "string" || program.host_template_entity.length === 0
           || structuralRegions.has(program.region) || structuralHosts.has(host)
+          || !Array.isArray(program.conditional_host_fragments)
           || !Array.isArray(program.template_instances)
           || !Array.isArray(program.template_occurrences)
           || program.template_occurrences.length !== program.template_instances.length
+          || new Set(program.conditional_host_fragments.map((fragments) => fragments?.host_instance)).size !== program.conditional_host_fragments.length
+          || program.conditional_host_fragments.some((fragments) => typeof fragments?.host_instance !== "string"
+            || !instances.has(fragments.host_instance)
+            || typeof fragments.when_true_html !== "string" || fragments.when_true_html.length === 0
+            || typeof fragments.when_false_html !== "string" || fragments.when_false_html.length === 0)
           || program.template_occurrences.some((occurrence, index) => typeof occurrence?.template_instance !== "string"
             || occurrence.template_instance !== program.template_instances[index]
             || typeof occurrence.invocation !== "string" || typeof occurrence.invocation_template_entity !== "string"

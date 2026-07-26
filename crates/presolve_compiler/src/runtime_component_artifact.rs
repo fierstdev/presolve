@@ -9,7 +9,7 @@ use crate::{
 };
 use crate::{TemplateChild, TemplateNode, TemplateSemanticKind};
 
-pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 10;
+pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 11;
 
 /// Public H14 compiler artifact. All executable references are canonical IDs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -141,10 +141,21 @@ pub struct SerializedStructuralComponentProgram {
     pub host_node: String,
     /// Exact semantic template entity for the conditional or keyed-list host.
     pub host_template_entity: String,
+    /// Compiler-rendered conditional branches for initially static host
+    /// instances. Keyed-list and nested host scopes remain absent until their
+    /// complete compiler input scopes have an authored product.
+    pub conditional_host_fragments: Vec<SerializedStructuralConditionalHostFragments>,
     pub template_occurrences: Vec<SerializedStructuralTemplateOccurrence>,
     pub template_instances: Vec<String>,
     pub destroy_order: Vec<String>,
     pub create_order: Vec<String>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SerializedStructuralConditionalHostFragments {
+    /// Exact initially-static component instance that owns the conditional.
+    pub host_instance: String,
+    pub when_true_html: String,
+    pub when_false_html: String,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SerializedStructuralTemplateOccurrence {
@@ -359,6 +370,17 @@ pub fn build_runtime_component_artifact(
             host_component: program.host_component,
             host_node: program.host_node,
             host_template_entity: program.host_template_entity,
+            conditional_host_fragments: crate::generate_structural_conditional_host_fragments(
+                model,
+                &program.region,
+            )
+            .into_iter()
+            .map(|fragments| SerializedStructuralConditionalHostFragments {
+                host_instance: fragments.host_instance.to_string(),
+                when_true_html: fragments.when_true_html,
+                when_false_html: fragments.when_false_html,
+            })
+            .collect(),
             template_occurrences: program.template_occurrences,
             create_order: program.template_instances.clone(),
             destroy_order: program.template_instances.iter().rev().cloned().collect(),
@@ -370,6 +392,7 @@ pub fn build_runtime_component_artifact(
 
 #[derive(Debug, Clone)]
 struct StructuralProgramBuild {
+    region: crate::ComponentStructuralRegionId,
     host_component: String,
     host_node: String,
     host_template_entity: String,
@@ -406,6 +429,7 @@ fn structural_program_build(
         .expect("structural template host has an emitted runtime node");
 
     StructuralProgramBuild {
+        region: region.clone(),
         host_component: component.to_string(),
         host_node,
         host_template_entity: entity.id.to_string(),
@@ -573,6 +597,11 @@ pub fn validate_runtime_component_artifact(
             || program.host_component.is_empty()
             || program.host_node.is_empty()
             || program.host_template_entity.is_empty()
+            || program.conditional_host_fragments.iter().any(|fragments| {
+                fragments.host_instance.is_empty()
+                    || fragments.when_true_html.is_empty()
+                    || fragments.when_false_html.is_empty()
+            })
             || program.template_occurrences.len() != program.template_instances.len()
             || program.template_occurrences.iter().any(|occurrence| {
                 occurrence.template_html.is_empty()
@@ -615,6 +644,20 @@ pub fn validate_runtime_component_artifact(
         .iter()
         .map(|r| r.instance.as_str())
         .collect::<std::collections::BTreeSet<_>>();
+    if artifact.structural_programs.iter().any(|program| {
+        let host_instances = program
+            .conditional_host_fragments
+            .iter()
+            .map(|fragments| fragments.host_instance.as_str())
+            .collect::<std::collections::BTreeSet<_>>();
+        host_instances.len() != program.conditional_host_fragments.len()
+            || program
+                .conditional_host_fragments
+                .iter()
+                .any(|fragments| !instances.contains(fragments.host_instance.as_str()))
+    }) {
+        return Err("component artifact has invalid conditional host fragments".to_string());
+    }
     let structural_template_instances = artifact
         .structural_programs
         .iter()
@@ -999,6 +1042,33 @@ mod tests {
                         .template_html
                         .contains("__PRESOLVE_STRUCTURAL_OCCURRENCE__")
             }));
+
+        let conditional = artifact
+            .structural_programs
+            .iter()
+            .find(|program| !program.conditional_host_fragments.is_empty())
+            .expect("conditional host has compiler-authored fragments");
+        assert_eq!(conditional.conditional_host_fragments.len(), 1);
+        let fragments = &conditional.conditional_host_fragments[0];
+        assert!(artifact
+            .instances
+            .iter()
+            .any(|instance| instance.instance == fragments.host_instance));
+        assert!(fragments
+            .when_true_html
+            .contains("data-presolve-structural-invocation="));
+        assert!(fragments.when_false_html.contains("Hidden"));
+
+        let mut invalid_fragments = artifact.clone();
+        invalid_fragments
+            .structural_programs
+            .iter_mut()
+            .find(|program| !program.conditional_host_fragments.is_empty())
+            .expect("conditional host has compiler-authored fragments")
+            .conditional_host_fragments[0]
+            .when_false_html
+            .clear();
+        assert!(validate_runtime_component_artifact(&invalid_fragments).is_err());
 
         let first = &mut artifact.structural_programs[0].template_occurrences[0];
         first

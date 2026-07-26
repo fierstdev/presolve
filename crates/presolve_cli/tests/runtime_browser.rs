@@ -1947,10 +1947,16 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
   const runtime = window.__PRESOLVE__;
   const artifact = JSON.parse(document.getElementById("presolve-component-runtime").textContent);
-  if (artifact.schema_version !== 10 || artifact.structural_programs.length !== 2) fail("structural component programs were missing");
+  if (artifact.schema_version !== 11 || artifact.structural_programs.length !== 2) fail("structural component programs were missing");
   if (runtime.store.componentRegions.size !== artifact.structural_programs.length) fail("closed structural region table diverged from the artifact");
   if (!artifact.structural_programs.every((program) => JSON.stringify(runtime.store.componentRegions.get(program.region)) === JSON.stringify(program))) {
     fail("runtime structural regions were not keyed by compiler IDs");
+  }
+  const conditionalHost = artifact.structural_programs.find((program) => program.conditional_host_fragments.length > 0);
+  if (conditionalHost === undefined || conditionalHost.conditional_host_fragments.length !== 1) fail("compiler conditional host fragments were missing");
+  const fragments = conditionalHost.conditional_host_fragments[0];
+  if (!fragments.when_true_html.includes("data-presolve-structural-invocation=") || !fragments.when_false_html.includes("Hidden")) {
+    fail("conditional host fragments lost compiler-issued branch anchors");
   }
   for (const program of artifact.structural_programs) {
     if (typeof program.host_template_entity !== "string" || program.host_template_entity.length === 0) {

@@ -47,9 +47,20 @@ its exact compiler-issued invocation ID. This marker is an integrity-checked
 fragment anchor, not a tag lookup: a materializer must reject a missing or
 duplicate marker and may never substitute a same-named element.
 
-Schema v10 is not a runtime materializer. It establishes the validated compiler
-template and membership set from which the later program must be constructed;
-the runtime must not activate, infer, or partially use it for dynamic component
+Schema v11 adds `conditional_host_fragments`: both compiler-rendered branch
+fragments, keyed by the exact initially-static root host instance, with normal
+ordinary markers and exact structural-invocation anchors. It is a narrow
+compiler-product slice, not activation authority. Nested host instances can
+need caller-owned Slot projection or an opaque parent occurrence scope; keyed
+list items also need a keyed renderer scope. Neither is represented by this
+field, so those cases are absent rather than approximated. A runtime must
+reject a missing fragment and must not use this field for a list or nested host
+as a fallback.
+
+Schemas v10 and v11 are not runtime materializers. They establish the
+validated compiler template, membership set, and initial conditional-host
+fragments from which the later complete program must be constructed; the
+runtime must not activate, infer, or partially use them for dynamic component
 rendering.
 
 ## Runtime identity and reconciliation
