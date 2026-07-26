@@ -58,6 +58,9 @@ normative source for this handoff.
 - [V2 effect lifecycle adoption contract](effect-lifecycle-adoption-contract.md)
   defines cleanup programs, resume scheduling, ordering, and browser runtime
   ownership for V2 effect fields.
+- [V2 effect instance-lifecycle contract](effect-instance-lifecycle-contract.md)
+  defines the required instance-qualified ownership boundary before cleanup
+  fields can be published.
 - [Vite adapter boundary](vite-adapter.md) records the compiler-product-only
   integration seam for the required external backend.
 - [Presolve-aware HMR contract](hmr-contract.md) records the compiler-selected
