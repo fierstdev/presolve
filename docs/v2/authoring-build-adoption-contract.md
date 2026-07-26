@@ -39,7 +39,9 @@ caller must never substitute the legacy decorator graph after such a failure.
    installed executable and `tsconfig.json`, then reject bridge transport,
    schema, source-join, and native-diagnostic failures before legacy assembly.
 3. Adopt resolved V2 components into the file-route graph while preserving
-   existing stable IDs and route source ownership.
+   existing stable IDs and route source ownership. Implemented: canonical V2
+   evidence now flows through check, route graph, route-scoped assembly, and
+   publication without a decorator fallback.
 4. Adopt canonical State and Action records into the existing runtime products,
    with separate cold and resumed evidence.
 5. Retire decorator fixtures from beta evidence; retain them only as named
@@ -57,6 +59,6 @@ caller must never substitute the legacy decorator graph after such a failure.
 - no legacy decorator lowering is invoked for the decorator-free fixture.
 
 This contract was created after a direct generated-project probe returned
-`PSAPP1005_ENTRY_APPLICATION_ROOT_MISSING`. The authority preflight now runs
-and is covered independently, but that legacy-graph failure remains expected
-until the canonical-model adapter in the next adoption step is implemented.
+`PSAPP1005_ENTRY_APPLICATION_ROOT_MISSING`. Canonical Component adoption now
+removes that failure for an authority-backed decorator-free route; canonical
+State and Action runtime adoption remains the next required step.
