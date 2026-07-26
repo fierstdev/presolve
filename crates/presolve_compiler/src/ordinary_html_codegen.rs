@@ -172,6 +172,7 @@ pub fn generate_structural_template_instance_html(
         .iter()
         .map(|template| (template.id.clone(), template))
         .collect::<BTreeMap<_, _>>();
+    let slot_projections = structural_instance_slot_projections(model, &templates, instance)?;
     Some(
         render_instance(
             model,
@@ -182,7 +183,7 @@ pub fn generate_structural_template_instance_html(
             &ResumeHtmlMarkers::default(),
             &instance.id,
             &instance.component,
-            &[],
+            &slot_projections,
         )
         .replace(instance.id.as_str(), "__PRESOLVE_STRUCTURAL_OCCURRENCE__"),
     )
@@ -1418,7 +1419,7 @@ mod tests {
     use super::{
         generate_ordinary_instance_html, generate_ordinary_instance_html_for_component,
         generate_structural_conditional_host_fragments, generate_structural_keyed_host_fragments,
-        StructuralConditionalHostScope,
+        generate_structural_template_instance_html, StructuralConditionalHostScope,
     };
     use crate::{
         build_application_semantic_model, build_resume_anchor_plan, validate_resume_marker_html,
@@ -1477,6 +1478,15 @@ mod tests {
             })
             .expect("structural Panel host fragment is emitted");
         assert!(projected.when_true_html.contains("Projected"));
+        let panel = model
+            .component_instance_plan
+            .instances
+            .values()
+            .find(|instance| instance.component.as_str().contains("component:x-panel"))
+            .expect("structural Panel instance");
+        let panel_html = generate_structural_template_instance_html(&model, &panel.id)
+            .expect("structural Panel template HTML");
+        assert!(panel_html.contains("Projected"));
     }
 
     #[test]
