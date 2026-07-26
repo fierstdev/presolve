@@ -209,6 +209,10 @@ pub struct ParsedInlineHandler {
     pub is_expression_body: bool,
     pub state_updates: Vec<ParsedStateUpdate>,
     pub unsupported_statement_spans: Vec<SourceSpan>,
+    /// A restricted ordered-body view retained from a general inline function.
+    /// It has no framework meaning until an authority-backed later consumer
+    /// selects the surrounding initializer call.
+    pub effect_body: Option<ParsedEffectBody>,
 }
 
 /// Authored TypeScript annotation retained for a state field without type checking.

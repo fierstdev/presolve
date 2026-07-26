@@ -732,6 +732,7 @@ fn parsed_inline_handler_body(
         is_expression_body,
         state_updates,
         unsupported_statement_spans,
+        effect_body: (!is_expression_body).then(|| parsed_effect_body(body, source)),
     }
 }
 

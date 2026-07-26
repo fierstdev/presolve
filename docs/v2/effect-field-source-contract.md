@@ -36,11 +36,13 @@ The lowering records the canonical field subject, source provenance, and
 resolved intrinsic identity in `CanonicalAuthoredSemanticModelV1`. It adds no
 legacy decorator, method, execution carrier, or source translation.
 
-The parser's generic inline-handler facts remain available for a later effect
-body contract, but this recognition slice neither treats those facts as cleanup
-proof nor publishes an executable effect. In particular, cleanup-return
-functions must remain outside runtime adoption until a dedicated semantic and
-runtime product can execute cleanup before re-execution and disposal.
+The parser's generic inline-handler facts include a restricted ordered-body
+view for block-bodied inline functions. That view remains syntax only until an
+authority-backed consumer selects the surrounding call; this recognition slice
+neither treats it as cleanup proof nor publishes an executable effect. In
+particular, cleanup-return functions must remain outside runtime adoption until
+a dedicated semantic and runtime product can execute cleanup before
+re-execution and disposal.
 
 ## Required later adoption proof
 

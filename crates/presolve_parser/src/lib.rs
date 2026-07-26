@@ -220,6 +220,15 @@ class Counter {
         assert_eq!(increment.state_updates[0].field, "count");
         assert_eq!(increment.unsupported_statement_spans.len(), 1);
         assert_eq!(
+            increment
+                .effect_body
+                .as_ref()
+                .expect("inline block body")
+                .statements
+                .len(),
+            2
+        );
+        assert_eq!(
             &source[increment.unsupported_statement_spans[0].start
                 ..increment.unsupported_statement_spans[0].end],
             "unrelated();"
@@ -233,6 +242,7 @@ class Counter {
         assert!(reset.is_async);
         assert_eq!(reset.state_updates.len(), 1);
         assert!(reset.unsupported_statement_spans.is_empty());
+        assert!(reset.effect_body.is_some());
     }
 
     #[test]
