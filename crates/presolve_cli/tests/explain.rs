@@ -4832,7 +4832,7 @@ fn build_command_writes_compiler_generated_effect_runtime_metadata() {
     let artifact = std::fs::read_to_string(out_dir.join("effect.runtime.json"))
         .expect("failed to read effect runtime artifact");
     let artifact: serde_json::Value = serde_json::from_str(&artifact).expect("artifact JSON");
-    assert_eq!(artifact["schema_version"], 1);
+    assert_eq!(artifact["schema_version"], 6);
     assert_eq!(artifact["effects"].as_array().map(Vec::len), Some(1));
     assert_eq!(
         artifact["effects"][0]["initial_trigger"]["effect_batch_index"],
