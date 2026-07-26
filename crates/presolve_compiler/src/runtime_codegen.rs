@@ -1656,6 +1656,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       computedUpdateRuns: 0,
       initialEffectRuns: [],
       completedActionEffectRuns: [],
+      effectCleanupRuns: [],
       effectSubscriptions: new Map(),
       effectCleanups: new Map(),
       resources: new Map(),
@@ -2071,6 +2072,37 @@ const RUNTIME_STUB: &str = r#"(() => {
     } finally {
       store.activeExecutionContext = priorExecutionContext;
     }
+  }
+
+  function disposeEffectInstances(store) {
+    const effects = new Map((store.effectArtifact?.effects ?? []).map((effect) => [effect.effect, effect]));
+    const instances = [...(store.effectArtifact?.instances ?? [])]
+      .sort((left, right) => right.depth - left.depth
+        || right.declaration_order - left.declaration_order
+        || right.effect_instance.localeCompare(left.effect_instance));
+    for (const instance of instances) {
+      const cleanup = store.effectCleanups.get(instance.effect_instance);
+      const effect = effects.get(instance.effect);
+      if (cleanup === undefined || effect === undefined) continue;
+      const priorExecutionContext = store.activeExecutionContext;
+      store.activeExecutionContext = { component_instance_id: instance.component_instance };
+      try {
+        const evidence = {
+          effect: effect.effect,
+          effect_instance: instance.effect_instance,
+          capability_operations: []
+        };
+        executeEffectProgram(store, effect, evidence, cleanup);
+        store.effectCleanupRuns.push(evidence);
+        store.effectCleanups.delete(instance.effect_instance);
+      } finally {
+        store.activeExecutionContext = priorExecutionContext;
+      }
+    }
+  }
+
+  function installEffectDisposal(store) {
+    window.addEventListener("pagehide", () => disposeEffectInstances(store), { once: true });
   }
 
   function executeInitialEffects(store) {
@@ -3886,6 +3918,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     restoreResumeForms(templateManifest, snapshot, registry, store, formsArtifact);
     installResumeDomBindings(store, templateManifest, componentArtifact);
     establishResumeEffects(registry, store, effectArtifact);
+    installEffectDisposal(store);
     installResumeActivationListeners(registry, store);
     const state = runtimeState({
       manifest: templateManifest,
@@ -4124,6 +4157,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     await resourceInitialization;
 
     executeInitialEffects(store);
+    installEffectDisposal(store);
 
     if (manifest.schema_version === SUPPORTED_SCHEMA_VERSION) {
       installOrdinaryInstanceEventListeners(store);
@@ -4224,6 +4258,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         failure: result.failure,
         contract_version: RESUME_REGISTRY_CONTRACT_VERSION
       };
+      state.disposeEffects = () => disposeEffectInstances(state.store);
       state.resume_registry = result.mode === "resume" ? result.registry : null;
       state.resume_debug = [...resumeBootstrapState.debug];
       state.production = productionIndexes === null ? null : {
@@ -4395,6 +4430,7 @@ mod tests {
         assert!(runtime.contains("executeInitialEffects"));
         assert!(runtime.contains("function executeResumeEffects"));
         assert!(runtime.contains("function validateEffectArtifactInstances"));
+        assert!(runtime.contains("function disposeEffectInstances"));
         assert!(runtime.contains("effect.run_on_resume !== true"));
         assert!(runtime.contains("dispatchEffectCapability"));
         assert!(!runtime.contains("const arguments ="));

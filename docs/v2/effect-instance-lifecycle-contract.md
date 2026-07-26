@@ -40,7 +40,9 @@ compatibility path.
 Initial activation follows parent-before-child component initialization.
 Structural removal and explicit application disposal use the component
 artifact's child-before-parent destroy order; within one component instance,
-cleanups run in reverse V2 field declaration order.
+cleanups run in reverse V2 field declaration order. Application/page disposal
+is now installed and uses this ordering. Structural removal remains fail-closed
+until its component-runtime destroy hook is connected to the same function.
 
 An effect program that reads State, computed values, Context, or Slots must
 receive its owning instance context explicitly. Until that execution context
