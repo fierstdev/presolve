@@ -7,7 +7,7 @@ events may be activated for a structural occurrence.
 
 ## Compiler product
 
-Every structural template occurrence must retain the complete compiler-issued
+Component artifact schema v14 retains the complete compiler-issued
 State and computed slot declarations for its target component: declaration
 identity, storage identity, initial serialized value, semantic type,
 serializability, computed cache declaration, computed dirty declaration, and

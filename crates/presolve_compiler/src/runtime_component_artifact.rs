@@ -9,7 +9,7 @@ use crate::{
 };
 use crate::{TemplateChild, TemplateNode, TemplateSemanticKind};
 
-pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 13;
+pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 14;
 
 /// Public H14 compiler artifact. All executable references are canonical IDs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -176,6 +176,10 @@ pub struct SerializedStructuralTemplateOccurrence {
     /// Exact semantic template entity for this invocation marker.
     pub invocation_template_entity: String,
     pub component: String,
+    /// Compiler template slots; runtime occurrence identity replaces only the
+    /// template-instance prefix when materialization is later admitted.
+    pub state_slots: Vec<SerializedRuntimeStateSlot>,
+    pub computed_slots: Vec<SerializedRuntimeComputedSlot>,
     /// Compiler-rendered target component template. It remains inactive until
     /// the materializer consumes it under an opaque occurrence identity.
     pub template_html: String,
@@ -344,6 +348,31 @@ pub fn build_runtime_component_artifact(
                             .template_entity
                             .to_string(),
                         component: instance.component.to_string(),
+                        state_slots: state_slots
+                            .records
+                            .iter()
+                            .filter(|slot| slot.component_instance_id == instance.id)
+                            .map(|slot| SerializedRuntimeStateSlot {
+                                slot_id: slot.slot_id.to_string(),
+                                state_id: slot.state_id.to_string(),
+                                storage_id: slot.storage_id.to_string(),
+                                initial_value: slot.initial_value.clone(),
+                                semantic_type: semantic_type_text(&slot.semantic_type),
+                                serializable: slot.serialization
+                                    == SerializationCompatibility::Serializable,
+                            })
+                            .collect(),
+                        computed_slots: computed_slots
+                            .records
+                            .iter()
+                            .filter(|slot| slot.component_instance_id == instance.id)
+                            .map(|slot| SerializedRuntimeComputedSlot {
+                                computed_id: slot.computed_id.to_string(),
+                                cache_slot_id: slot.cache_slot_id.to_string(),
+                                dirty_slot_id: slot.dirty_slot_id.to_string(),
+                                dirty_initial_value: slot.dirty_initial_value,
+                            })
+                            .collect(),
                         template_html: crate::generate_structural_template_instance_html(
                             model,
                             &instance.id,
@@ -1108,6 +1137,18 @@ mod tests {
                         .collect::<Vec<_>>()
                 );
                 assert!(occurrence.template_html.contains("data-presolve-node"));
+                assert!(occurrence.state_slots.iter().all(|slot| {
+                    slot.slot_id
+                        .starts_with(&format!("{}/state-slot:", occurrence.template_instance))
+                }));
+                assert!(occurrence.computed_slots.iter().all(|slot| {
+                    slot.cache_slot_id
+                        .starts_with(&format!("{}/computed-cache:", occurrence.template_instance))
+                        && slot.dirty_slot_id.starts_with(&format!(
+                            "{}/computed-dirty:",
+                            occurrence.template_instance
+                        ))
+                }));
             }
             let component = manifest
                 .components

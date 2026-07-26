@@ -1016,6 +1016,8 @@ const RUNTIME_STUB: &str = r#"(() => {
             || typeof occurrence.invocation !== "string" || typeof occurrence.invocation_template_entity !== "string"
             || occurrence.invocation_template_entity.length === 0 || typeof occurrence.component !== "string"
             || typeof occurrence.template_html !== "string" || occurrence.template_html.length === 0
+            || !Array.isArray(occurrence.state_slots)
+            || !Array.isArray(occurrence.computed_slots)
             || !Array.isArray(occurrence.ordinary_template_targets)
             || !Array.isArray(occurrence.ordinary_template_bindings)
             || !Array.isArray(occurrence.ordinary_template_events)
