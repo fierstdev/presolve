@@ -46,6 +46,8 @@ runtime occurrence identity from the structural region, the compiler template
 instance, and the reconciler's exact occurrence identity. The identity is
 runtime-local: it is not a new `SemanticId`, is never inferred from a DOM node,
 and is not reused by a removed conditional branch or a removed keyed item.
+Its exact parent-scoped, UTF-8 hex codec is fixed by the
+[`structural occurrence identity contract`](structural-occurrence-identity-contract.md).
 
 For a keyed list, retaining the same reconciler occurrence retains that opaque
 identity. Reordering alone neither rematerializes nor disposes it. Duplicate

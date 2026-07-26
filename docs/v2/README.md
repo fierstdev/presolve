@@ -64,6 +64,9 @@ normative source for this handoff.
 - [Structural component materialization contract](structural-component-materialization-contract.md)
   defines the compiler-issued renderer and opaque occurrence-identity boundary
   required before dynamic structural component lifecycles can activate.
+- [Structural occurrence identity contract](structural-occurrence-identity-contract.md)
+  fixes the parent-scoped runtime codec required for nested conditional and
+  keyed component materialization.
 - [Environment-read lowering contract](environment-read-lowering-contract.md)
   defines the manifest-backed source boundary for browser-visible environment
   values.
