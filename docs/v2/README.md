@@ -43,6 +43,9 @@ normative source for this handoff.
 - [V2 canonical ASM adapter contract](canonical-asm-adapter-contract.md)
   fixes the no-fallback boundary for canonical authoring records entering route
   and publication products.
+- [V2 action-field runtime adoption contract](action-field-runtime-adoption-contract.md)
+  defines the source/authority evidence required before V2 action fields reach
+  the existing runtime product.
 - [Vite adapter boundary](vite-adapter.md) records the compiler-product-only
   integration seam for the required external backend.
 - [Presolve-aware HMR contract](hmr-contract.md) records the compiler-selected
