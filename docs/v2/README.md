@@ -61,6 +61,9 @@ normative source for this handoff.
 - [V2 effect instance-lifecycle contract](effect-instance-lifecycle-contract.md)
   defines the required instance-qualified ownership boundary before cleanup
   fields can be published.
+- [Structural component materialization contract](structural-component-materialization-contract.md)
+  defines the compiler-issued renderer and opaque occurrence-identity boundary
+  required before dynamic structural component lifecycles can activate.
 - [Environment-read lowering contract](environment-read-lowering-contract.md)
   defines the manifest-backed source boundary for browser-visible environment
   values.
