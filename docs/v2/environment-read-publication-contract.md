@@ -27,6 +27,7 @@ provided lowering product.
 
 ## Integration boundary
 
-Project-level selection of a named environment manifest and incorporation into
-the application publication inventory remain separate contracts. Adapters may
-transport this immutable artifact but may not add names or values to it.
+The file-route publication inventory accepts this immutable artifact as an
+optional compiler input and emits it at `environment.browser.json`. Project-
+level selection of a named environment manifest remains a separate contract.
+Adapters may transport the artifact but may not add names or values to it.

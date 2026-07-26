@@ -20,6 +20,8 @@ pub enum EnvironmentPublicationErrorV1 {
     LoweringSchemaVersion(u32),
     LoweringDiagnostics(usize),
     ConflictingValue { name: String },
+    ArtifactSchemaVersion(u32),
+    InvalidArtifactValue { name: String },
 }
 
 impl std::fmt::Display for EnvironmentPublicationErrorV1 {
@@ -37,11 +39,40 @@ impl std::fmt::Display for EnvironmentPublicationErrorV1 {
                 formatter,
                 "environment read records disagree on browser value for `{name}`"
             ),
+            Self::ArtifactSchemaVersion(version) => write!(
+                formatter,
+                "unsupported environment publication artifact schema version {version}"
+            ),
+            Self::InvalidArtifactValue { name } => write!(
+                formatter,
+                "invalid browser environment artifact value `{name}`"
+            ),
         }
     }
 }
 
 impl std::error::Error for EnvironmentPublicationErrorV1 {}
+
+/// Rejects a caller-supplied artifact that could not have been emitted by the
+/// source-and-manifest publication boundary.
+pub fn validate_environment_publication_artifact_v1(
+    artifact: &EnvironmentPublicationArtifactV1,
+) -> Result<(), EnvironmentPublicationErrorV1> {
+    if artifact.schema_version != ENVIRONMENT_PUBLICATION_SCHEMA_VERSION {
+        return Err(EnvironmentPublicationErrorV1::ArtifactSchemaVersion(
+            artifact.schema_version,
+        ));
+    }
+    for (name, value) in &artifact.browser_values {
+        if !name.starts_with("PRESOLVE_PUBLIC_")
+            || name.len() == "PRESOLVE_PUBLIC_".len()
+            || value.contains('\0')
+        {
+            return Err(EnvironmentPublicationErrorV1::InvalidArtifactValue { name: name.clone() });
+        }
+    }
+    Ok(())
+}
 
 /// Publishes only the exact values proven by source lowering.  A diagnostic is
 /// a whole-product failure, so an adapter never receives a partial artifact.
@@ -96,6 +127,7 @@ mod tests {
 
     use super::{
         build_environment_publication_artifact_v1, environment_publication_artifact_json_v1,
+        validate_environment_publication_artifact_v1, EnvironmentPublicationArtifactV1,
         EnvironmentPublicationErrorV1, ENVIRONMENT_PUBLICATION_SCHEMA_VERSION,
     };
 
@@ -158,6 +190,20 @@ mod tests {
         assert_eq!(
             build_environment_publication_artifact_v1(&lowering),
             Err(EnvironmentPublicationErrorV1::LoweringDiagnostics(1))
+        );
+    }
+
+    #[test]
+    fn rejects_caller_fabricated_non_public_artifact_values() {
+        let artifact = EnvironmentPublicationArtifactV1 {
+            schema_version: ENVIRONMENT_PUBLICATION_SCHEMA_VERSION,
+            browser_values: BTreeMap::from([("DATABASE_URL".into(), "secret".into())]),
+        };
+        assert_eq!(
+            validate_environment_publication_artifact_v1(&artifact),
+            Err(EnvironmentPublicationErrorV1::InvalidArtifactValue {
+                name: "DATABASE_URL".into(),
+            })
         );
     }
 }

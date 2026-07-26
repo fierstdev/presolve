@@ -184,6 +184,7 @@ fn run_ergonomic_build(
         package_runtime_modules,
         profile,
         output_root: output_root.clone(),
+        environment_artifact: None,
         v2_authoring,
     };
     let mut product = build_file_route_publication_v1(request)

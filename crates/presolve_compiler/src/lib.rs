@@ -458,8 +458,8 @@ pub use environment_ownership::{
 };
 pub use environment_publication::{
     build_environment_publication_artifact_v1, environment_publication_artifact_json_v1,
-    EnvironmentPublicationArtifactV1, EnvironmentPublicationErrorV1,
-    ENVIRONMENT_PUBLICATION_SCHEMA_VERSION,
+    validate_environment_publication_artifact_v1, EnvironmentPublicationArtifactV1,
+    EnvironmentPublicationErrorV1, ENVIRONMENT_PUBLICATION_SCHEMA_VERSION,
 };
 pub use environment_read_lowering::{
     lower_environment_reads_v1, EnvironmentReadDiagnosticCodeV1, EnvironmentReadDiagnosticV1,
@@ -475,8 +475,8 @@ pub use file_route_publication::{
     file_route_publication_manifest_json_v1, resolve_file_route_request_match_v1,
     resolve_file_route_request_v1, FileRoutePublicationErrorV1, FileRoutePublicationManifestV1,
     FileRoutePublicationProductV1, FileRoutePublicationRequestV1, FileRoutePublicationRouteV1,
-    FileRouteRequestMatchV1, FileRouteRequestTargetV1, FILE_ROUTE_PUBLICATION_COMPILER_CONTRACT_V1,
-    FILE_ROUTE_PUBLICATION_MANIFEST_SCHEMA_VERSION,
+    FileRouteRequestMatchV1, FileRouteRequestTargetV1, FILE_ROUTE_ENVIRONMENT_ARTIFACT_PATH_V1,
+    FILE_ROUTE_PUBLICATION_COMPILER_CONTRACT_V1, FILE_ROUTE_PUBLICATION_MANIFEST_SCHEMA_VERSION,
 };
 pub use form::{collect_form_entities, FormEntity};
 pub use form_binding::{
