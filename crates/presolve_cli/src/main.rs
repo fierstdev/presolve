@@ -30,6 +30,7 @@ use presolve_compiler::{
     build_application_semantic_model_for_unit_with_packages, build_binding_table_with_packages,
     build_component_graph, build_context_inspection_registry, build_effect_inspection_registry,
     build_file_route_publication_v1, build_form_inspection_registry, build_module_graph,
+    build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring,
     build_production_audit_report_v1, build_production_reachability_graph,
     build_production_reports, build_production_runtime_artifact, build_resume_chunk_graph,
     build_resume_manifest, build_route_loader_plan_v1, build_route_server_action_plan_v1,
@@ -844,7 +845,7 @@ fn write_development_response(
 fn run_ergonomic_check(root: &Path) {
     let project = discover_project_v1(root)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
-    validate_v2_authoring_project(&project).unwrap_or_else(|message| {
+    let v2_authoring = validate_v2_authoring_project(&project).unwrap_or_else(|message| {
         application_cli_error("PSAUTH1001_V2_AUTHORITY_FAILED", &message)
     });
     let unit = CompilationUnit::parse_sources(
@@ -854,7 +855,13 @@ fn run_ergonomic_check(root: &Path) {
             .map(|source| (source.logical_path.clone(), source.source.as_str())),
     );
     let (package_contracts, _) = discover_imported_package_tables(&project.root, &unit);
-    let asm = build_application_semantic_model_for_unit_with_packages(&unit, &package_contracts);
+    let asm = if v2_authoring.is_empty() {
+        build_application_semantic_model_for_unit_with_packages(&unit, &package_contracts)
+    } else {
+        build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring(
+            &unit, &package_contracts, &v2_authoring,
+        ).unwrap_or_else(|error| application_cli_error(error.code, &error.message))
+    };
     let graph = presolve_compiler::build_validated_file_route_graph_v1(&asm)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
     let symbols = build_symbol_table(&unit);

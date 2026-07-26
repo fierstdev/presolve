@@ -24,7 +24,7 @@ fn project_root(label: &str) -> PathBuf {
 
 #[cfg(unix)]
 #[test]
-fn decorator_free_v2_source_invokes_installed_authority_before_legacy_assembly() {
+fn decorator_free_v2_source_uses_installed_authority_for_file_route_assembly() {
     let root = project_root("v2-authority");
     fs::write(
         root.join("app/routes/index.tsx"),
@@ -59,9 +59,13 @@ process.stdout.write(JSON.stringify({ schemaVersion: 1, diagnostics: [], compone
         .output()
         .unwrap();
 
-    assert_eq!(output.status.code(), Some(2));
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     assert!(root.join("authority-ran").is_file());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("PSC1001"));
+    assert!(String::from_utf8_lossy(&output.stdout).contains("Checked 1 source file(s)"));
     fs::remove_dir_all(root).unwrap();
 }
 
