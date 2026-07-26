@@ -5,11 +5,13 @@ import { resolve } from "node:path";
 
 import {
   analyzeTypeScriptProject,
+  analyzeV2Authoring,
   classifyResolvedComponentHeritage,
   classifyResolvedIntrinsic,
   createCanonicalIntrinsicRegistry,
   PRIMARY_TYPESCRIPT_VERSION,
   TYPESCRIPT_SEMANTIC_AUTHORITY_SCHEMA_VERSION,
+  V2_AUTHORED_AUTHORITY_SCHEMA_VERSION,
 } from "../src/index.js";
 
 const root = resolve(import.meta.dirname, "../../..");
@@ -115,4 +117,28 @@ test("component heritage preserves aliases and indirect bases for registry class
   const heritage = result.componentHeritage[0];
   assert.deepEqual(heritage.bases.map(base => base.name), ["V2CounterBase", "Component"]);
   assert.equal(classifyResolvedComponentHeritage(registry, heritage.bases)?.kind, "component");
+});
+
+test("the V2 authoring bridge resolves canonical component, State, and Action evidence", async () => {
+  const frameworkFile = resolve(root, "tests/framework-public-api/src/V2Counter.tsx");
+  const frameworkSource = readFileSync(frameworkFile, "utf8");
+  const result = await analyzeV2Authoring({
+    configFile: resolve(root, "tests/framework-public-api/tsconfig.json"),
+    canonical: {
+      component: { file: frameworkFile, position: frameworkSource.indexOf("Component") },
+      state: { file: frameworkFile, position: frameworkSource.indexOf("state") },
+      action: { file: frameworkFile, position: frameworkSource.indexOf("action") },
+    },
+    components: [{ id: "counter", file: frameworkFile, position: frameworkSource.indexOf("V2Counter extends") }],
+    states: [{ id: "count", file: frameworkFile, position: frameworkSource.indexOf("state(0)") }],
+    actions: [{ id: "increment", file: frameworkFile, position: frameworkSource.indexOf("action(()") }],
+  });
+  assert.equal(result.schemaVersion, V2_AUTHORED_AUTHORITY_SCHEMA_VERSION);
+  assert.equal(result.diagnostics.length, 0);
+  assert.deepEqual(result.components.map(entry => entry.id), ["counter"]);
+  assert.deepEqual(result.states.map(entry => entry.id), ["count"]);
+  assert.deepEqual(result.actions.map(entry => entry.id), ["increment"]);
+  assert.equal(result.components[0].identity.name, "Component");
+  assert.equal(result.states[0].identity.name, "state");
+  assert.equal(result.actions[0].identity.name, "action");
 });

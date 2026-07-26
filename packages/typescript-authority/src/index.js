@@ -8,6 +8,7 @@ export {
   classifyResolvedIntrinsic,
   createCanonicalIntrinsicRegistry,
 } from "./intrinsics.js";
+export { analyzeV2Authoring, V2_AUTHORED_AUTHORITY_SCHEMA_VERSION } from "./v2-authoring.js";
 
 export const TYPESCRIPT_SEMANTIC_AUTHORITY_SCHEMA_VERSION = 1;
 export const PRIMARY_TYPESCRIPT_VERSION = "7.0.2";

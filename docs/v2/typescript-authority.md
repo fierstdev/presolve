@@ -42,6 +42,12 @@ canonical intrinsic registry compares the serialized identities with the
 resolved `Component` export; this preserves the beta rule that aliases and
 indirect subclasses are components without spelling-based recognition.
 
+`analyzeV2Authoring` is the schema-v1 bridge for the implemented source forms.
+Its caller supplies parser-selected positions for the canonical framework
+exports and candidate component heritage, State, and Action sites. The bridge
+returns only registry-classified resolved evidence plus native diagnostics; it
+does not parse source, create compiler identities, or lower runtime behavior.
+
 ## Ownership
 
 The adapter may use TypeScript-native APIs. The parser remains responsible for
