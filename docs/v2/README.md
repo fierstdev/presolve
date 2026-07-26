@@ -78,6 +78,8 @@ normative source for this handoff.
   Slot, Effect, and resume paths remain fail-closed.
 - [Structural keyed-host activation contract](structural-keyed-activation-contract.md)
   fixes per-item compiler membership before keyed reconciliation may activate.
+- [Structural nested-activation contract](structural-nested-activation-contract.md)
+  fixes compiler membership for recursive structural occurrence creation.
 - [Environment-read lowering contract](environment-read-lowering-contract.md)
   defines the manifest-backed source boundary for browser-visible environment
   values.

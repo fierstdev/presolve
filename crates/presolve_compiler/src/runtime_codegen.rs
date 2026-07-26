@@ -1028,11 +1028,14 @@ const RUNTIME_STUB: &str = r#"(() => {
             || fragments.item_invocations.some((invocation) =>
               !program.template_occurrences.some((occurrence) => occurrence.invocation === invocation)
             ))
-          || program.template_occurrences.some((occurrence, index) => typeof occurrence?.template_instance !== "string"
+            || program.template_occurrences.some((occurrence, index) => typeof occurrence?.template_instance !== "string"
             || occurrence.template_instance !== program.template_instances[index]
             || typeof occurrence.invocation !== "string" || typeof occurrence.invocation_template_entity !== "string"
             || occurrence.invocation_template_entity.length === 0 || typeof occurrence.component !== "string"
             || typeof occurrence.template_html !== "string" || occurrence.template_html.length === 0
+            || !Array.isArray(occurrence.nested_invocations)
+            || new Set(occurrence.nested_invocations).size !== occurrence.nested_invocations.length
+            || occurrence.nested_invocations.some((invocation) => !program.template_occurrences.some((candidate) => candidate.invocation === invocation))
             || !Array.isArray(occurrence.state_slots)
             || !Array.isArray(occurrence.computed_slots)
             || !Array.isArray(occurrence.ordinary_template_targets)

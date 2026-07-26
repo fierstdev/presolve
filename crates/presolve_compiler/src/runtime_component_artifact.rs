@@ -9,7 +9,7 @@ use crate::{
 };
 use crate::{TemplateChild, TemplateNode, TemplateSemanticKind};
 
-pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 16;
+pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 17;
 
 /// Public H14 compiler artifact. All executable references are canonical IDs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -187,6 +187,7 @@ pub struct SerializedStructuralTemplateOccurrence {
     /// Compiler-rendered target component template. It remains inactive until
     /// the materializer consumes it under an opaque occurrence identity.
     pub template_html: String,
+    pub nested_invocations: Vec<String>,
     /// Inactive compiler-owned template projection for a future materializer.
     /// These IDs must be used as emitted; they are never selected from the DOM.
     pub ordinary_template_targets: Vec<String>,
@@ -382,6 +383,14 @@ pub fn build_runtime_component_artifact(
                             &instance.id,
                         )
                         .unwrap_or_default(),
+                        nested_invocations:
+                            crate::ordinary_html_codegen::structural_invocations_in_compiler_html(
+                                &crate::generate_structural_template_instance_html(
+                                    model,
+                                    &instance.id,
+                                )
+                                .unwrap_or_default(),
+                            ),
                         ordinary_template_targets: artifact
                             .ordinary_template_targets
                             .iter()
@@ -715,6 +724,18 @@ pub fn validate_runtime_component_artifact(
             || program.template_occurrences.iter().any(|occurrence| {
                 occurrence.template_html.is_empty()
                     || occurrence.invocation_template_entity.is_empty()
+                    || occurrence.nested_invocations.len()
+                        != occurrence
+                            .nested_invocations
+                            .iter()
+                            .collect::<std::collections::BTreeSet<_>>()
+                            .len()
+                    || occurrence.nested_invocations.iter().any(|invocation| {
+                        !program
+                            .template_occurrences
+                            .iter()
+                            .any(|candidate| candidate.invocation == *invocation)
+                    })
             })
             || program
                 .template_occurrences
