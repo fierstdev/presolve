@@ -1904,6 +1904,22 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
+  function structuralConditionalHostFragment(store, component, node) {
+    const programs = [...(store.componentRegions?.values() ?? [])].filter((program) =>
+      program.host_component === component?.manifest?.component_id
+      && program.host_node === node?.id
+    );
+    if (programs.length === 0) return null;
+    if (programs.length !== 1 || typeof component?.instance_id !== "string") {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const fragments = programs[0].conditional_host_fragments.filter((fragment) =>
+      fragment.host_scope === "static-instance" && fragment.host_instance === component.instance_id
+    );
+    if (fragments.length !== 1) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    return fragments[0];
+  }
+
   function structuralOccurrenceTemplateRegistry(manifest, componentArtifact, computedArtifact) {
     const components = new Map((manifest.components ?? []).map((component) => [component.component_id, component]));
     if (components.size !== (manifest.components ?? []).length) {
@@ -5103,6 +5119,7 @@ mod tests {
         assert!(runtime.contains("function attachStructuralOccurrenceFragment"));
         assert!(runtime.contains("function registerStructuralOccurrenceRecords"));
         assert!(runtime.contains("function materializeStructuralOccurrence"));
+        assert!(runtime.contains("function structuralConditionalHostFragment"));
         assert!(runtime.contains("active.indexOf(updateBinding)"));
         assert!(runtime.contains("function structuralOccurrenceTemplateRegistry"));
         assert!(runtime.contains("structuralOccurrenceTemplatesByInvocation"));
