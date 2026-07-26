@@ -60,7 +60,13 @@ anchors. They use the same validated parent host scope, but keyed
 materialization remains inactive. A runtime must reject a missing fragment or
 use of a different host kind or scope as a fallback.
 
-Schemas v10 through v13 are not runtime materializers. They establish the
+Schema v14 adds occurrence-local State and computed slot templates under the
+structural-instance-state contract. It does not make a decorator fixture a
+beta authority: structural compiler and browser acceptance evidence must use
+the decorator-free V2 authoring surface and its installed TypeScript-authority
+proof. Legacy decorator fixtures remain compatibility-only characterization.
+
+Schemas v10 through v14 are not runtime materializers. They establish the
 validated compiler template, membership set, and initial conditional-host
 fragments from which the later complete program must be constructed; the
 runtime must not activate, infer, or partially use them for dynamic component

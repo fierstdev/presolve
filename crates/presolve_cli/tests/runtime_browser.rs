@@ -1922,6 +1922,176 @@ fn component_structural_programs_preserve_host_dom_identity_in_a_real_browser() 
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn decorator_free_v2_structural_component_artifacts_preserve_host_dom_identity_in_a_real_browser() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let project_root = repo_root.join("target/psc-browser-test/v2-structural-component-project");
+    if project_root.exists() {
+        fs::remove_dir_all(&project_root).expect("failed to clean previous V2 structural project");
+    }
+    fs::create_dir_all(project_root.join("app/routes"))
+        .expect("failed to create V2 structural source root");
+    fs::create_dir_all(project_root.join("app/components"))
+        .expect("failed to create V2 structural component root");
+    fs::write(
+        project_root.join("app/components/StructuralLeaf.tsx"),
+        r#"import { Component, state, action } from "presolve";
+
+export class StructuralLeaf extends Component {
+  count = state(0);
+  increment = action(() => { this.count += 1; });
+  render() { return <button onClick={() => this.increment()}>Leaf: {this.count}</button>; }
+}
+"#,
+    )
+    .expect("failed to write V2 structural leaf source");
+    fs::write(
+        project_root.join("app/components/StructuralBranch.tsx"),
+        r#"import { Component } from "presolve";
+import { StructuralLeaf } from "./StructuralLeaf";
+
+export class StructuralBranch extends Component {
+  render() { return <section><StructuralLeaf /></section>; }
+}
+"#,
+    )
+    .expect("failed to write V2 structural branch source");
+    fs::write(
+        project_root.join("app/routes/index.tsx"),
+        r#"import { Component, state, action } from "presolve";
+import { StructuralLeaf } from "../components/StructuralLeaf";
+import { StructuralBranch } from "../components/StructuralBranch";
+
+export class StructuralPage extends Component {
+  visible = state(true);
+  items = state([{ id: "a" }, { id: "b" }, { id: "c" }]);
+  toggle = action(() => { this.visible = false; });
+  reconcile = action(() => { this.items = [{ id: "c" }, { id: "d" }, { id: "a" }]; });
+  trim = action(() => { this.items = [{ id: "d" }]; });
+  render() {
+    return <main><button onClick={() => this.toggle()}>Toggle</button><button onClick={() => this.reconcile()}>Reconcile</button><button onClick={() => this.trim()}>Trim</button>{this.visible ? <div><StructuralBranch /><StructuralLeaf /></div> : <aside>Hidden</aside>}<ul>{this.items.map(item => <li key={item.id}><StructuralLeaf /></li>)}</ul></main>;
+  }
+}
+"#,
+    )
+    .expect("failed to write V2 structural source");
+    fs::write(
+        project_root.join("tsconfig.json"),
+        r#"{"compilerOptions":{"noEmit":true}}"#,
+    )
+    .expect("failed to write V2 structural TypeScript config");
+    let executable = project_root.join("node_modules/.bin/presolve-typescript-authority");
+    fs::create_dir_all(executable.parent().expect("authority executable parent"))
+        .expect("failed to create V2 structural authority executable parent");
+    fs::write(
+        &executable,
+        r#"#!/usr/bin/env node
+import { readFileSync } from "node:fs";
+const request = JSON.parse(readFileSync(0, "utf8"));
+const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
+process.stdout.write(JSON.stringify({
+  schemaVersion: 4,
+  diagnostics: [],
+  components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
+  states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
+  actions: request.actions.map(site => ({ id: site.id, identity: identity("action") })),
+  effects: request.effects.map(site => ({ id: site.id, identity: identity("effect") })),
+  environmentPublic: request.environmentPublic.map(site => ({ id: site.id, identity: identity("public") })),
+}));
+"#,
+    )
+    .expect("failed to write V2 structural authority executable");
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o755))
+        .expect("failed to mark V2 structural authority executable");
+
+    let output = Command::new(presolve_cli_bin())
+        .current_dir(&project_root)
+        .arg("build")
+        .output()
+        .expect("failed to build V2 structural project");
+    assert!(
+        output.status.success(),
+        "expected V2 structural build to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let output_root = project_root.join("dist/routes/root");
+    let source = [
+        project_root.join("app/routes/index.tsx"),
+        project_root.join("app/components/StructuralLeaf.tsx"),
+        project_root.join("app/components/StructuralBranch.tsx"),
+    ]
+    .into_iter()
+    .map(|path| fs::read_to_string(path).expect("failed to read V2 structural source"))
+    .collect::<String>();
+    assert!(
+        !source.contains('@'),
+        "the V2 structural acceptance source must remain decorator-free"
+    );
+    let artifact = fs::read_to_string(output_root.join("component.runtime.json"))
+        .expect("failed to read V2 structural component artifact");
+    assert!(artifact.contains("\"schema_version\": 14"));
+    assert!(artifact.contains("structural_programs"));
+    assert!(artifact.contains("state_slots"));
+    assert!(artifact.contains("computed_slots"));
+    let artifact: serde_json::Value =
+        serde_json::from_str(&artifact).expect("V2 structural component artifact JSON");
+    let occurrences = artifact["structural_programs"]
+        .as_array()
+        .expect("V2 structural programs").iter()
+        .flat_map(|program| {
+            program["template_occurrences"]
+                .as_array()
+                .expect("V2 structural occurrences")
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        occurrences.iter().any(|occurrence| {
+            occurrence["state_slots"]
+                .as_array()
+                .is_some_and(|slots| !slots.is_empty())
+                && occurrence["ordinary_template_targets"]
+                    .as_array()
+                    .is_some_and(|targets| !targets.is_empty())
+                && occurrence["ordinary_template_bindings"]
+                    .as_array()
+                    .is_some_and(|bindings| !bindings.is_empty())
+                && occurrence["ordinary_template_events"]
+                    .as_array()
+                    .is_some_and(|events| !events.is_empty())
+        }),
+        "a structural V2 Leaf must retain its State, binding, and event templates"
+    );
+
+    write_component_structural_probe_page(&output_root);
+    let server = StaticServer::start(output_root.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = project_root.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile dir");
+    let user_data_dir = format!(
+        "--user-data-dir={}",
+        profile_dir
+            .to_str()
+            .expect("Chrome profile path was not valid UTF-8")
+    );
+    let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
+    let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+
+    assert!(
+        stdout.contains("PRESOLVE_COMPONENT_STRUCTURAL_BROWSER_TEST_PASS"),
+        "V2 structural browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    fs::remove_dir_all(project_root).expect("failed to remove V2 structural browser project");
+}
+
 #[allow(clippy::too_many_lines)]
 fn write_component_structural_probe_page(out_dir: &Path) {
     let index = fs::read_to_string(out_dir.join("index.html")).expect("failed to read built page");
