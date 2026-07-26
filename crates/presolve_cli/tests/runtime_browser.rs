@@ -1947,7 +1947,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
   const runtime = window.__PRESOLVE__;
   const artifact = JSON.parse(document.getElementById("presolve-component-runtime").textContent);
-  if (artifact.schema_version !== 7 || artifact.structural_programs.length !== 2) fail("structural component programs were missing");
+  if (artifact.schema_version !== 8 || artifact.structural_programs.length !== 2) fail("structural component programs were missing");
   if (runtime.store.componentRegions.size !== artifact.structural_programs.length) fail("closed structural region table diverged from the artifact");
   if (!artifact.structural_programs.every((program) => JSON.stringify(runtime.store.componentRegions.get(program.region)) === JSON.stringify(program))) {
     fail("runtime structural regions were not keyed by compiler IDs");

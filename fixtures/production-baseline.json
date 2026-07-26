@@ -4,13 +4,13 @@
     {
       "name": "action-counter",
       "input": "fixtures/0010-add-subtract-assign/input/StepCounter.tsx",
-      "artifacts": {"component.runtime.json": 7445, "computed.runtime.json": 562, "context.runtime.json": 111, "effect.runtime.json": 92, "forms.runtime.json": 100, "index.html": 29552, "resume.eager.module.js": 369, "resume.runtime.json": 12232, "runtime.js": 179978, "template.manifest.json": 5150},
+      "artifacts": {"component.runtime.json": 7445, "computed.runtime.json": 562, "context.runtime.json": 111, "effect.runtime.json": 92, "forms.runtime.json": 100, "index.html": 29552, "resume.eager.module.js": 369, "resume.runtime.json": 12232, "runtime.js": 180079, "template.manifest.json": 5150},
       "resume": {"boundaries": 2, "slot_schemas": 1, "capture_programs": 2, "restore_programs": 2, "anchors": 2, "events": 0, "activations": 1, "root_kinds": ["eager"], "root_ids": ["application"], "provided_program_ids": ["event-delegation", "runtime-bootstrap", "runtime-registries"]}
     },
     {
       "name": "component-structural",
       "input": "fixtures/0065-component-runtime/input/RuntimeComponents.tsx",
-      "artifacts": {"component.runtime.json": 46207, "computed.runtime.json": 570, "context.runtime.json": 111, "effect.runtime.json": 92, "forms.runtime.json": 100, "index.html": 187478, "resume.eager.module.js": 377, "resume.runtime.json": 117417, "runtime.js": 179978, "template.manifest.json": 14064},
+      "artifacts": {"component.runtime.json": 46207, "computed.runtime.json": 570, "context.runtime.json": 111, "effect.runtime.json": 92, "forms.runtime.json": 100, "index.html": 187478, "resume.eager.module.js": 377, "resume.runtime.json": 117417, "runtime.js": 180079, "template.manifest.json": 14064},
       "resume": {"boundaries": 7, "slot_schemas": 6, "capture_programs": 7, "restore_programs": 7, "anchors": 3, "events": 0, "activations": 1, "root_kinds": ["eager"], "root_ids": ["application"], "provided_program_ids": ["event-delegation", "runtime-bootstrap", "runtime-registries"]}
     }
   ]

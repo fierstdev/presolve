@@ -964,6 +964,7 @@ const RUNTIME_STUB: &str = r#"(() => {
           || program.template_occurrences.some((occurrence, index) => typeof occurrence?.template_instance !== "string"
             || occurrence.template_instance !== program.template_instances[index]
             || typeof occurrence.invocation !== "string" || typeof occurrence.component !== "string"
+            || typeof occurrence.template_html !== "string" || occurrence.template_html.length === 0
             || !Array.isArray(occurrence.ordinary_template_targets)
             || !Array.isArray(occurrence.ordinary_template_bindings)
             || !Array.isArray(occurrence.ordinary_template_events)

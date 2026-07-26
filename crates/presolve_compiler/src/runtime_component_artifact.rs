@@ -9,7 +9,7 @@ use crate::{
 };
 use crate::{TemplateChild, TemplateNode, TemplateSemanticKind};
 
-pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 7;
+pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 8;
 
 /// Public H14 compiler artifact. All executable references are canonical IDs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -149,6 +149,9 @@ pub struct SerializedStructuralTemplateOccurrence {
     pub template_instance: String,
     pub invocation: String,
     pub component: String,
+    /// Compiler-rendered target component template. It remains inactive until
+    /// the materializer consumes it under an opaque occurrence identity.
+    pub template_html: String,
     /// Inactive compiler-owned template projection for a future materializer.
     /// These IDs must be used as emitted; they are never selected from the DOM.
     pub ordinary_template_targets: Vec<String>,
@@ -303,6 +306,11 @@ pub fn build_runtime_component_artifact(
                             .expect("structural template invocation")
                             .to_string(),
                         component: instance.component.to_string(),
+                        template_html: model
+                            .templates
+                            .iter()
+                            .find(|template| template.id == instance.component.template())
+                            .map_or_else(String::new, crate::html_codegen::generate_template_html),
                         ordinary_template_targets: artifact
                             .ordinary_template_targets
                             .iter()
@@ -547,6 +555,10 @@ pub fn validate_runtime_component_artifact(
             || program.host_component.is_empty()
             || program.host_node.is_empty()
             || program.template_occurrences.len() != program.template_instances.len()
+            || program
+                .template_occurrences
+                .iter()
+                .any(|occurrence| occurrence.template_html.is_empty())
             || program
                 .template_occurrences
                 .iter()
@@ -936,6 +948,7 @@ mod tests {
                         .map(|event| event.declaration_event_id.clone())
                         .collect::<Vec<_>>()
                 );
+                assert!(occurrence.template_html.contains("data-presolve-node"));
             }
             let component = manifest
                 .components
