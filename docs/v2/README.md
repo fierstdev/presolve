@@ -61,6 +61,9 @@ normative source for this handoff.
 - [V2 effect instance-lifecycle contract](effect-instance-lifecycle-contract.md)
   defines the required instance-qualified ownership boundary before cleanup
   fields can be published.
+- [Environment-read lowering contract](environment-read-lowering-contract.md)
+  defines the manifest-backed source boundary for browser-visible environment
+  values.
 - [Vite adapter boundary](vite-adapter.md) records the compiler-product-only
   integration seam for the required external backend.
 - [Presolve-aware HMR contract](hmr-contract.md) records the compiler-selected
