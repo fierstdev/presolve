@@ -61,6 +61,10 @@ pub struct ParsedImportSpecifier {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedCallExpression {
     pub callee_span: SourceSpan,
+    /// Structural member spans when the callee is a static member expression.
+    /// These are syntax-only positions for an external semantic authority.
+    pub member_object_span: Option<SourceSpan>,
+    pub member_property_span: Option<SourceSpan>,
     pub span: SourceSpan,
     pub arguments: Vec<ParsedCallArgument>,
 }

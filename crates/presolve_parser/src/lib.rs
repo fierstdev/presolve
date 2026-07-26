@@ -141,6 +141,13 @@ const dynamic = environment.public(getName());
             })
             .collect::<Vec<_>>();
         assert_eq!(public_calls.len(), 2);
+        assert!(public_calls.iter().all(|call| {
+            call.member_object_span
+                .is_some_and(|span| &source[span.start..span.end] == "environment")
+                && call
+                    .member_property_span
+                    .is_some_and(|span| &source[span.start..span.end] == "public")
+        }));
         assert!(matches!(
             &public_calls[0].arguments[0],
             super::ParsedCallArgument::StringLiteral { value, .. }

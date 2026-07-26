@@ -83,8 +83,17 @@ fn collect_call_expressions(program: &Program<'_>, source: &str) -> Vec<ParsedCa
 
     impl<'a> Visit<'a> for Collector<'a> {
         fn visit_call_expression(&mut self, call: &oxc_ast::ast::CallExpression<'a>) {
+            let (member_object_span, member_property_span) = match &call.callee {
+                Expression::StaticMemberExpression(member) => (
+                    Some(source_span(self.source, member.object.span())),
+                    Some(source_span(self.source, member.property.span)),
+                ),
+                _ => (None, None),
+            };
             self.calls.push(ParsedCallExpression {
                 callee_span: source_span(self.source, call.callee.span()),
+                member_object_span,
+                member_property_span,
                 span: source_span(self.source, call.span),
                 arguments: call
                     .arguments
