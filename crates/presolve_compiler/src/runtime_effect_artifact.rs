@@ -12,7 +12,7 @@ use crate::{
     IrInstruction, IrInstructionKind, IrValueId, RuntimeEffectRecord, EFFECT_CAPABILITY_REGISTRY,
 };
 
-pub const RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION: u32 = 6;
+pub const RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION: u32 = 7;
 
 /// Versioned compiler-generated runtime metadata and effect programs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -38,8 +38,13 @@ pub struct RuntimeEffectArtifactInstance {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RuntimeEffectArtifactStructuralTemplate {
+    /// Template-qualified effect-instance identity. The structural runtime
+    /// replaces only the template-instance prefix with its opaque occurrence
+    /// identity before it can activate this record.
+    pub effect_instance: String,
     pub template_instance: String,
     pub effect: String,
+    pub component: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_instance: Option<String>,
     pub structural_region: String,
@@ -194,8 +199,21 @@ pub fn build_runtime_effect_artifact(
         structural_templates: build_runtime_effect_structural_template_registry(model)
             .into_iter()
             .map(|record| RuntimeEffectArtifactStructuralTemplate {
+                effect_instance: crate::EffectInstanceId::for_component_instance(
+                    &record.template_instance,
+                    &record.effect,
+                )
+                .as_str()
+                .to_owned(),
                 template_instance: record.template_instance.as_str().to_owned(),
                 effect: record.effect.to_string(),
+                component: model
+                    .component_instance_plan
+                    .instances
+                    .get(&record.template_instance)
+                    .expect("structural effect template belongs to a planned component instance")
+                    .component
+                    .to_string(),
                 parent_instance: record
                     .parent_instance
                     .map(|value| value.as_str().to_owned()),
@@ -534,7 +552,7 @@ class RuntimeEffectArtifact extends Component {
         ));
         assert_eq!(first, second);
         let json: serde_json::Value = serde_json::from_str(&first).expect("artifact JSON");
-        assert_eq!(json["schema_version"], 6);
+        assert_eq!(json["schema_version"], 7);
         assert_eq!(
             json["effects"][0]["program"]["instructions"][2]["kind"],
             "capability-call"

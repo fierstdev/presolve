@@ -286,7 +286,9 @@ pub fn validate_effects(
                 provenance: effect.provenance.clone(),
             });
         }
-        if effect_has_cleanup(components, effect) {
+        if effect_has_cleanup(components, effect)
+            && !matches!(effect.declaration, EffectDeclaration::V2Field)
+        {
             violations.push(EffectSemanticViolation {
                 kind: EffectSemanticViolationKind::CleanupLifecycleUnavailable,
                 statement: None,

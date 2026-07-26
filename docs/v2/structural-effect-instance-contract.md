@@ -7,12 +7,14 @@ conditional selection or each keyed occurrence has a separate lifetime.
 
 ## Template authority
 
-The compiler must project each valid V2 effect owned by a structural-template
-component instance to a structural effect template. That record contains only
-compiler-issued identities: the component-instance template ID, effect
-declaration ID, structural-region ID, parent template/instance, depth, field
-declaration order, and existing main/cleanup program references. It contains
-no DOM selector, callback, source spelling, or user-controlled list key.
+The compiler projects each valid V2 effect owned by a structural-template
+component instance to a schema-v7 structural effect template. The record has a
+template-qualified effect-instance identity, component-instance template ID,
+canonical target component ID, effect declaration ID, structural-region ID,
+parent template/instance, depth, and field declaration order. The runtime
+derives the live effect-instance identity by replacing only the
+template-instance prefix with the opaque occurrence identity. It contains no
+DOM selector, callback, source spelling, or user-controlled list key.
 
 Each structural-region program must additionally publish its exact renderer
 address: the canonical owning component ID and the generated conditional or
@@ -31,7 +33,8 @@ The runtime indexes those records by invocation ID at boot and rejects a
 duplicate before rendering begins.
 
 Static planned instances remain ordinary effect-instance records. A structural
-effect template is inactive metadata and must not execute or register cleanup.
+effect template is inactive metadata and must not execute or register cleanup
+until its compiler-owned occurrence has been successfully materialized.
 
 ## Runtime activation and teardown
 
@@ -50,9 +53,15 @@ never re-runs or disposes its effects.
 
 ## Admission boundary
 
-Cleanup-bearing V2 fields remain rejected until artifact validation, runtime
-dynamic activation, conditional/keyed removal disposal, and nested/repeated
-browser fixtures prove exact activation, retained-key stability, cleanup before
-removal, and child-before-parent order together. This contract does not
-authorize DOM-derived fallback identities, global cleanup sweeps, or
-adapter-side lifecycle implementations.
+This gate is implemented. The runtime validates every structural template
+against its exact compiler occurrence and rejects fabricated effect-instance,
+component, region, or declaration membership before boot. On successful
+materialization it activates only the matching occurrence-qualified Effects;
+on removal it disposes those records through the shared lifecycle operation
+before listener/binding teardown and DOM removal. Keyed retention keeps the
+same active records without re-execution. The decorator-free browser fixture
+proves nested child-first cleanup, keyed create/remove, retained-key stability,
+and malformed-effect-artifact rejection. Structural resume and slot-projected
+hosts remain separately fail-closed; this gate does not authorize DOM-derived
+fallback identities, global cleanup sweeps, or adapter-side lifecycle
+implementations.

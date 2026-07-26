@@ -880,7 +880,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       reportDiagnostic(diagnostics, "PSR_INVALID_EFFECT_INSTANCE_ARTIFACT", "Effect runtime metadata omitted instance ownership records", {}, true);
       throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
     }
-    if (effectArtifact.instances.length === 0) return;
+    if (effectArtifact.instances.length === 0 && effectArtifact.structural_templates.length === 0) return;
     if (componentArtifact === null) {
       reportDiagnostic(diagnostics, "PSR_INVALID_EFFECT_INSTANCE_ARTIFACT", "Instance-owned effects require a component runtime artifact", {}, true);
       throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
@@ -900,18 +900,30 @@ const RUNTIME_STUB: &str = r#"(() => {
       identities.add(record.effect_instance);
     }
     const regions = new Map((componentArtifact.structural_programs ?? []).map((program) => [program.region, program]));
-    const templateIds = new Set([...regions.values()].flatMap((program) => program.template_instances ?? []));
+    const occurrences = new Map();
+    for (const program of regions.values()) {
+      for (const occurrence of program.template_occurrences ?? []) {
+        if (occurrences.has(occurrence.template_instance)) {
+          reportDiagnostic(diagnostics, "PSR_INVALID_EFFECT_INSTANCE_ARTIFACT", "Structural effect templates did not have unique compiler occurrence ownership", { template_instance: occurrence.template_instance }, true);
+          throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
+        }
+        occurrences.set(occurrence.template_instance, { region: program.region, component: occurrence.component });
+      }
+    }
     const templateIdentities = new Set();
     for (const record of effectArtifact.structural_templates) {
-      const region = regions.get(record.structural_region);
-      if (typeof record.template_instance !== "string" || templateIdentities.has(record.template_instance)
-        || !templateIds.has(record.template_instance) || region === undefined
-        || !declarations.has(record.effect) || !Number.isInteger(record.depth) || record.depth < 0
+      const occurrence = occurrences.get(record.template_instance);
+      const expectedEffectInstance = `${String(record.template_instance ?? "")}/effect-instance:${String(record.effect ?? "")}`;
+      if (typeof record.effect_instance !== "string" || templateIdentities.has(record.effect_instance)
+        || record.effect_instance !== expectedEffectInstance
+        || occurrence === undefined || record.structural_region !== occurrence.region
+        || record.component !== occurrence.component || !declarations.has(record.effect)
+        || !Number.isInteger(record.depth) || record.depth < 0
         || !Number.isInteger(record.declaration_order) || record.declaration_order < 0) {
-        reportDiagnostic(diagnostics, "PSR_INVALID_EFFECT_INSTANCE_ARTIFACT", "Structural effect template metadata did not match compiler component metadata", { template_instance: record.template_instance }, true);
+        reportDiagnostic(diagnostics, "PSR_INVALID_EFFECT_INSTANCE_ARTIFACT", "Structural effect template metadata did not match compiler component metadata", { effect_instance: record.effect_instance }, true);
         throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
       }
-      templateIdentities.add(record.template_instance);
+      templateIdentities.add(record.effect_instance);
     }
   }
 
@@ -1769,7 +1781,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       rollback();
       throw error;
     }
-    return Object.freeze({ ...records, component, rollback });
+    return Object.freeze({ ...records, rollback });
   }
 
   function renderStructuralOccurrenceTemplate(records) {
@@ -1887,7 +1899,77 @@ const RUNTIME_STUB: &str = r#"(() => {
     return Object.freeze({ rollback });
   }
 
+  function structuralEffectInstances(store, records) {
+    const templateInstance = String(records?.template_instance ?? "");
+    const occurrenceIdentity = String(records?.occurrence_identity ?? "");
+    const structuralRegion = String(records?.structural_region ?? "");
+    const component = String(records?.component ?? "");
+    if (templateInstance.length === 0 || occurrenceIdentity.length === 0
+      || structuralRegion.length === 0 || component.length === 0) {
+      throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
+    }
+    const effects = new Set((store.effectArtifact?.effects ?? []).map((effect) => effect.effect));
+    const identities = new Set();
+    const instances = (store.effectArtifact?.structural_templates ?? [])
+      .filter((record) => record.template_instance === templateInstance)
+      .map((record) => {
+        if (record.structural_region !== structuralRegion || record.component !== component
+          || !effects.has(record.effect)) {
+          throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
+        }
+        const effectInstance = rewriteStructuralTemplateIdentity(
+          templateInstance,
+          occurrenceIdentity,
+          record.effect_instance
+        );
+        if (identities.has(effectInstance) || store.activeEffectInstances.has(effectInstance)) {
+          throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
+        }
+        identities.add(effectInstance);
+        return Object.freeze({
+          effect_instance: effectInstance,
+          effect: record.effect,
+          component_instance: occurrenceIdentity,
+          parent_instance: records.parent_scope,
+          depth: record.depth,
+          declaration_order: record.declaration_order,
+          structural: true
+        });
+      })
+      .sort((left, right) => left.declaration_order - right.declaration_order
+        || left.effect_instance.localeCompare(right.effect_instance));
+    return Object.freeze(instances);
+  }
+
+  function activateStructuralEffectInstances(store, records) {
+    const instances = structuralEffectInstances(store, records);
+    const effects = new Map((store.effectArtifact?.effects ?? []).map((effect) => [effect.effect, effect]));
+    const activated = [];
+    try {
+      for (const instance of instances) {
+        const effect = effects.get(instance.effect);
+        if (effect === undefined) throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
+        store.activeEffectInstances.set(instance.effect_instance, instance);
+        activated.push(instance);
+        const evidence = {
+          effect: effect.effect,
+          effect_instance: instance.effect_instance,
+          structural_region: records.structural_region,
+          occurrence_identity: records.occurrence_identity,
+          capability_operations: []
+        };
+        runEffect(store, effect, evidence, instance);
+        store.structuralEffectRuns.push(evidence);
+      }
+      return Object.freeze({ instances, dispose: () => disposeEffectInstances(store, instances) });
+    } catch (error) {
+      disposeEffectInstances(store, activated);
+      throw error;
+    }
+  }
+
   function materializeStructuralOccurrence(store, marker, parentScope, localOccurrence) {
+    let materializationPhase = "invocation";
     const invocation = marker?.getAttribute?.("data-presolve-structural-invocation");
     const template = store.structuralOccurrenceTemplatesByInvocation?.get(invocation);
     if (typeof invocation !== "string" || template === undefined
@@ -1901,15 +1983,20 @@ const RUNTIME_STUB: &str = r#"(() => {
       template.occurrence.template_instance,
       localOccurrence
     );
+    materializationPhase = "record-derivation";
     const records = deriveStructuralOccurrenceRecords(template, identity);
     let staged = null;
     let attachment = null;
     let registration = null;
+    let effects = null;
     const children = [];
     try {
+      materializationPhase = "record-staging";
       staged = stageStructuralOccurrenceRecords(store, records);
+      materializationPhase = "fragment-rendering";
       const program = store.componentRegions?.get(records.structural_region);
       const fragment = renderStructuralOccurrenceTemplate(records);
+      materializationPhase = "nested-anchor-validation";
       const anchors = compilerFragmentInvocationAnchors(
         fragment,
         program,
@@ -1920,21 +2007,34 @@ const RUNTIME_STUB: &str = r#"(() => {
         invocation,
         fragment
       );
+      materializationPhase = "ordinary-record-registration";
       registration = registerStructuralOccurrenceRecords(store, staged);
+      materializationPhase = "effect-activation";
+      effects = activateStructuralEffectInstances(store, staged);
+      materializationPhase = "nested-materialization";
       for (const anchor of anchors) {
         children.push(materializeStructuralOccurrence(store, anchor.marker, identity, localOccurrence));
       }
       return Object.freeze({ ...staged, attachment, registration, dispose: () => {
         for (const child of [...children].reverse()) child.dispose();
+        effects?.dispose();
         registration.rollback();
         attachment.rollback();
         staged.rollback();
       }});
     } catch (error) {
       for (const child of [...children].reverse()) child.dispose();
+      effects?.dispose();
       registration?.rollback();
       attachment?.rollback();
       staged?.rollback();
+      reportDiagnostic(
+        store.diagnostics,
+        error instanceof PresolveBootError ? error.code : "PSR_RUNTIME_BOOT_FAILED",
+        "Structural occurrence materialization failed",
+        { invocation, structural_region: template?.structural_region ?? null, phase: materializationPhase, message: error instanceof Error ? error.message : String(error) },
+        true
+      );
       throw error;
     }
   }
@@ -2585,9 +2685,14 @@ const RUNTIME_STUB: &str = r#"(() => {
       computedUpdateRuns: 0,
       initialEffectRuns: [],
       completedActionEffectRuns: [],
+      structuralEffectRuns: [],
       effectCleanupRuns: [],
       effectSubscriptions: new Map(),
       effectCleanups: new Map(),
+      activeEffectInstances: new Map((effectArtifact?.instances ?? []).map((record) => [
+        record.effect_instance,
+        Object.freeze({ ...record, structural: false })
+      ])),
       resources: new Map(),
       resourceActivationsByInstanceDeclaration: new Map(),
       activeActionBatch: null
@@ -2958,14 +3063,33 @@ const RUNTIME_STUB: &str = r#"(() => {
     });
   }
 
-  function effectInstanceTargets(effectArtifact, effect, actionInstanceId = null) {
-    const records = (effectArtifact?.instances ?? [])
+  function effectInstanceTargets(store, effect, actionInstanceId = null) {
+    const records = [...store.activeEffectInstances.values()]
       .filter((record) => record.effect === effect.effect)
       .filter((record) => actionInstanceId === null || record.component_instance === actionInstanceId)
       .sort((left, right) => left.depth - right.depth
         || left.declaration_order - right.declaration_order
         || left.effect_instance.localeCompare(right.effect_instance));
-    return records.length === 0 ? [null] : records;
+    const hasOwnership = (store.effectArtifact?.instances ?? []).some(
+      (record) => record.effect === effect.effect
+    ) || (store.effectArtifact?.structural_templates ?? []).some(
+      (record) => record.effect === effect.effect
+    );
+    return records.length === 0 && !hasOwnership ? [null] : records;
+  }
+
+  function initialEffectInstanceTargets(store, effect) {
+    const records = [...store.activeEffectInstances.values()]
+      .filter((record) => record.structural !== true && record.effect === effect.effect)
+      .sort((left, right) => left.depth - right.depth
+        || left.declaration_order - right.declaration_order
+        || left.effect_instance.localeCompare(right.effect_instance));
+    const hasOwnership = (store.effectArtifact?.instances ?? []).some(
+      (record) => record.effect === effect.effect
+    ) || (store.effectArtifact?.structural_templates ?? []).some(
+      (record) => record.effect === effect.effect
+    );
+    return records.length === 0 && !hasOwnership ? [null] : records;
   }
 
   function executeEffectProgram(store, effect, evidence, program = effect.program) {
@@ -3011,16 +3135,20 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
-  function disposeEffectInstances(store) {
+  function disposeEffectInstances(store, selected = null) {
     const effects = new Map((store.effectArtifact?.effects ?? []).map((effect) => [effect.effect, effect]));
-    const instances = [...(store.effectArtifact?.instances ?? [])]
+    const instances = [...(selected ?? store.activeEffectInstances.values())]
       .sort((left, right) => right.depth - left.depth
         || right.declaration_order - left.declaration_order
         || right.effect_instance.localeCompare(left.effect_instance));
     for (const instance of instances) {
       const cleanup = store.effectCleanups.get(instance.effect_instance);
       const effect = effects.get(instance.effect);
-      if (cleanup === undefined || effect === undefined) continue;
+      if (cleanup === undefined || effect === undefined) {
+        store.effectCleanups.delete(instance.effect_instance);
+        store.activeEffectInstances.delete(instance.effect_instance);
+        continue;
+      }
       const priorExecutionContext = store.activeExecutionContext;
       store.activeExecutionContext = { component_instance_id: instance.component_instance };
       try {
@@ -3035,6 +3163,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       } finally {
         store.activeExecutionContext = priorExecutionContext;
       }
+      store.activeEffectInstances.delete(instance.effect_instance);
     }
   }
 
@@ -3045,7 +3174,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   function executeInitialEffects(store) {
     for (const [effectBatchIndex, effects] of initialEffectBatches(store.effectArtifact)) {
       for (const effect of effects) {
-        for (const instance of effectInstanceTargets(store.effectArtifact, effect)) {
+        for (const instance of initialEffectInstanceTargets(store, effect)) {
           const evidence = {
             effect: effect.effect,
             effect_instance: instance?.effect_instance,
@@ -3066,7 +3195,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     for (const [effectBatchIndex, effects] of initialEffectBatches(store.effectArtifact)) {
       for (const effect of effects) {
         if (effect.run_on_resume !== true) continue;
-        for (const instance of effectInstanceTargets(store.effectArtifact, effect)) {
+        for (const instance of initialEffectInstanceTargets(store, effect)) {
           const evidence = {
             effect: effect.effect,
             effect_instance: instance?.effect_instance,
@@ -3116,7 +3245,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     )) {
       for (const effect of effects) {
         const actionInstanceId = store.activeExecutionContext?.component_instance_id ?? null;
-        for (const instance of effectInstanceTargets(store.effectArtifact, effect, actionInstanceId)) {
+        for (const instance of effectInstanceTargets(store, effect, actionInstanceId)) {
           const evidence = {
             action_batch_id: actionBatchId,
             effect: effect.effect,
@@ -3927,8 +4056,12 @@ const RUNTIME_STUB: &str = r#"(() => {
 
   function initializeOrdinaryInstanceRuntime(store, manifest, componentArtifact) {
     if (manifest.schema_version !== SUPPORTED_SCHEMA_VERSION) return;
+    const activeInstances = new Set((componentArtifact.instances ?? []).map((instance) => instance.instance));
+    const targets = (manifest.ordinary_targets ?? []).filter((target) => activeInstances.has(target.component_instance_id));
+    const bindings = (manifest.ordinary_bindings ?? []).filter((binding) => activeInstances.has(binding.component_instance_id));
+    const events = (manifest.ordinary_events ?? []).filter((event) => activeInstances.has(event.component_instance_id));
     const anchors = collectOrdinaryTargetAnchors();
-    for (const binding of manifest.ordinary_bindings ?? []) {
+    for (const binding of bindings) {
       if (binding.kind !== "text" || anchors.targets.has(binding.instance_target_id)) continue;
       const text = ordinaryTextBindingNode(binding.instance_binding_id);
       if (text !== null) anchors.targets.set(binding.instance_target_id, text);
@@ -3939,13 +4072,13 @@ const RUNTIME_STUB: &str = r#"(() => {
     store.templateTargetsById = anchors.targets;
     store.ordinaryBindingsById = new Map();
     store.ordinaryEventsByTargetAndType = new Map();
-    for (const target of manifest.ordinary_targets ?? []) {
+    for (const target of targets) {
       const artifactTarget = artifactTargets.get(target.id);
       if (artifactTarget === undefined || artifactTarget.component_instance_id !== target.component_instance_id || anchors.duplicates.has(target.id) || !anchors.targets.has(target.id)) {
         throw new PresolveBootError("PSR_INVALID_ORDINARY_TARGET");
       }
     }
-    for (const binding of manifest.ordinary_bindings ?? []) {
+    for (const binding of bindings) {
       const artifactBinding = artifactBindings.get(binding.instance_binding_id);
       if (artifactBinding === undefined || artifactBinding.component_instance_id !== binding.component_instance_id || artifactBinding.target_id !== binding.instance_target_id) {
         throw new PresolveBootError("PSR_INVALID_ORDINARY_BINDING");
@@ -3956,7 +4089,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       });
       registerOrdinaryBinding(store, binding, artifactBinding);
     }
-    for (const event of manifest.ordinary_events ?? []) {
+    for (const event of events) {
       const key = ordinaryEventKey(event.instance_target_id, event.event_type);
       const artifactEvent = artifactEvents.get(key);
       if (
@@ -4912,6 +5045,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     computed_update_runs = 0,
     initial_effect_runs = [],
     completed_action_effect_runs = [],
+    structural_effect_runs = [],
     context_initial_source_runs = [],
     context_slots = [],
     context_consumer_bindings = [],
@@ -4936,6 +5070,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       computed_update_runs,
       initial_effect_runs,
       completed_action_effect_runs,
+      structural_effect_runs,
       context_initial_source_runs,
       context_slots,
       context_consumer_bindings,
@@ -5151,6 +5286,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       computed_update_runs: store.computedUpdateRuns,
       initial_effect_runs: store.initialEffectRuns,
       completed_action_effect_runs: store.completedActionEffectRuns,
+      structural_effect_runs: store.structuralEffectRuns,
       context_initial_source_runs: store.contextInitialSourceRuns,
       context_slots: [...store.contextSlots.entries()],
       context_consumer_bindings: [...store.contextConsumerBindings.entries()],

@@ -1937,11 +1937,15 @@ fn decorator_free_v2_structural_component_artifacts_preserve_host_dom_identity_i
         .expect("failed to create V2 structural component root");
     fs::write(
         project_root.join("app/components/StructuralLeaf.tsx"),
-        r#"import { Component, state, action } from "presolve";
+        r#"import { Component, state, action, effect } from "presolve";
 
 export class StructuralLeaf extends Component {
   count = state(0);
   increment = action(() => { this.count += 1; });
+  lifecycle = effect(() => {
+    document.title = "leaf-active";
+    return () => { document.title = "leaf-cleanup"; };
+  });
   render() { return <button onClick={() => this.increment()}>Leaf: {this.count}</button>; }
 }
 "#,
@@ -1949,10 +1953,14 @@ export class StructuralLeaf extends Component {
     .expect("failed to write V2 structural leaf source");
     fs::write(
         project_root.join("app/components/StructuralBranch.tsx"),
-        r#"import { Component } from "presolve";
+        r#"import { Component, effect } from "presolve";
 import { StructuralLeaf } from "./StructuralLeaf";
 
 export class StructuralBranch extends Component {
+  lifecycle = effect(() => {
+    document.title = "branch-active";
+    return () => { document.title = "branch-cleanup"; };
+  });
   render() { return <section><StructuralLeaf /></section>; }
 }
 "#,
@@ -1991,13 +1999,14 @@ export class StructuralPage extends Component {
 import { readFileSync } from "node:fs";
 const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
+const resolves = (site, name) => readFileSync(site.file, "utf8").slice(site.position).startsWith(name);
 process.stdout.write(JSON.stringify({
   schemaVersion: 4,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
-  states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
-  actions: request.actions.map(site => ({ id: site.id, identity: identity("action") })),
-  effects: request.effects.map(site => ({ id: site.id, identity: identity("effect") })),
+  states: request.states.filter(site => resolves(site, "state")).map(site => ({ id: site.id, identity: identity("state") })),
+  actions: request.actions.filter(site => resolves(site, "action")).map(site => ({ id: site.id, identity: identity("action") })),
+  effects: request.effects.filter(site => resolves(site, "effect")).map(site => ({ id: site.id, identity: identity("effect") })),
   environmentPublic: request.environmentPublic.map(site => ({ id: site.id, identity: identity("public") })),
 }));
 "#,
@@ -2070,7 +2079,7 @@ process.stdout.write(JSON.stringify({
     write_component_structural_probe_page(&output_root, true);
     let server = StaticServer::start(output_root.clone());
     let chrome = chrome_bin().expect("headless Chrome was not found");
-    let profile_dir = project_root.join("chrome-profile");
+    let profile_dir = project_root.join(format!("chrome-profile-{}", std::process::id()));
     fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile dir");
     let user_data_dir = format!(
         "--user-data-dir={}",
@@ -2093,6 +2102,74 @@ process.stdout.write(JSON.stringify({
 
     let index = fs::read_to_string(output_root.join("index.html"))
         .expect("failed to read V2 structural output page");
+    let rejected_effect = replace_json_script(&index, "presolve-effect-runtime", |value| {
+        let template = value["structural_templates"]
+            .as_array_mut()
+            .expect("structural Effect templates should be an array")
+            .first_mut()
+            .expect("V2 structural fixture should have an Effect template");
+        let template_instance = template["template_instance"]
+            .as_str()
+            .expect("structural Effect template instance")
+            .to_owned();
+        template["effect_instance"] =
+            serde_json::json!(format!("{template_instance}/effect-instance:fabricated"));
+    });
+    let rejected_effect = rejected_effect.replace(
+        "</body>",
+        r#"<script>
+const observeState = () => {
+  const state = document.documentElement.dataset.presolveRuntime;
+  if (state === "pending" || state === undefined) return;
+  observer.disconnect();
+  const codes = window.__PRESOLVE__?.diagnostics?.map((diagnostic) => diagnostic.code) ?? [];
+  if (state === "error" && codes.includes("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT")) {
+    const pass = "PRESOLVE_STRUCTURAL_EFFECT_" + "OWNERSHIP_REJECTION_PASS";
+    document.body.insertAdjacentHTML("beforeend", `<div>${pass}</div>`);
+  } else {
+    document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_STRUCTURAL_EFFECT_OWNERSHIP_REJECTION_FAIL: ${state}:${codes.join(",")}</div>`);
+  }
+};
+const observer = new MutationObserver(observeState);
+observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-presolve-runtime"] });
+observeState();
+</script>
+</body>"#,
+    );
+    fs::write(
+        output_root.join("invalid-structural-effect.html"),
+        rejected_effect,
+    )
+    .expect("failed to write invalid structural Effect probe");
+    let server = StaticServer::start(output_root.clone());
+    let effect_profile_dir = project_root.join("invalid-structural-effect-profile");
+    fs::create_dir_all(&effect_profile_dir)
+        .expect("failed to create invalid structural Effect profile dir");
+    let effect_user_data_dir = format!(
+        "--user-data-dir={}",
+        effect_profile_dir
+            .to_str()
+            .expect("invalid structural Effect profile path was not valid UTF-8")
+    );
+    let effect_url = format!(
+        "http://127.0.0.1:{}/invalid-structural-effect.html",
+        server.port
+    );
+    let effect_output = run_chrome_probe(
+        chrome_bin().expect("headless Chrome was not found"),
+        &effect_user_data_dir,
+        &effect_url,
+    );
+    let effect_stdout = String::from_utf8_lossy(&effect_output.stdout);
+    server.stop();
+    assert!(
+        effect_stdout.contains("PRESOLVE_STRUCTURAL_EFFECT_OWNERSHIP_REJECTION_PASS"),
+        "malformed structural Effect ownership was not rejected\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        effect_output.status,
+        effect_stdout,
+        String::from_utf8_lossy(&effect_output.stderr)
+    );
+
     let rejected = replace_json_script(&index, "presolve-component-runtime", |value| {
         let fragment = value["structural_programs"]
             .as_array_mut()
@@ -2114,17 +2191,21 @@ process.stdout.write(JSON.stringify({
     let rejected = rejected.replace(
         "</body>",
         r#"<script>
-const wait = setInterval(() => {
+const observeState = () => {
   const state = document.documentElement.dataset.presolveRuntime;
   if (state === "pending" || state === undefined) return;
-  clearInterval(wait);
+  observer.disconnect();
   const codes = window.__PRESOLVE__?.diagnostics?.map((diagnostic) => diagnostic.code) ?? [];
   if (state === "error" && codes.includes("PSR_INVALID_COMPONENT_ARTIFACT")) {
-    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_STRUCTURAL_ANCHOR_REJECTION_PASS</div>");
+    const pass = "PRESOLVE_STRUCTURAL_" + "ANCHOR_REJECTION_PASS";
+    document.body.insertAdjacentHTML("beforeend", `<div>${pass}</div>`);
   } else {
     document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_STRUCTURAL_ANCHOR_REJECTION_FAIL: ${state}:${codes.join(",")}</div>`);
   }
-}, 20);
+};
+const observer = new MutationObserver(observeState);
+observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-presolve-runtime"] });
+observeState();
 </script>
 </body>"#,
     );
@@ -2172,7 +2253,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   const tick = () => {
     if (predicate()) { resolve(); return; }
     if (document.documentElement.dataset.presolveRuntime === "error") {
-      const diagnostic = window.__PRESOLVE__?.diagnostics?.map(({ code, message }) => `${code}: ${message}`).join(" | ") ?? "runtime error";
+      const diagnostic = window.__PRESOLVE__?.diagnostics?.map(({ code, message, detail }) => `${code}: ${message}: ${JSON.stringify(detail)}`).join(" | ") ?? "runtime error";
       reject(new Error(`Runtime failed before ${label}: ${diagnostic}`));
       return;
     }
@@ -2186,12 +2267,18 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
   const runtime = window.__PRESOLVE__;
   const artifact = JSON.parse(document.getElementById("presolve-component-runtime").textContent);
+  const effectArtifact = JSON.parse(document.getElementById("presolve-effect-runtime").textContent);
   if (artifact.schema_version !== 17 || artifact.structural_programs.length !== 2) fail("structural component programs were missing");
   if (runtime.store.componentRegions.size !== artifact.structural_programs.length) fail("closed structural region table diverged from the artifact");
   if (!artifact.structural_programs.every((program) => JSON.stringify(runtime.store.componentRegions.get(program.region)) === JSON.stringify(program))) {
     fail("runtime structural regions were not keyed by compiler IDs");
   }
   const occurrenceCount = artifact.structural_programs.reduce((count, program) => count + program.template_occurrences.length, 0);
+  if (expectStructuralMaterialization && (effectArtifact.schema_version !== 7 || effectArtifact.structural_templates.length === 0
+    || !effectArtifact.structural_templates.every((record) => typeof record.effect_instance === "string"
+      && typeof record.component === "string" && typeof record.template_instance === "string"))) {
+    fail("structural Effect templates were not published as schema-v7 compiler records");
+  }
   if (runtime.store.structuralOccurrenceTemplatesByInvocation.size !== occurrenceCount) {
     fail("runtime structural occurrence templates were not exactly preflighted");
   }
@@ -2259,19 +2346,44 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   const trim = control("Trim");
   if (toggle === undefined || reconcile === undefined || trim === undefined) fail("structural controls were missing");
   if (expectStructuralMaterialization) {
-    const leaf = [...main.querySelectorAll("button")].find((button) => button.textContent === "Leaf: 0");
+    const leaf = [...main.querySelectorAll("button")].find((button) => button.textContent === "Leaf:0");
     const dynamicLeaf = [...runtime.store.components.values()].find((component) =>
       component.name === "StructuralLeaf" && component.instance_id.startsWith("presolve-structural-occurrence:v1:")
     );
     if (leaf === undefined || dynamicLeaf === undefined) fail("static conditional host did not materialize a live structural Leaf");
     leaf.click();
-    await waitFor(() => leaf.textContent === "Leaf: 1", "materialized structural leaf action");
+    await waitFor(() => leaf.textContent === "Leaf:1", "materialized structural leaf action");
+    if (document.title !== "leaf-active" || runtime.structural_effect_runs.length === 0) {
+      fail("structural Effects did not activate under occurrence identities");
+    }
   }
   const listLeafA = a.querySelector("button");
   if (expectStructuralMaterialization) {
-    if (listLeafA === null || listLeafA.textContent !== "Leaf: 0") fail("initial keyed row did not materialize a structural Leaf");
+    if (listLeafA === null || listLeafA.textContent !== "Leaf:0") fail("initial keyed row did not materialize a structural Leaf");
     listLeafA.click();
-    await waitFor(() => listLeafA.textContent === "Leaf: 1", "materialized keyed leaf action");
+    await waitFor(() => listLeafA.textContent === "Leaf:1", "materialized keyed leaf action");
+  }
+  const structuralInstances = () => [...runtime.store.componentInstances.values()]
+    .filter((instance) => instance.instance.startsWith("presolve-structural-occurrence:v1:"));
+  const conditionalInstanceIds = structuralInstances()
+    .filter((instance) => instance.structural_region === conditionalHost.region)
+    .map((instance) => instance.instance);
+  const keyedInstanceIds = structuralInstances()
+    .filter((instance) => instance.structural_region === keyedHost.region)
+    .map((instance) => instance.instance);
+  if (expectStructuralMaterialization && (conditionalInstanceIds.length !== 3 || keyedInstanceIds.length !== 3)) {
+    fail("initial structural component ownership was not exact");
+  }
+  if (expectStructuralMaterialization && (runtime.initial_effect_runs.length !== 0
+    || runtime.structural_effect_runs.length !== 6)) {
+    fail("structural Effects escaped occurrence-qualified initial activation");
+  }
+  const branchEffect = effectArtifact.effects.find((effect) => effect.effect.includes("/component:StructuralBranch/effect:"));
+  const leafEffect = effectArtifact.effects.find((effect) => effect.effect.includes("/component:StructuralLeaf/effect:"));
+  if (expectStructuralMaterialization && (branchEffect === undefined || leafEffect === undefined
+    || runtime.structural_effect_runs[0].effect !== branchEffect.effect
+    || runtime.structural_effect_runs[1].effect !== leafEffect.effect)) {
+    fail("nested structural Effects did not activate parent-first");
   }
 
   toggle.click();
@@ -2279,19 +2391,29 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   if (document.querySelector("main div") !== null) fail("outgoing conditional subtree survived");
   if (document.querySelector("main") !== main || document.querySelector("main ul") !== listParent) fail("unaffected sibling identity changed");
   if (row("a") !== a || row("b") !== b || row("c") !== c) fail("conditional swap recreated unaffected keyed rows");
-  if (expectStructuralMaterialization && [...runtime.store.components.keys()].some((id) => id.startsWith("presolve-structural-occurrence:v1:"))) {
+  if (expectStructuralMaterialization && (conditionalInstanceIds.some((id) => runtime.store.components.has(id))
+    || keyedInstanceIds.some((id) => !runtime.store.components.has(id)))) {
     fail("conditional removal leaked a structural component instance");
   }
+  if (expectStructuralMaterialization && document.title !== "branch-cleanup") {
+    fail("structural Effect cleanup did not run child-first before conditional removal");
+  }
 
+  const structuralEffectRunsBeforeReconcile = runtime.structural_effect_runs.length;
   reconcile.click();
   await waitFor(() => row("d") !== null && row("b") === null, "keyed component reconciliation");
   const d = row("d");
   if (row("a") !== a || row("c") !== c) fail("moved keyed component rows were recreated");
   if (d === null) fail("new keyed component row was not created");
-  if (expectStructuralMaterialization && (a.querySelector("button") !== listLeafA || listLeafA.textContent !== "Leaf: 1" || d.querySelector("button")?.textContent !== "Leaf: 0")) {
+  if (expectStructuralMaterialization && (a.querySelector("button") !== listLeafA || listLeafA.textContent !== "Leaf:1" || d.querySelector("button")?.textContent !== "Leaf:0")) {
     fail("keyed structural occurrence was not retained or created exactly");
   }
+  if (expectStructuralMaterialization && (runtime.structural_effect_runs.length !== structuralEffectRunsBeforeReconcile + 1
+    || document.title !== "leaf-cleanup")) {
+    fail("keyed structural Effect activation or removal cleanup was not exact");
+  }
 
+  const structuralEffectRunsBeforeTrim = runtime.structural_effect_runs.length;
   trim.click();
   await waitFor(() => row("a") === null && row("c") === null, "nested keyed destruction");
   if (row("d") !== d) fail("retained keyed component row was recreated");
@@ -2299,8 +2421,13 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   if (expectStructuralMaterialization && [...runtime.store.components.keys()].filter((id) => id.startsWith("presolve-structural-occurrence:v1:")).length !== 1) {
     fail("keyed structural removal leaked a component occurrence");
   }
+  if (expectStructuralMaterialization && (runtime.structural_effect_runs.length !== structuralEffectRunsBeforeTrim
+    || document.title !== "leaf-cleanup")) {
+    fail("retained keyed structural Effect was spuriously reactivated or removed");
+  }
   if (runtime.component_failures.length !== 0) fail("structural component runtime reported failures");
-  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_COMPONENT_STRUCTURAL_BROWSER_TEST_PASS</div>");
+  const pass = "PRESOLVE_COMPONENT_" + "STRUCTURAL_BROWSER_TEST_PASS";
+  document.body.insertAdjacentHTML("beforeend", `<div>${pass}</div>`);
 })().catch((error) => {
   document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_COMPONENT_STRUCTURAL_BROWSER_TEST_FAIL: ${error.message}</div>`);
   console.error(error);
