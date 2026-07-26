@@ -5781,6 +5781,12 @@ const RUNTIME_STUB: &str = r#"(() => {
           if ((opaqueArtifact?.activations ?? []).length > 0) {
             throw new ResumeBootError("OpaqueTerminalColdFallback");
           }
+          // Resource snapshot/reload restoration is an authored lifecycle
+          // product. Until that registry is installed, resuming would omit
+          // live compiler-owned Resource state, so select one cold boot.
+          if ((resourcesArtifact?.activations ?? []).length > 0) {
+            throw new ResumeBootError("ResourceResumeUnsupported");
+          }
           return restoreResumeRuntimeThroughForms(
             resumeManifest,
             snapshot,
@@ -5984,6 +5990,7 @@ mod tests {
         assert!(runtime.contains("function decodeResumeValue"));
         assert!(runtime.contains("function restoreResumeRuntimeThroughForms"));
         assert!(runtime.contains("ResourceComputedReadUnsupported"));
+        assert!(runtime.contains("ResourceResumeUnsupported"));
         assert!(runtime.contains("executeResumeComputedRecomputation"));
         assert!(runtime.contains("function executeResumeContextBindings"));
         assert!(runtime.contains("function restoreResumeComponentsSlotsAndStructure"));
