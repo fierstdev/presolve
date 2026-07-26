@@ -1947,10 +1947,28 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
   const runtime = window.__PRESOLVE__;
   const artifact = JSON.parse(document.getElementById("presolve-component-runtime").textContent);
-  if (artifact.schema_version !== 2 || artifact.structural_programs.length !== 2) fail("structural component programs were missing");
+  if (artifact.schema_version !== 7 || artifact.structural_programs.length !== 2) fail("structural component programs were missing");
   if (runtime.store.componentRegions.size !== artifact.structural_programs.length) fail("closed structural region table diverged from the artifact");
   if (!artifact.structural_programs.every((program) => JSON.stringify(runtime.store.componentRegions.get(program.region)) === JSON.stringify(program))) {
     fail("runtime structural regions were not keyed by compiler IDs");
+  }
+  for (const program of artifact.structural_programs) {
+    for (const occurrence of program.template_occurrences) {
+      const targets = artifact.ordinary_template_targets
+        .filter((target) => target.component_instance_id === occurrence.template_instance)
+        .map((target) => target.id);
+      const bindings = artifact.ordinary_template_bindings
+        .filter((binding) => binding.component_instance_id === occurrence.template_instance)
+        .map((binding) => binding.id);
+      const events = artifact.ordinary_template_events
+        .filter((event) => event.component_instance_id === occurrence.template_instance)
+        .map((event) => event.declaration_event_id);
+      if (JSON.stringify(occurrence.ordinary_template_targets) !== JSON.stringify(targets)
+        || JSON.stringify(occurrence.ordinary_template_bindings) !== JSON.stringify(bindings)
+        || JSON.stringify(occurrence.ordinary_template_events) !== JSON.stringify(events)) {
+        fail("structural occurrence membership was not compiler projected");
+      }
+    }
   }
   const serialized = JSON.stringify(artifact).toLowerCase();
   if (serialized.includes("virtual_dom") || serialized.includes("vdom")) fail("component artifact introduced virtual DOM authority");
