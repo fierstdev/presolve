@@ -10,6 +10,9 @@ use std::sync::{
 use std::thread;
 use std::time::{Duration, Instant};
 
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
 static BROWSER_TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
 fn browser_test_guard() -> MutexGuard<'static, ()> {
@@ -2395,6 +2398,110 @@ fn framework_counter_increments_through_compiler_artifacts_in_a_real_browser() {
         stdout,
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+#[cfg(unix)]
+#[test]
+fn decorator_free_v2_action_field_runs_through_compiler_artifacts_in_a_real_browser() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let project_root = repo_root.join("target/psc-browser-test/v2-action-endpoint-project");
+    if project_root.exists() {
+        fs::remove_dir_all(&project_root).expect("failed to clean previous V2 action project");
+    }
+    fs::create_dir_all(project_root.join("app/routes")).expect("failed to create V2 source root");
+    fs::write(
+        project_root.join("app/routes/index.tsx"),
+        r#"import { Component, state, action } from "presolve";
+export class Home extends Component {
+  count = state(0);
+  increment = action(() => { this.count += 1; });
+  render() { return <button onClick={() => this.increment()}>Count: {this.count}</button>; }
+}
+"#,
+    )
+    .expect("failed to write V2 action source");
+    fs::write(
+        project_root.join("tsconfig.json"),
+        r#"{"compilerOptions":{"noEmit":true}}"#,
+    )
+    .expect("failed to write V2 TypeScript config");
+    let executable = project_root.join("node_modules/.bin/presolve-typescript-authority");
+    fs::create_dir_all(executable.parent().expect("authority executable parent"))
+        .expect("failed to create authority executable parent");
+    fs::write(
+        &executable,
+        r#"#!/usr/bin/env node
+import { readFileSync } from "node:fs";
+const request = JSON.parse(readFileSync(0, "utf8"));
+const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
+process.stdout.write(JSON.stringify({
+  schemaVersion: 1,
+  diagnostics: [],
+  components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
+  states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
+  actions: request.actions.map(site => ({ id: site.id, identity: identity("action") })),
+}));
+"#,
+    )
+    .expect("failed to write V2 authority executable");
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o755))
+        .expect("failed to mark V2 authority executable");
+
+    let output = Command::new(presolve_cli_bin())
+        .current_dir(&project_root)
+        .arg("build")
+        .output()
+        .expect("failed to build V2 action project");
+    assert!(
+        output.status.success(),
+        "expected V2 action build to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let output_root = project_root.join("dist/routes/root");
+    write_framework_counter_probe_page(&output_root);
+    write_v2_action_resume_probe_page(&output_root);
+    let server = StaticServer::start(output_root.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = project_root.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create Chrome profile dir");
+    let user_data_dir = format!(
+        "--user-data-dir={}",
+        profile_dir
+            .to_str()
+            .expect("Chrome profile path was not valid UTF-8")
+    );
+    let probe_url = format!("http://127.0.0.1:{}/probe.html", server.port);
+    let output = run_chrome_probe(chrome, &user_data_dir, &probe_url);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        stdout.contains("PRESOLVE_FRAMEWORK_COUNTER_BROWSER_TEST_PASS"),
+        "V2 action browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let resumed_profile_dir = project_root.join("chrome-resume-profile");
+    fs::create_dir_all(&resumed_profile_dir).expect("failed to create resumed Chrome profile dir");
+    let resumed_output = run_chrome_probe(
+        chrome_bin().expect("headless Chrome was not found"),
+        &format!("--user-data-dir={}", resumed_profile_dir.display()),
+        &format!("http://127.0.0.1:{}/resume-probe.html", server.port),
+    );
+    let resumed_stdout = String::from_utf8_lossy(&resumed_output.stdout);
+    assert!(
+        resumed_stdout.contains("PRESOLVE_V2_ACTION_RESUME_PASS"),
+        "V2 action resume browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        resumed_output.status,
+        resumed_stdout,
+        String::from_utf8_lossy(&resumed_output.stderr)
+    );
+    server.stop();
+    fs::remove_dir_all(project_root).expect("failed to remove V2 action browser project");
 }
 
 #[test]
@@ -5182,6 +5289,36 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 
     fs::write(out_dir.join("probe.html"), probe)
         .expect("failed to write framework Counter browser probe page");
+}
+
+fn write_v2_action_resume_probe_page(out_dir: &Path) {
+    let index = fs::read_to_string(out_dir.join("index.html"))
+        .expect("failed to read built V2 action page");
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &fs::read(out_dir.join("resume.runtime.json")).expect("failed to read V2 resume manifest"),
+    )
+    .expect("V2 resume manifest JSON");
+    let snapshot = resume_bootstrap_snapshot(&manifest);
+    let probe = resume_bootstrap_probe_page(
+        &index,
+        &format!(
+            "window.__PRESOLVE_RESUME_SNAPSHOT__ = {};",
+            serde_json::to_string(&snapshot).expect("V2 resume snapshot JSON")
+        ),
+        r#"
+if (runtime.resume.mode !== "resume") fail("V2 snapshot was not resumed");
+if (runtime.components[0].state.count !== 7) fail("V2 State slot did not restore");
+const template = JSON.parse(document.getElementById("presolve-template-manifest").textContent);
+const endpoint = template.components[0]?.actions?.[0]?.method_id;
+if (typeof endpoint !== "string" || !endpoint.includes("/action-endpoint:increment")) fail("V2 action endpoint identity was not retained");
+const button = document.querySelector("button");
+if (button === null) fail("V2 action button was not emitted");
+button.click();
+await waitFor(() => runtime.components[0].state.count === 8, "resumed V2 action update");
+if (runtime.diagnostics.some((diagnostic) => diagnostic.fatal)) fail("V2 resume reported a fatal diagnostic");"#,
+        "PRESOLVE_V2_ACTION_RESUME_PASS",
+    );
+    fs::write(out_dir.join("resume-probe.html"), probe).expect("failed to write V2 resume probe");
 }
 
 fn write_decrement_probe_page(out_dir: &Path) {
