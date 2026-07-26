@@ -10,4 +10,7 @@ documents that unprefixed environment values are server-owned. It intentionally
 retains the current compiler-owned `presolve dev`, build, and deployment
 commands until the Vite development-command adapter is a complete product.
 The scaffold must remain installable and pass the existing no-configuration
-ergonomic check, build, and deployment preparation fixtures.
+ergonomic check, build, and deployment preparation fixtures. Its decorator-free
+source is accepted only through the authority bridge defined in
+`authoring-build-adoption-contract.md`; the current direct build probe remains
+an explicitly tracked adoption gap rather than evidence of scaffold readiness.

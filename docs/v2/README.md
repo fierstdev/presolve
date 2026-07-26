@@ -37,6 +37,9 @@ normative source for this handoff.
 - [V2 authoring-syntax cutover contract](authoring-syntax-cutover-contract.md)
   records the decorator-free canonical source surface and the bounded alpha
   compatibility path.
+- [V2 authoring build-adoption contract](authoring-build-adoption-contract.md)
+  records the required authority bridge and downstream path for decorator-free
+  projects.
 - [Vite adapter boundary](vite-adapter.md) records the compiler-product-only
   integration seam for the required external backend.
 - [Presolve-aware HMR contract](hmr-contract.md) records the compiler-selected
