@@ -265,6 +265,11 @@ pub struct ResourceId(SemanticId);
 #[serde(transparent)]
 pub struct ResourceActivationId(SemanticId);
 
+/// Stable identity for one component-instance-qualified V2 effect execution.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct EffectInstanceId(SemanticId);
+
 /// Stable identity for an authored Context-family declaration candidate.
 ///
 /// Candidates are source-qualified compiler facts.  They intentionally do not
@@ -807,6 +812,27 @@ impl ResourceActivationId {
             instance
                 .as_semantic_id()
                 .child("resource-activation", resource.as_str()),
+        )
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl EffectInstanceId {
+    #[must_use]
+    pub fn for_component_instance(instance: &ComponentInstanceId, effect: &SemanticId) -> Self {
+        Self(
+            instance
+                .as_semantic_id()
+                .child("effect-instance", effect.as_str()),
         )
     }
 

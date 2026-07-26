@@ -148,6 +148,7 @@ pub mod runtime_context;
 pub mod runtime_context_artifact;
 pub mod runtime_effect;
 pub mod runtime_effect_artifact;
+pub mod runtime_effect_instance;
 pub mod runtime_form_artifact;
 pub mod runtime_form_registry;
 pub mod runtime_opaque_artifact;
@@ -865,6 +866,10 @@ pub use runtime_effect_artifact::{
     RuntimeEffectArtifactPrerequisiteBatch, RuntimeEffectArtifactProgram,
     RuntimeEffectArtifactRenderBoundary, RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION,
 };
+pub use runtime_effect_instance::{
+    build_runtime_effect_instance_registry, RuntimeEffectInstanceRecord,
+    RuntimeEffectInstanceRegistry, RUNTIME_EFFECT_INSTANCE_REGISTRY_VERSION,
+};
 pub use runtime_form_artifact::{
     build_runtime_forms_artifact, runtime_forms_artifact_json, validate_runtime_forms_artifact,
     RuntimeFormsArtifact, RuntimeFormsArtifactBinding, RuntimeFormsArtifactDependency,
@@ -906,14 +911,14 @@ pub use semantic_graph::{
 pub use semantic_id::{
     ComponentInstanceId, ComponentInvocationId, ComponentRootId, ComponentStructuralRegionId,
     ConsumerId, ContextDeclarationCandidateId, ContextId, DirtyTrackingPlanId, EffectId,
-    EffectStatementId, FieldBindingId, FieldDependencyId, FieldId, FieldResetOperationId,
-    FieldTrackingId, FormDeclarationCandidateId, FormFieldBindingCandidateId,
-    FormFieldDeclarationCandidateId, FormFieldDirtySlotId, FormFieldTouchedSlotId,
-    FormFieldValidationSlotId, FormFieldValueSlotId, FormId, FormInstanceId, FormOwnershipGraphId,
-    FormSubmissionStateSlotId, FormValidationAggregateSlotId, ProviderId, ResetPlanId,
-    ResourceActivationId, ResourceId, SemanticId, SemanticOwner, SerializationPlanId,
-    SlotBindingId, SlotContentFragmentId, SlotDeclarationCandidateId, SlotId, SlotOutletId,
-    SubmissionDeclarationCandidateId, SubmissionHostCandidateId, SubmissionHostId,
+    EffectInstanceId, EffectStatementId, FieldBindingId, FieldDependencyId, FieldId,
+    FieldResetOperationId, FieldTrackingId, FormDeclarationCandidateId,
+    FormFieldBindingCandidateId, FormFieldDeclarationCandidateId, FormFieldDirtySlotId,
+    FormFieldTouchedSlotId, FormFieldValidationSlotId, FormFieldValueSlotId, FormId,
+    FormInstanceId, FormOwnershipGraphId, FormSubmissionStateSlotId, FormValidationAggregateSlotId,
+    ProviderId, ResetPlanId, ResourceActivationId, ResourceId, SemanticId, SemanticOwner,
+    SerializationPlanId, SlotBindingId, SlotContentFragmentId, SlotDeclarationCandidateId, SlotId,
+    SlotOutletId, SubmissionDeclarationCandidateId, SubmissionHostCandidateId, SubmissionHostId,
     SubmissionPlanId, TemplatePositionId, TouchedTrackingPlanId, ValidationDependencyCycleId,
     ValidationGraphId, ValidationPlanId, ValidationRuleCandidateId, ValidationRuleId,
 };

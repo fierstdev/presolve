@@ -14,8 +14,9 @@ instances. It must therefore remain unavailable for cleanup-bearing V2 fields.
 
 ## Required instance projection
 
-The next effect artifact schema adds one canonical instance-execution record
-per planned component instance and matching V2 effect declaration. Each record
+The compiler instance-effect registry now adds one canonical
+instance-execution record per planned component instance and matching V2 effect
+declaration. The next effect artifact schema serializes those records. Each record
 must contain:
 
 - an instance-qualified effect execution identity;
@@ -44,8 +45,8 @@ error. Server publication and execution remain prohibited.
 
 ## Incremental acceptance
 
-1. The compiler emits deterministic instance-effect records for nested and
-   repeated components, including parent/depth and field order.
+1. The compiler registry emits deterministic instance-effect records for
+   nested and repeated components, including parent/depth and field order.
 2. The generated browser runtime validates every record against the component
    artifact before activation.
 3. A repeated-child fixture proves independent cold runs, rerun cleanup, and
