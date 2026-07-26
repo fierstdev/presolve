@@ -945,6 +945,11 @@ const RUNTIME_STUB: &str = r#"(() => {
       if (!Array.isArray(artifact.structural_programs)) {
         throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
       }
+      if (!Array.isArray(artifact.ordinary_template_targets)
+        || !Array.isArray(artifact.ordinary_template_bindings)
+        || !Array.isArray(artifact.ordinary_template_events)) {
+        throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      }
       const structuralRegions = new Set();
       const structuralHosts = new Set();
       for (const program of artifact.structural_programs) {
@@ -958,7 +963,25 @@ const RUNTIME_STUB: &str = r#"(() => {
           || program.template_occurrences.length !== program.template_instances.length
           || program.template_occurrences.some((occurrence, index) => typeof occurrence?.template_instance !== "string"
             || occurrence.template_instance !== program.template_instances[index]
-            || typeof occurrence.invocation !== "string" || typeof occurrence.component !== "string")
+            || typeof occurrence.invocation !== "string" || typeof occurrence.component !== "string"
+            || !Array.isArray(occurrence.ordinary_template_targets)
+            || !Array.isArray(occurrence.ordinary_template_bindings)
+            || !Array.isArray(occurrence.ordinary_template_events)
+            || JSON.stringify(occurrence.ordinary_template_targets) !== JSON.stringify(
+              artifact.ordinary_template_targets
+                .filter((target) => target.component_instance_id === occurrence.template_instance)
+                .map((target) => target.id)
+            )
+            || JSON.stringify(occurrence.ordinary_template_bindings) !== JSON.stringify(
+              artifact.ordinary_template_bindings
+                .filter((binding) => binding.component_instance_id === occurrence.template_instance)
+                .map((binding) => binding.id)
+            )
+            || JSON.stringify(occurrence.ordinary_template_events) !== JSON.stringify(
+              artifact.ordinary_template_events
+                .filter((event) => event.component_instance_id === occurrence.template_instance)
+                .map((event) => event.declaration_event_id)
+            ))
           || JSON.stringify(program.create_order) !== JSON.stringify(program.template_instances)
           || JSON.stringify([...(program.destroy_order ?? [])].reverse()) !== JSON.stringify(program.template_instances)) {
           throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
@@ -4455,6 +4478,9 @@ mod tests {
         assert!(runtime.contains("form_hosts"));
         assert!(runtime.contains("structuralOccurrences = new Map"));
         assert!(runtime.contains("structuralOccurrencesByInvocation"));
+        assert!(runtime.contains("occurrence.ordinary_template_targets"));
+        assert!(runtime.contains("occurrence.ordinary_template_bindings"));
+        assert!(runtime.contains("occurrence.ordinary_template_events"));
         assert!(!runtime.contains("FormData(formElement)"));
         assert!(runtime.contains("PSR_MISSING_MANIFEST"));
         assert!(runtime.contains("PSR_INVALID_MANIFEST_JSON"));

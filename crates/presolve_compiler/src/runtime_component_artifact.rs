@@ -9,7 +9,7 @@ use crate::{
 };
 use crate::{TemplateChild, TemplateNode, TemplateSemanticKind};
 
-pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 6;
+pub const RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION: u32 = 7;
 
 /// Public H14 compiler artifact. All executable references are canonical IDs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -149,6 +149,11 @@ pub struct SerializedStructuralTemplateOccurrence {
     pub template_instance: String,
     pub invocation: String,
     pub component: String,
+    /// Inactive compiler-owned template projection for a future materializer.
+    /// These IDs must be used as emitted; they are never selected from the DOM.
+    pub ordinary_template_targets: Vec<String>,
+    pub ordinary_template_bindings: Vec<String>,
+    pub ordinary_template_events: Vec<String>,
 }
 
 const fn target_kind_text(kind: OrdinaryTemplateTargetKind) -> &'static str {
@@ -298,6 +303,28 @@ pub fn build_runtime_component_artifact(
                             .expect("structural template invocation")
                             .to_string(),
                         component: instance.component.to_string(),
+                        ordinary_template_targets: artifact
+                            .ordinary_template_targets
+                            .iter()
+                            .filter(|target| {
+                                target.component_instance_id == instance.id.to_string()
+                            })
+                            .map(|target| target.id.clone())
+                            .collect(),
+                        ordinary_template_bindings: artifact
+                            .ordinary_template_bindings
+                            .iter()
+                            .filter(|binding| {
+                                binding.component_instance_id == instance.id.to_string()
+                            })
+                            .map(|binding| binding.id.clone())
+                            .collect(),
+                        ordinary_template_events: artifact
+                            .ordinary_template_events
+                            .iter()
+                            .filter(|event| event.component_instance_id == instance.id.to_string())
+                            .map(|event| event.declaration_event_id.clone())
+                            .collect(),
                     });
             }
         }
@@ -583,6 +610,46 @@ pub fn validate_runtime_component_artifact(
             )
         })
         .collect::<std::collections::BTreeSet<_>>();
+    if artifact
+        .structural_programs
+        .iter()
+        .flat_map(|program| {
+            program.template_occurrences.iter().map(move |occurrence| {
+                (
+                    occurrence,
+                    artifact
+                        .ordinary_template_targets
+                        .iter()
+                        .filter(|target| {
+                            target.component_instance_id == occurrence.template_instance
+                        })
+                        .map(|target| target.id.clone())
+                        .collect::<Vec<_>>(),
+                    artifact
+                        .ordinary_template_bindings
+                        .iter()
+                        .filter(|binding| {
+                            binding.component_instance_id == occurrence.template_instance
+                        })
+                        .map(|binding| binding.id.clone())
+                        .collect::<Vec<_>>(),
+                    artifact
+                        .ordinary_template_events
+                        .iter()
+                        .filter(|event| event.component_instance_id == occurrence.template_instance)
+                        .map(|event| event.declaration_event_id.clone())
+                        .collect::<Vec<_>>(),
+                )
+            })
+        })
+        .any(|(occurrence, targets, bindings, events)| {
+            occurrence.ordinary_template_targets != targets
+                || occurrence.ordinary_template_bindings != bindings
+                || occurrence.ordinary_template_events != events
+        })
+    {
+        return Err("component artifact has invalid structural template projection".to_string());
+    }
     let mut computed_cache_slots = std::collections::BTreeSet::new();
     let mut computed_dirty_slots = std::collections::BTreeSet::new();
     let mut computed_instance_pairs = std::collections::BTreeSet::new();
@@ -593,6 +660,7 @@ pub fn validate_runtime_component_artifact(
         || event_keys.len() != artifact.ordinary_template_events.len()
         || artifact.ordinary_template_targets.iter().any(|target| {
             !instances.contains(target.component_instance_id.as_str())
+                && !structural_template_instances.contains(target.component_instance_id.as_str())
                 || !target.id.starts_with(&format!(
                     "{}/template-target:",
                     target.component_instance_id
@@ -600,6 +668,7 @@ pub fn validate_runtime_component_artifact(
         })
         || artifact.ordinary_template_bindings.iter().any(|binding| {
             !instances.contains(binding.component_instance_id.as_str())
+                && !structural_template_instances.contains(binding.component_instance_id.as_str())
                 || !target_ids.contains(binding.target_id.as_str())
                 || !binding.id.starts_with(&format!(
                     "{}/template-binding:",
@@ -608,6 +677,7 @@ pub fn validate_runtime_component_artifact(
         })
         || artifact.ordinary_template_events.iter().any(|event| {
             !instances.contains(event.component_instance_id.as_str())
+                && !structural_template_instances.contains(event.component_instance_id.as_str())
                 || !target_ids.contains(event.target_id.as_str())
                 || event.action_batch_id.is_none()
         })
@@ -804,7 +874,8 @@ mod tests {
 }
 "#,
         ));
-        let artifact = build_runtime_component_artifact(&model, &model.component_ir_optimization);
+        let mut artifact =
+            build_runtime_component_artifact(&model, &model.component_ir_optimization);
         let manifest = crate::build_template_manifest_from_asm(&model);
 
         assert_eq!(artifact.structural_programs.len(), 2);
@@ -829,6 +900,39 @@ mod tests {
             assert!(program.template_occurrences.iter().all(|occurrence| {
                 !occurrence.invocation.is_empty() && !occurrence.component.is_empty()
             }));
+            for occurrence in &program.template_occurrences {
+                assert_eq!(
+                    occurrence.ordinary_template_targets,
+                    artifact
+                        .ordinary_template_targets
+                        .iter()
+                        .filter(
+                            |target| target.component_instance_id == occurrence.template_instance
+                        )
+                        .map(|target| target.id.clone())
+                        .collect::<Vec<_>>()
+                );
+                assert_eq!(
+                    occurrence.ordinary_template_bindings,
+                    artifact
+                        .ordinary_template_bindings
+                        .iter()
+                        .filter(
+                            |binding| binding.component_instance_id == occurrence.template_instance
+                        )
+                        .map(|binding| binding.id.clone())
+                        .collect::<Vec<_>>()
+                );
+                assert_eq!(
+                    occurrence.ordinary_template_events,
+                    artifact
+                        .ordinary_template_events
+                        .iter()
+                        .filter(|event| event.component_instance_id == occurrence.template_instance)
+                        .map(|event| event.declaration_event_id.clone())
+                        .collect::<Vec<_>>()
+                );
+            }
             let component = manifest
                 .components
                 .iter()
@@ -843,5 +947,11 @@ mod tests {
                 )
             }));
         }
+
+        let first = &mut artifact.structural_programs[0].template_occurrences[0];
+        first
+            .ordinary_template_targets
+            .push("fabricated-target".to_string());
+        assert!(validate_runtime_component_artifact(&artifact).is_err());
     }
 }

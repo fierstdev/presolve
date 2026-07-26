@@ -12,7 +12,9 @@ resume persistence for that topology.
 The sole input is the validated component runtime artifact structural program:
 its structural-region ID, exact host component/template-node address, ordered
 `template_occurrences`, and the ordinary compiler products for the referenced
-component. An occurrence record is valid only when all of the following agree:
+component. Component artifact schema v7 retains each occurrence's exact ordered
+ordinary target, binding, and event membership as inactive compiler projection
+data. An occurrence record is valid only when all of the following agree:
 
 1. `template_instance` is the compiler-issued structural-template instance;
 2. `invocation` is the exact invocation that issued that template instance;
@@ -32,6 +34,10 @@ They are not authority to render a component invocation as a raw custom HTML
 element. A structural program containing a component occurrence must remain
 inactive until its compiler-issued materializer program is present and
 validated.
+
+Schema v7 is not that materializer program. It only establishes the validated
+membership set from which the later program must be constructed; the runtime
+must not activate, infer, or partially use it for dynamic component rendering.
 
 ## Runtime identity and reconciliation
 
