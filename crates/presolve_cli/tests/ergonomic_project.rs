@@ -7,6 +7,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::Duration;
 
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
 static NEXT_ROOT: AtomicU64 = AtomicU64::new(1);
 
 fn project_root(label: &str) -> PathBuf {
@@ -17,6 +20,49 @@ fn project_root(label: &str) -> PathBuf {
     ));
     fs::create_dir_all(root.join("app/routes")).unwrap();
     root
+}
+
+#[cfg(unix)]
+#[test]
+fn decorator_free_v2_source_invokes_installed_authority_before_legacy_assembly() {
+    let root = project_root("v2-authority");
+    fs::write(
+        root.join("app/routes/index.tsx"),
+        r#"import { Component } from "presolve";
+export class Home extends Component { render() { return <main>Home</main>; } }
+"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("tsconfig.json"),
+        r#"{"compilerOptions":{"noEmit":true}}"#,
+    )
+    .unwrap();
+    let executable = root.join("node_modules/.bin/presolve-typescript-authority");
+    fs::create_dir_all(executable.parent().unwrap()).unwrap();
+    fs::write(
+        &executable,
+        r#"#!/usr/bin/env node
+import { readFileSync, writeFileSync } from "node:fs";
+const request = JSON.parse(readFileSync(0, "utf8"));
+writeFileSync("authority-ran", "yes");
+const identity = { name: "Component", flags: 32, declarationModules: ["presolve"] };
+process.stdout.write(JSON.stringify({ schemaVersion: 1, diagnostics: [], components: request.components.map(site => ({ id: site.id, identity })), states: [], actions: [] }));
+"#,
+    )
+    .unwrap();
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("check")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(2));
+    assert!(root.join("authority-ran").is_file());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("PSC1001"));
+    fs::remove_dir_all(root).unwrap();
 }
 
 #[test]

@@ -54,6 +54,7 @@ function template(name) {
       dependencies: { presolve: "0.1.0-alpha.1" },
       devDependencies: {
         "@presolve/cli": "0.1.0-alpha.1",
+        "@presolve/typescript-authority": "0.1.0-alpha.1",
         "typescript": "npm:typescript@^7.0.2",
         "wrangler": "^4.0.0",
       },

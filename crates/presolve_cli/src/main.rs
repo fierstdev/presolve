@@ -5,7 +5,7 @@ use std::fs;
 use std::io::{self, Read as _, Write as _};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::process::{self, Command};
+use std::process::{self, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use presolve_cli::cloudflare_deployment::{
@@ -38,12 +38,14 @@ use presolve_compiler::{
     build_runtime_opaque_artifact_with_modules, build_runtime_resource_artifact_with_modules,
     build_semantic_capability_registry, build_semantic_graph, build_static_request_handoff_v1,
     build_symbol_table, build_template_graph, build_template_manifest_from_asm,
+    build_v2_authority_component_request_v1, build_v2_authority_request_v1,
     build_validated_route_graph_v1, discover_project_v1, discover_semantic_packages_v1,
     embed_opaque_runtime_artifact, emit_production_modules, explain_json, explain_text,
     extract_production_chunk_graph, fold_component_graph, generate_ordinary_instance_html,
     generate_runtime_stub, generate_standalone_page_with_resume_runtime,
     generate_standalone_page_with_resume_runtime_and_resources, generate_static_html,
-    lower_components_to_ir, optimization_report_json, optimize_context_ir, optimize_effect_ir,
+    lower_component_inheritance_v1, lower_components_to_ir, lower_v2_authoring_v1,
+    optimization_report_json, optimize_context_ir, optimize_effect_ir,
     production_audit_report_json_v1, production_runtime_artifact_json,
     project_production_diagnostics, project_resume_diagnostics, resolve_file_route_request_v1,
     resume_manifest_json, runtime_component_artifact_json, runtime_computed_artifact_json,
@@ -51,20 +53,21 @@ use presolve_compiler::{
     runtime_forms_artifact_json, runtime_opaque_artifact_json, runtime_resource_artifact_json,
     semantic_capability_matrix_text, semantic_capability_migration_text,
     semantic_capability_registry_json, semantic_graph_json, semantic_type_text, summarize_source,
-    template_manifest_json, validate_application_publication_request_v1,
-    validate_application_semantic_model, validate_runtime_opaque_artifact,
-    validate_runtime_resource_artifact, ApplicationPublicationProfileV1,
-    ApplicationPublicationRequestV1, ApplicationPublicationSourceV1, ApplicationSemanticModel,
-    AsmValidationDiagnostic, AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass,
-    DeclaredStateTypeKind, EffectInspection, EffectInspectionRegistry,
-    ExecutableProgramFingerprint, FileRoutePublicationManifestV1, FileRoutePublicationRequestV1,
-    FileRouteRequestTargetV1, ImmutableAsmPass, ProductionDiagnosticFact, ProductionDiagnosticKind,
+    template_manifest_json, v2_authoring_resolutions_from_response_v1,
+    validate_application_publication_request_v1, validate_application_semantic_model,
+    validate_runtime_opaque_artifact, validate_runtime_resource_artifact,
+    ApplicationPublicationProfileV1, ApplicationPublicationRequestV1,
+    ApplicationPublicationSourceV1, ApplicationSemanticModel, AsmValidationDiagnostic,
+    AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
+    DiscoveredProjectV1, EffectInspection, EffectInspectionRegistry, ExecutableProgramFingerprint,
+    FileRoutePublicationManifestV1, FileRoutePublicationRequestV1, FileRouteRequestTargetV1,
+    ImmutableAsmPass, ProductionDiagnosticFact, ProductionDiagnosticKind,
     ProductionProjectedDiagnostic, ProductionReportInputs, ProductionRootChunkInput,
     RenderAttribute, RenderAttributeValue, SemanticEntity, SemanticEntityKind, SemanticId,
     SemanticOwner, SemanticPackageResolutionTable, SemanticPackageRuntimeModuleKey,
     SemanticPackageRuntimeModuleTable, SemanticReferenceKind, SerializableValue,
     SharedChunkCandidatePlan, SourceProvenance, StateOperation, TemplateChild, TemplateGraph,
-    TemplateSemanticKind,
+    TemplateSemanticKind, V2AuthorityResponseV1,
 };
 use presolve_parser::{
     parse_file, ParseDiagnostic, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
@@ -153,6 +156,9 @@ fn run_ergonomic_build(
 ) -> FileRoutePublicationManifestV1 {
     let project = discover_project_v1(root)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    validate_v2_authoring_project(&project).unwrap_or_else(|message| {
+        application_cli_error("PSAUTH1001_V2_AUTHORITY_FAILED", &message)
+    });
     let output_root = project.root.join("dist");
     validate_application_output_root(&output_root);
     let discovery_unit = CompilationUnit::parse_sources(
@@ -186,6 +192,137 @@ fn run_ergonomic_build(
         .unwrap_or_else(|error| application_cli_error("PSROUTE3008_PUBLICATION_FAILED", &error));
     println!("Built {}", output_root.display());
     product.manifest
+}
+
+/// Runs the installed TypeScript-authority bridge for decorator-free V2 source
+/// before legacy application assembly starts.  This is intentionally an
+/// orchestration adapter: it selects no framework meaning and fails rather
+/// than routing an authority failure through the legacy decorator graph.
+fn validate_v2_authoring_project(project: &DiscoveredProjectV1) -> Result<(), String> {
+    let config_file = project.root.join("tsconfig.json");
+    let executable = project
+        .root
+        .join("node_modules")
+        .join(".bin")
+        .join("presolve-typescript-authority");
+    let candidates = project
+        .sources
+        .iter()
+        .map(|source| parse_file(&source.logical_path, &source.source))
+        .filter(is_decorator_free_v2_candidate)
+        .collect::<Vec<_>>();
+    if candidates.is_empty() {
+        return Ok(());
+    }
+    if !config_file.is_file() {
+        return Err(format!(
+            "decorator-free V2 source requires {}; add the project TypeScript configuration before check or build",
+            config_file.display()
+        ));
+    }
+    if !executable.is_file() {
+        return Err(format!(
+            "decorator-free V2 source requires {}; install @presolve/typescript-authority in this project",
+            executable.display()
+        ));
+    }
+    for parsed in candidates {
+        let component_request =
+            build_v2_authority_component_request_v1(&parsed, PathBuf::from("tsconfig.json"))
+                .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
+        let component_response =
+            invoke_v2_authority_bridge(&project.root, &executable, &component_request)?;
+        let component_resolutions = v2_authoring_resolutions_from_response_v1(
+            &parsed,
+            &component_request,
+            &component_response,
+        )
+        .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
+        let component_model =
+            lower_component_inheritance_v1(&parsed, component_resolutions.components)
+                .map_err(|error| format!("{}: {error}", parsed.path.display()))?
+                .model;
+        if component_model.declarations.is_empty() {
+            return Err(format!(
+                "{}: no class heritage resolved to Presolve Component",
+                parsed.path.display()
+            ));
+        }
+        let request = build_v2_authority_request_v1(
+            &parsed,
+            PathBuf::from("tsconfig.json"),
+            &component_model,
+        )
+        .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
+        let response = invoke_v2_authority_bridge(&project.root, &executable, &request)?;
+        let resolutions = v2_authoring_resolutions_from_response_v1(&parsed, &request, &response)
+            .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
+        lower_v2_authoring_v1(&parsed, resolutions)
+            .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
+    }
+    Ok(())
+}
+
+fn is_decorator_free_v2_candidate(parsed: &ParsedFile) -> bool {
+    let imports_component = parsed.imports.iter().any(|import| {
+        import.source == "presolve"
+            && import
+                .specifiers
+                .iter()
+                .any(|specifier| specifier.imported == "Component")
+    });
+    imports_component
+        && parsed.classes.iter().any(|class| class.heritage.is_some())
+        && parsed.classes.iter().all(|class| {
+            class.decorators.is_empty()
+                && class
+                    .properties
+                    .iter()
+                    .all(|property| property.decorators.is_empty())
+                && class
+                    .methods
+                    .iter()
+                    .all(|method| method.decorators.is_empty())
+        })
+}
+
+fn invoke_v2_authority_bridge(
+    root: &Path,
+    executable: &Path,
+    request: &presolve_compiler::V2AuthorityRequestV1,
+) -> Result<V2AuthorityResponseV1, String> {
+    let request = serde_json::to_vec(request)
+        .map_err(|error| format!("failed to serialize V2 authority request: {error}"))?;
+    let mut child = Command::new(executable)
+        .current_dir(root)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("failed to start {}: {error}", executable.display()))?;
+    child
+        .stdin
+        .take()
+        .ok_or_else(|| "V2 authority bridge did not expose stdin".to_owned())?
+        .write_all(&request)
+        .map_err(|error| format!("failed to write V2 authority request: {error}"))?;
+    let output = child
+        .wait_with_output()
+        .map_err(|error| format!("failed to read V2 authority response: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "{} exited with {}: {}",
+            executable.display(),
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    serde_json::from_slice(&output.stdout).map_err(|error| {
+        format!(
+            "{} emitted malformed V2 authority JSON: {error}",
+            executable.display()
+        )
+    })
 }
 
 #[derive(Deserialize)]
@@ -702,6 +839,9 @@ fn write_development_response(
 fn run_ergonomic_check(root: &Path) {
     let project = discover_project_v1(root)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    validate_v2_authoring_project(&project).unwrap_or_else(|message| {
+        application_cli_error("PSAUTH1001_V2_AUTHORITY_FAILED", &message)
+    });
     let unit = CompilationUnit::parse_sources(
         project
             .sources

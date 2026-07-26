@@ -17,8 +17,8 @@ export async function analyzeV2Authoring(request) {
   const queries = {
     symbols: [
       { id: "canonical:component", ...request.canonical.component },
-      { id: "canonical:state", ...request.canonical.state },
-      { id: "canonical:action", ...request.canonical.action },
+      ...(request.canonical.state ? [{ id: "canonical:state", ...request.canonical.state }] : []),
+      ...(request.canonical.action ? [{ id: "canonical:action", ...request.canonical.action }] : []),
       ...request.states.map(site => ({ id: `state:${site.id}`, file: site.file, position: site.position })),
       ...request.actions.map(site => ({ id: `action:${site.id}`, file: site.file, position: site.position })),
     ],
@@ -36,8 +36,8 @@ export async function analyzeV2Authoring(request) {
   const symbols = new Map(authority.symbols.map(entry => [entry.id, entry.symbol]));
   const registry = createCanonicalIntrinsicRegistry([
     { kind: "component", symbol: symbols.get("canonical:component") },
-    { kind: "state", symbol: symbols.get("canonical:state") },
-    { kind: "action", symbol: symbols.get("canonical:action") },
+    ...(request.canonical.state ? [{ kind: "state", symbol: symbols.get("canonical:state") }] : []),
+    ...(request.canonical.action ? [{ kind: "action", symbol: symbols.get("canonical:action") }] : []),
   ]);
   return {
     schemaVersion: V2_AUTHORED_AUTHORITY_SCHEMA_VERSION,
@@ -64,11 +64,17 @@ function validateV2AuthoringRequest(request) {
   if (!request.canonical || typeof request.canonical !== "object") {
     throw new TypeError("V2 authoring authority requests require canonical framework positions");
   }
-  for (const kind of ["component", "state", "action"]) {
-    validatePosition(request.canonical[kind], `canonical ${kind}`);
+  validatePosition(request.canonical.component, "canonical component");
+  for (const kind of ["state", "action"]) {
+    if (request.canonical[kind] !== undefined) {
+      validatePosition(request.canonical[kind], `canonical ${kind}`);
+    }
   }
   for (const [kind, sites] of [["component", request.components], ["state", request.states], ["action", request.actions]]) {
     if (!Array.isArray(sites)) throw new TypeError(`V2 authoring ${kind} sites must be an array`);
+    if (kind !== "component" && sites.length > 0 && request.canonical[kind] === undefined) {
+      throw new TypeError(`V2 authoring ${kind} sites require a canonical ${kind} position`);
+    }
     const ids = new Set();
     for (const site of sites) {
       if (!site || typeof site.id !== "string" || !site.id || ids.has(site.id)) {

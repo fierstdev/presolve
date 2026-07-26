@@ -32,8 +32,10 @@ pub struct V2AuthoritySiteV1 {
 #[serde(rename_all = "camelCase")]
 pub struct V2AuthorityCanonicalV1 {
     pub component: V2AuthorityPositionV1,
-    pub state: V2AuthorityPositionV1,
-    pub action: V2AuthorityPositionV1,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub state: Option<V2AuthorityPositionV1>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action: Option<V2AuthorityPositionV1>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -51,6 +53,7 @@ pub struct V2AuthorityRequestV1 {
 pub enum V2AuthorityRequestErrorV1 {
     MissingCanonicalExport(&'static str),
     InvalidSourceOffset(usize),
+    FieldSiteSelection(String),
 }
 
 impl std::fmt::Display for V2AuthorityRequestErrorV1 {
@@ -64,6 +67,10 @@ impl std::fmt::Display for V2AuthorityRequestErrorV1 {
                 f,
                 "V2 authority query offset {offset} is not a UTF-8 source boundary"
             ),
+            Self::FieldSiteSelection(message) => write!(
+                f,
+                "unable to select V2 State or Action authority sites: {message}"
+            ),
         }
     }
 }
@@ -76,30 +83,11 @@ pub fn build_v2_authority_request_v1(
     config_file: PathBuf,
     component_model: &CanonicalAuthoredSemanticModelV1,
 ) -> Result<V2AuthorityRequestV1, V2AuthorityRequestErrorV1> {
-    let canonical = |name| {
-        parsed
-            .imports
-            .iter()
-            .filter(|import| import.source == "presolve")
-            .flat_map(|import| &import.specifiers)
-            .find(|specifier| specifier.imported == name)
-            .map(|specifier| {
-                utf16_position(&parsed.syntax.source, specifier.local_span.start).map(|position| {
-                    V2AuthorityPositionV1 {
-                        file: parsed.path.clone(),
-                        position,
-                    }
-                })
-            })
-            .transpose()
-    };
-    let component = canonical("Component")?.ok_or(
+    let component = canonical_import(parsed, "Component")?.ok_or(
         V2AuthorityRequestErrorV1::MissingCanonicalExport("Component"),
     )?;
-    let state =
-        canonical("state")?.ok_or(V2AuthorityRequestErrorV1::MissingCanonicalExport("state"))?;
-    let action =
-        canonical("action")?.ok_or(V2AuthorityRequestErrorV1::MissingCanonicalExport("action"))?;
+    let state = canonical_import(parsed, "state")?;
+    let action = canonical_import(parsed, "action")?;
     let components = component_inheritance_sites_v1(parsed)
         .into_iter()
         .map(|site| {
@@ -111,7 +99,11 @@ pub fn build_v2_authority_request_v1(
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let states = crate::state_initializer_sites_v1(parsed, component_model)
+    let states = state
+        .is_some()
+        .then(|| crate::state_initializer_sites_v1(parsed, component_model))
+        .transpose()
+        .map_err(|error| V2AuthorityRequestErrorV1::FieldSiteSelection(error.to_string()))?
         .unwrap_or_default()
         .into_iter()
         .map(|site| {
@@ -123,7 +115,11 @@ pub fn build_v2_authority_request_v1(
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let actions = action_field_sites_v1(parsed, component_model)
+    let actions = action
+        .is_some()
+        .then(|| action_field_sites_v1(parsed, component_model))
+        .transpose()
+        .map_err(|error| V2AuthorityRequestErrorV1::FieldSiteSelection(error.to_string()))?
         .unwrap_or_default()
         .into_iter()
         .map(|site| {
@@ -147,6 +143,62 @@ pub fn build_v2_authority_request_v1(
         states,
         actions,
     })
+}
+
+/// Builds the first authority query for a source file.  It asks only for
+/// component heritage; State and Action candidates cannot be selected until
+/// canonical component ownership has been proven by this response.
+pub fn build_v2_authority_component_request_v1(
+    parsed: &ParsedFile,
+    config_file: PathBuf,
+) -> Result<V2AuthorityRequestV1, V2AuthorityRequestErrorV1> {
+    let component = canonical_import(parsed, "Component")?.ok_or(
+        V2AuthorityRequestErrorV1::MissingCanonicalExport("Component"),
+    )?;
+    let components = component_inheritance_sites_v1(parsed)
+        .into_iter()
+        .map(|site| {
+            site_for(
+                "component",
+                site.heritage_source,
+                &parsed.path,
+                &parsed.syntax.source,
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(V2AuthorityRequestV1 {
+        schema_version: V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
+        config_file,
+        canonical: V2AuthorityCanonicalV1 {
+            component,
+            state: canonical_import(parsed, "state")?,
+            action: canonical_import(parsed, "action")?,
+        },
+        components,
+        states: Vec::new(),
+        actions: Vec::new(),
+    })
+}
+
+fn canonical_import(
+    parsed: &ParsedFile,
+    name: &str,
+) -> Result<Option<V2AuthorityPositionV1>, V2AuthorityRequestErrorV1> {
+    parsed
+        .imports
+        .iter()
+        .filter(|import| import.source == "presolve")
+        .flat_map(|import| &import.specifiers)
+        .find(|specifier| specifier.imported == name)
+        .map(|specifier| {
+            utf16_position(&parsed.syntax.source, specifier.local_span.start).map(|position| {
+                V2AuthorityPositionV1 {
+                    file: parsed.path.clone(),
+                    position,
+                }
+            })
+        })
+        .transpose()
 }
 
 fn site_for(
@@ -180,7 +232,10 @@ mod tests {
         ResolvedComponentInheritanceV1, ResolvedIntrinsicIdentityV1,
     };
 
-    use super::{build_v2_authority_request_v1, V2AuthorityRequestErrorV1};
+    use super::{
+        build_v2_authority_component_request_v1, build_v2_authority_request_v1,
+        V2AuthorityRequestErrorV1,
+    };
 
     #[test]
     fn builds_source_faithful_queries_for_aliases_and_canonical_fields() {
@@ -211,11 +266,11 @@ class Counter extends FrameworkBase { count = reactiveCell(0); increment = activ
             "FrameworkBase"
         );
         assert_eq!(
-            &source[request.canonical.state.position..][..12],
+            &source[request.canonical.state.as_ref().unwrap().position..][..12],
             "reactiveCell"
         );
         assert_eq!(
-            &source[request.canonical.action.position..][..8],
+            &source[request.canonical.action.as_ref().unwrap().position..][..8],
             "activate"
         );
         assert_eq!(request.components.len(), 1);
@@ -273,5 +328,21 @@ class Counter extends FrameworkBase { count = state(0); increment = action(() =>
             source[..byte_position].encode_utf16().count()
         );
         assert_ne!(request.canonical.component.position, byte_position);
+    }
+
+    #[test]
+    fn component_phase_needs_only_component_and_selects_no_fields() {
+        let parsed = parse_file(
+            "src/Counter.tsx",
+            "import { Component } from \"presolve\"; class Counter extends Component {}",
+        );
+        let request =
+            build_v2_authority_component_request_v1(&parsed, PathBuf::from("tsconfig.json"))
+                .unwrap();
+        assert_eq!(request.components.len(), 1);
+        assert!(request.canonical.state.is_none());
+        assert!(request.canonical.action.is_none());
+        assert!(request.states.is_empty());
+        assert!(request.actions.is_empty());
     }
 }

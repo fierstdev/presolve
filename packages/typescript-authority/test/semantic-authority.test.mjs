@@ -144,6 +144,23 @@ test("the V2 authoring bridge resolves canonical component, State, and Action ev
   assert.equal(result.actions[0].identity.name, "action");
 });
 
+test("the V2 authoring bridge supports a component-only discovery phase", async () => {
+  const frameworkFile = resolve(root, "tests/framework-public-api/src/V2Counter.tsx");
+  const frameworkSource = readFileSync(frameworkFile, "utf8");
+  const result = await analyzeV2Authoring({
+    configFile: resolve(root, "tests/framework-public-api/tsconfig.json"),
+    canonical: {
+      component: { file: frameworkFile, position: frameworkSource.indexOf("Component") },
+    },
+    components: [{ id: "counter", file: frameworkFile, position: frameworkSource.indexOf("V2Counter extends") }],
+    states: [],
+    actions: [],
+  });
+  assert.deepEqual(result.components.map(entry => entry.id), ["counter"]);
+  assert.deepEqual(result.states, []);
+  assert.deepEqual(result.actions, []);
+});
+
 test("the V2 authoring executable speaks the versioned stdin/stdout bridge protocol", () => {
   const frameworkFile = resolve(root, "tests/framework-public-api/src/V2Counter.tsx");
   const frameworkSource = readFileSync(frameworkFile, "utf8");

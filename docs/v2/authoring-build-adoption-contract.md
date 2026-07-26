@@ -11,7 +11,8 @@ acceptable fallback for these applications.
    `tsconfig.json`.
 2. The CLI invokes the installed `@presolve/typescript-authority` bridge with
    explicit syntax-site positions selected from the parser's source-faithful
-   AST.
+   AST. It first proves component heritage, then selects instance field calls
+   from only those proven components for the State/Action query.
 3. The bridge returns serialized resolved symbols and component base chains.
    The canonical intrinsic registry classifies only resolved framework targets.
 4. The compiler converts those exact source joins into
@@ -34,6 +35,9 @@ caller must never substitute the legacy decorator graph after such a failure.
    remains the next step.
 2. Add the CLI adapter and prove a generated project has the declared TypeScript
    dependency/configuration available before the compiler begins publication.
+   Implemented for decorator-free source: `check` and `build` require the
+   installed executable and `tsconfig.json`, then reject bridge transport,
+   schema, source-join, and native-diagnostic failures before legacy assembly.
 3. Adopt resolved V2 components into the file-route graph while preserving
    existing stable IDs and route source ownership.
 4. Adopt canonical State and Action records into the existing runtime products,
@@ -53,5 +57,6 @@ caller must never substitute the legacy decorator graph after such a failure.
 - no legacy decorator lowering is invoked for the decorator-free fixture.
 
 This contract was created after a direct generated-project probe returned
-`PSAPP1005_ENTRY_APPLICATION_ROOT_MISSING`; that failure remains expected until
-the above adapter is implemented and tested.
+`PSAPP1005_ENTRY_APPLICATION_ROOT_MISSING`. The authority preflight now runs
+and is covered independently, but that legacy-graph failure remains expected
+until the canonical-model adapter in the next adoption step is implemented.
