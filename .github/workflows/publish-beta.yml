@@ -120,6 +120,7 @@ jobs:
           name: ${{ matrix.package }}
           path: .release/*.tgz
           if-no-files-found: error
+          include-hidden-files: true
 
   publish-npm:
     name: Publish npm packages
