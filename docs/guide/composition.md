@@ -9,7 +9,7 @@ Declare slot fields with `@slot()` and the `SlotContent` type. `children` is the
 default slot; other field names are named slots.
 
 ```tsx
-import { component, slot, Component, type SlotContent } from "@presolve/core";
+import { component, slot, Component, type SlotContent } from "presolve";
 
 @component()
 export class Card extends Component {
@@ -41,7 +41,7 @@ The current public API declares Context on a static field and uses a stable
 `"Class.field"` designator for providers and consumers.
 
 ```tsx
-import { component, consume, context, provide, Component } from "@presolve/core";
+import { component, consume, context, provide, Component } from "presolve";
 
 @component()
 export class ThemeRoot extends Component {

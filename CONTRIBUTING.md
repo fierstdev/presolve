@@ -1,7 +1,7 @@
 # Contributing to Presolve
 
 Contributions should be small, evidence-backed, and consistent with the public
-alpha contract. Before opening a change, read the relevant current document in
+beta contract. Before opening a change, read the relevant current document in
 [`docs/`](docs/README.md), keep generated files and credentials out of Git, and
 run the verification that exercises the changed surface.
 

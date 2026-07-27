@@ -18,7 +18,7 @@ than expecting a source-analysis fallback.
 ## Troubleshooting
 
 1. Open the repository folder, not a loose `.tsx` file.
-2. Run `pnpm install` so VS Code can resolve `@presolve/core` and TypeScript.
+2. Run `pnpm install` so VS Code can resolve `presolve` and TypeScript.
 3. Verify that `tsconfig.json` includes `app/**/*.ts` and `app/**/*.tsx`.
 4. Run `pnpm check` in the integrated terminal for compiler diagnostics.
 5. Confirm the extension is enabled with **Presolve: Show Workspace Status**.

@@ -1,6 +1,6 @@
 {
   "name": "@presolve/testing",
-  "version": "0.1.0-alpha.8",
+  "version": "0.2.0-beta.1",
   "description": "Testing helpers for Presolve compiler products.",
   "license": "MIT OR Apache-2.0",
   "type": "module",
@@ -11,10 +11,13 @@
   },
   "publishConfig": {
     "access": "public",
-    "tag": "alpha"
+    "tag": "beta"
   },
   "exports": {
     ".": "./src/index.js"
+  },
+  "dependencies": {
+    "@presolve/vite": "workspace:*"
   },
   "scripts": {
     "test": "node test/smoke.mjs"

@@ -131,6 +131,7 @@ pub fn plan_component_instances_with_virtual_invocations(
             components,
             &all_invocations,
             template_entities,
+            None,
             &mut plan,
         );
     }
@@ -205,6 +206,7 @@ fn expand_component_instances(
     components: &[ComponentNode],
     invocations: &BTreeMap<ComponentInvocationId, ComponentInvocationEntity>,
     template_entities: &[TemplateSemanticEntity],
+    parent_structural_region: Option<&ComponentStructuralRegionId>,
     plan: &mut ComponentInstancePlan,
 ) {
     let owned_invocations = invocations
@@ -214,7 +216,8 @@ fn expand_component_instances(
 
     for invocation in owned_invocations {
         let id = ComponentInstanceId::for_invocation(parent_instance, &invocation.id);
-        let structural_region = enclosing_structural_region(invocation, template_entities);
+        let structural_region = enclosing_structural_region(invocation, template_entities)
+            .or_else(|| parent_structural_region.cloned());
         let blocked_reason = match invocation.status {
             ComponentInvocationResolutionStatus::Resolved => invocation
                 .target_component
@@ -253,7 +256,7 @@ fn expand_component_instances(
                     parent_instance: parent_instance.clone(),
                     owner_root: owner_root.clone(),
                     target_component: invocation.target_component.clone(),
-                    structural_region,
+                    structural_region: structural_region.clone(),
                     depth,
                     reason,
                     provenance: invocation.provenance.clone(),
@@ -280,7 +283,7 @@ fn expand_component_instances(
                 invocation: Some(invocation.id.clone()),
                 parent_instance: Some(parent_instance.clone()),
                 owner_root: owner_root.clone(),
-                structural_region,
+                structural_region: structural_region.clone(),
                 depth,
                 status,
                 provenance: invocation.provenance.clone(),
@@ -297,6 +300,7 @@ fn expand_component_instances(
             components,
             invocations,
             template_entities,
+            structural_region.as_ref(),
             plan,
         );
     }
@@ -328,6 +332,25 @@ fn enclosing_structural_region(
                 },
             )
         })
+}
+
+/// Return the compiler semantic template entity that issued `region`.
+///
+/// Structural-region identity derivation remains centralized here so artifact
+/// producers can join the renderer address without re-creating semantic IDs.
+#[must_use]
+pub fn structural_template_entity_for_region<'a>(
+    region: &ComponentStructuralRegionId,
+    template_entities: &'a [TemplateSemanticEntity],
+) -> Option<&'a TemplateSemanticEntity> {
+    template_entities.iter().find(|entity| {
+        let kind = match entity.kind {
+            TemplateSemanticKind::Conditional => "conditional",
+            TemplateSemanticKind::List => "keyed-list",
+            _ => return false,
+        };
+        ComponentStructuralRegionId::for_template_entity(&entity.id, kind) == *region
+    })
 }
 
 #[cfg(test)]
@@ -451,7 +474,8 @@ type Model = string;
         let asm = build_application_semantic_model(&presolve_parser::parse_file(
             "src/Structural.tsx",
             r#"
-@component("x-card") class Card extends Component { render() { return <article />; } }
+@component("x-leaf") class Leaf extends Component { render() { return <small />; } }
+@component("x-card") class Card extends Component { render() { return <article><Leaf /></article>; } }
 @component("x-page") class Page extends Component {
   shown = state(true);
   render() { return <main>{this.shown ? <Card /> : <span />}</main>; }
@@ -462,11 +486,19 @@ type Model = string;
             .component_instance_plan
             .instances
             .values()
-            .find(|instance| instance.status == ComponentInstanceStatus::StructuralTemplate)
-            .expect("conditional component template");
+            .filter(|instance| instance.status == ComponentInstanceStatus::StructuralTemplate)
+            .collect::<Vec<_>>();
 
-        assert!(structural.structural_region.is_some());
-        assert_eq!(structural.depth, 1);
+        assert_eq!(structural.len(), 2);
+        assert!(structural
+            .iter()
+            .all(|instance| instance.structural_region.is_some()));
+        assert_eq!(structural[0].depth, 1);
+        assert_eq!(structural[1].depth, 2);
+        assert_eq!(
+            structural[0].structural_region,
+            structural[1].structural_region
+        );
     }
 
     #[test]

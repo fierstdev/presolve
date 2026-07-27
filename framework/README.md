@@ -1,6 +1,6 @@
 # Presolve framework
 
-The public framework package is [`@presolve/core`](packages/presolve/). It exposes a
+The public framework package is [`presolve`](packages/presolve/). It exposes a
 small TypeScript authoring vocabulary over compiler-owned semantics and has no
 application renderer, scheduler, dependency tracker, parser, or reactive
 runtime of its own.

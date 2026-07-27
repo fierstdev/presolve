@@ -6,6 +6,7 @@ pub mod cloudflare_deployment;
 pub mod command_framework;
 pub mod compilation_commands;
 pub mod configuration_codec;
+pub mod node_deployment;
 pub mod workspace_commands;
 
 pub use build_check_commands::{

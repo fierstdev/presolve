@@ -265,6 +265,11 @@ pub struct ResourceId(SemanticId);
 #[serde(transparent)]
 pub struct ResourceActivationId(SemanticId);
 
+/// Stable identity for one component-instance-qualified V2 effect execution.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct EffectInstanceId(SemanticId);
+
 /// Stable identity for an authored Context-family declaration candidate.
 ///
 /// Candidates are source-qualified compiler facts.  They intentionally do not
@@ -322,6 +327,16 @@ impl SemanticId {
     pub fn type_alias_in_module(module_path: impl AsRef<Path>, name: &str) -> Self {
         Self(format!(
             "module:{}/type-alias:{name}",
+            normalized_module_path(module_path.as_ref())
+        ))
+    }
+
+    /// Stable identity for one authority-proven environment call selected by
+    /// its immutable source position, never by a user-controlled value name.
+    #[must_use]
+    pub fn environment_read_in_module(module_path: impl AsRef<Path>, position: usize) -> Self {
+        Self(format!(
+            "module:{}/environment-read:{position}",
             normalized_module_path(module_path.as_ref())
         ))
     }
@@ -565,8 +580,26 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn effect_cleanup_statement(&self, index: usize) -> Self {
+        self.child("cleanup-statement", &index.to_string())
+    }
+
+    #[must_use]
+    pub fn effect_cleanup_program(&self) -> Self {
+        self.child("cleanup", "program")
+    }
+
+    #[must_use]
     pub fn action(&self, method: &str, index: usize) -> Self {
         self.child("action", &format!("{method}:{index}"))
+    }
+
+    /// Stable identity for one authored action entry point. Legacy decorated
+    /// methods keep their method identity; V2 action fields use this distinct
+    /// endpoint identity and never synthesize a method.
+    #[must_use]
+    pub fn action_endpoint(&self, name: &str) -> Self {
+        self.child("action-endpoint", name)
     }
 
     #[must_use]
@@ -789,6 +822,45 @@ impl ResourceActivationId {
             instance
                 .as_semantic_id()
                 .child("resource-activation", resource.as_str()),
+        )
+    }
+
+    /// Canonical completed-value resume storage for this activation.
+    #[must_use]
+    pub fn data_slot(&self) -> SemanticId {
+        self.0.child("resource-slot", "data")
+    }
+
+    /// Canonical completed-error resume storage for this activation.
+    #[must_use]
+    pub fn error_slot(&self) -> SemanticId {
+        self.0.child("resource-slot", "error")
+    }
+
+    /// Canonical lifecycle/generation resume storage for this activation.
+    #[must_use]
+    pub fn state_slot(&self) -> SemanticId {
+        self.0.child("resource-slot", "state")
+    }
+
+    #[must_use]
+    pub const fn as_semantic_id(&self) -> &SemanticId {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl EffectInstanceId {
+    #[must_use]
+    pub fn for_component_instance(instance: &ComponentInstanceId, effect: &SemanticId) -> Self {
+        Self(
+            instance
+                .as_semantic_id()
+                .child("effect-instance", effect.as_str()),
         )
     }
 
@@ -1798,6 +1870,10 @@ mod tests {
         assert_eq!(
             component.state_field("count").as_str(),
             "module:src/Counter.tsx/component:x-counter/state:count"
+        );
+        assert_eq!(
+            SemanticId::environment_read_in_module("src/../src/environment.ts", 41).as_str(),
+            "module:src/environment.ts/environment-read:41"
         );
     }
 

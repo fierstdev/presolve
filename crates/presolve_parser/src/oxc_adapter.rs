@@ -9,21 +9,25 @@ use oxc_ast::ast::{
     JSXMemberExpression, JSXMemberExpressionObject, ModuleExportName, ObjectPropertyKind, Program,
     PropertyKey, PropertyKind, SimpleAssignmentTarget, Statement,
 };
+use oxc_ast_visit::{walk, Visit};
 use oxc_diagnostics::Severity as OxcSeverity;
+use oxc_estree::{CompactTSSerializer, ESTree};
 use oxc_parser::Parser;
 use oxc_span::{GetSpan, SourceType, Span};
 
 use crate::model::{
     ParseDiagnostic, ParseLabel, ParseSeverity, ParsedArithmeticExpression,
-    ParsedArithmeticExpressionKind, ParsedArithmeticOperator, ParsedClass, ParsedClassHeritage,
-    ParsedComparisonOperator, ParsedComputedExpression, ParsedComputedExpressionKind,
-    ParsedConstantExpression, ParsedConstantExpressionKind, ParsedDecorator, ParsedEffectBody,
+    ParsedArithmeticExpressionKind, ParsedArithmeticOperator, ParsedCallArgument,
+    ParsedCallExpression, ParsedClass, ParsedClassHeritage, ParsedComparisonOperator,
+    ParsedComputedExpression, ParsedComputedExpressionKind, ParsedConstantExpression,
+    ParsedConstantExpressionKind, ParsedDecorator, ParsedEffectBody, ParsedEffectCleanup,
     ParsedEffectExpression, ParsedEffectExpressionKind, ParsedEffectStatement,
     ParsedEffectStatementKind, ParsedEventHandler, ParsedExport, ParsedExportKind,
-    ParsedExportSpecifier, ParsedFile, ParsedImport, ParsedImportSpecifier, ParsedJsxAttribute,
-    ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional, ParsedJsxElement,
-    ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLocalVariable, ParsedLogicalOperator,
-    ParsedMethod, ParsedMethodCall, ParsedMethodParameter, ParsedProperty, ParsedSerializableValue,
+    ParsedExportSpecifier, ParsedFile, ParsedImport, ParsedImportSpecifier, ParsedInitializerCall,
+    ParsedInlineHandler, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild,
+    ParsedJsxConditional, ParsedJsxElement, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode,
+    ParsedLocalVariable, ParsedLogicalOperator, ParsedMethod, ParsedMethodCall,
+    ParsedMethodParameter, ParsedProperty, ParsedSerializableValue, ParsedSourceAst,
     ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator,
     ParsedThisMemberDesignator, ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator,
     ParsedUnsupportedEffectStatementKind, ParsedValidationRuleArgument,
@@ -40,6 +44,8 @@ pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
 
     let allocator = Allocator::default();
     let ret = Parser::new(&allocator, source, source_type).parse();
+    let syntax = parse_source_ast(&ret.program, source);
+    let call_expressions = collect_call_expressions(&ret.program, source);
 
     let ParsedProgramFacts {
         classes,
@@ -57,13 +63,74 @@ pub fn parse_file(path: impl AsRef<Path>, source: &str) -> ParsedFile {
 
     ParsedFile {
         path: PathBuf::from(path),
+        syntax,
         classes,
         type_aliases,
         local_type_bindings,
         local_value_bindings,
         imports,
         exports,
+        call_expressions,
         diagnostics,
+    }
+}
+
+fn collect_call_expressions(program: &Program<'_>, source: &str) -> Vec<ParsedCallExpression> {
+    struct Collector<'a> {
+        source: &'a str,
+        calls: Vec<ParsedCallExpression>,
+    }
+
+    impl<'a> Visit<'a> for Collector<'a> {
+        fn visit_call_expression(&mut self, call: &oxc_ast::ast::CallExpression<'a>) {
+            let (member_object_span, member_property_span) = match &call.callee {
+                Expression::StaticMemberExpression(member) => (
+                    Some(source_span(self.source, member.object.span())),
+                    Some(source_span(self.source, member.property.span)),
+                ),
+                _ => (None, None),
+            };
+            self.calls.push(ParsedCallExpression {
+                callee_span: source_span(self.source, call.callee.span()),
+                member_object_span,
+                member_property_span,
+                span: source_span(self.source, call.span),
+                arguments: call
+                    .arguments
+                    .iter()
+                    .map(|argument| match argument {
+                        Argument::StringLiteral(value) => ParsedCallArgument::StringLiteral {
+                            value: value.value.to_string(),
+                            span: source_span(self.source, value.span),
+                        },
+                        _ => ParsedCallArgument::Other {
+                            span: source_span(self.source, argument.span()),
+                        },
+                    })
+                    .collect(),
+            });
+            walk::walk_call_expression(self, call);
+        }
+    }
+
+    let mut collector = Collector {
+        source,
+        calls: Vec::new(),
+    };
+    collector.visit_program(program);
+    collector
+        .calls
+        .sort_by_key(|call| (call.span.start, call.span.end));
+    collector.calls
+}
+
+fn parse_source_ast(program: &Program<'_>, source: &str) -> ParsedSourceAst {
+    let mut serializer = CompactTSSerializer::new(true);
+    program.serialize(&mut serializer);
+    ParsedSourceAst {
+        source: source.to_string(),
+        estree_json: serializer.into_string(),
+        span: source_span(source, program.span),
     }
 }
 
@@ -219,18 +286,21 @@ fn parse_import_declaration(
                         ParsedImportSpecifier {
                             imported: module_export_name(&specifier.imported),
                             local: specifier.local.name.to_string(),
+                            local_span: source_span(source, specifier.local.span),
                         }
                     }
                     ImportDeclarationSpecifier::ImportDefaultSpecifier(specifier) => {
                         ParsedImportSpecifier {
                             imported: "default".to_string(),
                             local: specifier.local.name.to_string(),
+                            local_span: source_span(source, specifier.local.span),
                         }
                     }
                     ImportDeclarationSpecifier::ImportNamespaceSpecifier(specifier) => {
                         ParsedImportSpecifier {
                             imported: "*".to_string(),
                             local: specifier.local.name.to_string(),
+                            local_span: source_span(source, specifier.local.span),
                         }
                     }
                 })
@@ -597,6 +667,17 @@ fn parse_property(
     };
 
     let initializer = property.value.as_ref().and_then(expression_summary);
+    let initializer_call = property.value.as_ref().and_then(|expression| {
+        let Expression::CallExpression(call) = expression else {
+            return None;
+        };
+        Some(ParsedInitializerCall {
+            callee_span: source_span(source, call.callee.span()),
+            span: source_span(source, call.span),
+            argument_count: call.arguments.len(),
+            inline_handler: parsed_inline_handler(call, source),
+        })
+    });
     let initializer_literal = property
         .value
         .as_ref()
@@ -636,6 +717,7 @@ fn parse_property(
         name,
         is_identifier_name,
         decorators,
+        initializer_call,
         initializer,
         initializer_literal,
         initializer_expression,
@@ -651,6 +733,97 @@ fn parse_property(
         is_declare: property.declare,
         span: source_span_from_offsets(source, declaration_start, property.span.end as usize),
     })
+}
+
+/// Retain general syntax facts for a single inline function argument.  This
+/// deliberately makes no inference from the callee spelling or field name.
+fn parsed_inline_handler(
+    call: &oxc_ast::ast::CallExpression<'_>,
+    source: &str,
+) -> Option<ParsedInlineHandler> {
+    let [argument] = call.arguments.as_slice() else {
+        return None;
+    };
+    match argument {
+        Argument::ArrowFunctionExpression(handler) => Some(parsed_inline_handler_body(
+            handler.span,
+            &handler.body,
+            handler.r#async,
+            handler.expression,
+            parsed_inline_handler_parameters(&handler.params, source),
+            source,
+        )),
+        Argument::FunctionExpression(handler) => Some(parsed_inline_handler_body(
+            handler.span,
+            handler.body.as_deref()?,
+            handler.r#async,
+            false,
+            parsed_inline_handler_parameters(&handler.params, source),
+            source,
+        )),
+        _ => None,
+    }
+}
+
+fn parsed_inline_handler_body(
+    span: Span,
+    body: &oxc_ast::ast::FunctionBody<'_>,
+    is_async: bool,
+    is_expression_body: bool,
+    parameters: Vec<ParsedMethodParameter>,
+    source: &str,
+) -> ParsedInlineHandler {
+    let mut local_variables = Vec::new();
+    let mut state_updates = Vec::new();
+    let mut unsupported_statement_spans = Vec::new();
+    for statement in &body.statements {
+        if let Some(update) = parsed_state_update(statement, source) {
+            state_updates.push(update);
+        } else if let locals @ [.., _] = parsed_local_variables(statement, source).as_slice() {
+            local_variables.extend_from_slice(locals);
+        } else if !matches!(statement, Statement::EmptyStatement(_)) {
+            unsupported_statement_spans.push(source_span(source, statement.span()));
+        }
+    }
+    ParsedInlineHandler {
+        span: source_span(source, span),
+        body_span: source_span(source, body.span),
+        is_async,
+        is_expression_body,
+        parameters,
+        local_variables,
+        state_updates,
+        unsupported_statement_spans,
+        effect_body: (!is_expression_body).then(|| parsed_inline_effect_body(body, source)),
+    }
+}
+
+fn parsed_inline_handler_parameters(
+    parameters: &oxc_ast::ast::FormalParameters<'_>,
+    source: &str,
+) -> Vec<ParsedMethodParameter> {
+    parameters
+        .items
+        .iter()
+        .filter_map(|parameter| {
+            Some(ParsedMethodParameter {
+                name: binding_identifier_name(&parameter.pattern.kind)?,
+                decorators: normalized_decorators(
+                    parameter
+                        .decorators
+                        .iter()
+                        .filter_map(|decorator| parse_decorator(decorator, source))
+                        .collect(),
+                ),
+                span: source_span(source, parameter.span),
+                type_annotation: parameter
+                    .pattern
+                    .type_annotation
+                    .as_ref()
+                    .map(|annotation| parsed_type_annotation(annotation.span, source)),
+            })
+        })
+        .collect()
 }
 
 fn parsed_type_annotation(span: Span, source: &str) -> ParsedTypeAnnotation {
@@ -719,18 +892,18 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
         }
     }
 
-    let computed_expression = (method.kind == oxc_ast::ast::MethodDefinitionKind::Get
-        && decorators
-            .iter()
-            .any(|decorator| decorator.name == "computed"))
-    .then(|| {
-        let body = method.value.body.as_ref()?;
-        let [Statement::ReturnStatement(return_statement)] = body.statements.as_slice() else {
-            return None;
-        };
-        parsed_computed_expression(return_statement.argument.as_ref()?, source)
-    })
-    .flatten();
+    // Getter expression retention is syntax only. A later canonical V2
+    // analysis decides whether a getter is computed; decorators are not a
+    // parser recognition condition.
+    let computed_expression = (method.kind == oxc_ast::ast::MethodDefinitionKind::Get)
+        .then(|| {
+            let body = method.value.body.as_ref()?;
+            let [Statement::ReturnStatement(return_statement)] = body.statements.as_slice() else {
+                return None;
+            };
+            parsed_computed_expression(return_statement.argument.as_ref()?, source)
+        })
+        .flatten();
     let effect_body = decorators
         .iter()
         .any(|decorator| decorator.name == "effect")
@@ -769,17 +942,59 @@ fn parse_method(method: &oxc_ast::ast::MethodDefinition<'_>, source: &str) -> Op
 }
 
 fn parsed_effect_body(body: &oxc_ast::ast::FunctionBody<'_>, source: &str) -> ParsedEffectBody {
+    parsed_effect_body_with_cleanup(body, source, false)
+}
+
+fn parsed_inline_effect_body(
+    body: &oxc_ast::ast::FunctionBody<'_>,
+    source: &str,
+) -> ParsedEffectBody {
+    parsed_effect_body_with_cleanup(body, source, true)
+}
+
+fn parsed_effect_body_with_cleanup(
+    body: &oxc_ast::ast::FunctionBody<'_>,
+    source: &str,
+    allow_cleanup: bool,
+) -> ParsedEffectBody {
     let final_statement = body.statements.len().saturating_sub(1);
+    let cleanup = allow_cleanup
+        .then(|| body.statements.last())
+        .flatten()
+        .and_then(|statement| parsed_effect_cleanup(statement, source));
     ParsedEffectBody {
         statements: body
             .statements
             .iter()
             .enumerate()
+            .filter(|(index, _)| cleanup.is_none() || *index != final_statement)
             .map(|(index, statement)| {
                 parsed_effect_statement(statement, index == final_statement, source)
             })
             .collect(),
+        cleanup,
     }
+}
+
+fn parsed_effect_cleanup(statement: &Statement<'_>, source: &str) -> Option<ParsedEffectCleanup> {
+    let Statement::ReturnStatement(return_statement) = statement else {
+        return None;
+    };
+    let expression = return_statement.argument.as_ref()?;
+    let (span, is_async, body) = match expression {
+        Expression::ArrowFunctionExpression(handler) if !handler.expression => {
+            (handler.span, handler.r#async, handler.body.as_ref())
+        }
+        Expression::FunctionExpression(handler) => {
+            (handler.span, handler.r#async, handler.body.as_deref()?)
+        }
+        _ => return None,
+    };
+    Some(ParsedEffectCleanup {
+        span: source_span(source, span),
+        is_async,
+        body: Box::new(parsed_effect_body(body, source)),
+    })
 }
 
 fn parsed_effect_statement(

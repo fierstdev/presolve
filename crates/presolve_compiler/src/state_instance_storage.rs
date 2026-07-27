@@ -67,7 +67,10 @@ pub fn build_state_instance_storage_registry(
     let mut records = Vec::new();
 
     for instance in model.component_instance_plan.instances.values() {
-        if instance.status != ComponentInstanceStatus::Planned {
+        if !matches!(
+            instance.status,
+            ComponentInstanceStatus::Planned | ComponentInstanceStatus::StructuralTemplate
+        ) {
             continue;
         }
         let Some(component) = model

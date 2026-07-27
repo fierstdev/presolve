@@ -9,11 +9,14 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    semantic_type_text, ApplicationSemanticModel, ResourceEndpointResolutionOutcome,
-    ResourceLifecycleState, SemanticPackageRuntimeModuleKey, SemanticPackageRuntimeModuleTable,
+    resume_value_codec, semantic_type_text, ApplicationSemanticModel,
+    ResourceEndpointResolutionOutcome, ResourceLifecycleState, ResumeValueCodec,
+    SemanticPackageRuntimeModuleKey, SemanticPackageRuntimeModuleTable,
 };
 
-pub const RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION: u32 = 1;
+/// Version 3 adds exact activation-to-resume-slot linkage for atomic browser
+/// snapshot restoration.
+pub const RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -31,6 +34,8 @@ pub struct RuntimeResourceArtifactDeclaration {
     pub key: String,
     pub data_type: String,
     pub error_type: String,
+    pub data_codec: ResumeValueCodec,
+    pub error_codec: ResumeValueCodec,
     pub execution_boundary: String,
     pub input_dependencies: Vec<String>,
     pub retry_policy: String,
@@ -59,6 +64,9 @@ pub struct RuntimeResourceArtifactActivation {
     pub id: String,
     pub declaration: String,
     pub component_instance: String,
+    pub state_slot: String,
+    pub data_slot: String,
+    pub error_slot: String,
     pub state: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub generation: Option<u64>,
@@ -83,6 +91,12 @@ pub enum RuntimeResourceArtifactValidationError {
     },
     UnknownActivationDeclaration {
         activation: String,
+        declaration: String,
+    },
+    InvalidResumeSlotIdentity {
+        activation: String,
+    },
+    InvalidValueCodec {
         declaration: String,
     },
 }
@@ -124,6 +138,12 @@ pub fn build_runtime_resource_artifact(
                 key: declaration.key.clone(),
                 data_type: semantic_type_text(&declaration.data_type),
                 error_type: semantic_type_text(&declaration.error_type),
+                data_codec: resume_value_codec(&declaration.data_type).expect(
+                    "Resource declarations must use the compiler's closed runtime value codec vocabulary",
+                ),
+                error_codec: resume_value_codec(&declaration.error_type).expect(
+                    "Resource declarations must use the compiler's closed runtime value codec vocabulary",
+                ),
                 execution_boundary: format!("{:?}", declaration.execution_boundary),
                 input_dependencies: declaration
                     .input_dependencies
@@ -155,6 +175,9 @@ pub fn build_runtime_resource_artifact(
                 id: activation.id.as_str().to_string(),
                 declaration: activation.declaration.as_str().to_string(),
                 component_instance: activation.component_instance.as_str().to_string(),
+                state_slot: activation.id.state_slot().as_str().to_string(),
+                data_slot: activation.id.data_slot().as_str().to_string(),
+                error_slot: activation.id.error_slot().as_str().to_string(),
                 state: state.to_string(),
                 generation,
             }
@@ -235,6 +258,13 @@ pub fn validate_runtime_resource_artifact(
                 },
             );
         }
+        if !is_valid_value_codec(&declaration.data_codec)
+            || !is_valid_value_codec(&declaration.error_codec)
+        {
+            errors.push(RuntimeResourceArtifactValidationError::InvalidValueCodec {
+                declaration: declaration.id.clone(),
+            });
+        }
     }
     let mut activations = BTreeSet::new();
     for activation in &artifact.activations {
@@ -264,8 +294,42 @@ pub fn validate_runtime_resource_artifact(
                 },
             );
         }
+        let expected_prefix = format!("{}/resource-slot:", activation.id);
+        if activation.state_slot != format!("{expected_prefix}state")
+            || activation.data_slot != format!("{expected_prefix}data")
+            || activation.error_slot != format!("{expected_prefix}error")
+            || activation.state_slot == activation.data_slot
+            || activation.state_slot == activation.error_slot
+            || activation.data_slot == activation.error_slot
+        {
+            errors.push(
+                RuntimeResourceArtifactValidationError::InvalidResumeSlotIdentity {
+                    activation: activation.id.clone(),
+                },
+            );
+        }
     }
     errors
+}
+
+fn is_valid_value_codec(codec: &ResumeValueCodec) -> bool {
+    match codec {
+        ResumeValueCodec::NullCodec
+        | ResumeValueCodec::BooleanCodec
+        | ResumeValueCodec::NumberCodec
+        | ResumeValueCodec::StringCodec => true,
+        ResumeValueCodec::ArrayCodec(element) | ResumeValueCodec::NullableCodec(element) => {
+            is_valid_value_codec(element)
+        }
+        ResumeValueCodec::ObjectCodec(properties) => {
+            let mut names = BTreeSet::new();
+            properties.iter().all(|property| {
+                !property.name.is_empty()
+                    && names.insert(property.name.as_str())
+                    && is_valid_value_codec(&property.codec)
+            })
+        }
+    }
 }
 
 fn resource_lifecycle_artifact_state(state: ResourceLifecycleState) -> (&'static str, Option<u64>) {
@@ -309,6 +373,38 @@ class Profile extends Component {
         build_application_semantic_model_for_unit_with_packages(&unit, &packages)
     }
 
+    fn ordered_model(reverse: bool) -> crate::ApplicationSemanticModel {
+        let first = (
+            "src/Account.tsx",
+            r#"import { loadAccount } from "profile-service";
+@component("x-account") @route("/account") class Account extends Component {
+  @resource("loadAccount") account!: Resource<string, string>;
+  render() { return <main>Account</main>; }
+}"#,
+        );
+        let second = (
+            "src/Profile.tsx",
+            r#"import { loadProfile } from "profile-service";
+@component("x-profile") @route("/profile") class Profile extends Component {
+  @resource("loadProfile") profile!: Resource<string, string>;
+  render() { return <main>Profile</main>; }
+}"#,
+        );
+        let files = if reverse {
+            [second, first]
+        } else {
+            [first, second]
+        };
+        let unit = CompilationUnit::parse_sources(files);
+        let contract = parse_semantic_package_contract(
+            r#"{"schema_version":1,"package":"profile-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadAccount":{"kind":"resource","type_signature":"() -> Resource<string, string>","runtime_module":"dist/load-account.js","resume_policy":"snapshot","resource_endpoint":{"execution_boundary":"shared","cancellation":"abort","resume":"snapshot"}},"loadProfile":{"kind":"resource","type_signature":"() -> Resource<string, string>","runtime_module":"dist/load-profile.js","resume_policy":"snapshot","resource_endpoint":{"execution_boundary":"shared","cancellation":"abort","resume":"snapshot"}}}}"#,
+        )
+        .expect("resource contract");
+        let mut packages = SemanticPackageResolutionTable::default();
+        packages.insert("profile-service".into(), contract).unwrap();
+        build_application_semantic_model_for_unit_with_packages(&unit, &packages)
+    }
+
     #[test]
     fn projects_resolved_resource_declaration_and_idle_activation_deterministically() {
         let model = model();
@@ -320,6 +416,14 @@ class Profile extends Component {
         assert_eq!(artifact.declarations.len(), 1);
         assert_eq!(artifact.declarations[0].endpoint.package, "profile-service");
         assert_eq!(artifact.declarations[0].endpoint.export, "loadProfile");
+        assert_eq!(
+            artifact.declarations[0].data_codec,
+            crate::ResumeValueCodec::StringCodec
+        );
+        assert_eq!(
+            artifact.declarations[0].error_codec,
+            crate::ResumeValueCodec::StringCodec
+        );
         assert_eq!(artifact.activations.len(), 1);
         assert_eq!(artifact.activations[0].state, "idle");
         assert!(validate_runtime_resource_artifact(&artifact).is_empty());
@@ -335,7 +439,18 @@ class Profile extends Component {
         let mut artifact = build_runtime_resource_artifact(&model);
         artifact.schema_version = 9;
         artifact.declarations[0].endpoint.integrity.clear();
+        artifact.declarations[0].data_codec = crate::ResumeValueCodec::ObjectCodec(vec![
+            crate::ResumeObjectPropertyCodec {
+                name: "duplicate".to_string(),
+                codec: crate::ResumeValueCodec::StringCodec,
+            },
+            crate::ResumeObjectPropertyCodec {
+                name: "duplicate".to_string(),
+                codec: crate::ResumeValueCodec::StringCodec,
+            },
+        ]);
         artifact.activations[0].declaration = "resource:missing".to_string();
+        artifact.activations[0].data_slot = "fabricated:slot".to_string();
         artifact.activations[0].state = "ready".to_string();
 
         let errors = validate_runtime_resource_artifact(&artifact);
@@ -349,12 +464,34 @@ class Profile extends Component {
         )));
         assert!(errors.iter().any(|error| matches!(
             error,
+            crate::RuntimeResourceArtifactValidationError::InvalidValueCodec { .. }
+        )));
+        assert!(errors.iter().any(|error| matches!(
+            error,
             crate::RuntimeResourceArtifactValidationError::InvalidLifecycleGeneration { .. }
         )));
         assert!(errors.iter().any(|error| matches!(
             error,
             crate::RuntimeResourceArtifactValidationError::UnknownActivationDeclaration { .. }
         )));
+        assert!(errors.iter().any(|error| matches!(
+            error,
+            crate::RuntimeResourceArtifactValidationError::InvalidResumeSlotIdentity { .. }
+        )));
+    }
+
+    #[test]
+    fn resource_artifact_and_resume_manifest_are_deterministic_under_source_reversal() {
+        let forward = ordered_model(false);
+        let reverse = ordered_model(true);
+        assert_eq!(
+            runtime_resource_artifact_json(&build_runtime_resource_artifact(&forward)),
+            runtime_resource_artifact_json(&build_runtime_resource_artifact(&reverse))
+        );
+        assert_eq!(
+            crate::resume_manifest_json(&crate::build_resume_manifest(&forward)),
+            crate::resume_manifest_json(&crate::build_resume_manifest(&reverse))
+        );
     }
 
     #[test]

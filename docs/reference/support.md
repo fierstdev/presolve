@@ -1,6 +1,6 @@
-# Supported alpha surface
+# Supported beta surface
 
-Presolve 0.1 is a public technical preview. The compiler, framework, CLI,
+Presolve 0.2 is a public beta. The compiler, framework, CLI,
 metaframework, language tooling, VS Code extension, and generated artifacts
 are released as a lockstep compatibility train.
 
@@ -13,7 +13,7 @@ are released as a lockstep compatibility train.
 - Static production artifacts, resumability artifacts, and Cloudflare Workers
   Static Assets deployment preparation.
 - macOS Apple Silicon and Intel, Linux x64, and Windows x64 CLI release
-  packages when they are published for the selected alpha release.
+  packages when they are published for the selected beta release.
 
 ## Not supported
 

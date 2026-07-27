@@ -185,6 +185,9 @@ fn production_artifact_is_deterministic_and_preserves_the_committed_baseline() {
         let cost_size = first_artifacts
             .remove("runtime-cost-report.json")
             .expect("K15 runtime cost report should be emitted");
+        let audit_size = first_artifacts
+            .remove("production-audit.json")
+            .expect("V2 production audit should be emitted");
         assert!(production_size > 0, "production artifact must not be empty");
         assert_eq!(
             first_artifacts, fixture.artifacts,
@@ -207,11 +210,23 @@ fn production_artifact_is_deterministic_and_preserves_the_committed_baseline() {
             Some(cost_size)
         );
         assert_eq!(
+            second_artifacts.remove("production-audit.json"),
+            Some(audit_size)
+        );
+        assert_eq!(
             first_artifacts, second_artifacts,
             "{} repeated build",
             fixture.name
         );
         assert!(optimization_size > 0 && cost_size > 0);
+        assert!(audit_size > 0, "production audit must not be empty");
+        let audit: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(first.join("production-audit.json"))
+                .expect("production audit should be emitted"),
+        )
+        .expect("production audit should be valid JSON");
+        assert_eq!(audit["schemaVersion"], 1);
+        assert_eq!(audit["status"], "passed");
         let resume: serde_json::Value = serde_json::from_slice(
             &std::fs::read(first.join("resume.runtime.json"))
                 .expect("resume manifest should be emitted"),

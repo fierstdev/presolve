@@ -521,7 +521,12 @@ pub fn build_resume_restore_plan(model: &ApplicationSemanticModel) -> ResumeRest
 
 fn restore_phase(slot: &ResumeExistingSlot) -> ResumeRestorePhase {
     match slot {
-        ResumeExistingSlot::State(_) => ResumeRestorePhase::R3RestoreMutableStateAndResources,
+        ResumeExistingSlot::State(_)
+        | ResumeExistingSlot::ResourceState(_)
+        | ResumeExistingSlot::ResourceData(_)
+        | ResumeExistingSlot::ResourceError(_) => {
+            ResumeRestorePhase::R3RestoreMutableStateAndResources
+        }
         ResumeExistingSlot::ComputedCache(_) | ResumeExistingSlot::ComputedDirty(_) => {
             ResumeRestorePhase::R4RestoreRetainedComputedCaches
         }

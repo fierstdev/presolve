@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -18,20 +18,17 @@ try {
     cli: pack("packages/cli"),
     platform: packNative(`packages/${platformPackage()}`),
     create: pack("packages/create-presolve"),
+    typescriptAuthority: pack("packages/typescript-authority"),
   };
 
   run("pnpm", ["dlx", "--package", tarballs.create, "create-presolve", app]);
   const overrides = {
-    "@presolve/core": `file:${tarballs.framework}`,
+    presolve: `file:${tarballs.framework}`,
     "@presolve/cli": `file:${tarballs.cli}`,
+    "@presolve/typescript-authority": `file:${tarballs.typescriptAuthority}`,
     [`@presolve/${platformPackage()}`]: `file:${tarballs.platform}`,
   };
-  const scaffoldWorkspaceConfiguration = readFileSync(
-    join(app, "pnpm-workspace.yaml"),
-    "utf8",
-  ).trimEnd();
   const workspaceConfiguration = [
-    scaffoldWorkspaceConfiguration,
     "overrides:",
     ...Object.entries(overrides).map(
       ([packageName, specifier]) =>
@@ -41,7 +38,7 @@ try {
   ].join("\n");
   writeFileSync(join(app, "pnpm-workspace.yaml"), workspaceConfiguration);
 
-  run("pnpm", ["install"], app);
+  run("pnpm", ["install", "--ignore-scripts"], app);
   run("pnpm", ["check"], app);
   run("pnpm", ["build"], app);
   run("pnpm", ["deploy:prepare"], app);

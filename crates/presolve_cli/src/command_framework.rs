@@ -33,6 +33,7 @@ impl CliExitCodeV1 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CliCommandV1 {
     Create,
+    Migrate,
     Dev,
     Build,
     Watch,
@@ -54,6 +55,7 @@ impl CliCommandV1 {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Create => "create",
+            Self::Migrate => "migrate",
             Self::Dev => "dev",
             Self::Build => "build",
             Self::Watch => "watch",
@@ -77,6 +79,7 @@ impl CliCommandV1 {
 pub fn parse_cli_command_v1(value: &str) -> Option<CliCommandV1> {
     match value {
         "create" => Some(CliCommandV1::Create),
+        "migrate" => Some(CliCommandV1::Migrate),
         "dev" => Some(CliCommandV1::Dev),
         "build" => Some(CliCommandV1::Build),
         "watch" => Some(CliCommandV1::Watch),

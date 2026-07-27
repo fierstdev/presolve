@@ -14,7 +14,9 @@ const packageManifests = [
   "packages/create-presolve/package.json",
   "packages/language-service/package.json",
   "packages/lsp/package.json",
-  "packages/testing/package.json"
+  "packages/testing/package.json",
+  "packages/typescript-authority/package.json",
+  "packages/vite/package.json"
 ];
 
 function readJson(path) {
@@ -24,20 +26,20 @@ function readJson(path) {
 const root = readJson("package.json");
 const requestedVersion = process.argv[2] ?? root.version;
 
-const alphaVersion = requestedVersion.match(
-  /^(\d+)\.(\d+)\.(\d+)-alpha\.(\d+)$/
+const prereleaseVersion = requestedVersion.match(
+  /^(\d+)\.(\d+)\.(\d+)-(alpha|beta)\.(\d+)$/
 );
 
-if (alphaVersion === null) {
+if (prereleaseVersion === null) {
   throw new Error(
-    `Expected an alpha version such as 0.1.0-alpha.1; received ${requestedVersion}.`
+    `Expected an alpha or beta version such as 0.2.0-beta.1; received ${requestedVersion}.`
   );
 }
 
-const [, major, minor, patch, alpha] = alphaVersion;
-const alphaNumber = Number(alpha);
-if (!Number.isSafeInteger(alphaNumber) || alphaNumber < 1) {
-  throw new Error(`Expected a positive alpha number; received ${alpha}.`);
+const [, major, minor, patch, channel, prerelease] = prereleaseVersion;
+const prereleaseNumber = Number(prerelease);
+if (!Number.isSafeInteger(prereleaseNumber) || prereleaseNumber < 1) {
+  throw new Error(`Expected a positive ${channel} number; received ${prerelease}.`);
 }
 
 for (const manifestPath of packageManifests) {
@@ -61,7 +63,7 @@ for (const manifestPath of [
   }
 }
 
-const marketplaceVersion = `${major}.${minor}.${Number(patch) + alphaNumber}`;
+const marketplaceVersion = `${major}.${minor}.${Number(patch) + prereleaseNumber}`;
 const vscodeManifest = readJson("packages/vscode/package.json");
 if (vscodeManifest.version !== marketplaceVersion) {
   throw new Error(
@@ -70,5 +72,5 @@ if (vscodeManifest.version !== marketplaceVersion) {
 }
 
 console.log(
-  `Presolve release train is locked at ${requestedVersion}; VS Code Marketplace prerelease ${marketplaceVersion}.`
+  `Presolve ${channel} release train is locked at ${requestedVersion}; VS Code Marketplace prerelease ${marketplaceVersion}.`
 );

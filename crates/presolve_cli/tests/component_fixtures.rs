@@ -656,14 +656,14 @@ fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
     let component_artifact =
         build_runtime_component_artifact(&model, &model.component_ir_optimization);
     assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 6);
-    assert_eq!(RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION, 4);
+    assert_eq!(RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION, 20);
     assert_eq!(RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, 2);
-    assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 6);
+    assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 7);
     assert_eq!(TEMPLATE_MANIFEST_SCHEMA_VERSION, 5);
-    assert_eq!(component_artifact.schema_version, 4);
+    assert_eq!(component_artifact.schema_version, 20);
     assert!(validate_runtime_component_artifact(&component_artifact).is_ok());
     assert_eq!(build_semantic_graph(&model).schema_version, 6);
-    assert_eq!(build_resume_manifest(&model).schema_version, 6);
+    assert_eq!(build_resume_manifest(&model).schema_version, 7);
     assert_eq!(build_template_manifest_from_asm(&model).schema_version, 5);
 
     for (args, expected_status, expected_schema) in [
@@ -686,7 +686,7 @@ fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
     }
 
     let runtime = generate_runtime_stub();
-    assert!(runtime.contains("SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = 4"));
+    assert!(runtime.contains("SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = 20"));
     assert!(!runtime.contains("__EZ_COMPONENT_SCHEMA_VERSION__"));
     for forbidden in [
         "resolveComponent",
@@ -718,13 +718,17 @@ fn phase_h_freezes_authorities_schemas_and_no_discovery_contract() {
                 "resource.rs",
                 "resume_identity.rs",
                 "resume_liveness.rs",
+                "slot_projection.rs",
             ][..],
         ),
         (
             "ComponentStructuralRegionId::for_",
             &["component_instance.rs", "resume_restore.rs"][..],
         ),
-        ("SlotBindingId::for_instance", &["slot_binding.rs"][..]),
+        (
+            "SlotBindingId::for_instance",
+            &["slot_binding.rs", "slot_projection.rs"][..],
+        ),
         ("ProviderInstanceId::new", &["instance_context.rs"][..]),
         ("ConsumerInstanceId::new", &["instance_context.rs"][..]),
     ] {

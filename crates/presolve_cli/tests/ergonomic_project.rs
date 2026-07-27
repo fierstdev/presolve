@@ -7,6 +7,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::Duration;
 
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
 static NEXT_ROOT: AtomicU64 = AtomicU64::new(1);
 
 fn project_root(label: &str) -> PathBuf {
@@ -17,6 +20,100 @@ fn project_root(label: &str) -> PathBuf {
     ));
     fs::create_dir_all(root.join("app/routes")).unwrap();
     root
+}
+
+#[cfg(unix)]
+#[test]
+fn decorator_free_v2_source_uses_installed_authority_for_file_route_assembly() {
+    let root = project_root("v2-authority");
+    fs::write(
+        root.join("app/routes/index.tsx"),
+        r#"import { Component, state, action, environment } from "presolve";
+const applicationName = environment.public("PRESOLVE_PUBLIC_NAME");
+export class Home extends Component {
+  count = state(0);
+  increment = action(() => { this.count += 1; });
+  get doubled() { return this.count * 2; }
+  render() { return <button onClick={() => this.increment()}>Home: {this.doubled}</button>; }
+}
+"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("environment.manifest.json"),
+        r#"{"schemaVersion":1,"sourceLabel":".env","browserValues":{"PRESOLVE_PUBLIC_NAME":"Presolve"},"serverValueNames":[]}"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("tsconfig.json"),
+        r#"{"compilerOptions":{"noEmit":true}}"#,
+    )
+    .unwrap();
+    let executable = root.join("node_modules/.bin/presolve-typescript-authority");
+    fs::create_dir_all(executable.parent().unwrap()).unwrap();
+    fs::write(
+        &executable,
+        r#"#!/usr/bin/env node
+import { readFileSync, writeFileSync } from "node:fs";
+const request = JSON.parse(readFileSync(0, "utf8"));
+writeFileSync("authority-ran", "yes");
+const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
+process.stdout.write(JSON.stringify({
+  schemaVersion: 4,
+  diagnostics: [],
+  components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
+  states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
+  actions: request.actions.map(site => ({ id: site.id, identity: identity("action") })),
+  effects: request.effects.map(site => ({ id: site.id, identity: identity("effect") })),
+  environmentPublic: request.environmentPublic.slice(0, 1).map(site => ({ id: site.id, identity: identity("public") })),
+}));
+"#,
+    )
+    .unwrap();
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+
+    let missing_manifest = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("check")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(!missing_manifest.status.success());
+    assert!(
+        String::from_utf8_lossy(&missing_manifest.stderr).contains("PSENV1102_MANIFEST_REQUIRED")
+    );
+
+    let output = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("check")
+        .arg("--environment-manifest")
+        .arg("environment.manifest.json")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(root.join("authority-ran").is_file());
+    assert!(String::from_utf8_lossy(&output.stdout).contains("Checked 1 source file(s)"));
+    let build = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("build")
+        .arg("--environment-manifest")
+        .arg("environment.manifest.json")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    assert!(root.join("dist/routes/root/index.html").is_file());
+    let environment = fs::read_to_string(root.join("dist/environment.browser.json")).unwrap();
+    assert!(environment.contains("PRESOLVE_PUBLIC_NAME"));
+    assert!(!environment.contains("DATABASE_URL"));
+    fs::remove_dir_all(root).unwrap();
 }
 
 #[test]
@@ -100,6 +197,39 @@ fn default_check_reports_file_route_pattern_conflicts() {
 }
 
 #[test]
+fn environment_command_publishes_only_explicit_public_values() {
+    let root = project_root("environment");
+    fs::write(
+        root.join(".env"),
+        "PRESOLVE_PUBLIC_NAME=Presolve\nDATABASE_URL=postgres://secret\n",
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args(["environment", "--file", ".env"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let manifest: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        manifest["browserValues"]["PRESOLVE_PUBLIC_NAME"],
+        "Presolve"
+    );
+    assert_eq!(
+        manifest["serverValueNames"],
+        serde_json::json!(["DATABASE_URL"])
+    );
+    assert!(!String::from_utf8(output.stdout)
+        .unwrap()
+        .contains("postgres://secret"));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn dev_once_builds_a_default_project_without_configuration() {
     let root = project_root("dev");
     fs::write(
@@ -158,6 +288,36 @@ fn default_build_composes_a_conventional_layout_without_framework_wrapping() {
     assert!(html.contains("<main"));
     assert!(html.contains("<article"));
     assert!(html.contains("Home"));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn default_build_publishes_compiler_joined_route_metadata() {
+    let root = project_root("route-metadata");
+    fs::write(
+        root.join("app/routes/index.tsx"),
+        r#"@component() class Home extends Component { render() { return <main>Home</main>; } }"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("app/routes/index.metadata.json"),
+        r#"{"title":"Home","description":"Welcome"}"#,
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("build")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let metadata: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("dist/route-metadata.json")).unwrap()).unwrap();
+    assert_eq!(metadata["routes"][0]["path"], "/");
+    assert_eq!(metadata["routes"][0]["title"], "Home");
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -267,6 +427,19 @@ import { savePost } from "post-service";
     assert!(plan.contains("post-service"));
     assert!(plan.contains("form_data"));
     assert!(plan.contains("cold_fallback"));
+    let node = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args(["deploy", "node", "--prepare"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        node.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&node.stderr)
+    );
+    let deployment = fs::read_to_string(root.join(".presolve/node/deployment.plan.json")).unwrap();
+    assert!(deployment.contains("\"execution\": \"node\""));
+    assert!(deployment.contains("\"serverActionCount\": 1"));
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -321,6 +494,56 @@ fn deploy_prepare_projects_compiler_artifacts_to_cloudflare_workers_static_asset
         "worker syntax stderr: {}",
         String::from_utf8_lossy(&syntax.stderr)
     );
+    let node = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args(["deploy", "node", "--prepare", "--name", "presolve-docs"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        node.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&node.stderr)
+    );
+    let node_adapter = root.join(".presolve/node");
+    let node_plan = fs::read_to_string(node_adapter.join("deployment.plan.json")).unwrap();
+    assert!(node_plan.contains("\"provider\": \"node\""));
+    assert!(node_plan.contains("\"execution\": \"static\""));
+    let syntax = Command::new("node")
+        .arg("--check")
+        .arg(node_adapter.join("server.mjs"))
+        .output()
+        .unwrap();
+    assert!(
+        syntax.status.success(),
+        "Node release syntax stderr: {}",
+        String::from_utf8_lossy(&syntax.stderr)
+    );
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    drop(listener);
+    let mut host = Command::new("node")
+        .arg(node_adapter.join("server.mjs"))
+        .env("PORT", port.to_string())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    let mut response = Vec::new();
+    for _ in 0..120 {
+        if let Ok(mut stream) = TcpStream::connect(("127.0.0.1", port)) {
+            stream
+                .write_all(b"GET /about/ HTTP/1.1\r\nHost: localhost\r\n\r\n")
+                .unwrap();
+            stream.read_to_end(&mut response).unwrap();
+            break;
+        }
+        thread::sleep(Duration::from_millis(25));
+    }
+    host.kill().unwrap();
+    host.wait().unwrap();
+    let response = String::from_utf8(response).unwrap();
+    assert!(response.starts_with("HTTP/1.1 200 OK"));
+    assert!(response.contains("About"));
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -383,6 +606,7 @@ fn explain_projects_compiler_route_and_prepared_deployment_facts() {
     fs::remove_dir_all(root).unwrap();
 }
 
+#[cfg(unix)]
 #[test]
 fn fresh_scaffold_needs_no_configuration_source_list_or_component_identity() {
     let root = std::env::temp_dir().join(format!(
@@ -403,6 +627,27 @@ fn fresh_scaffold_needs_no_configuration_source_list_or_component_identity() {
         "stderr: {}",
         String::from_utf8_lossy(&created.stderr)
     );
+    let executable = application.join("node_modules/.bin/presolve-typescript-authority");
+    fs::create_dir_all(executable.parent().unwrap()).unwrap();
+    fs::write(
+        &executable,
+        r#"#!/usr/bin/env node
+import { readFileSync } from "node:fs";
+const request = JSON.parse(readFileSync(0, "utf8"));
+const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
+process.stdout.write(JSON.stringify({
+  schemaVersion: 4,
+  diagnostics: [],
+  components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
+  states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
+  actions: request.actions.map(site => ({ id: site.id, identity: identity("action") })),
+  effects: request.effects.map(site => ({ id: site.id, identity: identity("effect") })),
+  environmentPublic: request.environmentPublic.map(site => ({ id: site.id, identity: identity("public") })),
+}));
+"#,
+    )
+    .unwrap();
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
     let check = Command::new(env!("CARGO_BIN_EXE_presolve"))
         .arg("check")
         .current_dir(&application)

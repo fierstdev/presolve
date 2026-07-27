@@ -9,8 +9,8 @@ pnpm install
 pnpm dev
 ```
 
-The generated project already includes the public `@presolve/core` authoring
-package, the `@presolve/cli` command, TypeScript 7, a route directory, and a VS Code
+The generated project already includes the public `presolve` authoring package,
+the `@presolve/cli` command, TypeScript 7, a route directory, and a VS Code
 extension recommendation. It does not require a route registry, a component
 name registry, or a `presolve.json` file for ordinary applications.
 

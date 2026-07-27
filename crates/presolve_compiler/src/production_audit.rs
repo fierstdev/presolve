@@ -1,5 +1,11 @@
 //! K20 static authority and refinement audit manifest.
 
+use serde::{Deserialize, Serialize};
+
+use crate::{OptimizationReportV1, ResumeBuildId, RuntimeCostReportV1};
+
+pub const PRODUCTION_AUDIT_REPORT_SCHEMA_VERSION: u32 = 1;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ProductionRuntimeAuthority {
     pub responsibility: &'static str,
@@ -57,6 +63,100 @@ pub const PRODUCTION_RUNTIME_REFINEMENT_INVARIANTS: [&str; 13] = [
     "earlier-schema-freeze",
     "development-production-observable-parity",
 ];
+
+/// A versioned compiler-owned summary of the exact production reports that
+/// passed the frozen production authority checks.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProductionAuditReportV1 {
+    pub schema_version: u32,
+    pub build_id: ResumeBuildId,
+    pub optimization_report_schema_version: u32,
+    pub runtime_cost_report_schema_version: u32,
+    pub runtime_table_count: u32,
+    pub authority_count: u32,
+    pub invariant_count: u32,
+    pub checks: Vec<String>,
+    pub status: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProductionAuditErrorV1 {
+    pub code: &'static str,
+    pub message: String,
+}
+
+impl std::fmt::Display for ProductionAuditErrorV1 {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{}: {}", self.code, self.message)
+    }
+}
+
+impl std::error::Error for ProductionAuditErrorV1 {}
+
+/// Validates the immutable production reports and produces the sole audit
+/// artifact consumed by adapters and release tooling.
+pub fn build_production_audit_report_v1(
+    optimization: &OptimizationReportV1,
+    runtime_cost: &RuntimeCostReportV1,
+) -> Result<ProductionAuditReportV1, ProductionAuditErrorV1> {
+    if optimization.schema_version != crate::OPTIMIZATION_REPORT_SCHEMA_VERSION
+        || runtime_cost.schema_version != crate::RUNTIME_COST_REPORT_SCHEMA_VERSION
+    {
+        return Err(ProductionAuditErrorV1 {
+            code: "PSV2A001_UNSUPPORTED_PRODUCTION_REPORT_SCHEMA",
+            message: "production reports must use the frozen schema versions".into(),
+        });
+    }
+    if optimization.build_id != runtime_cost.build_id {
+        return Err(ProductionAuditErrorV1 {
+            code: "PSV2A002_PRODUCTION_REPORT_BUILD_MISMATCH",
+            message: "optimization and runtime-cost reports must describe one build".into(),
+        });
+    }
+    if optimization.validation_status != "valid" {
+        return Err(ProductionAuditErrorV1 {
+            code: "PSV2A003_PRODUCTION_VALIDATION_FAILED",
+            message: "the optimization report must record valid compiler validation".into(),
+        });
+    }
+    if optimization.runtime_table_count != runtime_cost.runtime_table_count {
+        return Err(ProductionAuditErrorV1 {
+            code: "PSV2A004_RUNTIME_TABLE_COUNT_MISMATCH",
+            message: "production reports disagree about runtime table count".into(),
+        });
+    }
+    if runtime_cost.production_artifact_bytes > optimization.production_bytes {
+        return Err(ProductionAuditErrorV1 {
+            code: "PSV2A005_PRODUCTION_BYTE_ACCOUNTING_INVALID",
+            message: "the production artifact cannot exceed the complete production output".into(),
+        });
+    }
+    Ok(ProductionAuditReportV1 {
+        schema_version: PRODUCTION_AUDIT_REPORT_SCHEMA_VERSION,
+        build_id: optimization.build_id.clone(),
+        optimization_report_schema_version: optimization.schema_version,
+        runtime_cost_report_schema_version: runtime_cost.schema_version,
+        runtime_table_count: optimization.runtime_table_count,
+        authority_count: u32::try_from(PRODUCTION_RUNTIME_AUTHORITIES.len())
+            .expect("production authority count exceeds u32"),
+        invariant_count: u32::try_from(PRODUCTION_RUNTIME_REFINEMENT_INVARIANTS.len())
+            .expect("production invariant count exceeds u32"),
+        checks: vec![
+            "report-schema".into(),
+            "build-identity".into(),
+            "compiler-validation".into(),
+            "runtime-table-count".into(),
+            "production-byte-accounting".into(),
+        ],
+        status: "passed".into(),
+    })
+}
+
+#[must_use]
+pub fn production_audit_report_json_v1(report: &ProductionAuditReportV1) -> String {
+    serde_json::to_string(report).expect("production audit report should serialize") + "\n"
+}
 
 #[cfg(test)]
 mod tests {
@@ -169,13 +269,67 @@ mod tests {
     fn k20_preserves_every_frozen_schema_and_phase_k_v1_product() {
         assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 6);
         assert_eq!(TEMPLATE_MANIFEST_SCHEMA_VERSION, 5);
-        assert_eq!(RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION, 4);
+        assert_eq!(RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION, 20);
         assert_eq!(RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, 2);
         assert_eq!(RUNTIME_FORM_ARTIFACT_SCHEMA_VERSION, 2);
-        assert_eq!(RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION, 1);
-        assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 6);
+        assert_eq!(RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION, 7);
+        assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 7);
         assert_eq!(PRODUCTION_RUNTIME_ARTIFACT_SCHEMA_VERSION, 1);
         assert_eq!(OPTIMIZATION_REPORT_SCHEMA_VERSION, 1);
         assert_eq!(RUNTIME_COST_REPORT_SCHEMA_VERSION, 1);
+    }
+
+    #[test]
+    fn v2_audit_report_is_deterministic_and_rejects_cross_build_reports() {
+        let optimization = OptimizationReportV1 {
+            schema_version: 1,
+            build_id: ResumeBuildId::for_public_inputs("audit"),
+            optimization_policy: crate::OptimizationPolicyId::production_v1(),
+            dead_products_removed: 0,
+            constants_pooled: 0,
+            programs_deduplicated: 0,
+            shared_chunks_extracted: 0,
+            shared_candidates_rejected: 0,
+            binding_writes_coalesced: 0,
+            runtime_table_count: 1,
+            development_bytes: 10,
+            production_bytes: 9,
+            retained_exclusions: Vec::new(),
+            validation_status: "valid".into(),
+        };
+        let runtime_cost = RuntimeCostReportV1 {
+            schema_version: 1,
+            build_id: optimization.build_id.clone(),
+            bootstrap_module_bytes: 1,
+            production_artifact_bytes: 2,
+            eager_program_count: 0,
+            lazy_root_chunk_count: 0,
+            shared_chunk_count: 0,
+            max_lazy_dependency_depth: 0,
+            runtime_table_count: 1,
+            runtime_record_count: 0,
+            estimated_boot_decode_units: 0,
+            estimated_boot_validation_units: 0,
+            estimated_cold_init_operation_count: 0,
+            estimated_resume_restore_operation_count: 0,
+            max_action_batch_operation_count: 0,
+            max_scheduler_batch_width: 0,
+            max_dom_patch_count_per_action: 0,
+            retained_slot_count: 0,
+        };
+        let first = build_production_audit_report_v1(&optimization, &runtime_cost).unwrap();
+        assert_eq!(first.status, "passed");
+        assert_eq!(
+            production_audit_report_json_v1(&first),
+            production_audit_report_json_v1(&first)
+        );
+        let mut different_build = runtime_cost;
+        different_build.build_id = ResumeBuildId::for_public_inputs("other");
+        assert_eq!(
+            build_production_audit_report_v1(&optimization, &different_build)
+                .unwrap_err()
+                .code,
+            "PSV2A002_PRODUCTION_REPORT_BUILD_MISMATCH"
+        );
     }
 }
