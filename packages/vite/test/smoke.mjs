@@ -336,6 +336,7 @@ try {
   await rm(outputDirectory, { recursive: true, force: true });
   await rm(applicationDirectory, { recursive: true, force: true });
 }
+process.exit(0);
 
 function assertRejects(action, message) {
   try {
