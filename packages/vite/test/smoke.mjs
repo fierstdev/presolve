@@ -252,11 +252,15 @@ const dev = await startPresolveDevServer({
 });
 try {
   const address = dev.server.httpServer.address();
-  const response = await fetch(`http://127.0.0.1:${address.port}/route`);
+  const response = await fetch(`http://127.0.0.1:${address.port}/route`, {
+    headers: { connection: "close" },
+  });
   if (response.status !== 200 || await response.text() !== "Presolve route") {
     throw new Error("presolve dev must route compiler-owned requests without restarting Vite");
   }
-  const viteAsset = await fetch(`http://127.0.0.1:${address.port}/@vite/client`);
+  const viteAsset = await fetch(`http://127.0.0.1:${address.port}/@vite/client`, {
+    headers: { connection: "close" },
+  });
   if (viteAsset.status !== 200 || !(await viteAsset.text()).includes("createHotContext")) {
     throw new Error("unclaimed JS assets must continue through Vite middleware");
   }
