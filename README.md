@@ -22,7 +22,8 @@ pnpm dev
 ```
 
 The generated application includes TypeScript 7, routes under `app/routes`, the
-public `presolve` package, the `@presolve/cli` command, and a VS Code extension
+public `@presolve/framework` package installed under the canonical `presolve`
+authoring alias, the `@presolve/cli` command, and a VS Code extension
 recommendation. It needs no route registry or configuration file for the normal
 workflow.
 
@@ -30,7 +31,7 @@ workflow.
 
 | Product | Package | What it provides |
 | --- | --- | --- |
-| Framework | `presolve` | Typed compiler intrinsics for components and application features. |
+| Framework | `@presolve/framework` (installed as `presolve`) | Typed compiler intrinsics for components and application features. |
 | Compiler and application CLI | `@presolve/cli` | Development, checks, builds, file routes, and deployment preparation. |
 | Scaffold | `create-presolve` | The `pnpm create presolve` starter. |
 | Editor | `presolve-vscode` | Workspace integration with the project TypeScript configuration. |

@@ -8,7 +8,8 @@ versioned compatibility train, not a set of independently published packages.
 - crates.io: `presolve-parser`, `presolve-compiler`, and `presolve-cli`,
   published in dependency order so the public compiler has resolvable registry
   dependencies.
-- npm: `presolve`, `create-presolve`, `@presolve/cli`, supported platform CLI
+- npm: `@presolve/framework` (installed by generated applications under the
+  `presolve` alias), `create-presolve`, `@presolve/cli`, supported platform CLI
   packages, and any public runtime/tooling/application packages.
 - Visual Studio Marketplace: `presolve-vscode` under the `fierstdev` publisher.
 - GitHub: a matching annotated release tag and release notes.
@@ -28,9 +29,10 @@ versioned compatibility train, not a set of independently published packages.
 3. Pack every npm package, install the tarballs in a fresh external directory,
    run `pnpm create presolve`, install, open/check it with the supported
    TypeScript configuration, then build it.
-4. Publish platform-specific CLI packages before `@presolve/cli`; publish the
-   framework, scaffold, and supported tooling packages at the exact same
-   version and beta tag.
+4. Publish platform-specific CLI packages before `@presolve/cli`; publish
+   `@presolve/framework`, the scaffold, and supported tooling packages at the
+   exact same version and beta tag. Recovery publication must query the exact
+   package version first and skip artifacts already accepted by npm.
 5. Publish `presolve-parser`, then `presolve-compiler`, then `presolve-cli`,
    using a registry token with only the permissions required for those crates.
 6. Package and publish `presolve-vscode`; install the produced VSIX in a clean
