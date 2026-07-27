@@ -116,6 +116,82 @@ process.stdout.write(JSON.stringify({
     fs::remove_dir_all(root).unwrap();
 }
 
+#[cfg(unix)]
+#[test]
+fn decorator_free_v2_layout_slot_compiles_through_the_real_authority_bridge() {
+    let root = project_root("v2-layout-slot");
+    let repository = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .unwrap();
+    let framework_types = repository.join("framework/packages/presolve/src/index.d.ts");
+    let authority_module = repository.join("packages/typescript-authority/src/index.js");
+    fs::write(
+        root.join("app/layout.tsx"),
+        r#"import { Component, slot, type SlotContent } from "presolve";
+
+export class DocsLayout extends Component {
+  children: SlotContent = slot();
+  render() { return <main><slot /></main>; }
+}
+"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("app/routes/index.tsx"),
+        r#"import { Component } from "presolve";
+
+export class DocsHome extends Component {
+  render() { return <article>Decorator-free docs</article>; }
+}
+"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("tsconfig.json"),
+        format!(
+            r#"{{"compilerOptions":{{"noEmit":true,"strict":true,"jsx":"preserve","module":"NodeNext","moduleResolution":"NodeNext","paths":{{"presolve":["{}"]}}}}}}"#,
+            framework_types.display()
+        ),
+    )
+    .unwrap();
+    let executable = root.join("node_modules/.bin/presolve-typescript-authority");
+    fs::create_dir_all(executable.parent().unwrap()).unwrap();
+    fs::write(
+        &executable,
+        format!(
+            r#"#!/usr/bin/env node
+import {{ analyzeV2Authoring }} from "{}";
+import {{ readFileSync }} from "node:fs";
+process.stdout.write(JSON.stringify(await analyzeV2Authoring(JSON.parse(readFileSync(0, "utf8")))));
+"#,
+            authority_module.display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+
+    for command in ["check", "build"] {
+        let output = Command::new(env!("CARGO_BIN_EXE_presolve"))
+            .arg(command)
+            .current_dir(&root)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{command} stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            !String::from_utf8_lossy(&output.stderr).contains("PSC1001"),
+            "a decorator-free layout must not be redirected to the legacy component diagnostic"
+        );
+    }
+    let html = fs::read_to_string(root.join("dist/routes/root/index.html")).unwrap();
+    assert!(html.contains("Decorator-free docs"));
+    fs::remove_dir_all(root).unwrap();
+}
+
 #[test]
 fn default_build_discovers_an_imported_semantic_package_contract() {
     let root = project_root("package");
@@ -548,6 +624,115 @@ fn deploy_prepare_projects_compiler_artifacts_to_cloudflare_workers_static_asset
 }
 
 #[test]
+fn static_styles_and_public_files_join_the_atomic_publication_and_deployment_inventory() {
+    let root = project_root("static-publication-inputs");
+    fs::create_dir_all(root.join("styles")).unwrap();
+    fs::create_dir_all(root.join("public/brand")).unwrap();
+    fs::write(
+        root.join("styles/site.css"),
+        "body { color: rebeccapurple; }\n",
+    )
+    .unwrap();
+    fs::write(
+        root.join("public/brand/logo.svg"),
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" />\n",
+    )
+    .unwrap();
+    fs::write(
+        root.join("app/routes/index.tsx"),
+        r#"@component() class Home extends Component { render() { return <main><link rel="stylesheet" href="/styles/site.css" />Static assets</main>; } }"#,
+    )
+    .unwrap();
+
+    let build = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("build")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    assert_eq!(
+        fs::read_to_string(root.join("dist/styles/site.css")).unwrap(),
+        "body { color: rebeccapurple; }\n"
+    );
+    assert_eq!(
+        fs::read_to_string(root.join("dist/brand/logo.svg")).unwrap(),
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" />\n"
+    );
+    let manifest = fs::read_to_string(root.join("dist/file-routes.manifest.json")).unwrap();
+    assert!(manifest.contains("styles/site.css"));
+    assert!(manifest.contains("brand/logo.svg"));
+
+    let cloudflare = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args([
+            "deploy",
+            "cloudflare",
+            "--prepare",
+            "--name",
+            "presolve-static-inputs",
+        ])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        cloudflare.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&cloudflare.stderr)
+    );
+    let cloudflare_plan =
+        fs::read_to_string(root.join(".presolve/cloudflare/deployment.plan.json")).unwrap();
+    assert!(cloudflare_plan.contains("styles/site.css"));
+    assert!(cloudflare_plan.contains("brand/logo.svg"));
+
+    let node = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args([
+            "deploy",
+            "node",
+            "--prepare",
+            "--name",
+            "presolve-static-inputs",
+        ])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        node.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&node.stderr)
+    );
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    drop(listener);
+    let mut host = Command::new("node")
+        .arg(root.join(".presolve/node/server.mjs"))
+        .env("PORT", port.to_string())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    let mut response = Vec::new();
+    for _ in 0..120 {
+        if let Ok(mut stream) = TcpStream::connect(("127.0.0.1", port)) {
+            stream
+                .write_all(b"GET /styles/site.css HTTP/1.1\r\nHost: localhost\r\n\r\n")
+                .unwrap();
+            stream.read_to_end(&mut response).unwrap();
+            break;
+        }
+        thread::sleep(Duration::from_millis(25));
+    }
+    host.kill().unwrap();
+    host.wait().unwrap();
+    let response = String::from_utf8(response).unwrap();
+    assert!(response.starts_with("HTTP/1.1 200 OK"));
+    assert!(response.contains("rebeccapurple"));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn deploy_rejects_rollback_mixed_with_preparation_options() {
     let root = project_root("cloudflare-rollback-arguments");
     let output = Command::new(env!("CARGO_BIN_EXE_presolve"))
@@ -642,6 +827,7 @@ process.stdout.write(JSON.stringify({
   states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
   actions: request.actions.map(site => ({ id: site.id, identity: identity("action") })),
   effects: request.effects.map(site => ({ id: site.id, identity: identity("effect") })),
+  slots: request.slots.map(site => ({ id: site.id, identity: identity("slot") })),
   environmentPublic: request.environmentPublic.map(site => ({ id: site.id, identity: identity("public") })),
 }));
 "#,

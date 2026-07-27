@@ -388,8 +388,8 @@ mod tests {
     #[test]
     fn builds_source_faithful_queries_for_aliases_and_canonical_fields() {
         let source = r#"
-import { Component as FrameworkBase, state as reactiveCell, action as activate, effect as observe } from "presolve";
-class Counter extends FrameworkBase { count = reactiveCell(0); increment = activate(() => {}); sync = observe(() => {}); }
+import { Component as FrameworkBase, state as reactiveCell, action as activate, effect as observe, slot } from "presolve";
+class Counter extends FrameworkBase { children: SlotContent = slot(); count = reactiveCell(0); increment = activate(() => {}); sync = observe(() => {}); }
 "#;
         let parsed = parse_file("src/Counter.tsx", source);
         let heritage = component_inheritance_sites_v1(&parsed).pop().unwrap();
@@ -425,10 +425,15 @@ class Counter extends FrameworkBase { count = reactiveCell(0); increment = activ
             &source[request.canonical.effect.as_ref().unwrap().position..][..7],
             "observe"
         );
+        assert_eq!(
+            &source[request.canonical.slot.as_ref().unwrap().position..][..4],
+            "slot"
+        );
         assert_eq!(request.components.len(), 1);
-        assert_eq!(request.states.len(), 3);
-        assert_eq!(request.actions.len(), 3);
-        assert_eq!(request.effects.len(), 3);
+        assert_eq!(request.states.len(), 4);
+        assert_eq!(request.actions.len(), 4);
+        assert_eq!(request.effects.len(), 4);
+        assert_eq!(request.slots.len(), 1);
     }
 
     #[test]

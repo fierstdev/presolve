@@ -48,10 +48,15 @@ export declare const environment: {
   public(name: string): string;
 };
 
-export declare function slot(): PresolveFieldDecorator;
 export interface SlotContent {
   readonly __presolveSlotContentBrand: unique symbol;
 }
+/**
+ * A V2 slot field initializer that remains callable as the alpha field
+ * decorator while that compatibility surface is supported.
+ */
+export type PresolveSlotField = SlotContent & PresolveFieldDecorator;
+export declare function slot(): PresolveSlotField;
 
 export declare function context(): PresolveFieldDecorator;
 export type ContextDesignator = `${string}.${string}`;

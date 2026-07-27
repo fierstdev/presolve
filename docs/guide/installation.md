@@ -26,8 +26,10 @@ pnpm build
 ```
 
 `check` validates application semantics without publishing a production build.
-`build` writes the compiler-issued output to `dist/`. Do not edit files in that
-directory: run the compiler again after changing source.
+`build` writes the compiler-issued output to `dist/`. It copies `styles/` to
+`dist/styles/` and `public/` to the root of `dist/`, including those files in
+the deployment inventory. Do not edit files in that directory: run the
+compiler again after changing source.
 
 For the first static deployment target, continue with
 [Cloudflare deployment](../reference/cloudflare.md).

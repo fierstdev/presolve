@@ -8,6 +8,16 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.2 - 2026-07-27
+
+### Fixed
+
+- Decorator-free `Component` layouts can declare V2 slot fields with
+  `children: SlotContent = slot()` through the published TypeScript authority
+  bridge, without falling back to the legacy `@component()` diagnostic.
+- `styles/` and `public/` are copied atomically into `dist/`, integrity-listed
+  for deployment, and served by development and Node static hosts.
+
 ## 0.2.0-beta.1 - 2026-07-26
 
 ### Added
