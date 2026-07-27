@@ -1,4 +1,4 @@
-//! J7 generated exact-slot capture programs and snapshot model v1.
+//! J7 generated exact-slot capture programs and snapshot model v2.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -10,8 +10,8 @@ use crate::{
 };
 
 pub const RESUME_CAPTURE_PLAN_VERSION: u32 = 1;
-pub const RESUME_SNAPSHOT_SCHEMA_VERSION: u32 = 1;
-pub const RESUME_CAPTURE_MANIFEST_VERSION: u32 = 6;
+pub const RESUME_SNAPSHOT_SCHEMA_VERSION: u32 = 2;
+pub const RESUME_CAPTURE_MANIFEST_VERSION: u32 = 7;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ResumeCaptureInstruction {
@@ -141,15 +141,41 @@ pub struct ResumeSnapshotBoundaryV1 {
     pub values: Vec<ResumeSnapshotValueRecordV1>,
 }
 
+/// Exact compiler-qualified State value for one restored structural occurrence.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ResumeSnapshotV1 {
+pub struct ResumeSnapshotStructuralStateV2 {
+    pub slot_id: String,
+    pub value: ResumeEncodedValue,
+}
+
+/// Snapshot-owned identity for a materialized component occurrence. These
+/// fields are redundant by design: resume verifies that the opaque identity
+/// decodes to the compiler-issued template, parent scope, region, and local
+/// occurrence before it touches the DOM.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResumeSnapshotStructuralOccurrenceV2 {
+    pub occurrence_identity: String,
+    pub template_instance: String,
+    pub parent_scope: String,
+    pub structural_region: String,
+    pub local_occurrence: String,
+    pub state: Vec<ResumeSnapshotStructuralStateV2>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResumeSnapshotV2 {
     pub schema_version: u32,
     pub build_id: ResumeBuildId,
     pub snapshot_id: ResumeSnapshotId,
     pub manifest_version: u32,
     pub captured_at: Option<()>,
     pub boundaries: Vec<ResumeSnapshotBoundaryV1>,
+    pub structural_occurrences: Vec<ResumeSnapshotStructuralOccurrenceV2>,
 }
+
+/// Compatibility type name for callers that constructed the previous snapshot
+/// model. Values always serialize with the schema-v2 envelope.
+pub type ResumeSnapshotV1 = ResumeSnapshotV2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ResumeCaptureErrorKind {
@@ -441,6 +467,7 @@ pub fn capture_resume_snapshot(
         manifest_version: RESUME_CAPTURE_MANIFEST_VERSION,
         captured_at: None,
         boundaries,
+        structural_occurrences: Vec::new(),
     })
 }
 
@@ -640,8 +667,33 @@ pub fn resume_snapshot_json(snapshot: &ResumeSnapshotV1) -> String {
         })
         .collect::<Vec<_>>()
         .join(",");
+    let structural_occurrences = snapshot
+        .structural_occurrences
+        .iter()
+        .map(|occurrence| {
+            let state = occurrence
+                .state
+                .iter()
+                .map(|slot| format!(
+                    "{{\"slotId\":{},\"value\":{}}}",
+                    json_string(&slot.slot_id),
+                    slot.value.as_str()
+                ))
+                .collect::<Vec<_>>()
+                .join(",");
+            format!(
+                "{{\"occurrenceIdentity\":{},\"templateInstance\":{},\"parentScope\":{},\"structuralRegion\":{},\"localOccurrence\":{},\"state\":[{state}]}}",
+                json_string(&occurrence.occurrence_identity),
+                json_string(&occurrence.template_instance),
+                json_string(&occurrence.parent_scope),
+                json_string(&occurrence.structural_region),
+                json_string(&occurrence.local_occurrence),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
     format!(
-        "{{\"schemaVersion\":{},\"buildId\":{},\"snapshotId\":{},\"manifestVersion\":{},\"capturedAt\":null,\"boundaries\":[{boundaries}]}}",
+        "{{\"schemaVersion\":{},\"buildId\":{},\"snapshotId\":{},\"manifestVersion\":{},\"capturedAt\":null,\"boundaries\":[{boundaries}],\"structuralOccurrences\":[{structural_occurrences}]}}",
         snapshot.schema_version,
         json_string(&snapshot.build_id.to_string()),
         json_string(&snapshot.snapshot_id.to_string()),

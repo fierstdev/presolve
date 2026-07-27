@@ -2,11 +2,13 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::template_graph::{AttributeValue, ElementNode, FragmentNode, TemplateAttribute};
+use crate::template_graph::{
+    AttributeValue, ConditionalNode, ElementNode, FragmentNode, ListNode, TemplateAttribute,
+};
 use crate::{
     build_ordinary_template_instance_registry, build_resume_anchor_plan, ApplicationSemanticModel,
     ComponentInstanceId, ComponentInstanceStatus, ResumeAnchorPlacement, SerializableValue,
-    SlotBindingStatus, TemplateChild, TemplateNode,
+    SlotBindingStatus, TemplateChild, TemplateNode, TemplateSemanticKind,
 };
 
 #[derive(Debug, Default)]
@@ -16,6 +18,62 @@ struct ResumeHtmlMarkers {
     structural_starts: BTreeMap<String, String>,
     structural_ends: BTreeMap<String, String>,
     events: BTreeMap<String, String>,
+}
+
+/// Compiler-rendered branches for one compiler-addressed conditional host.
+///
+/// These fragments deliberately carry the same target, binding, and exact
+/// structural-invocation markers as the ordinary initial renderer. They are
+/// artifact data only: runtime materialization remains separately gated.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StructuralConditionalHostFragments {
+    pub host_scope: StructuralConditionalHostScope,
+    pub host_instance: ComponentInstanceId,
+    pub when_true_html: String,
+    pub when_false_html: String,
+    pub when_true_invocations: Vec<String>,
+    pub when_false_invocations: Vec<String>,
+    /// Exact canonical Slot bindings consumed while rendering this host.
+    pub slot_projection_bindings: Vec<String>,
+}
+
+#[must_use]
+pub fn structural_invocations_in_compiler_html(html: &str) -> Vec<String> {
+    const MARKER: &str = "data-presolve-structural-invocation=\"";
+    html.match_indices(MARKER)
+        .filter_map(|(start, _)| {
+            let value = &html[start + MARKER.len()..];
+            value.find('"').map(|end| value[..end].to_string())
+        })
+        .collect()
+}
+
+/// Compiler-rendered keyed item fragment for one exact component host scope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StructuralKeyedHostFragment {
+    pub host_scope: StructuralConditionalHostScope,
+    pub host_instance: ComponentInstanceId,
+    pub item_template_html: String,
+    pub item_invocations: Vec<String>,
+    /// Exact canonical Slot bindings consumed while rendering this host.
+    pub slot_projection_bindings: Vec<String>,
+}
+
+/// The only host scopes the compiler currently renders exactly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StructuralConditionalHostScope {
+    StaticInstance,
+    StructuralOccurrence,
+}
+
+impl StructuralConditionalHostScope {
+    #[must_use]
+    pub const fn artifact_text(self) -> &'static str {
+        match self {
+            Self::StaticInstance => "static-instance",
+            Self::StructuralOccurrence => "structural-occurrence",
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -51,6 +109,613 @@ pub fn generate_ordinary_instance_html_for_component(
     root_component: &crate::SemanticId,
 ) -> String {
     generate_ordinary_instance_html_for_roots(model, Some(root_component))
+}
+
+/// Renders one compiler-planned structural template with the same exact
+/// ordinary target and binding markers as an initial instance. The static
+/// template-instance prefix is replaced by an opaque runtime-occurrence token;
+/// only the later structural materializer may substitute that token.
+#[must_use]
+pub fn generate_structural_template_instance_html(
+    model: &ApplicationSemanticModel,
+    template_instance: &ComponentInstanceId,
+) -> Option<String> {
+    let instance = model
+        .component_instance_plan
+        .instances
+        .get(template_instance)?;
+    if instance.status != ComponentInstanceStatus::StructuralTemplate {
+        return None;
+    }
+    let registry = build_ordinary_template_instance_registry(model);
+    let targets = registry
+        .targets
+        .iter()
+        .map(|record| {
+            (
+                (
+                    record.component_instance_id.clone(),
+                    record.template_entity_id.clone(),
+                ),
+                record.target_id.to_string(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let bindings = registry
+        .bindings
+        .iter()
+        .map(|record| {
+            (
+                (
+                    record.component_instance_id.clone(),
+                    record.declaration_binding_id.clone(),
+                ),
+                record.instance_binding_id.to_string(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let children = model
+        .component_instance_plan
+        .instances
+        .values()
+        .filter_map(|child| {
+            child.parent_instance.as_ref().and_then(|parent| {
+                child
+                    .invocation
+                    .as_ref()
+                    .map(|invocation| ((parent.clone(), invocation.clone()), child))
+            })
+        })
+        .collect::<BTreeMap<_, _>>();
+    let templates = model
+        .templates
+        .iter()
+        .map(|template| (template.id.clone(), template))
+        .collect::<BTreeMap<_, _>>();
+    let slot_projections = structural_instance_slot_projections(model, &templates, instance)?;
+    Some(
+        render_instance(
+            model,
+            &templates,
+            &children,
+            &targets,
+            &bindings,
+            &ResumeHtmlMarkers::default(),
+            &instance.id,
+            &instance.component,
+            &slot_projections,
+        )
+        .replace(instance.id.as_str(), "__PRESOLVE_STRUCTURAL_OCCURRENCE__"),
+    )
+}
+
+/// Render both branches for a compiler-issued conditional structural region.
+///
+/// Instances with caller-owned Slot projection remain absent: publishing an
+/// incomplete fragment would create a second renderer authority. A structural
+/// host that has no such projection uses the already-authorized opaque
+/// occurrence placeholder rather than a fabricated static instance ID.
+#[must_use]
+pub fn generate_structural_conditional_host_fragments(
+    model: &ApplicationSemanticModel,
+    region: &crate::ComponentStructuralRegionId,
+) -> Vec<StructuralConditionalHostFragments> {
+    let Some(entity) =
+        crate::structural_template_entity_for_region(region, &model.template_entities)
+    else {
+        return Vec::new();
+    };
+    if entity.kind != TemplateSemanticKind::Conditional {
+        return Vec::new();
+    }
+    let Some(template_id) = entity.owner.entity_id() else {
+        return Vec::new();
+    };
+    let Some(template) = model
+        .templates
+        .iter()
+        .find(|template| template.id == *template_id)
+    else {
+        return Vec::new();
+    };
+    let Some(component) = template.owner.entity_id() else {
+        return Vec::new();
+    };
+    let Some((conditional, path)) = conditional_at_span(template, entity.provenance.span) else {
+        return Vec::new();
+    };
+
+    let registry = build_ordinary_template_instance_registry(model);
+    let targets = registry
+        .targets
+        .iter()
+        .map(|record| {
+            (
+                (
+                    record.component_instance_id.clone(),
+                    record.template_entity_id.clone(),
+                ),
+                record.target_id.to_string(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let bindings = registry
+        .bindings
+        .iter()
+        .map(|record| {
+            (
+                (
+                    record.component_instance_id.clone(),
+                    record.declaration_binding_id.clone(),
+                ),
+                record.instance_binding_id.to_string(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let children = model
+        .component_instance_plan
+        .instances
+        .values()
+        .filter_map(|child| {
+            child.parent_instance.as_ref().and_then(|parent| {
+                child
+                    .invocation
+                    .as_ref()
+                    .map(|invocation| ((parent.clone(), invocation.clone()), child))
+            })
+        })
+        .collect::<BTreeMap<_, _>>();
+    let templates = model
+        .templates
+        .iter()
+        .map(|candidate| (candidate.id.clone(), candidate))
+        .collect::<BTreeMap<_, _>>();
+
+    model
+        .component_instance_plan
+        .instances
+        .values()
+        .filter(|instance| {
+            matches!(
+                instance.status,
+                ComponentInstanceStatus::Planned | ComponentInstanceStatus::StructuralTemplate
+            ) && instance.component == *component
+        })
+        .filter_map(|instance| {
+            let host_scope = match instance.status {
+                ComponentInstanceStatus::Planned => StructuralConditionalHostScope::StaticInstance,
+                ComponentInstanceStatus::StructuralTemplate => {
+                    StructuralConditionalHostScope::StructuralOccurrence
+                }
+            };
+            let slot_projections =
+                structural_instance_slot_projections(model, &templates, instance);
+            if !model.slot_bindings.for_callee(&instance.id).is_empty()
+                && slot_projections.is_none()
+            {
+                return None;
+            }
+            let slot_projections = slot_projections.unwrap_or_default();
+            let when_true_html = render_children(
+                model,
+                &templates,
+                &children,
+                &targets,
+                &bindings,
+                &ResumeHtmlMarkers::default(),
+                &instance.id,
+                template,
+                &conditional.when_true,
+                &format!("{path}.true"),
+                &slot_projections,
+            );
+            let when_false_html = render_children(
+                model,
+                &templates,
+                &children,
+                &targets,
+                &bindings,
+                &ResumeHtmlMarkers::default(),
+                &instance.id,
+                template,
+                &conditional.when_false,
+                &format!("{path}.false"),
+                &slot_projections,
+            );
+            let (when_true_html, when_false_html) = match host_scope {
+                StructuralConditionalHostScope::StaticInstance => (when_true_html, when_false_html),
+                StructuralConditionalHostScope::StructuralOccurrence => (
+                    when_true_html
+                        .replace(instance.id.as_str(), "__PRESOLVE_STRUCTURAL_OCCURRENCE__"),
+                    when_false_html
+                        .replace(instance.id.as_str(), "__PRESOLVE_STRUCTURAL_OCCURRENCE__"),
+                ),
+            };
+            Some(StructuralConditionalHostFragments {
+                host_scope,
+                host_instance: instance.id.clone(),
+                when_true_invocations: structural_invocations_in_compiler_html(&when_true_html),
+                when_false_invocations: structural_invocations_in_compiler_html(&when_false_html),
+                slot_projection_bindings: model
+                    .slot_bindings
+                    .for_callee(&instance.id)
+                    .into_iter()
+                    .filter(|binding| binding.status == SlotBindingStatus::Bound)
+                    .map(|binding| binding.id.to_string())
+                    .collect(),
+                when_true_html,
+                when_false_html,
+            })
+        })
+        .collect()
+}
+
+/// Render keyed item templates with compiler-issued structural invocation
+/// anchors. The generic keyed tokens remain owned by `html_codegen`; this
+/// function only joins exact template nodes to planned component invocations.
+#[must_use]
+pub fn generate_structural_keyed_host_fragments(
+    model: &ApplicationSemanticModel,
+    region: &crate::ComponentStructuralRegionId,
+) -> Vec<StructuralKeyedHostFragment> {
+    let Some(entity) =
+        crate::structural_template_entity_for_region(region, &model.template_entities)
+    else {
+        return Vec::new();
+    };
+    if entity.kind != TemplateSemanticKind::List {
+        return Vec::new();
+    }
+    let Some(template_id) = entity.owner.entity_id() else {
+        return Vec::new();
+    };
+    let Some(template) = model
+        .templates
+        .iter()
+        .find(|template| template.id == *template_id)
+    else {
+        return Vec::new();
+    };
+    let Some(component) = template.owner.entity_id() else {
+        return Vec::new();
+    };
+    let Some((list, path)) = list_at_span(template, entity.provenance.span) else {
+        return Vec::new();
+    };
+    let registry = build_ordinary_template_instance_registry(model);
+    let targets = registry
+        .targets
+        .iter()
+        .map(|record| {
+            (
+                (
+                    record.component_instance_id.clone(),
+                    record.template_entity_id.clone(),
+                ),
+                record.target_id.to_string(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let bindings = registry
+        .bindings
+        .iter()
+        .map(|record| {
+            (
+                (
+                    record.component_instance_id.clone(),
+                    record.declaration_binding_id.clone(),
+                ),
+                record.instance_binding_id.to_string(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let children = model
+        .component_instance_plan
+        .instances
+        .values()
+        .filter_map(|child| {
+            child.parent_instance.as_ref().and_then(|parent| {
+                child
+                    .invocation
+                    .as_ref()
+                    .map(|invocation| ((parent.clone(), invocation.clone()), child))
+            })
+        })
+        .collect::<BTreeMap<_, _>>();
+    let templates = model
+        .templates
+        .iter()
+        .map(|candidate| (candidate.id.clone(), candidate))
+        .collect::<BTreeMap<_, _>>();
+
+    model
+        .component_instance_plan
+        .instances
+        .values()
+        .filter(|instance| {
+            matches!(
+                instance.status,
+                ComponentInstanceStatus::Planned | ComponentInstanceStatus::StructuralTemplate
+            ) && instance.component == *component
+        })
+        .filter_map(|instance| {
+            let host_scope = if instance.status == ComponentInstanceStatus::Planned {
+                StructuralConditionalHostScope::StaticInstance
+            } else {
+                StructuralConditionalHostScope::StructuralOccurrence
+            };
+            let slot_projections =
+                structural_instance_slot_projections(model, &templates, instance);
+            if !model.slot_bindings.for_callee(&instance.id).is_empty()
+                && slot_projections.is_none()
+            {
+                return None;
+            }
+            let slot_projections = slot_projections.unwrap_or_default();
+            let mut html = qualify_keyed_item_node_ids(&render_children(
+                model,
+                &templates,
+                &children,
+                &targets,
+                &bindings,
+                &ResumeHtmlMarkers::default(),
+                &instance.id,
+                template,
+                &list.item_template,
+                &format!("{path}.item"),
+                &slot_projections,
+            ));
+            if instance.status == ComponentInstanceStatus::StructuralTemplate {
+                html = html.replace(instance.id.as_str(), "__PRESOLVE_STRUCTURAL_OCCURRENCE__");
+            }
+            Some(StructuralKeyedHostFragment {
+                host_scope,
+                host_instance: instance.id.clone(),
+                item_invocations: structural_invocations_in_compiler_html(&html),
+                slot_projection_bindings: model
+                    .slot_bindings
+                    .for_callee(&instance.id)
+                    .into_iter()
+                    .filter(|binding| binding.status == SlotBindingStatus::Bound)
+                    .map(|binding| binding.id.to_string())
+                    .collect(),
+                item_template_html: html,
+            })
+        })
+        .collect()
+}
+
+fn qualify_keyed_item_node_ids(html: &str) -> String {
+    const MARKER: &str = "data-presolve-node=\"";
+    let mut output = String::new();
+    let mut remaining = html;
+    while let Some(index) = remaining.find(MARKER) {
+        output.push_str(&remaining[..index + MARKER.len()]);
+        let value = &remaining[index + MARKER.len()..];
+        let Some(end) = value.find('"') else {
+            return html.to_string();
+        };
+        output.push_str(&value[..end]);
+        output.push_str(":__ez_list_key__");
+        output.push('"');
+        remaining = &value[end + 1..];
+    }
+    output.push_str(remaining);
+    output
+}
+
+fn structural_instance_slot_projections<'a>(
+    model: &'a ApplicationSemanticModel,
+    templates: &'a BTreeMap<crate::SemanticId, &'a TemplateNode>,
+    instance: &'a crate::ComponentInstance,
+) -> Option<Vec<SlotProjection<'a>>> {
+    if model.slot_bindings.for_callee(&instance.id).is_empty() {
+        return Some(Vec::new());
+    }
+    let parent = instance.parent_instance.as_ref()?;
+    let invocation = instance.invocation.as_ref()?;
+    let parent_instance = model.component_instance_plan.instances.get(parent)?;
+    let parent_template = templates.get(&parent_instance.component.template())?;
+    let invocation_entity = model
+        .component_invocations
+        .get(invocation)?
+        .template_entity
+        .clone();
+    let (element, path) = element_for_template_entity(parent_template, &invocation_entity)?;
+    Some(slot_projections_for_invocation(
+        model,
+        &instance.id,
+        parent,
+        parent_template,
+        element,
+        &path,
+        &[],
+    ))
+}
+
+fn element_for_template_entity<'a>(
+    template: &'a TemplateNode,
+    target: &crate::SemanticId,
+) -> Option<(&'a ElementNode, String)> {
+    fn visit<'a>(
+        template: &'a TemplateNode,
+        target: &crate::SemanticId,
+        nodes: &'a [TemplateChild],
+        parent_path: &str,
+    ) -> Option<(&'a ElementNode, String)> {
+        for (index, node) in nodes.iter().enumerate() {
+            let path = format!("{parent_path}.{index}");
+            match node {
+                TemplateChild::Element(element) => {
+                    if template.id.template_entity("element", &path) == *target {
+                        return Some((element, path));
+                    }
+                    if let Some(found) = visit(template, target, &element.children, &path) {
+                        return Some(found);
+                    }
+                }
+                TemplateChild::Fragment(fragment) => {
+                    if let Some(found) = visit(template, target, &fragment.children, &path) {
+                        return Some(found);
+                    }
+                }
+                TemplateChild::Conditional(conditional) => {
+                    if let Some(found) = visit(
+                        template,
+                        target,
+                        &conditional.when_true,
+                        &format!("{path}.true"),
+                    )
+                    .or_else(|| {
+                        visit(
+                            template,
+                            target,
+                            &conditional.when_false,
+                            &format!("{path}.false"),
+                        )
+                    }) {
+                        return Some(found);
+                    }
+                }
+                TemplateChild::List(list) => {
+                    if let Some(found) = visit(
+                        template,
+                        target,
+                        &list.item_template,
+                        &format!("{path}.item"),
+                    ) {
+                        return Some(found);
+                    }
+                }
+                TemplateChild::Text { .. } | TemplateChild::Binding { .. } => {}
+            }
+        }
+        None
+    }
+    if let Some(root) = &template.root {
+        if template.id.template_entity("element", "root") == *target {
+            return Some((root, "root".to_string()));
+        }
+        return visit(template, target, &root.children, "root");
+    }
+    template
+        .root_fragment
+        .as_ref()
+        .and_then(|fragment| visit(template, target, &fragment.children, "root"))
+}
+
+fn conditional_at_span(
+    template: &TemplateNode,
+    span: presolve_parser::SourceSpan,
+) -> Option<(&ConditionalNode, String)> {
+    fn visit<'a>(
+        children: &'a [TemplateChild],
+        parent_path: &str,
+        span: presolve_parser::SourceSpan,
+    ) -> Option<(&'a ConditionalNode, String)> {
+        for (index, child) in children.iter().enumerate() {
+            let path = format!("{parent_path}.{index}");
+            match child {
+                TemplateChild::Conditional(conditional) => {
+                    if conditional.span == span {
+                        return Some((conditional, path));
+                    }
+                    if let Some(found) =
+                        visit(&conditional.when_true, &format!("{path}.true"), span).or_else(|| {
+                            visit(&conditional.when_false, &format!("{path}.false"), span)
+                        })
+                    {
+                        return Some(found);
+                    }
+                }
+                TemplateChild::Element(element) => {
+                    if let Some(found) = visit(&element.children, &path, span) {
+                        return Some(found);
+                    }
+                }
+                TemplateChild::Fragment(fragment) => {
+                    if let Some(found) = visit(&fragment.children, &path, span) {
+                        return Some(found);
+                    }
+                }
+                TemplateChild::List(list) => {
+                    if let Some(found) = visit(&list.item_template, &format!("{path}.item"), span) {
+                        return Some(found);
+                    }
+                }
+                TemplateChild::Text { .. } | TemplateChild::Binding { .. } => {}
+            }
+        }
+        None
+    }
+
+    template
+        .root
+        .as_ref()
+        .and_then(|root| visit(&root.children, "root", span))
+        .or_else(|| {
+            template
+                .root_fragment
+                .as_ref()
+                .and_then(|fragment| visit(&fragment.children, "root", span))
+        })
+}
+
+fn list_at_span(
+    template: &TemplateNode,
+    span: presolve_parser::SourceSpan,
+) -> Option<(&ListNode, String)> {
+    fn visit<'a>(
+        children: &'a [TemplateChild],
+        parent_path: &str,
+        span: presolve_parser::SourceSpan,
+    ) -> Option<(&'a ListNode, String)> {
+        for (index, child) in children.iter().enumerate() {
+            let path = format!("{parent_path}.{index}");
+            match child {
+                TemplateChild::List(list) => {
+                    if list.span == span {
+                        return Some((list, path));
+                    }
+                    if let Some(found) = visit(&list.item_template, &format!("{path}.item"), span) {
+                        return Some(found);
+                    }
+                }
+                TemplateChild::Element(element) => {
+                    if let Some(found) = visit(&element.children, &path, span) {
+                        return Some(found);
+                    }
+                }
+                TemplateChild::Fragment(fragment) => {
+                    if let Some(found) = visit(&fragment.children, &path, span) {
+                        return Some(found);
+                    }
+                }
+                TemplateChild::Conditional(conditional) => {
+                    if let Some(found) =
+                        visit(&conditional.when_true, &format!("{path}.true"), span).or_else(|| {
+                            visit(&conditional.when_false, &format!("{path}.false"), span)
+                        })
+                    {
+                        return Some(found);
+                    }
+                }
+                TemplateChild::Text { .. } | TemplateChild::Binding { .. } => {}
+            }
+        }
+        None
+    }
+
+    template
+        .root
+        .as_ref()
+        .and_then(|root| visit(&root.children, "root", span))
+        .or_else(|| {
+            template
+                .root_fragment
+                .as_ref()
+                .and_then(|fragment| visit(&fragment.children, "root", span))
+        })
 }
 
 fn generate_ordinary_instance_html_for_roots(
@@ -352,14 +1017,16 @@ fn render_child(
                 .structural_ends
                 .get(marker)
                 .map_or("", String::as_str);
-            let selected = if matches!(
+            let selected_true = matches!(
                 conditional.initial_value,
                 Some(SerializableValue::Boolean(true))
-            ) {
+            );
+            let selected = if selected_true {
                 &conditional.when_true
             } else {
                 &conditional.when_false
             };
+            let selected_path = format!("{path}.{}", if selected_true { "true" } else { "false" });
             format!(
                 "<!--presolve-r-start:{}--><!--presolve-conditional-start:{}:ti:{}-->{}<!--presolve-conditional-end:{}:ti:{}--><!--presolve-r-end:{}-->",
                 escape_comment(resume_start),
@@ -375,7 +1042,7 @@ fn render_child(
                     instance,
                     template,
                     selected,
-                    path,
+                    &selected_path,
                     slot_projections,
                 ),
                 conditional.end_id.0,
@@ -487,6 +1154,16 @@ fn render_element(
             }
         }
     }
+    let structural_invocation = model
+        .component_invocations
+        .values()
+        .find(|candidate| candidate.template_entity == entity)
+        .and_then(|invocation| {
+            children
+                .get(&(instance.clone(), invocation.id.clone()))
+                .filter(|child| child.status == ComponentInstanceStatus::StructuralTemplate)
+                .map(|_| invocation.id.as_str())
+        });
     let mut html = format!(
         "<{} data-presolve-node=\"{}\"",
         element.tag_name,
@@ -506,6 +1183,11 @@ fn render_element(
             html.push_str(&escape_attr(event));
             html.push('"');
         }
+    }
+    if let Some(invocation) = structural_invocation {
+        html.push_str(" data-presolve-structural-invocation=\"");
+        html.push_str(&escape_attr(invocation));
+        html.push('"');
     }
     for attribute in &element.attributes {
         html.push(' ');
@@ -734,7 +1416,11 @@ fn escape_text(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{generate_ordinary_instance_html, generate_ordinary_instance_html_for_component};
+    use super::{
+        generate_ordinary_instance_html, generate_ordinary_instance_html_for_component,
+        generate_structural_conditional_host_fragments, generate_structural_keyed_host_fragments,
+        generate_structural_template_instance_html, StructuralConditionalHostScope,
+    };
     use crate::{
         build_application_semantic_model, build_resume_anchor_plan, validate_resume_marker_html,
     };
@@ -758,6 +1444,87 @@ mod tests {
         assert_eq!(html.matches("data-presolve-r=").count(), 4);
         assert_eq!(html.matches("data-presolve-e=").count(), 2);
         assert_eq!(html, generate_ordinary_instance_html(&model));
+    }
+
+    #[test]
+    fn renders_structural_conditional_slot_projection_from_the_canonical_binding() {
+        let model = build_application_semantic_model(&presolve_parser::parse_file(
+            "src/StructuralSlot.tsx",
+            r#"
+@component("x-panel") class Panel extends Component {
+  @slot() children!: SlotContent;
+  open = state(true);
+  render() { return <section>{this.open ? <><slot /><Leaf /></> : <aside>Closed</aside>}</section>; }
+}
+@component("x-leaf") class Leaf extends Component { render() { return <small>Leaf</small>; } }
+@component("x-page") class Page extends Component {
+  visible = state(true);
+  render() { return <main>{this.visible ? <Panel><button>Projected</button></Panel> : <aside>Hidden</aside>}</main>; }
+}
+"#,
+        ));
+        let region = model
+            .component_instance_plan
+            .instances
+            .values()
+            .find(|instance| instance.component.as_str().contains("component:x-leaf"))
+            .and_then(|instance| instance.structural_region.clone())
+            .expect("Panel conditional has a structural region");
+        let fragments = generate_structural_conditional_host_fragments(&model, &region);
+        let projected = fragments
+            .iter()
+            .find(|fragment| {
+                fragment.host_scope == StructuralConditionalHostScope::StructuralOccurrence
+            })
+            .expect("structural Panel host fragment is emitted");
+        assert!(projected.when_true_html.contains("Projected"));
+        let panel = model
+            .component_instance_plan
+            .instances
+            .values()
+            .find(|instance| instance.component.as_str().contains("component:x-panel"))
+            .expect("structural Panel instance");
+        let panel_html = generate_structural_template_instance_html(&model, &panel.id)
+            .expect("structural Panel template HTML");
+        assert!(panel_html.contains("Projected"));
+    }
+
+    #[test]
+    fn renders_structural_keyed_slot_projection_from_the_canonical_binding() {
+        let model = build_application_semantic_model(&presolve_parser::parse_file(
+            "src/StructuralKeyedSlot.tsx",
+            r#"
+@component("x-panel") class Panel extends Component {
+  @slot() children!: SlotContent;
+  items = state([{ id: "a" }]);
+  render() { return <ul>{this.items.map(item => <li key={item.id}><slot /><Leaf /></li>)}</ul>; }
+}
+@component("x-leaf") class Leaf extends Component { render() { return <small>Leaf</small>; } }
+@component("x-page") class Page extends Component {
+  visible = state(true);
+  render() { return <main>{this.visible ? <Panel><button>Projected</button></Panel> : <aside>Hidden</aside>}</main>; }
+}
+"#,
+        ));
+        let region = model
+            .component_instance_plan
+            .instances
+            .values()
+            .find(|instance| instance.component.as_str().contains("component:x-leaf"))
+            .and_then(|instance| instance.structural_region.clone())
+            .expect("Panel keyed host has a structural region");
+        let fragments = generate_structural_keyed_host_fragments(&model, &region);
+        let projected = fragments
+            .iter()
+            .find(|fragment| {
+                fragment.host_scope == StructuralConditionalHostScope::StructuralOccurrence
+            })
+            .expect("structural Panel keyed host fragment is emitted");
+        assert!(projected.item_template_html.contains("Projected"));
+        assert!(projected
+            .item_template_html
+            .contains("data-presolve-node=\""));
+        assert!(projected.item_template_html.contains(":__ez_list_key__"));
     }
 
     #[test]
@@ -808,5 +1575,120 @@ mod tests {
 
         assert!(html.contains("Home"));
         assert!(!html.contains("About"));
+    }
+
+    #[test]
+    fn preserves_conditional_template_paths_for_structural_invocations() {
+        let model = build_application_semantic_model(&presolve_parser::parse_file(
+            "src/StructuralMarker.tsx",
+            r#"
+@component("x-leaf") class Leaf { count = state(0); render() { return <strong>{this.count}</strong>; } }
+@component("x-page") class Page {
+  visible = state(true);
+  render() { return <main>{this.visible ? <Leaf /> : <span>Hidden</span>}</main>; }
+}
+"#,
+        ));
+        let html = generate_ordinary_instance_html(&model);
+        assert!(html.contains("data-presolve-node"));
+        assert!(!html.contains("componentByTag"));
+        assert!(html.contains("data-presolve-structural-invocation="));
+    }
+
+    #[test]
+    fn renders_both_compiler_addressed_conditional_host_fragments() {
+        let model = build_application_semantic_model(&presolve_parser::parse_file(
+            "src/StructuralHostFragments.tsx",
+            r#"
+@component("x-leaf") class Leaf { count = state(0); render() { return <strong>{this.count}</strong>; } }
+@component("x-page") class Page {
+  visible = state(true);
+  render() { return <main>{this.visible ? <Leaf /> : <span>Hidden</span>}</main>; }
+}
+"#,
+        ));
+        let region = model
+            .component_instance_plan
+            .instances
+            .values()
+            .find_map(|instance| instance.structural_region.as_ref())
+            .expect("conditional leaf is a structural template");
+
+        let fragments = generate_structural_conditional_host_fragments(&model, region);
+
+        assert_eq!(fragments.len(), 1);
+        assert!(fragments[0]
+            .when_true_html
+            .contains("data-presolve-structural-invocation="));
+        assert!(fragments[0].when_false_html.contains("Hidden"));
+        assert!(fragments[0].when_true_html.contains("data-presolve-node"));
+    }
+
+    #[test]
+    fn renders_nested_conditional_hosts_against_the_opaque_parent_occurrence() {
+        let model = build_application_semantic_model(&presolve_parser::parse_file(
+            "src/NestedStructuralHostFragments.tsx",
+            r#"
+@component("x-leaf") class Leaf { render() { return <small />; } }
+@component("x-card") class Card {
+  expanded = state(true);
+  render() { return <article>{this.expanded ? <section><Leaf />{this.expanded}</section> : <em>Collapsed</em>}</article>; }
+}
+@component("x-page") class Page {
+  shown = state(true);
+  render() { return <main>{this.shown ? <Card /> : <span>Hidden</span>}</main>; }
+}
+"#,
+        ));
+
+        let fragments = model
+            .component_instance_plan
+            .instances
+            .values()
+            .filter_map(|instance| instance.structural_region.clone())
+            .flat_map(|region| generate_structural_conditional_host_fragments(&model, &region))
+            .find(|fragments| {
+                fragments.host_scope == StructuralConditionalHostScope::StructuralOccurrence
+            })
+            .expect("nested structural host fragments");
+
+        assert!(fragments
+            .when_true_html
+            .contains("__PRESOLVE_STRUCTURAL_OCCURRENCE__"));
+        assert!(fragments
+            .when_true_html
+            .contains("data-presolve-structural-invocation="));
+        assert!(fragments.when_false_html.contains("Collapsed"));
+    }
+
+    #[test]
+    fn renders_keyed_component_invocations_with_compiler_anchors() {
+        let model = build_application_semantic_model(&presolve_parser::parse_file(
+            "src/KeyedStructuralHostFragments.tsx",
+            r#"
+@component("x-leaf") class Leaf { render() { return <small />; } }
+@component("x-page") class Page {
+  items = state([{ id: "a" }]);
+  render() { return <ul>{this.items.map(item => <li key={item.id}><Leaf /></li>)}</ul>; }
+}
+"#,
+        ));
+        let region = model
+            .component_instance_plan
+            .instances
+            .values()
+            .find_map(|instance| instance.structural_region.as_ref())
+            .expect("keyed leaf is a structural template");
+        let fragments = generate_structural_keyed_host_fragments(&model, region);
+
+        assert_eq!(fragments.len(), 1);
+        assert_eq!(
+            fragments[0].host_scope,
+            StructuralConditionalHostScope::StaticInstance
+        );
+        assert!(fragments[0].item_template_html.contains("__ez_list_key__"));
+        assert!(fragments[0]
+            .item_template_html
+            .contains("data-presolve-structural-invocation="));
     }
 }

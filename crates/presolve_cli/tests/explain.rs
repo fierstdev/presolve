@@ -4,6 +4,7 @@ use std::process::Command;
 use presolve_compiler::{
     build_application_semantic_model, build_resume_plan, lower_components_to_ir,
     optimize_computed_ir, IrConstant, IrInstructionKind, SerializationCompatibility,
+    RESUME_SNAPSHOT_SCHEMA_VERSION, RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION,
 };
 
 fn repo_root() -> PathBuf {
@@ -153,6 +154,27 @@ fn capability_registry_has_deterministic_json_human_and_migration_projections() 
     assert!(migration.starts_with("Presolve semantic compatibility guide (registry schema v1)\n\n"));
     assert!(!migration.contains("- opaque_typescript:"));
     assert!(!migration.contains("- resources:"));
+}
+
+#[test]
+fn migration_command_projects_the_canonical_registry_without_rewriting_source() {
+    let output = Command::new(presolve_cli_bin())
+        .current_dir(repo_root())
+        .args(["migrate", "--format", "json"])
+        .output()
+        .expect("failed to run migration report");
+    assert!(
+        output.status.success(),
+        "migration report failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("migration report JSON");
+    assert_eq!(report["schema"], "presolve.migration-report");
+    assert_eq!(report["version"], 1);
+    assert_eq!(report["policy"], "report-only-no-source-rewrites");
+    assert_eq!(report["automaticCodemods"], serde_json::json!([]));
+    assert_eq!(report["registry"]["schema_version"], 1);
 }
 
 #[test]
@@ -4385,8 +4407,11 @@ fn build_command_writes_page_manifest_and_runtime_artifacts() {
         .expect("failed to read built resume manifest");
     let parsed_resume: serde_json::Value =
         serde_json::from_str(&actual_resume).expect("resume manifest JSON");
-    assert_eq!(parsed_resume["schema_version"], 6);
-    assert_eq!(parsed_resume["snapshot_schema_version"], 1);
+    assert_eq!(parsed_resume["schema_version"], 7);
+    assert_eq!(
+        parsed_resume["snapshot_schema_version"],
+        RESUME_SNAPSHOT_SCHEMA_VERSION
+    );
     assert_eq!(parsed_resume["runtime_protocol_version"], 1);
     assert!(parsed_resume["build_id"]
         .as_str()
@@ -4811,7 +4836,10 @@ fn build_command_writes_compiler_generated_effect_runtime_metadata() {
     let artifact = std::fs::read_to_string(out_dir.join("effect.runtime.json"))
         .expect("failed to read effect runtime artifact");
     let artifact: serde_json::Value = serde_json::from_str(&artifact).expect("artifact JSON");
-    assert_eq!(artifact["schema_version"], 1);
+    assert_eq!(
+        artifact["schema_version"],
+        RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION
+    );
     assert_eq!(artifact["effects"].as_array().map(Vec::len), Some(1));
     assert_eq!(
         artifact["effects"][0]["initial_trigger"]["effect_batch_index"],

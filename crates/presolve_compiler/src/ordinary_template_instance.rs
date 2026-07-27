@@ -151,19 +151,16 @@ pub fn build_ordinary_template_instance_registry(
                             instance.id.clone(),
                             target_entity.id.clone(),
                         );
-                    let method = component.methods.iter().find(|method| {
-                        method.name
-                            == event
-                                .handler
-                                .strip_prefix("this.")
-                                .unwrap_or(&event.handler)
-                    });
-                    if let Some(method) = method {
+                    let name = event
+                        .handler
+                        .strip_prefix("this.")
+                        .unwrap_or(&event.handler);
+                    if let Some(endpoint) = component.action_endpoint_id(name) {
                         let Some(action_batch_id) = model
                             .effect_trigger_plan
                             .action_batches
                             .values()
-                            .find(|batch| batch.authored_action_method == method.id)
+                            .find(|batch| batch.authored_action_endpoint == endpoint)
                             .map(|batch| batch.id.clone())
                         else {
                             continue;
@@ -184,7 +181,7 @@ pub fn build_ordinary_template_instance_registry(
                             target_id,
                             declaration_event_id: event.id.clone(),
                             event_type: event.event.clone(),
-                            handler_method_id: method.id.clone(),
+                            handler_method_id: endpoint,
                             action_batch_id: Some(action_batch_id),
                             arguments: event.arguments.clone(),
                             existing_event_program_identity: event.id.clone(),

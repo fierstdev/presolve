@@ -683,6 +683,7 @@ fn query_semantic_kind(kind: SemanticEntityKind) -> ToolingQuerySemanticKindV1 {
         SemanticEntityKind::Component => ToolingQuerySemanticKindV1::Component,
         SemanticEntityKind::StateField => ToolingQuerySemanticKindV1::StateField,
         SemanticEntityKind::Method => ToolingQuerySemanticKindV1::Method,
+        SemanticEntityKind::ActionEndpoint => ToolingQuerySemanticKindV1::Action,
         SemanticEntityKind::Context => ToolingQuerySemanticKindV1::Context,
         SemanticEntityKind::Provider => ToolingQuerySemanticKindV1::Provider,
         SemanticEntityKind::Consumer => ToolingQuerySemanticKindV1::Consumer,

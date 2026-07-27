@@ -1,18 +1,12 @@
-name: Publish alpha
+name: Publish beta
 
 on:
   push:
     tags:
-      - "v0.1.0-alpha.*"
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "Exact prerelease version, for example 0.1.0-alpha.1"
-        required: true
-        type: string
+      - "v0.2.0-beta.*"
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
@@ -33,7 +27,7 @@ jobs:
       - run: cargo install wasm-bindgen-cli --version 0.2.108 --locked
       - name: Verify lockstep release version
         env:
-          RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+          RELEASE_VERSION: ${{ github.ref_name }}
         run: node scripts/verify-release-version.mjs "${RELEASE_VERSION#v}"
       - run: cargo fmt --all --check
       - run: RUST_TEST_THREADS=1 cargo test --workspace
@@ -42,18 +36,9 @@ jobs:
       - run: pnpm --dir packages/compiler-wasm test
       - run: pnpm --dir framework/packages/presolve pack --pack-destination ../../../.release
 
-  verify-browser:
-    name: Verify browser runtime
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Run browser e2e
-        run: cargo test -p presolve-cli --features browser-tests --test runtime_browser -- --nocapture --test-threads=1
-
   publish-crates:
     name: Publish crates.io packages
-    needs: [verify, verify-npm-auth]
+    needs: verify
     runs-on: ubuntu-latest
     environment:
       name: crates-io
@@ -75,7 +60,7 @@ jobs:
 
   native-cli:
     name: Build ${{ matrix.package }}
-    needs: [verify, verify-npm-auth]
+    needs: verify
     strategy:
       fail-fast: false
       matrix:
@@ -112,32 +97,12 @@ jobs:
         run: |
           mkdir -p packages/${{ matrix.package }}/bin
           cp target/${{ matrix.target }}/release/${{ matrix.executable }} packages/${{ matrix.package }}/bin/${{ matrix.executable }}
-      - name: Pack and verify native CLI package
-        run: node scripts/pack-native-cli.mjs "${{ matrix.package }}" release-artifacts
-      - uses: actions/upload-artifact@v7
+      - run: npm pack packages/${{ matrix.package }} --pack-destination .release
+      - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.package }}
-          path: release-artifacts/*.tgz
+          path: .release/*.tgz
           if-no-files-found: error
-
-  verify-npm-auth:
-    name: Verify npm publishing identity
-    needs: [verify, verify-browser]
-    runs-on: ubuntu-latest
-    environment:
-      name: npm
-    steps:
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 26.5.0
-          registry-url: https://registry.npmjs.org
-      - name: Verify npm identity and Presolve organization access
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          npm whoami
-          npm org ls presolve --json
-          npm access list packages @presolve --json
 
   publish-npm:
     name: Publish npm packages
@@ -150,9 +115,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v4
         with:
-          path: release-artifacts
+          path: .release
           merge-multiple: true
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
@@ -169,7 +134,10 @@ jobs:
       - name: Publish platform packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: node scripts/publish-native-cli.mjs --require-all release-artifacts
+        run: |
+          for package in .release/*.tgz; do
+            npm publish "$package" --tag beta --access public --provenance
+          done
       - name: Publish compiler tooling and application handoffs
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -178,6 +146,8 @@ jobs:
           pnpm --dir packages/language-service publish --no-git-checks --provenance
           pnpm --dir packages/lsp publish --no-git-checks --provenance
           pnpm --dir packages/testing publish --no-git-checks --provenance
+          pnpm --dir packages/typescript-authority publish --no-git-checks --provenance
+          pnpm --dir packages/vite publish --no-git-checks --provenance
       - name: Publish framework, CLI, and scaffold
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -206,22 +176,13 @@ jobs:
         run: npm exec --yes --package=@vscode/vsce@3.9.2 -- vsce publish --packagePath presolve-vscode.vsix --pat "$VSCE_PAT" --pre-release
         working-directory: packages/vscode
 
-  promote-scaffold:
-    name: Promote the public scaffold command
+  publish-github-release:
+    name: Publish GitHub release
     needs: publish-vscode
     runs-on: ubuntu-latest
-    environment:
-      name: npm
     steps:
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 26.5.0
-          registry-url: https://registry.npmjs.org
-      - name: Promote create-presolve only after the complete train succeeds
+      - uses: actions/checkout@v7
+      - name: Create prerelease notes
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
-        run: |
-          version="${RELEASE_VERSION#v}"
-          npm dist-tag add "create-presolve@${version}" latest
-          npm view create-presolve dist-tags --json
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --title "Presolve ${GITHUB_REF_NAME#v}" --generate-notes --prerelease

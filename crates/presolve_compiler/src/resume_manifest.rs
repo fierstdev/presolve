@@ -1,4 +1,4 @@
-//! J9 sole-authority executable resume manifest v6.
+//! J9 sole-authority executable resume manifest v7.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
@@ -28,7 +28,7 @@ use crate::{
     SourceProvenance,
 };
 
-pub const RESUME_MANIFEST_SCHEMA_VERSION: u32 = 6;
+pub const RESUME_MANIFEST_SCHEMA_VERSION: u32 = 7;
 pub const RESUME_RUNTIME_PROTOCOL_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -839,9 +839,9 @@ fn canonical_manifest_json(manifest: &ResumeManifest) -> String {
 
 /// # Errors
 ///
-/// Rejects non-v6 documents before deserialization and reports malformed v6
+/// Rejects non-v7 documents before deserialization and reports malformed v7
 /// JSON through the same runtime-boundary diagnostic envelope.
-pub fn parse_resume_manifest_v6(
+pub fn parse_resume_manifest_v7(
     json: &str,
 ) -> Result<ResumeManifest, ResumeManifestValidationDiagnostic> {
     let value = serde_json::from_str::<serde_json::Value>(json).map_err(|error| {
@@ -857,19 +857,27 @@ pub fn parse_resume_manifest_v6(
     {
         return Err(diagnostic(
             "PSRSM1201",
-            "resume runtime accepts only executable manifest schema v6",
+            "resume runtime accepts only executable manifest schema v7",
         ));
     }
     let manifest = serde_json::from_value(value).map_err(|error| {
         diagnostic(
             "PSRSM1201",
-            &format!("resume manifest v6 shape is malformed: {error}"),
+            &format!("resume manifest v7 shape is malformed: {error}"),
         )
     })?;
     if let Some(diagnostic) = validate_resume_manifest(&manifest).into_iter().next() {
         return Err(diagnostic);
     }
     Ok(manifest)
+}
+
+/// Compatibility entrypoint retained while callers migrate their symbol name.
+/// It accepts only the current schema-v7 product.
+pub fn parse_resume_manifest_v6(
+    json: &str,
+) -> Result<ResumeManifest, ResumeManifestValidationDiagnostic> {
+    parse_resume_manifest_v7(json)
 }
 
 #[must_use]
@@ -884,7 +892,7 @@ pub fn validate_resume_manifest(
     {
         diagnostics.push(diagnostic(
             "PSRSM1201",
-            "resume manifest version fields do not match the v6/v1/v1 contract",
+            "resume manifest version fields do not match the v7/v2/v1 contract",
         ));
         return diagnostics;
     }
@@ -1224,6 +1232,9 @@ fn manifest_provenance(provenance: &SourceProvenance) -> ResumeManifestProvenanc
 fn manifest_retention_reason(reason: ResumeRetentionReason) -> ResumeManifestRetentionReason {
     match reason {
         ResumeRetentionReason::MutableState => ResumeManifestRetentionReason::MutableState,
+        ResumeRetentionReason::ResourceSnapshotValue => {
+            ResumeManifestRetentionReason::SerializableResourceValue
+        }
         ResumeRetentionReason::NonRecomputableComputedCache
         | ResumeRetentionReason::ComputedDirtyState
         | ResumeRetentionReason::PureEagerComputedCache
@@ -1473,7 +1484,7 @@ mod tests {
     }
 
     #[test]
-    fn emits_canonical_v6_manifest_and_public_snapshot_protocol() {
+    fn emits_canonical_v7_manifest_and_public_snapshot_protocol() {
         let model = model(
             r#"@component("x-counter") class Counter {
   count = state(1);
@@ -1485,8 +1496,8 @@ mod tests {
         let manifest = build_resume_manifest(&model);
         let json = resume_manifest_json(&manifest);
         let value: serde_json::Value = serde_json::from_str(&json).expect("manifest JSON");
-        assert_eq!(value["schema_version"], 6);
-        assert_eq!(value["snapshot_schema_version"], 1);
+        assert_eq!(value["schema_version"], 7);
+        assert_eq!(value["snapshot_schema_version"], 2);
         assert_eq!(value["runtime_protocol_version"], 1);
         assert!(!manifest.boundaries.is_empty());
         assert!(!manifest.slot_schemas.is_empty());
@@ -1497,20 +1508,20 @@ mod tests {
         assert!(!manifest.anchors.is_empty());
         assert!(!manifest.events.is_empty());
         assert!(validate_resume_manifest(&manifest).is_empty());
-        assert_eq!(parse_resume_manifest_v6(&json), Ok(manifest));
+        assert_eq!(parse_resume_manifest_v7(&json), Ok(manifest));
         assert!(json.ends_with('\n'));
         assert!(!json[..json.len() - 1].contains('\n'));
     }
 
     #[test]
     fn rejects_v5_without_a_compatibility_adapter() {
-        let error = parse_resume_manifest_v6(r#"{"schema_version":5,"components":[]}"#)
+        let error = parse_resume_manifest_v7(r#"{"schema_version":5,"components":[]}"#)
             .expect_err("v5 rejected");
         assert_eq!(error.code, "PSRSM1201");
     }
 
     #[test]
-    fn rejects_unknown_fields_and_unresolved_v6_endpoints_at_parse_time() {
+    fn rejects_unknown_fields_and_unresolved_v7_endpoints_at_parse_time() {
         let model = model(
             r#"@component("x-counter") class Counter { count = state(1); render() { return <button>{this.count}</button>; } }"#,
         );
@@ -1521,11 +1532,11 @@ mod tests {
             .as_object_mut()
             .expect("manifest object")
             .insert("unknown".to_string(), serde_json::Value::Bool(true));
-        assert!(parse_resume_manifest_v6(&value.to_string()).is_err());
+        assert!(parse_resume_manifest_v7(&value.to_string()).is_err());
 
         let mut dangling = manifest;
         dangling.boundaries[0].capture_program_id = "resume-capture:missing".parse().expect("ID");
-        assert!(parse_resume_manifest_v6(&resume_manifest_json(&dangling)).is_err());
+        assert!(parse_resume_manifest_v7(&resume_manifest_json(&dangling)).is_err());
     }
 
     #[test]
@@ -1661,6 +1672,7 @@ mod tests {
             manifest_version: RESUME_MANIFEST_SCHEMA_VERSION,
             captured_at: None,
             boundaries: Vec::new(),
+            structural_occurrences: Vec::new(),
         };
         let json = crate::resume_snapshot_json(&snapshot);
         assert!(json.contains(manifest.build_id.as_str()));

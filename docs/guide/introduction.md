@@ -19,7 +19,7 @@ Presolve compiler
        └── deployment inventory
 ```
 
-The `@presolve/core` package is deliberately small. Its decorators communicate
+The `presolve` package is deliberately small. Its decorators communicate
 meaning to the compiler; they do not register components, create a reactive
 store, or install a renderer when JavaScript evaluates them. Compilation is
 what gives those declarations their behavior.

@@ -10,6 +10,8 @@ use crate::{
     build_application_publication_product_from_asm_v1,
     build_application_semantic_model_for_unit_with_packages, build_binding_table_with_packages,
     build_file_route_application_semantic_model_for_route_with_packages,
+    build_file_route_application_semantic_model_for_route_with_packages_and_v2_authoring,
+    build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring,
     build_layout_composition_plan_v1, build_module_graph, build_route_loader_plan_v1,
     build_route_server_action_plan_v1, build_symbol_table, build_validated_file_route_graph_v1,
     route_loader_plan_json_v1, route_server_action_plan_json_v1,
@@ -18,10 +20,12 @@ use crate::{
     ApplicationPublicationRequestErrorV1, ApplicationPublicationRequestV1,
     ApplicationPublicationSourceV1, CompilationUnit, ConstantFoldingPass, ImmutableAsmPass,
     SemanticPackageResolutionTable, SemanticPackageRuntimeModuleTable,
+    ValidatedApplicationPublicationRequestV1,
 };
 
 pub const FILE_ROUTE_PUBLICATION_MANIFEST_SCHEMA_VERSION: u32 = 1;
 pub const FILE_ROUTE_PUBLICATION_COMPILER_CONTRACT_V1: &str = "presolve-file-route-publication:1";
+pub const FILE_ROUTE_ENVIRONMENT_ARTIFACT_PATH_V1: &str = "environment.browser.json";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileRoutePublicationRequestV1 {
@@ -31,6 +35,12 @@ pub struct FileRoutePublicationRequestV1 {
     pub package_runtime_modules: SemanticPackageRuntimeModuleTable,
     pub profile: ApplicationPublicationProfileV1,
     pub output_root: PathBuf,
+    /// Optional caller-selected compiler environment artifact. Its contents
+    /// are validated here but must have been built from environment-read
+    /// lowering rather than from ambient configuration.
+    pub environment_artifact: Option<crate::EnvironmentPublicationArtifactV1>,
+    /// Compiler-validated V2 authoring evidence keyed by source path.
+    pub v2_authoring: BTreeMap<PathBuf, crate::CanonicalAuthoredSemanticModelV1>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -68,6 +78,9 @@ pub struct FileRoutePublicationRouteV1 {
 pub struct FileRoutePublicationProductV1 {
     pub manifest: FileRoutePublicationManifestV1,
     pub artifacts: BTreeMap<PathBuf, Vec<u8>>,
+    /// Internal compiler-selected route sources for sidecar joins. This is not
+    /// serialized and must not be reconstructed by adapters.
+    pub route_source_paths: BTreeMap<String, PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -98,6 +111,14 @@ pub struct FileRouteRequestMatchV1 {
 pub fn build_file_route_publication_v1(
     request: FileRoutePublicationRequestV1,
 ) -> Result<FileRoutePublicationProductV1, FileRoutePublicationErrorV1> {
+    if let Some(artifact) = &request.environment_artifact {
+        crate::validate_environment_publication_artifact_v1(artifact).map_err(|error| {
+            FileRoutePublicationErrorV1 {
+                code: "PSENV1201_ARTIFACT_INVALID",
+                message: error.to_string(),
+            }
+        })?;
+    }
     if request.sources.is_empty() {
         return Err(FileRoutePublicationErrorV1 {
             code: "PSROUTE2001_EMPTY_FILE_ROUTE_SOURCE_SET",
@@ -110,8 +131,19 @@ pub fn build_file_route_publication_v1(
             .iter()
             .map(|source| (&source.logical_path, source.source.as_str())),
     );
-    let model =
-        build_application_semantic_model_for_unit_with_packages(&unit, &request.package_contracts);
+    let model = if request.v2_authoring.is_empty() {
+        build_application_semantic_model_for_unit_with_packages(&unit, &request.package_contracts)
+    } else {
+        build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring(
+            &unit,
+            &request.package_contracts,
+            &request.v2_authoring,
+        )
+        .map_err(|error| FileRoutePublicationErrorV1 {
+            code: error.code,
+            message: error.message,
+        })?
+    };
     let graph = build_validated_file_route_graph_v1(&model).map_err(route_error)?;
     build_layout_composition_plan_v1(&model, &graph).map_err(|error| {
         FileRoutePublicationErrorV1 {
@@ -149,6 +181,7 @@ pub fn build_file_route_publication_v1(
         .collect::<BTreeMap<_, _>>();
     let mut artifacts = BTreeMap::new();
     let mut routes = Vec::new();
+    let mut route_source_paths = BTreeMap::new();
     for route in &graph.routes {
         let entry_path =
             component_modules
@@ -157,28 +190,45 @@ pub fn build_file_route_publication_v1(
                     code: "PSROUTE2003_ROUTE_COMPONENT_MODULE_MISSING",
                     message: route.component.to_string(),
                 })?;
-        let mut validated =
-            validate_application_publication_request_v1(ApplicationPublicationRequestV1 {
-                configuration: request.configuration.clone(),
-                sources: request.sources.clone(),
-                entry_path: entry_path.clone(),
-                package_contracts: request.package_contracts.clone(),
-                package_runtime_modules: request.package_runtime_modules.clone(),
-                profile: request.profile,
-                output_root: request.output_root.clone(),
-            })
-            .map_err(application_request_error)?;
-        let composed = ConstantFoldingPass.transform(
-            &build_file_route_application_semantic_model_for_route_with_packages(
+        let publication_request = ApplicationPublicationRequestV1 {
+            configuration: request.configuration.clone(),
+            sources: request.sources.clone(),
+            entry_path: entry_path.clone(),
+            package_contracts: request.package_contracts.clone(),
+            package_runtime_modules: request.package_runtime_modules.clone(),
+            profile: request.profile,
+            output_root: request.output_root.clone(),
+        };
+        let mut validated = if request.v2_authoring.is_empty() {
+            validate_application_publication_request_v1(publication_request)
+                .map_err(application_request_error)?
+        } else {
+            ValidatedApplicationPublicationRequestV1 {
+                request: publication_request,
+                unit: unit.clone(),
+                entry_component: route.component.clone(),
+                render_root_component: route.component.clone(),
+            }
+        };
+        let route_model = if request.v2_authoring.is_empty() {
+            build_file_route_application_semantic_model_for_route_with_packages(
                 &unit,
                 &request.package_contracts,
                 &route.component,
             )
-            .map_err(|error| FileRoutePublicationErrorV1 {
-                code: error.code,
-                message: error.message,
-            })?,
-        );
+        } else {
+            build_file_route_application_semantic_model_for_route_with_packages_and_v2_authoring(
+                &unit,
+                &request.package_contracts,
+                &route.component,
+                &request.v2_authoring,
+            )
+        }
+        .map_err(|error| FileRoutePublicationErrorV1 {
+            code: error.code,
+            message: error.message,
+        })?;
+        let composed = ConstantFoldingPass.transform(&route_model);
         validated.render_root_component = route
             .layouts
             .first()
@@ -202,6 +252,7 @@ pub fn build_file_route_publication_v1(
             artifact_root,
             layout_component_ids: route.layouts.iter().map(ToString::to_string).collect(),
         });
+        route_source_paths.insert(route.path.clone(), entry_path.clone());
     }
     routes.sort_by(|left, right| left.path.cmp(&right.path));
     artifacts.insert(
@@ -212,6 +263,12 @@ pub fn build_file_route_publication_v1(
         PathBuf::from("route-server-actions.plan.json"),
         route_server_action_plan_json_v1(&route_server_action_plan).into_bytes(),
     );
+    if let Some(artifact) = request.environment_artifact {
+        artifacts.insert(
+            PathBuf::from(FILE_ROUTE_ENVIRONMENT_ARTIFACT_PATH_V1),
+            crate::environment_publication_artifact_json_v1(&artifact).into_bytes(),
+        );
+    }
     let manifest = FileRoutePublicationManifestV1 {
         schema_version: FILE_ROUTE_PUBLICATION_MANIFEST_SCHEMA_VERSION,
         compiler_contract: FILE_ROUTE_PUBLICATION_COMPILER_CONTRACT_V1.into(),
@@ -232,6 +289,7 @@ pub fn build_file_route_publication_v1(
     Ok(FileRoutePublicationProductV1 {
         manifest,
         artifacts,
+        route_source_paths,
     })
 }
 
@@ -406,6 +464,14 @@ mod tests {
             package_runtime_modules: SemanticPackageRuntimeModuleTable::default(),
             profile: ApplicationPublicationProfileV1::Development,
             output_root: "dist".into(),
+            environment_artifact: Some(crate::EnvironmentPublicationArtifactV1 {
+                schema_version: crate::ENVIRONMENT_PUBLICATION_SCHEMA_VERSION,
+                browser_values: BTreeMap::from([(
+                    "PRESOLVE_PUBLIC_NAME".into(),
+                    "Presolve".into(),
+                )]),
+            }),
+            v2_authoring: BTreeMap::new(),
         })
         .unwrap();
 
@@ -423,6 +489,16 @@ mod tests {
         assert!(product
             .artifacts
             .contains_key(&PathBuf::from("file-routes.manifest.json")));
+        let environment = String::from_utf8(
+            product.artifacts[&PathBuf::from(FILE_ROUTE_ENVIRONMENT_ARTIFACT_PATH_V1)].clone(),
+        )
+        .unwrap();
+        assert!(environment.contains("PRESOLVE_PUBLIC_NAME"));
+        assert!(product
+            .manifest
+            .artifacts
+            .iter()
+            .any(|artifact| artifact.path == FILE_ROUTE_ENVIRONMENT_ARTIFACT_PATH_V1));
     }
 
     #[test]
@@ -449,6 +525,8 @@ mod tests {
             package_runtime_modules: SemanticPackageRuntimeModuleTable::default(),
             profile: ApplicationPublicationProfileV1::Development,
             output_root: "dist".into(),
+            environment_artifact: None,
+            v2_authoring: BTreeMap::new(),
         })
         .expect("valid route layout publication");
 
@@ -485,6 +563,8 @@ import { loadPost } from "post-service";
             package_runtime_modules: SemanticPackageRuntimeModuleTable::default(),
             profile: ApplicationPublicationProfileV1::Development,
             output_root: "dist".into(),
+            environment_artifact: None,
+            v2_authoring: BTreeMap::new(),
         })
         .expect("route loader handoff publication");
 
@@ -522,6 +602,8 @@ import { savePost } from "post-service";
             package_runtime_modules: SemanticPackageRuntimeModuleTable::default(),
             profile: ApplicationPublicationProfileV1::Development,
             output_root: "dist".into(),
+            environment_artifact: None,
+            v2_authoring: BTreeMap::new(),
         })
         .expect("route server-action handoff publication");
 

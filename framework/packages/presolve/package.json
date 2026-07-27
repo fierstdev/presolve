@@ -1,6 +1,6 @@
 {
-  "name": "@presolve/core",
-  "version": "0.1.0-alpha.8",
+  "name": "presolve",
+  "version": "0.2.0-beta.1",
   "description": "Presolve compiler authoring vocabulary for TypeScript.",
   "license": "MIT OR Apache-2.0",
   "repository": {
@@ -14,7 +14,7 @@
   ],
   "publishConfig": {
     "access": "public",
-    "tag": "alpha"
+    "tag": "beta"
   },
   "type": "module",
   "exports": {

@@ -4,7 +4,7 @@ Presolve support is limited to reproducible reports and contribution discussion
 in this repository. It is not a hosted service, private support channel,
 service-level agreement, compatibility guarantee, or operational commitment.
 
-For a defect in an available alpha surface, use the bug-report form with the
+For a defect in an available beta surface, use the bug-report form with the
 exact Presolve version, explicit command/configuration, and a minimal committed
 or attachable reproduction. For a security concern, follow
 [SECURITY.md](SECURITY.md). Contributions follow [CONTRIBUTING.md](CONTRIBUTING.md)

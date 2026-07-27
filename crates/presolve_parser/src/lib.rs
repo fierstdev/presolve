@@ -3,16 +3,17 @@ mod oxc_adapter;
 
 pub use model::{
     ParseDiagnostic, ParseLabel, ParseSeverity, ParsedArithmeticExpression,
-    ParsedArithmeticExpressionKind, ParsedArithmeticOperator, ParsedClass, ParsedClassHeritage,
-    ParsedComparisonOperator, ParsedComputedExpression, ParsedComputedExpressionKind,
-    ParsedConstantExpression, ParsedConstantExpressionKind, ParsedDecorator, ParsedEffectBody,
-    ParsedEffectExpression, ParsedEffectExpressionKind, ParsedEffectStatement,
-    ParsedEffectStatementKind, ParsedEventHandler, ParsedExport, ParsedExportKind,
-    ParsedExportSpecifier, ParsedFile, ParsedImport, ParsedImportSpecifier, ParsedJsxAttribute,
+    ParsedArithmeticExpressionKind, ParsedArithmeticOperator, ParsedCallArgument,
+    ParsedCallExpression, ParsedClass, ParsedClassHeritage, ParsedComparisonOperator,
+    ParsedComputedExpression, ParsedComputedExpressionKind, ParsedConstantExpression,
+    ParsedConstantExpressionKind, ParsedDecorator, ParsedEffectBody, ParsedEffectExpression,
+    ParsedEffectExpressionKind, ParsedEffectStatement, ParsedEffectStatementKind,
+    ParsedEventHandler, ParsedExport, ParsedExportKind, ParsedExportSpecifier, ParsedFile,
+    ParsedImport, ParsedImportSpecifier, ParsedInlineHandler, ParsedJsxAttribute,
     ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional, ParsedJsxElement,
     ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLocalVariable, ParsedLogicalOperator,
     ParsedMethod, ParsedMethodCall, ParsedMethodParameter, ParsedProperty, ParsedSerializableValue,
-    ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator,
+    ParsedSourceAst, ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator,
     ParsedThisMemberDesignator, ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator,
     ParsedUnsupportedEffectStatementKind, ParsedValidationRuleArgument,
     ParsedValidationRuleArgumentKind, ParsedValidationRuleExpression,
@@ -103,6 +104,62 @@ class Profile {
     }
 
     #[test]
+    fn retains_a_source_faithful_general_estree_product() {
+        let source = r#"
+import type { CardProps } from "./types";
+export const Card = <section aria-label="card">{1 + 2}</section>;
+"#;
+        let parsed = parse_file("src/Card.tsx", source);
+        assert_eq!(parsed.syntax.source, source);
+        assert_eq!(parsed.syntax.span.start, 0);
+        assert_eq!(parsed.syntax.span.end, source.len());
+        assert!(parsed.syntax.estree_json.contains("\"Program\""));
+        assert!(parsed.syntax.estree_json.contains("\"ImportDeclaration\""));
+        assert!(parsed.syntax.estree_json.contains("\"JSXElement\""));
+        assert!(
+            parsed.syntax.estree_json.contains("\"TSImportType\"")
+                || parsed
+                    .syntax
+                    .estree_json
+                    .contains("\"importKind\":\"type\"")
+        );
+    }
+
+    #[test]
+    fn retains_general_call_sites_without_framework_classification() {
+        let source = r#"
+const name = environment.public("PRESOLVE_PUBLIC_APP_NAME");
+const dynamic = environment.public(getName());
+"#;
+        let parsed = parse_file("src/environment.ts", source);
+        assert_eq!(parsed.call_expressions.len(), 3);
+        let public_calls = parsed
+            .call_expressions
+            .iter()
+            .filter(|call| {
+                &source[call.callee_span.start..call.callee_span.end] == "environment.public"
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(public_calls.len(), 2);
+        assert!(public_calls.iter().all(|call| {
+            call.member_object_span
+                .is_some_and(|span| &source[span.start..span.end] == "environment")
+                && call
+                    .member_property_span
+                    .is_some_and(|span| &source[span.start..span.end] == "public")
+        }));
+        assert!(matches!(
+            &public_calls[0].arguments[0],
+            super::ParsedCallArgument::StringLiteral { value, .. }
+                if value == "PRESOLVE_PUBLIC_APP_NAME"
+        ));
+        assert!(matches!(
+            public_calls[1].arguments[0],
+            super::ParsedCallArgument::Other { .. }
+        ));
+    }
+
+    #[test]
     fn retains_invalid_outer_validation_invocation_and_expression_shapes() {
         let source = r#"
 @component("profile")
@@ -146,6 +203,105 @@ class Profile {
             &source[heritage.span.start..heritage.span.end],
             "Base.Component"
         );
+    }
+
+    #[test]
+    fn retains_source_faithful_import_binding_spans() {
+        let source = "import { Component as FrameworkBase } from \"presolve\";";
+        let parsed = parse_file("src/Card.tsx", source);
+        let specifier = &parsed.imports[0].specifiers[0];
+        assert_eq!(specifier.imported, "Component");
+        assert_eq!(specifier.local, "FrameworkBase");
+        assert_eq!(
+            &source[specifier.local_span.start..specifier.local_span.end],
+            "FrameworkBase"
+        );
+    }
+
+    #[test]
+    fn retains_direct_initializer_call_spans_without_intrinsic_classification() {
+        let source = "class Counter { count = reactiveCell(0); plain = 1; }";
+        let parsed = parse_file("src/Counter.tsx", source);
+        let property = &parsed.classes[0].properties[0];
+        let call = property
+            .initializer_call
+            .as_ref()
+            .expect("direct calls are retained as syntax facts");
+        assert_eq!(
+            &source[call.callee_span.start..call.callee_span.end],
+            "reactiveCell"
+        );
+        assert_eq!(&source[call.span.start..call.span.end], "reactiveCell(0)");
+        assert_eq!(call.argument_count, 1);
+        assert!(parsed.classes[0].properties[1].initializer_call.is_none());
+    }
+
+    #[test]
+    fn retains_inline_initializer_handler_updates_without_classifying_the_call() {
+        let source = r#"
+class Counter {
+  increment = activate(() => { this.count += 1; unrelated(); });
+  reset = activate(async function () { this.count = 0; });
+}
+"#;
+        let parsed = parse_file("src/Counter.tsx", source);
+        let increment = parsed.classes[0].properties[0]
+            .initializer_call
+            .as_ref()
+            .and_then(|call| call.inline_handler.as_ref())
+            .expect("inline arrow handler should remain a syntax fact");
+        assert!(!increment.is_async);
+        assert!(!increment.is_expression_body);
+        assert_eq!(increment.state_updates.len(), 1);
+        assert_eq!(increment.state_updates[0].field, "count");
+        assert_eq!(increment.unsupported_statement_spans.len(), 1);
+        assert_eq!(
+            increment
+                .effect_body
+                .as_ref()
+                .expect("inline block body")
+                .statements
+                .len(),
+            2
+        );
+        assert_eq!(
+            &source[increment.unsupported_statement_spans[0].start
+                ..increment.unsupported_statement_spans[0].end],
+            "unrelated();"
+        );
+
+        let reset = parsed.classes[0].properties[1]
+            .initializer_call
+            .as_ref()
+            .and_then(|call| call.inline_handler.as_ref())
+            .expect("inline function handler should remain a syntax fact");
+        assert!(reset.is_async);
+        assert_eq!(reset.state_updates.len(), 1);
+        assert!(reset.unsupported_statement_spans.is_empty());
+        assert!(reset.effect_body.is_some());
+    }
+
+    #[test]
+    fn retains_inline_effect_cleanup_without_recognizing_the_callee() {
+        let source = r#"
+class Counter {
+  sync = observe(() => {
+    document.title = this.title;
+    return () => { document.title = ""; };
+  });
+}
+"#;
+        let parsed = parse_file("src/Counter.tsx", source);
+        let body = parsed.classes[0].properties[0]
+            .initializer_call
+            .as_ref()
+            .and_then(|call| call.inline_handler.as_ref())
+            .and_then(|handler| handler.effect_body.as_ref())
+            .expect("general inline block body");
+        assert_eq!(body.statements.len(), 1);
+        let cleanup = body.cleanup.as_ref().expect("cleanup callback");
+        assert!(!cleanup.is_async);
+        assert_eq!(cleanup.body.statements.len(), 1);
     }
 
     #[test]

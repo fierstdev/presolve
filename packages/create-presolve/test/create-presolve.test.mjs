@@ -14,13 +14,21 @@ const result = spawnSync(process.execPath, ["bin/create-presolve.mjs", target], 
 assert.equal(result.status, 0, result.stderr);
 assert.ok(existsSync(join(target, "app/routes/index.tsx")));
 assert.ok(existsSync(join(target, "app/routes/docs/getting-started.tsx")));
+for (const route of ["app/routes/index.tsx", "app/routes/docs/index.tsx", "app/routes/docs/getting-started.tsx"]) {
+  const source = readFileSync(join(target, route), "utf8");
+  assert.match(source, /extends Component/);
+  assert.doesNotMatch(source, /@component|@action|@computed|@form|@resource|@slot|@loader|@serverAction/);
+}
+for (const path of ["app/components/README.md", "server/README.md", "styles/app.css", "assets/README.md", "public/robots.txt", "tests/README.md", ".env.example"]) {
+  assert.ok(existsSync(join(target, path)), `missing conventional platform path ${path}`);
+}
+assert.match(readFileSync(join(target, ".env.example"), "utf8"), /PRESOLVE_PUBLIC_APP_NAME/);
 const manifest = JSON.parse(readFileSync(join(target, "package.json"), "utf8"));
 assert.equal(manifest.packageManager, "pnpm@11.17.0");
+assert.equal(manifest.devDependencies["@presolve/typescript-authority"], "0.2.0-beta.1");
 assert.ok(manifest.scripts["deploy:prepare"]);
-assert.equal(
-  readFileSync(join(target, "pnpm-workspace.yaml"), "utf8"),
-  "allowBuilds:\n  esbuild: true\n  workerd: true\n",
-);
+assert.equal(manifest.scripts["deploy:node:prepare"], "presolve deploy node --prepare");
+assert.match(readFileSync(join(target, "README.md"), "utf8"), /deploy:node:prepare/);
 const second = spawnSync(process.execPath, ["bin/create-presolve.mjs", target], {
   cwd: new URL("..", import.meta.url),
   encoding: "utf8",

@@ -6,18 +6,50 @@ use crate::runtime_computed_artifact::{
     RuntimeComputedArtifactInstruction, RuntimeComputedArtifactOperand,
 };
 use crate::{
-    build_runtime_effect_registry, ApplicationSemanticModel, EffectExecutionPolicy,
-    EffectRenderBoundary, ExecutionBoundary, IntermediateRepresentation, IrInstruction,
-    IrInstructionKind, IrValueId, RuntimeEffectRecord, EFFECT_CAPABILITY_REGISTRY,
+    build_runtime_effect_instance_registry, build_runtime_effect_registry,
+    build_runtime_effect_structural_template_registry, ApplicationSemanticModel,
+    EffectExecutionPolicy, EffectRenderBoundary, ExecutionBoundary, IntermediateRepresentation,
+    IrInstruction, IrInstructionKind, IrValueId, RuntimeEffectRecord, EFFECT_CAPABILITY_REGISTRY,
 };
 
-pub const RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION: u32 = 1;
+pub const RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION: u32 = 7;
 
 /// Versioned compiler-generated runtime metadata and effect programs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RuntimeEffectArtifact {
     pub schema_version: u32,
     pub effects: Vec<RuntimeEffectArtifactEffect>,
+    pub instances: Vec<RuntimeEffectArtifactInstance>,
+    pub structural_templates: Vec<RuntimeEffectArtifactStructuralTemplate>,
+}
+
+/// One instance-qualified V2 effect ownership record. Programs remain on the
+/// declaration record until instance execution context is available.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RuntimeEffectArtifactInstance {
+    pub effect_instance: String,
+    pub effect: String,
+    pub component_instance: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_instance: Option<String>,
+    pub depth: usize,
+    pub declaration_order: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RuntimeEffectArtifactStructuralTemplate {
+    /// Template-qualified effect-instance identity. The structural runtime
+    /// replaces only the template-instance prefix with its opaque occurrence
+    /// identity before it can activate this record.
+    pub effect_instance: String,
+    pub template_instance: String,
+    pub effect: String,
+    pub component: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_instance: Option<String>,
+    pub structural_region: String,
+    pub depth: usize,
+    pub declaration_order: u32,
 }
 
 /// Runtime metadata and executable capability program for one lowered effect.
@@ -30,7 +62,13 @@ pub struct RuntimeEffectArtifactEffect {
     pub action_batch_triggers: Vec<RuntimeEffectArtifactActionTrigger>,
     pub capability_operations: Vec<RuntimeEffectArtifactCapabilityOperation>,
     pub execution_boundary: RuntimeEffectArtifactExecutionBoundary,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub declaration_order: Option<u32>,
+    /// Whether this V2 field effect is eligible for its single post-resume run.
+    pub run_on_resume: bool,
     pub program: RuntimeEffectArtifactProgram,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cleanup_program: Option<RuntimeEffectArtifactProgram>,
 }
 
 /// Explicit initial-render trigger metadata for one emitted effect.
@@ -137,13 +175,53 @@ pub fn build_runtime_effect_artifact(
         .records
         .values()
         .filter_map(|record| {
-            let program = programs.get(&record.effect)?.clone();
-            runtime_effect(record, program)
+            let programs = programs.get(&record.effect)?;
+            runtime_effect(record, programs.main.clone(), programs.cleanup.clone())
         })
         .collect();
     RuntimeEffectArtifact {
         schema_version: RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION,
         effects,
+        instances: build_runtime_effect_instance_registry(model)
+            .records
+            .into_iter()
+            .map(|record| RuntimeEffectArtifactInstance {
+                effect_instance: record.id.as_str().to_owned(),
+                effect: record.effect.to_string(),
+                component_instance: record.component_instance.as_str().to_owned(),
+                parent_instance: record
+                    .parent_instance
+                    .map(|parent| parent.as_str().to_owned()),
+                depth: record.depth,
+                declaration_order: record.declaration_order,
+            })
+            .collect(),
+        structural_templates: build_runtime_effect_structural_template_registry(model)
+            .into_iter()
+            .map(|record| RuntimeEffectArtifactStructuralTemplate {
+                effect_instance: crate::EffectInstanceId::for_component_instance(
+                    &record.template_instance,
+                    &record.effect,
+                )
+                .as_str()
+                .to_owned(),
+                template_instance: record.template_instance.as_str().to_owned(),
+                effect: record.effect.to_string(),
+                component: model
+                    .component_instance_plan
+                    .instances
+                    .get(&record.template_instance)
+                    .expect("structural effect template belongs to a planned component instance")
+                    .component
+                    .to_string(),
+                parent_instance: record
+                    .parent_instance
+                    .map(|value| value.as_str().to_owned()),
+                structural_region: record.structural_region.as_str().to_owned(),
+                depth: record.depth,
+                declaration_order: record.declaration_order,
+            })
+            .collect(),
     }
 }
 
@@ -160,6 +238,7 @@ pub fn runtime_effect_artifact_json(artifact: &RuntimeEffectArtifact) -> String 
 fn runtime_effect(
     record: &RuntimeEffectRecord,
     program: RuntimeEffectArtifactProgram,
+    cleanup_program: Option<RuntimeEffectArtifactProgram>,
 ) -> Option<RuntimeEffectArtifactEffect> {
     Some(RuntimeEffectArtifactEffect {
         effect: record.effect.as_str().to_string(),
@@ -186,13 +265,20 @@ fn runtime_effect(
             .collect(),
         capability_operations: capability_operations(&record.capability_operations)?,
         execution_boundary: execution_boundary(record.execution_boundary),
+        declaration_order: record.declaration_order,
+        run_on_resume: record.run_on_resume,
         program,
+        cleanup_program,
     })
 }
 
-fn effect_programs(
-    ir: &IntermediateRepresentation,
-) -> BTreeMap<crate::SemanticId, RuntimeEffectArtifactProgram> {
+#[derive(Debug, Clone)]
+struct EffectPrograms {
+    main: RuntimeEffectArtifactProgram,
+    cleanup: Option<RuntimeEffectArtifactProgram>,
+}
+
+fn effect_programs(ir: &IntermediateRepresentation) -> BTreeMap<crate::SemanticId, EffectPrograms> {
     ir.modules
         .iter()
         .flat_map(|module| {
@@ -201,19 +287,36 @@ fn effect_programs(
                     .functions
                     .iter()
                     .find(|function| function.id == execution.function)?;
-                let instructions = function
-                    .blocks
-                    .iter()
-                    .flat_map(|block| block.instructions.iter())
-                    .map(runtime_instruction)
-                    .collect::<Option<Vec<_>>>()?;
+                let program = runtime_effect_program(function)?;
+                let cleanup = if let Some(cleanup_id) = &execution.cleanup_function {
+                    let function = module
+                        .functions
+                        .iter()
+                        .find(|function| function.id == *cleanup_id)?;
+                    Some(runtime_effect_program(function)?)
+                } else {
+                    None
+                };
                 Some((
                     execution.effect.clone(),
-                    RuntimeEffectArtifactProgram { instructions },
+                    EffectPrograms {
+                        main: program,
+                        cleanup,
+                    },
                 ))
             })
         })
         .collect()
+}
+
+fn runtime_effect_program(function: &crate::IrFunction) -> Option<RuntimeEffectArtifactProgram> {
+    let instructions = function
+        .blocks
+        .iter()
+        .flat_map(|block| block.instructions.iter())
+        .map(runtime_instruction)
+        .collect::<Option<Vec<_>>>()?;
+    Some(RuntimeEffectArtifactProgram { instructions })
 }
 
 fn runtime_instruction(instruction: &IrInstruction) -> Option<RuntimeEffectArtifactInstruction> {
@@ -377,6 +480,9 @@ class RuntimeEffectArtifact extends Component {
             RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION
         );
         assert_eq!(artifact.effects.len(), 1);
+        assert!(artifact.instances.is_empty());
+        assert!(effect.cleanup_program.is_none());
+        assert!(!effect.run_on_resume);
         assert_eq!(effect.effect, report.as_str());
         assert_eq!(effect.execution_function, report.as_str());
         assert_eq!(
@@ -446,7 +552,7 @@ class RuntimeEffectArtifact extends Component {
         ));
         assert_eq!(first, second);
         let json: serde_json::Value = serde_json::from_str(&first).expect("artifact JSON");
-        assert_eq!(json["schema_version"], 1);
+        assert_eq!(json["schema_version"], 7);
         assert_eq!(
             json["effects"][0]["program"]["instructions"][2]["kind"],
             "capability-call"
@@ -457,5 +563,46 @@ class RuntimeEffectArtifact extends Component {
             .expect("instructions")
             .iter()
             .all(|instruction| instruction.get("static_path").is_none()));
+    }
+
+    #[test]
+    fn emits_distinct_v2_effect_instances_for_repeated_component_instances() {
+        let parsed = presolve_parser::parse_file(
+            "src/RepeatedEffectArtifact.tsx",
+            r#"
+@component("x-card") class Card extends Component {
+  @effect() report() { document.title = "card"; }
+  render() { return <article />; }
+}
+@component("x-page") class Page extends Component {
+  render() { return <main><Card /><Card /></main>; }
+}
+"#,
+        );
+        let mut model = build_application_semantic_model(&parsed);
+        let effect_id = model.components[0].id.effect("report");
+        let effect = model.effects.get_mut(&effect_id).expect("Card effect");
+        effect.declaration = crate::EffectDeclaration::V2Field;
+        effect.declaration_order = Some(0);
+        let artifact = build_runtime_effect_artifact(
+            &model,
+            &optimize_effect_ir(&lower_components_to_ir(&model)).output,
+        );
+
+        assert_eq!(artifact.effects.len(), 1);
+        assert_eq!(artifact.instances.len(), 2);
+        assert!(artifact
+            .instances
+            .iter()
+            .all(|record| record.effect == effect_id.as_str()));
+        assert_ne!(
+            artifact.instances[0].effect_instance,
+            artifact.instances[1].effect_instance
+        );
+        assert!(artifact
+            .instances
+            .iter()
+            .all(|record| record.parent_instance.is_some()));
+        assert!(artifact.instances.iter().all(|record| record.depth == 1));
     }
 }

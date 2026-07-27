@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "suite": "presolve-representative-applications",
+  "applications": [
+    {
+      "name": "counter-resume",
+      "root": "fixtures/representative-applications/counter-resume",
+      "evidence": ["production-build", "cold-resume-runtime", "vite-hmr-transport"]
+    },
+    {
+      "name": "nested-routes",
+      "root": "fixtures/representative-applications/nested-routes",
+      "evidence": ["production-build", "route-layout-publication", "vite-hmr-transport"]
+    }
+  ]
+}

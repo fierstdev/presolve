@@ -4,15 +4,22 @@
 //! spans, obvious declarations, and diagnostics. That gives the project a stable
 //! place to learn compiler fundamentals before choosing a real parser backend.
 
+pub mod action_authority;
+pub mod action_field_lowering;
 pub mod application_publication;
 pub mod application_semantic_model;
 pub mod asm_validation;
+pub mod authored_semantics;
 pub mod binding_table;
+pub mod capability_projection;
+pub mod capture_escape;
+pub mod codec_protocol;
 pub mod compilation_unit;
 pub mod compiler_pass;
 pub mod component_composition;
 pub mod component_diagnostics;
 pub mod component_graph;
+pub mod component_inheritance_lowering;
 pub mod component_initialization;
 pub mod component_instance;
 pub mod component_instance_scope;
@@ -21,7 +28,9 @@ pub mod component_ir;
 pub mod component_ir_optimization;
 pub mod component_scope;
 pub mod composition_typing;
+pub mod computed_getter_lowering;
 pub mod computed_instance_slots;
+pub mod computed_projection;
 pub mod computed_value;
 pub mod consumer;
 pub mod context;
@@ -33,15 +42,25 @@ pub mod context_evaluation;
 pub mod context_inspection;
 pub mod context_lifetime;
 pub mod context_ownership;
+pub mod context_projection;
 pub mod context_resolution;
 pub mod context_resume;
+pub mod context_resume_projection;
 pub mod context_typing;
 pub mod context_update;
+pub mod control_flow;
 pub mod effect;
 pub mod effect_capability;
 pub mod effect_diagnostics;
+pub mod effect_field_lowering;
 pub mod effect_inspection;
+pub mod effect_projection;
 pub mod effect_resume;
+pub mod environment_input;
+pub mod environment_ownership;
+pub mod environment_publication;
+pub mod environment_read_lowering;
+pub mod environment_read_ownership;
 pub mod explain;
 pub mod expression_graph;
 pub mod file_route_publication;
@@ -53,14 +72,18 @@ pub mod form_inspection;
 pub mod form_ir;
 pub mod form_ir_optimization;
 pub mod form_ownership;
+pub mod form_projection;
 pub mod form_reset;
 pub mod form_serialization;
 pub mod form_submission;
 pub mod form_submission_host;
+pub mod form_submission_projection;
 pub mod form_tracking;
 pub mod form_validation;
 pub mod form_validation_plan;
+pub mod function_summary;
 pub mod html_codegen;
+pub mod incremental_projection;
 pub mod instance_context;
 pub mod intermediate_representation;
 #[cfg(any(test, all(feature = "wasm", target_arch = "wasm32")))]
@@ -68,6 +91,7 @@ mod language_service;
 pub mod layout_composition;
 pub mod layout_graph;
 pub mod lazy_action_chunks;
+pub mod legacy_decorator_lowering;
 pub mod metaframework_handoff;
 pub mod model;
 pub mod module_graph;
@@ -95,7 +119,9 @@ pub mod production_scheduler;
 pub mod production_validation;
 pub mod project_discovery;
 pub mod provider;
+pub mod purity_effect;
 pub mod resource;
+pub mod resource_projection;
 pub mod resume_activation;
 pub mod resume_anchor;
 pub mod resume_boot;
@@ -113,6 +139,8 @@ pub mod resume_restore;
 pub mod resume_schema;
 pub mod route_graph;
 pub mod route_loader;
+pub mod route_loader_projection;
+pub mod route_metadata;
 pub mod route_server_action;
 pub mod runtime_codegen;
 pub mod runtime_component;
@@ -123,6 +151,7 @@ pub mod runtime_context;
 pub mod runtime_context_artifact;
 pub mod runtime_effect;
 pub mod runtime_effect_artifact;
+pub mod runtime_effect_instance;
 pub mod runtime_form_artifact;
 pub mod runtime_form_registry;
 pub mod runtime_opaque_artifact;
@@ -135,12 +164,19 @@ pub mod semantic_package_runtime;
 pub mod semantic_provenance;
 pub mod semantic_reference;
 pub mod semantic_type;
+pub mod server_action_projection;
 pub mod service;
 pub mod shared_chunk_candidate;
 pub mod slot;
 pub mod slot_binding;
 pub mod slot_content;
+pub mod slot_field_lowering;
+pub mod slot_projection;
+pub mod state_initializer_lowering;
 pub mod state_instance_storage;
+pub mod state_projection;
+pub mod structural_component;
+pub mod structural_occurrence_identity;
 pub mod summarize;
 pub mod symbol_table;
 pub mod template_graph;
@@ -149,6 +185,11 @@ pub mod template_semantics;
 pub mod tooling_products;
 pub mod tooling_reader;
 pub mod tooling_schema;
+pub mod tsx_binding_projection;
+pub mod v2_authoring_lowering;
+pub mod v2_authority_request;
+pub mod v2_authority_response;
+pub mod validation_projection;
 pub use tooling_products::{
     build_tooling_artifact_graph_v1, build_tooling_build_trace_v1,
     build_tooling_compile_cost_report_v1, decode_tooling_artifact_graph_v1,
@@ -170,6 +211,14 @@ pub mod workspace;
 #[cfg(all(feature = "wasm", target_arch = "wasm32"))]
 mod wasm_binding;
 
+pub use action_authority::{
+    build_action_authority_v1, ActionAdmissionV1, ActionAuthorityV1, ActionCaptureCoverageV1,
+    ActionEnvironmentV1, ActionFactV1, ActionRecordV1, ACTION_AUTHORITY_SCHEMA_VERSION,
+};
+pub use action_field_lowering::{
+    action_field_sites_v1, lower_action_fields_v1, ActionFieldLoweringErrorV1,
+    ActionFieldLoweringV1, ActionFieldSiteV1, ResolvedActionFieldV1,
+};
 pub use application_publication::{
     application_publication_manifest_json_v1, build_application_publication_product_from_asm_v1,
     build_application_publication_product_v1, validate_application_publication_request_v1,
@@ -185,13 +234,35 @@ pub use application_semantic_model::{
     build_application_semantic_model_for_unit_with_packages,
     build_application_semantic_model_from_component_graph,
     build_file_route_application_semantic_model_for_route_with_packages,
-    build_file_route_application_semantic_model_for_unit_with_packages, ApplicationSemanticModel,
-    FileRouteApplicationModelErrorV1, SemanticEntity, SemanticEntityKind,
+    build_file_route_application_semantic_model_for_route_with_packages_and_v2_authoring,
+    build_file_route_application_semantic_model_for_unit_with_packages,
+    build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring,
+    ApplicationSemanticModel, FileRouteApplicationModelErrorV1, SemanticEntity, SemanticEntityKind,
 };
 pub use asm_validation::{validate_application_semantic_model, AsmValidationDiagnostic};
+pub use authored_semantics::{
+    compose_authored_semantics_v1, normalize_authored_semantics_v1,
+    AuthoredSemanticCandidateKindV1, AuthoredSemanticCompositionErrorV1,
+    AuthoredSemanticNormalizationErrorV1, AuthoredSourceRangeV1,
+    CanonicalAuthoredDeclarationKindV1, CanonicalAuthoredDeclarationV1,
+    CanonicalAuthoredSemanticModelV1, CanonicalIntrinsicKindV1, DerivedAuthoredEvidenceV2,
+    ResolvedAuthoredSemanticCandidateV1, ResolvedIntrinsicIdentityV1,
+    CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION,
+};
 pub use binding_table::{
     build_binding_table, build_binding_table_with_packages, BindingDiagnostic, BindingTable,
     ExportBinding, ImportBinding, ImportBindingTarget, ModuleBindingTable,
+};
+pub use capture_escape::{
+    build_capture_escape_graph_v1, CaptureEscapeCoverageV1, CaptureEscapeErrorV1,
+    CaptureEscapeFactV1, CaptureEscapeFactsV1, CaptureEscapeGraphV1, CaptureEscapeKindV1,
+    FunctionCaptureEscapeV1, ResumeCaptureAdmissionV1, CAPTURE_ESCAPE_SCHEMA_VERSION,
+};
+pub use codec_protocol::{
+    build_codec_protocol_v1, CodecBehaviorV1, CodecClassificationV1, CodecClassificationsV1,
+    CodecDeclarationV1, CodecEnvironmentV1, CodecFailureBehaviorV1,
+    CodecProtocolDiagnosticReasonV1, CodecProtocolDiagnosticV1, CodecProtocolRecordV1,
+    CodecProtocolV1, CodecRepresentationV1, CODEC_PROTOCOL_SCHEMA_VERSION,
 };
 pub use compilation_unit::CompilationUnit;
 pub use compiler_pass::{
@@ -205,26 +276,32 @@ pub use component_diagnostics::{
     collect_component_diagnostics, ComponentDiagnosticContract, COMPONENT_DIAGNOSTIC_CONTRACTS,
 };
 pub use component_graph::{
-    build_component_graph, build_component_graph_for_module, is_valid_opaque_action_fact,
-    ArithmeticEvaluationError, ArithmeticExpression, ArithmeticExpressionKind, ArithmeticOperator,
-    AuthoredComponentHeritage, AuthoredContextDeclarationCandidate, AuthoredDeclarationKind,
-    AuthoredOpaqueActionFact, AuthoredRouteLoaderDeclarationFact, AuthoredServerActionFact,
-    AuthoredSlotDeclarationCandidate, AuthoredSubmissionDeclarationFact,
-    AuthoredValidationRuleArgument, AuthoredValidationRuleArgumentKind,
-    AuthoredValidationRuleDeclarationFact, AuthoredValidationRuleExpression,
-    AuthoredValidationRuleExpressionKind, ComparisonOperator, ComponentAction, ComponentDiagnostic,
-    ComponentDiagnosticSeverity, ComponentGraph, ComponentMethod, ComponentNode,
-    ComputedExpression, ComputedExpressionKind, ConstantEvaluationError, ConstantExpression,
-    ConstantExpressionKind, ConsumerDeclaration, ContextDeclaration,
-    ContextDeclarationCandidateKind, ContextDeclarationViolation, ContextDesignator,
-    DeclaredStateType, DeclaredStateTypeKind, DiagnosticSecondaryLabel, EffectBodySyntax,
-    EffectExpression, EffectExpressionKind, EffectStatementSyntax, EffectStatementSyntaxKind,
-    FormDeclarationCandidate, FormDeclarationStatus, FormDeclarationViolation, FormDesignatorFact,
+    build_component_graph, build_component_graph_for_module, build_v2_component_graph_for_module,
+    is_valid_opaque_action_fact, ActionEndpoint, ArithmeticEvaluationError, ArithmeticExpression,
+    ArithmeticExpressionKind, ArithmeticOperator, AuthoredComponentHeritage,
+    AuthoredContextDeclarationCandidate, AuthoredDeclarationKind, AuthoredOpaqueActionFact,
+    AuthoredRouteLoaderDeclarationFact, AuthoredServerActionFact, AuthoredSlotDeclarationCandidate,
+    AuthoredSubmissionDeclarationFact, AuthoredValidationRuleArgument,
+    AuthoredValidationRuleArgumentKind, AuthoredValidationRuleDeclarationFact,
+    AuthoredValidationRuleExpression, AuthoredValidationRuleExpressionKind, ComparisonOperator,
+    ComponentAction, ComponentDiagnostic, ComponentDiagnosticSeverity, ComponentEffectField,
+    ComponentGraph, ComponentMethod, ComponentNode, ComputedExpression, ComputedExpressionKind,
+    ConstantEvaluationError, ConstantExpression, ConstantExpressionKind, ConsumerDeclaration,
+    ContextDeclaration, ContextDeclarationCandidateKind, ContextDeclarationViolation,
+    ContextDesignator, DeclaredStateType, DeclaredStateTypeKind, DiagnosticSecondaryLabel,
+    EffectBodySyntax, EffectCleanupSyntax, EffectExpression, EffectExpressionKind,
+    EffectStatementSyntax, EffectStatementSyntaxKind, FormDeclarationCandidate,
+    FormDeclarationStatus, FormDeclarationViolation, FormDesignatorFact,
     FormFieldDeclarationCandidate, FormFieldDeclarationViolation, LogicalOperator, MethodCall,
     MethodLocalVariable, MethodParameter, RenderAttribute, RenderAttributeValue, RenderChild,
     RenderEventHandler, RenderFragment, RenderList, RenderModel, SerializableValue,
     SlotDeclaration, SlotDeclarationViolation, SlotKind, StateField, StateOperation,
     UnsupportedEffectStatementKind, UnsupportedFormDesignatorFact,
+};
+pub use component_inheritance_lowering::{
+    component_inheritance_sites_v1, lower_component_inheritance_v1,
+    ComponentInheritanceLoweringErrorV1, ComponentInheritanceLoweringV1,
+    ComponentInheritanceSiteV1, ResolvedComponentInheritanceV1,
 };
 pub use component_initialization::{
     plan_component_initialization, ComponentInitializationPlan, ComponentInstanceBatch,
@@ -232,8 +309,9 @@ pub use component_initialization::{
 };
 pub use component_instance::{
     plan_component_instances, plan_component_instances_with_virtual_invocations,
-    BlockedComponentInstancePlan, BlockedComponentInstanceReason, ComponentBuildRoot,
-    ComponentBuildRootKind, ComponentInstance, ComponentInstancePlan, ComponentInstanceStatus,
+    structural_template_entity_for_region, BlockedComponentInstancePlan,
+    BlockedComponentInstanceReason, ComponentBuildRoot, ComponentBuildRootKind, ComponentInstance,
+    ComponentInstancePlan, ComponentInstanceStatus,
 };
 pub use component_instance_scope::{
     build_component_instance_scope_graph, validate_component_instance_scope_graph,
@@ -255,10 +333,18 @@ pub use composition_typing::{
     collect_composition_type_products, ComponentInvocationTypeRecord, CompositionCompatibility,
     CompositionTypeProducts, InstanceContextBindingTypeRecord, SlotBindingTypeRecord,
 };
+pub use computed_getter_lowering::{
+    computed_getter_sites_v1, lower_computed_getters_v1, ComputedGetterLoweringErrorV1,
+    ComputedGetterLoweringV1, ComputedGetterSiteV1,
+};
 pub use computed_instance_slots::{
     build_computed_instance_slot_registry, validate_computed_instance_slot_registry,
     ComputedInstanceSlotRecord, ComputedInstanceSlotRegistry,
     COMPUTED_INSTANCE_SLOT_REGISTRY_VERSION,
+};
+pub use computed_projection::{
+    build_computed_projection_v1, ComputedProjectionRecordV1, ComputedProjectionV1,
+    COMPUTED_PROJECTION_SCHEMA_VERSION,
 };
 pub use computed_value::{
     collect_computed_values, ComputedCachePolicy, ComputedDiagnosticCode, ComputedPurity,
@@ -296,6 +382,10 @@ pub use context_ownership::{
     ContextOwnershipEdgeKind, ContextOwnershipGraph, ContextOwnershipNode, ContextOwnershipNodeId,
     ContextOwnershipNodeKind, ContextOwnershipOwnerId, ContextOwnershipTargetId,
 };
+pub use context_projection::{
+    build_context_projection_v1, ContextProjectionV1, ContextProviderRecordV1,
+    ContextTokenRecordV1, CONTEXT_PROJECTION_SCHEMA_VERSION,
+};
 pub use context_resolution::{
     collect_context_resolutions, ContextResolution, ContextResolutionResult,
 };
@@ -303,20 +393,31 @@ pub use context_resume::{
     build_context_resume_plan, ContextResumePlan, ContextResumeRecord, ContextResumeSlotId,
     ContextSlotResumeStatus,
 };
+pub use context_resume_projection::{
+    build_context_resume_projection_v1, ContextConsumerResolutionV1,
+    ContextResumeProjectionRecordV1, ContextResumeProjectionV1,
+    CONTEXT_RESUME_PROJECTION_SCHEMA_VERSION,
+};
 pub use context_typing::{
     collect_context_type_products, CompatibilityStatus, ConsumerTypeRecord,
     ContextBindingCompatibility, ContextBindingTypeRecord, ContextSerializationCompatibility,
     ContextTypeProducts, ContextTypeRecord, ProviderTypeRecord,
 };
 pub use context_update::{build_context_update_plan, ContextActionUpdatePlan, ContextUpdatePlan};
+pub use control_flow::{
+    build_control_flow_graph_v1, ControlFlowAccessKindV1, ControlFlowAccessV1, ControlFlowBlockV1,
+    ControlFlowBranchArmV1, ControlFlowBranchEdgeV1, ControlFlowCoverageStatusV1,
+    ControlFlowCoverageV1, ControlFlowFunctionV1, ControlFlowGraphV1, ControlFlowLoopV1,
+    ControlFlowProvenanceV1, CONTROL_FLOW_SCHEMA_VERSION,
+};
 pub use effect::{
     analyze_effect_reactivity, collect_effects, derive_effect_trigger_plan, lower_effect_bodies,
     plan_effect_execution, validate_effects, ActionBatch, ActionBatchEffectTrigger,
     ActionEffectExecutionPlan, Effect, EffectBody, EffectComputedPrerequisiteBatch,
-    EffectExecutionBatch, EffectExecutionPlan, EffectExecutionPolicy, EffectReactiveAnalysis,
-    EffectRenderBoundary, EffectSemanticViolation, EffectSemanticViolationKind, EffectStatement,
-    EffectStatementKind, EffectTriggerPlan, EffectValidation, InitialEffectExecutionPlan,
-    UnplannedEffect, UnplannedEffectReason,
+    EffectDeclaration, EffectExecutionBatch, EffectExecutionPlan, EffectExecutionPolicy,
+    EffectReactiveAnalysis, EffectRenderBoundary, EffectSemanticViolation,
+    EffectSemanticViolationKind, EffectStatement, EffectStatementKind, EffectTriggerPlan,
+    EffectValidation, InitialEffectExecutionPlan, UnplannedEffect, UnplannedEffectReason,
 };
 pub use effect_capability::{
     ArgumentSerializationPolicy, BuiltinCapabilityProvenance, CapabilityDefinition, CapabilityId,
@@ -326,6 +427,10 @@ pub use effect_capability::{
     EFFECT_CAPABILITY_REGISTRY_VERSION,
 };
 pub use effect_diagnostics::{collect_effect_diagnostics, EffectDiagnosticCode};
+pub use effect_field_lowering::{
+    effect_field_sites_v1, lower_effect_fields_v1, EffectFieldLoweringErrorV1,
+    EffectFieldLoweringV1, EffectFieldSiteV1, ResolvedEffectFieldV1,
+};
 pub use effect_inspection::{
     build_effect_inspection_registry, validate_effect_inspection_registry, EffectInspection,
     EffectInspectionActionTrigger, EffectInspectionCapability, EffectInspectionDependencies,
@@ -335,10 +440,37 @@ pub use effect_inspection::{
     EffectInspectionUnplanned, EffectInspectionValidation, EffectInspectionValidationDiagnostic,
     EffectInspectionViolation,
 };
+pub use effect_projection::{
+    build_effect_projection_v1, EffectProjectionRecordV1, EffectProjectionV1,
+    EFFECT_PROJECTION_SCHEMA_VERSION,
+};
 pub use effect_resume::{
     build_effect_resume_plan, validate_effect_resume_plan, EffectActivationSlotId,
     EffectActivationStatus, EffectInitialResumeMembership, EffectResumePlan, EffectResumeRecord,
     EffectResumeValidationDiagnostic,
+};
+pub use environment_input::{
+    build_environment_input_manifest_v1, environment_input_manifest_from_json_v1,
+    environment_input_manifest_json_v1, validate_environment_input_manifest_v1,
+    EnvironmentInputErrorV1, EnvironmentInputManifestV1, ENVIRONMENT_INPUT_SCHEMA_VERSION,
+};
+pub use environment_ownership::{
+    build_environment_ownership_graph_v1, EnvironmentClassV1, EnvironmentOwnershipDiagnosticV1,
+    EnvironmentOwnershipEdgeKindV1, EnvironmentOwnershipEdgeV1, EnvironmentOwnershipErrorV1,
+    EnvironmentOwnershipFactsV1, EnvironmentOwnershipGraphV1, EnvironmentOwnershipNodeV1,
+    EnvironmentOwnershipViolationV1, LifetimeClassV1, ENVIRONMENT_OWNERSHIP_SCHEMA_VERSION,
+};
+pub use environment_publication::{
+    build_environment_publication_artifact_v1, environment_publication_artifact_json_v1,
+    validate_environment_publication_artifact_v1, EnvironmentPublicationArtifactV1,
+    EnvironmentPublicationErrorV1, ENVIRONMENT_PUBLICATION_SCHEMA_VERSION,
+};
+pub use environment_read_lowering::{
+    lower_environment_reads_v1, EnvironmentReadDiagnosticCodeV1, EnvironmentReadDiagnosticV1,
+    EnvironmentReadLoweringV1, EnvironmentReadRecordV1, ENVIRONMENT_READ_LOWERING_SCHEMA_VERSION,
+};
+pub use environment_read_ownership::{
+    build_environment_read_ownership_v1, EnvironmentReadOwnershipErrorV1,
 };
 pub use explain::{explain_json, explain_text};
 pub use expression_graph::{ExpressionGraph, ExpressionNode, ExpressionNodeKind};
@@ -347,8 +479,8 @@ pub use file_route_publication::{
     file_route_publication_manifest_json_v1, resolve_file_route_request_match_v1,
     resolve_file_route_request_v1, FileRoutePublicationErrorV1, FileRoutePublicationManifestV1,
     FileRoutePublicationProductV1, FileRoutePublicationRequestV1, FileRoutePublicationRouteV1,
-    FileRouteRequestMatchV1, FileRouteRequestTargetV1, FILE_ROUTE_PUBLICATION_COMPILER_CONTRACT_V1,
-    FILE_ROUTE_PUBLICATION_MANIFEST_SCHEMA_VERSION,
+    FileRouteRequestMatchV1, FileRouteRequestTargetV1, FILE_ROUTE_ENVIRONMENT_ARTIFACT_PATH_V1,
+    FILE_ROUTE_PUBLICATION_COMPILER_CONTRACT_V1, FILE_ROUTE_PUBLICATION_MANIFEST_SCHEMA_VERSION,
 };
 pub use form::{collect_form_entities, FormEntity};
 pub use form_binding::{
@@ -414,6 +546,11 @@ pub use form_validation_plan::{
     ValidationDependencyPlanIntegrityDiagnostic, ValidationDependencyPlanIntegrityKind,
     ValidationDependencyPlanValidation, ValidationDependencyPlans, ValidationPlanningStatus,
 };
+pub use function_summary::{
+    build_function_summary_graph_v1, FunctionCallCoverageV1, FunctionCallFactV1,
+    FunctionCallFactsV1, FunctionSummaryErrorV1, FunctionSummaryGraphV1, FunctionSummaryV1,
+    FUNCTION_SUMMARY_SCHEMA_VERSION,
+};
 pub use html_codegen::generate_static_html;
 pub use instance_context::{
     collect_instance_context_registry, ConsumerInstanceId, ConsumerInstanceRecord,
@@ -453,6 +590,10 @@ pub use layout_composition::{
     layout_composition_virtual_invocations_v1, LayoutCompositionEdgeV1, LayoutCompositionErrorV1,
     LayoutCompositionPlanV1, LayoutCompositionRouteV1,
 };
+pub use legacy_decorator_lowering::{
+    legacy_decorator_sites_v1, lower_legacy_decorators_v1, LegacyDecoratorLoweringErrorV1,
+    LegacyDecoratorLoweringV1, LegacyDecoratorResolutionV1, LegacyDecoratorSiteV1,
+};
 pub use metaframework_handoff::{
     build_deployable_release_manifest_v1, build_static_request_handoff_v1,
     deployable_release_manifest_json_v1, static_request_handoff_json_v1, DeployableArtifactV1,
@@ -467,6 +608,8 @@ pub use module_graph::{
 pub use opaque::{OpaqueActionResolution, OpaqueActionResolutionOutcome, OpaqueTerminalBinding};
 pub use ordinary_html_codegen::{
     generate_ordinary_instance_html, generate_ordinary_instance_html_for_component,
+    generate_structural_conditional_host_fragments, generate_structural_keyed_host_fragments,
+    generate_structural_template_instance_html,
 };
 pub use ordinary_template_instance::{
     build_ordinary_template_instance_registry, validate_ordinary_template_instance_registry,
@@ -488,8 +631,9 @@ pub use page_codegen::{
     generate_standalone_page_with_resume_runtime_and_resources,
 };
 pub use production_audit::{
-    ProductionRuntimeAuthority, PRODUCTION_RUNTIME_AUTHORITIES,
-    PRODUCTION_RUNTIME_REFINEMENT_INVARIANTS,
+    build_production_audit_report_v1, production_audit_report_json_v1, ProductionAuditErrorV1,
+    ProductionAuditReportV1, ProductionRuntimeAuthority, PRODUCTION_AUDIT_REPORT_SCHEMA_VERSION,
+    PRODUCTION_RUNTIME_AUTHORITIES, PRODUCTION_RUNTIME_REFINEMENT_INVARIANTS,
 };
 pub use production_bootstrap::{
     build_production_bootstrap_plan, ProductionBootstrapBlock, ProductionBootstrapPlan,
@@ -574,6 +718,11 @@ pub use project_discovery::{
     DiscoveredProjectV1, ProjectDiscoveryErrorV1,
 };
 pub use provider::{collect_provider_entities, DuplicateProviderDeclaration, ProviderEntity};
+pub use purity_effect::{
+    build_purity_effect_graph_v1, FunctionEffectFactV1, FunctionEffectKindV1,
+    FunctionPurityEffectV1, FunctionPurityV1, PurityEffectErrorV1, PurityEffectGraphV1,
+    PURITY_EFFECT_SCHEMA_VERSION,
+};
 pub use resource::{
     ResourceActivation, ResourceDeclaration, ResourceDeclarationError, ResourceEndpointBinding,
     ResourceEndpointResolution, ResourceEndpointResolutionOutcome, ResourceInvalidationPolicy,
@@ -604,9 +753,10 @@ pub use resume_capture::{
     ResumeCaptureBlock, ResumeCaptureBlockReason, ResumeCaptureError, ResumeCaptureErrorKind,
     ResumeCaptureInstruction, ResumeCaptureIntegrityCode, ResumeCaptureIntegrityDiagnostic,
     ResumeCapturePlan, ResumeCaptureProgram, ResumeEncodedValue, ResumeEnvelopeWriterPlan,
-    ResumeSnapshotBoundaryV1, ResumeSnapshotV1, ResumeSnapshotValueRecordV1,
-    RuntimeQuiescenceState, RESUME_CAPTURE_MANIFEST_VERSION, RESUME_CAPTURE_PLAN_VERSION,
-    RESUME_SNAPSHOT_SCHEMA_VERSION,
+    ResumeSnapshotBoundaryV1, ResumeSnapshotStructuralOccurrenceV2,
+    ResumeSnapshotStructuralStateV2, ResumeSnapshotV1, ResumeSnapshotV2,
+    ResumeSnapshotValueRecordV1, RuntimeQuiescenceState, RESUME_CAPTURE_MANIFEST_VERSION,
+    RESUME_CAPTURE_PLAN_VERSION, RESUME_SNAPSHOT_SCHEMA_VERSION,
 };
 pub use resume_chunk::{
     build_resume_chunk_graph, validate_resume_chunk_graph, ResumeChunk, ResumeChunkBlock,
@@ -637,16 +787,16 @@ pub use resume_liveness::{
     RESUME_LIVENESS_PLAN_VERSION,
 };
 pub use resume_manifest::{
-    build_resume_manifest, compute_resume_build_id, parse_resume_manifest_v6, resume_manifest_json,
-    validate_resume_manifest, ResumeManifest, ResumeManifestActivationPolicy,
-    ResumeManifestActivationRecord, ResumeManifestAnchorRecord, ResumeManifestBoundaryKind,
-    ResumeManifestBoundaryRecord, ResumeManifestCaptureInstruction, ResumeManifestCaptureProgram,
-    ResumeManifestChunkRecord, ResumeManifestContextSlotRecord, ResumeManifestEffectRecord,
-    ResumeManifestEventRecord, ResumeManifestPhaseIComponentResumeRecord,
-    ResumeManifestRestoreInstruction, ResumeManifestRestoreInstructionRecord,
-    ResumeManifestRestoreProgram, ResumeManifestSlotSchemaRecord,
-    ResumeManifestValidationDiagnostic, RESUME_MANIFEST_SCHEMA_VERSION,
-    RESUME_RUNTIME_PROTOCOL_VERSION,
+    build_resume_manifest, compute_resume_build_id, parse_resume_manifest_v6,
+    parse_resume_manifest_v7, resume_manifest_json, validate_resume_manifest, ResumeManifest,
+    ResumeManifestActivationPolicy, ResumeManifestActivationRecord, ResumeManifestAnchorRecord,
+    ResumeManifestBoundaryKind, ResumeManifestBoundaryRecord, ResumeManifestCaptureInstruction,
+    ResumeManifestCaptureProgram, ResumeManifestChunkRecord, ResumeManifestContextSlotRecord,
+    ResumeManifestEffectRecord, ResumeManifestEventRecord,
+    ResumeManifestPhaseIComponentResumeRecord, ResumeManifestRestoreInstruction,
+    ResumeManifestRestoreInstructionRecord, ResumeManifestRestoreProgram,
+    ResumeManifestSlotSchemaRecord, ResumeManifestValidationDiagnostic,
+    RESUME_MANIFEST_SCHEMA_VERSION, RESUME_RUNTIME_PROTOCOL_VERSION,
 };
 pub use resume_plan::{
     build_resume_plan, ComponentInstanceResumePlan, FormFieldResumePlan, FormInstanceResumePlan,
@@ -677,6 +827,11 @@ pub use route_loader::{
     build_route_loader_plan_v1, route_loader_plan_json_v1, RouteLoaderBindingV1,
     RouteLoaderPlanErrorV1, RouteLoaderPlanV1, RouteLoaderRouteV1,
     ROUTE_LOADER_PLAN_SCHEMA_VERSION,
+};
+pub use route_metadata::{
+    build_route_metadata_manifest_v1, route_metadata_manifest_json_v1, RouteMetadataErrorV1,
+    RouteMetadataInputV1, RouteMetadataManifestV1, RouteMetadataRecordV1,
+    ROUTE_METADATA_SCHEMA_VERSION,
 };
 pub use route_server_action::{
     build_route_server_action_plan_v1, route_server_action_plan_json_v1,
@@ -729,9 +884,15 @@ pub use runtime_effect_artifact::{
     RuntimeEffectArtifactActionTrigger, RuntimeEffectArtifactCapabilityInstructionKind,
     RuntimeEffectArtifactCapabilityOperation, RuntimeEffectArtifactEffect,
     RuntimeEffectArtifactExecutionBoundary, RuntimeEffectArtifactExecutionPolicy,
-    RuntimeEffectArtifactInitialTrigger, RuntimeEffectArtifactInstruction,
-    RuntimeEffectArtifactPrerequisiteBatch, RuntimeEffectArtifactProgram,
-    RuntimeEffectArtifactRenderBoundary, RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION,
+    RuntimeEffectArtifactInitialTrigger, RuntimeEffectArtifactInstance,
+    RuntimeEffectArtifactInstruction, RuntimeEffectArtifactPrerequisiteBatch,
+    RuntimeEffectArtifactProgram, RuntimeEffectArtifactRenderBoundary,
+    RuntimeEffectArtifactStructuralTemplate, RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION,
+};
+pub use runtime_effect_instance::{
+    build_runtime_effect_instance_registry, build_runtime_effect_structural_template_registry,
+    RuntimeEffectInstanceRecord, RuntimeEffectInstanceRegistry,
+    RuntimeEffectStructuralTemplateRecord, RUNTIME_EFFECT_INSTANCE_REGISTRY_VERSION,
 };
 pub use runtime_form_artifact::{
     build_runtime_forms_artifact, runtime_forms_artifact_json, validate_runtime_forms_artifact,
@@ -774,14 +935,14 @@ pub use semantic_graph::{
 pub use semantic_id::{
     ComponentInstanceId, ComponentInvocationId, ComponentRootId, ComponentStructuralRegionId,
     ConsumerId, ContextDeclarationCandidateId, ContextId, DirtyTrackingPlanId, EffectId,
-    EffectStatementId, FieldBindingId, FieldDependencyId, FieldId, FieldResetOperationId,
-    FieldTrackingId, FormDeclarationCandidateId, FormFieldBindingCandidateId,
-    FormFieldDeclarationCandidateId, FormFieldDirtySlotId, FormFieldTouchedSlotId,
-    FormFieldValidationSlotId, FormFieldValueSlotId, FormId, FormInstanceId, FormOwnershipGraphId,
-    FormSubmissionStateSlotId, FormValidationAggregateSlotId, ProviderId, ResetPlanId,
-    ResourceActivationId, ResourceId, SemanticId, SemanticOwner, SerializationPlanId,
-    SlotBindingId, SlotContentFragmentId, SlotDeclarationCandidateId, SlotId, SlotOutletId,
-    SubmissionDeclarationCandidateId, SubmissionHostCandidateId, SubmissionHostId,
+    EffectInstanceId, EffectStatementId, FieldBindingId, FieldDependencyId, FieldId,
+    FieldResetOperationId, FieldTrackingId, FormDeclarationCandidateId,
+    FormFieldBindingCandidateId, FormFieldDeclarationCandidateId, FormFieldDirtySlotId,
+    FormFieldTouchedSlotId, FormFieldValidationSlotId, FormFieldValueSlotId, FormId,
+    FormInstanceId, FormOwnershipGraphId, FormSubmissionStateSlotId, FormValidationAggregateSlotId,
+    ProviderId, ResetPlanId, ResourceActivationId, ResourceId, SemanticId, SemanticOwner,
+    SerializationPlanId, SlotBindingId, SlotContentFragmentId, SlotDeclarationCandidateId, SlotId,
+    SlotOutletId, SubmissionDeclarationCandidateId, SubmissionHostCandidateId, SubmissionHostId,
     SubmissionPlanId, TemplatePositionId, TouchedTrackingPlanId, ValidationDependencyCycleId,
     ValidationGraphId, ValidationPlanId, ValidationRuleCandidateId, ValidationRuleId,
 };
@@ -829,10 +990,36 @@ pub use slot_content::{
     SlotContentFragmentStatus, SlotContentFragmentViolation, SlotOutlet, SlotOutletStatus,
     SlotOutletViolation,
 };
+pub use slot_field_lowering::{
+    lower_slot_fields_v1, slot_field_sites_v1, ResolvedSlotFieldV1, SlotFieldLoweringErrorV1,
+    SlotFieldLoweringV1, SlotFieldSiteV1,
+};
+pub use slot_projection::{
+    build_slot_projection_graph_v1, SlotProjectionGraphV1, SlotProjectionRecordV1,
+    SlotProjectionStatusV1, SlotResumabilityCoverageV1, SLOT_PROJECTION_SCHEMA_VERSION,
+};
+pub use state_initializer_lowering::{
+    lower_state_initializers_v1, state_initializer_sites_v1, ResolvedStateInitializerV1,
+    StateInitializerLoweringErrorV1, StateInitializerLoweringV1, StateInitializerSiteV1,
+};
 pub use state_instance_storage::{
     build_state_instance_storage_registry, validate_state_instance_storage_registry,
     StateInstanceStorageRecord, StateInstanceStorageRegistry,
     STATE_INSTANCE_STORAGE_REGISTRY_VERSION,
+};
+pub use state_projection::{
+    build_state_projection_v1, StateProjectionRecordV1, StateProjectionV1, StateResumeAdmissionV1,
+    StateUpdateCoverageV1, STATE_PROJECTION_SCHEMA_VERSION,
+};
+pub use structural_component::{
+    build_structural_component_graph_v1, ComponentInheritanceStatusV1, ComponentPropsResolutionV1,
+    StructuralComponentDiagnosticReasonV1, StructuralComponentDiagnosticV1,
+    StructuralComponentFactV1, StructuralComponentGraphV1, StructuralComponentPropV1,
+    StructuralComponentRecordV1, STRUCTURAL_COMPONENT_SCHEMA_VERSION,
+};
+pub use structural_occurrence_identity::{
+    decode_structural_occurrence_identity, encode_structural_occurrence_identity,
+    StructuralOccurrenceIdentity,
 };
 pub use summarize::summarize_source;
 pub use symbol_table::{
@@ -852,6 +1039,22 @@ pub use template_manifest::{
 pub use template_semantics::{
     build_template_semantic_entities, TemplateSemanticEntity, TemplateSemanticKind,
     TemplateSemanticScope,
+};
+pub use v2_authoring_lowering::{
+    lower_v2_authoring_v1, V2AuthoringLoweringErrorV1, V2AuthoringLoweringV1,
+    V2AuthoringResolutionsV1,
+};
+pub use v2_authority_request::{
+    build_v2_authority_component_request_v1, build_v2_authority_request_v1,
+    build_v2_environment_authority_request_v1, V2AuthorityCanonicalV1, V2AuthorityMemberSiteV1,
+    V2AuthorityPositionV1, V2AuthorityRequestErrorV1, V2AuthorityRequestV1, V2AuthoritySiteV1,
+    V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
+};
+pub use v2_authority_response::{
+    v2_authoring_resolutions_from_response_v1, v2_environment_public_resolutions_from_response_v1,
+    validate_v2_authority_response_v1, ResolvedEnvironmentPublicReadV1, V2AuthorityIdentityV1,
+    V2AuthorityResolutionV1, V2AuthorityResponseErrorV1, V2AuthorityResponseV1,
+    V2_AUTHORITY_RESPONSE_SCHEMA_VERSION,
 };
 
 #[cfg(test)]
@@ -2377,9 +2580,15 @@ class ChainedProfile extends Component {
     fn component_graph_reports_duplicate_event_errors() {
         let parsed = presolve_parser::ParsedFile {
             path: "DuplicateEvent.tsx".into(),
+            syntax: presolve_parser::ParsedSourceAst {
+                source: String::new(),
+                estree_json: "{}".to_owned(),
+                span: test_span(),
+            },
             diagnostics: Vec::new(),
             imports: Vec::new(),
             exports: Vec::new(),
+            call_expressions: Vec::new(),
             type_aliases: Vec::new(),
             local_type_bindings: Vec::new(),
             local_value_bindings: Vec::new(),

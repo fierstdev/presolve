@@ -21,7 +21,7 @@ const cases = {
   symbols: { schema: "presolve.language-service-wasm-request", version: 1, operation: "documentSymbols", sourceUnitId: unit },
   diagnostics: { schema: "presolve.language-service-wasm-request", version: 1, operation: "diagnostics", sourceUnitId: unit },
   emptyPosition: { schema: "presolve.language-service-wasm-request", version: 1, operation: "position", sourceUnitId: unit, offset: 139 },
-  hover: { schema: "presolve.language-service-wasm-request", version: 1, operation: "hover" },
+  hover: { schema: "presolve.language-service-wasm-request", version: 1, operation: "hover", querySemanticId: target },
   unknownSource: { schema: "presolve.language-service-wasm-request", version: 1, operation: "position", sourceUnitId: "source:missing", offset: 0 },
   outOfRange: { schema: "presolve.language-service-wasm-request", version: 1, operation: "position", sourceUnitId: unit, offset: 140 },
   unknownId: { schema: "presolve.language-service-wasm-request", version: 1, operation: "definition", querySemanticId: "query-semantic:missing" },

@@ -9,7 +9,7 @@ Initialize component-owned state with `state()`. Mark a method that writes it
 with `@action()`.
 
 ```tsx
-import { action, component, state, Component } from "@presolve/core";
+import { action, component, state, Component } from "presolve";
 
 @component()
 export class Counter extends Component {
@@ -47,7 +47,7 @@ Use `@computed()` on a synchronous, pure getter. The compiler derives its
 dependencies and owns caching and invalidation.
 
 ```tsx
-import { computed } from "@presolve/core";
+import { computed } from "presolve";
 
 @computed()
 get remaining(): number {
@@ -64,7 +64,7 @@ Use `@effect()` for a synchronous terminal browser capability operation. An
 effect runs after initial render and after an affected completed action batch.
 
 ```tsx
-import { effect } from "@presolve/core";
+import { effect } from "presolve";
 
 @effect()
 updateTitle(): void {

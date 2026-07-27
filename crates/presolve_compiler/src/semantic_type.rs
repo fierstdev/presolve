@@ -187,7 +187,7 @@ impl BuiltinTypeAuthority {
         let has_non_presolve_import_binding = parsed.imports.iter().any(|import| {
             import.specifiers.iter().any(|specifier| {
                 specifier.local == "Form"
-                    && !(import.source == "@presolve/core" && specifier.imported == "Form")
+                    && !(import.source == "presolve" && specifier.imported == "Form")
             })
         });
         Self {

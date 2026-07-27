@@ -360,7 +360,7 @@ class Profile {
     #[test]
     fn resolves_the_form_marker_from_the_public_presolve_package() {
         let source = r#"
-import { Form } from "@presolve/core";
+import { Form } from "presolve";
 @component("profile")
 class Profile {
   @form() profile!: Form;

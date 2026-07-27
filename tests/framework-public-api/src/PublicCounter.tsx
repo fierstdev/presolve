@@ -9,7 +9,7 @@ import {
   slot,
   type Form,
   type SlotContent,
-} from "@presolve/core";
+} from "presolve";
 
 @component()
 export class PublicCounter extends Component {

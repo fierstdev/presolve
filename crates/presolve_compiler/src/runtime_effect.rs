@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     ApplicationSemanticModel, CapabilityOperationId, EffectComputedPrerequisiteBatch,
-    EffectExecutionBatch, EffectExecutionPolicy, EffectRenderBoundary, ExecutionBoundary,
-    IntermediateRepresentation, SemanticId, SourceProvenance,
+    EffectDeclaration, EffectExecutionBatch, EffectExecutionPolicy, EffectRenderBoundary,
+    ExecutionBoundary, IntermediateRepresentation, SemanticId, SourceProvenance,
 };
 
 /// Compiler-owned runtime registry for F10-lowered effects.
@@ -25,6 +25,11 @@ pub struct RuntimeEffectRecord {
     pub action_batch_triggers: Vec<RuntimeActionBatchEffectTrigger>,
     pub capability_operations: Vec<CapabilityOperationId>,
     pub execution_boundary: ExecutionBoundary,
+    /// V2 source field order, propagated to runtime batch ordering.
+    pub declaration_order: Option<u32>,
+    /// V2 field effects are scheduled once after a successful resume. Legacy
+    /// decorator effects retain the frozen resume behavior.
+    pub run_on_resume: bool,
     pub provenance: SourceProvenance,
 }
 
@@ -89,6 +94,8 @@ pub fn build_runtime_effect_registry(
                     ),
                     capability_operations: execution.capability_operations.clone(),
                     execution_boundary: effect.execution_boundary,
+                    declaration_order: effect.declaration_order,
+                    run_on_resume: matches!(effect.declaration, EffectDeclaration::V2Field),
                     provenance: effect.provenance.clone(),
                 },
             ))
@@ -306,6 +313,7 @@ class RuntimeEffect extends Component {
             EffectExecutionPolicy::AfterInitialRenderAndCompletedActionBatch
         );
         assert_eq!(report_record.execution_boundary, ExecutionBoundary::Client);
+        assert!(!report_record.run_on_resume);
         assert_eq!(
             initial.render_boundary,
             EffectRenderBoundary::AfterInitialRender

@@ -11,7 +11,7 @@ method boundary with `@opaque(packageSpecifier, exportName)`.
 
 ```tsx
 import { trackPurchase } from "@acme/analytics";
-import { action, component, opaque, Component } from "@presolve/core";
+import { action, component, opaque, Component } from "presolve";
 
 @component()
 export class Checkout extends Component {

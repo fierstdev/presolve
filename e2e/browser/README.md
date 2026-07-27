@@ -11,7 +11,7 @@ It builds the double-binding counter fixture, serves the generated output with a
 Run it directly:
 
 ```sh
-cargo test -p presolve-cli --features browser-tests --test runtime_browser -- --nocapture
+cargo test -p presolve-cli --test runtime_browser -- --nocapture
 ```
 
 Or through the project aliases:

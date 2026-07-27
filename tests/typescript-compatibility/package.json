@@ -1,0 +1,8 @@
+{
+  "name": "@presolve/typescript-compatibility",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#compat-internal": "./src/internal.ts"
+  }
+}

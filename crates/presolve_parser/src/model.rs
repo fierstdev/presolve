@@ -5,6 +5,9 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedFile {
     pub path: PathBuf,
+    /// The complete source-faithful syntax product. Feature-specific parser
+    /// facts below are derived views and must not become a second frontend.
+    pub syntax: ParsedSourceAst,
     pub classes: Vec<ParsedClass>,
     pub type_aliases: Vec<ParsedTypeAlias>,
     /// Module-local declarations that bind a name in TypeScript's type
@@ -17,7 +20,17 @@ pub struct ParsedFile {
     pub local_value_bindings: Vec<String>,
     pub imports: Vec<ParsedImport>,
     pub exports: Vec<ParsedExport>,
+    /// General-AST call sites. These facts intentionally carry no framework
+    /// meaning; downstream authorities select and classify them.
+    pub call_expressions: Vec<ParsedCallExpression>,
     pub diagnostics: Vec<ParseDiagnostic>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedSourceAst {
+    pub source: String,
+    pub estree_json: String,
+    pub span: SourceSpan,
 }
 
 /// Authored type alias retained for canonical semantic type lowering.
@@ -40,6 +53,27 @@ pub struct ParsedImport {
 pub struct ParsedImportSpecifier {
     pub imported: String,
     pub local: String,
+    /// The exact local binding span selected from the general source AST.
+    pub local_span: SourceSpan,
+}
+
+/// A source-faithful call expression selected from the general OXC AST.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedCallExpression {
+    pub callee_span: SourceSpan,
+    /// Structural member spans when the callee is a static member expression.
+    /// These are syntax-only positions for an external semantic authority.
+    pub member_object_span: Option<SourceSpan>,
+    pub member_property_span: Option<SourceSpan>,
+    pub span: SourceSpan,
+    pub arguments: Vec<ParsedCallArgument>,
+}
+
+/// Argument fact retained without interpreting the called function.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParsedCallArgument {
+    StringLiteral { value: String, span: SourceSpan },
+    Other { span: SourceSpan },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -154,6 +188,9 @@ pub struct ParsedProperty {
     pub name: String,
     pub is_identifier_name: bool,
     pub decorators: Vec<ParsedDecorator>,
+    /// A direct initializer call selected from the general source AST. Its
+    /// callee has no framework meaning until a semantic authority resolves it.
+    pub initializer_call: Option<ParsedInitializerCall>,
     pub initializer: Option<String>,
     pub initializer_literal: Option<ParsedSerializableValue>,
     pub initializer_expression: Option<ParsedComputedExpression>,
@@ -168,6 +205,47 @@ pub struct ParsedProperty {
     pub is_definite_assignment: bool,
     pub is_declare: bool,
     pub span: SourceSpan,
+}
+
+/// Source-faithful facts for a direct class-field initializer call.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedInitializerCall {
+    pub callee_span: SourceSpan,
+    pub span: SourceSpan,
+    /// The parser records call arity without assigning framework meaning to
+    /// the callee. Semantic lowering uses this to reject malformed intrinsics.
+    pub argument_count: usize,
+    /// An inline function argument selected from a general initializer call.
+    /// This remains syntax only: a later semantic authority decides whether
+    /// the surrounding call is a framework action or some unrelated helper.
+    pub inline_handler: Option<ParsedInlineHandler>,
+}
+
+/// Parser-owned facts for an inline function supplied to a class-field call.
+///
+/// The body retains only state updates supported by the existing compiler
+/// action semantics, plus exact spans for every other non-empty statement.
+/// Consumers must reject unsupported bodies rather than guessing a lowering.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedInlineHandler {
+    pub span: SourceSpan,
+    pub body_span: SourceSpan,
+    pub is_async: bool,
+    pub is_expression_body: bool,
+    /// Ordered, source-owned parameters of the inline function. These remain
+    /// syntax facts; later semantic lowering decides whether a handler form
+    /// may consume them.
+    pub parameters: Vec<ParsedMethodParameter>,
+    /// Serializable local declarations retained in source order. They have no
+    /// framework meaning until a later, authority-backed action projection
+    /// validates their use.
+    pub local_variables: Vec<ParsedLocalVariable>,
+    pub state_updates: Vec<ParsedStateUpdate>,
+    pub unsupported_statement_spans: Vec<SourceSpan>,
+    /// A restricted ordered-body view retained from a general inline function.
+    /// It has no framework meaning until an authority-backed later consumer
+    /// selects the surrounding initializer call.
+    pub effect_body: Option<ParsedEffectBody>,
 }
 
 /// Authored TypeScript annotation retained for a state field without type checking.
@@ -356,6 +434,15 @@ pub struct ParsedMethod {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedEffectBody {
     pub statements: Vec<ParsedEffectStatement>,
+    pub cleanup: Option<ParsedEffectCleanup>,
+}
+
+/// A synchronous cleanup callback returned from a retained inline effect body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedEffectCleanup {
+    pub span: SourceSpan,
+    pub is_async: bool,
+    pub body: Box<ParsedEffectBody>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -20,9 +20,9 @@ use crate::platform::{
 use crate::semantic_package::SemanticPackageResolutionTable;
 use crate::semantic_package_runtime::SemanticPackageRuntimeModuleTable;
 use crate::{
-    build_application_semantic_model_for_unit_with_packages, build_production_reports,
-    build_production_runtime_artifact, build_resume_chunk_graph, build_resume_manifest,
-    build_runtime_component_artifact, build_runtime_computed_artifact,
+    build_application_semantic_model_for_unit_with_packages, build_production_audit_report_v1,
+    build_production_reports, build_production_runtime_artifact, build_resume_chunk_graph,
+    build_resume_manifest, build_runtime_component_artifact, build_runtime_computed_artifact,
     build_runtime_context_artifact, build_runtime_effect_artifact, build_runtime_forms_artifact,
     build_runtime_opaque_artifact_with_modules, build_runtime_resource_artifact_with_modules,
     build_template_manifest_from_asm, embed_opaque_runtime_artifact, emit_production_modules,
@@ -30,12 +30,12 @@ use crate::{
     generate_runtime_stub, generate_standalone_page_with_resume_runtime,
     generate_standalone_page_with_resume_runtime_and_resources, lower_components_to_ir,
     optimization_report_json, optimize_context_ir, optimize_effect_ir,
-    production_runtime_artifact_json, resume_manifest_json, runtime_component_artifact_json,
-    runtime_computed_artifact_json, runtime_context_artifact_json, runtime_cost_report_json,
-    runtime_effect_artifact_json, runtime_forms_artifact_json, runtime_opaque_artifact_json,
-    runtime_resource_artifact_json, template_manifest_json, validate_runtime_opaque_artifact,
-    validate_runtime_resource_artifact, CompilationUnit, ConstantFoldingPass,
-    ExecutableProgramFingerprint, ImmutableAsmPass, ProductionReportInputs,
+    production_audit_report_json_v1, production_runtime_artifact_json, resume_manifest_json,
+    runtime_component_artifact_json, runtime_computed_artifact_json, runtime_context_artifact_json,
+    runtime_cost_report_json, runtime_effect_artifact_json, runtime_forms_artifact_json,
+    runtime_opaque_artifact_json, runtime_resource_artifact_json, template_manifest_json,
+    validate_runtime_opaque_artifact, validate_runtime_resource_artifact, CompilationUnit,
+    ConstantFoldingPass, ExecutableProgramFingerprint, ImmutableAsmPass, ProductionReportInputs,
     ProductionRootChunkInput, SemanticId, SharedChunkCandidatePlan,
 };
 
@@ -482,6 +482,13 @@ pub fn build_application_publication_product_from_asm_v1(
         &production_chunk_graph,
         &report_inputs,
     );
+    let production_audit_report =
+        build_production_audit_report_v1(&optimization_report, &runtime_cost_report).map_err(
+            |error| ApplicationPublicationErrorV1 {
+                code: error.code,
+                message: error.message,
+            },
+        )?;
 
     let mut artifacts = BTreeMap::new();
     insert_artifact(&mut artifacts, "index.html", page_html.into_bytes());
@@ -534,6 +541,11 @@ pub fn build_application_publication_product_from_asm_v1(
         &mut artifacts,
         "runtime-cost-report.json",
         runtime_cost_report_json(&runtime_cost_report).into_bytes(),
+    );
+    insert_artifact(
+        &mut artifacts,
+        "production-audit.json",
+        production_audit_report_json_v1(&production_audit_report).into_bytes(),
     );
     insert_artifact(&mut artifacts, "runtime.js", runtime_js.into_bytes());
     if let Some(json) = resource_runtime_json {
@@ -759,6 +771,11 @@ mod tests {
         assert_eq!(product.manifest.schema_version, 1);
         assert_eq!(product.manifest.profile, "development");
         assert!(product.artifacts.contains_key(&PathBuf::from("index.html")));
+        let audit: serde_json::Value =
+            serde_json::from_slice(&product.artifacts[&PathBuf::from("production-audit.json")])
+                .expect("production audit artifact JSON");
+        assert_eq!(audit["schemaVersion"], 1);
+        assert_eq!(audit["status"], "passed");
         assert!(product
             .artifacts
             .contains_key(&PathBuf::from("application.manifest.json")));

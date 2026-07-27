@@ -70,4 +70,4 @@ jobs:
       - name: Run browser e2e
         env:
           RUST_TEST_THREADS: 1
-        run: cargo test -p presolve-cli --features browser-tests --test runtime_browser -- --nocapture
+        run: cargo test -p presolve-cli --test runtime_browser -- --nocapture

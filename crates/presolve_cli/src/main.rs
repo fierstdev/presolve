@@ -5,7 +5,7 @@ use std::fs;
 use std::io::{self, Read as _, Write as _};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::process::{self, Command};
+use std::process::{self, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use presolve_cli::cloudflare_deployment::{
@@ -13,6 +13,10 @@ use presolve_cli::cloudflare_deployment::{
     cloudflare_workers_static_worker_module_v1, cloudflare_workers_wrangler_jsonc_v1,
     validate_cloudflare_workers_artifacts_v1, CloudflareWorkersDeploymentOptionsV1,
     CLOUDFLARE_WORKERS_COMPATIBILITY_DATE_V1,
+};
+use presolve_cli::node_deployment::{
+    build_node_deployment_plan_v1, node_deployment_plan_json_v1, node_static_host_module_v1,
+    validate_node_deployment_artifacts_v1, NodeDeploymentOptionsV1,
 };
 use presolve_cli::{
     load_explicit_project_envelope_v1, load_explicit_source_inputs_v1,
@@ -25,34 +29,38 @@ use presolve_compiler::{
     build_application_publication_product_v1, build_application_semantic_model_for_unit,
     build_application_semantic_model_for_unit_with_packages, build_binding_table_with_packages,
     build_component_graph, build_context_inspection_registry, build_effect_inspection_registry,
+    build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring,
     build_file_route_publication_v1, build_form_inspection_registry, build_module_graph,
-    build_production_reachability_graph, build_production_reports,
-    build_production_runtime_artifact, build_resume_chunk_graph, build_resume_manifest,
-    build_route_loader_plan_v1, build_route_server_action_plan_v1,
+    build_production_audit_report_v1, build_production_reachability_graph,
+    build_production_reports, build_production_runtime_artifact, build_resume_chunk_graph,
+    build_resume_manifest, build_route_loader_plan_v1, build_route_server_action_plan_v1,
     build_runtime_component_artifact, build_runtime_computed_artifact,
     build_runtime_context_artifact, build_runtime_effect_artifact, build_runtime_forms_artifact,
     build_runtime_opaque_artifact_with_modules, build_runtime_resource_artifact_with_modules,
-    build_semantic_graph, build_static_request_handoff_v1, build_symbol_table,
-    build_template_graph, build_template_manifest_from_asm, build_validated_route_graph_v1,
-    discover_project_v1, discover_semantic_packages_v1, embed_opaque_runtime_artifact,
-    emit_production_modules, explain_json, explain_text, extract_production_chunk_graph,
-    fold_component_graph, generate_ordinary_instance_html, generate_runtime_stub,
-    generate_standalone_page_with_resume_runtime,
+    build_semantic_capability_registry, build_semantic_graph, build_static_request_handoff_v1,
+    build_symbol_table, build_template_graph, build_template_manifest_from_asm,
+    build_v2_authority_component_request_v1, build_v2_authority_request_v1,
+    build_validated_route_graph_v1, discover_project_v1, discover_semantic_packages_v1,
+    embed_opaque_runtime_artifact, emit_production_modules, explain_json, explain_text,
+    extract_production_chunk_graph, fold_component_graph, generate_ordinary_instance_html,
+    generate_runtime_stub, generate_standalone_page_with_resume_runtime,
     generate_standalone_page_with_resume_runtime_and_resources, generate_static_html,
-    lower_components_to_ir, optimization_report_json, optimize_context_ir, optimize_effect_ir,
-    production_runtime_artifact_json, project_production_diagnostics, project_resume_diagnostics,
-    resolve_file_route_request_v1, resume_manifest_json, runtime_component_artifact_json,
-    runtime_computed_artifact_json, runtime_context_artifact_json, runtime_cost_report_json,
-    runtime_effect_artifact_json, runtime_forms_artifact_json, runtime_opaque_artifact_json,
-    runtime_resource_artifact_json, semantic_capability_matrix_text,
-    semantic_capability_migration_text, semantic_capability_registry_json, semantic_graph_json,
-    semantic_type_text, summarize_source, template_manifest_json,
+    lower_component_inheritance_v1, lower_components_to_ir, lower_v2_authoring_v1,
+    optimization_report_json, optimize_context_ir, optimize_effect_ir,
+    production_audit_report_json_v1, production_runtime_artifact_json,
+    project_production_diagnostics, project_resume_diagnostics, resolve_file_route_request_v1,
+    resume_manifest_json, runtime_component_artifact_json, runtime_computed_artifact_json,
+    runtime_context_artifact_json, runtime_cost_report_json, runtime_effect_artifact_json,
+    runtime_forms_artifact_json, runtime_opaque_artifact_json, runtime_resource_artifact_json,
+    semantic_capability_matrix_text, semantic_capability_migration_text,
+    semantic_capability_registry_json, semantic_graph_json, semantic_type_text, summarize_source,
+    template_manifest_json, v2_authoring_resolutions_from_response_v1,
     validate_application_publication_request_v1, validate_application_semantic_model,
     validate_runtime_opaque_artifact, validate_runtime_resource_artifact,
     ApplicationPublicationProfileV1, ApplicationPublicationRequestV1,
     ApplicationPublicationSourceV1, ApplicationSemanticModel, AsmValidationDiagnostic,
     AttributeValue, CompilationUnit, ComponentGraph, ConstantFoldingPass, DeclaredStateTypeKind,
-    EffectInspection, EffectInspectionRegistry, ExecutableProgramFingerprint,
+    DiscoveredProjectV1, EffectInspection, EffectInspectionRegistry, ExecutableProgramFingerprint,
     FileRoutePublicationManifestV1, FileRoutePublicationRequestV1, FileRouteRequestTargetV1,
     ImmutableAsmPass, ProductionDiagnosticFact, ProductionDiagnosticKind,
     ProductionProjectedDiagnostic, ProductionReportInputs, ProductionRootChunkInput,
@@ -60,13 +68,13 @@ use presolve_compiler::{
     SemanticOwner, SemanticPackageResolutionTable, SemanticPackageRuntimeModuleKey,
     SemanticPackageRuntimeModuleTable, SemanticReferenceKind, SerializableValue,
     SharedChunkCandidatePlan, SourceProvenance, StateOperation, TemplateChild, TemplateGraph,
-    TemplateSemanticKind,
+    TemplateSemanticKind, V2AuthorityResponseV1,
 };
 use presolve_parser::{
     parse_file, ParseDiagnostic, ParseSeverity, ParsedClass, ParsedFile, ParsedJsxAttribute,
     ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxNode, ParsedMethod, SourceSpan,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 
 const ASM_INSPECTION_SCHEMA_VERSION: u32 = 12;
@@ -90,6 +98,8 @@ fn main() {
         "version" => run_l9_version(&args),
         "help" | "--help" | "-h" => print_l9_usage(),
         "create" | "benchmark" | "doctor" => l9_reserved_command(&command),
+        "migrate" => run_migrate(&args),
+        "environment" => run_environment(&args),
         "explain" => run_explain(args),
         "parse" => run_parse(args),
         "graph" => {
@@ -104,7 +114,9 @@ fn main() {
         "asm" => l9_command_error("asm", "retired: use presolve explain", 6),
         "check" => {
             if args.is_empty() {
-                run_ergonomic_check(Path::new("."));
+                run_ergonomic_check(Path::new("."), None);
+            } else if let Some(manifest) = parse_ergonomic_environment_manifest(&args) {
+                run_ergonomic_check(Path::new("."), Some(manifest));
             } else if args.iter().any(|argument| argument == "--config") {
                 run_l9_build_or_check("check", &args);
             } else {
@@ -116,7 +128,17 @@ fn main() {
         "manifest" => run_manifest(args),
         "build" => {
             if args.is_empty() {
-                run_ergonomic_build(Path::new("."), ApplicationPublicationProfileV1::Production);
+                run_ergonomic_build(
+                    Path::new("."),
+                    ApplicationPublicationProfileV1::Production,
+                    None,
+                );
+            } else if let Some(manifest) = parse_ergonomic_environment_manifest(&args) {
+                run_ergonomic_build(
+                    Path::new("."),
+                    ApplicationPublicationProfileV1::Production,
+                    Some(manifest),
+                );
             } else if args.iter().any(|argument| argument == "--config") {
                 run_l9_build_or_check("build", &args);
             } else {
@@ -144,9 +166,14 @@ fn main() {
 fn run_ergonomic_build(
     root: &Path,
     profile: ApplicationPublicationProfileV1,
+    environment_manifest: Option<presolve_compiler::EnvironmentInputManifestV1>,
 ) -> FileRoutePublicationManifestV1 {
     let project = discover_project_v1(root)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    let v2_products = validate_v2_authoring_project(&project, environment_manifest.as_ref())
+        .unwrap_or_else(|message| {
+            application_cli_error("PSAUTH1001_V2_AUTHORITY_FAILED", &message)
+        });
     let output_root = project.root.join("dist");
     validate_application_output_root(&output_root);
     let discovery_unit = CompilationUnit::parse_sources(
@@ -171,13 +198,289 @@ fn run_ergonomic_build(
         package_runtime_modules,
         profile,
         output_root: output_root.clone(),
+        environment_artifact: v2_products.environment_artifact,
+        v2_authoring: v2_products.models,
     };
-    let product = build_file_route_publication_v1(request)
+    let mut product = build_file_route_publication_v1(request)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    attach_route_metadata(&project.root, &mut product)
+        .unwrap_or_else(|message| application_cli_error("PSMETA1004_DISCOVERY_FAILED", &message));
     publish_file_route_product(&output_root, &product)
         .unwrap_or_else(|error| application_cli_error("PSROUTE3008_PUBLICATION_FAILED", &error));
     println!("Built {}", output_root.display());
     product.manifest
+}
+
+/// Runs the installed TypeScript-authority bridge for decorator-free V2 source
+/// before legacy application assembly starts.  This is intentionally an
+/// orchestration adapter: it selects no framework meaning and fails rather
+/// than routing an authority failure through the legacy decorator graph.
+struct V2AuthoringProjectProductsV1 {
+    models: BTreeMap<PathBuf, presolve_compiler::CanonicalAuthoredSemanticModelV1>,
+    environment_artifact: Option<presolve_compiler::EnvironmentPublicationArtifactV1>,
+}
+
+fn validate_v2_authoring_project(
+    project: &DiscoveredProjectV1,
+    environment_manifest: Option<&presolve_compiler::EnvironmentInputManifestV1>,
+) -> Result<V2AuthoringProjectProductsV1, String> {
+    let config_file = project.root.join("tsconfig.json");
+    let executable = project
+        .root
+        .join("node_modules")
+        .join(".bin")
+        .join("presolve-typescript-authority");
+    let parsed_sources = project
+        .sources
+        .iter()
+        .map(|source| parse_file(&source.logical_path, &source.source))
+        .collect::<Vec<_>>();
+    let candidates = parsed_sources
+        .iter()
+        .filter(|parsed| is_decorator_free_v2_candidate(parsed))
+        .collect::<Vec<_>>();
+    let plain_environment_requests = parsed_sources
+        .iter()
+        .filter(|parsed| !is_decorator_free_v2_candidate(parsed))
+        .map(|parsed| {
+            presolve_compiler::build_v2_environment_authority_request_v1(
+                parsed,
+                PathBuf::from("tsconfig.json"),
+            )
+            .map(|request| request.map(|request| (parsed, request)))
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| error.to_string())?
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+    if candidates.is_empty() && plain_environment_requests.is_empty() {
+        return Ok(V2AuthoringProjectProductsV1 {
+            models: BTreeMap::new(),
+            environment_artifact: None,
+        });
+    }
+    if !config_file.is_file() {
+        return Err(format!(
+            "decorator-free V2 source requires {}; add the project TypeScript configuration before check or build",
+            config_file.display()
+        ));
+    }
+    if !executable.is_file() {
+        return Err(format!(
+            "decorator-free V2 source requires {}; install @presolve/typescript-authority in this project",
+            executable.display()
+        ));
+    }
+    let mut models = BTreeMap::new();
+    let mut environment_reads = Vec::new();
+    for parsed in candidates {
+        let component_request =
+            build_v2_authority_component_request_v1(parsed, PathBuf::from("tsconfig.json"))
+                .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
+        let component_response =
+            invoke_v2_authority_bridge(&project.root, &executable, &component_request)?;
+        let component_resolutions = v2_authoring_resolutions_from_response_v1(
+            parsed,
+            &component_request,
+            &component_response,
+        )
+        .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
+        let component_model =
+            lower_component_inheritance_v1(parsed, component_resolutions.components)
+                .map_err(|error| format!("{}: {error}", parsed.path.display()))?
+                .model;
+        if component_model.declarations.is_empty() {
+            return Err(format!(
+                "{}: no class heritage resolved to Presolve Component",
+                parsed.path.display()
+            ));
+        }
+        let request =
+            build_v2_authority_request_v1(parsed, PathBuf::from("tsconfig.json"), &component_model)
+                .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
+        let response = invoke_v2_authority_bridge(&project.root, &executable, &request)?;
+        environment_reads.extend(collect_environment_reads(
+            parsed,
+            &request,
+            &response,
+            environment_manifest,
+        )?);
+        let resolutions = v2_authoring_resolutions_from_response_v1(parsed, &request, &response)
+            .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
+        let lowering = lower_v2_authoring_v1(parsed, resolutions)
+            .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
+        models.insert(parsed.path.clone(), lowering.model);
+    }
+    for (parsed, request) in plain_environment_requests {
+        let response = invoke_v2_authority_bridge(&project.root, &executable, &request)?;
+        environment_reads.extend(collect_environment_reads(
+            parsed,
+            &request,
+            &response,
+            environment_manifest,
+        )?);
+    }
+    let environment_artifact = if environment_reads.is_empty() {
+        None
+    } else {
+        let lowering = presolve_compiler::EnvironmentReadLoweringV1 {
+            schema_version: presolve_compiler::ENVIRONMENT_READ_LOWERING_SCHEMA_VERSION,
+            reads: environment_reads,
+            diagnostics: Vec::new(),
+        };
+        presolve_compiler::build_environment_read_ownership_v1(&lowering)
+            .map_err(|error| error.to_string())?;
+        Some(
+            presolve_compiler::build_environment_publication_artifact_v1(&lowering)
+                .map_err(|error| error.to_string())?,
+        )
+    };
+    Ok(V2AuthoringProjectProductsV1 {
+        models,
+        environment_artifact,
+    })
+}
+
+fn collect_environment_reads(
+    parsed: &ParsedFile,
+    request: &presolve_compiler::V2AuthorityRequestV1,
+    response: &V2AuthorityResponseV1,
+    manifest: Option<&presolve_compiler::EnvironmentInputManifestV1>,
+) -> Result<Vec<presolve_compiler::EnvironmentReadRecordV1>, String> {
+    let evidence = presolve_compiler::v2_environment_public_resolutions_from_response_v1(
+        parsed, request, response,
+    )
+    .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
+    if evidence.is_empty() {
+        return Ok(Vec::new());
+    }
+    let lowering = presolve_compiler::lower_environment_reads_v1(parsed, evidence, manifest);
+    if let Some(diagnostic) = lowering.diagnostics.first() {
+        return Err(format!(
+            "{}: {} at {}:{}",
+            parsed.path.display(),
+            diagnostic.code.as_str(),
+            diagnostic.call_source.line,
+            diagnostic.call_source.column
+        ));
+    }
+    Ok(lowering.reads)
+}
+
+fn is_decorator_free_v2_candidate(parsed: &ParsedFile) -> bool {
+    let imports_component = parsed.imports.iter().any(|import| {
+        import.source == "presolve"
+            && import
+                .specifiers
+                .iter()
+                .any(|specifier| specifier.imported == "Component")
+    });
+    imports_component
+        && parsed.classes.iter().any(|class| class.heritage.is_some())
+        && parsed.classes.iter().all(|class| {
+            class.decorators.is_empty()
+                && class
+                    .properties
+                    .iter()
+                    .all(|property| property.decorators.is_empty())
+                && class
+                    .methods
+                    .iter()
+                    .all(|method| method.decorators.is_empty())
+        })
+}
+
+fn invoke_v2_authority_bridge(
+    root: &Path,
+    executable: &Path,
+    request: &presolve_compiler::V2AuthorityRequestV1,
+) -> Result<V2AuthorityResponseV1, String> {
+    let request = serde_json::to_vec(request)
+        .map_err(|error| format!("failed to serialize V2 authority request: {error}"))?;
+    let mut child = Command::new(executable)
+        .current_dir(root)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("failed to start {}: {error}", executable.display()))?;
+    child
+        .stdin
+        .take()
+        .ok_or_else(|| "V2 authority bridge did not expose stdin".to_owned())?
+        .write_all(&request)
+        .map_err(|error| format!("failed to write V2 authority request: {error}"))?;
+    let output = child
+        .wait_with_output()
+        .map_err(|error| format!("failed to read V2 authority response: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "{} exited with {}: {}",
+            executable.display(),
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    serde_json::from_slice(&output.stdout).map_err(|error| {
+        format!(
+            "{} emitted malformed V2 authority JSON: {error}",
+            executable.display()
+        )
+    })
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RouteMetadataSidecar {
+    title: String,
+    description: Option<String>,
+}
+
+fn attach_route_metadata(
+    root: &Path,
+    product: &mut presolve_compiler::FileRoutePublicationProductV1,
+) -> Result<(), String> {
+    let mut inputs = Vec::new();
+    for (route_path, source_path) in &product.route_source_paths {
+        let sidecar = root.join(source_path).with_extension("metadata.json");
+        if !sidecar.is_file() {
+            continue;
+        }
+        let source = fs::read_to_string(&sidecar)
+            .map_err(|error| format!("{}: {error}", sidecar.display()))?;
+        let sidecar: RouteMetadataSidecar = serde_json::from_str(&source)
+            .map_err(|error| format!("{}: {error}", sidecar.display()))?;
+        inputs.push(presolve_compiler::RouteMetadataInputV1 {
+            route_path: route_path.clone(),
+            title: sidecar.title,
+            description: sidecar.description,
+        });
+    }
+    if inputs.is_empty() {
+        return Ok(());
+    }
+    let metadata = presolve_compiler::build_route_metadata_manifest_v1(&product.manifest, &inputs)
+        .map_err(|error| format!("{}: {}", error.code, error.message))?;
+    let path = PathBuf::from("route-metadata.json");
+    let bytes = presolve_compiler::route_metadata_manifest_json_v1(&metadata).into_bytes();
+    product
+        .manifest
+        .artifacts
+        .push(presolve_compiler::ApplicationPublicationArtifactV1 {
+            path: path.to_string_lossy().into_owned(),
+            digest: format!("sha256:{:x}", Sha256::digest(&bytes)),
+        });
+    product
+        .manifest
+        .artifacts
+        .sort_by(|left, right| left.path.cmp(&right.path));
+    product.artifacts.insert(path, bytes);
+    product.artifacts.insert(
+        PathBuf::from("file-routes.manifest.json"),
+        presolve_compiler::file_route_publication_manifest_json_v1(&product.manifest).into_bytes(),
+    );
+    Ok(())
 }
 
 fn run_ergonomic_dev(args: &[String]) {
@@ -205,8 +508,11 @@ fn run_ergonomic_dev(args: &[String]) {
             ),
         }
     }
-    let manifest =
-        run_ergonomic_build(Path::new("."), ApplicationPublicationProfileV1::Development);
+    let manifest = run_ergonomic_build(
+        Path::new("."),
+        ApplicationPublicationProfileV1::Development,
+        None,
+    );
     if once {
         return;
     }
@@ -224,6 +530,10 @@ struct CloudflareDeployArgumentsV1 {
 }
 
 fn run_ergonomic_deploy(args: &[String]) {
+    if args.first().is_some_and(|value| value == "node") {
+        run_ergonomic_node_deploy(&args[1..]);
+        return;
+    }
     let arguments = parse_cloudflare_deploy_arguments(args).unwrap_or_else(|message| {
         application_cli_error("PSCFL1011_DEPLOY_ARGUMENT_INVALID", &message)
     });
@@ -232,7 +542,7 @@ fn run_ergonomic_deploy(args: &[String]) {
         run_cloudflare_rollback(root, version.as_deref());
         return;
     }
-    let manifest = run_ergonomic_build(root, ApplicationPublicationProfileV1::Production);
+    let manifest = run_ergonomic_build(root, ApplicationPublicationProfileV1::Production, None);
     let project = discover_project_v1(root)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
     let worker_name = arguments.worker_name.unwrap_or_else(|| {
@@ -298,6 +608,96 @@ fn run_ergonomic_deploy(args: &[String]) {
         process::exit(status.code().unwrap_or(1));
     }
     println!("Cloudflare release {} deployed", plan.release_id);
+}
+
+fn run_ergonomic_node_deploy(args: &[String]) {
+    let application_name = parse_node_deploy_arguments(args).unwrap_or_else(|message| {
+        application_cli_error("PSNODE1011_DEPLOY_ARGUMENT_INVALID", &message)
+    });
+    let root = Path::new(".");
+    let manifest = run_ergonomic_build(root, ApplicationPublicationProfileV1::Production, None);
+    let project = discover_project_v1(root)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    let output_root = project.root.join("dist");
+    let loader_plan = fs::read_to_string(output_root.join("route-loaders.plan.json"))
+        .unwrap_or_else(|error| {
+            application_cli_error("PSNODE1012_LOADER_HANDOFF_READ_FAILED", &error.to_string())
+        });
+    let action_plan = fs::read_to_string(output_root.join("route-server-actions.plan.json"))
+        .unwrap_or_else(|error| {
+            application_cli_error(
+                "PSNODE1013_SERVER_ACTION_HANDOFF_READ_FAILED",
+                &error.to_string(),
+            )
+        });
+    let application_name = application_name.unwrap_or_else(|| {
+        cloudflare_worker_name_from_project_root(&project.root).unwrap_or_else(|message| {
+            application_cli_error("PSNODE1014_DEFAULT_APPLICATION_NAME_INVALID", &message)
+        })
+    });
+    let plan = build_node_deployment_plan_v1(
+        &manifest,
+        &loader_plan,
+        &action_plan,
+        &NodeDeploymentOptionsV1 { application_name },
+    )
+    .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    validate_node_deployment_artifacts_v1(&output_root, &plan)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    let adapter_root = project.root.join(".presolve/node");
+    fs::create_dir_all(&adapter_root).unwrap_or_else(|error| {
+        application_cli_error("PSNODE1015_ADAPTER_OUTPUT_UNAVAILABLE", &error.to_string())
+    });
+    write_node_adapter_file(
+        &adapter_root.join("deployment.plan.json"),
+        node_deployment_plan_json_v1(&plan).as_bytes(),
+    );
+    write_node_adapter_file(
+        &adapter_root.join("server.mjs"),
+        node_static_host_module_v1(&plan).as_bytes(),
+    );
+    write_node_adapter_file(
+        &adapter_root.join("package.json"),
+        format!(
+            "{{\n  \"name\": \"{}-presolve-release\",\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {{ \"start\": \"node server.mjs\" }}\n}}\n",
+            plan.application_name
+        )
+        .as_bytes(),
+    );
+    println!(
+        "Prepared Node release {} ({})",
+        adapter_root.join("server.mjs").display(),
+        plan.release_id
+    );
+}
+
+fn parse_node_deploy_arguments(args: &[String]) -> Result<Option<String>, String> {
+    let mut application_name = None;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--prepare" => {}
+            "--name" => {
+                let Some(value) = args.get(index + 1) else {
+                    return Err("--name requires a value".into());
+                };
+                application_name = Some(value.clone());
+                index += 1;
+            }
+            option => return Err(format!("unknown Node deploy option `{option}`")),
+        }
+        index += 1;
+    }
+    Ok(application_name)
+}
+
+fn write_node_adapter_file(path: &Path, contents: &[u8]) {
+    fs::write(path, contents).unwrap_or_else(|error| {
+        application_cli_error(
+            "PSNODE1016_ADAPTER_OUTPUT_WRITE_FAILED",
+            &format!("{}: {error}", path.display()),
+        )
+    });
 }
 
 fn parse_cloudflare_deploy_arguments(
@@ -573,9 +973,17 @@ fn write_development_response(
     let _ = stream.write_all(body);
 }
 
-fn run_ergonomic_check(root: &Path) {
+fn run_ergonomic_check(
+    root: &Path,
+    environment_manifest: Option<presolve_compiler::EnvironmentInputManifestV1>,
+) {
     let project = discover_project_v1(root)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    let v2_products = validate_v2_authoring_project(&project, environment_manifest.as_ref())
+        .unwrap_or_else(|message| {
+            application_cli_error("PSAUTH1001_V2_AUTHORITY_FAILED", &message)
+        });
+    let v2_authoring = v2_products.models;
     let unit = CompilationUnit::parse_sources(
         project
             .sources
@@ -583,7 +991,16 @@ fn run_ergonomic_check(root: &Path) {
             .map(|source| (source.logical_path.clone(), source.source.as_str())),
     );
     let (package_contracts, _) = discover_imported_package_tables(&project.root, &unit);
-    let asm = build_application_semantic_model_for_unit_with_packages(&unit, &package_contracts);
+    let asm = if v2_authoring.is_empty() {
+        build_application_semantic_model_for_unit_with_packages(&unit, &package_contracts)
+    } else {
+        build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring(
+            &unit,
+            &package_contracts,
+            &v2_authoring,
+        )
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message))
+    };
     let graph = presolve_compiler::build_validated_file_route_graph_v1(&asm)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
     let symbols = build_symbol_table(&unit);
@@ -663,7 +1080,7 @@ fn l9_reserved_command(command: &str) -> ! {
 
 fn print_l9_usage() -> ! {
     println!("presolve <command> [options]");
-    println!("commands: version, build, check, clean, cache, workspace, watch, dev, create, explain, inspect, graph, trace, profile, benchmark, doctor");
+    println!("commands: version, build, check, clean, cache, workspace, watch, dev, create, migrate, explain, inspect, graph, trace, profile, benchmark, doctor");
     println!(
         "explicit project commands require --config <file> and --source <logical=relative-file>"
     );
@@ -1244,6 +1661,119 @@ fn l9_config_and_format(command: &str, args: &[String]) -> (PathBuf, bool) {
         l9_command_error(command, "--config is required", 2);
     };
     (configuration_path, json)
+}
+
+fn run_environment(args: &[String]) {
+    if args.len() != 2 || args[0] != "--file" {
+        application_cli_error(
+            "PSENV1004_ARGUMENT_INVALID",
+            "usage: presolve environment --file <path>",
+        );
+    }
+    let file = Path::new(&args[1]);
+    let source = fs::read_to_string(file).unwrap_or_else(|error| {
+        application_cli_error(
+            "PSENV1005_INPUT_READ_FAILED",
+            &format!("{}: {error}", file.display()),
+        )
+    });
+    let values = parse_explicit_dotenv_v1(&source)
+        .unwrap_or_else(|message| application_cli_error("PSENV1006_INPUT_INVALID", &message));
+    let manifest = presolve_compiler::build_environment_input_manifest_v1(&args[1], &values)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    print!(
+        "{}",
+        presolve_compiler::environment_input_manifest_json_v1(&manifest)
+    );
+}
+
+/// Loads only a caller-named manifest JSON. This intentionally does not look
+/// for `.env` files or consult ambient process state.
+fn parse_ergonomic_environment_manifest(
+    args: &[String],
+) -> Option<presolve_compiler::EnvironmentInputManifestV1> {
+    if args
+        .first()
+        .is_none_or(|argument| argument != "--environment-manifest")
+    {
+        return None;
+    }
+    if args.len() != 2 {
+        application_cli_error(
+            "PSENV1202_ARGUMENT_INVALID",
+            "usage: presolve <check|build> --environment-manifest <path>",
+        );
+    }
+    let path = Path::new(&args[1]);
+    let source = fs::read_to_string(path).unwrap_or_else(|error| {
+        application_cli_error(
+            "PSENV1203_MANIFEST_READ_FAILED",
+            &format!("{}: {error}", path.display()),
+        )
+    });
+    Some(
+        presolve_compiler::environment_input_manifest_from_json_v1(&source)
+            .unwrap_or_else(|error| application_cli_error(error.code, &error.message)),
+    )
+}
+
+fn parse_explicit_dotenv_v1(source: &str) -> Result<BTreeMap<String, String>, String> {
+    let mut values = BTreeMap::new();
+    for (line_number, line) in source.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let Some((name, value)) = line.split_once('=') else {
+            return Err(format!("line {} must use NAME=VALUE", line_number + 1));
+        };
+        if name.is_empty()
+            || name.trim() != name
+            || value.contains('\n')
+            || values.insert(name.into(), value.into()).is_some()
+        {
+            return Err(format!(
+                "line {} is not a unique NAME=VALUE declaration",
+                line_number + 1
+            ));
+        }
+    }
+    Ok(values)
+}
+
+fn run_migrate(args: &[String]) {
+    let mut format = "human";
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--format" => {
+                let Some(value) = args.get(index + 1) else {
+                    l9_command_error("migrate", "missing value for --format", 2);
+                };
+                format = value;
+                index += 2;
+            }
+            value => l9_command_error("migrate", &format!("unknown option: {value}"), 2),
+        }
+    }
+    let registry = build_semantic_capability_registry();
+    match format {
+        "human" => {
+            print!("{}", semantic_capability_migration_text());
+            println!("\nAutomatic codemods: none (no canonical source-transform authority is published).");
+        }
+        "json" => println!(
+            "{}",
+            serde_json::json!({
+                "schema": "presolve.migration-report",
+                "version": 1,
+                "registry": registry,
+                "automaticCodemods": [],
+                "policy": "report-only-no-source-rewrites",
+            })
+        ),
+        _ => l9_command_error("migrate", "--format must be human or json", 2),
+    }
 }
 
 fn run_explain(mut args: Vec<String>) {
@@ -2888,6 +3418,7 @@ fn semantic_entity_kind(entity: SemanticEntity<'_>) -> &'static str {
         SemanticEntity::Component(_) => "component",
         SemanticEntity::StateField(_) => "state-field",
         SemanticEntity::Method(_) => "method",
+        SemanticEntity::ActionEndpoint(_) => "action-endpoint",
         SemanticEntity::Context(_) => "context",
         SemanticEntity::Provider(_) => "provider",
         SemanticEntity::Consumer(_) => "consumer",
@@ -3769,6 +4300,10 @@ fn run_build(mut args: Vec<String>) {
     );
     let optimization_report_json = optimization_report_json(&optimization_report);
     let runtime_cost_report_json = runtime_cost_report_json(&runtime_cost_report);
+    let production_audit_report_json = production_audit_report_json_v1(
+        &build_production_audit_report_v1(&optimization_report, &runtime_cost_report)
+            .expect("fresh compiler production reports must satisfy the audit"),
+    );
     write_build_artifacts(
         &out_dir,
         &page_html,
@@ -3784,6 +4319,7 @@ fn run_build(mut args: Vec<String>) {
         &production_runtime_json,
         &optimization_report_json,
         &runtime_cost_report_json,
+        &production_audit_report_json,
         &runtime_js,
         &resume_chunks,
     )
@@ -4393,6 +4929,7 @@ fn print_build_artifact_paths(
         "production.runtime.json",
         "optimization-report.json",
         "runtime-cost-report.json",
+        "production-audit.json",
         "runtime.js",
     ] {
         println!("Wrote {}", out_dir.join(artifact).display());
@@ -5334,6 +5871,7 @@ fn write_build_artifacts(
     production_runtime_json: &str,
     optimization_report_json: &str,
     runtime_cost_report_json: &str,
+    production_audit_report_json: &str,
     runtime_js: &str,
     resume_chunks: &presolve_compiler::ResumeChunkGraph,
 ) -> io::Result<()> {
@@ -5359,6 +5897,10 @@ fn write_build_artifacts(
     fs::write(
         out_dir.join("runtime-cost-report.json"),
         runtime_cost_report_json,
+    )?;
+    fs::write(
+        out_dir.join("production-audit.json"),
+        production_audit_report_json,
     )?;
     fs::write(out_dir.join("forms.runtime.json"), forms_runtime_json)?;
     fs::write(out_dir.join("resume.runtime.json"), resume_runtime_json)?;
@@ -5390,6 +5932,7 @@ fn write_build_artifacts(
 fn print_usage_and_exit() -> ! {
     eprintln!("usage:");
     eprintln!("  presolve explain --capabilities --format human|json|migration");
+    eprintln!("  presolve migrate --format human|json");
     eprintln!("  presolve explain <file> [--format text|json]");
     eprintln!("  presolve explain <file> [--inspect] [--entity semantic-id | --source path --offset byte] [--child-kind kind] [--reference-kind kind] [--format text|json|graph]");
     eprintln!(

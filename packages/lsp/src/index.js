@@ -2,6 +2,7 @@ import { initializeLanguageService } from "@presolve/language-service";
 
 const requestSchema = "presolve.language-service-wasm-request";
 const supported = new Map([
+  ["textDocument/hover", (params) => ({ operation: "hover", querySemanticId: params.querySemanticId })],
   ["textDocument/definition", (params) => ({ operation: "definition", querySemanticId: params.querySemanticId })],
   ["textDocument/references", (params) => ({ operation: "references", querySemanticId: params.querySemanticId })],
   ["textDocument/documentSymbol", (params) => ({ operation: "documentSymbols", sourceUnitId: params.sourceUnitId })],

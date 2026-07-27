@@ -32,7 +32,10 @@ pub fn build_computed_instance_slot_registry(
     let declaration_records = build_runtime_computed_registry(model, ir);
     let mut records = Vec::new();
     for instance in model.component_instance_plan.instances.values() {
-        if instance.status != ComponentInstanceStatus::Planned {
+        if !matches!(
+            instance.status,
+            ComponentInstanceStatus::Planned | ComponentInstanceStatus::StructuralTemplate
+        ) {
             continue;
         }
         for computed in model

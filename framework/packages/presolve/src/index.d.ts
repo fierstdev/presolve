@@ -19,11 +19,34 @@ export type PresolveFieldDecorator = <This, Value>(
   context: ClassFieldDecoratorContext<This, Value>
 ) => void;
 
+/** @deprecated Alpha compatibility decorator. V2 components extend `Component`. */
 export declare function component(): PresolveClassDecorator;
+/**
+ * Creates a V2 action instance field.  The overload without a handler is
+ * retained solely for alpha decorator compatibility.
+ */
+export declare function action<This, Args extends readonly unknown[], Value>(
+  handler: (this: This, ...args: Args) => Value
+): (this: This, ...args: Args) => Value;
+/** @deprecated Alpha compatibility decorator. */
 export declare function action(): PresolveMethodDecorator;
 export declare function computed(): PresolveGetterDecorator;
+/** Creates a V2 browser effect instance field. */
+export declare function effect<This>(
+  handler: (this: This) => void | (() => void)
+): void;
+/** @deprecated Alpha compatibility decorator. */
 export declare function effect(): PresolveMethodDecorator;
 export declare function state<T>(initialValue: T): T;
+
+/**
+ * Manifest-backed browser environment access for decorator-free V2 source.
+ * Values are admitted only when a matching compiler environment manifest
+ * classifies the requested name as `PRESOLVE_PUBLIC_*`.
+ */
+export declare const environment: {
+  public(name: string): string;
+};
 
 export declare function slot(): PresolveFieldDecorator;
 export interface SlotContent {
@@ -66,7 +89,7 @@ export declare function opaque(
   exportName: string
 ): PresolveMethodDecorator;
 
-export declare abstract class Component {}
+export declare abstract class Component<Props = {}> {}
 
 declare global {
   namespace JSX {

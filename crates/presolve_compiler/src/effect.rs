@@ -29,6 +29,7 @@ pub enum EffectValidation {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum EffectSemanticViolationKind {
     Async,
+    CleanupLifecycleUnavailable,
     ReactiveStateMutation,
     ActionInvocation,
     EffectInvocation,
@@ -62,7 +63,7 @@ pub struct EffectReactiveAnalysis {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionBatch {
     pub id: SemanticId,
-    pub authored_action_method: SemanticId,
+    pub authored_action_endpoint: SemanticId,
     pub ordered_write_records: Vec<SemanticId>,
     pub written_states: Vec<SemanticId>,
     pub provenance: SourceProvenance,
@@ -147,13 +148,22 @@ pub struct EffectExecutionPlan {
     pub actions: Vec<ActionEffectExecutionPlan>,
 }
 
-/// A first-class compiler semantic entity for one `@effect()` method.
+/// The source declaration carrying one compiler effect body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EffectDeclaration {
+    LegacyMethod(SemanticId),
+    V2Field,
+}
+
+/// A first-class compiler semantic entity for one legacy or V2 effect.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Effect {
     pub id: SemanticId,
     pub owner: SemanticOwner,
-    pub method: SemanticId,
+    pub declaration: EffectDeclaration,
     pub name: String,
+    /// V2 field source order, when an effect originated from a class field.
+    pub declaration_order: Option<u32>,
     pub execution_boundary: ExecutionBoundary,
     pub execution_policy: EffectExecutionPolicy,
     pub validation: EffectValidation,
@@ -165,6 +175,14 @@ pub struct Effect {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EffectBody {
     pub effect: SemanticId,
+    pub statements: Vec<SemanticId>,
+    pub cleanup: Option<EffectCleanupBody>,
+    pub provenance: SourceProvenance,
+}
+
+/// The separately ordered cleanup program for one effect body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EffectCleanupBody {
     pub statements: Vec<SemanticId>,
     pub provenance: SourceProvenance,
 }
@@ -197,45 +215,57 @@ pub enum EffectStatementKind {
 
 /// Collect canonical effect entities in stable semantic-ID order.
 ///
-/// # Panics
-///
-/// Panics when an effect method has no canonical source provenance.
 #[must_use]
 pub fn collect_effects(
     components: &[ComponentNode],
     provenance: &BTreeMap<SemanticId, SourceProvenance>,
 ) -> BTreeMap<SemanticId, Effect> {
-    components
-        .iter()
-        .flat_map(|component| {
-            component
-                .methods
-                .iter()
-                .filter(|method| method.is_effect())
-                .map(move |method| {
-                    let id = component.id.effect(&method.name);
-                    let provenance = provenance
-                        .get(&method.id)
-                        .expect("effect methods should have canonical provenance")
-                        .clone();
-                    (
-                        id.clone(),
-                        Effect {
-                            id,
-                            owner: SemanticOwner::entity(component.id.clone()),
-                            method: method.id.clone(),
-                            name: method.name.clone(),
-                            execution_boundary: ExecutionBoundary::Client,
-                            execution_policy:
-                                EffectExecutionPolicy::AfterInitialRenderAndCompletedActionBatch,
-                            validation: EffectValidation::Unvalidated,
-                            semantic_violations: Vec::new(),
-                            provenance,
-                        },
-                    )
-                })
-        })
-        .collect()
+    let mut effects = BTreeMap::new();
+    for component in components {
+        for method in component.methods.iter().filter(|method| method.is_effect()) {
+            let id = component.id.effect(&method.name);
+            let method_provenance = provenance
+                .get(&method.id)
+                .expect("effect methods should have canonical provenance")
+                .clone();
+            effects.insert(
+                id.clone(),
+                Effect {
+                    id,
+                    owner: SemanticOwner::entity(component.id.clone()),
+                    declaration: EffectDeclaration::LegacyMethod(method.id.clone()),
+                    name: method.name.clone(),
+                    declaration_order: None,
+                    execution_boundary: ExecutionBoundary::Client,
+                    execution_policy:
+                        EffectExecutionPolicy::AfterInitialRenderAndCompletedActionBatch,
+                    validation: EffectValidation::Unvalidated,
+                    semantic_violations: Vec::new(),
+                    provenance: method_provenance,
+                },
+            );
+        }
+        for field in &component.effect_fields {
+            let id = component.id.effect(&field.name);
+            effects.insert(
+                id.clone(),
+                Effect {
+                    id,
+                    owner: field.owner.clone(),
+                    declaration: EffectDeclaration::V2Field,
+                    name: field.name.clone(),
+                    declaration_order: Some(field.declaration_order),
+                    execution_boundary: ExecutionBoundary::Client,
+                    execution_policy:
+                        EffectExecutionPolicy::AfterInitialRenderAndCompletedActionBatch,
+                    validation: EffectValidation::Unvalidated,
+                    semantic_violations: Vec::new(),
+                    provenance: field.provenance.clone(),
+                },
+            );
+        }
+    }
+    effects
 }
 
 /// Classifies effect legality from F4 statement facts without adding diagnostics.
@@ -249,23 +279,18 @@ pub fn validate_effects(
 ) -> BTreeMap<SemanticId, Effect> {
     for effect in effects.values_mut() {
         let mut violations = Vec::new();
-        let method = effect
-            .owner
-            .entity_id()
-            .and_then(|component_id| {
-                components
-                    .iter()
-                    .find(|component| component.id == *component_id)
-            })
-            .and_then(|component| {
-                component
-                    .methods
-                    .iter()
-                    .find(|method| method.id == effect.method)
-            });
-        if method.is_some_and(|method| method.is_async) {
+        if effect_is_async(components, effect) {
             violations.push(EffectSemanticViolation {
                 kind: EffectSemanticViolationKind::Async,
+                statement: None,
+                provenance: effect.provenance.clone(),
+            });
+        }
+        if effect_has_cleanup(components, effect)
+            && !matches!(effect.declaration, EffectDeclaration::V2Field)
+        {
+            violations.push(EffectSemanticViolation {
+                kind: EffectSemanticViolationKind::CleanupLifecycleUnavailable,
                 statement: None,
                 provenance: effect.provenance.clone(),
             });
@@ -425,18 +450,18 @@ pub fn derive_effect_trigger_plan(
         .collect::<Vec<_>>();
     let mut action_batches = BTreeMap::new();
     for component in components {
-        for method in component.methods.iter().filter(|method| method.is_action()) {
+        for (name, endpoint) in component.action_endpoint_ids() {
             let writes = component
                 .actions
                 .iter()
-                .filter(|action| action.method == method.name)
+                .filter(|action| action.method == name)
                 .collect::<Vec<_>>();
-            let id = component.id.action_batch(&method.name);
+            let id = component.id.action_batch(&name);
             action_batches.insert(
                 id.clone(),
                 ActionBatch {
                     id,
-                    authored_action_method: method.id.clone(),
+                    authored_action_endpoint: endpoint.clone(),
                     ordered_write_records: writes.iter().map(|action| action.id.clone()).collect(),
                     written_states: writes
                         .iter()
@@ -445,8 +470,8 @@ pub fn derive_effect_trigger_plan(
                         .into_iter()
                         .collect(),
                     provenance: provenance
-                        .get(&method.id)
-                        .expect("action methods should have canonical provenance")
+                        .get(&endpoint)
+                        .expect("action endpoints should have canonical provenance")
                         .clone(),
                 },
             );
@@ -731,7 +756,7 @@ fn schedule_terminal_effects(
         .into_iter()
         .enumerate()
         .filter_map(|(index, batch)| {
-            let effects = batch
+            let mut effects = batch
                 .into_iter()
                 .filter_map(|id| {
                     canonical_effects
@@ -740,6 +765,18 @@ fn schedule_terminal_effects(
                         .cloned()
                 })
                 .collect::<Vec<_>>();
+            effects.sort_by(|left, right| {
+                let left_effect = canonical_effects
+                    .get(left)
+                    .expect("scheduled effect should remain canonical");
+                let right_effect = canonical_effects
+                    .get(right)
+                    .expect("scheduled effect should remain canonical");
+                left_effect
+                    .declaration_order
+                    .cmp(&right_effect.declaration_order)
+                    .then_with(|| left.cmp(right))
+            });
             (!effects.is_empty()).then_some(EffectExecutionBatch {
                 index: u32::try_from(index).expect("effect scheduler batch index should fit u32"),
                 effects,
@@ -761,22 +798,7 @@ pub fn lower_effect_bodies(
     let mut bodies = BTreeMap::new();
     let mut statements = BTreeMap::new();
     for effect in effects.values() {
-        let Some(component_id) = effect.owner.entity_id() else {
-            continue;
-        };
-        let Some(method) = components
-            .iter()
-            .find(|component| component.id == *component_id)
-            .and_then(|component| {
-                component
-                    .methods
-                    .iter()
-                    .find(|method| method.id == effect.method)
-            })
-        else {
-            continue;
-        };
-        let Some(syntax) = &method.effect_body else {
+        let Some(syntax) = effect_body_syntax(components, effect) else {
             continue;
         };
         let mut body_statement_ids = Vec::new();
@@ -784,31 +806,7 @@ pub fn lower_effect_bodies(
             let id = effect.id.effect_statement(index);
             let path = format!("statement:{index}");
             let expression = |suffix: &str| effect.id.expression(&format!("{path}/{suffix}"));
-            let kind = match &statement.kind {
-                EffectStatementSyntaxKind::StaticMemberAssignment { .. } => {
-                    EffectStatementKind::ExternalMemberAssignment {
-                        target: expression("target"),
-                        value: expression("value"),
-                    }
-                }
-                EffectStatementSyntaxKind::CapabilityCall { arguments, .. } => {
-                    EffectStatementKind::CapabilityCall {
-                        callee: expression("callee"),
-                        arguments: (0..arguments.len())
-                            .map(|argument| expression(&format!("argument:{argument}")))
-                            .collect(),
-                    }
-                }
-                EffectStatementSyntaxKind::EffectReturn { value } => {
-                    EffectStatementKind::EffectReturn {
-                        value: value.as_ref().map(|_| expression("return")),
-                    }
-                }
-                EffectStatementSyntaxKind::Empty => EffectStatementKind::Empty,
-                EffectStatementSyntaxKind::Unsupported(kind) => {
-                    EffectStatementKind::Unsupported(*kind)
-                }
-            };
+            let kind = effect_statement_kind(statement, &expression);
             assert_effect_statement_expressions_exist(&kind, expression_graph);
             body_statement_ids.push(id.clone());
             statements.insert(
@@ -821,16 +819,118 @@ pub fn lower_effect_bodies(
                 },
             );
         }
+        let cleanup = syntax.cleanup.as_ref().map(|cleanup| {
+            let mut cleanup_statement_ids = Vec::new();
+            for (index, statement) in cleanup.body.statements.iter().enumerate() {
+                let id = effect.id.effect_cleanup_statement(index);
+                let path = format!("cleanup/statement:{index}");
+                let expression = |suffix: &str| effect.id.expression(&format!("{path}/{suffix}"));
+                let kind = effect_statement_kind(statement, &expression);
+                assert_effect_statement_expressions_exist(&kind, expression_graph);
+                cleanup_statement_ids.push(id.clone());
+                statements.insert(
+                    id.clone(),
+                    EffectStatement {
+                        id,
+                        owner: effect.id.clone(),
+                        kind,
+                        provenance: SourceProvenance::new(&effect.provenance.path, statement.span),
+                    },
+                );
+            }
+            EffectCleanupBody {
+                statements: cleanup_statement_ids,
+                provenance: SourceProvenance::new(&effect.provenance.path, cleanup.span),
+            }
+        });
         bodies.insert(
             effect.id.clone(),
             EffectBody {
                 effect: effect.id.clone(),
                 statements: body_statement_ids,
+                cleanup,
                 provenance: effect.provenance.clone(),
             },
         );
     }
     (bodies, statements)
+}
+
+fn effect_statement_kind(
+    statement: &crate::EffectStatementSyntax,
+    expression: &impl Fn(&str) -> SemanticId,
+) -> EffectStatementKind {
+    match &statement.kind {
+        EffectStatementSyntaxKind::StaticMemberAssignment { .. } => {
+            EffectStatementKind::ExternalMemberAssignment {
+                target: expression("target"),
+                value: expression("value"),
+            }
+        }
+        EffectStatementSyntaxKind::CapabilityCall { arguments, .. } => {
+            EffectStatementKind::CapabilityCall {
+                callee: expression("callee"),
+                arguments: (0..arguments.len())
+                    .map(|argument| expression(&format!("argument:{argument}")))
+                    .collect(),
+            }
+        }
+        EffectStatementSyntaxKind::EffectReturn { value } => EffectStatementKind::EffectReturn {
+            value: value.as_ref().map(|_| expression("return")),
+        },
+        EffectStatementSyntaxKind::Empty => EffectStatementKind::Empty,
+        EffectStatementSyntaxKind::Unsupported(kind) => EffectStatementKind::Unsupported(*kind),
+    }
+}
+
+fn effect_is_async(components: &[ComponentNode], effect: &Effect) -> bool {
+    let Some(component_id) = effect.owner.entity_id() else {
+        return false;
+    };
+    let Some(component) = components
+        .iter()
+        .find(|component| component.id == *component_id)
+    else {
+        return false;
+    };
+    match &effect.declaration {
+        EffectDeclaration::LegacyMethod(method_id) => component
+            .methods
+            .iter()
+            .find(|method| method.id == *method_id)
+            .is_some_and(|method| method.is_async),
+        EffectDeclaration::V2Field => component
+            .effect_fields
+            .iter()
+            .find(|field| field.name == effect.name)
+            .is_some_and(|field| field.is_async),
+    }
+}
+
+fn effect_has_cleanup(components: &[ComponentNode], effect: &Effect) -> bool {
+    effect_body_syntax(components, effect).is_some_and(|body| body.cleanup.is_some())
+}
+
+fn effect_body_syntax<'a>(
+    components: &'a [ComponentNode],
+    effect: &Effect,
+) -> Option<&'a crate::EffectBodySyntax> {
+    let component_id = effect.owner.entity_id()?;
+    let component = components
+        .iter()
+        .find(|component| component.id == *component_id)?;
+    match &effect.declaration {
+        EffectDeclaration::LegacyMethod(method_id) => component
+            .methods
+            .iter()
+            .find(|method| method.id == *method_id)
+            .and_then(|method| method.effect_body.as_ref()),
+        EffectDeclaration::V2Field => component
+            .effect_fields
+            .iter()
+            .find(|field| field.name == effect.name)
+            .map(|field| &field.body),
+    }
 }
 
 fn assert_effect_statement_expressions_exist(kind: &EffectStatementKind, graph: &ExpressionGraph) {
@@ -849,12 +949,14 @@ fn assert_effect_statement_expressions_exist(kind: &EffectStatementKind, graph: 
 
 #[cfg(test)]
 mod tests {
+    use super::{schedule_terminal_effects, Effect, EffectExecutionBatch};
+
     use crate::{
         build_application_semantic_model, build_component_graph, build_semantic_graph,
-        collect_effects, validate_application_semantic_model, EffectExecutionPolicy,
-        EffectSemanticViolationKind, EffectStatementKind, EffectValidation, ExecutionBoundary,
-        ExpressionNodeKind, SemanticEntity, SemanticEntityKind, SemanticOwner,
-        SemanticReferenceKind, UnsupportedEffectStatementKind,
+        collect_effects, validate_application_semantic_model, EffectDeclaration,
+        EffectExecutionPolicy, EffectSemanticViolationKind, EffectStatementKind, EffectValidation,
+        ExecutionBoundary, ExpressionNodeKind, SemanticEntity, SemanticEntityKind, SemanticId,
+        SemanticOwner, SemanticReferenceKind, SourceProvenance, UnsupportedEffectStatementKind,
     };
 
     #[test]
@@ -879,12 +981,57 @@ class Effects extends Component {
             .expect("effect entity");
 
         assert_eq!(effect.id.as_str(), "component:x-effects/effect:syncTitle");
-        assert_eq!(effect.method, component.methods[0].id);
+        assert_eq!(
+            effect.declaration,
+            EffectDeclaration::LegacyMethod(component.methods[0].id.clone())
+        );
         assert_eq!(effect.owner, component.methods[0].owner);
         assert_eq!(effect.execution_boundary, ExecutionBoundary::Client);
         assert_eq!(
             effect.execution_policy,
             EffectExecutionPolicy::AfterInitialRenderAndCompletedActionBatch
+        );
+    }
+
+    #[test]
+    fn schedules_v2_effects_by_field_declaration_order() {
+        let component = SemanticId::component(Some("x-v2-order"), "V2Order");
+        let early = component.effect("zEarly");
+        let late = component.effect("aLate");
+        let provenance = SourceProvenance::new(
+            "src/V2Order.tsx",
+            presolve_parser::SourceSpan {
+                start: 0,
+                end: 0,
+                line: 1,
+                column: 1,
+            },
+        );
+        let effect = |id: SemanticId, name: &str, declaration_order| Effect {
+            id,
+            owner: SemanticOwner::entity(component.clone()),
+            declaration: EffectDeclaration::V2Field,
+            name: name.to_owned(),
+            declaration_order: Some(declaration_order),
+            execution_boundary: ExecutionBoundary::Client,
+            execution_policy: EffectExecutionPolicy::AfterInitialRenderAndCompletedActionBatch,
+            validation: EffectValidation::Valid,
+            semantic_violations: Vec::new(),
+            provenance: provenance.clone(),
+        };
+        let effects = [
+            (late.clone(), effect(late.clone(), "aLate", 4)),
+            (early.clone(), effect(early.clone(), "zEarly", 1)),
+        ]
+        .into_iter()
+        .collect();
+
+        assert_eq!(
+            schedule_terminal_effects(&[late, early.clone()], &effects),
+            vec![EffectExecutionBatch {
+                index: 0,
+                effects: vec![early, component.effect("aLate")],
+            }]
         );
     }
 
@@ -913,10 +1060,16 @@ class Effects extends Component {
         let effect_id = component.id.effect("syncTitle");
         let effect = asm.effect(&effect_id).expect("effect entity");
 
-        assert_eq!(effect.method, component.id.method("syncTitle"));
+        assert_eq!(
+            effect.declaration,
+            EffectDeclaration::LegacyMethod(component.id.method("syncTitle"))
+        );
         assert_eq!(effect.owner, SemanticOwner::entity(component.id.clone()));
         assert_eq!(asm.owner(&effect_id), Some(&effect.owner));
-        assert_eq!(asm.provenance(&effect_id), asm.provenance(&effect.method));
+        assert_eq!(
+            asm.provenance(&effect_id),
+            asm.provenance(&component.id.method("syncTitle"))
+        );
         assert_eq!(
             asm.entity(&effect_id).map(SemanticEntity::kind),
             Some(SemanticEntityKind::Effect)

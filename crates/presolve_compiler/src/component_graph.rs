@@ -86,8 +86,40 @@ pub struct ComponentNode {
     /// Module imports that shadow compiler-owned validation intrinsic names.
     pub shadowed_validation_intrinsics: BTreeSet<String>,
     pub methods: Vec<ComponentMethod>,
+    /// Decorator-free effect fields retain their field source and ordered body
+    /// without being represented as legacy methods.
+    pub effect_fields: Vec<ComponentEffectField>,
+    /// Decorator-free action-field endpoints. Legacy action methods retain
+    /// their method identity and are exposed through `action_endpoint_ids`.
+    pub action_endpoints: Vec<ActionEndpoint>,
     pub actions: Vec<ComponentAction>,
     pub render: Option<RenderModel>,
+}
+
+impl ComponentNode {
+    /// Resolves the executable action endpoint for an authored binding name.
+    /// A legacy decorated action exposes its existing method ID; a V2 action
+    /// field exposes its separately owned endpoint ID.
+    #[must_use]
+    pub fn action_endpoint_ids(&self) -> Vec<(String, SemanticId)> {
+        let mut endpoints = self
+            .methods
+            .iter()
+            .filter(|method| method.is_action())
+            .map(|method| (method.name.clone(), method.id.clone()))
+            .collect::<BTreeMap<_, _>>();
+        for endpoint in &self.action_endpoints {
+            endpoints.insert(endpoint.name.clone(), endpoint.id.clone());
+        }
+        endpoints.into_iter().collect()
+    }
+
+    #[must_use]
+    pub fn action_endpoint_id(&self, name: &str) -> Option<SemanticId> {
+        self.action_endpoint_ids()
+            .into_iter()
+            .find_map(|(candidate, id)| (candidate == name).then_some(id))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -678,6 +710,15 @@ pub enum BuiltinPureOperation {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EffectBodySyntax {
     pub statements: Vec<EffectStatementSyntax>,
+    pub cleanup: Option<EffectCleanupSyntax>,
+}
+
+/// A retained cleanup callback owned by a V2 effect field or legacy effect body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EffectCleanupSyntax {
+    pub is_async: bool,
+    pub body: Box<EffectBodySyntax>,
+    pub span: SourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1148,6 +1189,20 @@ pub struct ComponentMethod {
     pub calls: Vec<MethodCall>,
 }
 
+/// An authority-backed V2 `effect(handler)` field retained before lifecycle
+/// scheduling and runtime lowering.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ComponentEffectField {
+    pub owner: SemanticOwner,
+    pub name: String,
+    /// Source field order within the declaring component. This is carried into
+    /// runtime scheduling rather than recovered from semantic-map iteration.
+    pub declaration_order: u32,
+    pub is_async: bool,
+    pub body: EffectBodySyntax,
+    pub provenance: SourceProvenance,
+}
+
 /// A compiler-owned call fact retained for computed-purity analysis.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MethodCall {
@@ -1207,6 +1262,14 @@ pub struct ComponentAction {
     pub method: String,
     pub operation: StateOperation,
     pub field: String,
+}
+
+/// One non-method action source that can own ordinary action write records.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionEndpoint {
+    pub id: SemanticId,
+    pub owner: SemanticOwner,
+    pub name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1397,6 +1460,481 @@ pub fn build_component_graph(parsed: &ParsedFile) -> ComponentGraph {
 #[must_use]
 pub fn build_component_graph_for_module(parsed: &ParsedFile) -> ComponentGraph {
     build_component_graph_with_identity(parsed, true)
+}
+
+/// Projects already-proven V2 component declarations into the legacy-shaped
+/// graph consumed by route and publication products.  This function performs
+/// no decorator or spelling recognition: its only component selection input
+/// is the canonical authored model.
+#[must_use]
+pub fn build_v2_component_graph_for_module(
+    parsed: &ParsedFile,
+    authored: &crate::CanonicalAuthoredSemanticModelV1,
+) -> ComponentGraph {
+    let mut components = Vec::new();
+    let mut diagnostics = Vec::new();
+    let mut provenance = BTreeMap::new();
+    let computed_sites = match crate::computed_getter_sites_v1(parsed, authored) {
+        Ok(sites) => sites,
+        Err(error) => {
+            diagnostics.push(ComponentDiagnostic::error(
+                "PSV2C1001",
+                format!("canonical V2 computed candidate selection failed: {error}"),
+            ));
+            Vec::new()
+        }
+    };
+    for declaration in authored.declarations.iter().filter(|declaration| {
+        declaration.kind == crate::CanonicalAuthoredDeclarationKindV1::Component
+    }) {
+        let Some(class) = parsed
+            .classes
+            .iter()
+            .find(|class| class.name == declaration.subject)
+        else {
+            diagnostics.push(ComponentDiagnostic::error(
+                "PSV2A1001",
+                format!(
+                    "canonical V2 component `{}` has no source class",
+                    declaration.subject
+                ),
+            ));
+            continue;
+        };
+        let id = SemanticId::component_in_module(&parsed.path, Some(&class.name), &class.name);
+        if class.methods.iter().all(|method| method.name != "render") {
+            diagnostics.push(ComponentDiagnostic::error(
+                "PSC1002",
+                format!("class `{}` is missing render()", class.name),
+            ));
+        }
+        provenance.insert(id.clone(), SourceProvenance::new(&parsed.path, class.span));
+        let state_fields: Vec<StateField> = authored
+            .declarations
+            .iter()
+            .filter(|candidate| {
+                candidate.kind == crate::CanonicalAuthoredDeclarationKindV1::State
+                    && candidate.subject.starts_with(&format!("{}.", class.name))
+            })
+            .filter_map(|candidate| {
+                let name = candidate
+                    .subject
+                    .strip_prefix(&format!("{}.", class.name))?;
+                let property = class
+                    .properties
+                    .iter()
+                    .find(|property| property.name == name)?;
+                provenance.insert(
+                    id.state_field(name),
+                    SourceProvenance::new(&parsed.path, property.span),
+                );
+                Some(StateField {
+                    id: id.state_field(name),
+                    owner: SemanticOwner::entity(id.clone()),
+                    name: name.into(),
+                    initial_value: property
+                        .state_initial_value
+                        .as_ref()
+                        .map(serializable_value_from_parsed),
+                    initial_expression: property
+                        .state_initial_expression
+                        .as_ref()
+                        .map(constant_expression_from_parsed),
+                    declared_type: property.state_type_annotation.as_ref().map(|annotation| {
+                        DeclaredStateType {
+                            text: annotation.text.clone(),
+                            provenance: SourceProvenance::new(&parsed.path, annotation.span),
+                            kind: declared_state_type_kind(&annotation.text),
+                        }
+                    }),
+                })
+            })
+            .collect();
+        let canonical_state_names = state_fields
+            .iter()
+            .map(|field| field.name.as_str())
+            .collect::<BTreeSet<_>>();
+        let mut slot_declarations = Vec::new();
+        for candidate in authored.declarations.iter().filter(|candidate| {
+            candidate.kind == crate::CanonicalAuthoredDeclarationKindV1::Slot
+                && candidate.subject.starts_with(&format!("{}.", class.name))
+        }) {
+            let Some(name) = candidate.subject.strip_prefix(&format!("{}.", class.name)) else {
+                continue;
+            };
+            let Some(property) = class
+                .properties
+                .iter()
+                .find(|property| property.name == name)
+            else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2S1001",
+                    format!(
+                        "canonical V2 Slot `{}` has no source field",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            };
+            let Some(annotation) = property
+                .type_annotation
+                .as_ref()
+                .filter(|annotation| annotation.text == "SlotContent")
+            else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2S1002",
+                    format!(
+                        "canonical V2 Slot `{}` requires the exact SlotContent type",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            };
+            let declared_type = DeclaredStateType {
+                kind: declared_state_type_kind(&annotation.text),
+                text: annotation.text.clone(),
+                provenance: SourceProvenance::new(&parsed.path, annotation.span),
+            };
+            let slot_provenance = SourceProvenance::new(&parsed.path, property.span);
+            provenance.insert(id.slot_field(name), slot_provenance.clone());
+            slot_declarations.push(SlotDeclaration {
+                authored_field: id.slot_field(name),
+                name: name.to_owned(),
+                kind: if name == "children" {
+                    SlotKind::Default
+                } else {
+                    SlotKind::Named
+                },
+                declared_type,
+                decorator_provenance: slot_provenance.clone(),
+                name_provenance: SourceProvenance::new(&parsed.path, property.name_span),
+                provenance: slot_provenance,
+            });
+        }
+        let mut action_endpoints = Vec::new();
+        let mut actions = Vec::new();
+        let mut v2_action_parameter_kinds = BTreeMap::new();
+        for candidate in authored.declarations.iter().filter(|candidate| {
+            candidate.kind == crate::CanonicalAuthoredDeclarationKindV1::Action
+                && candidate.subject.starts_with(&format!("{}.", class.name))
+        }) {
+            let Some(name) = candidate.subject.strip_prefix(&format!("{}.", class.name)) else {
+                continue;
+            };
+            let Some(property) = class
+                .properties
+                .iter()
+                .find(|property| property.name == name)
+            else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2A1002",
+                    format!(
+                        "canonical V2 Action `{}` has no source field",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            };
+            let Some(handler) = property
+                .initializer_call
+                .as_ref()
+                .and_then(|call| call.inline_handler.as_ref())
+            else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2A1003",
+                    format!(
+                        "canonical V2 Action `{}` requires one inline handler",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            };
+            if handler.is_expression_body
+                || handler.is_async
+                || !handler.unsupported_statement_spans.is_empty()
+                || handler
+                    .state_updates
+                    .iter()
+                    .any(|update| !canonical_state_names.contains(update.field.as_str()))
+            {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2A1004",
+                    format!(
+                        "canonical V2 Action `{}` has unsupported handler or State ownership evidence",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            }
+            let Some(operands) = v2_action_operands(handler, class) else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2A1004",
+                    format!(
+                        "canonical V2 Action `{}` has unsupported handler parameter or State ownership evidence",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            };
+            let endpoint_id = id.action_endpoint(name);
+            let authority = crate::build_action_authority_v1(&[crate::ActionFactV1 {
+                id: endpoint_id.to_string(),
+                component: id.to_string(),
+                asynchronous: handler.is_async,
+                accepts_abort_signal: false,
+                capture_coverage: crate::ActionCaptureCoverageV1::Complete,
+                environment: crate::ActionEnvironmentV1::Browser,
+            }]);
+            if authority
+                .actions
+                .first()
+                .is_none_or(|record| record.admission != crate::ActionAdmissionV1::Admissible)
+            {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2A1005",
+                    format!(
+                        "canonical V2 Action `{}` was not admitted",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            }
+            provenance.insert(
+                endpoint_id.clone(),
+                SourceProvenance::new(&parsed.path, property.span),
+            );
+            action_endpoints.push(ActionEndpoint {
+                id: endpoint_id.clone(),
+                owner: SemanticOwner::entity(id.clone()),
+                name: name.to_owned(),
+            });
+            v2_action_parameter_kinds.insert(
+                name.to_owned(),
+                handler
+                    .parameters
+                    .iter()
+                    .map(|parameter| {
+                        declared_state_type_kind(
+                            &parameter
+                                .type_annotation
+                                .as_ref()
+                                .expect("validated V2 action parameter should be typed")
+                                .text,
+                        )
+                        .expect("validated V2 action parameter should be primitive")
+                    })
+                    .collect::<Vec<_>>(),
+            );
+            actions.extend(
+                handler
+                    .state_updates
+                    .iter()
+                    .enumerate()
+                    .map(|(index, update)| {
+                        let action_id = id.action(name, index);
+                        provenance.insert(
+                            action_id.clone(),
+                            SourceProvenance::new(&parsed.path, update.span),
+                        );
+                        ComponentAction {
+                            id: action_id,
+                            owner: SemanticOwner::entity(endpoint_id.clone()),
+                            method: name.to_owned(),
+                            operation: state_operation_from_v2_parsed(&update.operation, &operands),
+                            field: update.field.clone(),
+                        }
+                    }),
+            );
+        }
+        let mut effect_fields = Vec::new();
+        for candidate in authored.declarations.iter().filter(|candidate| {
+            candidate.kind == crate::CanonicalAuthoredDeclarationKindV1::Effect
+                && candidate.subject.starts_with(&format!("{}.", class.name))
+        }) {
+            let Some(name) = candidate.subject.strip_prefix(&format!("{}.", class.name)) else {
+                continue;
+            };
+            let Some(property) = class
+                .properties
+                .iter()
+                .find(|property| property.name == name)
+            else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2E1001",
+                    format!(
+                        "canonical V2 Effect `{}` has no source field",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            };
+            let declaration_order = u32::try_from(
+                class
+                    .properties
+                    .iter()
+                    .position(|candidate| candidate.span == property.span)
+                    .expect("matched effect field should retain source position"),
+            )
+            .expect("component field position should fit u32");
+            let Some(handler) = property
+                .initializer_call
+                .as_ref()
+                .and_then(|call| call.inline_handler.as_ref())
+            else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2E1002",
+                    format!(
+                        "canonical V2 Effect `{}` requires one inline handler",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            };
+            let Some(body) = handler.effect_body.as_ref() else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2E1003",
+                    format!(
+                        "canonical V2 Effect `{}` requires a block-bodied handler",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            };
+            provenance.insert(
+                id.effect(name),
+                SourceProvenance::new(&parsed.path, property.span),
+            );
+            effect_fields.push(ComponentEffectField {
+                owner: SemanticOwner::entity(id.clone()),
+                name: name.to_owned(),
+                declaration_order,
+                is_async: handler.is_async,
+                body: effect_body_from_parsed(body),
+                provenance: SourceProvenance::new(&parsed.path, property.span),
+            });
+        }
+        let mut methods = Vec::new();
+        for candidate in authored.declarations.iter().filter(|candidate| {
+            candidate.kind == crate::CanonicalAuthoredDeclarationKindV1::Computed
+                && candidate.subject.starts_with(&format!("{}.", class.name))
+        }) {
+            let Some(crate::DerivedAuthoredEvidenceV2::ComputedGetter {
+                state_dependencies,
+                computed_dependencies,
+            }) = candidate.derived_evidence.as_ref()
+            else {
+                continue;
+            };
+            let Some(name) = candidate.subject.strip_prefix(&format!("{}.", class.name)) else {
+                continue;
+            };
+            let Some(site) = computed_sites.iter().find(|site| {
+                site.subject == candidate.subject
+                    && site.declaration_source == candidate.source
+                    && site.state_dependencies == *state_dependencies
+                    && site.computed_dependencies == *computed_dependencies
+            }) else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2C1002",
+                    format!(
+                        "canonical V2 Computed `{}` lacks matching derived getter evidence",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            };
+            let Some(method) = class.methods.iter().find(|method| {
+                method.name == name
+                    && range_from_span(method.span) == site.declaration_source
+                    && method.is_getter
+            }) else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2C1003",
+                    format!(
+                        "canonical V2 Computed `{}` has no matching source getter",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            };
+            let mut computed = component_method_from_parsed(method, &parsed.path, &id);
+            computed.semantic_role = MethodSemanticRole::Computed;
+            computed.computed_expression = method
+                .computed_expression
+                .as_ref()
+                .map(computed_expression_from_parsed);
+            provenance.insert(
+                computed.id.clone(),
+                SourceProvenance::new(&parsed.path, method.span),
+            );
+            methods.push(computed);
+        }
+        let render = class
+            .methods
+            .iter()
+            .find(|method| method.name == "render")
+            .map(|method| render_model_from_parsed_method(method, &id));
+        if let Some(render) = &render {
+            collect_v2_action_parameter_event_diagnostics(
+                class,
+                render,
+                &v2_action_parameter_kinds,
+                &mut diagnostics,
+            );
+        }
+        components.push(ComponentNode {
+            id: id.clone(),
+            module_path: parsed.path.clone(),
+            owner: SemanticOwner::Application,
+            class_name: class.name.clone(),
+            element_name: Some(class.name.clone()),
+            route_path: None,
+            heritage: class
+                .heritage
+                .as_ref()
+                .map(|heritage| AuthoredComponentHeritage {
+                    base: heritage.base.clone(),
+                    provenance: SourceProvenance::new(&parsed.path, heritage.span),
+                }),
+            state_fields,
+            context_declarations: Vec::new(),
+            provider_declarations: Vec::new(),
+            consumer_declarations: Vec::new(),
+            slot_declarations,
+            context_declaration_candidates: Vec::new(),
+            slot_declaration_candidates: Vec::new(),
+            form_declaration_candidates: Vec::new(),
+            resource_declaration_candidates: Vec::new(),
+            route_loader_declaration_candidates: Vec::new(),
+            form_field_declaration_candidates: Vec::new(),
+            validation_rule_declaration_facts: Vec::new(),
+            submission_declaration_facts: Vec::new(),
+            serialization_declaration_facts: Vec::new(),
+            opaque_action_facts: Vec::new(),
+            server_action_facts: Vec::new(),
+            shadowed_validation_intrinsics: BTreeSet::new(),
+            methods,
+            effect_fields,
+            action_endpoints,
+            actions,
+            render,
+        });
+    }
+    ComponentGraph {
+        components,
+        diagnostics,
+        references: Vec::new(),
+        provenance,
+    }
+}
+
+fn range_from_span(span: SourceSpan) -> crate::AuthoredSourceRangeV1 {
+    crate::AuthoredSourceRangeV1 {
+        start: span.start,
+        end: span.end,
+        line: span.line,
+        column: span.column,
+    }
 }
 
 fn build_component_graph_with_identity(
@@ -1607,6 +2145,8 @@ fn build_component_node(
         server_action_facts,
         shadowed_validation_intrinsics,
         methods,
+        effect_fields: Vec::new(),
+        action_endpoints: Vec::new(),
         actions,
         render,
     }
@@ -3004,20 +3544,24 @@ fn slot_declaration_candidates_from_class(
     let mut candidates = Vec::new();
 
     for property in &class.properties {
-        for decorator in property
+        let legacy_decorators = property
             .decorators
             .iter()
             .filter(|decorator| decorator.name == "slot")
-        {
+            .collect::<Vec<_>>();
+        let declaration_sources = legacy_decorators
+            .into_iter()
+            .map(|decorator| (decorator.span, decorator.argument_count, true));
+        for (declaration_span, argument_count, legacy_declaration) in declaration_sources {
             let declaration_kind = if property.is_static {
                 AuthoredDeclarationKind::StaticField
             } else {
                 AuthoredDeclarationKind::InstanceField
             };
             let mut violations = Vec::new();
-            if decorator.argument_count != 0 {
+            if argument_count != 0 {
                 violations.push(SlotDeclarationViolation::DecoratorArity {
-                    actual: decorator.argument_count,
+                    actual: argument_count,
                     expected: 0,
                 });
             }
@@ -3026,7 +3570,7 @@ fn slot_declaration_candidates_from_class(
             }
             let has_conflict = property.initializer.as_deref() == Some("state(...)")
                 || property.decorators.iter().any(|other| {
-                    other.name != "slot"
+                    (legacy_declaration || other.name != "slot")
                         && matches!(
                             other.name.as_str(),
                             "context"
@@ -3060,24 +3604,24 @@ fn slot_declaration_candidates_from_class(
                     actual: declared_type.as_ref().map(|declared| declared.text.clone()),
                 });
             }
-            if property.initializer.is_some() {
+            if legacy_declaration && property.initializer.is_some() {
                 violations.push(SlotDeclarationViolation::ForbiddenInitializer);
             }
-            if !property.is_definite_assignment {
+            if legacy_declaration && !property.is_definite_assignment {
                 violations.push(SlotDeclarationViolation::DefiniteAssignmentRequired);
             }
             candidates.push(AuthoredSlotDeclarationCandidate {
                 id: SlotDeclarationCandidateId::for_component_position(
                     component,
-                    decorator.span.start,
+                    declaration_span.start,
                 ),
                 owner_component: component.clone(),
                 authored_declaration: component.slot_field(&property.name),
                 declaration_kind,
                 field_name: Some(property.name.clone()),
                 declared_type,
-                decorator_argument_count: decorator.argument_count,
-                decorator_provenance: SourceProvenance::new(path, decorator.span),
+                decorator_argument_count: argument_count,
+                decorator_provenance: SourceProvenance::new(path, declaration_span),
                 name_provenance: Some(SourceProvenance::new(path, property.name_span)),
                 provenance: SourceProvenance::new(path, property.span),
                 static_modifier_provenance: property
@@ -3820,6 +4364,11 @@ fn effect_body_from_parsed(body: &ParsedEffectBody) -> EffectBodySyntax {
                 span: statement.span,
             })
             .collect(),
+        cleanup: body.cleanup.as_ref().map(|cleanup| EffectCleanupSyntax {
+            is_async: cleanup.is_async,
+            body: Box::new(effect_body_from_parsed(&cleanup.body)),
+            span: cleanup.span,
+        }),
     }
 }
 
@@ -4387,6 +4936,140 @@ fn static_argument_matches_annotation(
         Some("boolean") => matches!(argument, SerializableValue::Boolean(_)),
         Some("null") => matches!(argument, SerializableValue::Null),
         Some(_) | None => false,
+    }
+}
+
+#[derive(Debug, Clone)]
+enum V2ActionOperand {
+    Parameter(usize),
+    Local(SerializableValue),
+}
+
+/// Admit only inline operands already represented by the runtime action
+/// product: typed parameters or serializable local literals assigned directly
+/// to matching canonical State. Parameter names and local declarations never
+/// reach the artifact.
+fn v2_action_operands(
+    handler: &presolve_parser::ParsedInlineHandler,
+    class: &ParsedClass,
+) -> Option<BTreeMap<String, V2ActionOperand>> {
+    let parameter_indices = handler
+        .parameters
+        .iter()
+        .enumerate()
+        .map(|(index, parameter)| {
+            let kind = parameter
+                .type_annotation
+                .as_ref()
+                .and_then(|annotation| declared_state_type_kind(&annotation.text))?;
+            Some((parameter.name.clone(), (index, kind)))
+        })
+        .collect::<Option<BTreeMap<_, _>>>()?;
+    if parameter_indices.len() != handler.parameters.len() {
+        return None;
+    }
+    let locals = handler
+        .local_variables
+        .iter()
+        .map(|local| {
+            let kind = serializable_primitive_kind(&local.value)?;
+            Some((local.name.clone(), (local.span, kind, &local.value)))
+        })
+        .collect::<Option<BTreeMap<_, _>>>()?;
+    if locals.len() != handler.local_variables.len()
+        || parameter_indices
+            .keys()
+            .any(|name| locals.contains_key(name))
+    {
+        return None;
+    }
+    let uses = handler
+        .state_updates
+        .iter()
+        .filter_map(|update| match &update.operation {
+            ParsedStateOperation::AssignParameter(name) => Some((name, update)),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    if uses.len() != handler.parameters.len() + handler.local_variables.len() {
+        return None;
+    }
+    let mut operands = BTreeMap::new();
+    for (name, update) in uses {
+        let state_kind = state_field_primitive_kind(class, &update.field);
+        let operand = if let Some((index, parameter_kind)) = parameter_indices.get(name) {
+            (state_kind == Some(*parameter_kind)).then_some(V2ActionOperand::Parameter(*index))
+        } else if let Some((local_span, local_kind, local_value)) = locals.get(name) {
+            (local_span.start < update.span.start && state_kind == Some(*local_kind)).then_some(
+                V2ActionOperand::Local(serializable_value_from_parsed(local_value)),
+            )
+        } else {
+            None
+        }?;
+        if operands.insert(name.clone(), operand).is_some() {
+            return None;
+        }
+    }
+    Some(operands)
+}
+
+fn state_operation_from_v2_parsed(
+    operation: &ParsedStateOperation,
+    operands: &BTreeMap<String, V2ActionOperand>,
+) -> StateOperation {
+    match operation {
+        ParsedStateOperation::AssignParameter(name) => match operands
+            .get(name)
+            .expect("validated V2 action operand should be available")
+        {
+            V2ActionOperand::Parameter(index) => StateOperation::AssignParameter(index.to_string()),
+            V2ActionOperand::Local(value) => StateOperation::Assign(value.clone()),
+        },
+        _ => state_operation_from_parsed(operation),
+    }
+}
+
+fn collect_v2_action_parameter_event_diagnostics(
+    class: &ParsedClass,
+    render: &RenderModel,
+    parameter_kinds: &BTreeMap<String, Vec<DeclaredStateTypeKind>>,
+    diagnostics: &mut Vec<ComponentDiagnostic>,
+) {
+    for event in render_event_handlers(render) {
+        let name = event
+            .handler
+            .strip_prefix("this.")
+            .unwrap_or(&event.handler);
+        let Some(expected_kinds) = parameter_kinds.get(name) else {
+            continue;
+        };
+        if event.arguments.len() != expected_kinds.len()
+            || event
+                .arguments
+                .iter()
+                .zip(expected_kinds)
+                .any(|(argument, expected)| {
+                    serializable_value_primitive_kind(argument) != Some(*expected)
+                })
+        {
+            diagnostics.push(ComponentDiagnostic::error(
+                "PSV2A1006",
+                format!(
+                    "event handler `{}` supplies arguments incompatible with canonical V2 Action `{name}` in class `{}`",
+                    event.handler, class.name,
+                ),
+            ));
+        }
+    }
+}
+
+fn serializable_value_primitive_kind(value: &SerializableValue) -> Option<DeclaredStateTypeKind> {
+    match value {
+        SerializableValue::Null => Some(DeclaredStateTypeKind::Null),
+        SerializableValue::Number(_) => Some(DeclaredStateTypeKind::Number),
+        SerializableValue::String(_) => Some(DeclaredStateTypeKind::String),
+        SerializableValue::Boolean(_) => Some(DeclaredStateTypeKind::Boolean),
+        SerializableValue::Array(_) | SerializableValue::Object(_) => None,
     }
 }
 

@@ -303,6 +303,10 @@ fn semantic_graph_node_kind(entity: SemanticEntity<'_>) -> SemanticGraphNodeKind
         SemanticEntity::Component(_) => SemanticGraphNodeKind::Component,
         SemanticEntity::StateField(_) => SemanticGraphNodeKind::StateField,
         SemanticEntity::Method(_) => SemanticGraphNodeKind::Method,
+        // V2 action endpoints are an internal owner layer for ordinary action
+        // writes. The frozen graph schema exposes them through its existing
+        // Action node vocabulary rather than adding a second public node kind.
+        SemanticEntity::ActionEndpoint(_) => SemanticGraphNodeKind::Action,
         SemanticEntity::Context(_) => SemanticGraphNodeKind::Context,
         SemanticEntity::Provider(_) => SemanticGraphNodeKind::Provider,
         SemanticEntity::Consumer(_) => SemanticGraphNodeKind::Consumer,

@@ -18,15 +18,15 @@ const RUNTIME_STUB: &str = r#"(() => {
   const FORMS_MANIFEST_SCHEMA_VERSION = 3;
   const LEGACY_MANIFEST_SCHEMA_VERSION = 1;
   const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 12;
-  const SUPPORTED_EFFECT_ARTIFACT_SCHEMA_VERSION = 1;
+  const SUPPORTED_EFFECT_ARTIFACT_SCHEMA_VERSION = __EZ_EFFECT_SCHEMA_VERSION__;
   const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = __EZ_COMPONENT_SCHEMA_VERSION__;
   const LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 2;
-  const SUPPORTED_RESOURCES_ARTIFACT_SCHEMA_VERSION = 1;
+  const SUPPORTED_RESOURCES_ARTIFACT_SCHEMA_VERSION = 3;
   const SUPPORTED_OPAQUE_ARTIFACT_SCHEMA_VERSION = 1;
-  const SUPPORTED_RESUME_MANIFEST_SCHEMA_VERSION = 6;
-  const SUPPORTED_RESUME_SNAPSHOT_SCHEMA_VERSION = 1;
+  const SUPPORTED_RESUME_MANIFEST_SCHEMA_VERSION = 7;
+  const SUPPORTED_RESUME_SNAPSHOT_SCHEMA_VERSION = 2;
   const SUPPORTED_RESUME_RUNTIME_PROTOCOL_VERSION = 1;
   const RESUME_REGISTRY_CONTRACT_VERSION = 1;
 
@@ -82,13 +82,13 @@ const RUNTIME_STUB: &str = r#"(() => {
   function readResumeManifest(diagnostics) {
     const element = document.getElementById(RESUME_MANIFEST_ELEMENT_ID);
     if (!(element instanceof HTMLScriptElement)) {
-      reportDiagnostic(diagnostics, "PSR_RESUME_MANIFEST_MISSING", "Resume manifest v6 is missing", { artifactElementId: RESUME_MANIFEST_ELEMENT_ID });
+      reportDiagnostic(diagnostics, "PSR_RESUME_MANIFEST_MISSING", "Resume manifest v7 is missing", { artifactElementId: RESUME_MANIFEST_ELEMENT_ID });
       throw new ResumeBootError("ManifestVersionMismatch");
     }
     try {
       return JSON.parse(element.textContent ?? "");
     } catch (error) {
-      reportDiagnostic(diagnostics, "PSR_RESUME_MANIFEST_PARSE", "Resume manifest v6 could not be parsed", { message: error instanceof Error ? error.message : String(error) });
+      reportDiagnostic(diagnostics, "PSR_RESUME_MANIFEST_PARSE", "Resume manifest v7 could not be parsed", { message: error instanceof Error ? error.message : String(error) });
       throw new ResumeBootError("ManifestVersionMismatch");
     }
   }
@@ -144,7 +144,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     try {
       return JSON.parse(element.textContent ?? "");
     } catch (error) {
-      reportDiagnostic(diagnostics, "PSR_RESUME_SNAPSHOT_PARSE", "Resume snapshot v1 could not be parsed", { message: error instanceof Error ? error.message : String(error) });
+      reportDiagnostic(diagnostics, "PSR_RESUME_SNAPSHOT_PARSE", "Resume snapshot v2 could not be parsed", { message: error instanceof Error ? error.message : String(error) });
       throw new ResumeBootError("SnapshotParseFailure");
     }
   }
@@ -226,7 +226,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   }
 
   function validateResumeSnapshot(snapshot, manifest, definitions) {
-    if (!exactObjectKeys(snapshot, ["schemaVersion", "buildId", "snapshotId", "manifestVersion", "capturedAt", "boundaries"])) {
+    if (!exactObjectKeys(snapshot, ["schemaVersion", "buildId", "snapshotId", "manifestVersion", "capturedAt", "boundaries", "structuralOccurrences"])) {
       throw new ResumeBootError("SnapshotSchemaMismatch");
     }
     if (snapshot.schemaVersion !== SUPPORTED_RESUME_SNAPSHOT_SCHEMA_VERSION
@@ -238,7 +238,9 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (snapshot.buildId !== manifest.build_id) throw new ResumeBootError("BuildIdMismatch");
     const seenBoundaries = new Set();
     const seenSlots = new Set();
-    if (!Array.isArray(snapshot.boundaries)) throw new ResumeBootError("SnapshotSchemaMismatch");
+    if (!Array.isArray(snapshot.boundaries) || !Array.isArray(snapshot.structuralOccurrences)) {
+      throw new ResumeBootError("SnapshotSchemaMismatch");
+    }
     for (const boundary of snapshot.boundaries) {
       if (!exactObjectKeys(boundary, ["boundaryId", "schemaId", "values"])) {
         throw new ResumeBootError("SnapshotSchemaMismatch");
@@ -262,7 +264,30 @@ const RUNTIME_STUB: &str = r#"(() => {
         seenSlots.add(value.slotId);
       }
     }
-    return { seenBoundaries, seenSlots };
+    const structuralOccurrences = new Map();
+    for (const occurrence of snapshot.structuralOccurrences) {
+      if (!exactObjectKeys(occurrence, ["occurrenceIdentity", "templateInstance", "parentScope", "structuralRegion", "localOccurrence", "state"])
+        || typeof occurrence.occurrenceIdentity !== "string"
+        || typeof occurrence.templateInstance !== "string"
+        || typeof occurrence.parentScope !== "string"
+        || typeof occurrence.structuralRegion !== "string"
+        || typeof occurrence.localOccurrence !== "string"
+        || !Array.isArray(occurrence.state)
+        || structuralOccurrences.has(occurrence.occurrenceIdentity)) {
+        throw new ResumeBootError("SnapshotSchemaMismatch");
+      }
+      const stateSlots = new Set();
+      for (const state of occurrence.state) {
+        if (!exactObjectKeys(state, ["slotId", "value"])
+          || typeof state.slotId !== "string"
+          || stateSlots.has(state.slotId)) {
+          throw new ResumeBootError("SnapshotSchemaMismatch");
+        }
+        stateSlots.add(state.slotId);
+      }
+      structuralOccurrences.set(occurrence.occurrenceIdentity, occurrence);
+    }
+    return { seenBoundaries, seenSlots, structuralOccurrences };
   }
 
   function allocateResumeRegistry(manifest, definitions) {
@@ -276,6 +301,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       component_records: new Map(),
       form_records: new Map(),
       structural_records: new Map(),
+      structural_occurrences: new Map(),
       effect_subscriptions: new Map(),
       activation_states: new Map(),
       debug: []
@@ -469,17 +495,42 @@ const RUNTIME_STUB: &str = r#"(() => {
     );
   }
 
+  function legacyActionBinding(action) {
+    return action?.method_id === undefined
+      && action?.action_batch_id === undefined
+      && typeof action?.method === "string"
+      && action.method.length > 0;
+  }
+
+  function legacyEventBinding(event) {
+    return event?.kind === undefined
+      && event?.method_id === undefined
+      && event?.action_batch_id === undefined
+      && /^this\.[A-Za-z_$][\w$]*$/.test(String(event?.handler ?? ""));
+  }
+
+  function legacyHandlerMethod(reference) {
+    return String(reference ?? "").replace(/^this\./, "");
+  }
+
+  function legacyComponentMethodKey(componentName, method) {
+    return `${componentName}:${method}`;
+  }
+
   function validateManifestActionBindings(manifest, opaqueArtifact, diagnostics) {
     const opaqueMethods = new Set((opaqueArtifact?.activations ?? []).map((activation) => activation.method));
     for (const component of manifest.components ?? []) {
       const actionsByMethod = new Map();
+      const legacyMethods = new Set();
 
       for (const action of component.actions ?? []) {
-        if (
-          typeof action.method_id !== "string"
+        if (legacyActionBinding(action)) {
+          legacyMethods.add(action.method);
+          continue;
+        }
+        if (typeof action.method_id !== "string"
           || typeof action.action_batch_id !== "string"
-          || (manifest.schema_version === SUPPORTED_SCHEMA_VERSION && typeof action.storage_id !== "string")
-        ) {
+          || (manifest.schema_version === SUPPORTED_SCHEMA_VERSION && typeof action.storage_id !== "string")) {
           reportDiagnostic(
             diagnostics,
             "PSR_INVALID_ACTION_BINDING",
@@ -493,6 +544,18 @@ const RUNTIME_STUB: &str = r#"(() => {
       }
 
       for (const event of component.template?.events ?? []) {
+        if (legacyEventBinding(event)) {
+          const method = legacyHandlerMethod(event.handler);
+          if (legacyMethods.has(method)) continue;
+          reportDiagnostic(
+            diagnostics,
+            "PSR_INVALID_ACTION_BINDING",
+            "Legacy template action binding did not match its compiler action implementation",
+            { component: component.name, event },
+            true
+          );
+          throw new PresolveBootError("PSR_INVALID_ACTION_BINDING");
+        }
         if (event.kind !== "action") {
           reportDiagnostic(
             diagnostics,
@@ -561,6 +624,46 @@ const RUNTIME_STUB: &str = r#"(() => {
         true
       );
       throw new PresolveBootError("PSR_UNSUPPORTED_SCHEMA");
+    }
+
+    if (isOrdinaryInstancePair) {
+      for (const program of componentArtifact.structural_programs ?? []) {
+        const component = (manifest.components ?? []).find(
+          (candidate) => candidate.component_id === program.host_component
+        );
+        const host = component?.template?.nodes?.find((node) => node.id === program.host_node);
+        if (component === undefined || host === undefined
+          || (host.kind !== "conditional" && host.kind !== "list")) {
+          reportDiagnostic(
+            diagnostics,
+            "PSR_INVALID_COMPONENT_ARTIFACT",
+            "Structural component metadata did not resolve to an emitted conditional or keyed-list host",
+            { region: program.region, host_component: program.host_component, host_node: program.host_node },
+            true
+          );
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        if (host.kind === "list" && program.conditional_host_fragments.length !== 0) {
+          reportDiagnostic(
+            diagnostics,
+            "PSR_INVALID_COMPONENT_ARTIFACT",
+            "Conditional host fragments were attached to a keyed-list host",
+            { region: program.region, host_component: program.host_component, host_node: program.host_node },
+            true
+          );
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        if (host.kind === "conditional" && program.keyed_host_fragments.length !== 0) {
+          reportDiagnostic(
+            diagnostics,
+            "PSR_INVALID_COMPONENT_ARTIFACT",
+            "Keyed host fragments were attached to a conditional host",
+            { region: program.region, host_component: program.host_component, host_node: program.host_node },
+            true
+          );
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+      }
     }
 
     if (
@@ -661,7 +764,9 @@ const RUNTIME_STUB: &str = r#"(() => {
       if (typeof declaration?.id !== "string" || declarations.has(declaration.id)
         || typeof endpoint?.package !== "string" || typeof endpoint?.version !== "string"
         || typeof endpoint?.integrity !== "string" || typeof endpoint?.export !== "string"
-        || typeof endpoint?.runtime_module !== "string" || typeof endpoint?.runtime_location !== "string") {
+        || typeof endpoint?.runtime_module !== "string" || typeof endpoint?.runtime_location !== "string"
+        || !isValidResourceValueCodec(declaration?.data_codec)
+        || !isValidResourceValueCodec(declaration?.error_codec)) {
         reportDiagnostic(diagnostics, "PSR_INVALID_RESOURCES_ARTIFACT", "Resource declaration did not retain one exact executable endpoint", { declaration }, true);
         throw new PresolveBootError("PSR_INVALID_RESOURCES_ARTIFACT");
       }
@@ -672,11 +777,50 @@ const RUNTIME_STUB: &str = r#"(() => {
       const generationRequired = ["pending", "ready", "failed", "cancelled"].includes(activation?.state);
       if (typeof activation?.id !== "string" || activations.has(activation.id)
         || !declarations.has(activation?.declaration)
-        || generationRequired !== Number.isInteger(activation?.generation)) {
+        || generationRequired !== Number.isInteger(activation?.generation)
+        || !hasExactResourceResumeSlots(activation)) {
         reportDiagnostic(diagnostics, "PSR_INVALID_RESOURCES_ARTIFACT", "Resource activation did not retain canonical lifecycle linkage", { activation }, true);
         throw new PresolveBootError("PSR_INVALID_RESOURCES_ARTIFACT");
       }
       activations.add(activation.id);
+    }
+  }
+
+  function hasExactResourceResumeSlots(activation) {
+    if (typeof activation?.id !== "string"
+      || typeof activation?.state_slot !== "string"
+      || typeof activation?.data_slot !== "string"
+      || typeof activation?.error_slot !== "string") return false;
+    const prefix = `${activation.id}/resource-slot:`;
+    return activation.state_slot === `${prefix}state`
+      && activation.data_slot === `${prefix}data`
+      && activation.error_slot === `${prefix}error`;
+  }
+
+  function isValidResourceValueCodec(codec, depth = 0) {
+    if (depth > 32 || codec === null || typeof codec !== "object" || Array.isArray(codec)) return false;
+    switch (codec.kind) {
+      case "null_codec":
+      case "boolean_codec":
+      case "number_codec":
+      case "string_codec":
+        return exactObjectKeys(codec, ["kind"]);
+      case "array_codec":
+      case "nullable_codec":
+        return exactObjectKeys(codec, ["kind", "value"])
+          && isValidResourceValueCodec(codec.value, depth + 1);
+      case "object_codec": {
+        if (!exactObjectKeys(codec, ["kind", "value"]) || !Array.isArray(codec.value)) return false;
+        const names = new Set();
+        return codec.value.every((property) => property !== null
+          && typeof property === "object" && !Array.isArray(property)
+          && exactObjectKeys(property, ["name", "codec"])
+          && typeof property.name === "string" && property.name.length > 0
+          && !names.has(property.name) && names.add(property.name)
+          && isValidResourceValueCodec(property.codec, depth + 1));
+      }
+      default:
+        return false;
     }
   }
 
@@ -834,6 +978,59 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
+  function validateEffectArtifactInstances(effectArtifact, componentArtifact, diagnostics) {
+    if (effectArtifact === null) return;
+    if (!Array.isArray(effectArtifact.instances) || !Array.isArray(effectArtifact.structural_templates)) {
+      reportDiagnostic(diagnostics, "PSR_INVALID_EFFECT_INSTANCE_ARTIFACT", "Effect runtime metadata omitted instance ownership records", {}, true);
+      throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
+    }
+    if (effectArtifact.instances.length === 0 && effectArtifact.structural_templates.length === 0) return;
+    if (componentArtifact === null) {
+      reportDiagnostic(diagnostics, "PSR_INVALID_EFFECT_INSTANCE_ARTIFACT", "Instance-owned effects require a component runtime artifact", {}, true);
+      throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
+    }
+    const declarations = new Set((effectArtifact.effects ?? []).map((effect) => effect.effect));
+    const instances = new Map((componentArtifact.instances ?? []).map((instance) => [instance.instance, instance]));
+    const identities = new Set();
+    for (const record of effectArtifact.instances) {
+      const component = instances.get(record.component_instance);
+      if (typeof record.effect_instance !== "string" || identities.has(record.effect_instance)
+        || !declarations.has(record.effect) || component === undefined
+        || record.parent_instance !== component.parent || record.depth !== component.depth
+        || !Number.isInteger(record.declaration_order) || record.declaration_order < 0) {
+        reportDiagnostic(diagnostics, "PSR_INVALID_EFFECT_INSTANCE_ARTIFACT", "Effect instance ownership did not match compiler component metadata", { effect_instance: record.effect_instance }, true);
+        throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
+      }
+      identities.add(record.effect_instance);
+    }
+    const regions = new Map((componentArtifact.structural_programs ?? []).map((program) => [program.region, program]));
+    const occurrences = new Map();
+    for (const program of regions.values()) {
+      for (const occurrence of program.template_occurrences ?? []) {
+        if (occurrences.has(occurrence.template_instance)) {
+          reportDiagnostic(diagnostics, "PSR_INVALID_EFFECT_INSTANCE_ARTIFACT", "Structural effect templates did not have unique compiler occurrence ownership", { template_instance: occurrence.template_instance }, true);
+          throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
+        }
+        occurrences.set(occurrence.template_instance, { region: program.region, component: occurrence.component });
+      }
+    }
+    const templateIdentities = new Set();
+    for (const record of effectArtifact.structural_templates) {
+      const occurrence = occurrences.get(record.template_instance);
+      const expectedEffectInstance = `${String(record.template_instance ?? "")}/effect-instance:${String(record.effect ?? "")}`;
+      if (typeof record.effect_instance !== "string" || templateIdentities.has(record.effect_instance)
+        || record.effect_instance !== expectedEffectInstance
+        || occurrence === undefined || record.structural_region !== occurrence.region
+        || record.component !== occurrence.component || !declarations.has(record.effect)
+        || !Number.isInteger(record.depth) || record.depth < 0
+        || !Number.isInteger(record.declaration_order) || record.declaration_order < 0) {
+        reportDiagnostic(diagnostics, "PSR_INVALID_EFFECT_INSTANCE_ARTIFACT", "Structural effect template metadata did not match compiler component metadata", { effect_instance: record.effect_instance }, true);
+        throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
+      }
+      templateIdentities.add(record.effect_instance);
+    }
+  }
+
   function readComponentArtifact(diagnostics) {
     const element = document.getElementById(COMPONENT_ARTIFACT_ELEMENT_ID);
     if (element === null) return null;
@@ -865,12 +1062,25 @@ const RUNTIME_STUB: &str = r#"(() => {
       throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
     }
     const instances = new Set(artifact.instances.map((instance) => instance.instance));
+    const instancesById = new Map(artifact.instances.map((instance) => [instance.instance, instance]));
     const structuralTemplates = new Set(
       (artifact.structural_programs ?? [])
         .flatMap((program) => program.template_instances ?? [])
     );
+    const structuralTemplateComponents = new Map(
+      (artifact.structural_programs ?? [])
+        .flatMap((program) => (program.template_occurrences ?? []).map((occurrence) => [
+          occurrence.template_instance,
+          occurrence.component
+        ]))
+    );
     const stateSlots = new Set();
     const statePairs = new Set();
+    const structuralStateSlots = new Set();
+    const structuralStatePairs = new Set();
+    const structuralComputedCacheSlots = new Set();
+    const structuralComputedDirtySlots = new Set();
+    const structuralComputedPairs = new Set();
     for (const instance of artifact.instances) if (
       instance.parent !== null
       && instance.parent !== undefined
@@ -881,6 +1091,147 @@ const RUNTIME_STUB: &str = r#"(() => {
       throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
     }
     if (artifact.schema_version === SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION) {
+      if (!Array.isArray(artifact.structural_programs)) {
+        throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      }
+      if (!Array.isArray(artifact.ordinary_template_targets)
+        || !Array.isArray(artifact.ordinary_template_bindings)
+        || !Array.isArray(artifact.ordinary_template_events)) {
+        throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      }
+      const structuralRegions = new Set();
+      const structuralHosts = new Set();
+      const slotBindingCallees = new Map((artifact.slot_binding_programs ?? []).map((binding) => [binding.binding, binding.callee_instance]));
+      for (const program of artifact.structural_programs) {
+        const host = `${String(program.host_component)}\u001f${String(program.host_node)}`;
+        if (typeof program.region !== "string" || program.region.length === 0
+          || typeof program.host_component !== "string" || program.host_component.length === 0
+          || typeof program.host_node !== "string" || program.host_node.length === 0
+          || typeof program.host_template_entity !== "string" || program.host_template_entity.length === 0
+          || structuralRegions.has(program.region) || structuralHosts.has(host)
+          || !Array.isArray(program.conditional_host_fragments)
+          || !Array.isArray(program.keyed_host_fragments)
+          || !Array.isArray(program.template_instances)
+          || !Array.isArray(program.template_occurrences)
+          || program.template_occurrences.length !== program.template_instances.length
+          || new Set(program.conditional_host_fragments.map((fragments) => fragments?.host_instance)).size !== program.conditional_host_fragments.length
+          || program.conditional_host_fragments.some((fragments) => typeof fragments?.host_instance !== "string"
+            || typeof fragments.host_scope !== "string"
+            || (fragments.host_scope === "static-instance"
+              ? instancesById.get(fragments.host_instance)?.component !== program.host_component
+              : fragments.host_scope === "structural-occurrence"
+                ? structuralTemplateComponents.get(fragments.host_instance) !== program.host_component
+                : true)
+            || typeof fragments.when_true_html !== "string" || fragments.when_true_html.length === 0
+            || typeof fragments.when_false_html !== "string" || fragments.when_false_html.length === 0
+            || !Array.isArray(fragments.when_true_invocations)
+            || !Array.isArray(fragments.when_false_invocations)
+            || !Array.isArray(fragments.slot_projection_bindings)
+            || !Array.isArray(fragments.slot_projection_programs)
+            || fragments.slot_projection_programs.length !== fragments.slot_projection_bindings.length
+            || new Set(fragments.slot_projection_bindings).size !== fragments.slot_projection_bindings.length
+            || fragments.slot_projection_bindings.some((binding) => slotBindingCallees.get(binding) !== fragments.host_instance)
+            || fragments.slot_projection_programs.some((projection) => typeof projection?.binding !== "string"
+              || !fragments.slot_projection_bindings.includes(projection.binding)
+              || typeof projection.caller_instance !== "string" || typeof projection.content_owner_instance !== "string"
+              || !Array.isArray(projection.target_ids) || !Array.isArray(projection.binding_ids)
+              || !Array.isArray(projection.event_ids) || !Array.isArray(projection.nested_invocations))
+            || new Set(fragments.when_true_invocations).size !== fragments.when_true_invocations.length
+            || new Set(fragments.when_false_invocations).size !== fragments.when_false_invocations.length
+            || [...fragments.when_true_invocations, ...fragments.when_false_invocations].some((invocation) =>
+              !program.template_occurrences.some((occurrence) => occurrence.invocation === invocation)
+            ))
+          || new Set(program.keyed_host_fragments.map((fragments) => fragments?.host_instance)).size !== program.keyed_host_fragments.length
+          || program.keyed_host_fragments.some((fragments) => typeof fragments?.host_instance !== "string"
+            || typeof fragments.host_scope !== "string"
+            || (fragments.host_scope === "static-instance"
+              ? instancesById.get(fragments.host_instance)?.component !== program.host_component
+              : fragments.host_scope === "structural-occurrence"
+                ? structuralTemplateComponents.get(fragments.host_instance) !== program.host_component
+                : true)
+            || typeof fragments.item_template_html !== "string" || fragments.item_template_html.length === 0
+            || !Array.isArray(fragments.item_invocations)
+            || !Array.isArray(fragments.slot_projection_bindings)
+            || !Array.isArray(fragments.slot_projection_programs)
+            || fragments.slot_projection_programs.length !== fragments.slot_projection_bindings.length
+            || new Set(fragments.slot_projection_bindings).size !== fragments.slot_projection_bindings.length
+            || fragments.slot_projection_bindings.some((binding) => slotBindingCallees.get(binding) !== fragments.host_instance)
+            || fragments.slot_projection_programs.some((projection) => typeof projection?.binding !== "string"
+              || !fragments.slot_projection_bindings.includes(projection.binding)
+              || typeof projection.caller_instance !== "string" || typeof projection.content_owner_instance !== "string"
+              || !Array.isArray(projection.target_ids) || !Array.isArray(projection.binding_ids)
+              || !Array.isArray(projection.event_ids) || !Array.isArray(projection.nested_invocations))
+            || new Set(fragments.item_invocations).size !== fragments.item_invocations.length
+            || fragments.item_invocations.some((invocation) =>
+              !program.template_occurrences.some((occurrence) => occurrence.invocation === invocation)
+            ))
+            || program.template_occurrences.some((occurrence, index) => typeof occurrence?.template_instance !== "string"
+            || occurrence.template_instance !== program.template_instances[index]
+            || typeof occurrence.invocation !== "string" || typeof occurrence.invocation_template_entity !== "string"
+            || occurrence.invocation_template_entity.length === 0 || typeof occurrence.component !== "string"
+            || typeof occurrence.template_html !== "string" || occurrence.template_html.length === 0
+            || !Array.isArray(occurrence.nested_invocations)
+            || new Set(occurrence.nested_invocations).size !== occurrence.nested_invocations.length
+            || occurrence.nested_invocations.some((invocation) => !program.template_occurrences.some((candidate) => candidate.invocation === invocation))
+            || !Array.isArray(occurrence.state_slots)
+            || !Array.isArray(occurrence.computed_slots)
+            || !Array.isArray(occurrence.ordinary_template_targets)
+            || !Array.isArray(occurrence.ordinary_template_bindings)
+            || !Array.isArray(occurrence.ordinary_template_events)
+            || occurrence.state_slots.some((slot) => {
+              const pair = `${occurrence.template_instance}|${slot?.storage_id}`;
+              return typeof slot?.slot_id !== "string"
+                || slot.slot_id !== canonicalStateSlotId(occurrence.template_instance, slot.storage_id)
+                || typeof slot.state_id !== "string"
+                || slot.state_id.length === 0
+                || typeof slot.storage_id !== "string"
+                || slot.storage_id !== `storage:${slot.state_id}`
+                || typeof slot.semantic_type !== "string"
+                || slot.semantic_type.length === 0
+                || typeof slot.serializable !== "boolean"
+                || structuralStateSlots.has(slot.slot_id)
+                || structuralStatePairs.has(pair)
+                || !structuralStateSlots.add(slot.slot_id)
+                || !structuralStatePairs.add(pair);
+            })
+            || occurrence.computed_slots.some((slot) => {
+              const pair = `${occurrence.template_instance}|${slot?.computed_id}`;
+              return typeof slot?.computed_id !== "string"
+                || slot.computed_id.length === 0
+                || typeof slot?.cache_slot_id !== "string"
+                || typeof slot?.dirty_slot_id !== "string"
+                || !slot.cache_slot_id.startsWith(`${occurrence.template_instance}/computed-cache:`)
+                || !slot.dirty_slot_id.startsWith(`${occurrence.template_instance}/computed-dirty:`)
+                || typeof slot.dirty_initial_value !== "boolean"
+                || structuralComputedCacheSlots.has(slot.cache_slot_id)
+                || structuralComputedDirtySlots.has(slot.dirty_slot_id)
+                || structuralComputedPairs.has(pair)
+                || !structuralComputedCacheSlots.add(slot.cache_slot_id)
+                || !structuralComputedDirtySlots.add(slot.dirty_slot_id)
+                || !structuralComputedPairs.add(pair);
+            })
+            || JSON.stringify(occurrence.ordinary_template_targets) !== JSON.stringify(
+              artifact.ordinary_template_targets
+                .filter((target) => target.component_instance_id === occurrence.template_instance)
+                .map((target) => target.id)
+            )
+            || JSON.stringify(occurrence.ordinary_template_bindings) !== JSON.stringify(
+              artifact.ordinary_template_bindings
+                .filter((binding) => binding.component_instance_id === occurrence.template_instance)
+                .map((binding) => binding.id)
+            )
+            || JSON.stringify(occurrence.ordinary_template_events) !== JSON.stringify(
+              artifact.ordinary_template_events
+                .filter((event) => event.component_instance_id === occurrence.template_instance)
+                .map((event) => event.declaration_event_id)
+            ))
+          || JSON.stringify(program.create_order) !== JSON.stringify(program.template_instances)
+          || JSON.stringify([...(program.destroy_order ?? [])].reverse()) !== JSON.stringify(program.template_instances)) {
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        structuralRegions.add(program.region);
+        structuralHosts.add(host);
+      }
       for (const instance of artifact.instances) {
         if (!Array.isArray(instance.state_slots)) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
         for (const slot of instance.state_slots) {
@@ -1117,8 +1468,15 @@ const RUNTIME_STUB: &str = r#"(() => {
 
   function buildActionsByMethod(component) {
     const actionsByMethod = new Map();
+    const legacyActionsByMethod = new Map();
 
     for (const action of component.actions ?? []) {
+      if (legacyActionBinding(action)) {
+        const actions = legacyActionsByMethod.get(action.method) ?? [];
+        actions.push(action);
+        legacyActionsByMethod.set(action.method, actions);
+        continue;
+      }
       const record = actionsByMethod.get(action.method_id) ?? {
         action_batch_id: action.action_batch_id,
         actions: []
@@ -1127,7 +1485,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       actionsByMethod.set(action.method_id, record);
     }
 
-    return actionsByMethod;
+    return { actionsByMethod, legacyActionsByMethod };
   }
 
   function componentFieldKey(componentName, field) {
@@ -1317,6 +1675,943 @@ const RUNTIME_STUB: &str = r#"(() => {
     return String(index);
   }
 
+  const STRUCTURAL_OCCURRENCE_IDENTITY_PREFIX = "presolve-structural-occurrence:v1:";
+
+  function structuralOccurrenceHex(value) {
+    if (typeof value !== "string" || value.length === 0) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    return [...new TextEncoder().encode(value)]
+      .map((byte) => byte.toString(16).toUpperCase().padStart(2, "0"))
+      .join("");
+  }
+
+  function structuralOccurrenceIdentity(parentScope, region, templateInstance, localOccurrence) {
+    return `${STRUCTURAL_OCCURRENCE_IDENTITY_PREFIX}${structuralOccurrenceHex(parentScope)}.${structuralOccurrenceHex(region)}.${structuralOccurrenceHex(templateInstance)}.${structuralOccurrenceHex(localOccurrence)}`;
+  }
+
+  function decodeStructuralOccurrenceIdentity(value) {
+    if (typeof value !== "string" || !value.startsWith(STRUCTURAL_OCCURRENCE_IDENTITY_PREFIX)) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const fields = value.slice(STRUCTURAL_OCCURRENCE_IDENTITY_PREFIX.length).split(".");
+    if (fields.length !== 4 || fields.some((field) => field.length === 0 || field.length % 2 !== 0 || !/^[0-9a-f]+$/i.test(field))) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    let decoded;
+    try {
+      decoded = fields.map((field) => new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(
+        field.match(/../g).map((pair) => Number.parseInt(pair, 16))
+      )));
+    } catch (_) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    if (decoded.some((field) => field.length === 0)) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    return Object.freeze({
+      parent_scope: decoded[0],
+      region: decoded[1],
+      template_instance: decoded[2],
+      local_occurrence: decoded[3]
+    });
+  }
+
+  function instantiateStructuralTemplateSlots(occurrence, occurrenceIdentity) {
+    decodeStructuralOccurrenceIdentity(occurrenceIdentity);
+    const templateInstance = String(occurrence?.template_instance ?? "");
+    const prefix = `${templateInstance}/`;
+    if (templateInstance.length === 0
+      || !Array.isArray(occurrence?.state_slots)
+      || !Array.isArray(occurrence?.computed_slots)) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const ids = new Set();
+    const stateSlots = occurrence.state_slots.map((slot) => {
+      if (typeof slot?.slot_id !== "string" || !slot.slot_id.startsWith(`${prefix}state-slot:`)
+        || typeof slot.storage_id !== "string" || !slot.storage_id.startsWith("storage:")) {
+        throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      }
+      const slotId = `${occurrenceIdentity}/${slot.slot_id.slice(prefix.length)}`;
+      if (ids.has(slotId)) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      ids.add(slotId);
+      return Object.freeze({ ...slot, slot_id: slotId });
+    });
+    const computedSlots = occurrence.computed_slots.map((slot) => {
+      if (typeof slot?.cache_slot_id !== "string" || !slot.cache_slot_id.startsWith(`${prefix}computed-cache:`)
+        || typeof slot.dirty_slot_id !== "string" || !slot.dirty_slot_id.startsWith(`${prefix}computed-dirty:`)) {
+        throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      }
+      const cacheSlotId = `${occurrenceIdentity}/${slot.cache_slot_id.slice(prefix.length)}`;
+      const dirtySlotId = `${occurrenceIdentity}/${slot.dirty_slot_id.slice(prefix.length)}`;
+      if (ids.has(cacheSlotId) || ids.has(dirtySlotId)) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      ids.add(cacheSlotId);
+      ids.add(dirtySlotId);
+      return Object.freeze({ ...slot, cache_slot_id: cacheSlotId, dirty_slot_id: dirtySlotId });
+    });
+    return Object.freeze({ state_slots: stateSlots, computed_slots: computedSlots });
+  }
+
+  function rewriteStructuralTemplateIdentity(templateInstance, occurrenceIdentity, value) {
+    if (typeof templateInstance !== "string" || templateInstance.length === 0
+      || typeof occurrenceIdentity !== "string" || typeof value !== "string") {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const prefix = `${templateInstance}/`;
+    if (!value.startsWith(prefix)) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    return `${occurrenceIdentity}/${value.slice(prefix.length)}`;
+  }
+
+  function deriveStructuralOccurrenceRecords(templateRecord, occurrenceIdentity) {
+    const decoded = decodeStructuralOccurrenceIdentity(occurrenceIdentity);
+    const occurrence = templateRecord?.occurrence;
+    const templateInstance = String(occurrence?.template_instance ?? "");
+    if (templateInstance.length === 0
+      || decoded.template_instance !== templateInstance
+      || typeof templateRecord?.structural_region !== "string"
+      || decoded.region !== templateRecord.structural_region
+      || !Array.isArray(templateRecord?.targets)
+      || !Array.isArray(templateRecord?.bindings)
+      || !Array.isArray(templateRecord?.events)) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const slots = instantiateStructuralTemplateSlots(occurrence, occurrenceIdentity);
+    const targetIds = new Set();
+    const bindingIds = new Set();
+    const eventKeys = new Set();
+    const targets = templateRecord.targets.map((pair) => {
+      const artifact = pair?.artifact;
+      const manifest = pair?.manifest;
+      const id = rewriteStructuralTemplateIdentity(templateInstance, occurrenceIdentity, artifact?.id);
+      if (manifest?.id !== artifact?.id || targetIds.has(id)) {
+        throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      }
+      targetIds.add(id);
+      return Object.freeze({
+        artifact: Object.freeze({ ...artifact, id, component_instance_id: occurrenceIdentity }),
+        manifest: Object.freeze({ ...manifest, id, component_instance_id: occurrenceIdentity })
+      });
+    });
+    const bindings = templateRecord.bindings.map((pair) => {
+      const artifact = pair?.artifact;
+      const manifest = pair?.manifest;
+      const id = rewriteStructuralTemplateIdentity(templateInstance, occurrenceIdentity, artifact?.id);
+      const targetId = rewriteStructuralTemplateIdentity(templateInstance, occurrenceIdentity, artifact?.target_id);
+      if (manifest?.instance_binding_id !== artifact?.id
+        || manifest?.instance_target_id !== artifact?.target_id
+        || !targetIds.has(targetId)
+        || bindingIds.has(id)) {
+        throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      }
+      bindingIds.add(id);
+      return Object.freeze({
+        artifact: Object.freeze({ ...artifact, id, target_id: targetId, component_instance_id: occurrenceIdentity }),
+        manifest: Object.freeze({ ...manifest, instance_binding_id: id, instance_target_id: targetId, component_instance_id: occurrenceIdentity })
+      });
+    });
+    const events = templateRecord.events.map((pair) => {
+      const artifact = pair?.artifact;
+      const manifest = pair?.manifest;
+      const targetId = rewriteStructuralTemplateIdentity(templateInstance, occurrenceIdentity, artifact?.target_id);
+      const key = ordinaryEventKey(targetId, artifact?.event_type);
+      if (manifest?.instance_target_id !== artifact?.target_id
+        || !targetIds.has(targetId)
+        || eventKeys.has(key)) {
+        throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      }
+      eventKeys.add(key);
+      return Object.freeze({
+        artifact: Object.freeze({ ...artifact, target_id: targetId, component_instance_id: occurrenceIdentity }),
+        manifest: Object.freeze({ ...manifest, instance_target_id: targetId, component_instance_id: occurrenceIdentity })
+      });
+    });
+    return Object.freeze({
+      occurrence_identity: occurrenceIdentity,
+      parent_scope: decoded.parent_scope,
+      structural_region: templateRecord.structural_region,
+      template_instance: templateInstance,
+      occurrence,
+      component: occurrence.component,
+      definition: templateRecord.definition,
+      state_slots: slots.state_slots,
+      computed_slots: slots.computed_slots,
+      targets: Object.freeze(targets),
+      bindings: Object.freeze(bindings),
+      events: Object.freeze(events)
+    });
+  }
+
+  function stageStructuralOccurrenceRecords(store, records) {
+    const instanceId = String(records?.occurrence_identity ?? "");
+    const componentId = String(records?.component ?? "");
+    const definition = records?.definition;
+    if (instanceId.length === 0 || componentId.length === 0 || definition === undefined
+      || store.components.has(instanceId) || store.componentInstances.has(instanceId)) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const statePairs = [];
+    const computedPairs = [];
+    let component = null;
+    let staged = false;
+    const rollback = () => {
+      if (!staged) return;
+      for (const [pair, slot] of statePairs) {
+        store.stateSlotsByInstanceStorage.delete(pair);
+        store.storageValues.delete(slot.slot_id);
+        store.bindingsByStateSlot.delete(slot.slot_id);
+      }
+      for (const [pair, slot] of computedPairs) {
+        store.computedSlotsByInstanceComputed.delete(pair);
+        store.computedDirtySlots.delete(slot.dirty_slot_id);
+        store.computedCaches.delete(slot.cache_slot_id);
+        store.bindingsByInstanceComputed.delete(pair);
+      }
+      store.components.delete(instanceId);
+      store.componentInstances.delete(instanceId);
+      staged = false;
+    };
+    try {
+      for (const slot of records.state_slots ?? []) {
+        const pair = `${instanceId}|${slot.storage_id}`;
+        if (store.stateSlotsByInstanceStorage.has(pair) || store.storageValues.has(slot.slot_id)) {
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        store.stateSlotsByInstanceStorage.set(pair, slot);
+        store.storageValues.set(slot.slot_id, initialStateSlotValue(slot));
+        statePairs.push([pair, slot]);
+      }
+      for (const slot of records.computed_slots ?? []) {
+        const pair = `${instanceId}|${slot.computed_id}`;
+        if (store.computedSlotsByInstanceComputed.has(pair)
+          || store.computedDirtySlots.has(slot.dirty_slot_id)
+          || store.computedCaches.has(slot.cache_slot_id)) {
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        store.computedSlotsByInstanceComputed.set(pair, slot);
+        store.computedDirtySlots.set(slot.dirty_slot_id, slot.dirty_initial_value === true);
+        computedPairs.push([pair, slot]);
+      }
+      component = { instance_id: instanceId, name: definition.name, manifest: definition, state: {} };
+      for (const state of store.computedArtifact?.state ?? []) {
+        if (state.component !== definition.name) continue;
+        const slot = store.stateSlotsByInstanceStorage.get(`${instanceId}|${state.storage}`);
+        if (slot === undefined) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        component.state[state.field] = store.storageValues.get(slot.slot_id);
+      }
+      store.components.set(instanceId, component);
+      store.componentInstances.set(instanceId, {
+        instance: instanceId,
+        component: componentId,
+        parent: records.parent_scope,
+        structural_region: records.structural_region,
+        status: "staged"
+      });
+      registerActions(store, component, definition);
+      staged = true;
+    } catch (error) {
+      staged = true;
+      rollback();
+      throw error;
+    }
+    return Object.freeze({ ...records, rollback });
+  }
+
+  function renderStructuralOccurrenceTemplate(records) {
+    const occurrenceIdentity = String(records?.occurrence_identity ?? "");
+    const templateHtml = records?.occurrence?.template_html;
+    decodeStructuralOccurrenceIdentity(occurrenceIdentity);
+    if (typeof templateHtml !== "string" || templateHtml.length === 0) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const html = templateHtml.replaceAll("__PRESOLVE_STRUCTURAL_OCCURRENCE__", occurrenceIdentity);
+    if (html.includes("__PRESOLVE_STRUCTURAL_OCCURRENCE__")) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const template = document.createElement("template");
+    template.innerHTML = html;
+    if (!template.content.hasChildNodes()) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    return template.content;
+  }
+
+  function attachStructuralOccurrenceFragment(marker, invocation, fragment) {
+    if (!(marker instanceof Element)
+      || marker.getAttribute("data-presolve-structural-invocation") !== invocation
+      || marker.parentNode === null
+      || !(fragment instanceof DocumentFragment)
+      || !fragment.hasChildNodes()) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const parent = marker.parentNode;
+    const nextSibling = marker.nextSibling;
+    const nodes = [...fragment.childNodes];
+    marker.replaceWith(fragment);
+    let attached = true;
+    const rollback = () => {
+      if (!attached) return;
+      for (const node of nodes) {
+        if (node.parentNode !== null) node.remove();
+      }
+      if (nextSibling !== null && nextSibling.parentNode === parent) {
+        parent.insertBefore(marker, nextSibling);
+      } else {
+        parent.appendChild(marker);
+      }
+      attached = false;
+    };
+    return Object.freeze({ nodes: Object.freeze(nodes), rollback });
+  }
+
+  function registerStructuralOccurrenceRecords(store, staged) {
+    if (!(store.templateTargetsById instanceof Map)
+      || !(store.ordinaryBindingsById instanceof Map)
+      || !(store.ordinaryEventsByTargetAndType instanceof Map)) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const anchors = collectOrdinaryTargetAnchors();
+    for (const pair of staged.bindings) {
+      const binding = pair.manifest;
+      if (binding.kind !== "text" || anchors.targets.has(binding.instance_target_id)) continue;
+      const text = ordinaryTextBindingNode(binding.instance_binding_id);
+      if (text !== null) anchors.targets.set(binding.instance_target_id, text);
+    }
+    const targetIds = [];
+    const bindingIds = [];
+    const eventKeys = [];
+    const unsubscribes = [];
+    let registered = false;
+    const rollback = () => {
+      if (!registered) return;
+      for (const unsubscribe of unsubscribes.reverse()) unsubscribe();
+      for (const key of eventKeys) store.ordinaryEventsByTargetAndType.delete(key);
+      for (const id of bindingIds) store.ordinaryBindingsById.delete(id);
+      for (const id of targetIds) store.templateTargetsById.delete(id);
+      registered = false;
+    };
+    try {
+      for (const pair of staged.targets) {
+        const target = pair.manifest;
+        if (anchors.duplicates.has(target.id) || !anchors.targets.has(target.id)
+          || store.templateTargetsById.has(target.id)) {
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        store.templateTargetsById.set(target.id, anchors.targets.get(target.id));
+        targetIds.push(target.id);
+      }
+      for (const pair of staged.bindings) {
+        const binding = pair.manifest;
+        if (store.ordinaryBindingsById.has(binding.instance_binding_id)) {
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        store.ordinaryBindingsById.set(binding.instance_binding_id, {
+          ...binding,
+          execution_context: { component_instance_id: binding.component_instance_id }
+        });
+        bindingIds.push(binding.instance_binding_id);
+        unsubscribes.push(registerOrdinaryBinding(store, binding, pair.artifact));
+      }
+      for (const pair of staged.events) {
+        const event = pair.manifest;
+        const key = ordinaryEventKey(event.instance_target_id, event.event_type);
+        if (store.ordinaryEventsByTargetAndType.has(key)) {
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        store.ordinaryEventsByTargetAndType.set(key, event);
+        eventKeys.push(key);
+      }
+      executeComputedPlan(store, staged.occurrence_identity);
+      installOrdinaryInstanceEventListeners(store);
+      registered = true;
+    } catch (error) {
+      registered = true;
+      rollback();
+      throw error;
+    }
+    return Object.freeze({ rollback });
+  }
+
+  function structuralEffectInstances(store, records) {
+    const templateInstance = String(records?.template_instance ?? "");
+    const occurrenceIdentity = String(records?.occurrence_identity ?? "");
+    const structuralRegion = String(records?.structural_region ?? "");
+    const component = String(records?.component ?? "");
+    if (templateInstance.length === 0 || occurrenceIdentity.length === 0
+      || structuralRegion.length === 0 || component.length === 0) {
+      throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
+    }
+    const effects = new Set((store.effectArtifact?.effects ?? []).map((effect) => effect.effect));
+    const identities = new Set();
+    const instances = (store.effectArtifact?.structural_templates ?? [])
+      .filter((record) => record.template_instance === templateInstance)
+      .map((record) => {
+        if (record.structural_region !== structuralRegion || record.component !== component
+          || !effects.has(record.effect)) {
+          throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
+        }
+        const effectInstance = rewriteStructuralTemplateIdentity(
+          templateInstance,
+          occurrenceIdentity,
+          record.effect_instance
+        );
+        if (identities.has(effectInstance) || store.activeEffectInstances.has(effectInstance)) {
+          throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
+        }
+        identities.add(effectInstance);
+        return Object.freeze({
+          effect_instance: effectInstance,
+          effect: record.effect,
+          component_instance: occurrenceIdentity,
+          parent_instance: records.parent_scope,
+          depth: record.depth,
+          declaration_order: record.declaration_order,
+          structural: true
+        });
+      })
+      .sort((left, right) => left.declaration_order - right.declaration_order
+        || left.effect_instance.localeCompare(right.effect_instance));
+    return Object.freeze(instances);
+  }
+
+  function activateStructuralEffectInstances(store, records, resumeOnly = false) {
+    const instances = structuralEffectInstances(store, records);
+    const effects = new Map((store.effectArtifact?.effects ?? []).map((effect) => [effect.effect, effect]));
+    const activated = [];
+    try {
+      for (const instance of instances) {
+        const effect = effects.get(instance.effect);
+        if (effect === undefined) throw new PresolveBootError("PSR_INVALID_EFFECT_INSTANCE_ARTIFACT");
+        if (resumeOnly && effect.run_on_resume !== true) continue;
+        store.activeEffectInstances.set(instance.effect_instance, instance);
+        activated.push(instance);
+        const evidence = {
+          effect: effect.effect,
+          effect_instance: instance.effect_instance,
+          structural_region: records.structural_region,
+          occurrence_identity: records.occurrence_identity,
+          capability_operations: []
+        };
+        runEffect(store, effect, evidence, instance);
+        store.structuralEffectRuns.push(evidence);
+      }
+      return Object.freeze({ instances, dispose: () => disposeEffectInstances(store, instances) });
+    } catch (error) {
+      disposeEffectInstances(store, activated);
+      throw error;
+    }
+  }
+
+  function materializeStructuralOccurrence(store, marker, parentScope, localOccurrence) {
+    let materializationPhase = "invocation";
+    const invocation = marker?.getAttribute?.("data-presolve-structural-invocation");
+    const template = store.structuralOccurrenceTemplatesByInvocation?.get(invocation);
+    if (typeof invocation !== "string" || template === undefined
+      || typeof parentScope !== "string" || parentScope.length === 0
+      || typeof localOccurrence !== "string" || localOccurrence.length === 0) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const identity = structuralOccurrenceIdentity(
+      parentScope,
+      template.structural_region,
+      template.occurrence.template_instance,
+      localOccurrence
+    );
+    materializationPhase = "record-derivation";
+    const records = deriveStructuralOccurrenceRecords(template, identity);
+    let staged = null;
+    let attachment = null;
+    let registration = null;
+    let effects = null;
+    const children = [];
+    try {
+      materializationPhase = "record-staging";
+      staged = stageStructuralOccurrenceRecords(store, records);
+      materializationPhase = "fragment-rendering";
+      const program = store.componentRegions?.get(records.structural_region);
+      const fragment = renderStructuralOccurrenceTemplate(records);
+      materializationPhase = "nested-anchor-validation";
+      const anchors = compilerFragmentInvocationAnchors(
+        fragment,
+        program,
+        records.occurrence.nested_invocations
+      );
+      attachment = attachStructuralOccurrenceFragment(
+        marker,
+        invocation,
+        fragment
+      );
+      materializationPhase = "ordinary-record-registration";
+      registration = registerStructuralOccurrenceRecords(store, staged);
+      materializationPhase = "effect-activation";
+      effects = activateStructuralEffectInstances(store, staged);
+      materializationPhase = "nested-materialization";
+      for (const anchor of anchors) {
+        children.push(materializeStructuralOccurrence(store, anchor.marker, identity, localOccurrence));
+      }
+      return Object.freeze({ ...staged, attachment, registration, dispose: () => {
+        for (const child of [...children].reverse()) child.dispose();
+        effects?.dispose();
+        registration.rollback();
+        attachment.rollback();
+        staged.rollback();
+      }});
+    } catch (error) {
+      for (const child of [...children].reverse()) child.dispose();
+      effects?.dispose();
+      registration?.rollback();
+      attachment?.rollback();
+      staged?.rollback();
+      reportDiagnostic(
+        store.diagnostics,
+        error instanceof PresolveBootError ? error.code : "PSR_RUNTIME_BOOT_FAILED",
+        "Structural occurrence materialization failed",
+        { invocation, structural_region: template?.structural_region ?? null, phase: materializationPhase, message: error instanceof Error ? error.message : String(error) },
+        true
+      );
+      throw error;
+    }
+  }
+
+  function structuralConditionalHostFragment(store, component, node) {
+    const programs = [...(store.componentRegions?.values() ?? [])].filter((program) =>
+      program.host_component === component?.manifest?.component_id
+      && program.host_node === node?.id
+    );
+    if (programs.length === 0) return null;
+    if (programs.length !== 1 || typeof component?.instance_id !== "string") {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const fragments = programs[0].conditional_host_fragments.filter((fragment) =>
+      structuralHostScopeMatches(fragment, component)
+    );
+    if (fragments.length !== 1) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    return fragments[0];
+  }
+
+  function structuralKeyedHostFragment(store, component, node) {
+    const programs = [...(store.componentRegions?.values() ?? [])].filter((program) =>
+      program.host_component === component?.manifest?.component_id
+      && program.host_node === node?.id
+    );
+    if (programs.length === 0) return null;
+    if (programs.length !== 1 || typeof component?.instance_id !== "string") {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const fragments = programs[0].keyed_host_fragments.filter((fragment) =>
+      structuralHostScopeMatches(fragment, component)
+    );
+    if (fragments.length !== 1) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    return fragments[0];
+  }
+
+  function structuralHostScopeMatches(fragment, component) {
+    if (typeof component?.instance_id !== "string" || typeof fragment?.host_instance !== "string") {
+      return false;
+    }
+    if (fragment.host_scope === "static-instance") {
+      return fragment.host_instance === component.instance_id;
+    }
+    if (fragment.host_scope === "structural-occurrence") {
+      return decodeStructuralOccurrenceIdentity(component.instance_id).template_instance === fragment.host_instance;
+    }
+    return false;
+  }
+
+  function compilerFragmentInvocationAnchors(fragment, program, expectedInvocations) {
+    if (!(fragment instanceof DocumentFragment)
+      || !Array.isArray(program?.template_occurrences)
+      || !Array.isArray(program?.create_order)
+      || !Array.isArray(expectedInvocations)
+      || program.create_order.length !== program.template_occurrences.length) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const occurrencesByInvocation = new Map();
+    const occurrencesByTemplate = new Map();
+    for (const occurrence of program.template_occurrences) {
+      if (typeof occurrence?.invocation !== "string" || typeof occurrence?.template_instance !== "string"
+        || occurrencesByInvocation.has(occurrence.invocation)
+        || occurrencesByTemplate.has(occurrence.template_instance)) {
+        throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      }
+      occurrencesByInvocation.set(occurrence.invocation, occurrence);
+      occurrencesByTemplate.set(occurrence.template_instance, occurrence);
+    }
+    if (new Set(program.create_order).size !== program.create_order.length
+      || program.create_order.some((templateInstance) => !occurrencesByTemplate.has(templateInstance))) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    if (new Set(expectedInvocations).size !== expectedInvocations.length
+      || expectedInvocations.some((invocation) => !occurrencesByInvocation.has(invocation))) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const anchorsByInvocation = new Map();
+    const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_ELEMENT);
+    while (walker.nextNode()) {
+      const marker = walker.currentNode;
+      const invocation = marker.getAttribute("data-presolve-structural-invocation");
+      if (invocation === null) continue;
+      if (!occurrencesByInvocation.has(invocation) || anchorsByInvocation.has(invocation)) {
+        throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      }
+      anchorsByInvocation.set(invocation, marker);
+    }
+    if (anchorsByInvocation.size !== expectedInvocations.length
+      || expectedInvocations.some((invocation) => !anchorsByInvocation.has(invocation))) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    return Object.freeze(program.create_order
+      .map((templateInstance) => occurrencesByTemplate.get(templateInstance))
+      .filter((occurrence) => expectedInvocations.includes(occurrence.invocation))
+      .map((occurrence) => Object.freeze({
+        invocation: occurrence.invocation,
+        marker: anchorsByInvocation.get(occurrence.invocation)
+      })));
+  }
+
+  function replaceStructuralConditionalBranch(store, target, component, node, fragmentRecord, value) {
+    if (!structuralHostScopeMatches(fragmentRecord, component)
+      || target?.start?.parentNode === null
+      || target?.end?.parentNode === null
+      || target.start.parentNode !== target.end.parentNode) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const program = [...(store.componentRegions?.values() ?? [])].filter((candidate) =>
+      candidate.host_component === component.manifest?.component_id && candidate.host_node === node?.id
+    );
+    if (program.length !== 1) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    const branch = value === true ? "true" : "false";
+    const html = branch === "true" ? fragmentRecord.when_true_html : fragmentRecord.when_false_html;
+    if (typeof html !== "string" || html.length === 0) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const template = document.createElement("template");
+    template.innerHTML = html;
+    if (!template.content.hasChildNodes()) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    const expectedInvocations = branch === "true"
+      ? fragmentRecord.when_true_invocations
+      : fragmentRecord.when_false_invocations;
+    const anchors = compilerFragmentInvocationAnchors(template.content, program[0], expectedInvocations);
+    const previous = document.createDocumentFragment();
+    let current = target.start.nextSibling;
+    while (current !== null && current !== target.end) {
+      const next = current.nextSibling;
+      previous.appendChild(current);
+      current = next;
+    }
+    const prior = target.structural_occurrences ?? [];
+    const priorProjection = target.structural_projection_registration ?? null;
+    const priorBranch = target.structural_branch ?? null;
+    const priorHtml = priorBranch === "true" ? fragmentRecord.when_true_html
+      : priorBranch === "false" ? fragmentRecord.when_false_html
+      : null;
+    priorProjection?.rollback();
+    const created = [];
+    let projectionRegistration = null;
+    try {
+      target.end.parentNode.insertBefore(template.content, target.end);
+      const projection = structuralHostProjectionRecords(store, fragmentRecord, component, html);
+      projectionRegistration = registerStructuralOccurrenceRecords(store, {
+        ...projection,
+        occurrence_identity: component.instance_id
+      });
+      for (const anchor of anchors) {
+        created.push(materializeStructuralOccurrence(
+          store,
+          anchor.marker,
+          component.instance_id,
+          `conditional:${branch}`
+        ));
+      }
+      for (const occurrence of [...prior].reverse()) occurrence.dispose();
+      target.structural_occurrences = Object.freeze(created);
+      target.structural_projection_registration = projectionRegistration;
+      target.structural_branch = branch;
+      store.elementsByNode = collectElementAnchors();
+    } catch (error) {
+      for (const occurrence of [...created].reverse()) occurrence.dispose();
+      projectionRegistration?.rollback();
+      current = target.start.nextSibling;
+      while (current !== null && current !== target.end) {
+        const next = current.nextSibling;
+        current.remove();
+        current = next;
+      }
+      target.end.parentNode.insertBefore(previous, target.end);
+      if (priorProjection !== null) {
+        if (typeof priorHtml !== "string") throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        const projection = structuralHostProjectionRecords(store, fragmentRecord, component, priorHtml);
+        target.structural_projection_registration = registerStructuralOccurrenceRecords(store, {
+          ...projection,
+          occurrence_identity: component.instance_id
+        });
+      }
+      throw error;
+    }
+  }
+
+  function structuralOccurrenceTemplateRegistry(manifest, componentArtifact, computedArtifact) {
+    const components = new Map((manifest.components ?? []).map((component) => [component.component_id, component]));
+    if (components.size !== (manifest.components ?? []).length) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const targetRecords = new Map((componentArtifact.ordinary_template_targets ?? []).map((record) => [record.id, record]));
+    const bindingRecords = new Map((componentArtifact.ordinary_template_bindings ?? []).map((record) => [record.id, record]));
+    const manifestTargets = new Map((manifest.ordinary_targets ?? []).map((record) => [record.id, record]));
+    const manifestBindings = new Map((manifest.ordinary_bindings ?? []).map((record) => [record.instance_binding_id, record]));
+    if (targetRecords.size !== (componentArtifact.ordinary_template_targets ?? []).length
+      || bindingRecords.size !== (componentArtifact.ordinary_template_bindings ?? []).length
+      || manifestTargets.size !== (manifest.ordinary_targets ?? []).length
+      || manifestBindings.size !== (manifest.ordinary_bindings ?? []).length) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const recordsFor = (ids, table, templateInstance) => {
+      if (!Array.isArray(ids)) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      const records = ids.map((id) => table.get(id));
+      if (new Set(ids).size !== ids.length || records.some((record) => record === undefined
+        || record.component_instance_id !== templateInstance)) {
+        throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      }
+      return records;
+    };
+    const registry = new Map();
+    for (const program of componentArtifact.structural_programs ?? []) {
+      for (const occurrence of program.template_occurrences ?? []) {
+        if (registry.has(occurrence.invocation)) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        const definition = components.get(occurrence.component);
+        if (definition === undefined) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        const targets = recordsFor(occurrence.ordinary_template_targets, targetRecords, occurrence.template_instance);
+        const bindings = recordsFor(occurrence.ordinary_template_bindings, bindingRecords, occurrence.template_instance);
+        const events = (occurrence.ordinary_template_events ?? []).map((declarationEventId) => {
+          const matching = (componentArtifact.ordinary_template_events ?? []).filter((record) =>
+            record.component_instance_id === occurrence.template_instance
+            && record.declaration_event_id === declarationEventId
+          );
+          if (matching.length !== 1) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+          return matching[0];
+        });
+        if (new Set(occurrence.ordinary_template_events ?? []).size !== events.length) {
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        const targetPairs = targets.map((record) => {
+          const manifestRecord = manifestTargets.get(record.id);
+          if (manifestRecord === undefined
+            || manifestRecord.component_instance_id !== occurrence.template_instance
+            || manifestRecord.template_entity_id !== record.template_entity_id
+            || manifestRecord.kind !== record.kind) {
+            throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+          }
+          return Object.freeze({ artifact: record, manifest: manifestRecord });
+        });
+        const bindingPairs = bindings.map((record) => {
+          const manifestRecord = manifestBindings.get(record.id);
+          if (manifestRecord === undefined
+            || manifestRecord.component_instance_id !== occurrence.template_instance
+            || manifestRecord.instance_target_id !== record.target_id
+            || manifestRecord.declaration_binding_id !== record.declaration_binding_id
+            || manifestRecord.kind !== record.kind
+            || manifestRecord.program_id !== record.program_id
+            || manifestRecord.expression !== record.expression
+            || manifestRecord.attribute_name !== record.attribute_name) {
+            throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+          }
+          return Object.freeze({ artifact: record, manifest: manifestRecord });
+        });
+        const eventPairs = events.map((record) => {
+          const matching = (manifest.ordinary_events ?? []).filter((manifestRecord) =>
+            manifestRecord.component_instance_id === occurrence.template_instance
+            && manifestRecord.declaration_event_id === record.declaration_event_id
+          );
+          if (matching.length !== 1) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+          const manifestRecord = matching[0];
+          if (manifestRecord.component_id !== record.component_id
+            || manifestRecord.instance_target_id !== record.target_id
+            || manifestRecord.event_type !== record.event_type
+            || manifestRecord.handler_method_id !== record.handler_method_id
+            || manifestRecord.action_batch_id !== record.action_batch_id
+            || JSON.stringify(manifestRecord.arguments ?? []) !== JSON.stringify(record.arguments ?? [])
+            || manifestRecord.program_id !== record.program_id) {
+            throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+          }
+          return Object.freeze({ artifact: record, manifest: manifestRecord });
+        });
+        const expectedStateStorage = (computedArtifact?.state ?? [])
+          .filter((state) => state.component === definition.name)
+          .map((state) => state.storage);
+        const expectedComputed = (computedArtifact?.evaluations ?? [])
+          .filter((evaluation) => evaluation.component === definition.name)
+          .map((evaluation) => evaluation.computed);
+        if (JSON.stringify(occurrence.state_slots.map((slot) => slot.storage_id)) !== JSON.stringify(expectedStateStorage)
+          || JSON.stringify(occurrence.computed_slots.map((slot) => slot.computed_id)) !== JSON.stringify(expectedComputed)) {
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        registry.set(occurrence.invocation, Object.freeze({
+          structural_region: program.region,
+          occurrence,
+          definition,
+          targets: Object.freeze(targetPairs),
+          bindings: Object.freeze(bindingPairs),
+          events: Object.freeze(eventPairs)
+        }));
+      }
+    }
+    return registry;
+  }
+
+  function structuralSlotProjectionRegistry(manifest, componentArtifact) {
+    const targets = new Map((componentArtifact?.ordinary_template_targets ?? []).map((record) => [record.id, record]));
+    const bindings = new Map((componentArtifact?.ordinary_template_bindings ?? []).map((record) => [record.id, record]));
+    const manifestTargets = new Map((manifest?.ordinary_targets ?? []).map((record) => [record.id, record]));
+    const manifestBindings = new Map((manifest?.ordinary_bindings ?? []).map((record) => [record.instance_binding_id, record]));
+    const slotBindings = new Map((componentArtifact?.slot_binding_programs ?? []).map((record) => [record.binding, record]));
+    if (targets.size !== (componentArtifact?.ordinary_template_targets ?? []).length
+      || bindings.size !== (componentArtifact?.ordinary_template_bindings ?? []).length
+      || manifestTargets.size !== (manifest?.ordinary_targets ?? []).length
+      || manifestBindings.size !== (manifest?.ordinary_bindings ?? []).length
+      || slotBindings.size !== (componentArtifact?.slot_binding_programs ?? []).length) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const registry = new Map();
+    for (const program of componentArtifact?.structural_programs ?? []) {
+      for (const fragment of [...(program.conditional_host_fragments ?? []), ...(program.keyed_host_fragments ?? [])]) {
+        const programs = fragment?.slot_projection_programs;
+        if (!Array.isArray(programs) || !Array.isArray(fragment.slot_projection_bindings)
+          || programs.length !== fragment.slot_projection_bindings.length) {
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        for (const projection of programs) {
+          const slotBinding = slotBindings.get(projection?.binding);
+          if (slotBinding === undefined || slotBinding.binding !== projection.binding
+            || slotBinding.callee_instance !== fragment.host_instance
+            || slotBinding.caller_instance !== projection.caller_instance
+            || slotBinding.content_owner_instance !== projection.content_owner_instance
+            || !fragment.slot_projection_bindings.includes(projection.binding)
+            || !Array.isArray(projection.target_ids) || !Array.isArray(projection.binding_ids)
+            || !Array.isArray(projection.event_ids) || !Array.isArray(projection.nested_invocations)
+            || new Set(projection.target_ids).size !== projection.target_ids.length
+            || new Set(projection.binding_ids).size !== projection.binding_ids.length
+            || new Set(projection.event_ids).size !== projection.event_ids.length
+            || new Set(projection.nested_invocations).size !== projection.nested_invocations.length
+            // This amendment activates ordinary caller-owned projection
+            // members. Projected component invocation cloning needs its own
+            // State/Effect identity contract and therefore remains fail-closed.
+            || projection.nested_invocations.length !== 0) {
+            throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+          }
+          const targetPairs = projection.target_ids.map((id) => {
+            const artifact = targets.get(id); const manifestRecord = manifestTargets.get(id);
+            if (artifact === undefined || manifestRecord === undefined
+              || artifact.component_instance_id !== projection.caller_instance
+              || manifestRecord.component_instance_id !== projection.caller_instance) {
+              throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+            }
+            return Object.freeze({ artifact, manifest: manifestRecord });
+          });
+          const targetIds = new Set(projection.target_ids);
+          const bindingPairs = projection.binding_ids.map((id) => {
+            const artifact = bindings.get(id); const manifestRecord = manifestBindings.get(id);
+            if (artifact === undefined || manifestRecord === undefined
+              || artifact.component_instance_id !== projection.caller_instance
+              || !targetIds.has(artifact.target_id) || manifestRecord.instance_target_id !== artifact.target_id) {
+              throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+            }
+            return Object.freeze({ artifact, manifest: manifestRecord });
+          });
+          const eventPairs = projection.event_ids.map((id) => {
+            const matches = (componentArtifact?.ordinary_template_events ?? []).filter((event) =>
+              event.component_instance_id === projection.caller_instance && event.declaration_event_id === id
+            );
+            const manifestMatches = (manifest?.ordinary_events ?? []).filter((event) =>
+              event.component_instance_id === projection.caller_instance && event.declaration_event_id === id
+            );
+            if (matches.length !== 1 || manifestMatches.length !== 1 || !targetIds.has(matches[0].target_id)
+              || manifestMatches[0].instance_target_id !== matches[0].target_id) {
+              throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+            }
+            return Object.freeze({ artifact: matches[0], manifest: manifestMatches[0] });
+          });
+          const record = Object.freeze({
+            binding: projection.binding,
+            caller_instance: projection.caller_instance,
+            targets: Object.freeze(targetPairs), bindings: Object.freeze(bindingPairs), events: Object.freeze(eventPairs),
+            nested_invocations: Object.freeze([...projection.nested_invocations])
+          });
+          // A binding may be listed by more than one host fragment while only
+          // one exact outlet is emitted by a given conditional branch or keyed
+          // item template. Key the preflight result by the compiler program
+          // object, preserving fragment-local membership without merging it.
+          registry.set(projection, record);
+        }
+      }
+    }
+    return registry;
+  }
+
+  function structuralSlotProjectionTargetIds(componentArtifact) {
+    const ids = new Set();
+    for (const program of componentArtifact?.structural_programs ?? []) {
+      for (const fragment of [...(program.conditional_host_fragments ?? []), ...(program.keyed_host_fragments ?? [])]) {
+        for (const projection of fragment?.slot_projection_programs ?? []) {
+          for (const id of projection?.target_ids ?? []) {
+            if (typeof id !== "string" || id.length === 0) {
+              throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+            }
+            ids.add(id);
+          }
+        }
+      }
+    }
+    return ids;
+  }
+
+  function structuralProjectionOwnerScope(store, component, callerInstance) {
+    const parent = store.componentInstances?.get(component?.instance_id)?.parent;
+    if (typeof parent !== "string" || parent.length === 0 || typeof callerInstance !== "string") {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    if (callerInstance === parent) return parent;
+    if (parent.startsWith(STRUCTURAL_OCCURRENCE_IDENTITY_PREFIX)
+      && decodeStructuralOccurrenceIdentity(parent).template_instance === callerInstance) return parent;
+    throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+  }
+
+  function structuralHostProjectionRecords(store, fragment, component, compilerHtml, itemKey = null) {
+    if (typeof compilerHtml !== "string") throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    const records = [];
+    const ids = new Set();
+    for (const projection of fragment?.slot_projection_programs ?? []) {
+      const source = store.structuralSlotProjectionPrograms?.get(projection);
+      if (source === undefined) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      const emitted = [...source.targets, ...source.bindings].some((pair) => compilerHtml.includes(pair.artifact.id));
+      if (!emitted) continue;
+      const owner = structuralProjectionOwnerScope(store, component, source.caller_instance);
+      const rewrite = (value) => {
+        const base = owner === source.caller_instance ? value
+          : rewriteStructuralTemplateIdentity(source.caller_instance, owner, value);
+        return itemKey === null ? base : `${base}:${itemKey}`;
+      };
+      const targets = source.targets.map((pair) => Object.freeze({
+        artifact: Object.freeze({ ...pair.artifact, id: rewrite(pair.artifact.id), component_instance_id: owner }),
+        manifest: Object.freeze({ ...pair.manifest, id: rewrite(pair.manifest.id), component_instance_id: owner })
+      }));
+      const targetIds = new Set(targets.map((pair) => pair.manifest.id));
+      const bindings = source.bindings.map((pair) => Object.freeze({
+        artifact: Object.freeze({ ...pair.artifact, id: rewrite(pair.artifact.id), target_id: rewrite(pair.artifact.target_id), component_instance_id: owner }),
+        manifest: Object.freeze({ ...pair.manifest, instance_binding_id: rewrite(pair.manifest.instance_binding_id), instance_target_id: rewrite(pair.manifest.instance_target_id), component_instance_id: owner })
+      }));
+      const events = source.events.map((pair) => Object.freeze({
+        artifact: Object.freeze({ ...pair.artifact, target_id: rewrite(pair.artifact.target_id), component_instance_id: owner }),
+        manifest: Object.freeze({ ...pair.manifest, instance_target_id: rewrite(pair.manifest.instance_target_id), component_instance_id: owner })
+      }));
+      for (const target of targets) if (ids.has(target.manifest.id) || !ids.add(target.manifest.id)) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      if (bindings.some((pair) => !targetIds.has(pair.manifest.instance_target_id))) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+      records.push(...targets, ...bindings, ...events);
+    }
+    const targets = records.filter((pair) => pair.artifact?.template_entity_id !== undefined);
+    const bindings = records.filter((pair) => pair.artifact?.declaration_binding_id !== undefined);
+    const events = records.filter((pair) => pair.artifact?.declaration_event_id !== undefined);
+    return Object.freeze({ targets, bindings, events });
+  }
+
   function escapeHtmlText(value) {
     return String(value)
       .replaceAll("&", "&amp;")
@@ -1333,6 +2628,19 @@ const RUNTIME_STUB: &str = r#"(() => {
       .replaceAll("__ez_list_key__", escapeHtmlAttribute(key))
       .replaceAll("__ez_list_item__", escapeHtmlText(formatBindingValue(item)))
       .replaceAll("__ez_list_index__", String(index));
+  }
+
+  function qualifyStructuralSlotProjectionItemHtml(fragment, html, key) {
+    let qualified = html;
+    for (const projection of fragment?.slot_projection_programs ?? []) {
+      for (const id of [...(projection.target_ids ?? []), ...(projection.binding_ids ?? [])]) {
+        if (typeof id !== "string" || id.length === 0) {
+          throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+        }
+        qualified = qualified.replaceAll(id, `${id}:${escapeHtmlAttribute(key)}`);
+      }
+    }
+    return qualified;
   }
 
   function populateListItemMemberBindings(node, item, fragment) {
@@ -1468,7 +2776,100 @@ const RUNTIME_STUB: &str = r#"(() => {
     return template.content.firstElementChild;
   }
 
-  function initialListInstances(store, node, items) {
+  function renderStructuralKeyedListItem(store, component, node, fragmentRecord, item, index, key) {
+    if (!structuralHostScopeMatches(fragmentRecord, component)
+      || typeof fragmentRecord.item_template_html !== "string") {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const programs = [...(store.componentRegions?.values() ?? [])].filter((program) =>
+      program.host_component === component.manifest?.component_id && program.host_node === node?.id
+    );
+    if (programs.length !== 1) throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    const template = document.createElement("template");
+    template.innerHTML = qualifyStructuralSlotProjectionItemHtml(
+      fragmentRecord,
+      renderListItemHtml({ item_template_html: fragmentRecord.item_template_html }, item, index, key),
+      key
+    );
+    populateListItemMemberBindings(node, item, template.content);
+    const anchors = compilerFragmentInvocationAnchors(template.content, programs[0], fragmentRecord.item_invocations);
+    const element = template.content.firstElementChild;
+    if (element === null || template.content.childElementCount !== 1
+      || [...template.content.childNodes].some((child) => child !== element)) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    return Object.freeze({ element, anchors });
+  }
+
+  function disposeStructuralKeyedListItem(store, instance) {
+    for (const occurrence of [...(instance.structural_occurrences ?? [])].reverse()) occurrence.dispose();
+    instance.structural_projection_registration?.rollback();
+    unregisterListItemEvents(store, instance);
+    instance.element.remove();
+  }
+
+  function reconcileStructuralKeyedList(store, component, node, fragmentRecord, startMarker, endMarker, instances, value) {
+    if (startMarker.parentNode === null || endMarker.parentNode === null || startMarker.parentNode !== endMarker.parentNode) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+    const parent = startMarker.parentNode;
+    const nextInstances = new Map();
+    const ordered = [];
+    for (const [index, item] of listItems(value).entries()) {
+      const key = listItemKey(node, item, index);
+      if (nextInstances.has(key)) {
+        reportDiagnostic(store.diagnostics, "PSR_DUPLICATE_LIST_KEY", "List update produced a duplicate key", { id: node.id, key });
+        continue;
+      }
+      let instance = instances.get(key);
+      if (instance === undefined || !Array.isArray(instance.structural_occurrences)) {
+        const prior = instance;
+        const rendered = renderStructuralKeyedListItem(store, component, node, fragmentRecord, item, index, key);
+        const created = [];
+        let projectionRegistration = null;
+        try {
+          parent.insertBefore(rendered.element, endMarker);
+          const projection = structuralHostProjectionRecords(store, fragmentRecord, component, fragmentRecord.item_template_html, key);
+          projectionRegistration = registerStructuralOccurrenceRecords(store, {
+            ...projection,
+            occurrence_identity: component.instance_id
+          });
+          for (const anchor of rendered.anchors) {
+            created.push(materializeStructuralOccurrence(store, anchor.marker, component.instance_id, `keyed:${key}`));
+          }
+          instance = { element: rendered.element, item, index, key, structural_occurrences: Object.freeze(created), structural_projection_registration: projectionRegistration };
+          registerListItemEvents(store, component, instance);
+          if (prior !== undefined) {
+            unregisterListItemEvents(store, prior);
+            prior.element.remove();
+          }
+        } catch (error) {
+          for (const occurrence of [...created].reverse()) occurrence.dispose();
+          projectionRegistration?.rollback();
+          rendered.element.remove();
+          throw error;
+        }
+      }
+      instance.item = item;
+      instance.index = index;
+      updateListItemTextBindings(node, instance);
+      updateListItemAttributes(node, instance);
+      nextInstances.set(key, instance);
+      ordered.push(instance);
+    }
+    for (const [key, instance] of instances) {
+      if (!nextInstances.has(key)) disposeStructuralKeyedListItem(store, instance);
+    }
+    let cursor = startMarker.nextSibling;
+    for (const instance of ordered) {
+      if (instance.element !== cursor) parent.insertBefore(instance.element, cursor);
+      cursor = instance.element.nextSibling;
+    }
+    store.elementsByNode = collectElementAnchors();
+    return nextInstances;
+  }
+
+  function initialListInstances(store, component, node, items) {
     const instances = new Map();
 
     for (const [index, item] of items.entries()) {
@@ -1476,7 +2877,12 @@ const RUNTIME_STUB: &str = r#"(() => {
       const element = store.elementsByNode.get(`${node.item_root}:${key}`);
 
       if (element !== undefined) {
-        instances.set(key, { element, item, index, key });
+        const restored = store.restoredStructuralOccurrencesByParentLocal?.get(
+          `${component?.instance_id ?? ""}\u001fkeyed:${key}`
+        );
+        const instance = { element, item, index, key };
+        if (restored !== undefined) instance.structural_occurrences = Object.freeze(restored);
+        instances.set(key, instance);
       }
     }
 
@@ -1600,7 +3006,9 @@ const RUNTIME_STUB: &str = r#"(() => {
       bindingsByField: new Map(),
       bindingsByStateSlot: new Map(),
       bindingsByInstanceComputed: new Map(),
+      ordinaryEventListenerTypes: new Set(),
       actionsByMethod: new Map(),
+      legacyActionsByComponentMethod: new Map(),
       opaqueTerminalsByMethod: new Map((opaqueArtifact?.activations ?? []).map((activation) => [activation.method, activation])),
       opaqueActivations: [],
       eventsByType: new Map(),
@@ -1629,9 +3037,17 @@ const RUNTIME_STUB: &str = r#"(() => {
       computedUpdateRuns: 0,
       initialEffectRuns: [],
       completedActionEffectRuns: [],
+      structuralEffectRuns: [],
+      effectCleanupRuns: [],
       effectSubscriptions: new Map(),
+      effectCleanups: new Map(),
+      activeEffectInstances: new Map((effectArtifact?.instances ?? []).map((record) => [
+        record.effect_instance,
+        Object.freeze({ ...record, structural: false })
+      ])),
       resources: new Map(),
       resourceActivationsByInstanceDeclaration: new Map(),
+      resourceSlots: new Map(),
       activeActionBatch: null
     };
   }
@@ -1698,6 +3114,14 @@ const RUNTIME_STUB: &str = r#"(() => {
     const bindings = store.bindingsByInstanceComputed.get(key) ?? [];
     bindings.push(updateBinding);
     store.bindingsByInstanceComputed.set(key, bindings);
+    return () => {
+      const active = store.bindingsByInstanceComputed.get(key);
+      if (active === undefined) return;
+      const index = active.indexOf(updateBinding);
+      if (index < 0) return;
+      active.splice(index, 1);
+      if (active.length === 0) store.bindingsByInstanceComputed.delete(key);
+    };
   }
 
   function storeComputedValue(store, evaluation, value) {
@@ -1929,7 +3353,16 @@ const RUNTIME_STUB: &str = r#"(() => {
       batches.set(trigger.effect_batch_index, effects);
     }
 
-    return [...batches.entries()].sort(([left], [right]) => left - right);
+    return [...batches.entries()]
+      .sort(([left], [right]) => left - right)
+      .map(([batchIndex, effects]) => [
+        batchIndex,
+        effects.sort((left, right) =>
+          (left.declaration_order ?? Number.MAX_SAFE_INTEGER)
+            - (right.declaration_order ?? Number.MAX_SAFE_INTEGER)
+          || left.effect.localeCompare(right.effect)
+        )
+      ]);
   }
 
   function dispatchEffectCapability(store, effect, instruction, values, evidence) {
@@ -1983,10 +3416,39 @@ const RUNTIME_STUB: &str = r#"(() => {
     });
   }
 
-  function executeEffectProgram(store, effect, evidence) {
+  function effectInstanceTargets(store, effect, actionInstanceId = null) {
+    const records = [...store.activeEffectInstances.values()]
+      .filter((record) => record.effect === effect.effect)
+      .filter((record) => actionInstanceId === null || record.component_instance === actionInstanceId)
+      .sort((left, right) => left.depth - right.depth
+        || left.declaration_order - right.declaration_order
+        || left.effect_instance.localeCompare(right.effect_instance));
+    const hasOwnership = (store.effectArtifact?.instances ?? []).some(
+      (record) => record.effect === effect.effect
+    ) || (store.effectArtifact?.structural_templates ?? []).some(
+      (record) => record.effect === effect.effect
+    );
+    return records.length === 0 && !hasOwnership ? [null] : records;
+  }
+
+  function initialEffectInstanceTargets(store, effect) {
+    const records = [...store.activeEffectInstances.values()]
+      .filter((record) => record.structural !== true && record.effect === effect.effect)
+      .sort((left, right) => left.depth - right.depth
+        || left.declaration_order - right.declaration_order
+        || left.effect_instance.localeCompare(right.effect_instance));
+    const hasOwnership = (store.effectArtifact?.instances ?? []).some(
+      (record) => record.effect === effect.effect
+    ) || (store.effectArtifact?.structural_templates ?? []).some(
+      (record) => record.effect === effect.effect
+    );
+    return records.length === 0 && !hasOwnership ? [null] : records;
+  }
+
+  function executeEffectProgram(store, effect, evidence, program = effect.program) {
     const values = new Map();
 
-    for (const instruction of effect.program?.instructions ?? []) {
+    for (const instruction of program?.instructions ?? []) {
       if (executePureProgramInstruction(store, values, instruction, effect.effect)) {
         continue;
       }
@@ -2005,16 +3467,97 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
+  function runEffect(store, effect, evidence, instance = null) {
+    const key = instance?.effect_instance ?? effect.effect;
+    const priorExecutionContext = store.activeExecutionContext;
+    if (instance !== null) store.activeExecutionContext = { component_instance_id: instance.component_instance };
+    try {
+      const cleanup = store.effectCleanups.get(key);
+      if (cleanup !== undefined) {
+        const cleanupEvidence = { capability_operations: [] };
+        executeEffectProgram(store, effect, cleanupEvidence, cleanup);
+        evidence.cleanup_capability_operations = cleanupEvidence.capability_operations;
+        store.effectCleanups.delete(key);
+      }
+      executeEffectProgram(store, effect, evidence);
+      if (effect.cleanup_program !== null && effect.cleanup_program !== undefined) {
+        store.effectCleanups.set(key, effect.cleanup_program);
+      }
+    } finally {
+      store.activeExecutionContext = priorExecutionContext;
+    }
+  }
+
+  function disposeEffectInstances(store, selected = null) {
+    const effects = new Map((store.effectArtifact?.effects ?? []).map((effect) => [effect.effect, effect]));
+    const instances = [...(selected ?? store.activeEffectInstances.values())]
+      .sort((left, right) => right.depth - left.depth
+        || right.declaration_order - left.declaration_order
+        || right.effect_instance.localeCompare(left.effect_instance));
+    for (const instance of instances) {
+      const cleanup = store.effectCleanups.get(instance.effect_instance);
+      const effect = effects.get(instance.effect);
+      if (cleanup === undefined || effect === undefined) {
+        store.effectCleanups.delete(instance.effect_instance);
+        store.activeEffectInstances.delete(instance.effect_instance);
+        continue;
+      }
+      const priorExecutionContext = store.activeExecutionContext;
+      store.activeExecutionContext = { component_instance_id: instance.component_instance };
+      try {
+        const evidence = {
+          effect: effect.effect,
+          effect_instance: instance.effect_instance,
+          capability_operations: []
+        };
+        executeEffectProgram(store, effect, evidence, cleanup);
+        store.effectCleanupRuns.push(evidence);
+        store.effectCleanups.delete(instance.effect_instance);
+      } finally {
+        store.activeExecutionContext = priorExecutionContext;
+      }
+      store.activeEffectInstances.delete(instance.effect_instance);
+    }
+  }
+
+  function installEffectDisposal(store) {
+    window.addEventListener("pagehide", () => disposeEffectInstances(store), { once: true });
+  }
+
   function executeInitialEffects(store) {
     for (const [effectBatchIndex, effects] of initialEffectBatches(store.effectArtifact)) {
       for (const effect of effects) {
-        const evidence = {
-          effect: effect.effect,
-          effect_batch_index: effectBatchIndex,
-          capability_operations: []
-        };
-        executeEffectProgram(store, effect, evidence);
-        store.initialEffectRuns.push(evidence);
+        for (const instance of initialEffectInstanceTargets(store, effect)) {
+          const evidence = {
+            effect: effect.effect,
+            effect_instance: instance?.effect_instance,
+            effect_batch_index: effectBatchIndex,
+            capability_operations: []
+          };
+          runEffect(store, effect, evidence, instance);
+          store.initialEffectRuns.push(evidence);
+        }
+      }
+    }
+  }
+
+  // Resume is an explicit V2 lifecycle phase. It intentionally excludes the
+  // legacy decorator effects whose restore boundary is frozen by the existing
+  // resumability contract.
+  function executeResumeEffects(store) {
+    for (const [effectBatchIndex, effects] of initialEffectBatches(store.effectArtifact)) {
+      for (const effect of effects) {
+        if (effect.run_on_resume !== true) continue;
+        for (const instance of initialEffectInstanceTargets(store, effect)) {
+          const evidence = {
+            effect: effect.effect,
+            effect_instance: instance?.effect_instance,
+            effect_batch_index: effectBatchIndex,
+            capability_operations: []
+          };
+          runEffect(store, effect, evidence, instance);
+          store.initialEffectRuns.push(evidence);
+        }
       }
     }
   }
@@ -2036,7 +3579,16 @@ const RUNTIME_STUB: &str = r#"(() => {
       batches.set(trigger.effect_batch_index, effects);
     }
 
-    return [...batches.entries()].sort(([left], [right]) => left - right);
+    return [...batches.entries()]
+      .sort(([left], [right]) => left - right)
+      .map(([batchIndex, effects]) => [
+        batchIndex,
+        effects.sort((left, right) =>
+          (left.declaration_order ?? Number.MAX_SAFE_INTEGER)
+            - (right.declaration_order ?? Number.MAX_SAFE_INTEGER)
+          || left.effect.localeCompare(right.effect)
+        )
+      ]);
   }
 
   function executeCompletedActionEffects(store, actionBatchId) {
@@ -2045,14 +3597,18 @@ const RUNTIME_STUB: &str = r#"(() => {
       actionBatchId
     )) {
       for (const effect of effects) {
-        const evidence = {
-          action_batch_id: actionBatchId,
-          effect: effect.effect,
-          effect_batch_index: effectBatchIndex,
-          capability_operations: []
-        };
-        executeEffectProgram(store, effect, evidence);
-        store.completedActionEffectRuns.push(evidence);
+        const actionInstanceId = store.activeExecutionContext?.component_instance_id ?? null;
+        for (const instance of effectInstanceTargets(store, effect, actionInstanceId)) {
+          const evidence = {
+            action_batch_id: actionBatchId,
+            effect: effect.effect,
+            effect_instance: instance?.effect_instance,
+            effect_batch_index: effectBatchIndex,
+            capability_operations: []
+          };
+          runEffect(store, effect, evidence, instance);
+          store.completedActionEffectRuns.push(evidence);
+        }
       }
     }
   }
@@ -2288,19 +3844,40 @@ const RUNTIME_STUB: &str = r#"(() => {
       const bindings = store.bindingsByStateSlot.get(slot.slot_id) ?? [];
       bindings.push(updateBinding);
       store.bindingsByStateSlot.set(slot.slot_id, bindings);
-      return;
+      return () => {
+        const active = store.bindingsByStateSlot.get(slot.slot_id);
+        if (active === undefined) return;
+        const index = active.indexOf(updateBinding);
+        if (index < 0) return;
+        active.splice(index, 1);
+        if (active.length === 0) store.bindingsByStateSlot.delete(slot.slot_id);
+      };
     }
     const key = componentFieldKey(component.name, field);
     const bindings = store.bindingsByField.get(key) ?? [];
     bindings.push(updateBinding);
     store.bindingsByField.set(key, bindings);
+    return () => {
+      const active = store.bindingsByField.get(key);
+      if (active === undefined) return;
+      const index = active.indexOf(updateBinding);
+      if (index < 0) return;
+      active.splice(index, 1);
+      if (active.length === 0) store.bindingsByField.delete(key);
+    };
   }
 
   function registerActions(store, component, manifestComponent) {
-    const actionsByMethod = buildActionsByMethod(manifestComponent);
+    const { actionsByMethod, legacyActionsByMethod } = buildActionsByMethod(manifestComponent);
 
     for (const [methodId, actionRecord] of actionsByMethod) {
       store.actionsByMethod.set(methodId, actionRecord);
+    }
+    for (const [method, actions] of legacyActionsByMethod) {
+      store.legacyActionsByComponentMethod.set(
+        legacyComponentMethodKey(component.name, method),
+        actions
+      );
     }
   }
 
@@ -2312,6 +3889,44 @@ const RUNTIME_STUB: &str = r#"(() => {
         "Unsupported event type in template manifest",
         event
       );
+      return;
+    }
+
+    if (legacyEventBinding(event)) {
+      const method = legacyHandlerMethod(event.handler);
+      const actions = store.legacyActionsByComponentMethod.get(
+        legacyComponentMethodKey(component.name, method)
+      );
+
+      if (actions === undefined) {
+        reportDiagnostic(
+          store.diagnostics,
+          "PSR_UNRESOLVED_ACTION",
+          "Legacy event handler did not resolve to a compiler action",
+          event
+        );
+        return;
+      }
+
+      const eventsByNode = store.eventsByType.get(event.event) ?? new Map();
+      if (eventsByNode.has(event.node)) {
+        reportDiagnostic(
+          store.diagnostics,
+          "PSR_UNRESOLVED_EVENT",
+          "Duplicate event registration for template node",
+          event
+        );
+        return;
+      }
+
+      eventsByNode.set(event.node, {
+        component,
+        method_id: null,
+        action_batch_id: null,
+        actions,
+        arguments: Array.isArray(event.arguments) ? event.arguments : []
+      });
+      store.eventsByType.set(event.event, eventsByNode);
       return;
     }
 
@@ -2392,6 +4007,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
         let instances = initialListInstances(
           store,
+          component,
           node,
           listItems(component.state[field])
         );
@@ -2641,6 +4257,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
+  function registerLegacyComponentEvents(store, component) {
+    for (const event of component.manifest.template?.events ?? []) {
+      if (legacyEventBinding(event)) registerEvent(store, component, event);
+    }
+  }
+
   function delegatedEventRecord(store, eventType, target) {
     const eventsByNode = store.eventsByType.get(eventType);
 
@@ -2787,14 +4409,23 @@ const RUNTIME_STUB: &str = r#"(() => {
       );
       if (nodes.length === 1) {
         const node = nodes[0];
-        update = (value) => {
-          replaceConditionalBranch(
-            store,
-            target.start,
-            target.end,
-            value === true ? node.when_true_html : node.when_false_html
-          );
-        };
+        const fragment = structuralConditionalHostFragment(store, component, node);
+        if (fragment === null) {
+          update = (value) => {
+            replaceConditionalBranch(
+              store,
+              target.start,
+              target.end,
+              value === true ? node.when_true_html : node.when_false_html
+            );
+          };
+        } else {
+          update = (value) => {
+            const branch = value === true ? "true" : "false";
+            if (target.structural_branch === branch) return;
+            replaceStructuralConditionalBranch(store, target, component, node, fragment, value);
+          };
+        }
       }
     } else if (binding.kind === "list" && target?.kind === "list") {
       if (slot === null) throw new PresolveBootError("PSR_INVALID_ORDINARY_BINDING");
@@ -2803,41 +4434,50 @@ const RUNTIME_STUB: &str = r#"(() => {
       );
       if (nodes.length === 1) {
         const node = nodes[0];
+        const fragment = structuralKeyedHostFragment(store, component, node);
         let instances = initialListInstances(
           store,
+          component,
           node,
           listItems(store.storageValues.get(slot.slot_id))
         );
-        for (const instance of instances.values()) {
-          registerListItemEvents(store, component, instance);
-        }
+        if (fragment === null) for (const instance of instances.values()) registerListItemEvents(store, component, instance);
         update = (value) => {
-          instances = reconcileKeyedList(
-            store,
-            component,
-            node,
-            target.start,
-            target.end,
-            instances,
-            value
-          );
+          instances = fragment === null
+            ? reconcileKeyedList(store, component, node, target.start, target.end, instances, value)
+            : reconcileStructuralKeyedList(store, component, node, fragment, target.start, target.end, instances, value);
         };
       }
     }
     if (update === null) throw new PresolveBootError("PSR_INVALID_ORDINARY_BINDING");
     if (slot !== null) {
       update(store.storageValues.get(slot.slot_id));
-      registerBinding(store, component, field, update, storageId);
+      return registerBinding(store, component, field, update, storageId);
     } else {
       update(computedValueForInstance(store, binding.component_instance_id, computedId));
-      registerComputedBinding(store, binding.component_instance_id, computedId, update);
+      return registerComputedBinding(store, binding.component_instance_id, computedId, update);
     }
   }
 
   function initializeOrdinaryInstanceRuntime(store, manifest, componentArtifact) {
     if (manifest.schema_version !== SUPPORTED_SCHEMA_VERSION) return;
+    const activeInstances = new Set((componentArtifact.instances ?? []).map((instance) => instance.instance));
+    // Caller-owned Slot records selected by a structural host are absent until
+    // that compiler-issued fragment materializes. Registering them during
+    // ordinary boot would require anchors that the selected branch/list item
+    // has not attached yet; structuralHostProjectionRecords owns that staging.
+    const structuralSlotTargets = structuralSlotProjectionTargetIds(componentArtifact);
+    const targets = (manifest.ordinary_targets ?? []).filter((target) =>
+      activeInstances.has(target.component_instance_id) && !structuralSlotTargets.has(target.id)
+    );
+    const bindings = (manifest.ordinary_bindings ?? []).filter((binding) =>
+      activeInstances.has(binding.component_instance_id) && !structuralSlotTargets.has(binding.instance_target_id)
+    );
+    const events = (manifest.ordinary_events ?? []).filter((event) =>
+      activeInstances.has(event.component_instance_id) && !structuralSlotTargets.has(event.instance_target_id)
+    );
     const anchors = collectOrdinaryTargetAnchors();
-    for (const binding of manifest.ordinary_bindings ?? []) {
+    for (const binding of bindings) {
       if (binding.kind !== "text" || anchors.targets.has(binding.instance_target_id)) continue;
       const text = ordinaryTextBindingNode(binding.instance_binding_id);
       if (text !== null) anchors.targets.set(binding.instance_target_id, text);
@@ -2845,18 +4485,24 @@ const RUNTIME_STUB: &str = r#"(() => {
     const artifactTargets = new Map((componentArtifact.ordinary_template_targets ?? []).map((target) => [target.id, target]));
     const artifactBindings = new Map((componentArtifact.ordinary_template_bindings ?? []).map((binding) => [binding.id, binding]));
     const artifactEvents = new Map((componentArtifact.ordinary_template_events ?? []).map((event) => [ordinaryEventKey(event.target_id, event.event_type), event]));
+    const preserveStructuralRegistry = store.resumeStructuralRegistryPrepared === true;
     store.templateTargetsById = anchors.targets;
-    store.ordinaryBindingsById = new Map();
-    store.ordinaryEventsByTargetAndType = new Map();
-    for (const target of manifest.ordinary_targets ?? []) {
+    if (!preserveStructuralRegistry) {
+      store.ordinaryBindingsById = new Map();
+      store.ordinaryEventsByTargetAndType = new Map();
+    }
+    for (const target of targets) {
       const artifactTarget = artifactTargets.get(target.id);
       if (artifactTarget === undefined || artifactTarget.component_instance_id !== target.component_instance_id || anchors.duplicates.has(target.id) || !anchors.targets.has(target.id)) {
         throw new PresolveBootError("PSR_INVALID_ORDINARY_TARGET");
       }
     }
-    for (const binding of manifest.ordinary_bindings ?? []) {
+    for (const binding of bindings) {
       const artifactBinding = artifactBindings.get(binding.instance_binding_id);
       if (artifactBinding === undefined || artifactBinding.component_instance_id !== binding.component_instance_id || artifactBinding.target_id !== binding.instance_target_id) {
+        throw new PresolveBootError("PSR_INVALID_ORDINARY_BINDING");
+      }
+      if (store.ordinaryBindingsById.has(binding.instance_binding_id)) {
         throw new PresolveBootError("PSR_INVALID_ORDINARY_BINDING");
       }
       store.ordinaryBindingsById.set(binding.instance_binding_id, {
@@ -2865,7 +4511,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       });
       registerOrdinaryBinding(store, binding, artifactBinding);
     }
-    for (const event of manifest.ordinary_events ?? []) {
+    for (const event of events) {
       const key = ordinaryEventKey(event.instance_target_id, event.event_type);
       const artifactEvent = artifactEvents.get(key);
       if (
@@ -2888,7 +4534,9 @@ const RUNTIME_STUB: &str = r#"(() => {
     );
     const bindings = (manifest.ordinary_bindings ?? []).filter((binding) =>
       stateBindingIds.has(binding.instance_binding_id)
-      && (binding.kind === "text" || binding.kind === "attribute" || binding.kind === "property")
+      && (binding.kind === "text" || binding.kind === "attribute" || binding.kind === "property"
+        || (store.structuralOccurrenceResumeActive === true
+          && (binding.kind === "conditional" || binding.kind === "list")))
     );
     const targetIds = new Set(bindings.map((binding) => binding.instance_target_id));
     for (const event of manifest.ordinary_events ?? []) targetIds.add(event.instance_target_id);
@@ -2909,11 +4557,12 @@ const RUNTIME_STUB: &str = r#"(() => {
         effect_instance_id: effect.effect,
         scheduler_order: effect.initial_trigger?.effect_batch_index ?? null,
         active_after_restore: true,
-        run_on_restore: false
+        run_on_restore: effect.run_on_resume === true
       };
       store.effectSubscriptions.set(effect.effect, subscription);
       registry.effect_subscriptions.set(effect.effect, subscription);
     }
+    executeResumeEffects(store);
   }
 
   function ordinaryTargetFromEvent(target) {
@@ -2953,6 +4602,8 @@ const RUNTIME_STUB: &str = r#"(() => {
   function installOrdinaryInstanceEventListeners(store) {
     for (const key of store.ordinaryEventsByTargetAndType.keys()) {
       const eventType = key.slice(key.lastIndexOf("\u001f") + 1);
+      if (store.ordinaryEventListenerTypes.has(eventType)) continue;
+      store.ordinaryEventListenerTypes.add(eventType);
       document.addEventListener(eventType, (event) => dispatchOrdinaryInstanceEvent(store, event));
     }
   }
@@ -3252,6 +4903,14 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
+  function decodeResourceValue(value, codec) {
+    try {
+      return decodeResumeValue(value, codec);
+    } catch (_) {
+      throw new PresolveBootError("PSR_RESOURCE_VALUE_CODEC_FAILURE");
+    }
+  }
+
   function snapshotValuesBySlot(snapshot) {
     const values = new Map();
     for (const boundary of snapshot.boundaries) {
@@ -3281,7 +4940,15 @@ const RUNTIME_STUB: &str = r#"(() => {
     store.componentArtifact = componentArtifact;
     store.componentInstances = new Map();
     store.slotBindings = new Map();
-    store.componentRegions = new Map();
+    store.componentRegions = new Map((componentArtifact?.structural_programs ?? []).map(
+      (program) => [program.region, program]
+    ));
+    store.structuralOccurrenceTemplatesByInvocation = structuralOccurrenceTemplateRegistry(
+      templateManifest,
+      componentArtifact,
+      computedArtifact
+    );
+    store.structuralSlotProjectionPrograms = structuralSlotProjectionRegistry(templateManifest, componentArtifact);
     store.instanceContextBindings = new Map(
       (componentArtifact?.instance_context_bindings ?? [])
         .map((binding) => [binding.consumer_instance, binding])
@@ -3329,6 +4996,12 @@ const RUNTIME_STUB: &str = r#"(() => {
   function writeResumeSlot(store, registry, slotSchema, value) {
     registry.slot_values.set(slotSchema.slot_id, value);
     const existing = slotSchema.existing_storage_slot_id;
+    const resourceSlot = store.resourceSlots.get(existing);
+    if (resourceSlot !== undefined) {
+      if (slotSchema.restore_phase !== "R3") throw new ResumeBootError("RestoreInstructionFailure");
+      resourceSlot.resource.restoredValues[resourceSlot.kind] = value;
+      return;
+    }
     if (slotSchema.restore_phase === "R3") {
       store.storageValues.set(existing, value);
       return;
@@ -3603,20 +5276,21 @@ const RUNTIME_STUB: &str = r#"(() => {
       }
       const runtimeRecord = { ...record, program, selection_value: undefined };
       registry.structural_records.set(record.region, runtimeRecord);
-      store.componentRegions.set(record.region, runtimeRecord);
     }
 
-    const restoredRegions = new Set();
+    const restoredRegions = new Map();
     for (const program of registry.definitions.restorePrograms.values()) {
       for (const record of program.instructions ?? []) {
         if (record.phase !== "R9") continue;
         const instruction = record.instruction;
         if (
           instruction.kind !== "restore_structural_selection"
-          || restoredRegions.has(instruction.region_id)
+          || (restoredRegions.has(instruction.region_id)
+            && restoredRegions.get(instruction.region_id) !== instruction.slot_id)
         ) {
           throw new ResumeBootError("RestoreInstructionFailure");
         }
+        if (restoredRegions.has(instruction.region_id)) continue;
         const runtimeRecord = registry.structural_records.get(instruction.region_id);
         const schema = registry.definitions.slots.get(instruction.slot_id);
         const value = registry.slot_values.get(instruction.slot_id);
@@ -3630,13 +5304,154 @@ const RUNTIME_STUB: &str = r#"(() => {
           throw new ResumeBootError("StructuralStateMismatch");
         }
         runtimeRecord.selection_value = value;
-        restoredRegions.add(instruction.region_id);
+        restoredRegions.set(instruction.region_id, instruction.slot_id);
       }
     }
     if (restoredRegions.size !== expectedRegions.size) {
       throw new ResumeBootError("ResumeArtifactMismatch");
     }
     store.resumeAnchors = collectExactResumeAnchors(manifest);
+  }
+
+  function restoreResumeStructuralOccurrences(snapshot, registry, store, templateManifest, computedArtifact, componentArtifact) {
+    if (!(store.structuralOccurrenceTemplatesByInvocation instanceof Map)
+      || !(store.componentRegions instanceof Map)) {
+      throw new ResumeBootError("ResumeArtifactMismatch");
+    }
+    const templatesByInstance = new Map();
+    for (const template of store.structuralOccurrenceTemplatesByInvocation.values()) {
+      const templateInstance = template?.occurrence?.template_instance;
+      if (typeof templateInstance !== "string" || templatesByInstance.has(templateInstance)) {
+        throw new ResumeBootError("ResumeArtifactMismatch");
+      }
+      templatesByInstance.set(templateInstance, template);
+    }
+    const staticInstances = new Set((componentArtifact.instances ?? []).map((instance) => instance.instance));
+    const snapshotOccurrences = snapshot.structuralOccurrences ?? [];
+    store.structuralOccurrenceResumeActive = snapshotOccurrences.length > 0;
+    const snapshotIdentities = new Set(snapshotOccurrences.map((record) => record.occurrenceIdentity));
+    const domIdentities = new Set();
+    const addDomIdentity = (identity) => {
+      if (typeof identity !== "string" || !identity.startsWith(STRUCTURAL_OCCURRENCE_IDENTITY_PREFIX)
+        || domIdentities.has(identity)) return;
+      domIdentities.add(identity);
+      addDomIdentity(decodeStructuralOccurrenceIdentity(identity).parent_scope);
+    };
+    for (const target of document.querySelectorAll("[data-presolve-ti]")) {
+      const value = target.getAttribute("data-presolve-ti") ?? "";
+      const marker = "/template-target:";
+      const index = value.indexOf(marker);
+      if (index !== -1) addDomIdentity(value.slice(0, index));
+    }
+    if (domIdentities.size !== snapshotIdentities.size
+      || [...domIdentities].some((identity) => !snapshotIdentities.has(identity))) {
+      throw new ResumeBootError("StructuralOccurrenceAnchorMismatch");
+    }
+    const restored = new Map();
+    const byParentLocal = new Map();
+    store.restoredStructuralOccurrencesByParentLocal = new Map();
+    const fieldsByComponentStorage = new Map();
+    for (const state of computedArtifact?.state ?? []) {
+      fieldsByComponentStorage.set(`${state.component}\u001f${state.storage}`, state.field);
+    }
+    store.templateTargetsById = new Map();
+    store.ordinaryBindingsById = new Map();
+    store.ordinaryEventsByTargetAndType = new Map();
+    store.resumeStructuralRegistryPrepared = true;
+    for (const record of snapshotOccurrences) {
+        const decoded = decodeStructuralOccurrenceIdentity(record.occurrenceIdentity);
+        if (decoded.template_instance !== record.templateInstance
+          || decoded.parent_scope !== record.parentScope
+          || decoded.region !== record.structuralRegion
+          || decoded.local_occurrence !== record.localOccurrence) {
+          throw new ResumeBootError("StructuralOccurrenceIdentityMismatch");
+        }
+        const template = templatesByInstance.get(record.templateInstance);
+        if (template === undefined || template.structural_region !== record.structuralRegion) {
+          throw new ResumeBootError("StructuralOccurrenceIdentityMismatch");
+        }
+        const parentIsStatic = staticInstances.has(record.parentScope);
+        const parent = restored.get(record.parentScope);
+        if (!parentIsStatic && parent === undefined) {
+          throw new ResumeBootError("StructuralOccurrenceParentMismatch");
+        }
+        if (parent !== undefined && template.occurrence.parent_template_instance !== parent.template_instance) {
+          throw new ResumeBootError("StructuralOccurrenceIdentityMismatch");
+        }
+        if (parentIsStatic && template.occurrence.parent_template_instance !== record.parentScope) {
+          throw new ResumeBootError("StructuralOccurrenceIdentityMismatch");
+        }
+        const records = deriveStructuralOccurrenceRecords(template, record.occurrenceIdentity);
+        const expectedState = new Map();
+        for (const slot of records.state_slots) {
+          if (slot.serializable !== true || slot.resume_codec === undefined) {
+            throw new ResumeBootError("StructuralStateUnsupported");
+          }
+          expectedState.set(slot.slot_id, slot);
+        }
+        if (expectedState.size !== record.state.length) throw new ResumeBootError("StructuralStateMismatch");
+        const staged = stageStructuralOccurrenceRecords(store, records);
+        let registration = null;
+        let effects = null;
+        try {
+          for (const state of record.state) {
+            const slot = expectedState.get(state.slotId);
+            if (slot === undefined) throw new ResumeBootError("StructuralStateMismatch");
+            const value = decodeResumeValue(state.value, slot.resume_codec);
+            store.storageValues.set(slot.slot_id, value);
+            const field = fieldsByComponentStorage.get(`${records.definition.name}\u001f${slot.storage_id}`);
+            const component = store.components.get(record.occurrenceIdentity);
+            if (field === undefined || component === undefined) throw new ResumeBootError("StructuralStateMismatch");
+            component.state[field] = value;
+          }
+          registration = registerStructuralOccurrenceRecords(store, staged);
+          effects = activateStructuralEffectInstances(store, staged, true);
+          const transaction = Object.freeze({ ...staged, registration, effects, dispose: () => {
+            for (const child of [...(transaction.children ?? [])].reverse()) child.dispose();
+            effects?.dispose();
+            registration?.rollback();
+            staged.rollback();
+          }, children: [] });
+          restored.set(record.occurrenceIdentity, transaction);
+          registry.structural_occurrences.set(record.occurrenceIdentity, transaction);
+          const key = `${record.parentScope}\u001f${record.localOccurrence}`;
+          const siblings = byParentLocal.get(key) ?? [];
+          siblings.push(transaction);
+          byParentLocal.set(key, siblings);
+          if (parent !== undefined) parent.children.push(transaction);
+        } catch (error) {
+          effects?.dispose();
+          registration?.rollback();
+          staged.rollback();
+          throw error;
+        }
+    }
+    for (const [key, transactions] of byParentLocal) {
+      store.restoredStructuralOccurrencesByParentLocal.set(key, Object.freeze(transactions));
+    }
+    const anchors = collectOrdinaryTargetAnchors();
+    for (const target of templateManifest.ordinary_targets ?? []) {
+      const artifact = (componentArtifact.ordinary_template_targets ?? []).find((candidate) => candidate.id === target.id);
+      if (artifact === undefined || artifact.template_entity_id !== target.template_entity_id) continue;
+      const host = anchors.targets.get(target.id);
+      if (host?.kind !== "conditional") continue;
+      const program = [...store.componentRegions.values()].find((candidate) =>
+        candidate.host_template_entity === artifact.template_entity_id
+        && candidate.host_component === artifact.component_id
+      );
+      const component = store.components.get(target.component_instance_id);
+      const binding = (templateManifest.ordinary_bindings ?? []).find((candidate) =>
+        candidate.instance_target_id === target.id && candidate.kind === "conditional"
+      );
+      const field = fieldNameFromThisMember(binding?.expression);
+      if (program === undefined || component === undefined || field === null) {
+        throw new ResumeBootError("ResumeArtifactMismatch");
+      }
+      host.structural_branch = component.state[field] === true ? "true" : "false";
+      host.structural_occurrences = store.restoredStructuralOccurrencesByParentLocal.get(
+        `${target.component_instance_id}\u001fconditional:${host.structural_branch}`
+      ) ?? Object.freeze([]);
+    }
   }
 
   function restoreResumeForms(templateManifest, snapshot, registry, store, formsArtifact) {
@@ -3744,7 +5559,85 @@ const RUNTIME_STUB: &str = r#"(() => {
     };
   }
 
-  function restoreResumeRuntimeThroughForms(
+  function allocateResumeResources(store, registry, resourcesArtifact) {
+    if (resourcesArtifact === null) return;
+    const declarations = new Map((resourcesArtifact.declarations ?? []).map((declaration) => [declaration.id, declaration]));
+    if (declarations.size !== (resourcesArtifact.declarations ?? []).length) {
+      throw new ResumeBootError("ResourceArtifactMismatch");
+    }
+    const staged = [];
+    for (const activation of resourcesArtifact.activations ?? []) {
+      const declaration = declarations.get(activation.declaration);
+      if (declaration === undefined) {
+        throw new ResumeBootError("ResourceArtifactMismatch");
+      }
+      if (declaration.endpoint?.resume_policy === "reload") {
+        continue;
+      }
+      if (declaration.endpoint?.resume_policy !== "snapshot") {
+        throw new ResumeBootError("ResourceResumeUnsupported");
+      }
+      const slotIds = [activation.state_slot, activation.data_slot, activation.error_slot];
+      const schemasByExisting = new Map(
+        [...registry.definitions.slots.values()].map((schema) => [schema.existing_storage_slot_id, schema])
+      );
+      const stateSchema = schemasByExisting.get(activation.state_slot);
+      const dataSchema = schemasByExisting.get(activation.data_slot);
+      const errorSchema = schemasByExisting.get(activation.error_slot);
+      if (stateSchema === undefined || dataSchema === undefined || errorSchema === undefined
+        || stateSchema.restore_phase !== "R3" || dataSchema.restore_phase !== "R3" || errorSchema.restore_phase !== "R3"
+        || store.resources.has(activation.id)
+        || store.resourceActivationsByInstanceDeclaration.has(`${activation.component_instance}\u001f${activation.declaration}`)
+        || slotIds.some((slot) => store.resourceSlots.has(slot))) {
+        throw new ResumeBootError("ResourceArtifactMismatch");
+      }
+      staged.push({ activation, declaration, schemas: [stateSchema, dataSchema, errorSchema] });
+    }
+    for (const record of staged) {
+      const resource = {
+        activation: record.activation,
+        declaration: record.declaration,
+        controller: new AbortController(),
+        state: "restoring",
+        generation: null,
+        data: null,
+        error: null,
+        restoredValues: {}
+      };
+      store.resources.set(record.activation.id, resource);
+      store.resourceActivationsByInstanceDeclaration.set(
+        `${record.activation.component_instance}\u001f${record.activation.declaration}`,
+        record.activation.id
+      );
+      for (const [kind, schema] of [["state", record.schemas[0]], ["data", record.schemas[1]], ["error", record.schemas[2]]]) {
+        store.resourceSlots.set(schema.existing_storage_slot_id, { resource, kind });
+        resource.restoredValues[kind] = undefined;
+      }
+    }
+  }
+
+  function finalizeRestoredResources(store) {
+    for (const resource of store.resources.values()) {
+      const values = resource.restoredValues;
+      const lifecycle = values.state;
+      if (lifecycle === null || typeof lifecycle !== "object" || Array.isArray(lifecycle)
+        || !exactObjectKeys(lifecycle, ["state", "generation"])
+        || !["ready", "failed"].includes(lifecycle.state)
+        || !Number.isInteger(lifecycle.generation) || lifecycle.generation < 1
+        || values.data === undefined || values.error === undefined
+        || (lifecycle.state === "ready" && values.error !== null)
+        || (lifecycle.state === "failed" && values.data !== null)) {
+        throw new ResumeBootError("ResourceSnapshotMismatch");
+      }
+      resource.state = lifecycle.state;
+      resource.generation = lifecycle.generation;
+      resource.data = values.data;
+      resource.error = values.error;
+      delete resource.restoredValues;
+    }
+  }
+
+  async function restoreResumeRuntimeThroughForms(
     manifest,
     snapshot,
     registry,
@@ -3754,13 +5647,9 @@ const RUNTIME_STUB: &str = r#"(() => {
     effectArtifact,
     componentArtifact,
     formsArtifact,
+    resourcesArtifact,
     diagnostics
   ) {
-    if ((computedArtifact?.evaluations ?? []).some((evaluation) =>
-      (evaluation.program?.instructions ?? []).some((instruction) => instruction.kind === "load-resource")
-    )) {
-      throw new ResumeBootError("ResourceComputedReadUnsupported");
-    }
     const store = allocateResumeStateComputedStore(
       registry,
       manifest,
@@ -3771,15 +5660,27 @@ const RUNTIME_STUB: &str = r#"(() => {
       componentArtifact,
       diagnostics
     );
+    allocateResumeResources(store, registry, resourcesArtifact);
     executeResumeDecodeAndWrites(store, registry, snapshot, new Set(["R3", "R4"]));
+    finalizeRestoredResources(store);
     synchronizeRestoredComponentState(store, computedArtifact, componentArtifact);
     const recomputationRuns = executeResumeComputedRecomputation(store, registry);
     executeResumeDecodeAndWrites(store, registry, snapshot, new Set(["R6"]));
     executeResumeContextBindings(store, registry, componentArtifact);
     restoreResumeComponentsSlotsAndStructure(manifest, registry, store, componentArtifact);
+    restoreResumeStructuralOccurrences(
+      snapshot,
+      registry,
+      store,
+      templateManifest,
+      computedArtifact,
+      componentArtifact
+    );
     restoreResumeForms(templateManifest, snapshot, registry, store, formsArtifact);
     installResumeDomBindings(store, templateManifest, componentArtifact);
+    await initializeResourcesRuntime(store, resourcesArtifact, diagnostics, "reload");
     establishResumeEffects(registry, store, effectArtifact);
+    installEffectDisposal(store);
     installResumeActivationListeners(registry, store);
     const state = runtimeState({
       manifest: templateManifest,
@@ -3801,6 +5702,11 @@ const RUNTIME_STUB: &str = r#"(() => {
         aggregate_valid: instance.aggregate_valid,
         submission: instance.submission
       })),
+      resources: [...store.resources.entries()].map(([id, resource]) => ({
+        id,
+        state: resource.state,
+        generation: resource.generation
+      })),
       slot_binding_runs: [],
       component_failures: []
     });
@@ -3817,6 +5723,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     computed_update_runs = 0,
     initial_effect_runs = [],
     completed_action_effect_runs = [],
+    structural_effect_runs = [],
     context_initial_source_runs = [],
     context_slots = [],
     context_consumer_bindings = [],
@@ -3825,6 +5732,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     component_initialization_runs = [],
     component_instance_tree = [],
     forms = [],
+    resources = [],
     slot_binding_runs = [],
     component_failures = [],
     diagnostics
@@ -3841,6 +5749,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       computed_update_runs,
       initial_effect_runs,
       completed_action_effect_runs,
+      structural_effect_runs,
       context_initial_source_runs,
       context_slots,
       context_consumer_bindings,
@@ -3849,12 +5758,13 @@ const RUNTIME_STUB: &str = r#"(() => {
       component_initialization_runs,
       component_instance_tree,
       forms,
+      resources,
       slot_binding_runs,
       component_failures
     };
   }
 
-  async function initializeResourcesRuntime(store, resourcesArtifact, diagnostics) {
+  async function initializeResourcesRuntime(store, resourcesArtifact, diagnostics, resumePolicy = null) {
     if (resourcesArtifact === null) return;
     window.addEventListener("pagehide", () => {
       for (const resource of store.resources.values()) resource.controller.abort();
@@ -3864,6 +5774,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     for (const activation of resourcesArtifact.activations) {
       const declaration = declarations.get(activation.declaration);
       if (declaration === undefined) throw new PresolveBootError("PSR_INVALID_RESOURCES_ARTIFACT");
+      if (resumePolicy !== null && declaration.endpoint.resume_policy !== resumePolicy) continue;
       if (!["Client", "Shared"].includes(declaration.execution_boundary)) {
         reportDiagnostic(diagnostics, "PSR_RESOURCE_SERVER_UNAVAILABLE", "A server-only Resource cannot activate in the browser runtime", { activation, declaration }, true);
         throw new PresolveBootError("PSR_RESOURCE_SERVER_UNAVAILABLE");
@@ -3887,17 +5798,31 @@ const RUNTIME_STUB: &str = r#"(() => {
         if (record.controller.signal.aborted) {
           record.state = "cancelled";
         } else {
-          JSON.stringify(result);
-          record.state = "ready";
-          record.data = result;
+          try {
+            record.data = decodeResourceValue(result, record.declaration.data_codec);
+            record.state = "ready";
+          } catch (_) {
+            record.state = "failed";
+            record.data = null;
+            record.error = null;
+            reportDiagnostic(diagnostics, "PSR_RESOURCE_VALUE_CODEC_FAILURE", "A Resource endpoint result did not match its compiler-issued data codec", { activation: record.activation.id });
+          }
         }
       } catch (error) {
         if (record.controller.signal.aborted) {
           record.state = "cancelled";
         } else {
-          record.state = "failed";
-          record.error = error instanceof Error ? error.message : String(error);
-          reportDiagnostic(diagnostics, "PSR_RESOURCE_ENDPOINT_FAILURE", "A compiler-authorized Resource endpoint failed", { activation: record.activation.id, error: record.error });
+          const endpointError = error instanceof Error ? error.message : error;
+          try {
+            record.error = decodeResourceValue(endpointError, record.declaration.error_codec);
+            record.state = "failed";
+            reportDiagnostic(diagnostics, "PSR_RESOURCE_ENDPOINT_FAILURE", "A compiler-authorized Resource endpoint failed", { activation: record.activation.id, error: record.error });
+          } catch (_) {
+            record.state = "failed";
+            record.data = null;
+            record.error = null;
+            reportDiagnostic(diagnostics, "PSR_RESOURCE_VALUE_CODEC_FAILURE", "A Resource endpoint error did not match its compiler-issued error codec", { activation: record.activation.id });
+          }
         }
       }
       invalidateResourceComputeds(store, record.activation);
@@ -3915,6 +5840,27 @@ const RUNTIME_STUB: &str = r#"(() => {
     store.slotBindings = new Map((componentArtifact?.slot_binding_programs ?? []).map((binding) => [binding.binding, binding]));
     store.instanceContextBindings = new Map((componentArtifact?.instance_context_bindings ?? []).map((binding) => [binding.consumer_instance, binding]));
     store.componentRegions = new Map((componentArtifact?.structural_programs ?? []).map((program) => [program.region, program]));
+    // Inactive compiler-issued occurrence templates. Dynamic materialization
+    // must consume this table; it must not rediscover component structure from
+    // DOM nodes or selectors.
+    store.structuralOccurrences = new Map((componentArtifact?.structural_programs ?? []).map(
+      (program) => [program.region, program.template_occurrences]
+    ));
+    store.structuralOccurrenceTemplatesByInvocation = structuralOccurrenceTemplateRegistry(
+      manifest,
+      componentArtifact,
+      computedArtifact
+    );
+    store.structuralSlotProjectionPrograms = structuralSlotProjectionRegistry(manifest, componentArtifact);
+    store.structuralOccurrencesByInvocation = new Map(
+      [...store.structuralOccurrenceTemplatesByInvocation].map(([invocation, record]) => [
+        invocation,
+        Object.freeze({
+          ...record.occurrence,
+          structural_region: record.structural_region
+        })
+      ])
+    );
     const missingAnchors = manifest.schema_version === SUPPORTED_SCHEMA_VERSION
       ? []
       : collectMissingAnchors(
@@ -3988,6 +5934,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         }
         store.components.set(instance.instance, component);
         registerActions(store, component, definition);
+        registerLegacyComponentEvents(store, component);
       }
       initializeOrdinaryInstanceRuntime(store, manifest, componentArtifact);
     } else {
@@ -4018,9 +5965,14 @@ const RUNTIME_STUB: &str = r#"(() => {
     await resourceInitialization;
 
     executeInitialEffects(store);
+    installEffectDisposal(store);
 
     if (manifest.schema_version === SUPPORTED_SCHEMA_VERSION) {
       installOrdinaryInstanceEventListeners(store);
+      // Schema-v5 component instances can still host the frozen implicit
+      // decorator-action shape. Those bindings have no ordinary-event record
+      // because they intentionally predate canonical action batches.
+      installDelegatedEventListeners(store);
     } else {
       installDelegatedEventListeners(store);
     }
@@ -4035,6 +5987,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       computed_update_runs: store.computedUpdateRuns,
       initial_effect_runs: store.initialEffectRuns,
       completed_action_effect_runs: store.completedActionEffectRuns,
+      structural_effect_runs: store.structuralEffectRuns,
       context_initial_source_runs: store.contextInitialSourceRuns,
       context_slots: [...store.contextSlots.entries()],
       context_consumer_bindings: [...store.contextConsumerBindings.entries()],
@@ -4070,6 +6023,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       validateEffectArtifactSchema(effectArtifact, diagnostics);
       const componentArtifact = readComponentArtifact(diagnostics);
       validateComponentArtifactSchema(componentArtifact, diagnostics);
+      validateEffectArtifactInstances(effectArtifact, componentArtifact, diagnostics);
       const opaqueArtifact = readOpaqueArtifact(diagnostics);
       validateOpaqueArtifact(opaqueArtifact, diagnostics);
       validateManifestSchema(manifest, effectArtifact, componentArtifact, opaqueArtifact, diagnostics);
@@ -4094,6 +6048,7 @@ const RUNTIME_STUB: &str = r#"(() => {
             effectArtifact,
             componentArtifact,
             formsArtifact,
+            resourcesArtifact,
             diagnostics
           );
         },
@@ -4117,6 +6072,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         failure: result.failure,
         contract_version: RESUME_REGISTRY_CONTRACT_VERSION
       };
+      state.disposeEffects = () => disposeEffectInstances(state.store);
       state.resume_registry = result.mode === "resume" ? result.registry : null;
       state.resume_debug = [...resumeBootstrapState.debug];
       state.production = productionIndexes === null ? null : {
@@ -4188,10 +6144,15 @@ const RUNTIME_STUB: &str = r#"(() => {
 
 #[must_use]
 pub fn generate_runtime_stub() -> String {
-    RUNTIME_STUB.replace(
-        "__EZ_COMPONENT_SCHEMA_VERSION__",
-        &crate::RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION.to_string(),
-    )
+    RUNTIME_STUB
+        .replace(
+            "__EZ_COMPONENT_SCHEMA_VERSION__",
+            &crate::RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION.to_string(),
+        )
+        .replace(
+            "__EZ_EFFECT_SCHEMA_VERSION__",
+            &crate::RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION.to_string(),
+        )
 }
 
 #[cfg(test)]
@@ -4230,12 +6191,40 @@ mod tests {
         assert!(runtime.contains("initializeFormsRuntime"));
         assert!(runtime.contains("dispatchFormSubmit"));
         assert!(runtime.contains("form_hosts"));
+        assert!(runtime.contains("structuralOccurrences = new Map"));
+        assert!(runtime.contains("structuralOccurrencesByInvocation"));
+        assert!(runtime.contains("function structuralOccurrenceIdentity"));
+        assert!(runtime.contains("function decodeStructuralOccurrenceIdentity"));
+        assert!(runtime.contains("function instantiateStructuralTemplateSlots"));
+        assert!(runtime.contains("function rewriteStructuralTemplateIdentity"));
+        assert!(runtime.contains("function deriveStructuralOccurrenceRecords"));
+        assert!(runtime.contains("function stageStructuralOccurrenceRecords"));
+        assert!(runtime.contains("function renderStructuralOccurrenceTemplate"));
+        assert!(runtime.contains("function attachStructuralOccurrenceFragment"));
+        assert!(runtime.contains("function registerStructuralOccurrenceRecords"));
+        assert!(runtime.contains("function materializeStructuralOccurrence"));
+        assert!(runtime.contains("function structuralConditionalHostFragment"));
+        assert!(runtime.contains("function structuralKeyedHostFragment"));
+        assert!(runtime.contains("function renderStructuralKeyedListItem"));
+        assert!(runtime.contains("function reconcileStructuralKeyedList"));
+        assert!(runtime.contains("function compilerFragmentInvocationAnchors"));
+        assert!(runtime.contains("function replaceStructuralConditionalBranch"));
+        assert!(runtime.contains("active.indexOf(updateBinding)"));
+        assert!(runtime.contains("function structuralOccurrenceTemplateRegistry"));
+        assert!(runtime.contains("structuralOccurrenceTemplatesByInvocation"));
+        assert!(runtime.contains("structuralStateSlots = new Set()"));
+        assert!(runtime.contains("structuralComputedCacheSlots = new Set()"));
+        assert!(runtime.contains("Conditional host fragments were attached to a keyed-list host"));
+        assert!(runtime.contains("occurrence.ordinary_template_targets"));
+        assert!(runtime.contains("occurrence.ordinary_template_bindings"));
+        assert!(runtime.contains("occurrence.ordinary_template_events"));
         assert!(!runtime.contains("FormData(formElement)"));
         assert!(runtime.contains("PSR_MISSING_MANIFEST"));
         assert!(runtime.contains("PSR_INVALID_MANIFEST_JSON"));
         assert!(runtime.contains("PSR_UNSUPPORTED_SCHEMA"));
         assert!(runtime.contains("data-presolve-node"));
         assert!(runtime.contains("ordinaryEventsByTargetAndType"));
+        assert!(runtime.contains("ordinaryEventListenerTypes: new Set()"));
         assert!(runtime.contains("component_instance_id: record.component_instance_id"));
         assert!(runtime.contains("computedSlotsByInstanceComputed: new Map()"));
         assert!(runtime.contains("computedDirtySlots: new Map()"));
@@ -4251,8 +6240,10 @@ mod tests {
         assert!(runtime.contains("async function activateByEvent"));
         assert!(runtime.contains("async function activateBoundary"));
         assert!(runtime.contains("function decodeResumeValue"));
-        assert!(runtime.contains("function restoreResumeRuntimeThroughForms"));
-        assert!(runtime.contains("ResourceComputedReadUnsupported"));
+        assert!(runtime.contains("async function restoreResumeRuntimeThroughForms"));
+        assert!(runtime.contains("function allocateResumeResources"));
+        assert!(runtime.contains("function finalizeRestoredResources"));
+        assert!(runtime.contains("ResourceResumeUnsupported"));
         assert!(runtime.contains("executeResumeComputedRecomputation"));
         assert!(runtime.contains("function executeResumeContextBindings"));
         assert!(runtime.contains("function restoreResumeComponentsSlotsAndStructure"));
@@ -4274,6 +6265,12 @@ mod tests {
         assert!(runtime.contains("isBooleanAttribute"));
         assert!(runtime.contains("isPropertyAttribute"));
         assert!(runtime.contains("updateAttributeBinding"));
+        assert!(runtime.contains("function legacyActionBinding"));
+        assert!(runtime.contains("function legacyEventBinding"));
+        assert!(runtime.contains("function registerLegacyComponentEvents"));
+        assert!(runtime.contains(
+            "Legacy template action binding did not match its compiler action implementation"
+        ));
         assert!(runtime.contains("actionsByMethod.set(action.method_id, action.action_batch_id)"));
         assert!(runtime.contains("const actionRecord = store.actionsByMethod.get(event.method_id)"));
         assert!(runtime.contains("actionRecord.action_batch_id !== event.action_batch_id"));
@@ -4281,6 +6278,11 @@ mod tests {
         assert!(runtime.contains("executeCompletedActionEffects"));
         assert!(runtime.contains("activeActionBatch"));
         assert!(runtime.contains("executeInitialEffects"));
+        assert!(runtime.contains("function executeResumeEffects"));
+        assert!(runtime.contains("function validateEffectArtifactInstances"));
+        assert!(runtime.contains("effectArtifact.structural_templates"));
+        assert!(runtime.contains("function disposeEffectInstances"));
+        assert!(runtime.contains("effect.run_on_resume !== true"));
         assert!(runtime.contains("dispatchEffectCapability"));
         assert!(!runtime.contains("const arguments ="));
         assert!(runtime.contains("formatBindingValue"));
