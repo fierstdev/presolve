@@ -495,17 +495,42 @@ const RUNTIME_STUB: &str = r#"(() => {
     );
   }
 
+  function legacyActionBinding(action) {
+    return action?.method_id === undefined
+      && action?.action_batch_id === undefined
+      && typeof action?.method === "string"
+      && action.method.length > 0;
+  }
+
+  function legacyEventBinding(event) {
+    return event?.kind === undefined
+      && event?.method_id === undefined
+      && event?.action_batch_id === undefined
+      && /^this\.[A-Za-z_$][\w$]*$/.test(String(event?.handler ?? ""));
+  }
+
+  function legacyHandlerMethod(reference) {
+    return String(reference ?? "").replace(/^this\./, "");
+  }
+
+  function legacyComponentMethodKey(componentName, method) {
+    return `${componentName}:${method}`;
+  }
+
   function validateManifestActionBindings(manifest, opaqueArtifact, diagnostics) {
     const opaqueMethods = new Set((opaqueArtifact?.activations ?? []).map((activation) => activation.method));
     for (const component of manifest.components ?? []) {
       const actionsByMethod = new Map();
+      const legacyMethods = new Set();
 
       for (const action of component.actions ?? []) {
-        if (
-          typeof action.method_id !== "string"
+        if (legacyActionBinding(action)) {
+          legacyMethods.add(action.method);
+          continue;
+        }
+        if (typeof action.method_id !== "string"
           || typeof action.action_batch_id !== "string"
-          || (manifest.schema_version === SUPPORTED_SCHEMA_VERSION && typeof action.storage_id !== "string")
-        ) {
+          || (manifest.schema_version === SUPPORTED_SCHEMA_VERSION && typeof action.storage_id !== "string")) {
           reportDiagnostic(
             diagnostics,
             "PSR_INVALID_ACTION_BINDING",
@@ -519,6 +544,18 @@ const RUNTIME_STUB: &str = r#"(() => {
       }
 
       for (const event of component.template?.events ?? []) {
+        if (legacyEventBinding(event)) {
+          const method = legacyHandlerMethod(event.handler);
+          if (legacyMethods.has(method)) continue;
+          reportDiagnostic(
+            diagnostics,
+            "PSR_INVALID_ACTION_BINDING",
+            "Legacy template action binding did not match its compiler action implementation",
+            { component: component.name, event },
+            true
+          );
+          throw new PresolveBootError("PSR_INVALID_ACTION_BINDING");
+        }
         if (event.kind !== "action") {
           reportDiagnostic(
             diagnostics,
@@ -1431,8 +1468,15 @@ const RUNTIME_STUB: &str = r#"(() => {
 
   function buildActionsByMethod(component) {
     const actionsByMethod = new Map();
+    const legacyActionsByMethod = new Map();
 
     for (const action of component.actions ?? []) {
+      if (legacyActionBinding(action)) {
+        const actions = legacyActionsByMethod.get(action.method) ?? [];
+        actions.push(action);
+        legacyActionsByMethod.set(action.method, actions);
+        continue;
+      }
       const record = actionsByMethod.get(action.method_id) ?? {
         action_batch_id: action.action_batch_id,
         actions: []
@@ -1441,7 +1485,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       actionsByMethod.set(action.method_id, record);
     }
 
-    return actionsByMethod;
+    return { actionsByMethod, legacyActionsByMethod };
   }
 
   function componentFieldKey(componentName, field) {
@@ -2964,6 +3008,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       bindingsByInstanceComputed: new Map(),
       ordinaryEventListenerTypes: new Set(),
       actionsByMethod: new Map(),
+      legacyActionsByComponentMethod: new Map(),
       opaqueTerminalsByMethod: new Map((opaqueArtifact?.activations ?? []).map((activation) => [activation.method, activation])),
       opaqueActivations: [],
       eventsByType: new Map(),
@@ -3823,10 +3868,16 @@ const RUNTIME_STUB: &str = r#"(() => {
   }
 
   function registerActions(store, component, manifestComponent) {
-    const actionsByMethod = buildActionsByMethod(manifestComponent);
+    const { actionsByMethod, legacyActionsByMethod } = buildActionsByMethod(manifestComponent);
 
     for (const [methodId, actionRecord] of actionsByMethod) {
       store.actionsByMethod.set(methodId, actionRecord);
+    }
+    for (const [method, actions] of legacyActionsByMethod) {
+      store.legacyActionsByComponentMethod.set(
+        legacyComponentMethodKey(component.name, method),
+        actions
+      );
     }
   }
 
@@ -3838,6 +3889,44 @@ const RUNTIME_STUB: &str = r#"(() => {
         "Unsupported event type in template manifest",
         event
       );
+      return;
+    }
+
+    if (legacyEventBinding(event)) {
+      const method = legacyHandlerMethod(event.handler);
+      const actions = store.legacyActionsByComponentMethod.get(
+        legacyComponentMethodKey(component.name, method)
+      );
+
+      if (actions === undefined) {
+        reportDiagnostic(
+          store.diagnostics,
+          "PSR_UNRESOLVED_ACTION",
+          "Legacy event handler did not resolve to a compiler action",
+          event
+        );
+        return;
+      }
+
+      const eventsByNode = store.eventsByType.get(event.event) ?? new Map();
+      if (eventsByNode.has(event.node)) {
+        reportDiagnostic(
+          store.diagnostics,
+          "PSR_UNRESOLVED_EVENT",
+          "Duplicate event registration for template node",
+          event
+        );
+        return;
+      }
+
+      eventsByNode.set(event.node, {
+        component,
+        method_id: null,
+        action_batch_id: null,
+        actions,
+        arguments: Array.isArray(event.arguments) ? event.arguments : []
+      });
+      store.eventsByType.set(event.event, eventsByNode);
       return;
     }
 
@@ -4165,6 +4254,12 @@ const RUNTIME_STUB: &str = r#"(() => {
   function registerComponentEvents(store, component) {
     for (const event of component.manifest.template?.events ?? []) {
       registerEvent(store, component, event);
+    }
+  }
+
+  function registerLegacyComponentEvents(store, component) {
+    for (const event of component.manifest.template?.events ?? []) {
+      if (legacyEventBinding(event)) registerEvent(store, component, event);
     }
   }
 
@@ -5837,6 +5932,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         }
         store.components.set(instance.instance, component);
         registerActions(store, component, definition);
+        registerLegacyComponentEvents(store, component);
       }
       initializeOrdinaryInstanceRuntime(store, manifest, componentArtifact);
     } else {
@@ -5871,6 +5967,10 @@ const RUNTIME_STUB: &str = r#"(() => {
 
     if (manifest.schema_version === SUPPORTED_SCHEMA_VERSION) {
       installOrdinaryInstanceEventListeners(store);
+      // Schema-v5 component instances can still host the frozen implicit
+      // decorator-action shape. Those bindings have no ordinary-event record
+      // because they intentionally predate canonical action batches.
+      installDelegatedEventListeners(store);
     } else {
       installDelegatedEventListeners(store);
     }
@@ -6163,6 +6263,12 @@ mod tests {
         assert!(runtime.contains("isBooleanAttribute"));
         assert!(runtime.contains("isPropertyAttribute"));
         assert!(runtime.contains("updateAttributeBinding"));
+        assert!(runtime.contains("function legacyActionBinding"));
+        assert!(runtime.contains("function legacyEventBinding"));
+        assert!(runtime.contains("function registerLegacyComponentEvents"));
+        assert!(runtime.contains(
+            "Legacy template action binding did not match its compiler action implementation"
+        ));
         assert!(runtime.contains("actionsByMethod.set(action.method_id, action.action_batch_id)"));
         assert!(runtime.contains("const actionRecord = store.actionsByMethod.get(event.method_id)"));
         assert!(runtime.contains("actionRecord.action_batch_id !== event.action_batch_id"));
