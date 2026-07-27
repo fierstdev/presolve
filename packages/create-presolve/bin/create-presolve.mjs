@@ -51,16 +51,16 @@ function template(name) {
         "deploy:prepare": "presolve deploy cloudflare --prepare",
         "deploy:node:prepare": "presolve deploy node --prepare",
       },
-      dependencies: { presolve: "0.1.0-alpha.1" },
+      dependencies: { presolve: "0.2.0-beta.1" },
       devDependencies: {
-        "@presolve/cli": "0.1.0-alpha.1",
-        "@presolve/typescript-authority": "0.1.0-alpha.1",
+        "@presolve/cli": "0.2.0-beta.1",
+        "@presolve/typescript-authority": "0.2.0-beta.1",
         "typescript": "npm:typescript@^7.0.2",
         "wrangler": "^4.0.0",
       },
     }, null, 2)}\n`,
     ".gitignore": "node_modules/\ndist/\n.presolve/\n.dev.vars\n.env*\n",
-    "README.md": `# ${name}\n\nA Presolve application.\n\n## Development\n\n\`pnpm dev\` builds and serves compiler-published routes.\n\n\`pnpm build\` emits immutable artifacts in \`dist/\`.\n\n\`pnpm deploy:prepare\` validates a Cloudflare Workers Static Assets deployment without uploading.\n\n\`pnpm deploy\` deploys the prepared compiler artifact inventory through Wrangler.\n\n\`pnpm deploy:node:prepare\` writes a Node release inventory and static host under \`.presolve/node/\`. Routes with loaders or server actions remain explicitly Node-required until their capability-specific executor is available.\n\n## Project layout\n\nRoutes live in \`app/routes\`. Shared application source belongs in \`app/components\`; server-owned source in \`server\`; Vite style and asset inputs in \`styles\` and \`assets\`; directly served files in \`public\`; and application tests in \`tests\`. Only \`PRESOLVE_PUBLIC_*\` values are browser-eligible.\n\nVS Code will use the TypeScript configuration in this project. Install the **Presolve** extension for compiler-language tooling as it becomes available during the alpha.\n`,
+    "README.md": `# ${name}\n\nA Presolve application.\n\n## Development\n\n\`pnpm dev\` builds and serves compiler-published routes.\n\n\`pnpm build\` emits immutable artifacts in \`dist/\`.\n\n\`pnpm deploy:prepare\` validates a Cloudflare Workers Static Assets deployment without uploading.\n\n\`pnpm deploy\` deploys the prepared compiler artifact inventory through Wrangler.\n\n\`pnpm deploy:node:prepare\` writes a Node release inventory and static host under \`.presolve/node/\`. Routes with loaders or server actions remain explicitly Node-required until their capability-specific executor is available.\n\n## Project layout\n\nRoutes live in \`app/routes\`. Shared application source belongs in \`app/components\`; server-owned source in \`server\`; Vite style and asset inputs in \`styles\` and \`assets\`; directly served files in \`public\`; and application tests in \`tests\`. Only \`PRESOLVE_PUBLIC_*\` values are browser-eligible.\n\nVS Code will use the TypeScript configuration in this project. Install the **Presolve** extension for compiler-language tooling during the beta.\n`,
     "tsconfig.json": `${JSON.stringify({
       compilerOptions: {
         target: "ES2022",

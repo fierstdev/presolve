@@ -28,7 +28,7 @@ that application.
 - [CLI](reference/cli.md)
 - [VS Code and language tooling](reference/editor.md)
 - [Cloudflare deployment](reference/cloudflare.md)
-- [Supported alpha surface](reference/support.md)
+- [Supported beta surface](reference/support.md)
 - [Publishing the Presolve release train](reference/publishing.md)
 
 ## For contributors
@@ -38,6 +38,6 @@ reference are the public documentation source; examples in them must be kept
 valid against the published `presolve` package and the CLI release train.
 
 The [V2 engineering handoff](v2/README.md) records the normative beta
-specification provenance, the alpha characterization snapshot, and the
+specification provenance, the historical alpha characterization snapshot, and the
 implementation tracking map. It is contributor planning material, not public
 API documentation.

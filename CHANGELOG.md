@@ -8,6 +8,20 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.1 - 2026-07-26
+
+### Added
+
+- Completion-grade V2 structural lifecycle, context, form, resource, route
+  handoff, capability, and beta hardening evidence.
+- The explicit closed beta Action surface, packed-scaffold verification, and
+  tag-triggered beta publication workflow.
+
+### Changed
+
+- The compiler, framework, tooling, scaffold, native CLI packages, and VS Code
+  extension now identify the `0.2.0-beta.1` compatibility train.
+
 ## 0.1.0-alpha.1 - 2026-07-23
 
 ### Added

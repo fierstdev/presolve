@@ -1,18 +1,12 @@
-name: Publish alpha
+name: Publish beta
 
 on:
   push:
     tags:
-      - "v0.1.0-alpha.*"
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "Exact prerelease version, for example 0.1.0-alpha.1"
-        required: true
-        type: string
+      - "v0.2.0-beta.*"
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
@@ -33,7 +27,7 @@ jobs:
       - run: cargo install wasm-bindgen-cli --version 0.2.108 --locked
       - name: Verify lockstep release version
         env:
-          RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+          RELEASE_VERSION: ${{ github.ref_name }}
         run: node scripts/verify-release-version.mjs "${RELEASE_VERSION#v}"
       - run: cargo fmt --all --check
       - run: RUST_TEST_THREADS=1 cargo test --workspace
@@ -142,7 +136,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           for package in .release/*.tgz; do
-            npm publish "$package" --tag alpha --access public --provenance
+            npm publish "$package" --tag beta --access public --provenance
           done
       - name: Publish compiler tooling and application handoffs
         env:
@@ -152,6 +146,8 @@ jobs:
           pnpm --dir packages/language-service publish --no-git-checks --provenance
           pnpm --dir packages/lsp publish --no-git-checks --provenance
           pnpm --dir packages/testing publish --no-git-checks --provenance
+          pnpm --dir packages/typescript-authority publish --no-git-checks --provenance
+          pnpm --dir packages/vite publish --no-git-checks --provenance
       - name: Publish framework, CLI, and scaffold
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -179,3 +175,14 @@ jobs:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: npm exec --yes --package=@vscode/vsce@3.9.2 -- vsce publish --packagePath presolve-vscode.vsix --pat "$VSCE_PAT" --pre-release
         working-directory: packages/vscode
+
+  publish-github-release:
+    name: Publish GitHub release
+    needs: publish-vscode
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Create prerelease notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --title "Presolve ${GITHUB_REF_NAME#v}" --generate-notes --prerelease

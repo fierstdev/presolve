@@ -6,8 +6,11 @@ HTML, browser artifacts, route inventory, resumability records, and deployment
 plan. There is no separate renderer, dependency tracker, or router deciding
 application semantics beside it.
 
-`0.1.0-alpha.1` is a public technical preview for evaluation and static sites.
-It is not yet a replacement for every React or Next.js application.
+`0.2.0-beta.1` is the public beta for compiler-owned application products,
+including resumability, structural components, slots, context, forms,
+resources, and the documented Action surface. It is not a replacement for
+every React or Next.js application: generic server execution and unadmitted
+semantics remain deliberately unsupported.
 
 ## Create an application
 
@@ -34,7 +37,7 @@ workflow.
 | Tooling APIs | `@presolve/compiler-wasm`, `@presolve/language-service`, `@presolve/lsp` | Compiler-product queries for editor integrations. |
 | Rust crates | `presolve-parser`, `presolve-compiler`, `presolve-cli` | Embedding and toolchain integration. |
 
-The alpha release train is lockstep: compatible published packages and crates
+The beta release train is lockstep: compatible published packages and crates
 share the same prerelease version.
 
 ## Documentation
