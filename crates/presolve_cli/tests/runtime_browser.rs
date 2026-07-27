@@ -2829,6 +2829,17 @@ fn decorator_free_v2_slots_project_into_conditional_and_keyed_hosts_in_a_real_br
     fs::create_dir_all(project_root.join("app/components"))
         .expect("failed to create V2 structural Slot component root");
     fs::write(
+        project_root.join("app/layout.tsx"),
+        r#"import { Component, slot, type SlotContent } from "presolve";
+
+export class DocsLayout extends Component {
+  children: SlotContent = slot();
+  render() { return <main><slot /></main>; }
+}
+"#,
+    )
+    .expect("failed to write decorator-free V2 Docs layout");
+    fs::write(
         project_root.join("app/components/StructuralSlotLeaf.tsx"),
         r#"import { Component } from "presolve";
 

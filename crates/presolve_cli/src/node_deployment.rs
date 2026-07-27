@@ -288,13 +288,21 @@ createServer(async (request, response) => {{\n\
   const url = new URL(request.url, 'http://presolve.local');\n\
   const requested = segments(url.pathname);\n\
   const selected = routeFor(requested);\n\
-  if (!selected) {{ response.writeHead(404); response.end('Not Found\\n'); return; }}\n\
+  if (!selected) {{\n\
+    if (!safeSegments(requested) || requested.length === 0) {{ response.writeHead(404); response.end('Not Found\\n'); return; }}\n\
+    try {{ const bytes = await readFile(resolve(outputRoot, requested.join('/'))); response.writeHead(200); response.end(request.method === 'HEAD' ? undefined : bytes); return; }}\n\
+    catch {{ response.writeHead(404); response.end('Not Found\\n'); return; }}\n\
+  }}\n\
   if (selected.route.execution !== 'static') {{ response.writeHead(501); response.end('Presolve Node executor required for this route\\n'); return; }}\n\
   const suffix = requested.slice(selected.parts.length);\n\
   if (!safeSegments(suffix)) {{ response.writeHead(404); response.end('Not Found\\n'); return; }}\n\
   const relative = suffix.length === 0 ? `${{selected.route.artifactRoot}}/index.html` : `${{selected.route.artifactRoot}}/${{suffix.join('/')}}`;\n\
   try {{ const bytes = await readFile(resolve(outputRoot, relative)); response.writeHead(200); response.end(request.method === 'HEAD' ? undefined : bytes); }}\n\
-  catch {{ response.writeHead(404); response.end('Not Found\\n'); }}\n\
+  catch {{\n\
+    if (!safeSegments(requested) || requested.length === 0) {{ response.writeHead(404); response.end('Not Found\\n'); return; }}\n\
+    try {{ const bytes = await readFile(resolve(outputRoot, requested.join('/'))); response.writeHead(200); response.end(request.method === 'HEAD' ? undefined : bytes); }}\n\
+    catch {{ response.writeHead(404); response.end('Not Found\\n'); }}\n\
+  }}\n\
 }}).listen(port, '0.0.0.0', () => console.log(`Presolve Node release listening on ${{port}}`));\n"
     )
 }

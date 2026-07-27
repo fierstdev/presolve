@@ -205,6 +205,9 @@ fn run_ergonomic_build(
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
     attach_route_metadata(&project.root, &mut product)
         .unwrap_or_else(|message| application_cli_error("PSMETA1004_DISCOVERY_FAILED", &message));
+    attach_static_publication_inputs(&project.root, &mut product).unwrap_or_else(|message| {
+        application_cli_error("PSROUTE3008_PUBLICATION_FAILED", &message)
+    });
     publish_file_route_product(&output_root, &product)
         .unwrap_or_else(|error| application_cli_error("PSROUTE3008_PUBLICATION_FAILED", &error));
     println!("Built {}", output_root.display());
@@ -480,6 +483,125 @@ fn attach_route_metadata(
         PathBuf::from("file-routes.manifest.json"),
         presolve_compiler::file_route_publication_manifest_json_v1(&product.manifest).into_bytes(),
     );
+    Ok(())
+}
+
+/// Adds caller-owned static inputs to the immutable file-route publication.
+/// `public/` is served from the output root and `styles/` is served below its
+/// own directory. Their bytes are included in the release inventory so
+/// development and deployment adapters verify the exact published files.
+fn attach_static_publication_inputs(
+    project_root: &Path,
+    product: &mut presolve_compiler::FileRoutePublicationProductV1,
+) -> Result<(), String> {
+    let mut inputs = Vec::new();
+    collect_static_publication_input(&project_root.join("public"), Path::new(""), &mut inputs)?;
+    collect_static_publication_input(
+        &project_root.join("styles"),
+        Path::new("styles"),
+        &mut inputs,
+    )?;
+
+    for (path, bytes) in inputs {
+        validate_publication_relative_path(&path)?;
+        if product.artifacts.contains_key(&path) {
+            return Err(format!(
+                "static input {} collides with a compiler-published artifact",
+                path.display()
+            ));
+        }
+        product
+            .manifest
+            .artifacts
+            .push(presolve_compiler::ApplicationPublicationArtifactV1 {
+                path: path.to_string_lossy().into_owned(),
+                digest: format!("sha256:{:x}", Sha256::digest(&bytes)),
+            });
+        product.artifacts.insert(path, bytes);
+    }
+    product
+        .manifest
+        .artifacts
+        .sort_by(|left, right| left.path.cmp(&right.path));
+    if product
+        .manifest
+        .artifacts
+        .windows(2)
+        .any(|pair| pair[0].path == pair[1].path)
+    {
+        return Err("static publication inputs produced duplicate artifact paths".into());
+    }
+    product.artifacts.insert(
+        PathBuf::from("file-routes.manifest.json"),
+        presolve_compiler::file_route_publication_manifest_json_v1(&product.manifest).into_bytes(),
+    );
+    Ok(())
+}
+
+fn collect_static_publication_input(
+    source_root: &Path,
+    output_prefix: &Path,
+    inputs: &mut Vec<(PathBuf, Vec<u8>)>,
+) -> Result<(), String> {
+    let metadata = match fs::symlink_metadata(source_root) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(format!(
+                "failed to inspect {}: {error}",
+                source_root.display()
+            ))
+        }
+    };
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err(format!(
+            "static input {} must be a real directory, not a file or symlink",
+            source_root.display()
+        ));
+    }
+    let mut entries = fs::read_dir(source_root)
+        .map_err(|error| {
+            format!(
+                "failed to read static input {}: {error}",
+                source_root.display()
+            )
+        })?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| {
+            format!(
+                "failed to read static input {}: {error}",
+                source_root.display()
+            )
+        })?;
+    entries.sort_by_key(|entry| entry.file_name());
+    for entry in entries {
+        let source_path = entry.path();
+        let output_path = output_prefix.join(entry.file_name());
+        let metadata = fs::symlink_metadata(&source_path)
+            .map_err(|error| format!("failed to inspect {}: {error}", source_path.display()))?;
+        if metadata.file_type().is_symlink() {
+            return Err(format!(
+                "static input {} must not contain symlinks",
+                source_path.display()
+            ));
+        }
+        if metadata.is_dir() {
+            collect_static_publication_input(&source_path, &output_path, inputs)?;
+        } else if metadata.is_file() {
+            validate_publication_relative_path(&output_path)?;
+            inputs.push((
+                output_path,
+                fs::read(&source_path).map_err(|error| {
+                    format!("failed to read {}: {error}", source_path.display())
+                })?,
+            ));
+        } else {
+            return Err(format!(
+                "static input {} must contain only regular files and directories",
+                source_path.display()
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -919,7 +1041,24 @@ fn serve_ergonomic_development_connection(
     };
     let path = target.split('?').next().unwrap_or(target);
     let Some(target) = resolve_file_route_request_v1(manifest, path) else {
-        write_development_response(&mut stream, "404 Not Found", "text/plain", b"Not found\n");
+        let Some(relative) = development_static_relative_path(path) else {
+            write_development_response(&mut stream, "404 Not Found", "text/plain", b"Not found\n");
+            return;
+        };
+        match fs::read(output_root.join(&relative)) {
+            Ok(bytes) => write_development_response(
+                &mut stream,
+                "200 OK",
+                development_content_type(&relative),
+                &bytes,
+            ),
+            Err(_) => write_development_response(
+                &mut stream,
+                "404 Not Found",
+                "text/plain",
+                b"Not found\n",
+            ),
+        }
         return;
     };
     let relative = match target {
@@ -937,9 +1076,27 @@ fn serve_ergonomic_development_connection(
             &bytes,
         ),
         Err(_) => {
+            if let Some(static_relative) = development_static_relative_path(path) {
+                if let Ok(bytes) = fs::read(output_root.join(&static_relative)) {
+                    write_development_response(
+                        &mut stream,
+                        "200 OK",
+                        development_content_type(&static_relative),
+                        &bytes,
+                    );
+                    return;
+                }
+            }
             write_development_response(&mut stream, "404 Not Found", "text/plain", b"Not found\n")
         }
     }
+}
+
+fn development_static_relative_path(path: &str) -> Option<PathBuf> {
+    let relative = path.strip_prefix('/').filter(|value| !value.is_empty())?;
+    let relative = PathBuf::from(relative);
+    validate_publication_relative_path(&relative).ok()?;
+    Some(relative)
 }
 
 fn write_development_redirect(stream: &mut TcpStream, location: &str) {
@@ -955,6 +1112,12 @@ fn development_content_type(path: &Path) -> &'static str {
         Some("js") => "text/javascript; charset=utf-8",
         Some("json") => "application/json; charset=utf-8",
         Some("css") => "text/css; charset=utf-8",
+        Some("svg") => "image/svg+xml",
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("webp") => "image/webp",
+        Some("ico") => "image/x-icon",
+        Some("woff2") => "font/woff2",
         _ => "application/octet-stream",
     }
 }

@@ -1,12 +1,11 @@
 # Components
 
-A Presolve component is an exported class marked with `@component()` and one
-instance `render()` method. `render()` returns TSX.
+A Presolve beta component is an exported class that extends `Component` and
+has one instance `render()` method. `render()` returns TSX.
 
 ```tsx
-import { component, Component } from "presolve";
+import { Component } from "presolve";
 
-@component()
 export class Welcome extends Component {
   name = "Ada";
 
@@ -16,9 +15,10 @@ export class Welcome extends Component {
 }
 ```
 
-The component decorator is a compiler intrinsic. It is intentionally inert at
-normal JavaScript evaluation time; importing a component does not create a
-runtime component registry.
+Extending `Component` is compiler-owned authoring evidence; importing a
+component does not create a runtime component registry. `@component()` remains
+an alpha compatibility form for existing applications, but do not add it to
+new beta source.
 
 ## Inputs
 
@@ -26,7 +26,6 @@ Undecorated instance fields express component inputs. A definite-assignment
 field is required; an initialized field supplies its default.
 
 ```tsx
-@component()
 export class UserCard extends Component {
   user!: { name: string };
   compact = false;
@@ -45,7 +44,6 @@ the `state()` intrinsic described in [reactivity](reactivity.md).
 Use a local or imported PascalCase class in TSX:
 
 ```tsx
-@component()
 export class ProfilePage extends Component {
   render() {
     return <main><UserCard /></main>;
@@ -54,5 +52,5 @@ export class ProfilePage extends Component {
 ```
 
 The compiler resolves invocation and instance identity. Dynamic component
-expressions, inheritance, mixins, and constructors that establish component
-semantics are outside the alpha surface.
+expressions, mixins, and constructors that establish component semantics are
+outside the beta surface.

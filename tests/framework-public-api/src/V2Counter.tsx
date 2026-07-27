@@ -1,4 +1,4 @@
-import { action, effect, state, Component, environment as runtimeEnvironment } from "presolve";
+import { action, effect, state, slot, Component, environment as runtimeEnvironment, type SlotContent } from "presolve";
 
 const lookalikeEnvironment = { public: (name: string) => name };
 const applicationName = runtimeEnvironment.public("PRESOLVE_PUBLIC_APP_NAME");
@@ -7,6 +7,7 @@ const rejectedLookalikeName = lookalikeEnvironment.public("PRESOLVE_PUBLIC_REJEC
 export abstract class V2CounterBase extends Component {}
 
 export class V2Counter extends V2CounterBase {
+  children: SlotContent = slot();
   count = state(0);
 
   increment = action(() => {
