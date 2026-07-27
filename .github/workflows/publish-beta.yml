@@ -4,10 +4,24 @@ on:
   push:
     tags:
       - "v0.2.0-beta.*"
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: Existing beta version to resume, with or without the v prefix
+        required: true
+        default: "0.2.0-beta.1"
+      crates_already_published:
+        description: Skip crates.io only after confirming all three crates exist
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: write
   id-token: write
+
+env:
+  RELEASE_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.release_version || github.ref_name }}
 
 jobs:
   verify:
@@ -26,8 +40,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: cargo install wasm-bindgen-cli --version 0.2.108 --locked
       - name: Verify lockstep release version
-        env:
-          RELEASE_VERSION: ${{ github.ref_name }}
         run: node scripts/verify-release-version.mjs "${RELEASE_VERSION#v}"
       - run: cargo fmt --all --check
       - run: RUST_TEST_THREADS=1 cargo test --workspace
@@ -48,7 +60,12 @@ jobs:
       - name: Publish parser, compiler, and CLI in dependency order
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CRATES_ALREADY_PUBLISHED: ${{ github.event_name == 'workflow_dispatch' && inputs.crates_already_published || false }}
         run: |
+          if [ "$CRATES_ALREADY_PUBLISHED" = "true" ]; then
+            echo "Skipping crates.io for the explicitly confirmed recovery of ${RELEASE_VERSION#v}."
+            exit 0
+          fi
           cargo publish -p presolve-parser
           for crate in presolve-compiler presolve-cli; do
             for attempt in $(seq 1 12); do
@@ -97,7 +114,7 @@ jobs:
         run: |
           mkdir -p packages/${{ matrix.package }}/bin
           cp target/${{ matrix.target }}/release/${{ matrix.executable }} packages/${{ matrix.package }}/bin/${{ matrix.executable }}
-      - run: npm pack packages/${{ matrix.package }} --pack-destination .release
+      - run: npm pack ./packages/${{ matrix.package }} --pack-destination .release
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.package }}
@@ -185,4 +202,10 @@ jobs:
       - name: Create prerelease notes
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --title "Presolve ${GITHUB_REF_NAME#v}" --generate-notes --prerelease
+        run: |
+          release_tag="$RELEASE_VERSION"
+          case "$release_tag" in
+            v*) ;;
+            *) release_tag="v$release_tag" ;;
+          esac
+          gh release create "$release_tag" --title "Presolve ${release_tag#v}" --generate-notes --prerelease
