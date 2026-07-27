@@ -154,25 +154,25 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           for package in .release/*.tgz; do
-            npm publish "$package" --tag beta --access public --provenance
+            node scripts/publish-npm-if-missing.mjs npm "$package" --tag beta --access public --provenance
           done
       - name: Publish compiler tooling and application handoffs
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          pnpm --dir packages/compiler-wasm publish --no-git-checks --provenance
-          pnpm --dir packages/language-service publish --no-git-checks --provenance
-          pnpm --dir packages/lsp publish --no-git-checks --provenance
-          pnpm --dir packages/testing publish --no-git-checks --provenance
-          pnpm --dir packages/typescript-authority publish --no-git-checks --provenance
-          pnpm --dir packages/vite publish --no-git-checks --provenance
+          node scripts/publish-npm-if-missing.mjs pnpm packages/compiler-wasm --no-git-checks --provenance
+          node scripts/publish-npm-if-missing.mjs pnpm packages/language-service --no-git-checks --provenance
+          node scripts/publish-npm-if-missing.mjs pnpm packages/lsp --no-git-checks --provenance
+          node scripts/publish-npm-if-missing.mjs pnpm packages/testing --no-git-checks --provenance
+          node scripts/publish-npm-if-missing.mjs pnpm packages/typescript-authority --no-git-checks --provenance
+          node scripts/publish-npm-if-missing.mjs pnpm packages/vite --no-git-checks --provenance
       - name: Publish framework, CLI, and scaffold
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          pnpm --dir framework/packages/presolve publish --no-git-checks --provenance
-          pnpm --dir packages/cli publish --no-git-checks --provenance
-          pnpm --dir packages/create-presolve publish --no-git-checks --provenance
+          node scripts/publish-npm-if-missing.mjs pnpm framework/packages/presolve --no-git-checks --provenance
+          node scripts/publish-npm-if-missing.mjs pnpm packages/cli --no-git-checks --provenance
+          node scripts/publish-npm-if-missing.mjs pnpm packages/create-presolve --no-git-checks --provenance
 
   publish-vscode:
     name: Publish VS Code extension
