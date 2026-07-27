@@ -58,6 +58,9 @@ normative source for this handoff.
 - [V2 synchronous Action-local-literal contract](action-local-literal-contract.md)
   projects compiler-retained local primitives to ordinary literal assignments
   without runtime source evaluation.
+- [V2 beta Action surface contract](action-beta-surface-contract.md) fixes the
+  complete closed Action source surface and its fail-closed exclusions for
+  beta readiness.
 - [Resource lifecycle and resume contract](resource-lifecycle-resume-contract.md)
   defines compiler-owned cold, snapshot, reload, cancellation, and fallback
   behavior for declared Resource endpoints.
@@ -104,6 +107,8 @@ normative source for this handoff.
   update vocabulary, state-preservation evidence, and Vite transport boundary.
 - [Production audit contract](production-audit-contract.md) records the
   compiler-produced production-report audit and adapter verification boundary.
+- [Beta hardening contract](beta-hardening-contract.md) fixes the final
+  compatibility, deterministic-product, packed-scaffold, and release proof.
 - [Source maps contract](source-maps-contract.md) records Vite physical-map
   ownership and the manifest-bound compiler artifact translation boundary.
 - [Vite styles and assets contract](vite-assets-contract.md) records explicit
@@ -155,6 +160,7 @@ normative source for this handoff.
 
 The tracker records repository-owned V2 authority products through the
 compiler-issued Node release inventory and static eligibility classification.
-It remains the source of implementation status and intentionally separates
-those products from the remaining server-executor, environment, performance,
-and hardening evidence required for beta readiness.
+Its beta gate is complete: server executors remain explicitly deferred
+capability products, while the admitted compiler, runtime, diagnostics,
+artifact, compatibility, and release evidence is recorded in the tracker and
+the beta-hardening contract.

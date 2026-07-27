@@ -44,8 +44,9 @@ caller must never substitute the legacy decorator graph after such a failure.
    publication without a decorator fallback.
 4. Adopt canonical State and Action records into the existing runtime products,
    with separate cold and resumed evidence. Implemented for canonical State
-   and the closed synchronous `action(() => { this.state += operand; })`
-   subset; broader Action handler semantics remain separately authored work.
+   and the complete closed beta Action surface: ordinary State operations,
+   typed static parameters, and serializable local literals. Its precise
+   exclusions are fixed by `action-beta-surface-contract.md`.
 5. Retire decorator fixtures from beta evidence; retain them only as named
    alpha compatibility coverage.
 
@@ -63,6 +64,6 @@ caller must never substitute the legacy decorator graph after such a failure.
 This contract was created after a direct generated-project probe returned
 `PSAPP1005_ENTRY_APPLICATION_ROOT_MISSING`. Canonical Component adoption now
 removes that failure for an authority-backed decorator-free route. The focused
-V2 browser fixture now proves canonical State and the closed synchronous Action
-subset through cold and resumed execution; broader Action handler forms remain
-the next required runtime-adoption work.
+V2 browser fixtures prove canonical State plus ordinary, typed-parameter, and
+local-literal Actions through cold and resumed execution. The remaining
+handler forms are explicit beta exclusions rather than an implicit fallback.
