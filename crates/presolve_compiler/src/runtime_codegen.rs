@@ -5278,17 +5278,19 @@ const RUNTIME_STUB: &str = r#"(() => {
       registry.structural_records.set(record.region, runtimeRecord);
     }
 
-    const restoredRegions = new Set();
+    const restoredRegions = new Map();
     for (const program of registry.definitions.restorePrograms.values()) {
       for (const record of program.instructions ?? []) {
         if (record.phase !== "R9") continue;
         const instruction = record.instruction;
         if (
           instruction.kind !== "restore_structural_selection"
-          || restoredRegions.has(instruction.region_id)
+          || (restoredRegions.has(instruction.region_id)
+            && restoredRegions.get(instruction.region_id) !== instruction.slot_id)
         ) {
           throw new ResumeBootError("RestoreInstructionFailure");
         }
+        if (restoredRegions.has(instruction.region_id)) continue;
         const runtimeRecord = registry.structural_records.get(instruction.region_id);
         const schema = registry.definitions.slots.get(instruction.slot_id);
         const value = registry.slot_values.get(instruction.slot_id);
@@ -5302,7 +5304,7 @@ const RUNTIME_STUB: &str = r#"(() => {
           throw new ResumeBootError("StructuralStateMismatch");
         }
         runtimeRecord.selection_value = value;
-        restoredRegions.add(instruction.region_id);
+        restoredRegions.set(instruction.region_id, instruction.slot_id);
       }
     }
     if (restoredRegions.size !== expectedRegions.size) {
@@ -5347,6 +5349,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
     const restored = new Map();
     const byParentLocal = new Map();
+    store.restoredStructuralOccurrencesByParentLocal = new Map();
     const fieldsByComponentStorage = new Map();
     for (const state of computedArtifact?.state ?? []) {
       fieldsByComponentStorage.set(`${state.component}\u001f${state.storage}`, state.field);
@@ -5424,7 +5427,6 @@ const RUNTIME_STUB: &str = r#"(() => {
         }
     }
     for (const [key, transactions] of byParentLocal) {
-      store.restoredStructuralOccurrencesByParentLocal ??= new Map();
       store.restoredStructuralOccurrencesByParentLocal.set(key, Object.freeze(transactions));
     }
     const anchors = collectOrdinaryTargetAnchors();
