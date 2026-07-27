@@ -112,7 +112,7 @@ jobs:
       - name: Stage binary
         shell: bash
         run: |
-          mkdir -p packages/${{ matrix.package }}/bin
+          mkdir -p packages/${{ matrix.package }}/bin .release
           cp target/${{ matrix.target }}/release/${{ matrix.executable }} packages/${{ matrix.package }}/bin/${{ matrix.executable }}
       - run: npm pack ./packages/${{ matrix.package }} --pack-destination .release
       - uses: actions/upload-artifact@v4
