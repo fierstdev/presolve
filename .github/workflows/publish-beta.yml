@@ -15,8 +15,8 @@ on:
         required: true
         type: boolean
         default: false
-      repair_framework_visibility:
-        description: Make the already-published scoped framework package public without republishing
+      repair_npm_metadata:
+        description: Repair npm visibility and beta dist-tags without republishing
         required: true
         type: boolean
         default: false
@@ -29,9 +29,9 @@ env:
   RELEASE_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.release_version || github.ref_name }}
 
 jobs:
-  repair-framework-visibility:
-    name: Repair framework npm visibility
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.repair_framework_visibility }}
+  repair-npm-metadata:
+    name: Repair npm release metadata
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.repair_npm_metadata }}
     runs-on: ubuntu-latest
     environment:
       name: npm
@@ -40,14 +40,32 @@ jobs:
         with:
           node-version: 26.5.0
           registry-url: https://registry.npmjs.org
-      - name: Make the scoped framework package public
+      - name: Make the framework public and apply beta dist-tags
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm access set status=public @presolve/framework
+        run: |
+          npm access set status=public @presolve/framework
+          for package in \
+            @presolve/framework \
+            @presolve/cli \
+            create-presolve \
+            @presolve/cli-darwin-arm64 \
+            @presolve/cli-darwin-x64 \
+            @presolve/cli-linux-x64 \
+            @presolve/cli-win32-x64 \
+            @presolve/compiler-wasm \
+            @presolve/language-service \
+            @presolve/lsp \
+            @presolve/testing \
+            @presolve/typescript-authority \
+            @presolve/vite
+          do
+            npm dist-tag add "$package@${RELEASE_VERSION#v}" beta
+          done
 
   verify:
     name: Verify release inputs
-    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.repair_framework_visibility) }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.repair_npm_metadata) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -182,19 +200,19 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          node scripts/publish-npm-if-missing.mjs pnpm packages/compiler-wasm --no-git-checks --provenance
-          node scripts/publish-npm-if-missing.mjs pnpm packages/language-service --no-git-checks --provenance
-          node scripts/publish-npm-if-missing.mjs pnpm packages/lsp --no-git-checks --provenance
-          node scripts/publish-npm-if-missing.mjs pnpm packages/testing --no-git-checks --provenance
-          node scripts/publish-npm-if-missing.mjs pnpm packages/typescript-authority --no-git-checks --provenance
-          node scripts/publish-npm-if-missing.mjs pnpm packages/vite --no-git-checks --provenance
+          node scripts/publish-npm-if-missing.mjs pnpm packages/compiler-wasm --no-git-checks --provenance --tag beta
+          node scripts/publish-npm-if-missing.mjs pnpm packages/language-service --no-git-checks --provenance --tag beta
+          node scripts/publish-npm-if-missing.mjs pnpm packages/lsp --no-git-checks --provenance --tag beta
+          node scripts/publish-npm-if-missing.mjs pnpm packages/testing --no-git-checks --provenance --tag beta
+          node scripts/publish-npm-if-missing.mjs pnpm packages/typescript-authority --no-git-checks --provenance --tag beta
+          node scripts/publish-npm-if-missing.mjs pnpm packages/vite --no-git-checks --provenance --tag beta
       - name: Publish framework, CLI, and scaffold
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          node scripts/publish-npm-if-missing.mjs pnpm framework/packages/presolve --no-git-checks --provenance --access public
-          node scripts/publish-npm-if-missing.mjs pnpm packages/cli --no-git-checks --provenance
-          node scripts/publish-npm-if-missing.mjs pnpm packages/create-presolve --no-git-checks --provenance
+          node scripts/publish-npm-if-missing.mjs pnpm framework/packages/presolve --no-git-checks --provenance --access public --tag beta
+          node scripts/publish-npm-if-missing.mjs pnpm packages/cli --no-git-checks --provenance --tag beta
+          node scripts/publish-npm-if-missing.mjs pnpm packages/create-presolve --no-git-checks --provenance --tag beta
 
   publish-vscode:
     name: Publish VS Code extension
