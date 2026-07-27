@@ -42,6 +42,20 @@ jobs:
         with:
           components: rustfmt
 
+      # The ergonomic CLI contract exercises the real TypeScript authority
+      # against a decorator-free layout. Keep its workspace dependency graph
+      # available in this Rust-owned gate rather than silently substituting a
+      # fixture authority.
+      - name: Install Node dependencies for the authority contract
+        uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.5.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
