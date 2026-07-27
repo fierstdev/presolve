@@ -15,6 +15,11 @@ on:
         required: true
         type: boolean
         default: false
+      repair_framework_visibility:
+        description: Make the already-published scoped framework package public without republishing
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -24,8 +29,25 @@ env:
   RELEASE_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.release_version || github.ref_name }}
 
 jobs:
+  repair-framework-visibility:
+    name: Repair framework npm visibility
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.repair_framework_visibility }}
+    runs-on: ubuntu-latest
+    environment:
+      name: npm
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.5.0
+          registry-url: https://registry.npmjs.org
+      - name: Make the scoped framework package public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm access set status=public @presolve/framework
+
   verify:
     name: Verify release inputs
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.repair_framework_visibility) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -170,7 +192,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          node scripts/publish-npm-if-missing.mjs pnpm framework/packages/presolve --no-git-checks --provenance
+          node scripts/publish-npm-if-missing.mjs pnpm framework/packages/presolve --no-git-checks --provenance --access public
           node scripts/publish-npm-if-missing.mjs pnpm packages/cli --no-git-checks --provenance
           node scripts/publish-npm-if-missing.mjs pnpm packages/create-presolve --no-git-checks --provenance
 
