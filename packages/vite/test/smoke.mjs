@@ -269,6 +269,7 @@ try {
     throw new Error("presolve dev must republish the composed diagnostics product");
   }
 } finally {
+  dev.server.httpServer.closeAllConnections?.();
   await dev.close();
 }
 
