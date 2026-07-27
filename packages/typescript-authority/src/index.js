@@ -154,7 +154,14 @@ async function resolvedBaseSymbols(project, symbol) {
   while (current && !seen.has(current.id)) {
     seen.add(current.id);
     const base = await directBaseSymbol(project, current);
-    if (!base) break;
+    if (!base) {
+      // The compiler's structural selection points at a heritage expression,
+      // so a direct `extends Component` query resolves to Component itself.
+      // Preserve that terminal resolved base without treating source spelling
+      // as framework meaning.
+      if (bases.length === 0) bases.push(await serializeSymbol(project, current));
+      break;
+    }
     bases.push(await serializeSymbol(project, base));
     current = await resolvedSymbol(project.checker, base);
   }

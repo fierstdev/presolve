@@ -18,12 +18,14 @@ try {
     cli: pack("packages/cli"),
     platform: packNative(`packages/${platformPackage()}`),
     create: pack("packages/create-presolve"),
+    typescriptAuthority: pack("packages/typescript-authority"),
   };
 
   run("pnpm", ["dlx", "--package", tarballs.create, "create-presolve", app]);
   const overrides = {
     presolve: `file:${tarballs.framework}`,
     "@presolve/cli": `file:${tarballs.cli}`,
+    "@presolve/typescript-authority": `file:${tarballs.typescriptAuthority}`,
     [`@presolve/${platformPackage()}`]: `file:${tarballs.platform}`,
   };
   const workspaceConfiguration = [

@@ -187,6 +187,27 @@ test("the V2 authoring bridge supports a component-only discovery phase", async 
   assert.deepEqual(result.effects, []);
 });
 
+test("the V2 authoring bridge recognizes a direct Component heritage-expression query", async () => {
+  const frameworkFile = resolve(root, "tests/framework-public-api/src/V2Counter.tsx");
+  const frameworkSource = readFileSync(frameworkFile, "utf8");
+  const directFile = resolve(root, "tests/framework-public-api/src/DirectV2.tsx");
+  const directSource = readFileSync(directFile, "utf8");
+  const result = await analyzeV2Authoring({
+    schemaVersion: V2_AUTHORED_AUTHORITY_SCHEMA_VERSION,
+    configFile: resolve(root, "tests/framework-public-api/tsconfig.json"),
+    canonical: {
+      component: { file: frameworkFile, position: frameworkSource.indexOf("Component") },
+    },
+    components: [{ id: "direct", file: directFile, position: directSource.lastIndexOf("Component") }],
+    states: [],
+    actions: [],
+    effects: [],
+    environmentPublic: [],
+  });
+  assert.deepEqual(result.components.map(entry => entry.id), ["direct"]);
+  assert.equal(result.components[0].identity.name, "Component");
+});
+
 test("the V2 authoring bridge resolves environment evidence without a component query", async () => {
   const frameworkFile = resolve(root, "tests/framework-public-api/src/V2Counter.tsx");
   const frameworkSource = readFileSync(frameworkFile, "utf8");
