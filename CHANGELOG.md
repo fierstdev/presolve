@@ -8,6 +8,14 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.4 - 2026-07-27
+
+### Fixed
+
+- Cloudflare Workers Static Assets deployments now consume compiler-internal
+  canonicalization redirects for every authored route, including nested routes
+  such as `/docs/`, without exposing `/routes/...` artifact paths.
+
 ## 0.2.0-beta.3 - 2026-07-27
 
 ### Added
