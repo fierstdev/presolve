@@ -25,3 +25,10 @@ export const lookalikeSchema = {
     },
   },
 };
+
+export async function saveProfile(
+  value: unknown,
+  signal: AbortSignal,
+): Promise<void> {
+  await Promise.resolve({ value, signal });
+}

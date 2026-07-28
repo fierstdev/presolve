@@ -1649,6 +1649,8 @@ pub fn build_application_semantic_model_from_component_graph(
         &form_fields,
         &validation_rules,
         &effect_trigger_plan,
+        None,
+        None,
     );
     let serialization = collect_serialization_products(
         &component_graph.components,
@@ -2420,6 +2422,8 @@ fn build_application_semantic_model_from_files_with_bindings_mode_and_v2(
         &form_fields,
         &validation_rules,
         &effect_trigger_plan,
+        bindings,
+        None,
     );
     let serialization =
         collect_serialization_products(&components, &forms, &form_fields, &submissions.plans);

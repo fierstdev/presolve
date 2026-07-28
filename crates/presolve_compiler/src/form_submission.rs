@@ -4,9 +4,9 @@ use std::collections::BTreeMap;
 
 use crate::component_graph::AuthoredSubmissionDeclarationFact;
 use crate::{
-    ComponentNode, EffectTriggerPlan, FieldId, FormEntity, FormFieldEntity, FormId, SemanticId,
-    SourceProvenance, SubmissionDeclarationCandidateId, SubmissionPlanId, ValidationRule,
-    ValidationRuleId,
+    BindingTable, ComponentNode, EffectTriggerPlan, FieldId, FormEntity, FormFieldEntity, FormId,
+    ImportBindingTarget, SemanticId, SourceProvenance, SubmissionDeclarationCandidateId,
+    SubmissionPlanId, ValidationRule, ValidationRuleId,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -21,6 +21,7 @@ pub enum SubmissionDeclarationViolation {
     AsyncMethod,
     ParameterizedMethod,
     InvalidReturnType,
+    InvalidCapability,
     InheritedDeclaration,
     DuplicateFormSubmission,
 }
@@ -33,6 +34,7 @@ pub struct SubmissionDeclarationCandidate {
     pub form_designator: Option<String>,
     pub resolved_form: Option<FormId>,
     pub action_batch: Option<SemanticId>,
+    pub capability: Option<FormSubmissionCapability>,
     pub provenance: SourceProvenance,
     pub decorator_provenance: SourceProvenance,
     pub form_designator_provenance: Option<SourceProvenance>,
@@ -59,10 +61,24 @@ pub struct FormSubmissionPlan {
     pub candidate: SubmissionDeclarationCandidateId,
     pub action_method: SemanticId,
     pub action_batch: SemanticId,
+    pub capability: Option<FormSubmissionCapability>,
     pub validation_rules: Vec<ValidationRuleId>,
     pub blocks_action_on_invalid: bool,
     pub reset_policy: SubmitResetPolicy,
     pub provenance: SourceProvenance,
+}
+
+/// Exact integrity-bound client capability selected for one Form submission.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct FormSubmissionCapability {
+    pub id: String,
+    pub module_specifier: String,
+    pub package: String,
+    pub version: String,
+    pub integrity: String,
+    pub export: String,
+    pub runtime_module: String,
+    pub resume_policy: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -90,11 +106,15 @@ pub fn collect_submission_products(
     fields: &BTreeMap<FieldId, FormFieldEntity>,
     rules: &BTreeMap<ValidationRuleId, ValidationRule>,
     action_batches: &EffectTriggerPlan,
+    bindings: Option<&BindingTable>,
+    retained_capabilities: Option<
+        &BTreeMap<SubmissionDeclarationCandidateId, FormSubmissionCapability>,
+    >,
 ) -> SubmissionProducts {
     let mut candidates = components
         .iter()
         .flat_map(|component| component.submission_declaration_facts.iter())
-        .map(|fact| lower_candidate(fact, forms, action_batches))
+        .map(|fact| lower_candidate(fact, forms, action_batches, bindings, retained_capabilities))
         .collect::<Vec<_>>();
     candidates.sort_by(|left, right| {
         (
@@ -202,6 +222,7 @@ pub fn collect_submission_products(
                 candidate: candidate.id.clone(),
                 action_method,
                 action_batch,
+                capability: candidate.capability.clone(),
                 validation_rules: validation_rules
                     .into_iter()
                     .map(|rule| rule.id.clone())
@@ -220,6 +241,10 @@ fn lower_candidate(
     fact: &AuthoredSubmissionDeclarationFact,
     forms: &BTreeMap<FormId, FormEntity>,
     action_batches: &EffectTriggerPlan,
+    bindings: Option<&BindingTable>,
+    retained_capabilities: Option<
+        &BTreeMap<SubmissionDeclarationCandidateId, FormSubmissionCapability>,
+    >,
 ) -> SubmissionDeclarationCandidate {
     let mut violations = Vec::new();
     if fact.owner_component.is_none() {
@@ -284,6 +309,45 @@ fn lower_candidate(
     if fact.has_action && action_batch.is_none() {
         violations.push(SubmissionDeclarationViolation::InvalidAction);
     }
+    let capability = retained_capabilities
+        .and_then(|capabilities| capabilities.get(&fact.id))
+        .cloned()
+        .or_else(|| {
+            fact.capability_local_name.as_ref().and_then(|local| {
+                let binding = bindings?.resolve_import(&fact.method_provenance.path, local)?;
+                if binding.imported_name == "default" {
+                    return None;
+                }
+                let ImportBindingTarget::SemanticPackage {
+                    package,
+                    version,
+                    integrity,
+                    export,
+                    runtime_module,
+                    resume_policy,
+                    form_submission: Some(_),
+                    ..
+                } = &binding.target
+                else {
+                    return None;
+                };
+                Some(FormSubmissionCapability {
+                    id: format!(
+                        "form-submission-capability:{package}@{version}:{export}:{integrity}"
+                    ),
+                    module_specifier: binding.source_module.to_string_lossy().into_owned(),
+                    package: package.clone(),
+                    version: version.clone(),
+                    integrity: integrity.clone(),
+                    export: export.clone(),
+                    runtime_module: runtime_module.clone(),
+                    resume_policy: resume_policy.clone(),
+                })
+            })
+        });
+    if fact.capability_local_name.is_some() && capability.is_none() {
+        violations.push(SubmissionDeclarationViolation::InvalidCapability);
+    }
     violations.sort();
     violations.dedup();
     SubmissionDeclarationCandidate {
@@ -293,6 +357,7 @@ fn lower_candidate(
         form_designator: fact.form_designator.clone(),
         resolved_form,
         action_batch,
+        capability,
         provenance: fact.method_provenance.clone(),
         decorator_provenance: fact.decorator_provenance.clone(),
         form_designator_provenance: fact.form_designator_provenance.clone(),

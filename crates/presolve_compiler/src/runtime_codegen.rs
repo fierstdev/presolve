@@ -22,7 +22,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = __EZ_COMPONENT_SCHEMA_VERSION__;
   const LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2;
-  const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 5;
+  const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 6;
   const SUPPORTED_RESOURCES_ARTIFACT_SCHEMA_VERSION = 3;
   const SUPPORTED_OPAQUE_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_RESUME_MANIFEST_SCHEMA_VERSION = 7;
@@ -71,6 +71,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     debug: []
   };
   let standardSchemaValidators = new Map();
+  let formSubmissionCapabilities = new Map();
 
   function exactObjectKeys(value, expected) {
     if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
@@ -883,6 +884,32 @@ const RUNTIME_STUB: &str = r#"(() => {
       reportDiagnostic(diagnostics, "PSR_INVALID_FORMS_ARTIFACT", "Standard Schema runtime module did not match validation rules", {}, true);
       throw new PresolveBootError("PSR_INVALID_FORMS_ARTIFACT");
     }
+    const submissionCapabilityIds = [...new Set(formsArtifact.forms
+      .map((form) => form?.submission?.capability)
+      .filter((capability) => typeof capability === "string"))].sort();
+    const submissionCapabilityModule = formsArtifact.submission_capability_module;
+    if (submissionCapabilityIds.length === 0) {
+      if (submissionCapabilityModule !== undefined) {
+        reportDiagnostic(diagnostics, "PSR_INVALID_FORMS_ARTIFACT", "Unused Form submission capability module was published", {}, true);
+        throw new PresolveBootError("PSR_INVALID_FORMS_ARTIFACT");
+      }
+    } else if (!exactObjectKeys(submissionCapabilityModule, ["path", "capabilities"])
+      || submissionCapabilityModule.path !== "/presolve.form-submissions.js"
+      || !Array.isArray(submissionCapabilityModule.capabilities)
+      || JSON.stringify(submissionCapabilityModule.capabilities.map((capability) => capability?.id).sort()) !== JSON.stringify(submissionCapabilityIds)
+      || !submissionCapabilityModule.capabilities.every((capability) =>
+        exactObjectKeys(capability, ["id", "module_specifier", "package", "version", "integrity", "export", "runtime_module", "resume_policy"])
+        && typeof capability.id === "string" && capability.id.length > 0
+        && typeof capability.module_specifier === "string" && capability.module_specifier.length > 0
+        && typeof capability.package === "string" && capability.package.length > 0
+        && typeof capability.version === "string" && capability.version.length > 0
+        && typeof capability.integrity === "string" && /^sha256:[0-9a-fA-F]{64}$/.test(capability.integrity)
+        && typeof capability.export === "string" && capability.export.length > 0
+        && typeof capability.runtime_module === "string" && capability.runtime_module.length > 0
+        && capability.resume_policy === "cold_fallback")) {
+      reportDiagnostic(diagnostics, "PSR_INVALID_FORMS_ARTIFACT", "Form submission capability module did not match submission plans", {}, true);
+      throw new PresolveBootError("PSR_INVALID_FORMS_ARTIFACT");
+    }
     const hasForms = formsArtifact.forms.length > 0 || formsArtifact.instances.length > 0;
     if (hasForms && manifest.schema_version < 3) {
       reportDiagnostic(diagnostics, "PSR_FORMS_MANIFEST_MISMATCH", "Forms runtime metadata requires a schema-v3 template manifest", { schema_version: manifest.schema_version }, true);
@@ -975,6 +1002,37 @@ const RUNTIME_STUB: &str = r#"(() => {
       validators.set(id, schema);
     }
     return validators;
+  }
+
+  async function loadFormSubmissionCapabilities(formsArtifact, diagnostics) {
+    const runtimeModule = formsArtifact?.submission_capability_module;
+    if (runtimeModule === undefined) return new Map();
+    let imported;
+    try {
+      imported = await import(runtimeModule.path);
+    } catch (error) {
+      reportDiagnostic(diagnostics, "PSR_FORM_SUBMISSION_MODULE_FAILED", "The compiler-published Form submission module could not be loaded", {
+        path: runtimeModule.path,
+        message: error instanceof Error ? error.message : String(error)
+      }, true);
+      throw new PresolveBootError("PSR_FORM_SUBMISSION_MODULE_FAILED");
+    }
+    const registry = imported?.presolveFormSubmissionCapabilities;
+    const expected = runtimeModule.capabilities.map((capability) => capability.id).sort();
+    if (registry === null || typeof registry !== "object" || Array.isArray(registry)
+      || !expected.every((id) => Object.prototype.hasOwnProperty.call(registry, id))) {
+      reportDiagnostic(diagnostics, "PSR_FORM_SUBMISSION_MODULE_MISMATCH", "The Form submission module did not expose the compiler-issued capability registry", {}, true);
+      throw new PresolveBootError("PSR_FORM_SUBMISSION_MODULE_MISMATCH");
+    }
+    const capabilities = new Map();
+    for (const id of expected) {
+      if (typeof registry[id] !== "function") {
+        reportDiagnostic(diagnostics, "PSR_FORM_SUBMISSION_MODULE_MISMATCH", "A bundled Form submission capability was not callable", { capability: id }, true);
+        throw new PresolveBootError("PSR_FORM_SUBMISSION_MODULE_MISMATCH");
+      }
+      capabilities.set(id, registry[id]);
+    }
+    return capabilities;
   }
 
   function readComputedArtifact(diagnostics) {
@@ -2253,6 +2311,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       }
       return Object.freeze({ ...staged, attachment, registration, dispose: () => {
         for (const child of [...children].reverse()) child.dispose();
+        cancelFormSubmissionsForComponent(store, identity);
         effects?.dispose();
         registration.rollback();
         attachment.rollback();
@@ -4755,6 +4814,8 @@ const RUNTIME_STUB: &str = r#"(() => {
         fields,
         aggregate_valid: true,
         submission: "Idle",
+        submission_generation: 0,
+        submission_controller: null,
         diagnostics
       });
     }
@@ -4807,6 +4868,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
     await Promise.all(initialValidations);
     installFormControlListeners(store);
+    installFormSubmissionDisposal(store);
     window.__PRESOLVE_FORMS__ = {
       resetForm: (instanceId) => resetForm(store, instanceId),
       resetField: (instanceId, fieldId) => resetField(store, instanceId, fieldId)
@@ -4825,14 +4887,68 @@ const RUNTIME_STUB: &str = r#"(() => {
     });
   }
 
+  function installFormSubmissionDisposal(store) {
+    window.addEventListener("pagehide", () => {
+      cancelFormSubmissionsForComponent(store, null);
+    }, { once: true });
+  }
+
+  function cancelFormSubmissionsForComponent(store, componentInstanceId) {
+    for (const formInstance of store.formInstances?.values() ?? []) {
+      if (componentInstanceId !== null
+        && formInstance.instance.component_instance !== componentInstanceId) continue;
+      if (formInstance.submission_controller === null) continue;
+      formInstance.submission_generation += 1;
+      formInstance.submission = "Cancelled";
+      formInstance.submission_controller.abort();
+      formInstance.submission_controller = null;
+    }
+  }
+
   async function dispatchFormSubmit(store, event, anchor) {
     const record = store.formHostsByAnchor.get(anchor);
     if (record === undefined || event.type !== record.host.event) return;
     if (record.host.prevent_default === true) event.preventDefault();
+    if (record.formInstance.submission === "Submitting") return;
     record.formInstance.submission = "Submitting";
+    const generation = ++record.formInstance.submission_generation;
     await Promise.all([...record.formInstance.fields.keys()]
       .map((fieldId) => validateFormField(record.formInstance, fieldId)));
+    if (generation !== record.formInstance.submission_generation) return;
     if (!record.formInstance.aggregate_valid) { record.formInstance.submission = "Invalid"; return; }
+    const capabilityId = record.formInstance.definition.submission?.capability;
+    if (capabilityId !== undefined) {
+      const capability = formSubmissionCapabilities.get(capabilityId);
+      if (capability === undefined) {
+        reportDiagnostic(store.diagnostics, "PSR_UNRESOLVED_FORM_SUBMISSION_CAPABILITY", "Submission plan did not resolve its exact compiler capability", { capability: capabilityId }, true);
+        record.formInstance.submission = "Failed";
+        return;
+      }
+      const controller = new AbortController();
+      record.formInstance.submission_controller = controller;
+      record.formInstance.serialized = serializeFormInstance(record.formInstance);
+      try {
+        await capability(canonicalFormValue(record.formInstance), controller.signal);
+        if (generation === record.formInstance.submission_generation) {
+          record.formInstance.submission = controller.signal.aborted ? "Cancelled" : "Completed";
+        }
+      } catch (error) {
+        if (generation === record.formInstance.submission_generation) {
+          record.formInstance.submission = controller.signal.aborted ? "Cancelled" : "Failed";
+          if (!controller.signal.aborted) {
+            reportDiagnostic(store.diagnostics, "PSR_FORM_SUBMISSION_CAPABILITY_REJECTED", "Form submission capability rejected", {
+              capability: capabilityId,
+              message: error instanceof Error ? error.message : String(error)
+            });
+          }
+        }
+      } finally {
+        if (generation === record.formInstance.submission_generation) {
+          record.formInstance.submission_controller = null;
+        }
+      }
+      return;
+    }
     const action = store.actionsByMethod.get(record.host.submit_action);
     const component = store.components.get(record.bridge.component_instance_id) ?? action?.component;
     if (action === undefined || action.action_batch_id !== record.host.action_batch || component === undefined) {
@@ -4856,20 +4972,25 @@ const RUNTIME_STUB: &str = r#"(() => {
     const definition = formInstance.definition;
     const fields = new Map((definition.fields ?? []).map((field) => [field.id, field]));
     if (definition.serialization?.format === "Json") {
-      const result = {};
-      for (const [fieldId, state] of formInstance.fields.entries()) {
-        const path = fields.get(fieldId)?.path;
-        if (!Array.isArray(path) || path.length === 0) continue;
-        let target = result;
-        for (const segment of path.slice(0, -1)) target = target[segment] ??= {};
-        target[path[path.length - 1]] = state.value;
-      }
-      return result;
+      return canonicalFormValue(formInstance);
     }
     return [...formInstance.fields.entries()].map(([field, state]) => ({
       key: fields.get(field)?.path?.join(".") ?? field,
       value: state.value
     }));
+  }
+
+  function canonicalFormValue(formInstance) {
+    const fields = new Map((formInstance.definition.fields ?? []).map((field) => [field.id, field]));
+    const result = {};
+    for (const [fieldId, state] of formInstance.fields.entries()) {
+      const path = fields.get(fieldId)?.path;
+      if (!Array.isArray(path) || path.length === 0) continue;
+      let target = result;
+      for (const segment of path.slice(0, -1)) target = target[segment] ??= {};
+      target[path[path.length - 1]] = state.value;
+    }
+    return result;
   }
 
   function dispatchFormEvent(store, event, blur) {
@@ -5072,6 +5193,9 @@ const RUNTIME_STUB: &str = r#"(() => {
   function resetForm(store, instanceId) {
     const formInstance = store.formInstances?.get(instanceId);
     if (formInstance === undefined) return false;
+    formInstance.submission_controller?.abort();
+    formInstance.submission_controller = null;
+    formInstance.submission_generation += 1;
     for (const fieldId of formInstance.fields.keys()) resetField(store, instanceId, fieldId);
     formInstance.submission = "Idle";
     return true;
@@ -5751,6 +5875,8 @@ const RUNTIME_STUB: &str = r#"(() => {
         fields,
         aggregate_valid: true,
         submission: "Idle",
+        submission_generation: 0,
+        submission_controller: null,
         diagnostics: store.diagnostics
       };
       store.forms.set(definition.id, definition);
@@ -5854,6 +5980,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
     await Promise.all(resumedValidations);
     installFormControlListeners(store);
+    installFormSubmissionDisposal(store);
     window.__PRESOLVE_FORMS__ = {
       resetForm: (instanceId) => resetForm(store, instanceId),
       resetField: (instanceId, fieldId) => resetField(store, instanceId, fieldId)
@@ -6331,6 +6458,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       const formsArtifact = readFormsArtifact(diagnostics);
       validateFormsArtifact(formsArtifact, manifest, diagnostics);
       standardSchemaValidators = await loadStandardSchemaValidators(formsArtifact, diagnostics);
+      formSubmissionCapabilities = await loadFormSubmissionCapabilities(formsArtifact, diagnostics);
       const resourcesArtifact = readResourcesArtifact(diagnostics);
       validateResourcesArtifact(resourcesArtifact, diagnostics);
 

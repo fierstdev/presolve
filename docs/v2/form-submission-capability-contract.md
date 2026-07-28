@@ -64,7 +64,15 @@ contract/runtime module fails publication.
 - `Submitting` is never resumed. Existing snapshot validation falls back
   cold for an active submission.
 
-The next implementation slice must project this contract into the Forms
-artifact, bundle the exact runtime export into the publication inventory, and
-prove completion, rejection, cancellation, duplicate-submit suppression, cold
-boot, and resume in a real browser.
+## Publication and proof
+
+Forms artifact schema v6 publishes the exact capability coordinate and the
+closed `/presolve.form-submissions.js` registry path. The ergonomic builder
+uses project Vite to bundle only the contract-selected runtime module and named
+export, includes the output in the digest inventory, and rejects missing or
+drifting records.
+
+Real-browser evidence covers fulfillment, rejection, reset-driven
+cancellation, duplicate-submit suppression, canonical nested values including
+files, cold boot, and resumed submission. Identical builds produce identical
+Forms artifacts, capability bundles, and publication manifests.

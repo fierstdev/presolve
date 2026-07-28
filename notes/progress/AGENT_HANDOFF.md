@@ -59,7 +59,8 @@ Decorator-free file controls now have an authority-backed platform-value path:
 - file value/tracking/validation slots are excluded from resume, while other
   fields resume and the Form deterministically revalidates after rebinding.
 
-Forms runtime artifact schema v5 now publishes typed validation arguments.
+Forms runtime artifact schema v6 publishes typed validation arguments plus the
+exact imported submission capability registry.
 Required, min/max, length, pattern, email, and compiler-bound cross-Field rules
 fail closed and execute in the browser. The acceptance fixture also proves IME
 composition suppression and Form input after snapshot resume.
@@ -74,7 +75,7 @@ Standard Schema authority and execution are now explicit:
 - the V2 Form graph retains the coordinate on its validation candidate;
 - ergonomic builds use the project's direct Vite dependency to bundle exact
   named exports into the publication inventory;
-- Forms artifact schema v5 names the module and exact validator IDs; and
+- Forms artifact schema v6 names the module and exact validator IDs; and
 - cold/resume browser proof covers Promise scheduling, stale-result
   suppression, non-coercion, issue normalization, validation-aware submit, and
   post-resume interactivity.
@@ -95,13 +96,25 @@ Imported Form submission now has a closed authored and package contract:
 - ambient calls, member/default/namespace imports, captures, reordered
   arguments, and arbitrary source execution remain excluded.
 
+That contract is executable through Forms artifact schema v6. Ergonomic
+publication bundles only the exact contract runtime module and export into
+`presolve.form-submissions.js`; the browser validates and imports its closed
+registry before initializing Forms. The runtime validates before invocation,
+constructs the canonical nested value from compiler Field paths, suppresses
+duplicates, owns one AbortController per accepted submission, and records
+Completed, Failed, Cancelled, Invalid, or reset-to-Idle transitions.
+
+The real-browser acceptance project proves deterministic double-build
+publication, exact nested values including `File[]`, fulfillment, rejection,
+reset-driven abort, duplicate suppression, cold boot, and resumed submission.
+The full inherited workspace gate, including 57 browser tests and the updated
+290343-byte production runtime baseline, passes.
+
 ## Next slice
 
-Project the imported submission authority into compiler products and the Forms
-runtime artifact, bundle the exact integrity-bound export, and prove success,
-rejection, abort, duplicate suppression, cold boot, and resume in a real
-browser. Then close the remaining server-validation/executor boundary and
-release-hardening gates.
+Close the remaining server-validation/executor boundary for route loaders and
+server actions, then run the final release-hardening, version, publication, and
+public compatibility gates.
 
 ## Verification
 
@@ -113,5 +126,4 @@ release-hardening gates.
 - `pnpm exec tsc -p tests/framework-public-api/tsconfig.json`
 - `cargo test -p presolve-cli --test runtime_browser decorator_free_v2_form_fields_bind_and_validate_in_a_real_browser -- --nocapture`
 
-Beta readiness estimate after the authored Form submission capability contract:
-96%.
+Beta readiness estimate after executable imported Form submissions: 98%.

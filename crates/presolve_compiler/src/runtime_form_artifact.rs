@@ -12,9 +12,8 @@ use crate::{
     ValidationRuleArgument, RUNTIME_FORM_REGISTRY_VERSION,
 };
 
-/// Version 5 adds the integrity-published Standard Schema runtime module and
-/// validator registry.
-pub const RUNTIME_FORM_ARTIFACT_SCHEMA_VERSION: u32 = 5;
+/// Version 6 adds the integrity-bound Form submission capability registry.
+pub const RUNTIME_FORM_ARTIFACT_SCHEMA_VERSION: u32 = 6;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RuntimeFormsArtifact {
@@ -22,11 +21,31 @@ pub struct RuntimeFormsArtifact {
     pub registry_version: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub standard_schema_module: Option<RuntimeFormsArtifactStandardSchemaModule>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub submission_capability_module: Option<RuntimeFormsArtifactSubmissionCapabilityModule>,
     pub forms: Vec<RuntimeFormsArtifactForm>,
     pub instances: Vec<RuntimeFormsArtifactInstance>,
     /// Instance-qualified executable submit-host records. These are the only
     /// runtime authority for locating and handling a native submit event.
     pub hosts: Vec<RuntimeFormsArtifactHost>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RuntimeFormsArtifactSubmissionCapabilityModule {
+    pub path: String,
+    pub capabilities: Vec<RuntimeFormsArtifactSubmissionCapability>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+pub struct RuntimeFormsArtifactSubmissionCapability {
+    pub id: String,
+    pub module_specifier: String,
+    pub package: String,
+    pub version: String,
+    pub integrity: String,
+    pub export: String,
+    pub runtime_module: String,
+    pub resume_policy: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -102,6 +121,8 @@ pub struct RuntimeFormsArtifactDependency {
 pub struct RuntimeFormsArtifactSubmission {
     pub plan: String,
     pub action_batch: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capability: Option<String>,
     pub validation_rules: Vec<String>,
 }
 
@@ -244,6 +265,10 @@ pub fn build_runtime_forms_artifact(model: &ApplicationSemanticModel) -> Runtime
                     .map(|plan| RuntimeFormsArtifactSubmission {
                         plan: plan.id.as_str().to_string(),
                         action_batch: plan.action_batch.to_string(),
+                        capability: plan
+                            .capability
+                            .as_ref()
+                            .map(|capability| capability.id.clone()),
                         validation_rules: plan
                             .validation_rules
                             .iter()
@@ -298,6 +323,24 @@ pub fn build_runtime_forms_artifact(model: &ApplicationSemanticModel) -> Runtime
                 Some(validator.clone())
             }
             _ => None,
+        })
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let submission_capabilities = model
+        .submissions
+        .plans
+        .values()
+        .filter_map(|plan| plan.capability.as_ref())
+        .map(|capability| RuntimeFormsArtifactSubmissionCapability {
+            id: capability.id.clone(),
+            module_specifier: capability.module_specifier.clone(),
+            package: capability.package.clone(),
+            version: capability.version.clone(),
+            integrity: capability.integrity.clone(),
+            export: capability.export.clone(),
+            runtime_module: capability.runtime_module.clone(),
+            resume_policy: capability.resume_policy.clone(),
         })
         .collect::<BTreeSet<_>>()
         .into_iter()
@@ -376,6 +419,12 @@ pub fn build_runtime_forms_artifact(model: &ApplicationSemanticModel) -> Runtime
             RuntimeFormsArtifactStandardSchemaModule {
                 path: "/presolve.validators.js".into(),
                 validators: standard_schema_validators,
+            },
+        ),
+        submission_capability_module: (!submission_capabilities.is_empty()).then_some(
+            RuntimeFormsArtifactSubmissionCapabilityModule {
+                path: "/presolve.form-submissions.js".into(),
+                capabilities: submission_capabilities,
             },
         ),
         forms,
@@ -467,6 +516,34 @@ pub fn validate_runtime_forms_artifact(
                     == expected_standard_schema_validators => {}
         None if expected_standard_schema_validators.is_empty() => {}
         _ => diagnostics.push("invalid Standard Schema runtime module".to_string()),
+    }
+    let expected_submission_capabilities = artifact
+        .forms
+        .iter()
+        .filter_map(|form| form.submission.as_ref()?.capability.as_deref())
+        .collect::<BTreeSet<_>>();
+    match &artifact.submission_capability_module {
+        Some(module)
+            if module.path == "/presolve.form-submissions.js"
+                && module.capabilities.len() == expected_submission_capabilities.len()
+                && module
+                    .capabilities
+                    .iter()
+                    .map(|capability| capability.id.as_str())
+                    .collect::<BTreeSet<_>>()
+                    == expected_submission_capabilities
+                && module.capabilities.iter().all(|capability| {
+                    !capability.id.is_empty()
+                        && !capability.module_specifier.is_empty()
+                        && !capability.package.is_empty()
+                        && !capability.version.is_empty()
+                        && capability.integrity.starts_with("sha256:")
+                        && !capability.export.is_empty()
+                        && !capability.runtime_module.is_empty()
+                        && capability.resume_policy == "cold_fallback"
+                }) => {}
+        None if expected_submission_capabilities.is_empty() => {}
+        _ => diagnostics.push("invalid Form submission capability module".to_string()),
     }
     for instance in &artifact.instances {
         if !forms.contains(instance.form.as_str()) {
@@ -623,14 +700,14 @@ fn field_programs(
 #[cfg(test)]
 mod tests {
     #[test]
-    fn emits_schema_v5_with_typed_validation_arguments_and_canonical_references() {
+    fn emits_schema_v6_with_typed_validation_arguments_and_canonical_references() {
         let parsed = presolve_parser::parse_file(
             "src/X.tsx",
             r#"@component("x")class X{@form()form!:Form;@validate(minLength(2))@field(this.form)value="";render(){return <input field={this.value}/>;}}"#,
         );
         let asm = crate::build_application_semantic_model(&parsed);
         let artifact = super::build_runtime_forms_artifact(&asm);
-        assert_eq!(artifact.schema_version, 5);
+        assert_eq!(artifact.schema_version, 6);
         assert_eq!(artifact.registry_version, 1);
         assert_eq!(artifact.forms.len(), 1);
         assert_eq!(artifact.instances.len(), 1);

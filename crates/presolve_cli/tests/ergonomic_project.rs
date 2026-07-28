@@ -305,7 +305,7 @@ process.stdout.write(JSON.stringify(await analyzeV2Authoring(JSON.parse(readFile
         &fs::read(root.join("dist/routes/root/forms.runtime.json")).unwrap(),
     )
     .unwrap();
-    assert_eq!(forms["schema_version"], 5);
+    assert_eq!(forms["schema_version"], 6);
     assert_eq!(
         forms["standard_schema_module"]["path"],
         "/presolve.validators.js"

@@ -278,12 +278,25 @@ fn validate_form_submissions(
     model: &ApplicationSemanticModel,
     diagnostics: &mut Vec<AsmValidationDiagnostic>,
 ) {
+    let retained_capabilities = model
+        .submissions
+        .candidates
+        .iter()
+        .filter_map(|candidate| {
+            candidate
+                .capability
+                .as_ref()
+                .map(|capability| (candidate.id.clone(), capability.clone()))
+        })
+        .collect();
     let expected = crate::collect_submission_products(
         &model.components,
         &model.forms,
         &model.form_fields,
         &model.validation_rules,
         &model.effect_trigger_plan,
+        None,
+        Some(&retained_capabilities),
     );
     if model.submissions != expected {
         diagnostics.push(AsmValidationDiagnostic {

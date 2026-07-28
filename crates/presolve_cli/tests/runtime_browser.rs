@@ -1114,11 +1114,11 @@ fn decorator_free_v2_form_fields_bind_and_validate_in_a_real_browser() {
         .expect("failed to create V2 Form source root");
     fs::write(
         project_root.join("app/routes/index.tsx"),
-        r#"import { Component, defineForm, email, field, max, maxLength, min, minLength, pattern, required, state } from "presolve";
+        r#"import { Component, defineForm, email, field, max, maxLength, min, minLength, pattern, required } from "presolve";
+import { saveProfile } from "profile-service";
 import { displayNameSchema } from "./schemas.js";
 
 export class Contact extends Component {
-  submitted = state(0);
   contact = defineForm({
     serialization: "form-data",
     fields: {
@@ -1129,13 +1129,11 @@ export class Contact extends Component {
       subscribed: field({ initial: false }),
       attachments: field<File[]>({ initial: [], validate: [required()] }),
     },
-    submit: async ({ value, signal }) => {
-      this.submitted += 1;
-    },
+    submit: async ({ value, signal }) => saveProfile(value, signal),
   });
 
   render() {
-    return <main><form form={this.contact}><input bind:value={this.contact.fields.name} /><input bind:value={this.contact.fields.alias} /><input type="number" bind:value={this.contact.fields.age} /><input type="email" bind:value={this.contact.fields.emailAddress} /><input type="checkbox" bind:checked={this.contact.fields.subscribed} /><input type="file" bind:files={this.contact.fields.attachments} /><button type="submit">Send</button></form><output>{this.submitted}</output></main>;
+    return <main><form form={this.contact}><input bind:value={this.contact.fields.name} /><input bind:value={this.contact.fields.alias} /><input type="number" bind:value={this.contact.fields.age} /><input type="email" bind:value={this.contact.fields.emailAddress} /><input type="checkbox" bind:checked={this.contact.fields.subscribed} /><input type="file" bind:files={this.contact.fields.attachments} /><button type="submit">Send</button></form></main>;
   }
 }
 "#,
@@ -1162,6 +1160,42 @@ export class Contact extends Component {
 "#,
     )
     .expect("failed to write Standard Schema validator");
+    let profile_service = project_root.join("node_modules/profile-service");
+    fs::create_dir_all(profile_service.join("dist"))
+        .expect("failed to create Form submission capability package");
+    fs::write(
+        profile_service.join("package.json"),
+        r#"{"name":"profile-service","version":"1.2.3","type":"module","exports":{".":{"types":"./dist/save-profile.d.ts","import":"./dist/save-profile.js"}}}"#,
+    )
+    .expect("failed to write Form submission package manifest");
+    fs::write(
+        profile_service.join("presolve.contract.json"),
+        r#"{"schema_version":1,"package":"profile-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"saveProfile":{"kind":"capability","type_signature":"(FormValue, AbortSignal) -> Promise<void>","runtime_module":"dist/save-profile.js","resume_policy":"cold_fallback","form_submission":{"execution_boundary":"client","cancellation":"abort","input":"form_value","result":"void"}}}}"#,
+    )
+    .expect("failed to write Form submission capability contract");
+    fs::write(
+        profile_service.join("dist/save-profile.d.ts"),
+        "export declare function saveProfile(value: unknown, signal: AbortSignal): Promise<void>;\n",
+    )
+    .expect("failed to write Form submission capability types");
+    fs::write(
+        profile_service.join("dist/save-profile.js"),
+        r#"export async function saveProfile(value, signal) {
+  const probe = window.__PRESOLVE_SUBMISSION_PROBE__ ??= { calls: [], aborts: 0 };
+  probe.calls.push(value);
+  signal.addEventListener("abort", () => { probe.aborts += 1; }, { once: true });
+  if (value.name === "reject") throw new Error("fixture rejection");
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, 80);
+    signal.addEventListener("abort", () => {
+      clearTimeout(timer);
+      reject(new DOMException("aborted", "AbortError"));
+    }, { once: true });
+  });
+}
+"#,
+    )
+    .expect("failed to write Form submission capability runtime");
     fs::write(
         project_root.join("tsconfig.json"),
         r#"{"compilerOptions":{"noEmit":true}}"#,
@@ -1236,11 +1270,11 @@ process.stdout.write(JSON.stringify({
         String::from_utf8_lossy(&output.stderr)
     );
     let output_root = project_root.join("dist/routes/root");
-    let artifact = fs::read_to_string(output_root.join("forms.runtime.json"))
+    let artifact_json = fs::read_to_string(output_root.join("forms.runtime.json"))
         .expect("V2 Form runtime artifact");
     let artifact: serde_json::Value =
-        serde_json::from_str(&artifact).expect("V2 Form runtime artifact JSON");
-    assert_eq!(artifact["schema_version"], 5);
+        serde_json::from_str(&artifact_json).expect("V2 Form runtime artifact JSON");
+    assert_eq!(artifact["schema_version"], 6);
     assert_eq!(artifact["forms"][0]["fields"].as_array().unwrap().len(), 6);
     assert_eq!(
         artifact["forms"][0]["validation_rules"]
@@ -1259,6 +1293,53 @@ process.stdout.write(JSON.stringify({
     assert!(
         validator_module.contains("presolveStandardSchemaValidators"),
         "published validator module did not retain its named registry export"
+    );
+    assert_eq!(
+        artifact["submission_capability_module"]["path"],
+        "/presolve.form-submissions.js"
+    );
+    assert_eq!(
+        artifact["submission_capability_module"]["capabilities"]
+            .as_array()
+            .map(Vec::len),
+        Some(1)
+    );
+    let submission_module =
+        fs::read_to_string(project_root.join("dist/presolve.form-submissions.js"))
+            .expect("published Form submission capability module");
+    assert!(
+        submission_module.contains("presolveFormSubmissionCapabilities"),
+        "published Form submission module did not retain its named registry export"
+    );
+    let publication_manifest = fs::read(project_root.join("dist/file-routes.manifest.json"))
+        .expect("V2 Form publication manifest");
+    let deterministic = Command::new(presolve_cli_bin())
+        .current_dir(&project_root)
+        .arg("build")
+        .output()
+        .expect("failed to repeat the V2 Form build");
+    assert!(
+        deterministic.status.success(),
+        "repeated V2 Form build failed: {}",
+        String::from_utf8_lossy(&deterministic.stderr)
+    );
+    assert_eq!(
+        fs::read_to_string(output_root.join("forms.runtime.json"))
+            .expect("repeated V2 Form runtime artifact"),
+        artifact_json,
+        "Forms artifact changed across identical builds"
+    );
+    assert_eq!(
+        fs::read_to_string(project_root.join("dist/presolve.form-submissions.js"))
+            .expect("repeated Form submission capability module"),
+        submission_module,
+        "Form submission capability module changed across identical builds"
+    );
+    assert_eq!(
+        fs::read(project_root.join("dist/file-routes.manifest.json"))
+            .expect("repeated V2 Form publication manifest"),
+        publication_manifest,
+        "publication manifest changed across identical builds"
     );
 
     let index = fs::read_to_string(output_root.join("index.html")).expect("built V2 Form page");
@@ -1321,9 +1402,27 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => { const d
   attachments.dispatchEvent(new Event("change", { bubbles: true }));
   const submit = new Event("submit", { bubbles: true, cancelable: true });
   document.querySelector("form").dispatchEvent(submit);
-  await waitFor(() => window.__PRESOLVE__.components[0].state.submitted === 1, "inline submit action");
-  if (!submit.defaultPrevented || instance.submission !== "Completed") fail("native inline submit did not complete through the compiler host");
-  if (window.__PRESOLVE__.diagnostics.length !== 0) fail("runtime reported V2 Form diagnostics");
+  const duplicate = new Event("submit", { bubbles: true, cancelable: true });
+  document.querySelector("form").dispatchEvent(duplicate);
+  await waitFor(() => instance.submission === "Completed", "imported Form submission capability");
+  const submissionProbe = window.__PRESOLVE_SUBMISSION_PROBE__;
+  if (!submit.defaultPrevented || !duplicate.defaultPrevented || submissionProbe.calls.length !== 1) fail("duplicate submission was not suppressed");
+  const submittedValue = submissionProbe.calls[0];
+  if (submittedValue.name !== "Grace" || submittedValue.age !== 42 || submittedValue.subscribed !== true
+    || submittedValue.attachments.length !== 1 || submittedValue.attachments[0].name !== "proof.txt") fail("capability did not receive the compiler-owned nested Form value");
+  name.value = "reject"; name.dispatchEvent(new Event("input", { bubbles: true }));
+  await waitFor(() => !stateFor("name").validation_pending, "rejection input validation");
+  document.querySelector("form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+  await waitFor(() => instance.submission === "Failed", "capability rejection");
+  if (submissionProbe.calls.length !== 2 || !window.__PRESOLVE__.diagnostics.some((diagnostic) => diagnostic.code === "PSR_FORM_SUBMISSION_CAPABILITY_REJECTED")) fail("capability rejection did not enter the failed state");
+  name.value = "cancel"; name.dispatchEvent(new Event("input", { bubbles: true }));
+  await waitFor(() => !stateFor("name").validation_pending, "cancellation input validation");
+  document.querySelector("form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+  await waitFor(() => instance.submission === "Submitting" && submissionProbe.calls.length === 3, "active capability invocation");
+  if (!window.__PRESOLVE_FORMS__.resetForm(instance.instance.id)) fail("Form reset was unavailable");
+  await waitFor(() => submissionProbe.aborts === 1, "submission AbortSignal");
+  if (instance.submission !== "Idle" || submissionProbe.calls.length !== 3) fail("Form reset did not cancel and reset the submission lifecycle");
+  if (window.__PRESOLVE__.diagnostics.some((diagnostic) => diagnostic.fatal)) fail("runtime reported fatal V2 Form diagnostics");
   document.body.insertAdjacentHTML("beforeend", "<div>" + "PRESOLVE_V2_FORM_" + "BROWSER_PASS" + "</div>");
 })().catch((error) => { document.body.insertAdjacentHTML("beforeend", `<div>${"PRESOLVE_V2_FORM_" + "BROWSER_FAIL"}: ${error.message}</div>`); console.error(error); });
 </script></body>"#,
@@ -1428,8 +1527,9 @@ await waitFor(() => [...instance.fields.values()].every((field) => !field.valida
 if (!instance.aggregate_valid) fail("resumed Form validation did not recover after valid input");
 const resumedSubmit = new Event("submit", { bubbles: true, cancelable: true });
 document.querySelector("form").dispatchEvent(resumedSubmit);
-await waitFor(() => runtime.components[0].state.submitted === 1, "resumed Form submission");
-if (!resumedSubmit.defaultPrevented || instance.submission !== "Completed") fail("resumed Form submission host was not restored");
+await waitFor(() => instance.submission === "Completed", "resumed imported Form submission");
+if (!resumedSubmit.defaultPrevented || window.__PRESOLVE_SUBMISSION_PROBE__.calls.length !== 1
+  || window.__PRESOLVE_SUBMISSION_PROBE__.calls[0].name !== "Resumed") fail("resumed Form submission capability was not restored");
 if (runtime.diagnostics.some((diagnostic) => diagnostic.fatal)) fail("V2 Form resume reported fatal diagnostics");"#,
         "PRESOLVE_V2_FORM_RESUME_PASS",
     );

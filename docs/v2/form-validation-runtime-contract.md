@@ -7,7 +7,7 @@ and asynchronous execution are defined in
 
 ## Artifact authority
 
-- Forms runtime artifact schema v5 uses a closed tagged rule vocabulary:
+- Forms runtime artifact schema v6 uses a closed tagged rule vocabulary:
   `none`, `number`, `length`, `pattern`, `field`, and `standard_schema`.
   It also carries the optional compiler-published validator-module path and
   exact sorted validator registry.

@@ -212,6 +212,11 @@ pub struct AuthoredSubmissionDeclarationFact {
     pub has_action: bool,
     pub action_invoked: bool,
     pub action_argument_count: usize,
+    /// Direct imported capability candidate retained from the closed V2 submit
+    /// syntax. Binding/package authority resolves it during application
+    /// assembly; legacy and State-update submissions leave it absent.
+    pub capability_local_name: Option<String>,
+    pub capability_provenance: Option<SourceProvenance>,
     pub inherited: bool,
     pub decorator_provenance: SourceProvenance,
     pub form_designator_provenance: Option<SourceProvenance>,
@@ -2156,14 +2161,23 @@ pub fn build_v2_component_graph_for_module(
             }
             if let Some(submit) = shape.submit.as_ref() {
                 let handler = &submit.handler;
-                if submit.parameter_count != 1
-                    || handler.is_expression_body
-                    || !handler.unsupported_statement_spans.is_empty()
-                    || handler
+                let capability_call = handler.direct_call.as_ref().filter(|call| {
+                    submit.is_async
+                        && submit.parameter_count == 1
+                        && handler.state_updates.is_empty()
+                        && handler.local_variables.is_empty()
+                        && call.arguments.len() == 2
+                        && call.arguments[0].name == "value"
+                        && call.arguments[1].name == "signal"
+                });
+                let state_update_handler = submit.parameter_count == 1
+                    && !handler.is_expression_body
+                    && handler.unsupported_statement_spans.is_empty()
+                    && handler
                         .state_updates
                         .iter()
-                        .any(|update| !canonical_state_names.contains(update.field.as_str()))
-                {
+                        .all(|update| canonical_state_names.contains(update.field.as_str()));
+                if capability_call.is_none() && !state_update_handler {
                     diagnostics.push(ComponentDiagnostic::error(
                         "PSV2F1006",
                         format!(
@@ -2173,7 +2187,11 @@ pub fn build_v2_component_graph_for_module(
                     ));
                     continue;
                 }
-                let Some(operands) = v2_action_operands(handler, class) else {
+                let Some(operands) = capability_call
+                    .is_some()
+                    .then(BTreeMap::new)
+                    .or_else(|| v2_action_operands(handler, class))
+                else {
                     diagnostics.push(ComponentDiagnostic::error(
                         "PSV2F1007",
                         format!(
@@ -2224,6 +2242,9 @@ pub fn build_v2_component_graph_for_module(
                     has_action: true,
                     action_invoked: true,
                     action_argument_count: 0,
+                    capability_local_name: capability_call.map(|call| call.callee.clone()),
+                    capability_provenance: capability_call
+                        .map(|call| SourceProvenance::new(&parsed.path, call.callee_span)),
                     inherited: false,
                     decorator_provenance: submit_provenance.clone(),
                     form_designator_provenance: Some(SourceProvenance::new(
@@ -3276,6 +3297,8 @@ fn submission_declaration_facts_from_class(
                     has_action: action.is_some(),
                     action_invoked: action.is_some_and(|decorator| decorator.is_invoked),
                     action_argument_count: action.map_or(0, |decorator| decorator.argument_count),
+                    capability_local_name: None,
+                    capability_provenance: None,
                     inherited: class.heritage.is_some(),
                     decorator_provenance: SourceProvenance::new(path, decorator.span),
                     form_designator_provenance: decorator

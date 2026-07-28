@@ -530,8 +530,9 @@ pub use form_serialization::{
     SerializationProducts, SerializedFieldPlan,
 };
 pub use form_submission::{
-    collect_submission_products, FormSubmissionPlan, SubmissionDeclarationCandidate,
-    SubmissionDeclarationViolation, SubmissionProducts, SubmitResetPolicy,
+    collect_submission_products, FormSubmissionCapability, FormSubmissionPlan,
+    SubmissionDeclarationCandidate, SubmissionDeclarationViolation, SubmissionProducts,
+    SubmitResetPolicy,
 };
 pub use form_submission_host::{
     collect_submission_host_products, SubmissionHost, SubmissionHostCandidate,

@@ -292,6 +292,7 @@ mod tests {
                 schema_version: 1,
                 registry_version: 1,
                 standard_schema_module: None,
+                submission_capability_module: None,
                 forms: Vec::new(),
                 instances: Vec::new(),
                 hosts: Vec::new(),

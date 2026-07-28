@@ -4,9 +4,9 @@ use std::path::{Path, PathBuf};
 use crate::compilation_unit::CompilationUnit;
 use crate::module_graph::{ModuleEdgeKind, ModuleGraph, ModuleTarget};
 use crate::semantic_package::{
-    SemanticPackageKind, SemanticPackageOpaqueTerminal, SemanticPackagePureOperation,
-    SemanticPackageResolutionTable, SemanticPackageResourceEndpoint, SemanticPackageRouteLoader,
-    SemanticPackageServerAction,
+    SemanticPackageFormSubmission, SemanticPackageKind, SemanticPackageOpaqueTerminal,
+    SemanticPackagePureOperation, SemanticPackageResolutionTable, SemanticPackageResourceEndpoint,
+    SemanticPackageRouteLoader, SemanticPackageServerAction,
 };
 use crate::symbol_table::{ModuleSymbol, SymbolKind, SymbolTable};
 
@@ -59,6 +59,7 @@ pub enum ImportBindingTarget {
         resource_endpoint: Option<SemanticPackageResourceEndpoint>,
         route_loader: Option<SemanticPackageRouteLoader>,
         server_action: Option<SemanticPackageServerAction>,
+        form_submission: Option<SemanticPackageFormSubmission>,
         opaque_terminal: Option<SemanticPackageOpaqueTerminal>,
     },
 }
@@ -314,6 +315,7 @@ fn resolve_semantic_package_import(
                     resource_endpoint: export.resource_endpoint.clone(),
                     route_loader: export.route_loader.clone(),
                     server_action: export.server_action.clone(),
+                    form_submission: export.form_submission.clone(),
                     opaque_terminal: export.opaque_terminal.clone(),
                 },
             },
@@ -809,6 +811,7 @@ class Second extends Component {
             resource_endpoint: _,
             route_loader: _,
             server_action: _,
+            form_submission: _,
             opaque_terminal: _,
         } = &bindings
             .resolve_import("src/App.tsx", "format")

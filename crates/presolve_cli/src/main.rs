@@ -220,6 +220,9 @@ fn run_ergonomic_build(
         .unwrap_or_else(|message| {
             application_cli_error("PSFORM1001_STANDARD_SCHEMA_BUNDLE_FAILED", &message)
         });
+    attach_form_submission_runtime_module(&project.root, &mut product).unwrap_or_else(|message| {
+        application_cli_error("PSFORM1002_SUBMISSION_CAPABILITY_BUNDLE_FAILED", &message)
+    });
     publish_file_route_product(&output_root, &product)
         .unwrap_or_else(|error| application_cli_error("PSROUTE3008_PUBLICATION_FAILED", &error));
     println!("Built {}", output_root.display());
@@ -859,6 +862,196 @@ fn standard_schema_bundle_specifier(
         "../{}",
         normalized.to_string_lossy().replace('\\', "/")
     ))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FormSubmissionRuntimeCapabilityV1 {
+    id: String,
+    module_specifier: String,
+    package: String,
+    version: String,
+    integrity: String,
+    export: String,
+    runtime_module: String,
+    resume_policy: String,
+}
+
+fn attach_form_submission_runtime_module(
+    project_root: &Path,
+    product: &mut presolve_compiler::FileRoutePublicationProductV1,
+) -> Result<(), String> {
+    let mut capabilities = BTreeSet::new();
+    for (path, bytes) in &product.artifacts {
+        if path.file_name().and_then(|name| name.to_str()) != Some("forms.runtime.json") {
+            continue;
+        }
+        let artifact: serde_json::Value = serde_json::from_slice(bytes)
+            .map_err(|error| format!("{}: {error}", path.display()))?;
+        let Some(records) = artifact
+            .get("submission_capability_module")
+            .and_then(|module| module.get("capabilities"))
+            .and_then(serde_json::Value::as_array)
+        else {
+            continue;
+        };
+        for record in records {
+            capabilities.insert(
+                serde_json::from_value::<FormSubmissionRuntimeCapabilityV1>(record.clone())
+                    .map_err(|error| {
+                        format!(
+                            "{} contains an invalid Form submission capability: {error}",
+                            path.display()
+                        )
+                    })?,
+            );
+        }
+    }
+    if capabilities.is_empty() {
+        return Ok(());
+    }
+    let mut by_id = BTreeMap::new();
+    for capability in capabilities {
+        if let Some(existing) = by_id.insert(capability.id.clone(), capability.clone()) {
+            if existing != capability {
+                return Err(format!(
+                    "Form submission capability id {} resolved to multiple exports",
+                    capability.id
+                ));
+            }
+        }
+    }
+    let mut entry = String::new();
+    for (index, capability) in by_id.values().enumerate() {
+        let specifier = form_submission_bundle_specifier(project_root, capability)?;
+        entry.push_str(&format!(
+            "import {{ {} as __presolve_form_submission_{index} }} from {};\n",
+            capability.export,
+            serde_json::to_string(&specifier)
+                .map_err(|error| format!("failed to encode capability module: {error}"))?
+        ));
+    }
+    entry.push_str("const registry = Object.create(null);\n");
+    for (index, capability) in by_id.values().enumerate() {
+        entry.push_str(&format!(
+            "registry[{}] = __presolve_form_submission_{index};\n",
+            serde_json::to_string(&capability.id)
+                .map_err(|error| format!("failed to encode capability id: {error}"))?
+        ));
+    }
+    entry.push_str("export const presolveFormSubmissionCapabilities = Object.freeze(registry);\n");
+
+    let work_root = project_root.join(".presolve");
+    fs::create_dir_all(&work_root)
+        .map_err(|error| format!("failed to create {}: {error}", work_root.display()))?;
+    let entry_path = work_root.join("presolve-form-submission-entry.mjs");
+    let runner_path = work_root.join("presolve-form-submission-build.mjs");
+    fs::write(&entry_path, entry)
+        .map_err(|error| format!("failed to write {}: {error}", entry_path.display()))?;
+    fs::write(
+        &runner_path,
+        r#"import { build } from "vite";
+await build({
+  root: process.cwd(),
+  configFile: false,
+  logLevel: "error",
+  build: {
+    outDir: ".presolve/form-submission-output",
+    emptyOutDir: true,
+    sourcemap: false,
+    assetsInlineLimit: Number.MAX_SAFE_INTEGER,
+    rollupOptions: {
+      input: ".presolve/presolve-form-submission-entry.mjs",
+      preserveEntrySignatures: "strict",
+      output: {
+        format: "es",
+        entryFileNames: "presolve.form-submissions.js",
+        chunkFileNames: "presolve.form-submissions.[hash].js",
+        assetFileNames: "presolve.form-submissions.[hash][extname]",
+        inlineDynamicImports: true
+      }
+    }
+  }
+});
+"#,
+    )
+    .map_err(|error| format!("failed to write {}: {error}", runner_path.display()))?;
+    let output = Command::new("node")
+        .arg(&runner_path)
+        .current_dir(project_root)
+        .output()
+        .map_err(|error| format!("failed to start the Form submission Vite build: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "Vite exited with {}: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    let output_root = work_root.join("form-submission-output");
+    let mut bundled = Vec::new();
+    collect_static_publication_input(&output_root, Path::new(""), &mut bundled)?;
+    if !bundled
+        .iter()
+        .any(|(path, _)| path == Path::new("presolve.form-submissions.js"))
+    {
+        return Err("Vite did not emit presolve.form-submissions.js".into());
+    }
+    for (path, bytes) in bundled {
+        if product.artifacts.contains_key(&path) {
+            return Err(format!(
+                "Form submission bundle {} collides with a published artifact",
+                path.display()
+            ));
+        }
+        product
+            .manifest
+            .artifacts
+            .push(presolve_compiler::ApplicationPublicationArtifactV1 {
+                path: path.to_string_lossy().into_owned(),
+                digest: format!("sha256:{:x}", Sha256::digest(&bytes)),
+            });
+        product.artifacts.insert(path, bytes);
+    }
+    product
+        .manifest
+        .artifacts
+        .sort_by(|left, right| left.path.cmp(&right.path));
+    product.artifacts.insert(
+        PathBuf::from("file-routes.manifest.json"),
+        presolve_compiler::file_route_publication_manifest_json_v1(&product.manifest).into_bytes(),
+    );
+    Ok(())
+}
+
+fn form_submission_bundle_specifier(
+    project_root: &Path,
+    capability: &FormSubmissionRuntimeCapabilityV1,
+) -> Result<String, String> {
+    if capability.module_specifier.starts_with('.')
+        || capability.module_specifier.starts_with('/')
+        || capability.runtime_module.starts_with('/')
+        || Path::new(&capability.runtime_module)
+            .components()
+            .any(|component| matches!(component, std::path::Component::ParentDir))
+    {
+        return Err(format!(
+            "Form submission capability {} has a non-canonical runtime module",
+            capability.id
+        ));
+    }
+    let package_root = project_root
+        .join("node_modules")
+        .join(&capability.module_specifier);
+    let runtime = package_root.join(&capability.runtime_module);
+    if !runtime.is_file() {
+        return Err(format!(
+            "Form submission capability {} runtime module {} does not exist",
+            capability.id,
+            runtime.display()
+        ));
+    }
+    Ok(runtime.to_string_lossy().into_owned())
 }
 
 fn collect_static_publication_input(
