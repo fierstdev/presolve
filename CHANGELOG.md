@@ -8,6 +8,15 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.5 - 2026-07-27
+
+### Fixed
+
+- Unsupported-platform CLI diagnostics now report the installed Presolve beta
+  version instead of the retired `0.1 alpha` label.
+- The public capability matrix and guides now distinguish canonical
+  decorator-free V2 source from retained alpha-compatibility decorators.
+
 ## 0.2.0-beta.4 - 2026-07-27
 
 ### Fixed

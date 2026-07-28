@@ -1,7 +1,7 @@
 # Presolve V2 engineering handoff
 
 This directory starts the implementation path from `0.1.0-alpha.1` to
-`0.2.0-beta.4`. It is intentionally an engineering record rather than a second
+`0.2.0-beta.5`. It is intentionally an engineering record rather than a second
 user guide.
 
 ## Authority
