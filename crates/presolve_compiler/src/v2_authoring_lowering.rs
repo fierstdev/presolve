@@ -7,9 +7,9 @@ use crate::{
     lower_computed_getters_v1, lower_state_initializers_v1, ActionFieldLoweringErrorV1,
     AuthoredSemanticCompositionErrorV1, CanonicalAuthoredSemanticModelV1,
     ComponentInheritanceLoweringErrorV1, ComputedGetterLoweringErrorV1, EffectFieldLoweringErrorV1,
-    ResolvedActionFieldV1, ResolvedComponentInheritanceV1, ResolvedEffectFieldV1,
-    ResolvedSlotFieldV1, ResolvedStateInitializerV1, SlotFieldLoweringErrorV1,
-    StateInitializerLoweringErrorV1,
+    FormDefinitionLoweringErrorV1, ResolvedActionFieldV1, ResolvedComponentInheritanceV1,
+    ResolvedEffectFieldV1, ResolvedFormDefinitionV1, ResolvedSlotFieldV1,
+    ResolvedStateInitializerV1, SlotFieldLoweringErrorV1, StateInitializerLoweringErrorV1,
 };
 
 /// The authority-resolved inputs for the currently implemented V2 source forms.
@@ -20,6 +20,7 @@ pub struct V2AuthoringResolutionsV1 {
     pub actions: Vec<ResolvedActionFieldV1>,
     pub effects: Vec<ResolvedEffectFieldV1>,
     pub slots: Vec<ResolvedSlotFieldV1>,
+    pub forms: Vec<ResolvedFormDefinitionV1>,
 }
 
 /// The unified decorator-free canonical model and its constituent proof products.
@@ -32,6 +33,7 @@ pub struct V2AuthoringLoweringV1 {
     pub computed_count: usize,
     pub effect_count: usize,
     pub slot_count: usize,
+    pub form_count: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,6 +43,7 @@ pub enum V2AuthoringLoweringErrorV1 {
     Action(ActionFieldLoweringErrorV1),
     Effect(EffectFieldLoweringErrorV1),
     Slot(SlotFieldLoweringErrorV1),
+    Form(FormDefinitionLoweringErrorV1),
     Computed(ComputedGetterLoweringErrorV1),
     Composition(AuthoredSemanticCompositionErrorV1),
 }
@@ -53,6 +56,7 @@ impl std::fmt::Display for V2AuthoringLoweringErrorV1 {
             Self::Action(error) => error.fmt(formatter),
             Self::Effect(error) => error.fmt(formatter),
             Self::Slot(error) => error.fmt(formatter),
+            Self::Form(error) => error.fmt(formatter),
             Self::Computed(error) => error.fmt(formatter),
             Self::Composition(error) => error.fmt(formatter),
         }
@@ -76,12 +80,15 @@ pub fn lower_v2_authoring_v1(
         .map_err(V2AuthoringLoweringErrorV1::Effect)?;
     let slots = crate::lower_slot_fields_v1(parsed, &components.model, resolutions.slots)
         .map_err(V2AuthoringLoweringErrorV1::Slot)?;
+    let forms = crate::lower_form_definitions_v1(parsed, &components.model, resolutions.forms)
+        .map_err(V2AuthoringLoweringErrorV1::Form)?;
     let input = compose_authored_semantics_v1([
         components.model.clone(),
         states.model.clone(),
         actions.model.clone(),
         effects.model.clone(),
         slots.model.clone(),
+        forms.model.clone(),
     ])
     .map_err(V2AuthoringLoweringErrorV1::Composition)?;
     let computed =
@@ -92,6 +99,7 @@ pub fn lower_v2_authoring_v1(
     let computed_count = computed.model.declarations.len();
     let effect_count = effects.model.declarations.len();
     let slot_count = slots.model.declarations.len();
+    let form_count = forms.model.declarations.len();
     let model = compose_authored_semantics_v1([input, computed.model])
         .map_err(V2AuthoringLoweringErrorV1::Composition)?;
     Ok(V2AuthoringLoweringV1 {
@@ -101,6 +109,7 @@ pub fn lower_v2_authoring_v1(
         computed_count,
         effect_count,
         slot_count,
+        form_count,
         model,
     })
 }
@@ -207,6 +216,7 @@ class Counter extends AliasedBase {
                     },
                     slot_identity: identity("slot"),
                 }],
+                forms: Vec::new(),
             },
         )
         .expect("one authority-backed V2 source model");
@@ -215,6 +225,7 @@ class Counter extends AliasedBase {
         assert_eq!(lowering.action_count, 1);
         assert_eq!(lowering.effect_count, 1);
         assert_eq!(lowering.slot_count, 1);
+        assert_eq!(lowering.form_count, 0);
         assert_eq!(lowering.computed_count, 2);
         assert_eq!(
             lowering

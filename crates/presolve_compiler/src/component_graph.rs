@@ -1882,6 +1882,78 @@ pub fn build_v2_component_graph_for_module(
                 &mut diagnostics,
             );
         }
+        let mut form_declaration_candidates = Vec::new();
+        for candidate in authored.declarations.iter().filter(|candidate| {
+            candidate.kind == crate::CanonicalAuthoredDeclarationKindV1::Form
+                && candidate.subject.starts_with(&format!("{}.", class.name))
+        }) {
+            let Some(name) = candidate.subject.strip_prefix(&format!("{}.", class.name)) else {
+                continue;
+            };
+            let Some(property) = class
+                .properties
+                .iter()
+                .find(|property| property.name == name)
+            else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2F1001",
+                    format!(
+                        "canonical V2 Form `{}` has no source field",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            };
+            let Some(call) = property.initializer_call.as_ref() else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2F1002",
+                    format!(
+                        "canonical V2 Form `{}` requires defineForm({{...}})",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            };
+            if call.argument_count != 1 {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2F1003",
+                    format!(
+                        "canonical V2 Form `{}` requires exactly one static definition",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            }
+            let form_id = FormId::for_owner(&id, name);
+            let authored_field = id.form_field(name);
+            let form_provenance = SourceProvenance::new(&parsed.path, property.span);
+            provenance.insert(form_id.as_semantic_id().clone(), form_provenance.clone());
+            provenance.insert(authored_field.clone(), form_provenance.clone());
+            form_declaration_candidates.push(FormDeclarationCandidate {
+                id: FormDeclarationCandidateId::for_source_position(
+                    &parsed.path,
+                    property.span.start,
+                ),
+                owner_component: Some(id.clone()),
+                form_id: Some(form_id),
+                authored_field: Some(authored_field),
+                authored_name: Some(name.to_owned()),
+                declaration_kind: AuthoredDeclarationKind::InstanceField,
+                decorator_invoked: false,
+                decorator_argument_count: 0,
+                decorator_argument_provenance: Vec::new(),
+                declaration_only: false,
+                declared_type: None,
+                conflicting_decorators: Vec::new(),
+                decorator_provenance: SourceProvenance::new(&parsed.path, call.callee_span),
+                name_provenance: Some(SourceProvenance::new(&parsed.path, property.name_span)),
+                initializer_provenance: property
+                    .initializer_span
+                    .map(|span| SourceProvenance::new(&parsed.path, span)),
+                provenance: form_provenance,
+                status: FormDeclarationStatus::Valid,
+            });
+        }
         components.push(ComponentNode {
             id: id.clone(),
             module_path: parsed.path.clone(),
@@ -1903,7 +1975,7 @@ pub fn build_v2_component_graph_for_module(
             slot_declarations,
             context_declaration_candidates: Vec::new(),
             slot_declaration_candidates: Vec::new(),
-            form_declaration_candidates: Vec::new(),
+            form_declaration_candidates,
             resource_declaration_candidates: Vec::new(),
             route_loader_declaration_candidates: Vec::new(),
             form_field_declaration_candidates: Vec::new(),

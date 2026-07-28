@@ -8,11 +8,12 @@ use presolve_parser::ParsedFile;
 
 use crate::{
     v2_authority_request::V2AuthorityRequestV1, AuthoredSourceRangeV1, ResolvedActionFieldV1,
-    ResolvedComponentInheritanceV1, ResolvedEffectFieldV1, ResolvedIntrinsicIdentityV1,
-    ResolvedSlotFieldV1, ResolvedStateInitializerV1, V2AuthoringResolutionsV1,
+    ResolvedComponentInheritanceV1, ResolvedEffectFieldV1, ResolvedFormDefinitionV1,
+    ResolvedIntrinsicIdentityV1, ResolvedSlotFieldV1, ResolvedStateInitializerV1,
+    V2AuthoringResolutionsV1,
 };
 
-pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 4;
+pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 5;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -25,6 +26,8 @@ pub struct V2AuthorityResponseV1 {
     pub effects: Vec<V2AuthorityResolutionV1>,
     #[serde(default)]
     pub slots: Vec<V2AuthorityResolutionV1>,
+    #[serde(default)]
+    pub forms: Vec<V2AuthorityResolutionV1>,
     pub environment_public: Vec<V2AuthorityResolutionV1>,
 }
 
@@ -94,6 +97,7 @@ pub fn validate_v2_authority_response_v1(
     validate_family(&request.actions, &response.actions)?;
     validate_family(&request.effects, &response.effects)?;
     validate_family(&request.slots, &response.slots)?;
+    validate_family(&request.forms, &response.forms)?;
     validate_member_family(&request.environment_public, &response.environment_public)
 }
 
@@ -148,6 +152,13 @@ pub fn v2_authoring_resolutions_from_response_v1(
             .map(|(callee_source, identity)| ResolvedSlotFieldV1 {
                 callee_source,
                 slot_identity: identity,
+            })
+            .collect(),
+        forms: resolutions_for(&response.forms, "form", parsed)?
+            .into_iter()
+            .map(|(callee_source, identity)| ResolvedFormDefinitionV1 {
+                callee_source,
+                form_identity: identity,
             })
             .collect(),
     })
@@ -347,7 +358,7 @@ class Counter extends Component { count = state(0); increment = action(() => {})
         )
         .unwrap();
         let response = V2AuthorityResponseV1 {
-            schema_version: 4,
+            schema_version: 5,
             diagnostics: Vec::new(),
             components: vec![V2AuthorityResolutionV1 {
                 id: request.components[0].id.clone(),
@@ -363,6 +374,7 @@ class Counter extends Component { count = state(0); increment = action(() => {})
             }],
             effects: Vec::new(),
             slots: Vec::new(),
+            forms: Vec::new(),
             environment_public: Vec::new(),
         };
         (parsed, request, response)
@@ -462,7 +474,7 @@ const applicationName = environment.public("PRESOLVE_PUBLIC_APP_NAME");
             crate::build_v2_authority_request_v1(&parsed, PathBuf::from("tsconfig.json"), &model)
                 .unwrap();
         let response = V2AuthorityResponseV1 {
-            schema_version: 4,
+            schema_version: 5,
             diagnostics: Vec::new(),
             components: vec![V2AuthorityResolutionV1 {
                 id: request.components[0].id.clone(),
@@ -472,6 +484,7 @@ const applicationName = environment.public("PRESOLVE_PUBLIC_APP_NAME");
             actions: Vec::new(),
             effects: Vec::new(),
             slots: Vec::new(),
+            forms: Vec::new(),
             environment_public: vec![V2AuthorityResolutionV1 {
                 id: request.environment_public[0].id.clone(),
                 identity: identity("public"),

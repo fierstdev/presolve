@@ -5,7 +5,7 @@ import {
   createCanonicalIntrinsicRegistry,
 } from "./index.js";
 
-export const V2_AUTHORED_AUTHORITY_SCHEMA_VERSION = 4;
+export const V2_AUTHORED_AUTHORITY_SCHEMA_VERSION = 5;
 
 /**
  * Resolves explicit source positions for the implemented decorator-free V2
@@ -21,11 +21,13 @@ export async function analyzeV2Authoring(request) {
       ...(request.canonical.action ? [{ id: "canonical:action", ...request.canonical.action }] : []),
       ...(request.canonical.effect ? [{ id: "canonical:effect", ...request.canonical.effect }] : []),
       ...(request.canonical.slot ? [{ id: "canonical:slot", ...request.canonical.slot }] : []),
+      ...(request.canonical.defineForm ? [{ id: "canonical:define-form", ...request.canonical.defineForm }] : []),
       ...(request.canonical.environment ? [{ id: "canonical:environment", ...request.canonical.environment }] : []),
       ...request.states.map(site => ({ id: `state:${site.id}`, file: site.file, position: site.position })),
       ...request.actions.map(site => ({ id: `action:${site.id}`, file: site.file, position: site.position })),
       ...request.effects.map(site => ({ id: `effect:${site.id}`, file: site.file, position: site.position })),
       ...request.slots.map(site => ({ id: `slot:${site.id}`, file: site.file, position: site.position })),
+      ...request.forms.map(site => ({ id: `form:${site.id}`, file: site.file, position: site.position })),
       ...request.environmentPublic.flatMap(site => [
         { id: `environment-object:${site.id}`, file: site.file, position: site.objectPosition },
         { id: `environment-property:${site.id}`, file: site.file, position: site.propertyPosition },
@@ -49,6 +51,7 @@ export async function analyzeV2Authoring(request) {
     ...(request.canonical.action ? [{ kind: "action", symbol: symbols.get("canonical:action") }] : []),
     ...(request.canonical.effect ? [{ kind: "effect", symbol: symbols.get("canonical:effect") }] : []),
     ...(request.canonical.slot ? [{ kind: "slot", symbol: symbols.get("canonical:slot") }] : []),
+    ...(request.canonical.defineForm ? [{ kind: "form", symbol: symbols.get("canonical:define-form") }] : []),
     ...(request.canonical.environment ? [{ kind: "environment_public", symbol: symbols.get("canonical:environment") }] : []),
   ]);
   return {
@@ -74,6 +77,10 @@ export async function analyzeV2Authoring(request) {
       const intrinsic = classifyResolvedIntrinsic(registry, symbols.get(`slot:${site.id}`));
       return intrinsic?.kind === "slot" ? [{ id: site.id, identity: intrinsic.identity }] : [];
     }),
+    forms: request.forms.flatMap(site => {
+      const intrinsic = classifyResolvedIntrinsic(registry, symbols.get(`form:${site.id}`));
+      return intrinsic?.kind === "form" ? [{ id: site.id, identity: intrinsic.identity }] : [];
+    }),
     environmentPublic: request.environmentPublic.flatMap(site => {
       const receiver = classifyResolvedIntrinsic(registry, symbols.get(`environment-object:${site.id}`));
       const member = resolvedIdentity(symbols.get(`environment-property:${site.id}`));
@@ -95,15 +102,22 @@ function validateV2AuthoringRequest(request) {
   if (request.schemaVersion !== V2_AUTHORED_AUTHORITY_SCHEMA_VERSION) {
     throw new TypeError(`unsupported V2 authoring authority schema version ${request.schemaVersion}`);
   }
-  for (const kind of ["component", "state", "action", "effect", "slot", "environment"]) {
+  for (const kind of ["component", "state", "action", "effect", "slot", "defineForm", "environment"]) {
     if (request.canonical[kind] !== undefined) {
       validatePosition(request.canonical[kind], `canonical ${kind}`);
     }
   }
-  for (const [kind, sites] of [["component", request.components], ["state", request.states], ["action", request.actions], ["effect", request.effects], ["slot", request.slots]]) {
+  for (const [kind, sites, canonicalKind] of [
+    ["component", request.components, "component"],
+    ["state", request.states, "state"],
+    ["action", request.actions, "action"],
+    ["effect", request.effects, "effect"],
+    ["slot", request.slots, "slot"],
+    ["form", request.forms, "defineForm"],
+  ]) {
     if (!Array.isArray(sites)) throw new TypeError(`V2 authoring ${kind} sites must be an array`);
-    if (sites.length > 0 && request.canonical[kind] === undefined) {
-      throw new TypeError(`V2 authoring ${kind} sites require a canonical ${kind} position`);
+    if (sites.length > 0 && request.canonical[canonicalKind] === undefined) {
+      throw new TypeError(`V2 authoring ${kind} sites require a canonical ${canonicalKind} position`);
     }
     const ids = new Set();
     for (const site of sites) {

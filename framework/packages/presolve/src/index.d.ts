@@ -68,9 +68,61 @@ export declare function form(): PresolveFieldDecorator;
 export interface Form {
   readonly __presolveFormBrand: unique symbol;
 }
+export type FormSerialization = "json" | "form-data" | "url-encoded";
+export interface FormField<Value> {
+  readonly value: Value;
+  readonly pristine: boolean;
+  readonly dirty: boolean;
+  readonly touched: boolean;
+  readonly valid: boolean;
+  readonly issues: readonly unknown[];
+  readonly __presolveFormFieldBrand: unique symbol;
+}
+export type FormFieldTree =
+  | FormField<unknown>
+  | { readonly [name: string]: FormFieldTree }
+  | readonly FormFieldTree[];
+export type FormValue<Tree> =
+  Tree extends FormField<infer Value>
+    ? Value
+    : Tree extends readonly (infer Item)[]
+      ? FormValue<Item>[]
+      : Tree extends object
+        ? { [Key in keyof Tree]: FormValue<Tree[Key]> }
+        : never;
+export interface FormFieldOptions<Value> {
+  initial: Value;
+  validate?: readonly ValidationRule[];
+}
+export interface FormSubmission<Value> {
+  readonly value: Value;
+  readonly signal: AbortSignal;
+}
+export interface FormDefinition<Fields extends FormFieldTree> {
+  serialization?: FormSerialization;
+  fields: Fields;
+  submit?: (submission: FormSubmission<FormValue<Fields>>) => void | Promise<void>;
+}
+export interface DefinedForm<Fields extends FormFieldTree> extends Form {
+  readonly fields: Fields;
+  readonly pristine: boolean;
+  readonly dirty: boolean;
+  readonly touched: boolean;
+  readonly submitting: boolean;
+  readonly submitted: boolean;
+  readonly valid: boolean;
+  readonly issues: readonly unknown[];
+}
+/** Declares a canonical decorator-free V2 Form. */
+export declare function defineForm<Fields extends FormFieldTree>(
+  definition: FormDefinition<Fields>
+): DefinedForm<Fields>;
+/** Declares one statically recoverable field inside `defineForm({ fields })`. */
+export declare function field<Value>(options: FormFieldOptions<Value>): FormField<Value>;
 export declare function serialize(
-  format: "json" | "form-data" | "url-encoded"
+  format: FormSerialization
 ): PresolveFieldDecorator;
+/** @deprecated Alpha compatibility decorator. */
 export declare function field(form: string, path?: string): PresolveFieldDecorator;
 export interface ValidationRule {
   readonly __presolveValidationRuleBrand: unique symbol;

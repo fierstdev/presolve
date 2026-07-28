@@ -7,10 +7,11 @@ use serde::Serialize;
 
 use crate::{
     action_field_sites_v1, component_inheritance_sites_v1, effect_field_sites_v1,
-    slot_field_sites_v1, AuthoredSourceRangeV1, CanonicalAuthoredSemanticModelV1,
+    form_definition_sites_v1, slot_field_sites_v1, AuthoredSourceRangeV1,
+    CanonicalAuthoredSemanticModelV1,
 };
 
-pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 4;
+pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 5;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -54,6 +55,8 @@ pub struct V2AuthorityCanonicalV1 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slot: Option<V2AuthorityPositionV1>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub define_form: Option<V2AuthorityPositionV1>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub environment: Option<V2AuthorityPositionV1>,
 }
 
@@ -68,6 +71,7 @@ pub struct V2AuthorityRequestV1 {
     pub actions: Vec<V2AuthoritySiteV1>,
     pub effects: Vec<V2AuthoritySiteV1>,
     pub slots: Vec<V2AuthoritySiteV1>,
+    pub forms: Vec<V2AuthoritySiteV1>,
     pub environment_public: Vec<V2AuthorityMemberSiteV1>,
 }
 
@@ -112,6 +116,7 @@ pub fn build_v2_authority_request_v1(
     let action = canonical_import(parsed, "action")?;
     let effect = canonical_import(parsed, "effect")?;
     let slot = canonical_import(parsed, "slot")?;
+    let define_form = canonical_import(parsed, "defineForm")?;
     let environment = canonical_import(parsed, "environment")?;
     let components = component_inheritance_sites_v1(parsed)
         .into_iter()
@@ -188,6 +193,22 @@ pub fn build_v2_authority_request_v1(
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
+    let forms = define_form
+        .is_some()
+        .then(|| form_definition_sites_v1(parsed, component_model))
+        .transpose()
+        .map_err(|error| V2AuthorityRequestErrorV1::FieldSiteSelection(error.to_string()))?
+        .unwrap_or_default()
+        .into_iter()
+        .map(|site| {
+            site_for(
+                "form",
+                site.callee_source,
+                &parsed.path,
+                &parsed.syntax.source,
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let environment_public = environment_public_member_sites(parsed, environment.is_some())?;
     Ok(V2AuthorityRequestV1 {
         schema_version: V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
@@ -198,6 +219,7 @@ pub fn build_v2_authority_request_v1(
             action,
             effect,
             slot,
+            define_form,
             environment,
         },
         components,
@@ -205,6 +227,7 @@ pub fn build_v2_authority_request_v1(
         actions,
         effects,
         slots,
+        forms,
         environment_public,
     })
 }
@@ -239,6 +262,7 @@ pub fn build_v2_authority_component_request_v1(
             action: canonical_import(parsed, "action")?,
             effect: canonical_import(parsed, "effect")?,
             slot: canonical_import(parsed, "slot")?,
+            define_form: canonical_import(parsed, "defineForm")?,
             environment: canonical_import(parsed, "environment")?,
         },
         components,
@@ -246,6 +270,7 @@ pub fn build_v2_authority_component_request_v1(
         actions: Vec::new(),
         effects: Vec::new(),
         slots: Vec::new(),
+        forms: Vec::new(),
         environment_public: Vec::new(),
     })
 }
@@ -271,6 +296,7 @@ pub fn build_v2_environment_authority_request_v1(
             action: None,
             effect: None,
             slot: None,
+            define_form: None,
             environment: Some(environment),
         },
         components: Vec::new(),
@@ -278,6 +304,7 @@ pub fn build_v2_environment_authority_request_v1(
         actions: Vec::new(),
         effects: Vec::new(),
         slots: Vec::new(),
+        forms: Vec::new(),
         environment_public: environment_public_member_sites(parsed, true)?,
     }))
 }
@@ -434,6 +461,42 @@ class Counter extends FrameworkBase { children: SlotContent = slot(); count = re
         assert_eq!(request.actions.len(), 4);
         assert_eq!(request.effects.len(), 4);
         assert_eq!(request.slots.len(), 1);
+        assert!(request.forms.is_empty());
+    }
+
+    #[test]
+    fn selects_form_definition_sites_only_when_define_form_is_imported() {
+        let source = r#"
+import { Component, defineForm as declareForm } from "presolve";
+class Profile extends Component {
+  profile = declareForm({ fields: {} });
+  lookalike = helper({ fields: {} });
+}
+"#;
+        let parsed = parse_file("src/Profile.tsx", source);
+        let heritage = component_inheritance_sites_v1(&parsed).pop().unwrap();
+        let components = lower_component_inheritance_v1(
+            &parsed,
+            [ResolvedComponentInheritanceV1 {
+                heritage_source: heritage.heritage_source,
+                component_identity: ResolvedIntrinsicIdentityV1 {
+                    name: "Component".into(),
+                    flags: 32,
+                    declaration_modules: vec!["presolve".into()],
+                },
+            }],
+        )
+        .unwrap()
+        .model;
+        let request =
+            build_v2_authority_request_v1(&parsed, PathBuf::from("tsconfig.json"), &components)
+                .unwrap();
+        assert!(request.canonical.define_form.is_some());
+        assert_eq!(request.forms.len(), 2);
+        assert_eq!(
+            &source[request.forms[0].position..][.."declareForm".len()],
+            "declareForm"
+        );
     }
 
     #[test]

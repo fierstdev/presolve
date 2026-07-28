@@ -14,8 +14,11 @@ export function context() { return emptyField; }
 export function provide() { return emptyField; }
 export function consume() { return emptyField; }
 export function form() { return emptyField; }
+export function defineForm(definition) { return definition; }
 export function serialize() { return emptyField; }
-export function field() { return emptyField; }
+export function field(value) {
+  return typeof value === "object" && value !== null ? value : emptyField;
+}
 export function validate() { return emptyField; }
 export function required() { return Object.freeze({}); }
 export function submit() { return identityClass; }

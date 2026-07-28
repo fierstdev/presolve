@@ -139,6 +139,7 @@ test("the V2 authoring bridge resolves canonical component, State, Action, Effec
     actions: [{ id: "increment", file: frameworkFile, position: frameworkSource.indexOf("action(()") }],
     effects: [{ id: "syncTitle", file: frameworkFile, position: frameworkSource.indexOf("effect(()") }],
     slots: [{ id: "children", file: frameworkFile, position: frameworkSource.indexOf("slot()") }],
+    forms: [],
     environmentPublic: [
       {
         id: "application-name",
@@ -184,12 +185,43 @@ test("the V2 authoring bridge supports a component-only discovery phase", async 
     actions: [],
     effects: [],
     slots: [],
+    forms: [],
     environmentPublic: [],
   });
   assert.deepEqual(result.components.map(entry => entry.id), ["counter"]);
   assert.deepEqual(result.states, []);
   assert.deepEqual(result.actions, []);
   assert.deepEqual(result.effects, []);
+});
+
+test("the V2 authoring bridge resolves canonical decorator-free Form evidence", async () => {
+  const formFile = resolve(root, "tests/framework-public-api/src/V2Form.tsx");
+  const formSource = readFileSync(formFile, "utf8");
+  const result = await analyzeV2Authoring({
+    schemaVersion: V2_AUTHORED_AUTHORITY_SCHEMA_VERSION,
+    configFile: resolve(root, "tests/framework-public-api/tsconfig.json"),
+    canonical: {
+      component: { file: formFile, position: formSource.indexOf("Component") },
+      defineForm: { file: formFile, position: formSource.indexOf("defineForm") },
+    },
+    components: [{
+      id: "profile",
+      file: formFile,
+      position: formSource.indexOf("V2ProfileForm extends"),
+    }],
+    states: [],
+    actions: [],
+    effects: [],
+    slots: [],
+    forms: [{
+      id: "profile-form",
+      file: formFile,
+      position: formSource.indexOf("defineForm({"),
+    }],
+    environmentPublic: [],
+  });
+  assert.deepEqual(result.forms.map(entry => entry.id), ["profile-form"]);
+  assert.equal(result.forms[0].identity.name, "defineForm");
 });
 
 test("the V2 authoring bridge recognizes a direct Component heritage-expression query", async () => {
@@ -208,6 +240,7 @@ test("the V2 authoring bridge recognizes a direct Component heritage-expression 
     actions: [],
     effects: [],
     slots: [],
+    forms: [],
     environmentPublic: [],
   });
   assert.deepEqual(result.components.map(entry => entry.id), ["direct"]);
@@ -228,6 +261,7 @@ test("the V2 authoring bridge resolves environment evidence without a component 
     actions: [],
     effects: [],
     slots: [],
+    forms: [],
     environmentPublic: [{
       id: "application-name",
       file: frameworkFile,
@@ -262,6 +296,7 @@ test("the V2 authoring executable speaks the versioned stdin/stdout bridge proto
         actions: [{ id: "increment", file: frameworkFile, position: frameworkSource.indexOf("action(()") }],
         effects: [{ id: "syncTitle", file: frameworkFile, position: frameworkSource.indexOf("effect(()") }],
         slots: [{ id: "children", file: frameworkFile, position: frameworkSource.indexOf("slot()") }],
+        forms: [],
         environmentPublic: [],
       }),
       encoding: "utf8",

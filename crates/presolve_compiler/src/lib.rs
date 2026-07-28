@@ -67,6 +67,7 @@ pub mod expression_graph;
 pub mod file_route_publication;
 pub mod form;
 pub mod form_binding;
+pub mod form_definition_lowering;
 pub mod form_diagnostics;
 pub mod form_field;
 pub mod form_inspection;
@@ -490,6 +491,10 @@ pub use form_binding::{
     FormControlNormalization, FormFieldBinding, FormFieldBindingCandidate,
     FormFieldBindingEvidence, FormFieldBindingEvidenceKind, FormFieldBindingExpressionFact,
     FormFieldBindingProducts, FormFieldBindingViolation, FormInputKind,
+};
+pub use form_definition_lowering::{
+    form_definition_sites_v1, lower_form_definitions_v1, FormDefinitionLoweringErrorV1,
+    FormDefinitionLoweringV1, FormDefinitionSiteV1, ResolvedFormDefinitionV1,
 };
 pub use form_diagnostics::{
     collect_form_diagnostics, FormDiagnosticReservation, FORM_DIAGNOSTIC_RESERVATIONS,

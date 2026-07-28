@@ -4762,6 +4762,61 @@ mod tests {
     }
 
     #[test]
+    fn file_route_assembly_projects_canonical_v2_form_into_existing_form_products() {
+        let unit = CompilationUnit::parse_sources([(
+            "app/routes/contact.tsx",
+            "import { Component, defineForm } from \"presolve\"; export class Contact extends Component { contact = defineForm({ fields: {} }); render() { return <form form={this.contact}></form>; } }",
+        )]);
+        let parsed = &unit.files()[0];
+        let class = &parsed.classes[0];
+        let property = &class.properties[0];
+        let model = CanonicalAuthoredSemanticModelV1 {
+            schema_version: crate::CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION,
+            source_path: parsed.path.clone(),
+            declarations: vec![
+                CanonicalAuthoredDeclarationV1 {
+                    kind: CanonicalAuthoredDeclarationKindV1::Component,
+                    subject: "Contact".into(),
+                    source: crate::AuthoredSourceRangeV1 {
+                        start: class.span.start,
+                        end: class.span.end,
+                        line: class.span.line,
+                        column: class.span.column,
+                    },
+                    intrinsic_identity: None,
+                    derived_evidence: None,
+                },
+                CanonicalAuthoredDeclarationV1 {
+                    kind: CanonicalAuthoredDeclarationKindV1::Form,
+                    subject: "Contact.contact".into(),
+                    source: crate::AuthoredSourceRangeV1 {
+                        start: property.span.start,
+                        end: property.span.end,
+                        line: property.span.line,
+                        column: property.span.column,
+                    },
+                    intrinsic_identity: None,
+                    derived_evidence: None,
+                },
+            ],
+        };
+        let asm =
+            build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring(
+                &unit,
+                &crate::SemanticPackageResolutionTable::default(),
+                &BTreeMap::from([("app/routes/contact.tsx".into(), model)]),
+            )
+            .expect("canonical V2 Form route assembly");
+        assert_eq!(asm.forms().len(), 1);
+        assert_eq!(asm.forms()[0].name, "contact");
+        assert_eq!(asm.form_declaration_candidates().len(), 1);
+        assert_eq!(
+            asm.form_declaration_candidates()[0].status,
+            crate::FormDeclarationStatus::Valid
+        );
+    }
+
+    #[test]
     fn file_route_v2_slot_fields_bind_caller_content_through_the_existing_slot_model() {
         let unit = CompilationUnit::parse_sources([
             (
@@ -4822,6 +4877,7 @@ mod tests {
                                 },
                             })
                             .collect(),
+                        forms: Vec::new(),
                     },
                 )
                 .expect("V2 Slot lowering");
