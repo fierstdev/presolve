@@ -131,3 +131,5 @@ deterministic compiler handoff and explicitly prohibit an inferred executor.
 
 The complete 0.2.0-beta.14 local release gate passes. Beta readiness is 99%
 until the hosted publication and public registry compatibility checks pass.
+The isolated GitHub browser job now installs the locked Node workspace required
+by the real Vite-backed Form acceptance project before running Chrome.

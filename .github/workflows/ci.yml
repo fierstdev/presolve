@@ -78,6 +78,23 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      # The decorator-free Form browser project proves the real ergonomic
+      # Standard Schema and submission-capability publication path. That path
+      # intentionally invokes the application's direct Vite dependency, so
+      # this clean runner must materialize the same locked workspace graph as
+      # a newly installed Presolve application.
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Install Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26.5.0
+          cache: pnpm
+
+      - name: Install browser fixture dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
