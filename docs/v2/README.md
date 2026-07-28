@@ -65,8 +65,10 @@ normative source for this handoff.
   defines typed built-in rule arguments, IME-safe binding updates, and
   post-resume Form interactivity.
 - [V2 Form Standard Schema authority contract](form-standard-schema-authority-contract.md)
-  defines named-export protocol proof, exact module identity, and fail-closed
-  behavior before runtime bundling.
+  defines named-export protocol proof, exact module identity, deterministic
+  runtime publication, and async validation behavior.
+- [V2 Form submission capability contract](form-submission-capability-contract.md)
+  defines the closed imported client persistence call and abort lifecycle.
 - [V2 Form file binding contract](form-file-binding-contract.md) defines
   authority-proven `File[]`, `bind:files`, FormData-only transport, and
   non-resumable file state.

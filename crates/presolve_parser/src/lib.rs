@@ -10,9 +10,10 @@ pub use model::{
     ParsedEffectExpressionKind, ParsedEffectStatement, ParsedEffectStatementKind,
     ParsedEventHandler, ParsedExport, ParsedExportKind, ParsedExportSpecifier, ParsedFile,
     ParsedFormDefinitionShape, ParsedFormFieldShape, ParsedFormSubmitShape, ParsedImport,
-    ParsedImportSpecifier, ParsedInlineHandler, ParsedJsxAttribute, ParsedJsxAttributeValue,
-    ParsedJsxChild, ParsedJsxConditional, ParsedJsxElement, ParsedJsxFragment, ParsedJsxList,
-    ParsedJsxNode, ParsedLocalVariable, ParsedLogicalOperator, ParsedMethod, ParsedMethodCall,
+    ParsedImportSpecifier, ParsedInlineDirectCall, ParsedInlineDirectCallArgument,
+    ParsedInlineHandler, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild,
+    ParsedJsxConditional, ParsedJsxElement, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode,
+    ParsedLocalVariable, ParsedLogicalOperator, ParsedMethod, ParsedMethodCall,
     ParsedMethodParameter, ParsedProperty, ParsedSerializableValue, ParsedSourceAst,
     ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator,
     ParsedThisMemberDesignator, ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator,
@@ -141,6 +142,20 @@ class Profile {
             shape.submit.as_ref().map(|submit| submit.is_async),
             Some(true)
         );
+        let call = shape
+            .submit
+            .as_ref()
+            .and_then(|submit| submit.handler.direct_call.as_ref())
+            .expect("direct inline call");
+        assert_eq!(call.callee, "save");
+        assert_eq!(
+            call.arguments
+                .iter()
+                .map(|argument| argument.name.as_str())
+                .collect::<Vec<_>>(),
+            ["value", "signal"]
+        );
+        assert!(!call.awaited);
         assert_eq!(
             &source[shape.fields[0].callee_span.start..shape.fields[0].callee_span.end],
             "leaf"

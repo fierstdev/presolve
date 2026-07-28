@@ -83,11 +83,25 @@ The same proof corrected two hidden ownership gaps: Vite now preserves the
 registry entry export, and canonical Form `bind:*` channels are excluded from
 ordinary component-state binding registration.
 
+Imported Form submission now has a closed authored and package contract:
+
+- the parser retains one direct identifier call and identifier arguments as
+  syntax facts without granting them framework meaning;
+- the admitted source boundary is an async single-parameter `submit` whose
+  complete body calls one named import with exact `value, signal` arguments;
+- semantic-package kind `capability` is closed to the exact
+  `(FormValue, AbortSignal) -> Promise<void>` signature, client execution,
+  abort cancellation, Form-value input, void result, and cold fallback; and
+- ambient calls, member/default/namespace imports, captures, reordered
+  arguments, and arbitrary source execution remain excluded.
+
 ## Next slice
 
-Broaden native inline submit/action execution to admitted imported capability
-calls with abort signals, then close the remaining server-validation/executor
-boundary and release-hardening gates.
+Project the imported submission authority into compiler products and the Forms
+runtime artifact, bundle the exact integrity-bound export, and prove success,
+rejection, abort, duplicate suppression, cold boot, and resume in a real
+browser. Then close the remaining server-validation/executor boundary and
+release-hardening gates.
 
 ## Verification
 
@@ -99,4 +113,5 @@ boundary and release-hardening gates.
 - `pnpm exec tsc -p tests/framework-public-api/tsconfig.json`
 - `cargo test -p presolve-cli --test runtime_browser decorator_free_v2_form_fields_bind_and_validate_in_a_real_browser -- --nocapture`
 
-Beta readiness estimate after the executable Standard Schema gate: 95%.
+Beta readiness estimate after the authored Form submission capability contract:
+96%.

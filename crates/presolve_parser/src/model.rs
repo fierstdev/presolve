@@ -283,11 +283,31 @@ pub struct ParsedInlineHandler {
     /// validates their use.
     pub local_variables: Vec<ParsedLocalVariable>,
     pub state_updates: Vec<ParsedStateUpdate>,
+    /// One direct identifier call retained from an otherwise closed inline
+    /// body. This is syntax only; later authorities decide whether the callee
+    /// is an admitted capability and whether its identifier arguments have
+    /// framework meaning.
+    pub direct_call: Option<ParsedInlineDirectCall>,
     pub unsupported_statement_spans: Vec<SourceSpan>,
     /// A restricted ordered-body view retained from a general inline function.
     /// It has no framework meaning until an authority-backed later consumer
     /// selects the surrounding initializer call.
     pub effect_body: Option<ParsedEffectBody>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedInlineDirectCall {
+    pub callee: String,
+    pub callee_span: SourceSpan,
+    pub arguments: Vec<ParsedInlineDirectCallArgument>,
+    pub span: SourceSpan,
+    pub awaited: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedInlineDirectCallArgument {
+    pub name: String,
+    pub span: SourceSpan,
 }
 
 /// Authored TypeScript annotation retained for a state field without type checking.

@@ -100,6 +100,43 @@ pub struct SemanticPackageServerAction {
     pub failure: SemanticPackageRouteLoaderFailure,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticPackageFormSubmissionExecutionBoundary {
+    Client,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticPackageFormSubmissionCancellation {
+    Abort,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticPackageFormSubmissionInput {
+    FormValue,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticPackageFormSubmissionResult {
+    Void,
+}
+
+/// Closed contract for an asynchronous client Form submission capability.
+///
+/// The compiler does not inspect package source. It supplies the canonical
+/// nested Form value and one submission-owned AbortSignal to the named export.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SemanticPackageFormSubmission {
+    pub execution_boundary: SemanticPackageFormSubmissionExecutionBoundary,
+    pub cancellation: SemanticPackageFormSubmissionCancellation,
+    pub input: SemanticPackageFormSubmissionInput,
+    pub result: SemanticPackageFormSubmissionResult,
+}
+
 /// Execution side for the initial opaque terminal package boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -163,6 +200,8 @@ pub struct SemanticPackageExport {
     #[serde(default)]
     pub server_action: Option<SemanticPackageServerAction>,
     #[serde(default)]
+    pub form_submission: Option<SemanticPackageFormSubmission>,
+    #[serde(default)]
     pub opaque_terminal: Option<SemanticPackageOpaqueTerminal>,
 }
 
@@ -189,6 +228,7 @@ pub enum SemanticPackageContractError {
     InvalidResourceEndpoint,
     InvalidRouteLoader,
     InvalidServerAction,
+    InvalidFormSubmission,
     InvalidOpaqueTerminal,
     DuplicateSpecifier,
 }
@@ -269,6 +309,14 @@ pub fn parse_semantic_package_contract(
                     || export.resume_policy != "cold_fallback"))
     }) {
         return Err(SemanticPackageContractError::InvalidServerAction);
+    }
+    if contract.exports.values().any(|export| {
+        (export.kind == SemanticPackageKind::Capability) != export.form_submission.is_some()
+            || (export.kind == SemanticPackageKind::Capability
+                && (export.type_signature != "(FormValue, AbortSignal) -> Promise<void>"
+                    || export.resume_policy != "cold_fallback"))
+    }) {
+        return Err(SemanticPackageContractError::InvalidFormSubmission);
     }
     if contract.exports.values().any(|export| {
         (export.kind == SemanticPackageKind::Opaque) != export.opaque_terminal.is_some()
@@ -420,5 +468,30 @@ mod tests {
             r#"{"schema_version":1,"package":"post-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"savePost":{"kind":"server_action","type_signature":"FormData -> ServerActionResult","runtime_module":"dist/save-post.js","resume_policy":"cold_fallback","server_action":{"input":"form_data","response":"json","failure":"typed"}}}}"#,
         );
         assert!(contract.is_ok());
+    }
+
+    #[test]
+    fn form_submission_capabilities_require_the_closed_client_abort_contract() {
+        let contract = parse_semantic_package_contract(
+            r#"{"schema_version":1,"package":"profile-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"saveProfile":{"kind":"capability","type_signature":"(FormValue, AbortSignal) -> Promise<void>","runtime_module":"dist/save-profile.js","resume_policy":"cold_fallback","form_submission":{"execution_boundary":"client","cancellation":"abort","input":"form_value","result":"void"}}}}"#,
+        )
+        .expect("closed Form submission contract");
+        assert_eq!(
+            contract.exports["saveProfile"].form_submission,
+            Some(SemanticPackageFormSubmission {
+                execution_boundary: SemanticPackageFormSubmissionExecutionBoundary::Client,
+                cancellation: SemanticPackageFormSubmissionCancellation::Abort,
+                input: SemanticPackageFormSubmissionInput::FormValue,
+                result: SemanticPackageFormSubmissionResult::Void,
+            })
+        );
+
+        let missing = parse_semantic_package_contract(
+            r#"{"schema_version":1,"package":"profile-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"saveProfile":{"kind":"capability","type_signature":"(FormValue, AbortSignal) -> Promise<void>","runtime_module":"dist/save-profile.js","resume_policy":"cold_fallback"}}}"#,
+        );
+        assert_eq!(
+            missing,
+            Err(SemanticPackageContractError::InvalidFormSubmission)
+        );
     }
 }

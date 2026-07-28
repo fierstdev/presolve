@@ -25,14 +25,14 @@ use crate::model::{
     ParsedEffectStatementKind, ParsedEventHandler, ParsedExport, ParsedExportKind,
     ParsedExportSpecifier, ParsedFile, ParsedFormDefinitionShape, ParsedFormFieldShape,
     ParsedFormSubmitShape, ParsedImport, ParsedImportSpecifier, ParsedInitializerCall,
-    ParsedInlineHandler, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild,
-    ParsedJsxConditional, ParsedJsxElement, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode,
-    ParsedLocalVariable, ParsedLogicalOperator, ParsedMethod, ParsedMethodCall,
-    ParsedMethodParameter, ParsedProperty, ParsedSerializableValue, ParsedSourceAst,
-    ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator,
-    ParsedThisMemberDesignator, ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator,
-    ParsedUnsupportedEffectStatementKind, ParsedValidationRuleArgument,
-    ParsedValidationRuleArgumentKind, ParsedValidationRuleExpression,
+    ParsedInlineDirectCall, ParsedInlineDirectCallArgument, ParsedInlineHandler,
+    ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional,
+    ParsedJsxElement, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLocalVariable,
+    ParsedLogicalOperator, ParsedMethod, ParsedMethodCall, ParsedMethodParameter, ParsedProperty,
+    ParsedSerializableValue, ParsedSourceAst, ParsedStateOperation, ParsedStateUpdate,
+    ParsedStaticMemberDesignator, ParsedThisMemberDesignator, ParsedTypeAlias,
+    ParsedTypeAnnotation, ParsedUnaryOperator, ParsedUnsupportedEffectStatementKind,
+    ParsedValidationRuleArgument, ParsedValidationRuleArgumentKind, ParsedValidationRuleExpression,
     ParsedValidationRuleExpressionKind, SourceSpan,
 };
 
@@ -1060,9 +1060,49 @@ fn parsed_inline_handler_body(
         parameters,
         local_variables,
         state_updates,
+        direct_call: parsed_inline_direct_call(body, source),
         unsupported_statement_spans,
         effect_body: (!is_expression_body).then(|| parsed_inline_effect_body(body, source)),
     }
+}
+
+fn parsed_inline_direct_call(
+    body: &oxc_ast::ast::FunctionBody<'_>,
+    source: &str,
+) -> Option<ParsedInlineDirectCall> {
+    let [Statement::ExpressionStatement(statement)] = body.statements.as_slice() else {
+        return None;
+    };
+    let (expression, awaited) = match &statement.expression {
+        Expression::AwaitExpression(awaited) => (&awaited.argument, true),
+        expression => (expression, false),
+    };
+    let Expression::CallExpression(call) = expression else {
+        return None;
+    };
+    let Expression::Identifier(callee) = &call.callee else {
+        return None;
+    };
+    let arguments = call
+        .arguments
+        .iter()
+        .map(|argument| {
+            let Expression::Identifier(identifier) = argument.as_expression()? else {
+                return None;
+            };
+            Some(ParsedInlineDirectCallArgument {
+                name: identifier.name.to_string(),
+                span: source_span(source, identifier.span),
+            })
+        })
+        .collect::<Option<Vec<_>>>()?;
+    Some(ParsedInlineDirectCall {
+        callee: callee.name.to_string(),
+        callee_span: source_span(source, callee.span),
+        arguments,
+        span: source_span(source, call.span),
+        awaited,
+    })
 }
 
 fn parsed_inline_handler_parameters(
