@@ -7,9 +7,10 @@ use crate::{
     lower_computed_getters_v1, lower_state_initializers_v1, ActionFieldLoweringErrorV1,
     AuthoredSemanticCompositionErrorV1, CanonicalAuthoredSemanticModelV1,
     ComponentInheritanceLoweringErrorV1, ComputedGetterLoweringErrorV1, EffectFieldLoweringErrorV1,
-    FormDefinitionLoweringErrorV1, ResolvedActionFieldV1, ResolvedComponentInheritanceV1,
-    ResolvedEffectFieldV1, ResolvedFormDefinitionV1, ResolvedSlotFieldV1,
-    ResolvedStateInitializerV1, SlotFieldLoweringErrorV1, StateInitializerLoweringErrorV1,
+    FormDefinitionLoweringErrorV1, FormFieldDefinitionLoweringErrorV1, ResolvedActionFieldV1,
+    ResolvedComponentInheritanceV1, ResolvedEffectFieldV1, ResolvedFormDefinitionV1,
+    ResolvedFormFieldDefinitionV1, ResolvedSlotFieldV1, ResolvedStateInitializerV1,
+    SlotFieldLoweringErrorV1, StateInitializerLoweringErrorV1,
 };
 
 /// The authority-resolved inputs for the currently implemented V2 source forms.
@@ -21,6 +22,7 @@ pub struct V2AuthoringResolutionsV1 {
     pub effects: Vec<ResolvedEffectFieldV1>,
     pub slots: Vec<ResolvedSlotFieldV1>,
     pub forms: Vec<ResolvedFormDefinitionV1>,
+    pub form_fields: Vec<ResolvedFormFieldDefinitionV1>,
 }
 
 /// The unified decorator-free canonical model and its constituent proof products.
@@ -34,6 +36,7 @@ pub struct V2AuthoringLoweringV1 {
     pub effect_count: usize,
     pub slot_count: usize,
     pub form_count: usize,
+    pub form_field_count: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,6 +47,7 @@ pub enum V2AuthoringLoweringErrorV1 {
     Effect(EffectFieldLoweringErrorV1),
     Slot(SlotFieldLoweringErrorV1),
     Form(FormDefinitionLoweringErrorV1),
+    FormField(FormFieldDefinitionLoweringErrorV1),
     Computed(ComputedGetterLoweringErrorV1),
     Composition(AuthoredSemanticCompositionErrorV1),
 }
@@ -57,6 +61,7 @@ impl std::fmt::Display for V2AuthoringLoweringErrorV1 {
             Self::Effect(error) => error.fmt(formatter),
             Self::Slot(error) => error.fmt(formatter),
             Self::Form(error) => error.fmt(formatter),
+            Self::FormField(error) => error.fmt(formatter),
             Self::Computed(error) => error.fmt(formatter),
             Self::Composition(error) => error.fmt(formatter),
         }
@@ -82,6 +87,13 @@ pub fn lower_v2_authoring_v1(
         .map_err(V2AuthoringLoweringErrorV1::Slot)?;
     let forms = crate::lower_form_definitions_v1(parsed, &components.model, resolutions.forms)
         .map_err(V2AuthoringLoweringErrorV1::Form)?;
+    let form_fields = crate::lower_form_field_definitions_v1(
+        parsed,
+        &components.model,
+        &forms.model,
+        resolutions.form_fields,
+    )
+    .map_err(V2AuthoringLoweringErrorV1::FormField)?;
     let input = compose_authored_semantics_v1([
         components.model.clone(),
         states.model.clone(),
@@ -89,6 +101,7 @@ pub fn lower_v2_authoring_v1(
         effects.model.clone(),
         slots.model.clone(),
         forms.model.clone(),
+        form_fields.model.clone(),
     ])
     .map_err(V2AuthoringLoweringErrorV1::Composition)?;
     let computed =
@@ -100,6 +113,7 @@ pub fn lower_v2_authoring_v1(
     let effect_count = effects.model.declarations.len();
     let slot_count = slots.model.declarations.len();
     let form_count = forms.model.declarations.len();
+    let form_field_count = form_fields.model.declarations.len();
     let model = compose_authored_semantics_v1([input, computed.model])
         .map_err(V2AuthoringLoweringErrorV1::Composition)?;
     Ok(V2AuthoringLoweringV1 {
@@ -110,6 +124,7 @@ pub fn lower_v2_authoring_v1(
         effect_count,
         slot_count,
         form_count,
+        form_field_count,
         model,
     })
 }
@@ -217,6 +232,7 @@ class Counter extends AliasedBase {
                     slot_identity: identity("slot"),
                 }],
                 forms: Vec::new(),
+                form_fields: Vec::new(),
             },
         )
         .expect("one authority-backed V2 source model");
@@ -226,6 +242,7 @@ class Counter extends AliasedBase {
         assert_eq!(lowering.effect_count, 1);
         assert_eq!(lowering.slot_count, 1);
         assert_eq!(lowering.form_count, 0);
+        assert_eq!(lowering.form_field_count, 0);
         assert_eq!(lowering.computed_count, 2);
         assert_eq!(
             lowering

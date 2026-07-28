@@ -9,11 +9,12 @@ pub use model::{
     ParsedConstantExpressionKind, ParsedDecorator, ParsedEffectBody, ParsedEffectExpression,
     ParsedEffectExpressionKind, ParsedEffectStatement, ParsedEffectStatementKind,
     ParsedEventHandler, ParsedExport, ParsedExportKind, ParsedExportSpecifier, ParsedFile,
-    ParsedImport, ParsedImportSpecifier, ParsedInlineHandler, ParsedJsxAttribute,
-    ParsedJsxAttributeValue, ParsedJsxChild, ParsedJsxConditional, ParsedJsxElement,
-    ParsedJsxFragment, ParsedJsxList, ParsedJsxNode, ParsedLocalVariable, ParsedLogicalOperator,
-    ParsedMethod, ParsedMethodCall, ParsedMethodParameter, ParsedProperty, ParsedSerializableValue,
-    ParsedSourceAst, ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator,
+    ParsedFormDefinitionShape, ParsedFormFieldShape, ParsedFormSubmitShape, ParsedImport,
+    ParsedImportSpecifier, ParsedInlineHandler, ParsedJsxAttribute, ParsedJsxAttributeValue,
+    ParsedJsxChild, ParsedJsxConditional, ParsedJsxElement, ParsedJsxFragment, ParsedJsxList,
+    ParsedJsxNode, ParsedLocalVariable, ParsedLogicalOperator, ParsedMethod, ParsedMethodCall,
+    ParsedMethodParameter, ParsedProperty, ParsedSerializableValue, ParsedSourceAst,
+    ParsedStateOperation, ParsedStateUpdate, ParsedStaticMemberDesignator,
     ParsedThisMemberDesignator, ParsedTypeAlias, ParsedTypeAnnotation, ParsedUnaryOperator,
     ParsedUnsupportedEffectStatementKind, ParsedValidationRuleArgument,
     ParsedValidationRuleArgumentKind, ParsedValidationRuleExpression,
@@ -101,6 +102,49 @@ class Profile {
             ParsedValidationRuleArgumentKind::ThisMember(designator)
                 if designator.member == "name"
         ));
+    }
+
+    #[test]
+    fn retains_static_decorator_free_form_definition_shapes_without_classification() {
+        let source = r#"
+class Profile {
+  profile = declareSomething({
+    serialization: "form-data",
+    fields: {
+      name: leaf({ initial: "", validate: [required()] }),
+      address: {
+        street: leaf({ initial: "Main" }),
+      },
+      tags: leaf({ initial: ["compiler"] }),
+    },
+    submit: async ({ value, signal }) => save(value, signal),
+  });
+}
+"#;
+        let parsed = parse_file("src/Profile.tsx", source);
+        let shape = parsed.classes[0].properties[0]
+            .form_definition_shape
+            .as_ref()
+            .expect("static object-argument shape");
+        assert_eq!(shape.serialization.as_deref(), Some("form-data"));
+        assert_eq!(shape.fields.len(), 3);
+        assert_eq!(shape.fields[0].path, ["name"]);
+        assert_eq!(shape.fields[1].path, ["address", "street"]);
+        assert_eq!(shape.fields[2].path, ["tags"]);
+        assert_eq!(shape.fields[0].validations.len(), 1);
+        assert!(matches!(
+            shape.fields[2].initial_value,
+            Some(ParsedSerializableValue::Array(_))
+        ));
+        assert!(shape.unsupported_fields.is_empty());
+        assert_eq!(
+            shape.submit.as_ref().map(|submit| submit.is_async),
+            Some(true)
+        );
+        assert_eq!(
+            &source[shape.fields[0].callee_span.start..shape.fields[0].callee_span.end],
+            "leaf"
+        );
     }
 
     #[test]

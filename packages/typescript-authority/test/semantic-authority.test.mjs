@@ -140,6 +140,7 @@ test("the V2 authoring bridge resolves canonical component, State, Action, Effec
     effects: [{ id: "syncTitle", file: frameworkFile, position: frameworkSource.indexOf("effect(()") }],
     slots: [{ id: "children", file: frameworkFile, position: frameworkSource.indexOf("slot()") }],
     forms: [],
+    formFields: [],
     environmentPublic: [
       {
         id: "application-name",
@@ -186,6 +187,7 @@ test("the V2 authoring bridge supports a component-only discovery phase", async 
     effects: [],
     slots: [],
     forms: [],
+    formFields: [],
     environmentPublic: [],
   });
   assert.deepEqual(result.components.map(entry => entry.id), ["counter"]);
@@ -203,6 +205,7 @@ test("the V2 authoring bridge resolves canonical decorator-free Form evidence", 
     canonical: {
       component: { file: formFile, position: formSource.indexOf("Component") },
       defineForm: { file: formFile, position: formSource.indexOf("defineForm") },
+      field: { file: formFile, position: formSource.indexOf("field") },
     },
     components: [{
       id: "profile",
@@ -218,10 +221,17 @@ test("the V2 authoring bridge resolves canonical decorator-free Form evidence", 
       file: formFile,
       position: formSource.indexOf("defineForm({"),
     }],
+    formFields: [{
+      id: "profile-name",
+      file: formFile,
+      position: formSource.indexOf("field({"),
+    }],
     environmentPublic: [],
   });
   assert.deepEqual(result.forms.map(entry => entry.id), ["profile-form"]);
   assert.equal(result.forms[0].identity.name, "defineForm");
+  assert.deepEqual(result.formFields.map(entry => entry.id), ["profile-name"]);
+  assert.equal(result.formFields[0].identity.name, "field");
 });
 
 test("the V2 authoring bridge recognizes a direct Component heritage-expression query", async () => {
@@ -241,6 +251,7 @@ test("the V2 authoring bridge recognizes a direct Component heritage-expression 
     effects: [],
     slots: [],
     forms: [],
+    formFields: [],
     environmentPublic: [],
   });
   assert.deepEqual(result.components.map(entry => entry.id), ["direct"]);
@@ -262,6 +273,7 @@ test("the V2 authoring bridge resolves environment evidence without a component 
     effects: [],
     slots: [],
     forms: [],
+    formFields: [],
     environmentPublic: [{
       id: "application-name",
       file: frameworkFile,
@@ -297,6 +309,7 @@ test("the V2 authoring executable speaks the versioned stdin/stdout bridge proto
         effects: [{ id: "syncTitle", file: frameworkFile, position: frameworkSource.indexOf("effect(()") }],
         slots: [{ id: "children", file: frameworkFile, position: frameworkSource.indexOf("slot()") }],
         forms: [],
+        formFields: [],
         environmentPublic: [],
       }),
       encoding: "utf8",

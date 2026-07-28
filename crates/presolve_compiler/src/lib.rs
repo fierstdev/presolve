@@ -70,6 +70,7 @@ pub mod form_binding;
 pub mod form_definition_lowering;
 pub mod form_diagnostics;
 pub mod form_field;
+pub mod form_field_definition_lowering;
 pub mod form_inspection;
 pub mod form_ir;
 pub mod form_ir_optimization;
@@ -500,6 +501,11 @@ pub use form_diagnostics::{
     collect_form_diagnostics, FormDiagnosticReservation, FORM_DIAGNOSTIC_RESERVATIONS,
 };
 pub use form_field::{collect_form_field_products, FormFieldEntity, FormFieldProducts};
+pub use form_field_definition_lowering::{
+    form_field_definition_sites_v1, lower_form_field_definitions_v1,
+    FormFieldDefinitionLoweringErrorV1, FormFieldDefinitionLoweringV1, FormFieldDefinitionSiteV1,
+    ResolvedFormFieldDefinitionV1,
+};
 pub use form_inspection::{build_form_inspection_registry, FormInspection, FormInspectionRegistry};
 pub use form_ir::{
     lower_form_ir, FormInstanceIr, FormIrOperation, FormIrReport, FormRuntimeStorage,

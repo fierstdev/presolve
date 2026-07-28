@@ -4765,11 +4765,16 @@ mod tests {
     fn file_route_assembly_projects_canonical_v2_form_into_existing_form_products() {
         let unit = CompilationUnit::parse_sources([(
             "app/routes/contact.tsx",
-            "import { Component, defineForm } from \"presolve\"; export class Contact extends Component { contact = defineForm({ fields: {} }); render() { return <form form={this.contact}></form>; } }",
+            "import { Component, defineForm, field } from \"presolve\"; export class Contact extends Component { contact = defineForm({ serialization: \"form-data\", fields: { email: field({ initial: \"\" }) } }); render() { return <form form={this.contact}><input bind:value={this.contact.fields.email} /></form>; } }",
         )]);
         let parsed = &unit.files()[0];
         let class = &parsed.classes[0];
         let property = &class.properties[0];
+        let field = &property
+            .form_definition_shape
+            .as_ref()
+            .expect("static Form shape")
+            .fields[0];
         let model = CanonicalAuthoredSemanticModelV1 {
             schema_version: crate::CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION,
             source_path: parsed.path.clone(),
@@ -4782,6 +4787,18 @@ mod tests {
                         end: class.span.end,
                         line: class.span.line,
                         column: class.span.column,
+                    },
+                    intrinsic_identity: None,
+                    derived_evidence: None,
+                },
+                CanonicalAuthoredDeclarationV1 {
+                    kind: CanonicalAuthoredDeclarationKindV1::FormField,
+                    subject: "Contact.contact.email".into(),
+                    source: crate::AuthoredSourceRangeV1 {
+                        start: field.declaration_span.start,
+                        end: field.declaration_span.end,
+                        line: field.declaration_span.line,
+                        column: field.declaration_span.column,
                     },
                     intrinsic_identity: None,
                     derived_evidence: None,
@@ -4810,6 +4827,18 @@ mod tests {
         assert_eq!(asm.forms().len(), 1);
         assert_eq!(asm.forms()[0].name, "contact");
         assert_eq!(asm.form_declaration_candidates().len(), 1);
+        assert_eq!(asm.form_fields().len(), 1);
+        assert_eq!(asm.form_fields()[0].name, "email");
+        assert_eq!(asm.form_fields()[0].path, ["email"]);
+        assert_eq!(
+            asm.serialization
+                .plans
+                .values()
+                .next()
+                .expect("Form serialization plan")
+                .format,
+            crate::FormSerializationFormat::FormData
+        );
         assert_eq!(
             asm.form_declaration_candidates()[0].status,
             crate::FormDeclarationStatus::Valid
@@ -4878,6 +4907,7 @@ mod tests {
                             })
                             .collect(),
                         forms: Vec::new(),
+                        form_fields: Vec::new(),
                     },
                 )
                 .expect("V2 Slot lowering");

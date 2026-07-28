@@ -1883,6 +1883,9 @@ pub fn build_v2_component_graph_for_module(
             );
         }
         let mut form_declaration_candidates = Vec::new();
+        let mut form_field_declaration_candidates = Vec::new();
+        let validation_rule_declaration_facts = Vec::new();
+        let mut serialization_declaration_facts = Vec::new();
         for candidate in authored.declarations.iter().filter(|candidate| {
             candidate.kind == crate::CanonicalAuthoredDeclarationKindV1::Form
                 && candidate.subject.starts_with(&format!("{}.", class.name))
@@ -1953,6 +1956,110 @@ pub fn build_v2_component_graph_for_module(
                 provenance: form_provenance,
                 status: FormDeclarationStatus::Valid,
             });
+            let Some(shape) = property.form_definition_shape.as_ref() else {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2F1004",
+                    format!(
+                        "canonical V2 Form `{}` requires a static object definition",
+                        candidate.subject
+                    ),
+                ));
+                continue;
+            };
+            if !shape.unknown_options.is_empty() || !shape.unsupported_fields.is_empty() {
+                diagnostics.push(ComponentDiagnostic::error(
+                    "PSV2F1005",
+                    format!(
+                        "canonical V2 Form `{}` contains unsupported dynamic structure or options",
+                        candidate.subject
+                    ),
+                ));
+            }
+            if let Some(format) = shape.serialization.as_ref() {
+                serialization_declaration_facts.push(AuthoredSerializationDeclarationFact {
+                    owner_component: Some(id.clone()),
+                    declaration_field: Some(id.form_field(name)),
+                    authored_name: Some(name.to_owned()),
+                    invoked: true,
+                    argument_count: 1,
+                    format: Some(format.clone()),
+                    provenance: SourceProvenance::new(&parsed.path, property.span),
+                    decorator_provenance: SourceProvenance::new(
+                        &parsed.path,
+                        shape.serialization_span.unwrap_or(shape.definition_span),
+                    ),
+                });
+            }
+            let canonical_field_prefix = format!("{}.", candidate.subject);
+            for field in &shape.fields {
+                let field_subject = format!("{}{}", canonical_field_prefix, field.path.join("."));
+                if !authored.declarations.iter().any(|declaration| {
+                    declaration.kind == crate::CanonicalAuthoredDeclarationKindV1::FormField
+                        && declaration.subject == field_subject
+                }) {
+                    continue;
+                }
+                let field_name = field.path.join(".");
+                let declaration_field = id.form_field(&format!("{name}.{field_name}"));
+                let mut violations = Vec::new();
+                if field.argument_count != 1 {
+                    violations.push(FormFieldDeclarationViolation::InvalidDecoratorArity {
+                        actual: field.argument_count,
+                        expected: 1,
+                    });
+                }
+                if field.initial_value.is_none() {
+                    violations.push(FormFieldDeclarationViolation::MissingInitializer);
+                }
+                if !field.unknown_options.is_empty() {
+                    violations.push(FormFieldDeclarationViolation::UnsupportedInitializer);
+                }
+                canonicalize_form_field_violations(&mut violations);
+                form_field_declaration_candidates.push(FormFieldDeclarationCandidate {
+                    id: FormFieldDeclarationCandidateId::for_source_position(
+                        &parsed.path,
+                        field.declaration_span.start,
+                    ),
+                    owner_component: Some(id.clone()),
+                    declaration_field: Some(declaration_field.clone()),
+                    authored_name: Some(field_name),
+                    field_id: None,
+                    decorator_invoked: true,
+                    decorator_argument_count: 1,
+                    decorator_argument_provenance: vec![SourceProvenance::new(
+                        &parsed.path,
+                        field.call_span,
+                    )],
+                    nested_path_segments: Some(field.path.clone()),
+                    form_designator: Some(FormDesignatorFact {
+                        authored_name: name.to_owned(),
+                        provenance: SourceProvenance::new(&parsed.path, property.span),
+                        name_provenance: SourceProvenance::new(&parsed.path, property.name_span),
+                    }),
+                    unsupported_form_designator: None,
+                    resolved_form: None,
+                    declaration_kind: AuthoredDeclarationKind::InstanceField,
+                    is_static: false,
+                    declared_type: None,
+                    semantic_type: None,
+                    type_assignment: None,
+                    initializer: field
+                        .initial_value
+                        .as_ref()
+                        .map(serializable_value_from_parsed),
+                    conflicting_decorators: Vec::new(),
+                    decorator_provenance: SourceProvenance::new(&parsed.path, field.callee_span),
+                    name_provenance: Some(SourceProvenance::new(
+                        &parsed.path,
+                        field.declaration_span,
+                    )),
+                    initializer_provenance: field
+                        .initial_span
+                        .map(|span| SourceProvenance::new(&parsed.path, span)),
+                    provenance: SourceProvenance::new(&parsed.path, field.declaration_span),
+                    violations,
+                });
+            }
         }
         components.push(ComponentNode {
             id: id.clone(),
@@ -1978,10 +2085,10 @@ pub fn build_v2_component_graph_for_module(
             form_declaration_candidates,
             resource_declaration_candidates: Vec::new(),
             route_loader_declaration_candidates: Vec::new(),
-            form_field_declaration_candidates: Vec::new(),
-            validation_rule_declaration_facts: Vec::new(),
+            form_field_declaration_candidates,
+            validation_rule_declaration_facts,
             submission_declaration_facts: Vec::new(),
-            serialization_declaration_facts: Vec::new(),
+            serialization_declaration_facts,
             opaque_action_facts: Vec::new(),
             server_action_facts: Vec::new(),
             shadowed_validation_intrinsics: BTreeSet::new(),

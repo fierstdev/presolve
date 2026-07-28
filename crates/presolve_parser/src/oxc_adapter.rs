@@ -23,7 +23,8 @@ use crate::model::{
     ParsedConstantExpressionKind, ParsedDecorator, ParsedEffectBody, ParsedEffectCleanup,
     ParsedEffectExpression, ParsedEffectExpressionKind, ParsedEffectStatement,
     ParsedEffectStatementKind, ParsedEventHandler, ParsedExport, ParsedExportKind,
-    ParsedExportSpecifier, ParsedFile, ParsedImport, ParsedImportSpecifier, ParsedInitializerCall,
+    ParsedExportSpecifier, ParsedFile, ParsedFormDefinitionShape, ParsedFormFieldShape,
+    ParsedFormSubmitShape, ParsedImport, ParsedImportSpecifier, ParsedInitializerCall,
     ParsedInlineHandler, ParsedJsxAttribute, ParsedJsxAttributeValue, ParsedJsxChild,
     ParsedJsxConditional, ParsedJsxElement, ParsedJsxFragment, ParsedJsxList, ParsedJsxNode,
     ParsedLocalVariable, ParsedLogicalOperator, ParsedMethod, ParsedMethodCall,
@@ -678,6 +679,10 @@ fn parse_property(
             inline_handler: parsed_inline_handler(call, source),
         })
     });
+    let form_definition_shape = property
+        .value
+        .as_ref()
+        .and_then(|expression| parsed_form_definition_shape(expression, source));
     let initializer_literal = property
         .value
         .as_ref()
@@ -718,6 +723,7 @@ fn parse_property(
         is_identifier_name,
         decorators,
         initializer_call,
+        form_definition_shape,
         initializer,
         initializer_literal,
         initializer_expression,
@@ -733,6 +739,245 @@ fn parse_property(
         is_declare: property.declare,
         span: source_span_from_offsets(source, declaration_start, property.span.end as usize),
     })
+}
+
+fn parsed_form_definition_shape(
+    expression: &Expression<'_>,
+    source: &str,
+) -> Option<ParsedFormDefinitionShape> {
+    let Expression::CallExpression(call) = expression else {
+        return None;
+    };
+    let [argument] = call.arguments.as_slice() else {
+        return None;
+    };
+    let Expression::ObjectExpression(definition) = argument.as_expression()? else {
+        return None;
+    };
+
+    let mut serialization = None;
+    let mut serialization_span = None;
+    let mut fields_span = None;
+    let mut fields = Vec::new();
+    let mut unsupported_fields = Vec::new();
+    let mut submit = None;
+    let mut unknown_options = Vec::new();
+    for property in &definition.properties {
+        let ObjectPropertyKind::ObjectProperty(property) = property else {
+            unknown_options.push("<spread>".to_owned());
+            continue;
+        };
+        if property.computed || property.method || property.kind != PropertyKind::Init {
+            unknown_options.push("<dynamic>".to_owned());
+            continue;
+        }
+        let Some(name) = object_property_key_name(&property.key) else {
+            unknown_options.push("<dynamic>".to_owned());
+            continue;
+        };
+        match name.as_str() {
+            "serialization" => {
+                serialization_span = Some(source_span(source, property.value.span()));
+                if let Expression::StringLiteral(literal) = &property.value {
+                    serialization = Some(literal.value.to_string());
+                }
+            }
+            "fields" => {
+                fields_span = Some(source_span(source, property.value.span()));
+                collect_form_field_shapes(
+                    &property.value,
+                    &[],
+                    source,
+                    &mut fields,
+                    &mut unsupported_fields,
+                );
+            }
+            "submit" => {
+                submit = parsed_form_submit_shape(&property.value, source);
+            }
+            _ => unknown_options.push(name),
+        }
+    }
+    fields.sort_by(|left, right| {
+        (
+            left.declaration_span.start,
+            left.declaration_span.end,
+            &left.path,
+        )
+            .cmp(&(
+                right.declaration_span.start,
+                right.declaration_span.end,
+                &right.path,
+            ))
+    });
+    unsupported_fields.sort();
+    unknown_options.sort();
+    unknown_options.dedup();
+    Some(ParsedFormDefinitionShape {
+        call_span: source_span(source, call.span),
+        definition_span: source_span(source, definition.span),
+        serialization,
+        serialization_span,
+        fields_span,
+        fields,
+        unsupported_fields,
+        submit,
+        unknown_options,
+    })
+}
+
+fn collect_form_field_shapes(
+    expression: &Expression<'_>,
+    path: &[String],
+    source: &str,
+    fields: &mut Vec<ParsedFormFieldShape>,
+    unsupported: &mut Vec<Vec<String>>,
+) {
+    match expression {
+        Expression::ObjectExpression(object) => {
+            for property in &object.properties {
+                let ObjectPropertyKind::ObjectProperty(property) = property else {
+                    unsupported.push(path.to_vec());
+                    continue;
+                };
+                if property.computed || property.method || property.kind != PropertyKind::Init {
+                    unsupported.push(path.to_vec());
+                    continue;
+                }
+                let Some(name) = object_property_key_name(&property.key) else {
+                    unsupported.push(path.to_vec());
+                    continue;
+                };
+                let mut child_path = path.to_vec();
+                child_path.push(name);
+                collect_form_field_shape(
+                    &property.value,
+                    child_path,
+                    source_span(source, property.span),
+                    source,
+                    fields,
+                    unsupported,
+                );
+            }
+        }
+        _ => unsupported.push(path.to_vec()),
+    }
+}
+
+fn collect_form_field_shape(
+    expression: &Expression<'_>,
+    path: Vec<String>,
+    declaration_span: SourceSpan,
+    source: &str,
+    fields: &mut Vec<ParsedFormFieldShape>,
+    unsupported: &mut Vec<Vec<String>>,
+) {
+    match expression {
+        Expression::ObjectExpression(_) => {
+            collect_form_field_shapes(expression, &path, source, fields, unsupported);
+        }
+        Expression::CallExpression(call) => {
+            let mut initial_value = None;
+            let mut initial_span = None;
+            let mut validations = Vec::new();
+            let mut unknown_options = Vec::new();
+            if let [argument] = call.arguments.as_slice() {
+                if let Some(Expression::ObjectExpression(options)) = argument.as_expression() {
+                    for property in &options.properties {
+                        let ObjectPropertyKind::ObjectProperty(property) = property else {
+                            unknown_options.push("<spread>".to_owned());
+                            continue;
+                        };
+                        if property.computed
+                            || property.method
+                            || property.kind != PropertyKind::Init
+                        {
+                            unknown_options.push("<dynamic>".to_owned());
+                            continue;
+                        }
+                        let Some(name) = object_property_key_name(&property.key) else {
+                            unknown_options.push("<dynamic>".to_owned());
+                            continue;
+                        };
+                        match name.as_str() {
+                            "initial" => {
+                                initial_span = Some(source_span(source, property.value.span()));
+                                initial_value = serializable_value_from_expression(&property.value);
+                            }
+                            "validate" => {
+                                if let Expression::ArrayExpression(array) = &property.value {
+                                    validations.extend(array.elements.iter().filter_map(
+                                        |element| {
+                                            element.as_expression().map(|expression| {
+                                                parsed_validation_rule_expression(
+                                                    expression, source,
+                                                )
+                                            })
+                                        },
+                                    ));
+                                } else {
+                                    unknown_options.push("validate".to_owned());
+                                }
+                            }
+                            _ => unknown_options.push(name),
+                        }
+                    }
+                }
+            }
+            unknown_options.sort();
+            unknown_options.dedup();
+            fields.push(ParsedFormFieldShape {
+                name: path.last().cloned().unwrap_or_default(),
+                path,
+                declaration_span,
+                call_span: source_span(source, call.span),
+                callee_span: source_span(source, call.callee.span()),
+                argument_count: call.arguments.len(),
+                initial_value,
+                initial_span,
+                validations,
+                unknown_options,
+            });
+        }
+        Expression::ArrayExpression(array) => {
+            for (index, element) in array.elements.iter().enumerate() {
+                let Some(expression) = element.as_expression() else {
+                    unsupported.push(path.clone());
+                    continue;
+                };
+                let mut child_path = path.clone();
+                child_path.push(index.to_string());
+                collect_form_field_shape(
+                    expression,
+                    child_path,
+                    source_span(source, expression.span()),
+                    source,
+                    fields,
+                    unsupported,
+                );
+            }
+        }
+        _ => unsupported.push(path),
+    }
+}
+
+fn parsed_form_submit_shape(
+    expression: &Expression<'_>,
+    source: &str,
+) -> Option<ParsedFormSubmitShape> {
+    match expression {
+        Expression::ArrowFunctionExpression(handler) => Some(ParsedFormSubmitShape {
+            span: source_span(source, handler.span),
+            is_async: handler.r#async,
+            parameter_count: handler.params.items.len(),
+        }),
+        Expression::FunctionExpression(handler) => Some(ParsedFormSubmitShape {
+            span: source_span(source, handler.span),
+            is_async: handler.r#async,
+            parameter_count: handler.params.items.len(),
+        }),
+        _ => None,
+    }
 }
 
 /// Retain general syntax facts for a single inline function argument.  This

@@ -7,7 +7,7 @@ Complete the canonical decorator-free V2 Forms gate from the supplied
 `defineForm({ serialization, fields, submit })` with nested `field(...)`
 declarations and compiler-owned `bind:value`, `bind:checked`, and `bind:files`.
 
-## Completed slice
+## Completed slices
 
 Decorator-free Form source-authority foundation:
 
@@ -19,13 +19,28 @@ Decorator-free Form source-authority foundation:
 
 Legacy Form decorators remain compatibility-only and were not used as evidence.
 
+Decorator-free Form Field authority and product projection:
+
+- parser-owned static `defineForm` shape for serialization, nested fields,
+  initial values, validation expressions, and inline submit shape;
+- TypeScript-resolved canonical `field(...)` recognition through V2 authority
+  schema v6, including alias-safe and lookalike-safe site classification;
+- canonical nested Form Field declarations joined only below a canonical Form;
+- projection into existing Form Field and serialization products, retaining
+  nested paths and stable source provenance; and
+- focused parser, compiler, authority, CLI compilation, and public TypeScript
+  evidence.
+
+Validation helpers are retained as syntax but are not yet classified or lowered
+by spelling. This deliberately preserves the compiler authority boundary.
+
 ## Next slice
 
-Add a parser-derived, source-faithful static Form definition view and lower
-nested `fields` entries into existing Form Field, serialization, validation,
-and submission products. Preserve the frozen Form runtime identities and fail
-closed for dynamic schemas, unsupported validation, files in resume data, and
-malformed definitions.
+Add TypeScript-authoritative built-in and Standard Schema validation
+classification, then lower validation and inline submit into their canonical
+products without adapting them through legacy decorated-method semantics.
+Complete `bind:value`, `bind:checked`, and `bind:files` runtime/resume browser
+proof, with files explicitly excluded from resumable payloads.
 
 ## Verification
 
@@ -36,4 +51,4 @@ malformed definitions.
 - `pnpm --filter @presolve/typescript-authority test`
 - `pnpm exec tsc -p tests/framework-public-api/tsconfig.json`
 
-Beta readiness estimate after this slice: 79%.
+Beta readiness estimate after the Form Field gate: 82%.

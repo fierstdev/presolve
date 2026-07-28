@@ -7,11 +7,11 @@ use serde::Serialize;
 
 use crate::{
     action_field_sites_v1, component_inheritance_sites_v1, effect_field_sites_v1,
-    form_definition_sites_v1, slot_field_sites_v1, AuthoredSourceRangeV1,
-    CanonicalAuthoredSemanticModelV1,
+    form_definition_sites_v1, form_field_definition_sites_v1, slot_field_sites_v1,
+    AuthoredSourceRangeV1, CanonicalAuthoredSemanticModelV1,
 };
 
-pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 5;
+pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 6;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -57,6 +57,8 @@ pub struct V2AuthorityCanonicalV1 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub define_form: Option<V2AuthorityPositionV1>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub field: Option<V2AuthorityPositionV1>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub environment: Option<V2AuthorityPositionV1>,
 }
 
@@ -72,6 +74,7 @@ pub struct V2AuthorityRequestV1 {
     pub effects: Vec<V2AuthoritySiteV1>,
     pub slots: Vec<V2AuthoritySiteV1>,
     pub forms: Vec<V2AuthoritySiteV1>,
+    pub form_fields: Vec<V2AuthoritySiteV1>,
     pub environment_public: Vec<V2AuthorityMemberSiteV1>,
 }
 
@@ -117,6 +120,7 @@ pub fn build_v2_authority_request_v1(
     let effect = canonical_import(parsed, "effect")?;
     let slot = canonical_import(parsed, "slot")?;
     let define_form = canonical_import(parsed, "defineForm")?;
+    let field = canonical_import(parsed, "field")?;
     let environment = canonical_import(parsed, "environment")?;
     let components = component_inheritance_sites_v1(parsed)
         .into_iter()
@@ -209,6 +213,22 @@ pub fn build_v2_authority_request_v1(
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
+    let form_fields = field
+        .is_some()
+        .then(|| form_field_definition_sites_v1(parsed, component_model))
+        .transpose()
+        .map_err(|error| V2AuthorityRequestErrorV1::FieldSiteSelection(error.to_string()))?
+        .unwrap_or_default()
+        .into_iter()
+        .map(|site| {
+            site_for(
+                "form-field",
+                site.callee_source,
+                &parsed.path,
+                &parsed.syntax.source,
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let environment_public = environment_public_member_sites(parsed, environment.is_some())?;
     Ok(V2AuthorityRequestV1 {
         schema_version: V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
@@ -220,6 +240,7 @@ pub fn build_v2_authority_request_v1(
             effect,
             slot,
             define_form,
+            field,
             environment,
         },
         components,
@@ -228,6 +249,7 @@ pub fn build_v2_authority_request_v1(
         effects,
         slots,
         forms,
+        form_fields,
         environment_public,
     })
 }
@@ -263,6 +285,7 @@ pub fn build_v2_authority_component_request_v1(
             effect: canonical_import(parsed, "effect")?,
             slot: canonical_import(parsed, "slot")?,
             define_form: canonical_import(parsed, "defineForm")?,
+            field: canonical_import(parsed, "field")?,
             environment: canonical_import(parsed, "environment")?,
         },
         components,
@@ -271,6 +294,7 @@ pub fn build_v2_authority_component_request_v1(
         effects: Vec::new(),
         slots: Vec::new(),
         forms: Vec::new(),
+        form_fields: Vec::new(),
         environment_public: Vec::new(),
     })
 }
@@ -297,6 +321,7 @@ pub fn build_v2_environment_authority_request_v1(
             effect: None,
             slot: None,
             define_form: None,
+            field: None,
             environment: Some(environment),
         },
         components: Vec::new(),
@@ -305,6 +330,7 @@ pub fn build_v2_environment_authority_request_v1(
         effects: Vec::new(),
         slots: Vec::new(),
         forms: Vec::new(),
+        form_fields: Vec::new(),
         environment_public: environment_public_member_sites(parsed, true)?,
     }))
 }

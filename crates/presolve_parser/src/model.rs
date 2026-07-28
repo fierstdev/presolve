@@ -191,6 +191,10 @@ pub struct ParsedProperty {
     /// A direct initializer call selected from the general source AST. Its
     /// callee has no framework meaning until a semantic authority resolves it.
     pub initializer_call: Option<ParsedInitializerCall>,
+    /// A static object-argument shape selected from a direct initializer call.
+    /// It has no Form meaning until TypeScript authority resolves the outer
+    /// call to `defineForm`.
+    pub form_definition_shape: Option<ParsedFormDefinitionShape>,
     pub initializer: Option<String>,
     pub initializer_literal: Option<ParsedSerializableValue>,
     pub initializer_expression: Option<ParsedComputedExpression>,
@@ -205,6 +209,42 @@ pub struct ParsedProperty {
     pub is_definite_assignment: bool,
     pub is_declare: bool,
     pub span: SourceSpan,
+}
+
+/// Source-faithful static facts from a possible `defineForm({...})` argument.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedFormDefinitionShape {
+    pub call_span: SourceSpan,
+    pub definition_span: SourceSpan,
+    pub serialization: Option<String>,
+    pub serialization_span: Option<SourceSpan>,
+    pub fields_span: Option<SourceSpan>,
+    pub fields: Vec<ParsedFormFieldShape>,
+    pub unsupported_fields: Vec<Vec<String>>,
+    pub submit: Option<ParsedFormSubmitShape>,
+    pub unknown_options: Vec<String>,
+}
+
+/// One statically named leaf call below a possible Form `fields` object.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedFormFieldShape {
+    pub name: String,
+    pub path: Vec<String>,
+    pub declaration_span: SourceSpan,
+    pub call_span: SourceSpan,
+    pub callee_span: SourceSpan,
+    pub argument_count: usize,
+    pub initial_value: Option<ParsedSerializableValue>,
+    pub initial_span: Option<SourceSpan>,
+    pub validations: Vec<ParsedValidationRuleExpression>,
+    pub unknown_options: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedFormSubmitShape {
+    pub span: SourceSpan,
+    pub is_async: bool,
+    pub parameter_count: usize,
 }
 
 /// Source-faithful facts for a direct class-field initializer call.
