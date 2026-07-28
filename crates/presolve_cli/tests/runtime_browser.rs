@@ -2488,12 +2488,14 @@ import { StructuralBranch } from "../components/StructuralBranch";
 
 export class StructuralPage extends Component {
   visible = state(true);
+  details = state(false);
   items = state([{ id: "a" }, { id: "b" }, { id: "c" }]);
   toggle = action(() => { this.visible = false; });
+  show = action(() => { this.details = true; });
   reconcile = action(() => { this.items = [{ id: "c" }, { id: "d" }, { id: "a" }]; });
   trim = action(() => { this.items = [{ id: "d" }]; });
   render() {
-    return <main><button onClick={() => this.toggle()}>Toggle</button><button onClick={() => this.reconcile()}>Reconcile</button><button onClick={() => this.trim()}>Trim</button>{this.visible ? <div><StructuralBranch /><StructuralLeaf /></div> : <aside>Hidden</aside>}<ul>{this.items.map(item => <li key={item.id}><StructuralLeaf /></li>)}</ul></main>;
+    return <main><button onClick={() => this.toggle()}>Toggle</button><button onClick={() => this.reconcile()}>Reconcile</button><button onClick={() => this.trim()}>Trim</button>{this.visible ? <div><StructuralBranch /><StructuralLeaf /></div> : <aside>Hidden</aside>}<ul>{this.items.map(item => <li key={item.id}><StructuralLeaf /></li>)}</ul><button onClick={() => this.show()}>Show details</button>{this.details ? (<output className="null-detail">Compiler-owned detail</output>) : null}</main>;
   }
 }
 "#,
@@ -3388,6 +3390,11 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   const trim = control("Trim");
   if (toggle === undefined || reconcile === undefined || trim === undefined) fail("structural controls were missing");
   if (expectStructuralMaterialization) {
+    const show = control("Show details");
+    if (show === undefined) fail("null false branch control was missing");
+    if (document.querySelector(".null-detail") !== null) fail("null false branch materialized eagerly");
+    show.click();
+    await waitFor(() => document.querySelector(".null-detail")?.textContent === "Compiler-owned detail", "null false branch materialization");
     const leaf = [...main.querySelectorAll("button")].find((button) => button.textContent === "Leaf: 0");
     const dynamicLeaf = [...runtime.store.components.values()].find((component) =>
       component.name === "StructuralLeaf" && component.instance_id.startsWith("presolve-structural-occurrence:v1:")

@@ -1824,13 +1824,16 @@ fn parsed_jsx_conditional(
 ) -> Option<ParsedJsxConditional> {
     let condition = expression_summary(&conditional.test)?;
     let when_true = parsed_jsx_node_from_expression(&conditional.consequent, source)?;
-    let when_false = parsed_jsx_node_from_expression(&conditional.alternate, source)?;
+    let when_false = match &conditional.alternate {
+        Expression::NullLiteral(_) => None,
+        alternate => Some(parsed_jsx_node_from_expression(alternate, source)?),
+    };
 
     Some(ParsedJsxConditional {
         condition,
         span: source_span(source, conditional.span),
         when_true,
-        when_false: Some(when_false),
+        when_false,
     })
 }
 

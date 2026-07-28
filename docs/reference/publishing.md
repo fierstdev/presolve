@@ -22,7 +22,7 @@ versioned compatibility train, not a set of independently published packages.
    manifest, package metadata, and compatibility assertion. Map
    `MAJOR.MINOR.PATCH-(alpha|beta).N` to the numeric Visual Studio Marketplace
    prerelease version `MAJOR.MINOR.(PATCH + N)` because the Marketplace does
-   not accept SemVer prerelease suffixes. Presolve `0.2.0-beta.11` therefore
+   not accept SemVer prerelease suffixes. Presolve `0.2.0-beta.12` therefore
    publishes as Marketplace prerelease `0.2.11`.
 2. Run the full Rust, package, browser, artifact, formatter, and release-check
    matrix from a clean checkout.

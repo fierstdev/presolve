@@ -8,6 +8,15 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.12 - 2026-07-28
+
+### Fixed
+
+- Parenthesized JSX conditionals with an explicit `null` false branch now
+  remain compiler-owned structural hosts. Decorator-free actions can
+  materialize `condition ? (<Element />) : null` content in the browser
+  instead of updating adjacent bindings while silently omitting the branch.
+
 ## 0.2.0-beta.11 - 2026-07-28
 
 ### Fixed

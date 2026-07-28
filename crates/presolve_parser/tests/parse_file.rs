@@ -996,6 +996,57 @@ fn parses_jsx_logical_and_conditional_rendering() {
 }
 
 #[test]
+fn parses_parenthesized_jsx_conditional_with_null_false_branch() {
+    let source = r#"
+        import { Component, state } from "presolve";
+
+        export class Details extends Component {
+          visible = state(false);
+
+          render() {
+            return (
+              <section>
+                {this.visible ? (
+                  <div className="details">Compiler-owned detail</div>
+                ) : null}
+              </section>
+            );
+          }
+        }
+    "#;
+
+    let parsed = parse_file("app/routes/details.tsx", source);
+
+    assert!(parsed.diagnostics.is_empty());
+
+    let class = parsed.classes.first().expect("expected class");
+    let render = class
+        .methods
+        .iter()
+        .find(|method| method.name == "render")
+        .expect("expected render method");
+
+    assert_eq!(render.bindings, vec!["this.visible"]);
+
+    let ParsedJsxNode::Element(section) = &render.jsx_roots[0] else {
+        panic!("expected section root");
+    };
+
+    let ParsedJsxChild::Conditional(conditional) = &section.children[0] else {
+        panic!("expected conditional child");
+    };
+
+    assert_eq!(conditional.condition, "this.visible");
+    assert!(conditional.when_false.is_none());
+
+    let ParsedJsxNode::Element(when_true) = &conditional.when_true else {
+        panic!("expected true branch element");
+    };
+    assert_eq!(when_true.name, "div");
+    assert_eq!(when_true.attributes[0].name, "className");
+}
+
+#[test]
 fn parses_keyed_jsx_list_rendering() {
     let source = include_str!("../../../fixtures/0019-keyed-list-semantics/input/KeyedList.tsx");
 
