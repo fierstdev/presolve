@@ -31,16 +31,17 @@ Decorator-free Form Field authority and product projection:
 - focused parser, compiler, authority, CLI compilation, and public TypeScript
   evidence.
 
-Validation helpers are retained as syntax but are not yet classified or lowered
-by spelling. This deliberately preserves the compiler authority boundary.
+Built-in validation helpers are now independently classified by TypeScript
+identity through V2 authority schema v7. Aliases lower to their canonical rule
+identity; local lookalikes remain inert. Proven rules enter the existing
+validation graph with their original arguments and source provenance.
 
 ## Next slice
 
-Add TypeScript-authoritative built-in and Standard Schema validation
-classification, then lower validation and inline submit into their canonical
-products without adapting them through legacy decorated-method semantics.
-Complete `bind:value`, `bind:checked`, and `bind:files` runtime/resume browser
-proof, with files explicitly excluded from resumable payloads.
+Lower inline submit into a native V2 submission/action product without adapting
+it through legacy decorated-method semantics. Add Standard Schema validation,
+then complete `bind:value`, `bind:checked`, and `bind:files` runtime/resume
+browser proof, with files explicitly excluded from resumable payloads.
 
 ## Verification
 
@@ -51,4 +52,4 @@ proof, with files explicitly excluded from resumable payloads.
 - `pnpm --filter @presolve/typescript-authority test`
 - `pnpm exec tsc -p tests/framework-public-api/tsconfig.json`
 
-Beta readiness estimate after the Form Field gate: 82%.
+Beta readiness estimate after the built-in validation gate: 84%.

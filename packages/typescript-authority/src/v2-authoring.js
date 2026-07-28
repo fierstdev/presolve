@@ -5,7 +5,7 @@ import {
   createCanonicalIntrinsicRegistry,
 } from "./index.js";
 
-export const V2_AUTHORED_AUTHORITY_SCHEMA_VERSION = 6;
+export const V2_AUTHORED_AUTHORITY_SCHEMA_VERSION = 7;
 
 /**
  * Resolves explicit source positions for the implemented decorator-free V2
@@ -23,6 +23,11 @@ export async function analyzeV2Authoring(request) {
       ...(request.canonical.slot ? [{ id: "canonical:slot", ...request.canonical.slot }] : []),
       ...(request.canonical.defineForm ? [{ id: "canonical:define-form", ...request.canonical.defineForm }] : []),
       ...(request.canonical.field ? [{ id: "canonical:field", ...request.canonical.field }] : []),
+      ...request.canonical.validationRules.map(entry => ({
+        id: `canonical-validation:${entry.name}`,
+        file: entry.file,
+        position: entry.position,
+      })),
       ...(request.canonical.environment ? [{ id: "canonical:environment", ...request.canonical.environment }] : []),
       ...request.states.map(site => ({ id: `state:${site.id}`, file: site.file, position: site.position })),
       ...request.actions.map(site => ({ id: `action:${site.id}`, file: site.file, position: site.position })),
@@ -30,6 +35,7 @@ export async function analyzeV2Authoring(request) {
       ...request.slots.map(site => ({ id: `slot:${site.id}`, file: site.file, position: site.position })),
       ...request.forms.map(site => ({ id: `form:${site.id}`, file: site.file, position: site.position })),
       ...request.formFields.map(site => ({ id: `form-field:${site.id}`, file: site.file, position: site.position })),
+      ...request.validations.map(site => ({ id: `validation:${site.id}`, file: site.file, position: site.position })),
       ...request.environmentPublic.flatMap(site => [
         { id: `environment-object:${site.id}`, file: site.file, position: site.objectPosition },
         { id: `environment-property:${site.id}`, file: site.file, position: site.propertyPosition },
@@ -55,6 +61,10 @@ export async function analyzeV2Authoring(request) {
     ...(request.canonical.slot ? [{ kind: "slot", symbol: symbols.get("canonical:slot") }] : []),
     ...(request.canonical.defineForm ? [{ kind: "form", symbol: symbols.get("canonical:define-form") }] : []),
     ...(request.canonical.field ? [{ kind: "field", symbol: symbols.get("canonical:field") }] : []),
+    ...request.canonical.validationRules.map(entry => ({
+      kind: "validate",
+      symbol: symbols.get(`canonical-validation:${entry.name}`),
+    })),
     ...(request.canonical.environment ? [{ kind: "environment_public", symbol: symbols.get("canonical:environment") }] : []),
   ]);
   return {
@@ -88,6 +98,10 @@ export async function analyzeV2Authoring(request) {
       const intrinsic = classifyResolvedIntrinsic(registry, symbols.get(`form-field:${site.id}`));
       return intrinsic?.kind === "field" ? [{ id: site.id, identity: intrinsic.identity }] : [];
     }),
+    validations: request.validations.flatMap(site => {
+      const intrinsic = classifyResolvedIntrinsic(registry, symbols.get(`validation:${site.id}`));
+      return intrinsic?.kind === "validate" ? [{ id: site.id, identity: intrinsic.identity }] : [];
+    }),
     environmentPublic: request.environmentPublic.flatMap(site => {
       const receiver = classifyResolvedIntrinsic(registry, symbols.get(`environment-object:${site.id}`));
       const member = resolvedIdentity(symbols.get(`environment-property:${site.id}`));
@@ -114,6 +128,15 @@ function validateV2AuthoringRequest(request) {
       validatePosition(request.canonical[kind], `canonical ${kind}`);
     }
   }
+  if (!Array.isArray(request.canonical.validationRules)) {
+    throw new TypeError("V2 authoring canonical validation rules must be an array");
+  }
+  for (const entry of request.canonical.validationRules) {
+    if (!entry || typeof entry.name !== "string" || !entry.name) {
+      throw new TypeError("V2 authoring canonical validation rules require names");
+    }
+    validatePosition(entry, `canonical validation ${entry.name}`);
+  }
   for (const [kind, sites, canonicalKind] of [
     ["component", request.components, "component"],
     ["state", request.states, "state"],
@@ -135,6 +158,17 @@ function validateV2AuthoringRequest(request) {
       ids.add(site.id);
       validatePosition(site, `${kind} site`);
     }
+  }
+  if (!Array.isArray(request.validations)) {
+    throw new TypeError("V2 authoring validation sites must be an array");
+  }
+  const validationIds = new Set();
+  for (const site of request.validations) {
+    if (!site || typeof site.id !== "string" || !site.id || validationIds.has(site.id)) {
+      throw new TypeError("V2 authoring validation sites require unique non-empty ids");
+    }
+    validationIds.add(site.id);
+    validatePosition(site, "validation site");
   }
   if (!Array.isArray(request.environmentPublic)) {
     throw new TypeError("V2 authoring environment public sites must be an array");

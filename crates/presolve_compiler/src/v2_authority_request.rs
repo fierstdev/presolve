@@ -7,17 +7,25 @@ use serde::Serialize;
 
 use crate::{
     action_field_sites_v1, component_inheritance_sites_v1, effect_field_sites_v1,
-    form_definition_sites_v1, form_field_definition_sites_v1, slot_field_sites_v1,
-    AuthoredSourceRangeV1, CanonicalAuthoredSemanticModelV1,
+    form_definition_sites_v1, form_field_definition_sites_v1, form_validation_definition_sites_v1,
+    slot_field_sites_v1, AuthoredSourceRangeV1, CanonicalAuthoredSemanticModelV1,
 };
 
-pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 6;
+pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 7;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct V2AuthorityPositionV1 {
     pub file: PathBuf,
     /// Zero-based UTF-16 code-unit offset used by the TypeScript API.
+    pub position: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct V2AuthorityNamedPositionV1 {
+    pub name: String,
+    pub file: PathBuf,
     pub position: usize,
 }
 
@@ -58,6 +66,7 @@ pub struct V2AuthorityCanonicalV1 {
     pub define_form: Option<V2AuthorityPositionV1>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub field: Option<V2AuthorityPositionV1>,
+    pub validation_rules: Vec<V2AuthorityNamedPositionV1>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub environment: Option<V2AuthorityPositionV1>,
 }
@@ -75,6 +84,7 @@ pub struct V2AuthorityRequestV1 {
     pub slots: Vec<V2AuthoritySiteV1>,
     pub forms: Vec<V2AuthoritySiteV1>,
     pub form_fields: Vec<V2AuthoritySiteV1>,
+    pub validations: Vec<V2AuthoritySiteV1>,
     pub environment_public: Vec<V2AuthorityMemberSiteV1>,
 }
 
@@ -121,6 +131,7 @@ pub fn build_v2_authority_request_v1(
     let slot = canonical_import(parsed, "slot")?;
     let define_form = canonical_import(parsed, "defineForm")?;
     let field = canonical_import(parsed, "field")?;
+    let validation_rules = canonical_validation_imports(parsed)?;
     let environment = canonical_import(parsed, "environment")?;
     let components = component_inheritance_sites_v1(parsed)
         .into_iter()
@@ -229,6 +240,21 @@ pub fn build_v2_authority_request_v1(
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
+    let validations = (!validation_rules.is_empty())
+        .then(|| form_validation_definition_sites_v1(parsed, component_model))
+        .transpose()
+        .map_err(|error| V2AuthorityRequestErrorV1::FieldSiteSelection(error.to_string()))?
+        .unwrap_or_default()
+        .into_iter()
+        .map(|site| {
+            site_for(
+                "validation",
+                site.callee_source,
+                &parsed.path,
+                &parsed.syntax.source,
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let environment_public = environment_public_member_sites(parsed, environment.is_some())?;
     Ok(V2AuthorityRequestV1 {
         schema_version: V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
@@ -241,6 +267,7 @@ pub fn build_v2_authority_request_v1(
             slot,
             define_form,
             field,
+            validation_rules,
             environment,
         },
         components,
@@ -250,6 +277,7 @@ pub fn build_v2_authority_request_v1(
         slots,
         forms,
         form_fields,
+        validations,
         environment_public,
     })
 }
@@ -286,6 +314,7 @@ pub fn build_v2_authority_component_request_v1(
             slot: canonical_import(parsed, "slot")?,
             define_form: canonical_import(parsed, "defineForm")?,
             field: canonical_import(parsed, "field")?,
+            validation_rules: canonical_validation_imports(parsed)?,
             environment: canonical_import(parsed, "environment")?,
         },
         components,
@@ -295,6 +324,7 @@ pub fn build_v2_authority_component_request_v1(
         slots: Vec::new(),
         forms: Vec::new(),
         form_fields: Vec::new(),
+        validations: Vec::new(),
         environment_public: Vec::new(),
     })
 }
@@ -322,6 +352,7 @@ pub fn build_v2_environment_authority_request_v1(
             slot: None,
             define_form: None,
             field: None,
+            validation_rules: Vec::new(),
             environment: Some(environment),
         },
         components: Vec::new(),
@@ -331,6 +362,7 @@ pub fn build_v2_environment_authority_request_v1(
         slots: Vec::new(),
         forms: Vec::new(),
         form_fields: Vec::new(),
+        validations: Vec::new(),
         environment_public: environment_public_member_sites(parsed, true)?,
     }))
 }
@@ -384,6 +416,37 @@ fn canonical_import(
             })
         })
         .transpose()
+}
+
+fn canonical_validation_imports(
+    parsed: &ParsedFile,
+) -> Result<Vec<V2AuthorityNamedPositionV1>, V2AuthorityRequestErrorV1> {
+    const NAMES: &[&str] = &[
+        "required",
+        "min",
+        "max",
+        "minLength",
+        "maxLength",
+        "pattern",
+        "email",
+        "equals",
+        "notEquals",
+    ];
+    NAMES
+        .iter()
+        .filter_map(|name| {
+            canonical_import(parsed, name)
+                .transpose()
+                .map(|result| result.map(|position| ((*name).to_owned(), position)))
+        })
+        .map(|result| {
+            result.map(|(name, position)| V2AuthorityNamedPositionV1 {
+                name,
+                file: position.file,
+                position: position.position,
+            })
+        })
+        .collect()
 }
 
 fn site_for(
@@ -493,9 +556,9 @@ class Counter extends FrameworkBase { children: SlotContent = slot(); count = re
     #[test]
     fn selects_form_definition_sites_only_when_define_form_is_imported() {
         let source = r#"
-import { Component, defineForm as declareForm } from "presolve";
+import { Component, defineForm as declareForm, field as declareField, required as mustExist } from "presolve";
 class Profile extends Component {
-  profile = declareForm({ fields: {} });
+  profile = declareForm({ fields: { name: declareField({ initial: "", validate: [mustExist()] }) } });
   lookalike = helper({ fields: {} });
 }
 "#;
@@ -518,10 +581,22 @@ class Profile extends Component {
             build_v2_authority_request_v1(&parsed, PathBuf::from("tsconfig.json"), &components)
                 .unwrap();
         assert!(request.canonical.define_form.is_some());
+        assert!(request.canonical.field.is_some());
+        assert_eq!(request.canonical.validation_rules.len(), 1);
         assert_eq!(request.forms.len(), 2);
+        assert_eq!(request.form_fields.len(), 1);
+        assert_eq!(request.validations.len(), 1);
         assert_eq!(
             &source[request.forms[0].position..][.."declareForm".len()],
             "declareForm"
+        );
+        assert_eq!(
+            &source[request.form_fields[0].position..][.."declareField".len()],
+            "declareField"
+        );
+        assert_eq!(
+            &source[request.validations[0].position..][.."mustExist".len()],
+            "mustExist"
         );
     }
 

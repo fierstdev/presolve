@@ -4765,7 +4765,7 @@ mod tests {
     fn file_route_assembly_projects_canonical_v2_form_into_existing_form_products() {
         let unit = CompilationUnit::parse_sources([(
             "app/routes/contact.tsx",
-            "import { Component, defineForm, field } from \"presolve\"; export class Contact extends Component { contact = defineForm({ serialization: \"form-data\", fields: { email: field({ initial: \"\" }) } }); render() { return <form form={this.contact}><input bind:value={this.contact.fields.email} /></form>; } }",
+            "import { Component, defineForm, field, required } from \"presolve\"; export class Contact extends Component { contact = defineForm({ serialization: \"form-data\", fields: { email: field({ initial: \"\", validate: [required()] }) } }); render() { return <form form={this.contact}><input bind:value={this.contact.fields.email} /></form>; } }",
         )]);
         let parsed = &unit.files()[0];
         let class = &parsed.classes[0];
@@ -4775,6 +4775,7 @@ mod tests {
             .as_ref()
             .expect("static Form shape")
             .fields[0];
+        let validation = &field.validations[0];
         let model = CanonicalAuthoredSemanticModelV1 {
             schema_version: crate::CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION,
             source_path: parsed.path.clone(),
@@ -4815,6 +4816,22 @@ mod tests {
                     intrinsic_identity: None,
                     derived_evidence: None,
                 },
+                CanonicalAuthoredDeclarationV1 {
+                    kind: CanonicalAuthoredDeclarationKindV1::Validation,
+                    subject: "Contact.contact.email.validation.0".into(),
+                    source: crate::AuthoredSourceRangeV1 {
+                        start: validation.span.start,
+                        end: validation.span.end,
+                        line: validation.span.line,
+                        column: validation.span.column,
+                    },
+                    intrinsic_identity: Some(crate::ResolvedIntrinsicIdentityV1 {
+                        name: "required".into(),
+                        flags: 32,
+                        declaration_modules: vec!["presolve".into()],
+                    }),
+                    derived_evidence: None,
+                },
             ],
         };
         let asm =
@@ -4830,6 +4847,11 @@ mod tests {
         assert_eq!(asm.form_fields().len(), 1);
         assert_eq!(asm.form_fields()[0].name, "email");
         assert_eq!(asm.form_fields()[0].path, ["email"]);
+        assert_eq!(asm.validation_rules().len(), 1);
+        assert_eq!(
+            asm.validation_rules()[0].kind,
+            crate::ValidationRuleKind::Required
+        );
         assert_eq!(
             asm.serialization
                 .plans
@@ -4908,6 +4930,7 @@ mod tests {
                             .collect(),
                         forms: Vec::new(),
                         form_fields: Vec::new(),
+                        validations: Vec::new(),
                     },
                 )
                 .expect("V2 Slot lowering");

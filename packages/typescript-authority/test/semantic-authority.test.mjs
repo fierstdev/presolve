@@ -133,6 +133,7 @@ test("the V2 authoring bridge resolves canonical component, State, Action, Effec
       effect: { file: frameworkFile, position: frameworkSource.indexOf("effect") },
       slot: { file: frameworkFile, position: frameworkSource.indexOf("slot") },
       environment: { file: frameworkFile, position: frameworkSource.indexOf("runtimeEnvironment") },
+      validationRules: [],
     },
     components: [{ id: "counter", file: frameworkFile, position: frameworkSource.indexOf("V2Counter extends") }],
     states: [{ id: "count", file: frameworkFile, position: frameworkSource.indexOf("state(0)") }],
@@ -141,6 +142,7 @@ test("the V2 authoring bridge resolves canonical component, State, Action, Effec
     slots: [{ id: "children", file: frameworkFile, position: frameworkSource.indexOf("slot()") }],
     forms: [],
     formFields: [],
+    validations: [],
     environmentPublic: [
       {
         id: "application-name",
@@ -180,6 +182,7 @@ test("the V2 authoring bridge supports a component-only discovery phase", async 
     configFile: resolve(root, "tests/framework-public-api/tsconfig.json"),
     canonical: {
       component: { file: frameworkFile, position: frameworkSource.indexOf("Component") },
+      validationRules: [],
     },
     components: [{ id: "counter", file: frameworkFile, position: frameworkSource.indexOf("V2Counter extends") }],
     states: [],
@@ -188,6 +191,7 @@ test("the V2 authoring bridge supports a component-only discovery phase", async 
     slots: [],
     forms: [],
     formFields: [],
+    validations: [],
     environmentPublic: [],
   });
   assert.deepEqual(result.components.map(entry => entry.id), ["counter"]);
@@ -206,6 +210,11 @@ test("the V2 authoring bridge resolves canonical decorator-free Form evidence", 
       component: { file: formFile, position: formSource.indexOf("Component") },
       defineForm: { file: formFile, position: formSource.indexOf("defineForm") },
       field: { file: formFile, position: formSource.indexOf("field") },
+      validationRules: [{
+        name: "required",
+        file: formFile,
+        position: formSource.indexOf("required"),
+      }],
     },
     components: [{
       id: "profile",
@@ -226,12 +235,19 @@ test("the V2 authoring bridge resolves canonical decorator-free Form evidence", 
       file: formFile,
       position: formSource.indexOf("field({"),
     }],
+    validations: [{
+      id: "profile-name-required",
+      file: formFile,
+      position: formSource.indexOf("required()"),
+    }],
     environmentPublic: [],
   });
   assert.deepEqual(result.forms.map(entry => entry.id), ["profile-form"]);
   assert.equal(result.forms[0].identity.name, "defineForm");
   assert.deepEqual(result.formFields.map(entry => entry.id), ["profile-name"]);
   assert.equal(result.formFields[0].identity.name, "field");
+  assert.deepEqual(result.validations.map(entry => entry.id), ["profile-name-required"]);
+  assert.equal(result.validations[0].identity.name, "required");
 });
 
 test("the V2 authoring bridge recognizes a direct Component heritage-expression query", async () => {
@@ -244,6 +260,7 @@ test("the V2 authoring bridge recognizes a direct Component heritage-expression 
     configFile: resolve(root, "tests/framework-public-api/tsconfig.json"),
     canonical: {
       component: { file: frameworkFile, position: frameworkSource.indexOf("Component") },
+      validationRules: [],
     },
     components: [{ id: "direct", file: directFile, position: directSource.lastIndexOf("Component") }],
     states: [],
@@ -252,6 +269,7 @@ test("the V2 authoring bridge recognizes a direct Component heritage-expression 
     slots: [],
     forms: [],
     formFields: [],
+    validations: [],
     environmentPublic: [],
   });
   assert.deepEqual(result.components.map(entry => entry.id), ["direct"]);
@@ -266,6 +284,7 @@ test("the V2 authoring bridge resolves environment evidence without a component 
     configFile: resolve(root, "tests/framework-public-api/tsconfig.json"),
     canonical: {
       environment: { file: frameworkFile, position: frameworkSource.indexOf("runtimeEnvironment") },
+      validationRules: [],
     },
     components: [],
     states: [],
@@ -274,6 +293,7 @@ test("the V2 authoring bridge resolves environment evidence without a component 
     slots: [],
     forms: [],
     formFields: [],
+    validations: [],
     environmentPublic: [{
       id: "application-name",
       file: frameworkFile,
@@ -302,6 +322,7 @@ test("the V2 authoring executable speaks the versioned stdin/stdout bridge proto
           effect: { file: frameworkFile, position: frameworkSource.indexOf("effect") },
           slot: { file: frameworkFile, position: frameworkSource.indexOf("slot") },
           environment: { file: frameworkFile, position: frameworkSource.indexOf("runtimeEnvironment") },
+          validationRules: [],
         },
         components: [{ id: "counter", file: frameworkFile, position: frameworkSource.indexOf("V2Counter extends") }],
         states: [{ id: "count", file: frameworkFile, position: frameworkSource.indexOf("state(0)") }],
@@ -310,6 +331,7 @@ test("the V2 authoring executable speaks the versioned stdin/stdout bridge proto
         slots: [{ id: "children", file: frameworkFile, position: frameworkSource.indexOf("slot()") }],
         forms: [],
         formFields: [],
+        validations: [],
         environmentPublic: [],
       }),
       encoding: "utf8",

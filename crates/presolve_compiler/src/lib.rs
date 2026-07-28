@@ -83,6 +83,7 @@ pub mod form_submission_host;
 pub mod form_submission_projection;
 pub mod form_tracking;
 pub mod form_validation;
+pub mod form_validation_definition_lowering;
 pub mod form_validation_plan;
 pub mod function_summary;
 pub mod html_codegen;
@@ -550,6 +551,11 @@ pub use form_validation::{
     ValidationGraphIntegrityDiagnostic, ValidationGraphIntegrityKind, ValidationGraphNode,
     ValidationGraphNodeKey, ValidationGraphValidation, ValidationProducts, ValidationRule,
     ValidationRuleArgument, ValidationRuleCandidate, ValidationRuleKind, ValidationRuleViolation,
+};
+pub use form_validation_definition_lowering::{
+    form_validation_definition_sites_v1, lower_form_validation_definitions_v1,
+    FormValidationDefinitionLoweringErrorV1, FormValidationDefinitionSiteV1,
+    ResolvedFormValidationDefinitionV1,
 };
 pub use form_validation_plan::{
     collect_validation_dependency_plans, validate_validation_dependency_plans,

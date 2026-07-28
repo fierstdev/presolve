@@ -9,11 +9,11 @@ use presolve_parser::ParsedFile;
 use crate::{
     v2_authority_request::V2AuthorityRequestV1, AuthoredSourceRangeV1, ResolvedActionFieldV1,
     ResolvedComponentInheritanceV1, ResolvedEffectFieldV1, ResolvedFormDefinitionV1,
-    ResolvedFormFieldDefinitionV1, ResolvedIntrinsicIdentityV1, ResolvedSlotFieldV1,
-    ResolvedStateInitializerV1, V2AuthoringResolutionsV1,
+    ResolvedFormFieldDefinitionV1, ResolvedFormValidationDefinitionV1, ResolvedIntrinsicIdentityV1,
+    ResolvedSlotFieldV1, ResolvedStateInitializerV1, V2AuthoringResolutionsV1,
 };
 
-pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 6;
+pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 7;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -30,6 +30,8 @@ pub struct V2AuthorityResponseV1 {
     pub forms: Vec<V2AuthorityResolutionV1>,
     #[serde(default)]
     pub form_fields: Vec<V2AuthorityResolutionV1>,
+    #[serde(default)]
+    pub validations: Vec<V2AuthorityResolutionV1>,
     pub environment_public: Vec<V2AuthorityResolutionV1>,
 }
 
@@ -101,6 +103,7 @@ pub fn validate_v2_authority_response_v1(
     validate_family(&request.slots, &response.slots)?;
     validate_family(&request.forms, &response.forms)?;
     validate_family(&request.form_fields, &response.form_fields)?;
+    validate_family(&request.validations, &response.validations)?;
     validate_member_family(&request.environment_public, &response.environment_public)
 }
 
@@ -170,6 +173,15 @@ pub fn v2_authoring_resolutions_from_response_v1(
                 callee_source,
                 field_identity: identity,
             })
+            .collect(),
+        validations: resolutions_for(&response.validations, "validation", parsed)?
+            .into_iter()
+            .map(
+                |(callee_source, identity)| ResolvedFormValidationDefinitionV1 {
+                    callee_source,
+                    validation_identity: identity,
+                },
+            )
             .collect(),
     })
 }
@@ -368,7 +380,7 @@ class Counter extends Component { count = state(0); increment = action(() => {})
         )
         .unwrap();
         let response = V2AuthorityResponseV1 {
-            schema_version: 6,
+            schema_version: 7,
             diagnostics: Vec::new(),
             components: vec![V2AuthorityResolutionV1 {
                 id: request.components[0].id.clone(),
@@ -386,6 +398,7 @@ class Counter extends Component { count = state(0); increment = action(() => {})
             slots: Vec::new(),
             forms: Vec::new(),
             form_fields: Vec::new(),
+            validations: Vec::new(),
             environment_public: Vec::new(),
         };
         (parsed, request, response)
@@ -485,7 +498,7 @@ const applicationName = environment.public("PRESOLVE_PUBLIC_APP_NAME");
             crate::build_v2_authority_request_v1(&parsed, PathBuf::from("tsconfig.json"), &model)
                 .unwrap();
         let response = V2AuthorityResponseV1 {
-            schema_version: 6,
+            schema_version: 7,
             diagnostics: Vec::new(),
             components: vec![V2AuthorityResolutionV1 {
                 id: request.components[0].id.clone(),
@@ -497,6 +510,7 @@ const applicationName = environment.public("PRESOLVE_PUBLIC_APP_NAME");
             slots: Vec::new(),
             forms: Vec::new(),
             form_fields: Vec::new(),
+            validations: Vec::new(),
             environment_public: vec![V2AuthorityResolutionV1 {
                 id: request.environment_public[0].id.clone(),
                 identity: identity("public"),

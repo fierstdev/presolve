@@ -1884,7 +1884,7 @@ pub fn build_v2_component_graph_for_module(
         }
         let mut form_declaration_candidates = Vec::new();
         let mut form_field_declaration_candidates = Vec::new();
-        let validation_rule_declaration_facts = Vec::new();
+        let mut validation_rule_declaration_facts = Vec::new();
         let mut serialization_declaration_facts = Vec::new();
         for candidate in authored.declarations.iter().filter(|candidate| {
             candidate.kind == crate::CanonicalAuthoredDeclarationKindV1::Form
@@ -2059,6 +2059,55 @@ pub fn build_v2_component_graph_for_module(
                     provenance: SourceProvenance::new(&parsed.path, field.declaration_span),
                     violations,
                 });
+                for (authored_ordinal, validation) in field.validations.iter().enumerate() {
+                    let validation_subject =
+                        format!("{field_subject}.validation.{authored_ordinal}");
+                    let Some(validation_declaration) =
+                        authored.declarations.iter().find(|declaration| {
+                            declaration.kind
+                                == crate::CanonicalAuthoredDeclarationKindV1::Validation
+                                && declaration.subject == validation_subject
+                        })
+                    else {
+                        continue;
+                    };
+                    let Some(identity) = validation_declaration.intrinsic_identity.as_ref() else {
+                        continue;
+                    };
+                    let mut expression =
+                        authored_validation_rule_expression(validation, &parsed.path);
+                    match &mut expression.kind {
+                        AuthoredValidationRuleExpressionKind::Call { callee, .. } => {
+                            *callee = Some(identity.name.clone());
+                        }
+                        AuthoredValidationRuleExpressionKind::Identifier(name) => {
+                            *name = identity.name.clone();
+                        }
+                        AuthoredValidationRuleExpressionKind::Unsupported => continue,
+                    }
+                    validation_rule_declaration_facts.push(AuthoredValidationRuleDeclarationFact {
+                        id: ValidationRuleCandidateId::for_source_position(
+                            &parsed.path,
+                            validation.span.start,
+                        ),
+                        owner_component: Some(id.clone()),
+                        declaration_field: Some(declaration_field.clone()),
+                        authored_name: Some(field.path.join(".")),
+                        declaration_kind: AuthoredDeclarationKind::InstanceField,
+                        is_static: false,
+                        authored_ordinal,
+                        decorator_invoked: true,
+                        decorator_argument_count: 1,
+                        expression: Some(expression),
+                        conflicting_decorators: Vec::new(),
+                        decorator_provenance: SourceProvenance::new(&parsed.path, validation.span),
+                        name_provenance: Some(SourceProvenance::new(
+                            &parsed.path,
+                            field.declaration_span,
+                        )),
+                        provenance: SourceProvenance::new(&parsed.path, field.declaration_span),
+                    });
+                }
             }
         }
         components.push(ComponentNode {

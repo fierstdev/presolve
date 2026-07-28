@@ -137,6 +137,7 @@ pub struct ParsedDecorator {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedValidationRuleExpression {
     pub kind: ParsedValidationRuleExpressionKind,
+    pub callee_span: Option<SourceSpan>,
     pub span: SourceSpan,
 }
 

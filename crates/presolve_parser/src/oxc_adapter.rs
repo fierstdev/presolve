@@ -542,6 +542,11 @@ fn parsed_validation_rule_expression(
     expression: &Expression<'_>,
     source: &str,
 ) -> ParsedValidationRuleExpression {
+    let callee_span = match expression {
+        Expression::CallExpression(call) => Some(source_span(source, call.callee.span())),
+        Expression::Identifier(identifier) => Some(source_span(source, identifier.span)),
+        _ => None,
+    };
     let kind = match expression {
         Expression::CallExpression(call) => ParsedValidationRuleExpressionKind::Call {
             callee: match &call.callee {
@@ -561,6 +566,7 @@ fn parsed_validation_rule_expression(
     };
     ParsedValidationRuleExpression {
         kind,
+        callee_span,
         span: source_span(source, expression.span()),
     }
 }
