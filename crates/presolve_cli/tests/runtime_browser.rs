@@ -1101,6 +1101,211 @@ fn explicit_form_hosts_submit_only_through_compiler_emitted_records() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn decorator_free_v2_form_fields_bind_and_validate_in_a_real_browser() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let project_root = repo_root.join("target/psc-browser-test/v2-form-project");
+    if project_root.exists() {
+        fs::remove_dir_all(&project_root).expect("failed to clean previous V2 Form project");
+    }
+    fs::create_dir_all(project_root.join("app/routes"))
+        .expect("failed to create V2 Form source root");
+    fs::write(
+        project_root.join("app/routes/index.tsx"),
+        r#"import { Component, defineForm, field, required } from "presolve";
+
+export class Contact extends Component {
+  contact = defineForm({
+    serialization: "form-data",
+    fields: {
+      name: field({ initial: "", validate: [required()] }),
+      subscribed: field({ initial: false }),
+    },
+  });
+
+  render() {
+    return <main><input bind:value={this.contact.fields.name} /><input type="checkbox" bind:checked={this.contact.fields.subscribed} /><output>{this.contact.fields.name}</output></main>;
+  }
+}
+"#,
+    )
+    .expect("failed to write V2 Form source");
+    fs::write(
+        project_root.join("tsconfig.json"),
+        r#"{"compilerOptions":{"noEmit":true}}"#,
+    )
+    .expect("failed to write V2 Form TypeScript config");
+    let executable = project_root.join("node_modules/.bin/presolve-typescript-authority");
+    fs::create_dir_all(executable.parent().expect("authority executable parent"))
+        .expect("failed to create V2 Form authority executable parent");
+    fs::write(
+        &executable,
+        r#"#!/usr/bin/env node
+import { readFileSync } from "node:fs";
+const request = JSON.parse(readFileSync(0, "utf8"));
+const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
+const sourceAt = site => readFileSync(site.file, "utf8").slice(site.position);
+process.stdout.write(JSON.stringify({
+  schemaVersion: 7,
+  diagnostics: [],
+  components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
+  states: [],
+  actions: [],
+  effects: [],
+  slots: [],
+  forms: request.forms.map(site => ({ id: site.id, identity: identity("defineForm") })),
+  formFields: request.formFields.map(site => ({ id: site.id, identity: identity("field") })),
+  validations: request.validations.map(site => ({ id: site.id, identity: identity(sourceAt(site).startsWith("required") ? "required" : "unknown") })),
+  environmentPublic: [],
+}));
+"#,
+    )
+    .expect("failed to write V2 Form authority executable");
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o755))
+        .expect("failed to mark V2 Form authority executable");
+
+    let output = Command::new(presolve_cli_bin())
+        .current_dir(&project_root)
+        .arg("build")
+        .output()
+        .expect("failed to build V2 Form project");
+    assert!(
+        output.status.success(),
+        "expected V2 Form build to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let output_root = project_root.join("dist/routes/root");
+    let artifact = fs::read_to_string(output_root.join("forms.runtime.json"))
+        .expect("V2 Form runtime artifact");
+    let artifact: serde_json::Value =
+        serde_json::from_str(&artifact).expect("V2 Form runtime artifact JSON");
+    assert_eq!(artifact["forms"][0]["fields"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        artifact["forms"][0]["validation_rules"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+
+    let index = fs::read_to_string(output_root.join("index.html")).expect("built V2 Form page");
+    let probe = index.replace(
+        "</body>",
+        r#"<script>
+const fail = (message) => { throw new Error(message); };
+const waitFor = (predicate, label) => new Promise((resolve, reject) => { const deadline = Date.now() + 3000; const tick = () => predicate() ? resolve() : Date.now() > deadline ? reject(new Error(`Timed out waiting for ${label}`)) : setTimeout(tick, 20); tick(); });
+(async () => {
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
+  if (window.__PRESOLVE__.resume.mode !== "cold") fail("fresh V2 Form boot did not select cold mode");
+  const [name, subscribed] = document.querySelectorAll("input");
+  name.value = "Ada"; name.dispatchEvent(new Event("input", { bubbles: true }));
+  subscribed.checked = true; subscribed.dispatchEvent(new Event("change", { bubbles: true }));
+  const instance = window.__PRESOLVE__.store.formInstances.values().next().value;
+  const fields = [...instance.fields.values()].sort((left, right) => left.path.join(".").localeCompare(right.path.join(".")));
+  if (fields[0].value !== "Ada" || !fields[0].dirty || fields[0].validation.length !== 0) fail("bind:value did not update and validate the canonical Field");
+  if (fields[1].value !== true || !fields[1].dirty) fail("bind:checked did not update the canonical Field");
+  if (window.__PRESOLVE__.diagnostics.length !== 0) fail("runtime reported V2 Form diagnostics");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_V2_FORM_BROWSER_PASS</div>");
+})().catch((error) => { document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_V2_FORM_BROWSER_FAIL: ${error.message}</div>`); console.error(error); });
+</script></body>"#,
+    );
+    fs::write(output_root.join("probe.html"), probe).expect("V2 Form browser probe");
+    let server = StaticServer::start(output_root.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = output_root.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create V2 Form Chrome profile");
+    let output = run_chrome_probe(
+        chrome,
+        &format!("--user-data-dir={}", profile_dir.display()),
+        &format!("http://127.0.0.1:{}/probe.html", server.port),
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("PRESOLVE_V2_FORM_BROWSER_PASS"),
+        "V2 Form browser probe failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let resume_json = fs::read_to_string(output_root.join("resume.runtime.json"))
+        .expect("V2 Form resume manifest");
+    let resume_manifest: serde_json::Value =
+        serde_json::from_str(&resume_json).expect("V2 Form resume manifest JSON");
+    let component_json = fs::read_to_string(output_root.join("component.runtime.json"))
+        .expect("V2 Form component artifact");
+    let component_artifact: serde_json::Value =
+        serde_json::from_str(&component_json).expect("V2 Form component artifact JSON");
+    let mut snapshot = resume_bootstrap_snapshot(&resume_manifest);
+    set_snapshot_state_to_compiled_initials(&resume_manifest, &component_artifact, &mut snapshot);
+    for record in snapshot["boundaries"]
+        .as_array_mut()
+        .expect("V2 Form resume boundaries")
+        .iter_mut()
+        .flat_map(|boundary| {
+            boundary["values"]
+                .as_array_mut()
+                .expect("V2 Form resume values")
+                .iter_mut()
+        })
+    {
+        let schema = resume_manifest["slot_schemas"]
+            .as_array()
+            .expect("V2 Form slot schemas")
+            .iter()
+            .find(|schema| schema["slot_id"] == record["slotId"])
+            .expect("V2 Form slot schema");
+        record["value"] = match (
+            schema["restore_phase"].as_str(),
+            schema["semantic_type"].as_str(),
+        ) {
+            (Some("R11"), Some("string")) => serde_json::Value::String("Grace".into()),
+            (Some("R11"), Some("boolean")) | (Some("R12"), _) => serde_json::Value::Bool(true),
+            (Some("R13"), Some("boolean")) => serde_json::Value::Bool(true),
+            (Some("R13"), _) => serde_json::Value::Array(Vec::new()),
+            (Some("R14"), _) => serde_json::Value::String("Idle".into()),
+            _ => record["value"].clone(),
+        };
+    }
+    let resume_page = resume_bootstrap_probe_page(
+        &index,
+        &format!(
+            "window.__PRESOLVE_RESUME_SNAPSHOT__ = {};",
+            serde_json::to_string(&snapshot).expect("V2 Form snapshot JSON")
+        ),
+        r#"
+if (runtime.resume.mode !== "resume") fail("V2 Form snapshot was not resumed");
+const fields = [...runtime.store.formInstances.values().next().value.fields.values()];
+if (!fields.some((field) => field.value === "Grace") || !fields.some((field) => field.value === true)) fail("V2 Form Field slots were not restored");
+const controls = document.querySelectorAll("input");
+if (controls[0].value !== "Grace" || controls[1].checked !== true) fail("V2 Form controls were not synchronized from resume");
+if (runtime.diagnostics.some((diagnostic) => diagnostic.fatal)) fail("V2 Form resume reported fatal diagnostics");"#,
+        "PRESOLVE_V2_FORM_RESUME_PASS",
+    );
+    fs::write(output_root.join("resume.html"), resume_page).expect("V2 Form resume probe");
+    let resume_server = StaticServer::start(output_root.clone());
+    let resume_profile = output_root.join("chrome-profile-resume");
+    fs::create_dir_all(&resume_profile).expect("failed to create V2 Form resume Chrome profile");
+    let resumed = run_chrome_probe(
+        chrome_bin().expect("headless Chrome was not found"),
+        &format!("--user-data-dir={}", resume_profile.display()),
+        &format!("http://127.0.0.1:{}/resume.html", resume_server.port),
+    );
+    let resumed_stdout = String::from_utf8_lossy(&resumed.stdout);
+    resume_server.stop();
+    assert!(
+        resumed_stdout.contains("PRESOLVE_V2_FORM_RESUME_PASS"),
+        "V2 Form resume probe failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        resumed.status,
+        resumed_stdout,
+        String::from_utf8_lossy(&resumed.stderr)
+    );
+}
+
 #[test]
 fn resume_bootstrap_registry_accepts_and_atomically_falls_back_in_a_real_browser() {
     let _guard = browser_test_guard();

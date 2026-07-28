@@ -36,12 +36,17 @@ identity through V2 authority schema v7. Aliases lower to their canonical rule
 identity; local lookalikes remain inert. Proven rules enter the existing
 validation graph with their original arguments and source provenance.
 
+Decorator-free `bind:value` and `bind:checked` expressions now resolve
+`this.<form>.fields.<path>` directly through canonical Form and Form Field
+identity. A real-browser acceptance project proves cold boot, input/change
+updates, built-in validation, exact runtime artifacts, and stable resume with
+control synchronization.
+
 ## Next slice
 
 Lower inline submit into a native V2 submission/action product without adapting
-it through legacy decorated-method semantics. Add Standard Schema validation,
-then complete `bind:value`, `bind:checked`, and `bind:files` runtime/resume
-browser proof, with files explicitly excluded from resumable payloads.
+it through legacy decorated-method semantics. Add Standard Schema validation
+and `bind:files`, with files explicitly excluded from resumable payloads.
 
 ## Verification
 
@@ -51,5 +56,6 @@ browser proof, with files explicitly excluded from resumable payloads.
 - `pnpm --filter @presolve/framework test`
 - `pnpm --filter @presolve/typescript-authority test`
 - `pnpm exec tsc -p tests/framework-public-api/tsconfig.json`
+- `cargo test -p presolve-cli --test runtime_browser decorator_free_v2_form_fields_bind_and_validate_in_a_real_browser -- --nocapture`
 
-Beta readiness estimate after the built-in validation gate: 84%.
+Beta readiness estimate after the binding/resume gate: 87%.

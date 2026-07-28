@@ -101,6 +101,7 @@ pub enum FormControlCompatibility {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FormFieldBindingExpressionFact {
     DirectThisMember { name: String },
+    FormFieldPath { form: String, path: Vec<String> },
     Bare,
     Static(String),
     Unsupported { expression: Option<String> },
@@ -318,7 +319,12 @@ fn collect_element_candidates(
     let field_attributes = element
         .authored_attributes
         .iter()
-        .filter(|attribute| attribute.name == "field")
+        .filter(|attribute| {
+            matches!(
+                attribute.name.as_str(),
+                "field" | "bind:value" | "bind:checked" | "bind:files"
+            )
+        })
         .collect::<Vec<_>>();
     for attribute in &field_attributes {
         let mut candidate = binding_candidate(element, template, &control, component, attribute);
@@ -326,6 +332,16 @@ fn collect_element_candidates(
             candidate.add_violation(FormFieldBindingViolation::DuplicateBindingAttribute);
         }
         classify_control(element, template, &mut candidate);
+        match attribute.name.as_str() {
+            "bind:checked" if candidate.channel != Some(FormControlChannel::Checked) => {
+                candidate.add_violation(FormFieldBindingViolation::IncompatibleControlType);
+            }
+            "bind:files" => {
+                candidate.add_violation(FormFieldBindingViolation::IncompatibleControlType);
+            }
+            "bind:value" | "bind:checked" | "field" => {}
+            _ => unreachable!("selected Form binding attribute"),
+        }
         resolve_field(component, fields, field_candidates, forms, &mut candidate);
         classify_compatibility(&mut candidate);
         candidates.push(candidate);
@@ -427,14 +443,19 @@ fn binding_candidate(
         RenderAttributeValue::Static(value) => {
             FormFieldBindingExpressionFact::Static(value.clone())
         }
-        RenderAttributeValue::Expression(expression) => attribute.this_member.as_ref().map_or_else(
-            || FormFieldBindingExpressionFact::Unsupported {
-                expression: expression.clone(),
-            },
-            |member| FormFieldBindingExpressionFact::DirectThisMember {
-                name: member.member.clone(),
-            },
-        ),
+        RenderAttributeValue::Expression(expression) => {
+            parse_form_field_path_expression(expression.as_deref())
+                .or_else(|| {
+                    attribute.this_member.as_ref().map(|member| {
+                        FormFieldBindingExpressionFact::DirectThisMember {
+                            name: member.member.clone(),
+                        }
+                    })
+                })
+                .unwrap_or_else(|| FormFieldBindingExpressionFact::Unsupported {
+                    expression: expression.clone(),
+                })
+        }
         RenderAttributeValue::Spread(expression) => FormFieldBindingExpressionFact::Unsupported {
             expression: expression.clone(),
         },
@@ -444,6 +465,7 @@ fn binding_candidate(
     };
     let authored_field_name = match &field_expression {
         FormFieldBindingExpressionFact::DirectThisMember { name } => Some(name.clone()),
+        FormFieldBindingExpressionFact::FormFieldPath { path, .. } => Some(path.join(".")),
         _ => None,
     };
     let mut candidate = FormFieldBindingCandidate {
@@ -482,10 +504,41 @@ fn binding_candidate(
     if !matches!(
         candidate.field_expression,
         FormFieldBindingExpressionFact::DirectThisMember { .. }
+            | FormFieldBindingExpressionFact::FormFieldPath { .. }
     ) {
         candidate.add_violation(FormFieldBindingViolation::InvalidBindingExpression);
     }
     candidate
+}
+
+fn parse_form_field_path_expression(
+    expression: Option<&str>,
+) -> Option<FormFieldBindingExpressionFact> {
+    let expression = expression?.trim();
+    let path = expression.strip_prefix("this.")?;
+    let (form, field_path) = path.split_once(".fields.")?;
+    if form.is_empty()
+        || form.contains('.')
+        || field_path.is_empty()
+        || field_path
+            .split('.')
+            .any(|segment| segment.is_empty() || !is_identifier_segment(segment))
+    {
+        return None;
+    }
+    Some(FormFieldBindingExpressionFact::FormFieldPath {
+        form: form.to_owned(),
+        path: field_path.split('.').map(str::to_owned).collect(),
+    })
+}
+
+fn is_identifier_segment(value: &str) -> bool {
+    let mut characters = value.chars();
+    matches!(
+        characters.next(),
+        Some(character) if character == '_' || character == '$' || character.is_ascii_alphabetic()
+    ) && characters
+        .all(|character| character == '_' || character == '$' || character.is_ascii_alphanumeric())
 }
 
 fn classify_control(
@@ -685,9 +738,21 @@ fn resolve_field(
         }
         return;
     };
+    let requested_form = match &candidate.field_expression {
+        FormFieldBindingExpressionFact::FormFieldPath { form, .. } => Some(form.as_str()),
+        _ => None,
+    };
     let local = fields
         .values()
-        .filter(|field| field.owner_component == component.id && field.name == name)
+        .filter(|field| {
+            field.owner_component == component.id
+                && field.name == name
+                && requested_form.is_none_or(|form_name| {
+                    forms
+                        .get(&field.owner_form)
+                        .is_some_and(|form| form.name == form_name)
+                })
+        })
         .collect::<Vec<_>>();
     let local_invalid = field_candidates
         .iter()

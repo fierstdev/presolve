@@ -4847,6 +4847,11 @@ mod tests {
         assert_eq!(asm.form_fields().len(), 1);
         assert_eq!(asm.form_fields()[0].name, "email");
         assert_eq!(asm.form_fields()[0].path, ["email"]);
+        assert_eq!(asm.form_field_bindings().len(), 1);
+        assert_eq!(
+            asm.form_field_bindings()[0].channel,
+            crate::FormControlChannel::Value
+        );
         assert_eq!(asm.validation_rules().len(), 1);
         assert_eq!(
             asm.validation_rules()[0].kind,
