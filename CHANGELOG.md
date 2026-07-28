@@ -8,6 +8,21 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.3 - 2026-07-27
+
+### Added
+
+- Canonical application files: `app/app.tsx`, automatic `app/app.css`, and a
+  strict `app/index.html` document template with compiler-owned `head`, `app`,
+  and `runtime` placeholders. The former `app/layout.tsx` and `styles/` paths
+  remain beta compatibility inputs.
+
+### Fixed
+
+- Cloudflare Workers Static Assets deployments now consume internal asset
+  canonicalization redirects inside the worker, so `/` remains `/` instead of
+  exposing the internal `/routes/root/` artifact path.
+
 ## 0.2.0-beta.2 - 2026-07-27
 
 ### Fixed

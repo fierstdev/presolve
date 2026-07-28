@@ -183,6 +183,16 @@ function routeFor(requested) {{\n\
   return selected;\n\
 }}\n\
 function safeAssetSegments(values) {{ return values.every((value) => value && value !== '.' && value !== '..' && !value.includes('\\\\')); }}\n\
+async function fetchCompilerAsset(request, env, artifactUrl) {{\n\
+  const response = await env.ASSETS.fetch(new Request(artifactUrl, request));\n\
+  if (response.status < 300 || response.status > 399) return response;\n\
+  const location = response.headers.get('Location');\n\
+  if (!location) return response;\n\
+  const redirected = new URL(location, artifactUrl);\n\
+  const internal = new URL(artifactUrl);\n\
+  if (redirected.origin !== internal.origin || !redirected.pathname.startsWith('/routes/')) return response;\n\
+  return env.ASSETS.fetch(new Request(redirected, request));\n\
+}}\n\
 export default {{ async fetch(request, env) {{\n\
   if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('Method Not Allowed\\n', {{ status: 405, headers: {{ Allow: 'GET, HEAD' }} }});\n\
   const url = new URL(request.url);\n\
@@ -193,11 +203,11 @@ export default {{ async fetch(request, env) {{\n\
   if (!selected) return new Response('Not Found\\n', {{ status: 404 }});\n\
   if (requested.length === selected.parts.length) {{\n\
     if (selected.route.path !== '/' && !url.pathname.endsWith('/')) return Response.redirect(new URL(`${{url.pathname}}/`, url).toString(), 308);\n\
-    return env.ASSETS.fetch(new Request(new URL(`/${{selected.route.artifact_root}}/index.html`, url), request));\n\
+    return fetchCompilerAsset(request, env, new URL(`/${{selected.route.artifact_root}}/index.html`, url));\n\
   }}\n\
   const suffix = requested.slice(selected.parts.length);\n\
   if (!safeAssetSegments(suffix)) return new Response('Not Found\\n', {{ status: 404 }});\n\
-  return env.ASSETS.fetch(new Request(new URL(`/${{selected.route.artifact_root}}/${{suffix.join('/')}}`, url), request));\n\
+  return fetchCompilerAsset(request, env, new URL(`/${{selected.route.artifact_root}}/${{suffix.join('/')}}`, url));\n\
 }} }};\n"
     )
 }
@@ -351,6 +361,8 @@ mod tests {
         let worker = cloudflare_workers_static_worker_module_v1(&plan);
         assert!(worker.contains("routeFor"));
         assert!(worker.contains("routes/segment-posts/parameter-slug"));
+        assert!(worker.contains("fetchCompilerAsset"));
+        assert!(worker.contains("redirected.pathname.startsWith('/routes/')"));
         assert!(!worker.contains("component:post"));
         let config = cloudflare_workers_wrangler_jsonc_v1(&plan, "../../dist");
         assert!(config.contains("run_worker_first"));

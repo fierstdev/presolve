@@ -26,10 +26,12 @@ pnpm build
 ```
 
 `check` validates application semantics without publishing a production build.
-`build` writes the compiler-issued output to `dist/`. It copies `styles/` to
-`dist/styles/` and `public/` to the root of `dist/`, including those files in
-the deployment inventory. Do not edit files in that directory: run the
-compiler again after changing source.
+`build` writes the compiler-issued output to `dist/`. It publishes
+`app/app.css` as `/app.css` and includes it from the document head, while
+copying `public/` to the root of `dist/`; both are included in the deployment
+inventory. The former `styles/` directory remains supported for beta
+compatibility and is copied to `dist/styles/`. Do not edit files in that
+directory: run the compiler again after changing source.
 
 For the first static deployment target, continue with
 [Cloudflare deployment](../reference/cloudflare.md).

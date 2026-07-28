@@ -26,7 +26,8 @@ use presolve_cli::{
 
 use presolve_compiler::tooling_reader::{read_tooling_product_v1, ToolingProductV1};
 use presolve_compiler::{
-    build_application_publication_product_v1, build_application_semantic_model_for_unit,
+    apply_document_template_v1, build_application_publication_product_v1,
+    build_application_semantic_model_for_unit,
     build_application_semantic_model_for_unit_with_packages, build_binding_table_with_packages,
     build_component_graph, build_context_inspection_registry, build_effect_inspection_registry,
     build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring,
@@ -205,6 +206,8 @@ fn run_ergonomic_build(
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
     attach_route_metadata(&project.root, &mut product)
         .unwrap_or_else(|message| application_cli_error("PSMETA1004_DISCOVERY_FAILED", &message));
+    attach_application_document_inputs(&project.root, &mut product)
+        .unwrap_or_else(|message| application_cli_error("PSDOC1005_PUBLICATION_FAILED", &message));
     attach_static_publication_inputs(&project.root, &mut product).unwrap_or_else(|message| {
         application_cli_error("PSROUTE3008_PUBLICATION_FAILED", &message)
     });
@@ -212,6 +215,100 @@ fn run_ergonomic_build(
         .unwrap_or_else(|error| application_cli_error("PSROUTE3008_PUBLICATION_FAILED", &error));
     println!("Built {}", output_root.display());
     product.manifest
+}
+
+/// Projects the canonical application document inputs into compiler-published
+/// routes. `app/index.html` is a validated document frame, and `app/app.css`
+/// is an automatic document-level stylesheet. Neither changes route identity.
+fn attach_application_document_inputs(
+    project_root: &Path,
+    product: &mut presolve_compiler::FileRoutePublicationProductV1,
+) -> Result<(), String> {
+    let app_root = project_root.join("app");
+    let template_path = app_root.join("index.html");
+    let stylesheet_path = app_root.join("app.css");
+    let template = match fs::read_to_string(&template_path) {
+        Ok(template) => Some(template),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+        Err(error) => return Err(format!("{}: {error}", template_path.display())),
+    };
+    let stylesheet = match fs::read(&stylesheet_path) {
+        Ok(bytes) => Some(bytes),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+        Err(error) => return Err(format!("{}: {error}", stylesheet_path.display())),
+    };
+    if template.is_none() && stylesheet.is_none() {
+        return Ok(());
+    }
+    if let Some(template) = template {
+        let additional_head = if stylesheet.is_some() {
+            "    <link rel=\"stylesheet\" href=\"/app.css\">\n"
+        } else {
+            ""
+        };
+        let route_artifacts = product
+            .artifacts
+            .iter()
+            .filter(|(path, _)| {
+                path.starts_with("routes")
+                    && path.file_name().is_some_and(|name| name == "index.html")
+            })
+            .map(|(path, bytes)| (path.clone(), String::from_utf8(bytes.clone())))
+            .collect::<Vec<_>>();
+        for (path, page) in route_artifacts {
+            let page = page.map_err(|error| format!("{} is not UTF-8: {error}", path.display()))?;
+            let output = apply_document_template_v1(&template, &page, additional_head)
+                .map_err(|error| error.to_string())?;
+            product.artifacts.insert(path.clone(), output.into_bytes());
+            update_publication_artifact_digest(product, &path)?;
+        }
+    }
+    if let Some(bytes) = stylesheet {
+        let path = PathBuf::from("app.css");
+        if product.artifacts.contains_key(&path) {
+            return Err("app/app.css collides with a compiler-published artifact".into());
+        }
+        product.artifacts.insert(path.clone(), bytes);
+        update_publication_artifact_digest(product, &path)?;
+    }
+    product
+        .manifest
+        .artifacts
+        .sort_by(|left, right| left.path.cmp(&right.path));
+    product.artifacts.insert(
+        PathBuf::from("file-routes.manifest.json"),
+        presolve_compiler::file_route_publication_manifest_json_v1(&product.manifest).into_bytes(),
+    );
+    Ok(())
+}
+
+fn update_publication_artifact_digest(
+    product: &mut presolve_compiler::FileRoutePublicationProductV1,
+    path: &Path,
+) -> Result<(), String> {
+    let bytes = product
+        .artifacts
+        .get(path)
+        .ok_or_else(|| format!("missing publication artifact {}", path.display()))?;
+    let artifact_path = path.to_string_lossy();
+    let digest = format!("sha256:{:x}", Sha256::digest(bytes));
+    if let Some(artifact) = product
+        .manifest
+        .artifacts
+        .iter_mut()
+        .find(|artifact| artifact.path == artifact_path)
+    {
+        artifact.digest = digest;
+    } else {
+        product
+            .manifest
+            .artifacts
+            .push(presolve_compiler::ApplicationPublicationArtifactV1 {
+                path: artifact_path.into_owned(),
+                digest,
+            });
+    }
+    Ok(())
 }
 
 /// Runs the installed TypeScript-authority bridge for decorator-free V2 source

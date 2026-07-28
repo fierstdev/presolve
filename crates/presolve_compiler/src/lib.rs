@@ -49,6 +49,7 @@ pub mod context_resume_projection;
 pub mod context_typing;
 pub mod context_update;
 pub mod control_flow;
+pub mod document_template;
 pub mod effect;
 pub mod effect_capability;
 pub mod effect_diagnostics;
@@ -410,6 +411,7 @@ pub use control_flow::{
     ControlFlowCoverageV1, ControlFlowFunctionV1, ControlFlowGraphV1, ControlFlowLoopV1,
     ControlFlowProvenanceV1, CONTROL_FLOW_SCHEMA_VERSION,
 };
+pub use document_template::{apply_document_template_v1, DocumentTemplateErrorV1};
 pub use effect::{
     analyze_effect_reactivity, collect_effects, derive_effect_trigger_plan, lower_effect_bodies,
     plan_effect_execution, validate_effects, ActionBatch, ActionBatchEffectTrigger,
