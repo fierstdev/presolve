@@ -8,6 +8,16 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.11 - 2026-07-28
+
+### Fixed
+
+- File-scoped `presolve check <file> --format json` requests made inside a
+  canonical application now use the same TypeScript-authority-backed,
+  decorator-free project assembly as workspace checks and production builds.
+  Editor diagnostics no longer redirect `extends Component`, V2 action fields,
+  or Slot layouts through the legacy decorator graph.
+
 ## 0.2.0-beta.10 - 2026-07-28
 
 ### Added

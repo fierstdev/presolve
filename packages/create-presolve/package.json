@@ -1,6 +1,6 @@
 {
   "name": "create-presolve",
-  "version": "0.2.0-beta.10",
+  "version": "0.2.0-beta.11",
   "description": "Create a Presolve application.",
   "license": "MIT OR Apache-2.0",
   "repository": {

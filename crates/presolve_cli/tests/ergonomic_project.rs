@@ -187,6 +187,29 @@ process.stdout.write(JSON.stringify(await analyzeV2Authoring(JSON.parse(readFile
             "a decorator-free layout must not be redirected to the legacy component diagnostic"
         );
     }
+    let scoped = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args(["check", "app/routes/index.tsx", "--format", "json"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        scoped.status.success(),
+        "file-scoped check stderr: {}\nstdout: {}",
+        String::from_utf8_lossy(&scoped.stderr),
+        String::from_utf8_lossy(&scoped.stdout)
+    );
+    let scoped_json: serde_json::Value =
+        serde_json::from_slice(&scoped.stdout).expect("file-scoped check JSON");
+    assert_eq!(
+        scoped_json["summary"]["compiler_diagnostics"],
+        serde_json::json!(0)
+    );
+    assert!(
+        scoped_json["compiler_diagnostics"]
+            .as_array()
+            .is_some_and(Vec::is_empty),
+        "decorator-free file checks must not emit legacy component diagnostics"
+    );
     let html = fs::read_to_string(root.join("dist/routes/root/index.html")).unwrap();
     assert!(html.contains("Decorator-free docs"));
     fs::remove_dir_all(root).unwrap();

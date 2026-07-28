@@ -120,7 +120,7 @@ fn main() {
                 run_ergonomic_check(Path::new("."), Some(manifest));
             } else if args.iter().any(|argument| argument == "--config") {
                 run_l9_build_or_check("check", &args);
-            } else {
+            } else if !try_run_ergonomic_file_check(Path::new("."), &args) {
                 run_check(&args);
             }
         }
@@ -1288,6 +1288,133 @@ fn run_ergonomic_check(
         eprintln!("{}: {}", diagnostic.code, diagnostic.message);
     }
     process::exit(2);
+}
+
+/// Checks selected files through the discovered application's canonical V2
+/// authority path. File selection scopes the editor request; application
+/// assembly still includes the complete project because route, layout, Slot,
+/// and Context meaning can cross source-file boundaries.
+fn try_run_ergonomic_file_check(root: &Path, args: &[String]) -> bool {
+    if !root.join("app").is_dir() || !root.join("tsconfig.json").is_file() {
+        return false;
+    }
+    let (input_paths, format, categories, fail_on) = parse_check_inputs(args);
+    let Ok(project) = discover_project_v1(root) else {
+        return false;
+    };
+    let project_paths = project
+        .sources
+        .iter()
+        .filter_map(|source| project.root.join(&source.logical_path).canonicalize().ok())
+        .collect::<BTreeSet<_>>();
+    let selected_paths = input_paths
+        .iter()
+        .filter_map(|path| {
+            let host_path = if path.is_absolute() {
+                path.clone()
+            } else {
+                project.root.join(path)
+            };
+            host_path.canonicalize().ok()
+        })
+        .collect::<Vec<_>>();
+    if selected_paths.len() != input_paths.len()
+        || selected_paths
+            .iter()
+            .any(|path| !project_paths.contains(path))
+    {
+        return false;
+    }
+
+    let v2_products = validate_v2_authoring_project(&project, None).unwrap_or_else(|message| {
+        application_cli_error("PSAUTH1001_V2_AUTHORITY_FAILED", &message)
+    });
+    let unit = CompilationUnit::parse_sources(
+        project
+            .sources
+            .iter()
+            .map(|source| (source.logical_path.clone(), source.source.as_str())),
+    );
+    let (package_contracts, _) = discover_imported_package_tables(&project.root, &unit);
+    let has_v2_authoring = !v2_products.models.is_empty();
+    let asm = if !has_v2_authoring {
+        build_application_semantic_model_for_unit_with_packages(&unit, &package_contracts)
+    } else {
+        build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring(
+            &unit,
+            &package_contracts,
+            &v2_products.models,
+        )
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message))
+    };
+    let asm = if has_v2_authoring {
+        asm
+    } else {
+        ConstantFoldingPass.transform(&asm)
+    };
+    let (resume_diagnostics, validation) = if has_v2_authoring {
+        let graph = presolve_compiler::build_validated_file_route_graph_v1(&asm)
+            .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+        let symbols = build_symbol_table(&unit);
+        let modules = build_module_graph(&unit);
+        let bindings =
+            build_binding_table_with_packages(&unit, &symbols, &modules, &package_contracts);
+        build_route_loader_plan_v1(&asm.components, &graph, &bindings)
+            .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+        build_route_server_action_plan_v1(&asm.components, &graph, &bindings)
+            .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+        (Vec::new(), Vec::new())
+    } else {
+        let resume_diagnostics = if unit.files().iter().any(|file| !file.diagnostics.is_empty()) {
+            Vec::new()
+        } else {
+            project_resume_diagnostics(&asm)
+        };
+        let mut validation = validate_application_semantic_model(&asm);
+        validation.extend(resume_diagnostics.iter().cloned().map(|diagnostic| {
+            AsmValidationDiagnostic {
+                code: diagnostic.code.to_string(),
+                message: diagnostic.message,
+            }
+        }));
+        (resume_diagnostics, validation)
+    };
+    let parser_diagnostic_count = unit
+        .files()
+        .iter()
+        .map(|file| file.diagnostics.len())
+        .sum::<usize>();
+
+    match format.as_str() {
+        "text" => print_check_text(
+            &unit,
+            &asm,
+            &validation,
+            parser_diagnostic_count,
+            &categories,
+            &fail_on,
+        ),
+        "json" => print!(
+            "{}",
+            check_json(
+                &unit,
+                &asm,
+                &validation,
+                &resume_diagnostics,
+                &categories,
+                &fail_on,
+            )
+        ),
+        _ => unreachable!("check input parsing rejects unsupported formats"),
+    }
+
+    if parser_diagnostics_fail(&unit, &fail_on)
+        || !asm.diagnostics.is_empty()
+        || !validation.is_empty()
+    {
+        process::exit(1);
+    }
+    true
 }
 
 fn discover_imported_package_tables(
