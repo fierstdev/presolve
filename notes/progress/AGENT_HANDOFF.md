@@ -112,9 +112,10 @@ The full inherited workspace gate, including 57 browser tests and the updated
 
 ## Next slice
 
-Close the remaining server-validation/executor boundary for route loaders and
-server actions, then run the final release-hardening, version, publication, and
-public compatibility gates.
+Publish 0.2.0-beta.14 from `main`, then verify the GitHub release, scoped npm
+packages, crates, and VS Code prerelease. Server executors are not part of this
+beta: the frozen loader/server-action contracts complete those families at
+deterministic compiler handoff and explicitly prohibit an inferred executor.
 
 ## Verification
 
@@ -125,5 +126,8 @@ public compatibility gates.
 - `pnpm --filter @presolve/typescript-authority test`
 - `pnpm exec tsc -p tests/framework-public-api/tsconfig.json`
 - `cargo test -p presolve-cli --test runtime_browser decorator_free_v2_form_fields_bind_and_validate_in_a_real_browser -- --nocapture`
+- `node scripts/verify-release-version.mjs 0.2.0-beta.14`
+- `pnpm release:check`
 
-Beta readiness estimate after executable imported Form submissions: 98%.
+The complete 0.2.0-beta.14 local release gate passes. Beta readiness is 99%
+until the hosted publication and public registry compatibility checks pass.

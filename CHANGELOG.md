@@ -8,6 +8,26 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.14 - 2026-07-28
+
+### Added
+
+- Canonical decorator-free `defineForm({ fields, submit })` authoring now
+  lowers nested Fields, compiler-owned value/checked/file bindings, built-in
+  and Standard Schema validation, native submission hosts, and stable Form
+  resume products without legacy decorators.
+- Imported async Form submission capabilities now resolve through exact
+  semantic-package contracts, publish deterministic callable registries, and
+  receive compiler-built nested values plus submission-owned AbortSignals.
+
+### Changed
+
+- Forms runtime artifact schema v6 records exact Standard Schema validators
+  and integrity-bound submission capabilities. Browser execution validates
+  before submit, suppresses duplicate calls, rejects stale async validation,
+  preserves file fields as cold-only resume state, and reports explicit
+  Completed, Failed, Cancelled, Invalid, and reset lifecycle outcomes.
+
 ## 0.2.0-beta.13 - 2026-07-28
 
 ### Fixed
