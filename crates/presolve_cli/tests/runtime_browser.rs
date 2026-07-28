@@ -2959,14 +2959,13 @@ process.stdout.write(JSON.stringify({
 
     write_v2_structural_slot_probe_page(&output_root);
     write_v2_structural_slot_rejection_probe_pages(&output_root);
-    let server = StaticServer::start(output_root.clone());
     let chrome = chrome_bin().expect("headless Chrome was not found");
     let profile_dir = project_root.join("chrome-profile");
     fs::create_dir_all(&profile_dir).expect("failed to create structural Slot Chrome profile");
     let output = run_chrome_probe_with_timeout(
         chrome,
         &format!("--user-data-dir={}", profile_dir.display()),
-        &format!("http://127.0.0.1:{}/slot-probe.html", server.port),
+        &format!("file://{}", output_root.join("slot-probe.html").display()),
         Duration::from_secs(30),
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -3000,7 +2999,10 @@ process.stdout.write(JSON.stringify({
         let rejected = run_chrome_probe(
             chrome_bin().expect("headless Chrome was not found"),
             &format!("--user-data-dir={}", profile.display()),
-            &format!("http://127.0.0.1:{}/{name}.html", server.port),
+            &format!(
+                "file://{}",
+                output_root.join(format!("{name}.html")).display()
+            ),
         );
         let rejected_stdout = String::from_utf8_lossy(&rejected.stdout);
         assert!(
@@ -3011,7 +3013,6 @@ process.stdout.write(JSON.stringify({
             String::from_utf8_lossy(&rejected.stderr)
         );
     }
-    server.stop();
     fs::remove_dir_all(project_root).expect("failed to remove V2 structural Slot project");
 }
 

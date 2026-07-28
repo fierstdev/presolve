@@ -138,6 +138,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "html-escape"
+version = "0.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46c1ff2d1cbf39efe5af0900ced8a069b5e61557a17544eb0c4a50239937389e"
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -461,7 +467,7 @@ dependencies = [
 
 [[package]]
 name = "presolve-cli"
-version = "0.2.0-beta.6"
+version = "0.2.0-beta.7"
 dependencies = [
  "presolve-compiler",
  "presolve-parser",
@@ -472,7 +478,7 @@ dependencies = [
 
 [[package]]
 name = "presolve-compiler"
-version = "0.2.0-beta.6"
+version = "0.2.0-beta.7"
 dependencies = [
  "presolve-parser",
  "serde",
@@ -483,8 +489,9 @@ dependencies = [
 
 [[package]]
 name = "presolve-parser"
-version = "0.2.0-beta.6"
+version = "0.2.0-beta.7"
 dependencies = [
+ "html-escape",
  "oxc_allocator",
  "oxc_ast",
  "oxc_ast_visit",

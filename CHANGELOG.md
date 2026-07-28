@@ -8,6 +8,15 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.7 - 2026-07-27
+
+### Fixed
+
+- JSX text now decodes standard HTML character references before compiler
+  publication escapes the resulting text. Literal code examples such as
+  `&lt;button&gt;`, quoted attributes, braces, and other named or numeric entities
+  render correctly in generated static HTML instead of appearing double-escaped.
+
 ## 0.2.0-beta.6 - 2026-07-27
 
 ### Fixed

@@ -28,8 +28,8 @@ for (const path of ["app/components/README.md", "server/README.md", "app/app.css
 assert.match(readFileSync(join(target, ".env.example"), "utf8"), /PRESOLVE_PUBLIC_APP_NAME/);
 const manifest = JSON.parse(readFileSync(join(target, "package.json"), "utf8"));
 assert.equal(manifest.packageManager, "pnpm@11.17.0");
-assert.equal(manifest.dependencies.presolve, "npm:@presolve/framework@0.2.0-beta.6");
-assert.equal(manifest.devDependencies["@presolve/typescript-authority"], "0.2.0-beta.6");
+assert.equal(manifest.dependencies.presolve, "npm:@presolve/framework@0.2.0-beta.7");
+assert.equal(manifest.devDependencies["@presolve/typescript-authority"], "0.2.0-beta.7");
 assert.ok(manifest.scripts["deploy:prepare"]);
 assert.equal(manifest.scripts["deploy:node:prepare"], "presolve deploy node --prepare");
 assert.match(readFileSync(join(target, "README.md"), "utf8"), /deploy:node:prepare/);

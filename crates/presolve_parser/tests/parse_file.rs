@@ -153,6 +153,33 @@ fn parses_counter_fixture() {
 }
 
 #[test]
+fn decodes_jsx_text_character_references_before_normalization() {
+    let parsed = parse_file(
+        "CodeExample.tsx",
+        r#"
+class CodeExample extends Component {
+  render() {
+    return <code>&lt;button&gt;A &amp; B&#123;ok&#x7d; &quot;quoted&quot; &apos;single&apos; &copy;</code>;
+  }
+}
+"#,
+    );
+
+    assert!(parsed.diagnostics.is_empty());
+    let render = parsed.classes[0]
+        .methods
+        .iter()
+        .find(|method| method.name == "render")
+        .expect("expected render method");
+    let root = jsx_root_element(&render.jsx_roots[0]);
+    let ParsedJsxChild::Text { value, .. } = &root.children[0] else {
+        panic!("expected code example text");
+    };
+
+    assert_eq!(value, "<button>A & B{ok} \"quoted\" 'single' ©");
+}
+
+#[test]
 fn retains_constrained_method_parameters() {
     let source = r#"
 @component("x-parameters")

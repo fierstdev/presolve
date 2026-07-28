@@ -3074,6 +3074,30 @@ class AttributeAlias extends Component {
     }
 
     #[test]
+    fn decodes_jsx_text_character_references_before_static_html_escaping() {
+        let parsed = presolve_parser::parse_file(
+            "CodeExample.tsx",
+            r#"
+@component("x-code-example")
+class CodeExample extends Component {
+  render() {
+    return <pre><code>&lt;button&gt;A &amp; B&#123;ok&#125;&lt;/button&gt;</code></pre>;
+  }
+}
+"#,
+        );
+
+        let component_graph = build_component_graph(&parsed);
+        assert!(component_graph.diagnostics.is_empty());
+
+        let html = generate_static_html(&build_template_graph(&component_graph));
+
+        assert!(html.contains("&lt;button&gt;A &amp; B{ok}&lt;/button&gt;"));
+        assert!(!html.contains("&amp;lt;button&amp;gt;"));
+        assert!(!html.contains("&amp;#123;"));
+    }
+
+    #[test]
     fn preserves_static_jsx_attributes_in_template_outputs() {
         let source =
             include_str!("../../../fixtures/0014-static-attributes/input/StaticAttributePanel.tsx");

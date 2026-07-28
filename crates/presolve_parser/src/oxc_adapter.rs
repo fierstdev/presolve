@@ -1920,7 +1920,10 @@ fn parsed_jsx_element(
 }
 
 fn normalize_jsx_text(value: &str) -> String {
-    value.split_whitespace().collect::<Vec<_>>().join(" ")
+    html_escape::decode_html_entities(value)
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn jsx_text_value_span(source: &str, value: &str, span: Span) -> SourceSpan {
