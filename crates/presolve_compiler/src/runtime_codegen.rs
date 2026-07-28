@@ -22,7 +22,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = __EZ_COMPONENT_SCHEMA_VERSION__;
   const LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2;
-  const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 3;
+  const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 4;
   const SUPPORTED_RESOURCES_ARTIFACT_SCHEMA_VERSION = 3;
   const SUPPORTED_OPAQUE_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_RESUME_MANIFEST_SCHEMA_VERSION = 7;
@@ -840,6 +840,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
     for (const form of formsArtifact.forms) {
       const paths = new Set();
+      const fieldIds = new Set((form?.fields ?? []).map((field) => field.id));
       for (const field of form?.fields ?? []) {
         if (!Array.isArray(field?.path) || field.path.length === 0 || field.path.length > 16
           || !field.path.every((segment) => typeof segment === "string" && /^[A-Za-z_][A-Za-z0-9_]*$/.test(segment))) {
@@ -852,6 +853,16 @@ const RUNTIME_STUB: &str = r#"(() => {
           throw new PresolveBootError("PSR_INVALID_FORMS_ARTIFACT");
         }
         paths.add(path);
+      }
+      const ruleIds = new Set();
+      for (const rule of form?.validation_rules ?? []) {
+        if (typeof rule?.id !== "string" || !rule.id || ruleIds.has(rule.id)
+          || !fieldIds.has(rule.target_field)
+          || !isValidFormRuleArtifact(rule, fieldIds)) {
+          reportDiagnostic(diagnostics, "PSR_INVALID_FORMS_ARTIFACT", "Form validation rule was not compiler-canonical", { form: form.id, rule }, true);
+          throw new PresolveBootError("PSR_INVALID_FORMS_ARTIFACT");
+        }
+        ruleIds.add(rule.id);
       }
     }
     const hasForms = formsArtifact.forms.length > 0 || formsArtifact.instances.length > 0;
@@ -874,6 +885,38 @@ const RUNTIME_STUB: &str = r#"(() => {
         throw new PresolveBootError("PSR_FORMS_MANIFEST_MISMATCH");
       }
     }
+  }
+
+  function isValidFormRuleArtifact(rule, fieldIds) {
+    const argument = rule?.argument;
+    if (argument === null || typeof argument !== "object" || Array.isArray(argument)
+      || typeof rule.kind !== "string") return false;
+    if (rule.kind === "Required" || rule.kind === "Email") {
+      return exactObjectKeys(argument, ["kind"]) && argument.kind === "none"
+        && rule.dependency === undefined;
+    }
+    if (rule.kind === "Min" || rule.kind === "Max") {
+      return exactObjectKeys(argument, ["kind", "value"]) && argument.kind === "number"
+        && typeof argument.value === "string" && Number.isFinite(Number(argument.value))
+        && rule.dependency === undefined;
+    }
+    if (rule.kind === "MinLength" || rule.kind === "MaxLength") {
+      return exactObjectKeys(argument, ["kind", "value"]) && argument.kind === "length"
+        && Number.isSafeInteger(argument.value) && argument.value >= 0
+        && rule.dependency === undefined;
+    }
+    if (rule.kind === "Pattern") {
+      if (!exactObjectKeys(argument, ["kind", "value"]) || argument.kind !== "pattern"
+        || typeof argument.value !== "string" || rule.dependency !== undefined) return false;
+      try { new RegExp(argument.value); } catch (_) { return false; }
+      return true;
+    }
+    if (rule.kind === "Equals" || rule.kind === "NotEquals") {
+      return exactObjectKeys(argument, ["kind", "field"]) && argument.kind === "field"
+        && typeof argument.field === "string" && fieldIds.has(argument.field)
+        && rule.dependency === argument.field;
+    }
+    return false;
   }
 
   function readComputedArtifact(diagnostics) {
@@ -4618,6 +4661,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     store.formBindingsByAnchor = new Map();
     store.formBindingsByField = new Map();
     store.formHostsByAnchor = new Map();
+    store.composingFormControls = new WeakSet();
     if (formsArtifact === null) return;
 
     const definitions = new Map(formsArtifact.forms.map((form) => [form.id, form]));
@@ -4682,13 +4726,23 @@ const RUNTIME_STUB: &str = r#"(() => {
       element.addEventListener(host.event, (event) => dispatchFormSubmit(store, event, anchor));
     }
 
-    document.addEventListener("input", (event) => dispatchFormEvent(store, event, false));
-    document.addEventListener("change", (event) => dispatchFormEvent(store, event, false));
-    document.addEventListener("focusout", (event) => dispatchFormEvent(store, event, true));
+    installFormControlListeners(store);
     window.__PRESOLVE_FORMS__ = {
       resetForm: (instanceId) => resetForm(store, instanceId),
       resetField: (instanceId, fieldId) => resetField(store, instanceId, fieldId)
     };
+  }
+
+  function installFormControlListeners(store) {
+    document.addEventListener("input", (event) => dispatchFormEvent(store, event, false));
+    document.addEventListener("change", (event) => dispatchFormEvent(store, event, false));
+    document.addEventListener("focusout", (event) => dispatchFormEvent(store, event, true));
+    document.addEventListener("compositionstart", (event) => {
+      if (event.target instanceof HTMLElement) store.composingFormControls.add(event.target);
+    });
+    document.addEventListener("compositionend", (event) => {
+      if (event.target instanceof HTMLElement) store.composingFormControls.delete(event.target);
+    });
   }
 
   function dispatchFormSubmit(store, event, anchor) {
@@ -4751,6 +4805,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       validateFormField(record.formInstance, record.binding.field);
       return;
     }
+    if (event.isComposing === true || store.composingFormControls.has(element)) return;
     const expected = record.binding.channel === "Checked"
       || record.binding.channel === "RadioValue"
       || record.binding.channel === "Files"
@@ -4809,10 +4864,16 @@ const RUNTIME_STUB: &str = r#"(() => {
   function validateFormRule(formInstance, value, rule) {
     const dependency = rule.dependency === undefined ? undefined : formInstance.fields.get(rule.dependency)?.value;
     if (rule.kind === "Required") return !(value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0));
+    if (value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0)) return true;
+    if (rule.kind === "Min") return typeof value === "number" && Number.isFinite(value) && value >= Number(rule.argument.value);
+    if (rule.kind === "Max") return typeof value === "number" && Number.isFinite(value) && value <= Number(rule.argument.value);
+    if (rule.kind === "MinLength") return (typeof value === "string" || Array.isArray(value)) && value.length >= rule.argument.value;
+    if (rule.kind === "MaxLength") return (typeof value === "string" || Array.isArray(value)) && value.length <= rule.argument.value;
+    if (rule.kind === "Pattern") return typeof value === "string" && new RegExp(rule.argument.value).test(value);
     if (rule.kind === "Email") return value === "" || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(value));
     if (rule.kind === "Equals") return value === dependency;
     if (rule.kind === "NotEquals") return value !== dependency;
-    return true;
+    return false;
   }
 
   function resetField(store, instanceId, fieldId) {
@@ -5483,6 +5544,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     store.formBindingsByAnchor = new Map();
     store.formBindingsByField = new Map();
     store.formHostsByAnchor = new Map();
+    store.composingFormControls = new WeakSet();
     const slotOwners = new Map();
     for (const instance of instances.values()) {
       const definition = definitions.get(instance.form);
@@ -5563,11 +5625,37 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
     const expectedBindings = [...instances.values()].reduce((count, instance) => count + (definitions.get(instance.form)?.bindings?.length ?? 0), 0);
     if (store.formBindingsByAnchor.size !== expectedBindings) throw new ResumeBootError("ResumeArtifactMismatch");
+    for (const bridge of templateManifest.form_hosts ?? []) {
+      const target = targets.targets.get(bridge.instance_target_id);
+      const formInstance = store.formInstances.get(bridge.form_instance_id);
+      const host = (formsArtifact.hosts ?? []).find((candidate) =>
+        candidate.host_anchor === bridge.host_anchor
+        && candidate.form_instance === bridge.form_instance_id
+      );
+      if (!(target instanceof HTMLFormElement) || targets.duplicates.has(bridge.instance_target_id)
+        || formInstance === undefined || host === undefined || host.event !== "submit"
+        || store.formHostsByAnchor.has(bridge.instance_target_id)) {
+        throw new ResumeBootError("ResumeArtifactMismatch");
+      }
+      store.formHostsByAnchor.set(bridge.instance_target_id, {
+        bridge,
+        host,
+        element: target,
+        formInstance
+      });
+      target.addEventListener(host.event, (event) =>
+        dispatchFormSubmit(store, event, bridge.instance_target_id)
+      );
+    }
+    if (store.formHostsByAnchor.size !== (templateManifest.form_hosts ?? []).length) {
+      throw new ResumeBootError("ResumeArtifactMismatch");
+    }
     for (const formInstance of store.formInstances.values()) {
       if ((formInstance.definition.fields ?? []).some((field) => field.semantic_type === "File[]")) {
         for (const fieldId of formInstance.fields.keys()) validateFormField(formInstance, fieldId);
       }
     }
+    installFormControlListeners(store);
     window.__PRESOLVE_FORMS__ = {
       resetForm: (instanceId) => resetForm(store, instanceId),
       resetField: (instanceId, fieldId) => resetField(store, instanceId, fieldId)

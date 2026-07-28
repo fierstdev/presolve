@@ -61,6 +61,12 @@ normative source for this handoff.
 - [V2 beta Action surface contract](action-beta-surface-contract.md) fixes the
   complete closed Action source surface and its fail-closed exclusions for
   beta readiness.
+- [V2 Form validation runtime contract](form-validation-runtime-contract.md)
+  defines typed built-in rule arguments, IME-safe binding updates, and
+  post-resume Form interactivity.
+- [V2 Form file binding contract](form-file-binding-contract.md) defines
+  authority-proven `File[]`, `bind:files`, FormData-only transport, and
+  non-resumable file state.
 - [Resource lifecycle and resume contract](resource-lifecycle-resume-contract.md)
   defines compiler-owned cold, snapshot, reload, cancellation, and fallback
   behavior for declared Resource endpoints.

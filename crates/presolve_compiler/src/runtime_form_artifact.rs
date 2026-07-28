@@ -9,10 +9,12 @@ use serde::Serialize;
 
 use crate::{
     semantic_type_text, ApplicationSemanticModel, FormControlCompatibility, FormIrOperation,
-    RUNTIME_FORM_REGISTRY_VERSION,
+    ValidationRuleArgument, RUNTIME_FORM_REGISTRY_VERSION,
 };
 
-pub const RUNTIME_FORM_ARTIFACT_SCHEMA_VERSION: u32 = 3;
+/// Version 4 replaces validation debug strings with a closed executable
+/// argument vocabulary.
+pub const RUNTIME_FORM_ARTIFACT_SCHEMA_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RuntimeFormsArtifact {
@@ -64,9 +66,19 @@ pub struct RuntimeFormsArtifactRule {
     pub id: String,
     pub target_field: String,
     pub kind: String,
-    pub argument: String,
+    pub argument: RuntimeFormsArtifactRuleArgument,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dependency: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum RuntimeFormsArtifactRuleArgument {
+    None,
+    Number { value: String },
+    Length { value: u64 },
+    Pattern { value: String },
+    Field { field: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -200,7 +212,7 @@ pub fn build_runtime_forms_artifact(model: &ApplicationSemanticModel) -> Runtime
                     id: rule.id.to_string(),
                     target_field: rule.target_field.to_string(),
                     kind: format!("{:?}", rule.kind),
-                    argument: format!("{:?}", rule.argument),
+                    argument: runtime_rule_argument(&rule.argument),
                     dependency: rule.dependency.as_ref().map(ToString::to_string),
                 })
                 .collect();
@@ -411,6 +423,11 @@ pub fn validate_runtime_forms_artifact(
         }
     }
     for form in &artifact.forms {
+        let field_ids = form
+            .fields
+            .iter()
+            .map(|field| field.id.as_str())
+            .collect::<BTreeSet<_>>();
         let paths = form
             .fields
             .iter()
@@ -432,6 +449,17 @@ pub fn validate_runtime_forms_artifact(
         }) {
             diagnostics.push(format!("conflicting Form Field path for {}", form.id));
         }
+        for rule in &form.validation_rules {
+            if !field_ids.contains(rule.target_field.as_str())
+                || !runtime_rule_argument_matches(rule)
+                || rule
+                    .dependency
+                    .as_ref()
+                    .is_some_and(|dependency| !field_ids.contains(dependency.as_str()))
+            {
+                diagnostics.push(format!("invalid Form validation rule {}", rule.id));
+            }
+        }
     }
     for host in &artifact.hosts {
         if !instances.contains(host.form_instance.as_str())
@@ -444,6 +472,43 @@ pub fn validate_runtime_forms_artifact(
     RuntimeFormsArtifactValidation {
         is_valid: diagnostics.is_empty(),
         diagnostics,
+    }
+}
+
+fn runtime_rule_argument(argument: &ValidationRuleArgument) -> RuntimeFormsArtifactRuleArgument {
+    match argument {
+        ValidationRuleArgument::None => RuntimeFormsArtifactRuleArgument::None,
+        ValidationRuleArgument::Number(value) => RuntimeFormsArtifactRuleArgument::Number {
+            value: value.clone(),
+        },
+        ValidationRuleArgument::Length(value) => {
+            RuntimeFormsArtifactRuleArgument::Length { value: *value }
+        }
+        ValidationRuleArgument::Pattern(value) => RuntimeFormsArtifactRuleArgument::Pattern {
+            value: value.clone(),
+        },
+        ValidationRuleArgument::Field(field) => RuntimeFormsArtifactRuleArgument::Field {
+            field: field.to_string(),
+        },
+    }
+}
+
+fn runtime_rule_argument_matches(rule: &RuntimeFormsArtifactRule) -> bool {
+    match (&*rule.kind, &rule.argument) {
+        ("Required" | "Email", RuntimeFormsArtifactRuleArgument::None) => rule.dependency.is_none(),
+        ("Min" | "Max", RuntimeFormsArtifactRuleArgument::Number { value }) => {
+            rule.dependency.is_none() && value.parse::<f64>().is_ok_and(|value| value.is_finite())
+        }
+        ("MinLength" | "MaxLength", RuntimeFormsArtifactRuleArgument::Length { .. }) => {
+            rule.dependency.is_none()
+        }
+        ("Pattern", RuntimeFormsArtifactRuleArgument::Pattern { value }) => {
+            rule.dependency.is_none() && presolve_parser::is_valid_ecmascript_pattern(value)
+        }
+        ("Equals" | "NotEquals", RuntimeFormsArtifactRuleArgument::Field { field }) => {
+            rule.dependency.as_ref() == Some(field)
+        }
+        _ => false,
     }
 }
 
@@ -499,19 +564,28 @@ fn field_programs(
 #[cfg(test)]
 mod tests {
     #[test]
-    fn emits_schema_v3_with_only_canonical_execution_references_and_field_paths() {
+    fn emits_schema_v4_with_typed_validation_arguments_and_canonical_references() {
         let parsed = presolve_parser::parse_file(
             "src/X.tsx",
-            r#"@component("x")class X{@form()form!:Form;@field(this.form)value="";render(){return <input field={this.value}/>;}}"#,
+            r#"@component("x")class X{@form()form!:Form;@validate(minLength(2))@field(this.form)value="";render(){return <input field={this.value}/>;}}"#,
         );
         let asm = crate::build_application_semantic_model(&parsed);
         let artifact = super::build_runtime_forms_artifact(&asm);
-        assert_eq!(artifact.schema_version, 3);
+        assert_eq!(artifact.schema_version, 4);
         assert_eq!(artifact.registry_version, 1);
         assert_eq!(artifact.forms.len(), 1);
         assert_eq!(artifact.instances.len(), 1);
+        assert_eq!(
+            artifact.forms[0].validation_rules[0].argument,
+            super::RuntimeFormsArtifactRuleArgument::Length { value: 2 }
+        );
         assert!(super::validate_runtime_forms_artifact(&artifact).is_valid);
         assert!(super::runtime_forms_artifact_json(&artifact).contains("field-binding"));
+
+        let mut malformed = artifact;
+        malformed.forms[0].validation_rules[0].argument =
+            super::RuntimeFormsArtifactRuleArgument::None;
+        assert!(!super::validate_runtime_forms_artifact(&malformed).is_valid);
     }
 
     #[test]

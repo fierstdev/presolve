@@ -1114,7 +1114,7 @@ fn decorator_free_v2_form_fields_bind_and_validate_in_a_real_browser() {
         .expect("failed to create V2 Form source root");
     fs::write(
         project_root.join("app/routes/index.tsx"),
-        r#"import { Component, defineForm, field, required, state } from "presolve";
+        r#"import { Component, defineForm, email, field, max, maxLength, min, minLength, pattern, required, state } from "presolve";
 
 export class Contact extends Component {
   submitted = state(0);
@@ -1122,6 +1122,9 @@ export class Contact extends Component {
     serialization: "form-data",
     fields: {
       name: field({ initial: "", validate: [required()] }),
+      alias: field({ initial: "", validate: [minLength(3), maxLength(8), pattern("^[a-z]+$")] }),
+      age: field({ initial: 20, validate: [min(18), max(120)] }),
+      emailAddress: field({ initial: "", validate: [email()] }),
       subscribed: field({ initial: false }),
       attachments: field<File[]>({ initial: [], validate: [required()] }),
     },
@@ -1131,7 +1134,7 @@ export class Contact extends Component {
   });
 
   render() {
-    return <main><form form={this.contact}><input bind:value={this.contact.fields.name} /><input type="checkbox" bind:checked={this.contact.fields.subscribed} /><input type="file" bind:files={this.contact.fields.attachments} /><button type="submit">Send</button></form><output>{this.submitted}</output></main>;
+    return <main><form form={this.contact}><input bind:value={this.contact.fields.name} /><input bind:value={this.contact.fields.alias} /><input type="number" bind:value={this.contact.fields.age} /><input type="email" bind:value={this.contact.fields.emailAddress} /><input type="checkbox" bind:checked={this.contact.fields.subscribed} /><input type="file" bind:files={this.contact.fields.attachments} /><button type="submit">Send</button></form><output>{this.submitted}</output></main>;
   }
 }
 "#,
@@ -1166,7 +1169,10 @@ process.stdout.write(JSON.stringify({
     identity: identity("field"),
     ...(sourceAt(site).startsWith("field<File[]>") ? { valueClassification: "file_array" } : {}),
   })),
-  validations: request.validations.map(site => ({ id: site.id, identity: identity(sourceAt(site).startsWith("required") ? "required" : "unknown") })),
+  validations: request.validations.map(site => ({
+    id: site.id,
+    identity: identity(sourceAt(site).match(/^[A-Za-z_$][\w$]*/)?.[0] ?? "unknown"),
+  })),
   environmentPublic: [],
 }));
 "#,
@@ -1191,13 +1197,14 @@ process.stdout.write(JSON.stringify({
         .expect("V2 Form runtime artifact");
     let artifact: serde_json::Value =
         serde_json::from_str(&artifact).expect("V2 Form runtime artifact JSON");
-    assert_eq!(artifact["forms"][0]["fields"].as_array().unwrap().len(), 3);
+    assert_eq!(artifact["schema_version"], 4);
+    assert_eq!(artifact["forms"][0]["fields"].as_array().unwrap().len(), 6);
     assert_eq!(
         artifact["forms"][0]["validation_rules"]
             .as_array()
             .unwrap()
             .len(),
-        2
+        8
     );
     assert_eq!(artifact["hosts"].as_array().unwrap().len(), 1);
 
@@ -1210,18 +1217,39 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => { const d
 (async () => {
   await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
   if (window.__PRESOLVE__.resume.mode !== "cold") fail("fresh V2 Form boot did not select cold mode");
-  const [name, subscribed, attachments] = document.querySelectorAll("input");
-  name.value = "Ada"; name.dispatchEvent(new Event("input", { bubbles: true }));
-  subscribed.checked = true; subscribed.dispatchEvent(new Event("change", { bubbles: true }));
-  const transfer = new DataTransfer();
-  transfer.items.add(new File(["proof"], "proof.txt", { type: "text/plain" }));
-  attachments.files = transfer.files;
-  attachments.dispatchEvent(new Event("change", { bubbles: true }));
+  const [name, alias, age, emailAddress, subscribed, attachments] = document.querySelectorAll("input");
   const instance = window.__PRESOLVE__.store.formInstances.values().next().value;
   const stateFor = (name) => {
     const definition = instance.definition.fields.find((field) => field.debug_name === name);
     return definition === undefined ? undefined : instance.fields.get(definition.id);
   };
+  name.value = "composition";
+  name.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true, data: "composition" }));
+  name.dispatchEvent(new InputEvent("input", { bubbles: true, data: "composition", inputType: "insertCompositionText", isComposing: true }));
+  if (stateFor("name").value !== "") fail("IME composition committed incomplete text");
+  name.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "composition" }));
+  name.value = "Ada"; name.dispatchEvent(new InputEvent("input", { bubbles: true, data: "Ada", inputType: "insertText" }));
+  alias.value = "A1"; alias.dispatchEvent(new Event("input", { bubbles: true }));
+  if (stateFor("alias").validation.length !== 2) fail("minLength and pattern did not reject an invalid value");
+  alias.value = "abcdefghi"; alias.dispatchEvent(new Event("input", { bubbles: true }));
+  if (stateFor("alias").validation.length !== 1) fail("maxLength did not reject an overlong value");
+  alias.value = "valid"; alias.dispatchEvent(new Event("input", { bubbles: true }));
+  if (stateFor("alias").validation.length !== 0) fail("string validation did not accept a valid value");
+  age.value = "17"; age.dispatchEvent(new Event("input", { bubbles: true }));
+  if (stateFor("age").validation.length !== 1) fail("min did not reject a low number");
+  age.value = "121"; age.dispatchEvent(new Event("input", { bubbles: true }));
+  if (stateFor("age").validation.length !== 1) fail("max did not reject a high number");
+  age.value = "42"; age.dispatchEvent(new Event("input", { bubbles: true }));
+  if (stateFor("age").value !== 42 || stateFor("age").validation.length !== 0) fail("numeric validation did not accept a valid number");
+  emailAddress.value = "invalid"; emailAddress.dispatchEvent(new Event("input", { bubbles: true }));
+  if (stateFor("emailAddress").validation.length !== 1) fail("email did not reject an invalid address");
+  emailAddress.value = "ada@example.com"; emailAddress.dispatchEvent(new Event("input", { bubbles: true }));
+  if (stateFor("emailAddress").validation.length !== 0) fail("email did not accept a valid address");
+  subscribed.checked = true; subscribed.dispatchEvent(new Event("change", { bubbles: true }));
+  const transfer = new DataTransfer();
+  transfer.items.add(new File(["proof"], "proof.txt", { type: "text/plain" }));
+  attachments.files = transfer.files;
+  attachments.dispatchEvent(new Event("change", { bubbles: true }));
   if (stateFor("name").value !== "Ada" || !stateFor("name").dirty || stateFor("name").validation.length !== 0) fail("bind:value did not update and validate the canonical Field");
   if (stateFor("subscribed").value !== true || !stateFor("subscribed").dirty) fail("bind:checked did not update the canonical Field");
   if (stateFor("attachments").value.length !== 1 || stateFor("attachments").value[0].name !== "proof.txt" || !stateFor("attachments").dirty || stateFor("attachments").validation.length !== 0) fail("bind:files did not commit the platform File array");
@@ -1318,11 +1346,29 @@ if (runtime.resume.mode !== "resume") fail("V2 Form snapshot was not resumed");
 const fields = [...runtime.store.formInstances.values().next().value.fields.values()];
 if (!fields.some((field) => field.value === "Grace") || !fields.some((field) => field.value === true)) fail("V2 Form Field slots were not restored");
 const controls = document.querySelectorAll("input");
-if (controls[0].value !== "Grace" || controls[1].checked !== true) fail("V2 Form controls were not synchronized from resume");
+if (controls[0].value !== "Grace" || controls[4].checked !== true) fail("V2 Form controls were not synchronized from resume");
 const instance = runtime.store.formInstances.values().next().value;
 const fileDefinition = instance.definition.fields.find((field) => field.debug_name === "attachments");
 const fileState = instance.fields.get(fileDefinition.id);
-if (controls[2].files.length !== 0 || fileState.value.length !== 0 || fileState.dirty || fileState.touched || fileState.validation.length !== 1 || instance.aggregate_valid) fail("non-resumable file field did not cold-reset and revalidate");
+if (controls[5].files.length !== 0 || fileState.value.length !== 0 || fileState.dirty || fileState.touched || fileState.validation.length !== 1 || instance.aggregate_valid) fail("non-resumable file field did not cold-reset and revalidate");
+controls[0].value = "Resumed";
+controls[0].dispatchEvent(new Event("input", { bubbles: true }));
+if (instance.fields.get(instance.definition.fields.find((field) => field.debug_name === "name").id).value !== "Resumed") fail("resumed Form binding did not remain interactive");
+controls[1].value = "valid";
+controls[1].dispatchEvent(new Event("input", { bubbles: true }));
+controls[2].value = "42";
+controls[2].dispatchEvent(new Event("input", { bubbles: true }));
+controls[3].value = "resume@example.com";
+controls[3].dispatchEvent(new Event("input", { bubbles: true }));
+const resumedTransfer = new DataTransfer();
+resumedTransfer.items.add(new File(["resume"], "resume.txt", { type: "text/plain" }));
+controls[5].files = resumedTransfer.files;
+controls[5].dispatchEvent(new Event("change", { bubbles: true }));
+if (!instance.aggregate_valid) fail("resumed Form validation did not recover after valid input");
+const resumedSubmit = new Event("submit", { bubbles: true, cancelable: true });
+document.querySelector("form").dispatchEvent(resumedSubmit);
+await waitFor(() => runtime.components[0].state.submitted === 1, "resumed Form submission");
+if (!resumedSubmit.defaultPrevented || instance.submission !== "Completed") fail("resumed Form submission host was not restored");
 if (runtime.diagnostics.some((diagnostic) => diagnostic.fatal)) fail("V2 Form resume reported fatal diagnostics");"#,
         "PRESOLVE_V2_FORM_RESUME_PASS",
     );

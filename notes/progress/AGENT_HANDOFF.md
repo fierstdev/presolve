@@ -59,6 +59,11 @@ Decorator-free file controls now have an authority-backed platform-value path:
 - file value/tracking/validation slots are excluded from resume, while other
   fields resume and the Form deterministically revalidates after rebinding.
 
+Forms runtime artifact schema v4 now publishes typed validation arguments.
+Required, min/max, length, pattern, email, and compiler-bound cross-Field rules
+fail closed and execute in the browser. The acceptance fixture also proves IME
+composition suppression and Form input after snapshot resume.
+
 ## Next slice
 
 Add Standard Schema validation, then broaden native inline submit/action
@@ -74,4 +79,4 @@ execution to admitted imported capability calls with abort signals.
 - `pnpm exec tsc -p tests/framework-public-api/tsconfig.json`
 - `cargo test -p presolve-cli --test runtime_browser decorator_free_v2_form_fields_bind_and_validate_in_a_real_browser -- --nocapture`
 
-Beta readiness estimate after the file binding gate: 91%.
+Beta readiness estimate after the built-in validation runtime gate: 92%.
