@@ -1143,6 +1143,10 @@ fn resume_bootstrap_registry_accepts_and_atomically_falls_back_in_a_real_browser
     for (index, (page, marker)) in [
         ("cold.html", "PRESOLVE_RESUME_COLD_PASS"),
         ("accepted.html", "PRESOLVE_RESUME_ACCEPTED_PASS"),
+        (
+            "async-event.html",
+            "PRESOLVE_RESUME_ASYNC_EVENT_SNAPSHOT_PASS",
+        ),
         ("build-mismatch.html", "PRESOLVE_RESUME_BUILD_FALLBACK_PASS"),
         (
             "protocol-mismatch.html",
@@ -2008,6 +2012,39 @@ if (doubleFailure !== "DoubleBootstrap") fail("double bootstrap was not rejected
         "PRESOLVE_RESUME_ACCEPTED_PASS",
     );
     fs::write(out_dir.join("accepted.html"), accepted).expect("accepted probe");
+
+    let async_event = resume_bootstrap_probe_page(
+        &index,
+        &format!(
+            r#"
+window.__PRESOLVE_RESUME_SNAPSHOT__ = {};
+(() => {{
+  const targetDescriptor = Object.getOwnPropertyDescriptor(Event.prototype, "target");
+  if (typeof targetDescriptor?.get !== "function" || targetDescriptor.configurable !== true) {{
+    throw new Error("Event target descriptor cannot model asynchronous disposal");
+  }}
+  const expiredEvents = new WeakSet();
+  Object.defineProperty(Event.prototype, "target", {{
+    configurable: true,
+    get() {{
+      return expiredEvents.has(this) ? null : targetDescriptor.get.call(this);
+    }}
+  }});
+  document.addEventListener("click", (event) => {{
+    queueMicrotask(() => expiredEvents.add(event));
+  }}, {{ capture: true }});
+}})();"#,
+            serde_json::to_string(&snapshot).expect("snapshot JSON")
+        ),
+        r#"
+if (runtime.resume.mode !== "resume" || runtime.resume.failure !== null) fail("valid snapshot was not accepted");
+if (!(runtime.store?.components instanceof Map) || runtime.components[0].state.count !== 7) fail("snapshot State was not restored");
+document.querySelector("button").click();
+await waitFor(() => runtime.components[0].state.count === 8, "asynchronous event target snapshot");
+if (document.querySelector("button").textContent !== "8") fail("asynchronous event target did not patch the exact binding");"#,
+        "PRESOLVE_RESUME_ASYNC_EVENT_SNAPSHOT_PASS",
+    );
+    fs::write(out_dir.join("async-event.html"), async_event).expect("async event probe");
 
     let mut wrong_build = snapshot.clone();
     wrong_build["buildId"] = serde_json::Value::String(

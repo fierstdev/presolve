@@ -8,6 +8,19 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.13 - 2026-07-28
+
+### Fixed
+
+- Resumable event activation now snapshots the exact target and event type
+  before awaiting its lazy interaction chunk. Mobile Safari and other engines
+  may release live event-path state after synchronous dispatch; deferred
+  actions now retain compiler-authorized event authority and execute reliably.
+- Canonical `app/app.css` links now carry the stylesheet's SHA-256 content
+  identity. Browsers revalidate a distinct URL whenever global CSS changes,
+  preventing stale or previously failed mobile caches from leaving otherwise
+  valid application HTML unstyled after a release.
+
 ## 0.2.0-beta.12 - 2026-07-28
 
 ### Fixed

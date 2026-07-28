@@ -241,11 +241,15 @@ fn attach_application_document_inputs(
         return Ok(());
     }
     if let Some(template) = template {
-        let additional_head = if stylesheet.is_some() {
-            "    <link rel=\"stylesheet\" href=\"/app.css\">\n"
-        } else {
-            ""
-        };
+        let additional_head = stylesheet
+            .as_ref()
+            .map(|bytes| {
+                format!(
+                    "    <link rel=\"stylesheet\" href=\"/app.css?v={:x}\">\n",
+                    Sha256::digest(bytes)
+                )
+            })
+            .unwrap_or_default();
         let route_artifacts = product
             .artifacts
             .iter()
@@ -257,7 +261,7 @@ fn attach_application_document_inputs(
             .collect::<Vec<_>>();
         for (path, page) in route_artifacts {
             let page = page.map_err(|error| format!("{} is not UTF-8: {error}", path.display()))?;
-            let output = apply_document_template_v1(&template, &page, additional_head)
+            let output = apply_document_template_v1(&template, &page, &additional_head)
                 .map_err(|error| error.to_string())?;
             product.artifacts.insert(path.clone(), output.into_bytes());
             update_publication_artifact_digest(product, &path)?;

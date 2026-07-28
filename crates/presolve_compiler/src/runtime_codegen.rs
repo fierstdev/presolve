@@ -432,8 +432,8 @@ const RUNTIME_STUB: &str = r#"(() => {
     return activateBoundary(activation.boundary_id);
   }
 
-  function resumeEventMarker(event) {
-    let current = event.target instanceof Element ? event.target : event.target?.parentElement;
+  function resumeEventMarker(target) {
+    let current = target instanceof Element ? target : target?.parentElement;
     while (current !== null && current !== undefined) {
       const marker = current.getAttribute("data-presolve-e");
       if (marker !== null) return marker;
@@ -447,13 +447,15 @@ const RUNTIME_STUB: &str = r#"(() => {
     const eventTypes = new Set([...events.values()].map((event) => event.event_type));
     for (const eventType of eventTypes) {
       document.addEventListener(eventType, async (event) => {
-        const marker = resumeEventMarker(event);
+        const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+        const type = event.type;
+        const marker = resumeEventMarker(target);
         if (marker === null) return;
         const record = events.get(marker);
-        if (record === undefined || record.event_type !== event.type) return;
+        if (record === undefined || record.event_type !== type) return;
         try {
           await activateByEvent(marker);
-          dispatchOrdinaryInstanceEvent(store, event);
+          dispatchOrdinaryInstanceEvent(store, { target, type });
         } catch (error) {
           registry.debug.push({ event_id: marker, failure: error instanceof ResumeBootError ? error.failure : "ActivationFailure" });
         }

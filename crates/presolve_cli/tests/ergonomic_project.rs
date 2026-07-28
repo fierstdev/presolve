@@ -431,7 +431,9 @@ fn canonical_application_files_own_the_document_and_global_stylesheet() {
         String::from_utf8_lossy(&output.stderr)
     );
     let html = fs::read_to_string(root.join("dist/routes/root/index.html")).unwrap();
-    assert!(html.contains("<link rel=\"stylesheet\" href=\"/app.css\">"));
+    assert!(html.contains(
+        "<link rel=\"stylesheet\" href=\"/app.css?v=36709dfafff32d5ed90c36b3b50c450fe2d484fdb88eb49abcb5f6b17cbff2c8\">"
+    ));
     assert!(html.contains("app-shell"));
     assert!(!html.contains("<main><main"));
     assert_eq!(
