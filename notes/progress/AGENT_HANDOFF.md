@@ -112,10 +112,10 @@ The full inherited workspace gate, including 57 browser tests and the updated
 
 ## Next slice
 
-Publish 0.2.0-beta.14 from `main`, then verify the GitHub release, scoped npm
-packages, crates, and VS Code prerelease. Server executors are not part of this
-beta: the frozen loader/server-action contracts complete those families at
-deterministic compiler handoff and explicitly prohibit an inferred executor.
+Begin post-beta adoption and feedback work from the published 0.2.0-beta.14
+contract. Server executors remain outside this beta: the frozen
+loader/server-action contracts complete those families at deterministic
+compiler handoff and explicitly prohibit an inferred executor.
 
 ## Verification
 
@@ -129,10 +129,14 @@ deterministic compiler handoff and explicitly prohibit an inferred executor.
 - `node scripts/verify-release-version.mjs 0.2.0-beta.14`
 - `pnpm release:check`
 
-The complete 0.2.0-beta.14 local release gate passes. Beta readiness is 99%
-until the hosted publication and public registry compatibility checks pass.
+The complete 0.2.0-beta.14 local and hosted release gates pass. GitHub Actions
+published the prerelease, all 13 npm packages and their `beta` tags, all three
+crates, and VS Code prerelease 0.2.14; each public coordinate was independently
+verified.
 The isolated GitHub browser job now installs the locked Node workspace required
 by the real Vite-backed Form acceptance project before running Chrome.
 TypeScript declaration-module identity coordinates are also case-folded
 independently of host filesystem behavior; authored bundler specifiers retain
 their exact source case.
+
+Beta completion: 100%.
