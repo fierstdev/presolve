@@ -920,8 +920,9 @@ pub use runtime_form_artifact::{
     RuntimeFormsArtifactField, RuntimeFormsArtifactFieldProgram, RuntimeFormsArtifactFieldSlots,
     RuntimeFormsArtifactForm, RuntimeFormsArtifactInstance, RuntimeFormsArtifactPrograms,
     RuntimeFormsArtifactReset, RuntimeFormsArtifactRule, RuntimeFormsArtifactRuleArgument,
-    RuntimeFormsArtifactSerialization, RuntimeFormsArtifactSubmission,
-    RuntimeFormsArtifactValidation, RUNTIME_FORM_ARTIFACT_SCHEMA_VERSION,
+    RuntimeFormsArtifactSerialization, RuntimeFormsArtifactStandardSchemaModule,
+    RuntimeFormsArtifactSubmission, RuntimeFormsArtifactValidation,
+    RUNTIME_FORM_ARTIFACT_SCHEMA_VERSION,
 };
 pub use runtime_form_registry::{
     build_runtime_form_registry, RuntimeFormInstanceRecord, RuntimeFormRecord, RuntimeFormRegistry,

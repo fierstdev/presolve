@@ -22,6 +22,7 @@ pub enum ValidationRuleKind {
     Email,
     Equals,
     NotEquals,
+    StandardSchema,
 }
 
 impl ValidationRuleKind {
@@ -42,7 +43,7 @@ impl ValidationRuleKind {
 
     const fn expected_arity(self) -> usize {
         match self {
-            Self::Required | Self::Email => 0,
+            Self::Required | Self::Email | Self::StandardSchema => 0,
             Self::Min
             | Self::Max
             | Self::MinLength
@@ -61,6 +62,7 @@ pub enum ValidationRuleArgument {
     Length(u64),
     Pattern(String),
     Field(FieldId),
+    StandardSchema { validator: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -82,7 +84,6 @@ pub enum ValidationRuleViolation {
     InvalidDecoratorArity { actual: usize, expected: usize },
     InvalidRuleExpression,
     UnknownRule,
-    MissingStandardSchemaRuntimeModule,
     ShadowedCompilerRule,
     InvalidRuleArity { actual: usize, expected: usize },
     UnsupportedArgument,
@@ -350,7 +351,10 @@ fn lower_candidate(
         .map(|expression| expression.provenance.clone());
 
     if fact.standard_schema.is_some() {
-        violations.push(ValidationRuleViolation::MissingStandardSchemaRuntimeModule);
+        kind = Some(ValidationRuleKind::StandardSchema);
+        argument = Some(ValidationRuleArgument::StandardSchema {
+            validator: fact.id.to_string(),
+        });
     } else {
         match fact.expression.as_ref().map(|expression| &expression.kind) {
             Some(AuthoredValidationRuleExpressionKind::Call { callee, arguments }) => {
@@ -641,6 +645,7 @@ fn rule_is_compatible(
                     && (is_assignable(target, dependency) || is_assignable(dependency, target))
             })
         }
+        ValidationRuleKind::StandardSchema => true,
     }
 }
 

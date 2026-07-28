@@ -56,6 +56,7 @@ function template(name) {
         "@presolve/cli": "0.2.0-beta.13",
         "@presolve/typescript-authority": "0.2.0-beta.13",
         "typescript": "npm:typescript@^7.0.2",
+        "vite": "^7.0.0",
         "wrangler": "^4.0.0",
       },
     }, null, 2)}\n`,

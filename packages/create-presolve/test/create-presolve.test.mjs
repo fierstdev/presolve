@@ -30,6 +30,7 @@ const manifest = JSON.parse(readFileSync(join(target, "package.json"), "utf8"));
 assert.equal(manifest.packageManager, "pnpm@11.17.0");
 assert.equal(manifest.dependencies.presolve, "npm:@presolve/framework@0.2.0-beta.13");
 assert.equal(manifest.devDependencies["@presolve/typescript-authority"], "0.2.0-beta.13");
+assert.equal(manifest.devDependencies.vite, "^7.0.0");
 assert.ok(manifest.scripts["deploy:prepare"]);
 assert.equal(manifest.scripts["deploy:node:prepare"], "presolve deploy node --prepare");
 assert.match(readFileSync(join(target, "README.md"), "utf8"), /deploy:node:prepare/);

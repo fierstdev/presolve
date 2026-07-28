@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use presolve_parser::ParsedFile;
 
@@ -1874,14 +1874,95 @@ pub fn build_file_route_application_semantic_model_for_unit_with_packages_and_v2
 ) -> Result<ApplicationSemanticModel, FileRouteApplicationModelErrorV1> {
     let symbols = crate::build_symbol_table(unit);
     let modules = crate::build_module_graph(unit);
-    let bindings =
+    let mut bindings =
         crate::binding_table::build_binding_table_with_packages(unit, &symbols, &modules, packages);
+    retain_standard_schema_runtime_bindings(&mut bindings, unit, &modules, v2_authoring);
     build_application_semantic_model_from_files_with_bindings_mode_and_v2(
         unit.files(),
         Some(&bindings),
         ApplicationAssemblyMode::FileRoutes,
         Some(v2_authoring),
     )
+}
+
+fn retain_standard_schema_runtime_bindings(
+    bindings: &mut crate::BindingTable,
+    unit: &CompilationUnit,
+    modules: &crate::ModuleGraph,
+    v2_authoring: &BTreeMap<std::path::PathBuf, crate::CanonicalAuthoredSemanticModelV1>,
+) {
+    let mut imports = BTreeSet::new();
+    let mut specifiers = BTreeSet::new();
+    let mut exports = BTreeSet::new();
+    for model in v2_authoring.values() {
+        let Some(parsed) = unit
+            .files()
+            .iter()
+            .find(|parsed| parsed.path == model.source_path)
+        else {
+            continue;
+        };
+        for evidence in model
+            .declarations
+            .iter()
+            .filter_map(|declaration| declaration.derived_evidence.as_ref())
+        {
+            let crate::DerivedAuthoredEvidenceV2::StandardSchemaValidation {
+                module_specifier,
+                export_name,
+                declaration_modules,
+                ..
+            } = evidence
+            else {
+                continue;
+            };
+            let Some(import) = parsed
+                .imports
+                .iter()
+                .find(|import| import.source == *module_specifier)
+            else {
+                continue;
+            };
+            if let Some(local) = import
+                .specifiers
+                .iter()
+                .find(|specifier| specifier.imported == *export_name)
+                .map(|specifier| specifier.local.clone())
+            {
+                imports.insert((model.source_path.clone(), local));
+                specifiers.insert((model.source_path.clone(), module_specifier.clone()));
+            }
+            if let Some(crate::ModuleTarget::Resolved(target)) = modules
+                .edges
+                .iter()
+                .find(|edge| {
+                    edge.kind == crate::ModuleEdgeKind::Import
+                        && edge.source == model.source_path
+                        && edge.specifier == *module_specifier
+                })
+                .map(|edge| &edge.target)
+            {
+                exports.insert((target.clone(), export_name.clone()));
+            }
+            for target in declaration_modules {
+                if unit
+                    .files()
+                    .iter()
+                    .any(|file| file.path == Path::new(target))
+                {
+                    exports.insert((PathBuf::from(target), export_name.clone()));
+                }
+            }
+        }
+    }
+    bindings.diagnostics.retain(|diagnostic| {
+        !((diagnostic.code == "PSBIND1001"
+            && exports.contains(&(diagnostic.module.clone(), diagnostic.name.clone())))
+            || (diagnostic.code == "PSBIND1003"
+                && imports.contains(&(diagnostic.module.clone(), diagnostic.name.clone())))
+            || (matches!(diagnostic.code.as_str(), "PSBIND1002" | "PSBIND1009")
+                && specifiers.contains(&(diagnostic.module.clone(), diagnostic.name.clone()))))
+    });
 }
 
 /// Builds the canonical composed model for one already-resolved file-route
@@ -1918,8 +1999,9 @@ pub fn build_file_route_application_semantic_model_for_route_with_packages_and_v
 ) -> Result<ApplicationSemanticModel, FileRouteApplicationModelErrorV1> {
     let symbols = crate::build_symbol_table(unit);
     let modules = crate::build_module_graph(unit);
-    let bindings =
+    let mut bindings =
         crate::binding_table::build_binding_table_with_packages(unit, &symbols, &modules, packages);
+    retain_standard_schema_runtime_bindings(&mut bindings, unit, &modules, v2_authoring);
     build_application_semantic_model_from_files_with_bindings_mode_and_v2(
         unit.files(),
         Some(&bindings),

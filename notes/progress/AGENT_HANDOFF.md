@@ -59,28 +59,35 @@ Decorator-free file controls now have an authority-backed platform-value path:
 - file value/tracking/validation slots are excluded from resume, while other
   fields resume and the Form deterministically revalidates after rebinding.
 
-Forms runtime artifact schema v4 now publishes typed validation arguments.
+Forms runtime artifact schema v5 now publishes typed validation arguments.
 Required, min/max, length, pattern, email, and compiler-bound cross-Field rules
 fail closed and execute in the browser. The acceptance fixture also proves IME
 composition suppression and Form input after snapshot resume.
 
-Standard Schema compile-time authority is now explicit:
+Standard Schema authority and execution are now explicit:
 
 - TypeScript semantic-authority schema v3 proves Standard Schema v1 protocol
   shape and V2 authoring schema v9 joins named imports to exact
   module/export/declaration identity;
 - canonical authored semantics schema v5 carries that evidence without
   executing or serializing validator source;
-- the V2 Form graph retains the coordinate on its validation candidate; and
-- missing runtime bundling emits `PSC1087` instead of silently dropping the
-  validator.
+- the V2 Form graph retains the coordinate on its validation candidate;
+- ergonomic builds use the project's direct Vite dependency to bundle exact
+  named exports into the publication inventory;
+- Forms artifact schema v5 names the module and exact validator IDs; and
+- cold/resume browser proof covers Promise scheduling, stale-result
+  suppression, non-coercion, issue normalization, validation-aware submit, and
+  post-resume interactivity.
+
+The same proof corrected two hidden ownership gaps: Vite now preserves the
+registry entry export, and canonical Form `bind:*` channels are excluded from
+ordinary component-state binding registration.
 
 ## Next slice
 
-Bundle and execute the authority-proven Standard Schema export with async
-generation control and cold/resume browser evidence, then broaden native inline
-submit/action execution to admitted imported capability calls with abort
-signals.
+Broaden native inline submit/action execution to admitted imported capability
+calls with abort signals, then close the remaining server-validation/executor
+boundary and release-hardening gates.
 
 ## Verification
 
@@ -92,4 +99,4 @@ signals.
 - `pnpm exec tsc -p tests/framework-public-api/tsconfig.json`
 - `cargo test -p presolve-cli --test runtime_browser decorator_free_v2_form_fields_bind_and_validate_in_a_real_browser -- --nocapture`
 
-Beta readiness estimate after the Standard Schema authority gate: 93%.
+Beta readiness estimate after the executable Standard Schema gate: 95%.

@@ -291,6 +291,7 @@ mod tests {
             &RuntimeFormsArtifact {
                 schema_version: 1,
                 registry_version: 1,
+                standard_schema_module: None,
                 forms: Vec::new(),
                 instances: Vec::new(),
                 hosts: Vec::new(),

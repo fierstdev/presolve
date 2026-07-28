@@ -12,19 +12,27 @@ use crate::{
     ValidationRuleArgument, RUNTIME_FORM_REGISTRY_VERSION,
 };
 
-/// Version 4 replaces validation debug strings with a closed executable
-/// argument vocabulary.
-pub const RUNTIME_FORM_ARTIFACT_SCHEMA_VERSION: u32 = 4;
+/// Version 5 adds the integrity-published Standard Schema runtime module and
+/// validator registry.
+pub const RUNTIME_FORM_ARTIFACT_SCHEMA_VERSION: u32 = 5;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RuntimeFormsArtifact {
     pub schema_version: u32,
     pub registry_version: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub standard_schema_module: Option<RuntimeFormsArtifactStandardSchemaModule>,
     pub forms: Vec<RuntimeFormsArtifactForm>,
     pub instances: Vec<RuntimeFormsArtifactInstance>,
     /// Instance-qualified executable submit-host records. These are the only
     /// runtime authority for locating and handling a native submit event.
     pub hosts: Vec<RuntimeFormsArtifactHost>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RuntimeFormsArtifactStandardSchemaModule {
+    pub path: String,
+    pub validators: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -79,6 +87,7 @@ pub enum RuntimeFormsArtifactRuleArgument {
     Length { value: u64 },
     Pattern { value: String },
     Field { field: String },
+    StandardSchema { validator: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -280,7 +289,19 @@ pub fn build_runtime_forms_artifact(model: &ApplicationSemanticModel) -> Runtime
                 },
             }
         })
-        .collect();
+        .collect::<Vec<_>>();
+    let standard_schema_validators = forms
+        .iter()
+        .flat_map(|form| &form.validation_rules)
+        .filter_map(|rule| match &rule.argument {
+            RuntimeFormsArtifactRuleArgument::StandardSchema { validator } => {
+                Some(validator.clone())
+            }
+            _ => None,
+        })
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
     let instances = model
         .optimized_form_ir
         .optimized
@@ -351,6 +372,12 @@ pub fn build_runtime_forms_artifact(model: &ApplicationSemanticModel) -> Runtime
     let artifact = RuntimeFormsArtifact {
         schema_version: RUNTIME_FORM_ARTIFACT_SCHEMA_VERSION,
         registry_version: RUNTIME_FORM_REGISTRY_VERSION,
+        standard_schema_module: (!standard_schema_validators.is_empty()).then_some(
+            RuntimeFormsArtifactStandardSchemaModule {
+                path: "/presolve.validators.js".into(),
+                validators: standard_schema_validators,
+            },
+        ),
         forms,
         instances,
         hosts,
@@ -416,6 +443,30 @@ pub fn validate_runtime_forms_artifact(
         .collect::<BTreeSet<_>>();
     if instances.len() != artifact.instances.len() {
         diagnostics.push("duplicate Form instance".to_string());
+    }
+    let expected_standard_schema_validators = artifact
+        .forms
+        .iter()
+        .flat_map(|form| &form.validation_rules)
+        .filter_map(|rule| match &rule.argument {
+            RuntimeFormsArtifactRuleArgument::StandardSchema { validator } => {
+                Some(validator.as_str())
+            }
+            _ => None,
+        })
+        .collect::<BTreeSet<_>>();
+    match &artifact.standard_schema_module {
+        Some(module)
+            if module.path == "/presolve.validators.js"
+                && module.validators.len() == expected_standard_schema_validators.len()
+                && module
+                    .validators
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<BTreeSet<_>>()
+                    == expected_standard_schema_validators => {}
+        None if expected_standard_schema_validators.is_empty() => {}
+        _ => diagnostics.push("invalid Standard Schema runtime module".to_string()),
     }
     for instance in &artifact.instances {
         if !forms.contains(instance.form.as_str()) {
@@ -490,6 +541,11 @@ fn runtime_rule_argument(argument: &ValidationRuleArgument) -> RuntimeFormsArtif
         ValidationRuleArgument::Field(field) => RuntimeFormsArtifactRuleArgument::Field {
             field: field.to_string(),
         },
+        ValidationRuleArgument::StandardSchema { validator } => {
+            RuntimeFormsArtifactRuleArgument::StandardSchema {
+                validator: validator.clone(),
+            }
+        }
     }
 }
 
@@ -507,6 +563,9 @@ fn runtime_rule_argument_matches(rule: &RuntimeFormsArtifactRule) -> bool {
         }
         ("Equals" | "NotEquals", RuntimeFormsArtifactRuleArgument::Field { field }) => {
             rule.dependency.as_ref() == Some(field)
+        }
+        ("StandardSchema", RuntimeFormsArtifactRuleArgument::StandardSchema { validator }) => {
+            rule.dependency.is_none() && !validator.is_empty()
         }
         _ => false,
     }
@@ -564,14 +623,14 @@ fn field_programs(
 #[cfg(test)]
 mod tests {
     #[test]
-    fn emits_schema_v4_with_typed_validation_arguments_and_canonical_references() {
+    fn emits_schema_v5_with_typed_validation_arguments_and_canonical_references() {
         let parsed = presolve_parser::parse_file(
             "src/X.tsx",
             r#"@component("x")class X{@form()form!:Form;@validate(minLength(2))@field(this.form)value="";render(){return <input field={this.value}/>;}}"#,
         );
         let asm = crate::build_application_semantic_model(&parsed);
         let artifact = super::build_runtime_forms_artifact(&asm);
-        assert_eq!(artifact.schema_version, 4);
+        assert_eq!(artifact.schema_version, 5);
         assert_eq!(artifact.registry_version, 1);
         assert_eq!(artifact.forms.len(), 1);
         assert_eq!(artifact.instances.len(), 1);
@@ -582,10 +641,32 @@ mod tests {
         assert!(super::validate_runtime_forms_artifact(&artifact).is_valid);
         assert!(super::runtime_forms_artifact_json(&artifact).contains("field-binding"));
 
+        let mut standard_schema = artifact.clone();
+        let validator = "module:src/X.tsx/validation-rule-candidate:42".to_string();
+        standard_schema.forms[0].validation_rules[0].kind = "StandardSchema".to_string();
+        standard_schema.forms[0].validation_rules[0].argument =
+            super::RuntimeFormsArtifactRuleArgument::StandardSchema {
+                validator: validator.clone(),
+            };
+        standard_schema.standard_schema_module =
+            Some(super::RuntimeFormsArtifactStandardSchemaModule {
+                path: "/presolve.validators.js".to_string(),
+                validators: vec![validator],
+            });
+        assert!(super::validate_runtime_forms_artifact(&standard_schema).is_valid);
+
         let mut malformed = artifact;
         malformed.forms[0].validation_rules[0].argument =
             super::RuntimeFormsArtifactRuleArgument::None;
         assert!(!super::validate_runtime_forms_artifact(&malformed).is_valid);
+
+        let mut malformed_module = standard_schema;
+        malformed_module
+            .standard_schema_module
+            .as_mut()
+            .expect("Standard Schema module")
+            .path = "/other.js".to_string();
+        assert!(!super::validate_runtime_forms_artifact(&malformed_module).is_valid);
     }
 
     #[test]

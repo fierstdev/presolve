@@ -175,6 +175,11 @@ fn run_ergonomic_build(
         .unwrap_or_else(|message| {
             application_cli_error("PSAUTH1001_V2_AUTHORITY_FAILED", &message)
         });
+    let V2AuthoringProjectProductsV1 {
+        models,
+        environment_artifact,
+        standard_schema_validators,
+    } = v2_products;
     let output_root = project.root.join("dist");
     validate_application_output_root(&output_root);
     let discovery_unit = CompilationUnit::parse_sources(
@@ -199,8 +204,8 @@ fn run_ergonomic_build(
         package_runtime_modules,
         profile,
         output_root: output_root.clone(),
-        environment_artifact: v2_products.environment_artifact,
-        v2_authoring: v2_products.models,
+        environment_artifact,
+        v2_authoring: models,
     };
     let mut product = build_file_route_publication_v1(request)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
@@ -211,6 +216,10 @@ fn run_ergonomic_build(
     attach_static_publication_inputs(&project.root, &mut product).unwrap_or_else(|message| {
         application_cli_error("PSROUTE3008_PUBLICATION_FAILED", &message)
     });
+    attach_standard_schema_runtime_module(&project.root, &standard_schema_validators, &mut product)
+        .unwrap_or_else(|message| {
+            application_cli_error("PSFORM1001_STANDARD_SCHEMA_BUNDLE_FAILED", &message)
+        });
     publish_file_route_product(&output_root, &product)
         .unwrap_or_else(|error| application_cli_error("PSROUTE3008_PUBLICATION_FAILED", &error));
     println!("Built {}", output_root.display());
@@ -322,6 +331,15 @@ fn update_publication_artifact_digest(
 struct V2AuthoringProjectProductsV1 {
     models: BTreeMap<PathBuf, presolve_compiler::CanonicalAuthoredSemanticModelV1>,
     environment_artifact: Option<presolve_compiler::EnvironmentPublicationArtifactV1>,
+    standard_schema_validators: Vec<StandardSchemaRuntimeValidatorV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct StandardSchemaRuntimeValidatorV1 {
+    id: String,
+    owner_source: PathBuf,
+    module_specifier: String,
+    export_name: String,
 }
 
 fn validate_v2_authoring_project(
@@ -362,6 +380,7 @@ fn validate_v2_authoring_project(
         return Ok(V2AuthoringProjectProductsV1 {
             models: BTreeMap::new(),
             environment_artifact: None,
+            standard_schema_validators: Vec::new(),
         });
     }
     if !config_file.is_file() {
@@ -378,6 +397,7 @@ fn validate_v2_authoring_project(
     }
     let mut models = BTreeMap::new();
     let mut environment_reads = Vec::new();
+    let mut standard_schema_validators = Vec::new();
     for parsed in candidates {
         let component_request =
             build_v2_authority_component_request_v1(parsed, PathBuf::from("tsconfig.json"))
@@ -414,6 +434,28 @@ fn validate_v2_authoring_project(
             .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
         let lowering = lower_v2_authoring_v1(parsed, resolutions)
             .map_err(|error| format!("{}: {error}", parsed.path.display()))?;
+        standard_schema_validators.extend(lowering.model.declarations.iter().filter_map(
+            |declaration| {
+                let presolve_compiler::DerivedAuthoredEvidenceV2::StandardSchemaValidation {
+                    module_specifier,
+                    export_name,
+                    ..
+                } = declaration.derived_evidence.as_ref()?
+                else {
+                    return None;
+                };
+                Some(StandardSchemaRuntimeValidatorV1 {
+                    id: presolve_compiler::ValidationRuleCandidateId::for_source_position(
+                        &lowering.model.source_path,
+                        declaration.source.start,
+                    )
+                    .to_string(),
+                    owner_source: lowering.model.source_path.clone(),
+                    module_specifier: module_specifier.clone(),
+                    export_name: export_name.clone(),
+                })
+            },
+        ));
         models.insert(parsed.path.clone(), lowering.model);
     }
     for (parsed, request) in plain_environment_requests {
@@ -443,6 +485,11 @@ fn validate_v2_authoring_project(
     Ok(V2AuthoringProjectProductsV1 {
         models,
         environment_artifact,
+        standard_schema_validators: {
+            standard_schema_validators.sort();
+            standard_schema_validators.dedup();
+            standard_schema_validators
+        },
     })
 }
 
@@ -637,6 +684,181 @@ fn attach_static_publication_inputs(
         presolve_compiler::file_route_publication_manifest_json_v1(&product.manifest).into_bytes(),
     );
     Ok(())
+}
+
+fn attach_standard_schema_runtime_module(
+    project_root: &Path,
+    validators: &[StandardSchemaRuntimeValidatorV1],
+    product: &mut presolve_compiler::FileRoutePublicationProductV1,
+) -> Result<(), String> {
+    if validators.is_empty() {
+        return Ok(());
+    }
+    let mut by_id = BTreeMap::new();
+    for validator in validators {
+        if let Some(existing) = by_id.insert(validator.id.as_str(), validator) {
+            if existing != validator {
+                return Err(format!(
+                    "Standard Schema validator id {} resolved to multiple exports",
+                    validator.id
+                ));
+            }
+        }
+    }
+    let mut modules = BTreeMap::<String, String>::new();
+    let mut records = Vec::new();
+    for validator in by_id.values() {
+        let specifier = standard_schema_bundle_specifier(validator)?;
+        let next_alias = format!("__presolve_schema_module_{}", modules.len());
+        let alias = modules.entry(specifier).or_insert(next_alias).clone();
+        records.push((validator.id.as_str(), alias, validator.export_name.as_str()));
+    }
+
+    let mut entry = String::new();
+    for (specifier, alias) in &modules {
+        entry.push_str(&format!(
+            "import * as {alias} from {};\n",
+            serde_json::to_string(specifier)
+                .map_err(|error| format!("failed to encode validator module: {error}"))?
+        ));
+    }
+    entry.push_str("const registry = Object.create(null);\n");
+    for (id, alias, export_name) in records {
+        entry.push_str(&format!(
+            "registry[{}] = {alias}[{}];\n",
+            serde_json::to_string(id)
+                .map_err(|error| format!("failed to encode validator id: {error}"))?,
+            serde_json::to_string(export_name)
+                .map_err(|error| format!("failed to encode validator export: {error}"))?,
+        ));
+    }
+    entry.push_str("export const presolveStandardSchemaValidators = Object.freeze(registry);\n");
+
+    let work_root = project_root.join(".presolve");
+    fs::create_dir_all(&work_root)
+        .map_err(|error| format!("failed to create {}: {error}", work_root.display()))?;
+    let entry_path = work_root.join("presolve-standard-schema-entry.mjs");
+    let runner_path = work_root.join("presolve-standard-schema-build.mjs");
+    fs::write(&entry_path, entry)
+        .map_err(|error| format!("failed to write {}: {error}", entry_path.display()))?;
+    fs::write(
+        &runner_path,
+        r#"import { build } from "vite";
+await build({
+  root: process.cwd(),
+  configFile: false,
+  logLevel: "error",
+  build: {
+    outDir: ".presolve/standard-schema-output",
+    emptyOutDir: true,
+    sourcemap: false,
+    assetsInlineLimit: Number.MAX_SAFE_INTEGER,
+    rollupOptions: {
+      input: ".presolve/presolve-standard-schema-entry.mjs",
+      preserveEntrySignatures: "strict",
+      output: {
+        format: "es",
+        entryFileNames: "presolve.validators.js",
+        chunkFileNames: "presolve.validators.[hash].js",
+        assetFileNames: "presolve.validators.[hash][extname]",
+        inlineDynamicImports: true
+      }
+    }
+  }
+});
+"#,
+    )
+    .map_err(|error| format!("failed to write {}: {error}", runner_path.display()))?;
+    let output = Command::new("node")
+        .arg(&runner_path)
+        .current_dir(project_root)
+        .output()
+        .map_err(|error| format!("failed to start the Standard Schema Vite build: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "Vite exited with {}: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    let output_root = work_root.join("standard-schema-output");
+    let mut bundled = Vec::new();
+    collect_static_publication_input(&output_root, Path::new(""), &mut bundled)?;
+    if !bundled
+        .iter()
+        .any(|(path, _)| path == Path::new("presolve.validators.js"))
+    {
+        return Err("Vite did not emit presolve.validators.js".into());
+    }
+    for (path, bytes) in bundled {
+        if product.artifacts.contains_key(&path) {
+            return Err(format!(
+                "Standard Schema bundle {} collides with a published artifact",
+                path.display()
+            ));
+        }
+        product
+            .manifest
+            .artifacts
+            .push(presolve_compiler::ApplicationPublicationArtifactV1 {
+                path: path.to_string_lossy().into_owned(),
+                digest: format!("sha256:{:x}", Sha256::digest(&bytes)),
+            });
+        product.artifacts.insert(path, bytes);
+    }
+    product
+        .manifest
+        .artifacts
+        .sort_by(|left, right| left.path.cmp(&right.path));
+    product.artifacts.insert(
+        PathBuf::from("file-routes.manifest.json"),
+        presolve_compiler::file_route_publication_manifest_json_v1(&product.manifest).into_bytes(),
+    );
+    Ok(())
+}
+
+fn standard_schema_bundle_specifier(
+    validator: &StandardSchemaRuntimeValidatorV1,
+) -> Result<String, String> {
+    if !validator.module_specifier.starts_with('.') {
+        if validator.module_specifier.starts_with('/') {
+            return Err(format!(
+                "Standard Schema module {} must be relative or a package specifier",
+                validator.module_specifier
+            ));
+        }
+        return Ok(validator.module_specifier.clone());
+    }
+    let mut normalized = PathBuf::new();
+    let joined = validator
+        .owner_source
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .join(&validator.module_specifier);
+    for component in joined.components() {
+        match component {
+            std::path::Component::Normal(value) => normalized.push(value),
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                if !normalized.pop() {
+                    return Err(format!(
+                        "Standard Schema module {} escapes the project",
+                        validator.module_specifier
+                    ));
+                }
+            }
+            std::path::Component::RootDir | std::path::Component::Prefix(_) => {
+                return Err(format!(
+                    "Standard Schema module {} must stay inside the project",
+                    validator.module_specifier
+                ))
+            }
+        }
+    }
+    Ok(format!(
+        "../{}",
+        normalized.to_string_lossy().replace('\\', "/")
+    ))
 }
 
 fn collect_static_publication_input(

@@ -22,7 +22,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = __EZ_COMPONENT_SCHEMA_VERSION__;
   const LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2;
-  const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 4;
+  const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 5;
   const SUPPORTED_RESOURCES_ARTIFACT_SCHEMA_VERSION = 3;
   const SUPPORTED_OPAQUE_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_RESUME_MANIFEST_SCHEMA_VERSION = 7;
@@ -70,6 +70,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     result: null,
     debug: []
   };
+  let standardSchemaValidators = new Map();
 
   function exactObjectKeys(value, expected) {
     if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
@@ -865,6 +866,23 @@ const RUNTIME_STUB: &str = r#"(() => {
         ruleIds.add(rule.id);
       }
     }
+    const standardSchemaValidators = [...new Set(formsArtifact.forms
+      .flatMap((form) => form.validation_rules ?? [])
+      .filter((rule) => rule.kind === "StandardSchema")
+      .map((rule) => rule.argument.validator))].sort();
+    const standardSchemaModule = formsArtifact.standard_schema_module;
+    if (standardSchemaValidators.length === 0) {
+      if (standardSchemaModule !== undefined) {
+        reportDiagnostic(diagnostics, "PSR_INVALID_FORMS_ARTIFACT", "Unused Standard Schema runtime module was published", {}, true);
+        throw new PresolveBootError("PSR_INVALID_FORMS_ARTIFACT");
+      }
+    } else if (!exactObjectKeys(standardSchemaModule, ["path", "validators"])
+      || standardSchemaModule.path !== "/presolve.validators.js"
+      || !Array.isArray(standardSchemaModule.validators)
+      || JSON.stringify([...standardSchemaModule.validators].sort()) !== JSON.stringify(standardSchemaValidators)) {
+      reportDiagnostic(diagnostics, "PSR_INVALID_FORMS_ARTIFACT", "Standard Schema runtime module did not match validation rules", {}, true);
+      throw new PresolveBootError("PSR_INVALID_FORMS_ARTIFACT");
+    }
     const hasForms = formsArtifact.forms.length > 0 || formsArtifact.instances.length > 0;
     if (hasForms && manifest.schema_version < 3) {
       reportDiagnostic(diagnostics, "PSR_FORMS_MANIFEST_MISMATCH", "Forms runtime metadata requires a schema-v3 template manifest", { schema_version: manifest.schema_version }, true);
@@ -916,7 +934,47 @@ const RUNTIME_STUB: &str = r#"(() => {
         && typeof argument.field === "string" && fieldIds.has(argument.field)
         && rule.dependency === argument.field;
     }
+    if (rule.kind === "StandardSchema") {
+      return exactObjectKeys(argument, ["kind", "validator"])
+        && argument.kind === "standard_schema"
+        && typeof argument.validator === "string" && argument.validator.length > 0
+        && rule.dependency === undefined;
+    }
     return false;
+  }
+
+  async function loadStandardSchemaValidators(formsArtifact, diagnostics) {
+    const runtimeModule = formsArtifact?.standard_schema_module;
+    if (runtimeModule === undefined) return new Map();
+    let imported;
+    try {
+      imported = await import(runtimeModule.path);
+    } catch (error) {
+      reportDiagnostic(diagnostics, "PSR_STANDARD_SCHEMA_MODULE_FAILED", "The compiler-published Standard Schema module could not be loaded", {
+        path: runtimeModule.path,
+        message: error instanceof Error ? error.message : String(error)
+      }, true);
+      throw new PresolveBootError("PSR_STANDARD_SCHEMA_MODULE_FAILED");
+    }
+    const registry = imported?.presolveStandardSchemaValidators;
+    const expected = [...runtimeModule.validators].sort();
+    if (registry === null || typeof registry !== "object" || Array.isArray(registry)
+      || !expected.every((id) => Object.prototype.hasOwnProperty.call(registry, id))) {
+      reportDiagnostic(diagnostics, "PSR_STANDARD_SCHEMA_MODULE_MISMATCH", "The Standard Schema module did not expose the compiler-issued validator registry", {}, true);
+      throw new PresolveBootError("PSR_STANDARD_SCHEMA_MODULE_MISMATCH");
+    }
+    const validators = new Map();
+    for (const id of expected) {
+      const schema = registry[id];
+      const protocol = schema?.["~standard"];
+      if (protocol?.version !== 1 || typeof protocol.vendor !== "string"
+        || typeof protocol.validate !== "function") {
+        reportDiagnostic(diagnostics, "PSR_STANDARD_SCHEMA_MODULE_MISMATCH", "A bundled validator did not implement Standard Schema v1", { validator: id }, true);
+        throw new PresolveBootError("PSR_STANDARD_SCHEMA_MODULE_MISMATCH");
+      }
+      validators.set(id, schema);
+    }
+    return validators;
   }
 
   function readComputedArtifact(diagnostics) {
@@ -4512,11 +4570,20 @@ const RUNTIME_STUB: &str = r#"(() => {
     // ordinary boot would require anchors that the selected branch/list item
     // has not attached yet; structuralHostProjectionRecords owns that staging.
     const structuralSlotTargets = structuralSlotProjectionTargetIds(componentArtifact);
+    // Canonical Form bindings deliberately remain in the template/component
+    // membership artifacts, but the Forms runtime owns their value channels.
+    // Registering the same bind:* expression as ordinary component state would
+    // create a second authority path and reject valid `Field` member chains.
+    const formBindingTargets = new Set(
+      (manifest.form_bindings ?? []).map((binding) => binding.instance_target_id)
+    );
     const targets = (manifest.ordinary_targets ?? []).filter((target) =>
       activeInstances.has(target.component_instance_id) && !structuralSlotTargets.has(target.id)
     );
     const bindings = (manifest.ordinary_bindings ?? []).filter((binding) =>
-      activeInstances.has(binding.component_instance_id) && !structuralSlotTargets.has(binding.instance_target_id)
+      activeInstances.has(binding.component_instance_id)
+      && !structuralSlotTargets.has(binding.instance_target_id)
+      && !formBindingTargets.has(binding.instance_target_id)
     );
     const events = (manifest.ordinary_events ?? []).filter((event) =>
       activeInstances.has(event.component_instance_id) && !structuralSlotTargets.has(event.instance_target_id)
@@ -4655,7 +4722,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
   // Forms are initialized exclusively from the compiler artifact and manifest
   // bridge. The DOM contributes only the user event value for a known anchor.
-  function initializeFormsRuntime(store, formsArtifact, manifest, elementsByNode, diagnostics) {
+  async function initializeFormsRuntime(store, formsArtifact, manifest, elementsByNode, diagnostics) {
     store.forms = new Map();
     store.formInstances = new Map();
     store.formBindingsByAnchor = new Map();
@@ -4676,7 +4743,10 @@ const RUNTIME_STUB: &str = r#"(() => {
         initial: field.initial_value,
         dirty: false,
         touched: false,
-        validation: []
+        validation: [],
+        validation_issues: [],
+        validation_pending: false,
+        validation_generation: 0
       }]));
       store.forms.set(definition.id, definition);
       store.formInstances.set(instance.id, {
@@ -4684,7 +4754,8 @@ const RUNTIME_STUB: &str = r#"(() => {
         instance,
         fields,
         aggregate_valid: true,
-        submission: "Idle"
+        submission: "Idle",
+        diagnostics
       });
     }
 
@@ -4726,6 +4797,15 @@ const RUNTIME_STUB: &str = r#"(() => {
       element.addEventListener(host.event, (event) => dispatchFormSubmit(store, event, anchor));
     }
 
+    const initialValidations = [];
+    for (const formInstance of store.formInstances.values()) {
+      if ((formInstance.definition.validation_rules ?? []).some((rule) => rule.kind === "StandardSchema")) {
+        for (const fieldId of formInstance.fields.keys()) {
+          initialValidations.push(validateFormField(formInstance, fieldId));
+        }
+      }
+    }
+    await Promise.all(initialValidations);
     installFormControlListeners(store);
     window.__PRESOLVE_FORMS__ = {
       resetForm: (instanceId) => resetForm(store, instanceId),
@@ -4745,11 +4825,13 @@ const RUNTIME_STUB: &str = r#"(() => {
     });
   }
 
-  function dispatchFormSubmit(store, event, anchor) {
+  async function dispatchFormSubmit(store, event, anchor) {
     const record = store.formHostsByAnchor.get(anchor);
     if (record === undefined || event.type !== record.host.event) return;
     if (record.host.prevent_default === true) event.preventDefault();
-    for (const fieldId of record.formInstance.fields.keys()) validateFormField(record.formInstance, fieldId);
+    record.formInstance.submission = "Submitting";
+    await Promise.all([...record.formInstance.fields.keys()]
+      .map((fieldId) => validateFormField(record.formInstance, fieldId)));
     if (!record.formInstance.aggregate_valid) { record.formInstance.submission = "Invalid"; return; }
     const action = store.actionsByMethod.get(record.host.submit_action);
     const component = store.components.get(record.bridge.component_instance_id) ?? action?.component;
@@ -4758,7 +4840,6 @@ const RUNTIME_STUB: &str = r#"(() => {
       record.formInstance.submission = "Failed";
       return;
     }
-    record.formInstance.submission = "Submitting";
     // Serialization is deliberately compiler-record driven: field values and
     // path shape come from the compiler artifact, never DOM scanning.
     record.formInstance.serialized = serializeFormInstance(record.formInstance);
@@ -4846,19 +4927,119 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (state === undefined) return;
     state.value = value;
     state.dirty = JSON.stringify(value) !== JSON.stringify(state.initial);
-    validateFormField(formInstance, fieldId);
+    void validateFormField(formInstance, fieldId);
     for (const dependency of formInstance.definition.validation_dependencies ?? []) {
-      if (dependency.source_field === fieldId) validateFormField(formInstance, dependency.target_field);
+      if (dependency.source_field === fieldId) {
+        void validateFormField(formInstance, dependency.target_field);
+      }
     }
     for (const record of store.formBindingsByField.get(`${formInstance.instance.id}|${fieldId}`) ?? []) writeFormControl(record, value);
   }
 
   function validateFormField(formInstance, fieldId) {
     const state = formInstance.fields.get(fieldId);
-    if (state === undefined) return;
+    if (state === undefined) return Promise.resolve(false);
+    const generation = state.validation_generation + 1;
+    state.validation_generation = generation;
     const rules = (formInstance.definition.validation_rules ?? []).filter((rule) => rule.target_field === fieldId);
-    state.validation = rules.filter((rule) => !validateFormRule(formInstance, state.value, rule)).map((rule) => rule.id);
-    formInstance.aggregate_valid = [...formInstance.fields.values()].every((field) => field.validation.length === 0);
+    const failures = [];
+    const pending = [];
+    for (const rule of rules) {
+      if (rule.kind !== "StandardSchema") {
+        if (!validateFormRule(formInstance, state.value, rule)) {
+          failures.push({
+            rule: rule.id,
+            issues: [{ message: "Built-in validation failed", path: [] }]
+          });
+        }
+        continue;
+      }
+      const schema = standardSchemaValidators.get(rule.argument.validator);
+      if (schema === undefined) {
+        failures.push({
+          rule: rule.id,
+          issues: [{ message: "Standard Schema validator was unavailable", path: [] }]
+        });
+        continue;
+      }
+      try {
+        const result = schema["~standard"].validate(state.value);
+        if (result !== null && typeof result === "object" && typeof result.then === "function") {
+          pending.push(Promise.resolve(result)
+            .then((value) => ({ rule: rule.id, outcome: normalizeStandardSchemaResult(value) }))
+            .catch((error) => ({
+              rule: rule.id,
+              outcome: {
+                valid: false,
+                issues: [{
+                  message: error instanceof Error ? error.message : String(error),
+                  path: []
+                }]
+              }
+            })));
+        } else {
+          const outcome = normalizeStandardSchemaResult(result);
+          if (!outcome.valid) failures.push({ rule: rule.id, issues: outcome.issues });
+        }
+      } catch (error) {
+        failures.push({
+          rule: rule.id,
+          issues: [{
+            message: error instanceof Error ? error.message : String(error),
+            path: []
+          }]
+        });
+      }
+    }
+    applyFormValidationState(formInstance, state, failures, pending.length > 0);
+    if (pending.length === 0) return Promise.resolve(true);
+    return Promise.all(pending).then((outcomes) => {
+      if (state.validation_generation !== generation) return false;
+      for (const { rule, outcome } of outcomes) {
+        if (!outcome.valid) failures.push({ rule, issues: outcome.issues });
+      }
+      applyFormValidationState(formInstance, state, failures, false);
+      return true;
+    });
+  }
+
+  function normalizeStandardSchemaResult(result) {
+    if (result === null || typeof result !== "object" || Array.isArray(result)) {
+      return { valid: false, issues: [{ message: "Validator returned a malformed result", path: [] }] };
+    }
+    if (Array.isArray(result.issues)) {
+      if (result.issues.length === 0 || !result.issues.every((issue) =>
+        issue !== null && typeof issue === "object" && typeof issue.message === "string")) {
+        return { valid: false, issues: [{ message: "Validator returned malformed issues", path: [] }] };
+      }
+      return {
+        valid: false,
+        issues: result.issues.map((issue) => ({
+          message: issue.message,
+          path: Array.isArray(issue.path)
+            ? issue.path.map((segment) => {
+                const key = segment !== null && typeof segment === "object" ? segment.key : segment;
+                return typeof key === "string" || typeof key === "number" ? key : String(key);
+              })
+            : []
+        }))
+      };
+    }
+    if (Object.prototype.hasOwnProperty.call(result, "value")) {
+      return { valid: true, issues: [] };
+    }
+    return { valid: false, issues: [{ message: "Validator returned a malformed result", path: [] }] };
+  }
+
+  function applyFormValidationState(formInstance, state, failures, pending) {
+    state.validation = failures.map((failure) => failure.rule);
+    state.validation_issues = failures.flatMap((failure) =>
+      failure.issues.map((issue) => ({ rule: failure.rule, ...issue }))
+    );
+    state.validation_pending = pending;
+    formInstance.aggregate_valid = [...formInstance.fields.values()].every((field) =>
+      field.validation.length === 0 && field.validation_pending !== true
+    );
   }
 
   function validateFormRule(formInstance, value, rule) {
@@ -4880,9 +5061,11 @@ const RUNTIME_STUB: &str = r#"(() => {
     const formInstance = store.formInstances?.get(instanceId);
     const state = formInstance?.fields.get(fieldId);
     if (state === undefined) return false;
-    state.value = state.initial; state.dirty = false; state.touched = false; state.validation = [];
+    state.validation_generation += 1;
+    state.value = state.initial; state.dirty = false; state.touched = false;
+    state.validation = []; state.validation_issues = []; state.validation_pending = false;
     for (const record of store.formBindingsByField.get(`${instanceId}|${fieldId}`) ?? []) writeFormControl(record, state.value, true);
-    formInstance.aggregate_valid = true;
+    void validateFormField(formInstance, fieldId);
     return true;
   }
 
@@ -5525,7 +5708,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
-  function restoreResumeForms(templateManifest, snapshot, registry, store, formsArtifact) {
+  async function restoreResumeForms(templateManifest, snapshot, registry, store, formsArtifact) {
     const restoreRecords = [...registry.definitions.restorePrograms.values()]
       .flatMap((program) => program.instructions ?? [])
       .filter((record) => ["R11", "R12", "R13", "R14", "R15"].includes(record.phase));
@@ -5556,10 +5739,20 @@ const RUNTIME_STUB: &str = r#"(() => {
         initial: field.initial_value,
         dirty: false,
         touched: false,
-        validation: []
+        validation: [],
+        validation_issues: [],
+        validation_pending: false,
+        validation_generation: 0
       }]));
       if (fields.size !== (definition.fields ?? []).length) throw new ResumeBootError("DuplicateIdentity");
-      const runtime = { definition, instance, fields, aggregate_valid: true, submission: "Idle" };
+      const runtime = {
+        definition,
+        instance,
+        fields,
+        aggregate_valid: true,
+        submission: "Idle",
+        diagnostics: store.diagnostics
+      };
       store.forms.set(definition.id, definition);
       store.formInstances.set(instance.id, runtime);
       registry.form_records.set(instance.id, runtime);
@@ -5650,11 +5843,16 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (store.formHostsByAnchor.size !== (templateManifest.form_hosts ?? []).length) {
       throw new ResumeBootError("ResumeArtifactMismatch");
     }
+    const resumedValidations = [];
     for (const formInstance of store.formInstances.values()) {
-      if ((formInstance.definition.fields ?? []).some((field) => field.semantic_type === "File[]")) {
-        for (const fieldId of formInstance.fields.keys()) validateFormField(formInstance, fieldId);
+      if ((formInstance.definition.fields ?? []).some((field) => field.semantic_type === "File[]")
+        || (formInstance.definition.validation_rules ?? []).some((rule) => rule.kind === "StandardSchema")) {
+        for (const fieldId of formInstance.fields.keys()) {
+          resumedValidations.push(validateFormField(formInstance, fieldId));
+        }
       }
     }
+    await Promise.all(resumedValidations);
     installFormControlListeners(store);
     window.__PRESOLVE_FORMS__ = {
       resetForm: (instanceId) => resetForm(store, instanceId),
@@ -5779,7 +5977,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       computedArtifact,
       componentArtifact
     );
-    restoreResumeForms(templateManifest, snapshot, registry, store, formsArtifact);
+    await restoreResumeForms(templateManifest, snapshot, registry, store, formsArtifact);
     installResumeDomBindings(store, templateManifest, componentArtifact);
     await initializeResourcesRuntime(store, resourcesArtifact, diagnostics, "reload");
     establishResumeEffects(registry, store, effectArtifact);
@@ -6063,7 +6261,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
     executeInitialContext(store);
 
-    initializeFormsRuntime(store, formsArtifact, manifest, elementsByNode, diagnostics);
+    await initializeFormsRuntime(store, formsArtifact, manifest, elementsByNode, diagnostics);
 
     await resourceInitialization;
 
@@ -6132,6 +6330,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       validateManifestSchema(manifest, effectArtifact, componentArtifact, opaqueArtifact, diagnostics);
       const formsArtifact = readFormsArtifact(diagnostics);
       validateFormsArtifact(formsArtifact, manifest, diagnostics);
+      standardSchemaValidators = await loadStandardSchemaValidators(formsArtifact, diagnostics);
       const resourcesArtifact = readResourcesArtifact(diagnostics);
       validateResourcesArtifact(resourcesArtifact, diagnostics);
 

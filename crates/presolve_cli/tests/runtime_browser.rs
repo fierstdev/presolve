@@ -1115,13 +1115,14 @@ fn decorator_free_v2_form_fields_bind_and_validate_in_a_real_browser() {
     fs::write(
         project_root.join("app/routes/index.tsx"),
         r#"import { Component, defineForm, email, field, max, maxLength, min, minLength, pattern, required, state } from "presolve";
+import { displayNameSchema } from "./schemas.js";
 
 export class Contact extends Component {
   submitted = state(0);
   contact = defineForm({
     serialization: "form-data",
     fields: {
-      name: field({ initial: "", validate: [required()] }),
+      name: field({ initial: "", validate: [required(), displayNameSchema] }),
       alias: field({ initial: "", validate: [minLength(3), maxLength(8), pattern("^[a-z]+$")] }),
       age: field({ initial: 20, validate: [min(18), max(120)] }),
       emailAddress: field({ initial: "", validate: [email()] }),
@@ -1141,6 +1142,27 @@ export class Contact extends Component {
     )
     .expect("failed to write V2 Form source");
     fs::write(
+        project_root.join("app/routes/schemas.ts"),
+        r#"export const displayNameSchema = {
+  "~standard": {
+    version: 1,
+    vendor: "presolve-browser-fixture",
+    validate(value: unknown) {
+      const text = typeof value === "string" ? value : "";
+      const delay = text === "x" ? 100 : 5;
+      return new Promise((resolve) => setTimeout(() => {
+        resolve(text.length >= 3
+          ? { value: text.toUpperCase() }
+          : { issues: [{ message: "Use at least three characters", path: ["name"] }] });
+      }, delay));
+    },
+    types: undefined as unknown as { input: string; output: string },
+  },
+};
+"#,
+    )
+    .expect("failed to write Standard Schema validator");
+    fs::write(
         project_root.join("tsconfig.json"),
         r#"{"compilerOptions":{"noEmit":true}}"#,
     )
@@ -1159,19 +1181,35 @@ process.stdout.write(JSON.stringify({
   schemaVersion: 9,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
-  states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
+  states: request.states
+    .filter(site => sourceAt(site).startsWith("state("))
+    .map(site => ({ id: site.id, identity: identity("state") })),
   actions: [],
   effects: [],
   slots: [],
-  forms: request.forms.map(site => ({ id: site.id, identity: identity("defineForm") })),
-  formFields: request.formFields.map(site => ({
+  forms: request.forms
+    .filter(site => sourceAt(site).startsWith("defineForm("))
+    .map(site => ({ id: site.id, identity: identity("defineForm") })),
+  formFields: request.formFields.filter(site => sourceAt(site).startsWith("field")).map(site => ({
     id: site.id,
     identity: identity("field"),
     ...(sourceAt(site).startsWith("field<File[]>") ? { valueClassification: "file_array" } : {}),
   })),
-  validations: request.validations.map(site => ({
+  validations: request.validations.filter(site => /^(required|email|min|max|minLength|maxLength|pattern)\(/.test(sourceAt(site))).map(site => ({
     id: site.id,
     identity: identity(sourceAt(site).match(/^[A-Za-z_$][\w$]*/)?.[0] ?? "unknown"),
+  })),
+  standardValidations: request.standardValidations.map(site => ({
+    id: site.id,
+    identity: {
+      name: site.exportName,
+      flags: 2,
+      declarationModules: ["app/routes/schemas.ts"],
+    },
+    moduleSpecifier: site.moduleSpecifier,
+    exportName: site.exportName,
+    inputType: "string",
+    outputType: "string",
   })),
   environmentPublic: [],
 }));
@@ -1180,6 +1218,11 @@ process.stdout.write(JSON.stringify({
     .expect("failed to write V2 Form authority executable");
     fs::set_permissions(&executable, fs::Permissions::from_mode(0o755))
         .expect("failed to mark V2 Form authority executable");
+    std::os::unix::fs::symlink(
+        repo_root.join("packages/vite/node_modules/vite"),
+        project_root.join("node_modules/vite"),
+    )
+    .expect("failed to link Vite into V2 Form project");
 
     let output = Command::new(presolve_cli_bin())
         .current_dir(&project_root)
@@ -1197,16 +1240,26 @@ process.stdout.write(JSON.stringify({
         .expect("V2 Form runtime artifact");
     let artifact: serde_json::Value =
         serde_json::from_str(&artifact).expect("V2 Form runtime artifact JSON");
-    assert_eq!(artifact["schema_version"], 4);
+    assert_eq!(artifact["schema_version"], 5);
     assert_eq!(artifact["forms"][0]["fields"].as_array().unwrap().len(), 6);
     assert_eq!(
         artifact["forms"][0]["validation_rules"]
             .as_array()
             .unwrap()
             .len(),
-        8
+        9
     );
     assert_eq!(artifact["hosts"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        artifact["standard_schema_module"]["path"],
+        "/presolve.validators.js"
+    );
+    let validator_module = fs::read_to_string(project_root.join("dist/presolve.validators.js"))
+        .expect("published Standard Schema validator module");
+    assert!(
+        validator_module.contains("presolveStandardSchemaValidators"),
+        "published validator module did not retain its named registry export"
+    );
 
     let index = fs::read_to_string(output_root.join("index.html")).expect("built V2 Form page");
     let probe = index.replace(
@@ -1215,7 +1268,8 @@ process.stdout.write(JSON.stringify({
 const fail = (message) => { throw new Error(message); };
 const waitFor = (predicate, label) => new Promise((resolve, reject) => { const deadline = Date.now() + 3000; const tick = () => predicate() ? resolve() : Date.now() > deadline ? reject(new Error(`Timed out waiting for ${label}`)) : setTimeout(tick, 20); tick(); });
 (async () => {
-  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
+  await waitFor(() => ["ready", "error"].includes(document.documentElement.dataset.presolveRuntime), "runtime readiness");
+  if (document.documentElement.dataset.presolveRuntime !== "ready") fail(`runtime boot failed: ${JSON.stringify(window.__PRESOLVE__?.diagnostics ?? [])}`);
   if (window.__PRESOLVE__.resume.mode !== "cold") fail("fresh V2 Form boot did not select cold mode");
   const [name, alias, age, emailAddress, subscribed, attachments] = document.querySelectorAll("input");
   const instance = window.__PRESOLVE__.store.formInstances.values().next().value;
@@ -1229,6 +1283,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => { const d
   if (stateFor("name").value !== "") fail("IME composition committed incomplete text");
   name.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "composition" }));
   name.value = "Ada"; name.dispatchEvent(new InputEvent("input", { bubbles: true, data: "Ada", inputType: "insertText" }));
+  await waitFor(() => !stateFor("name").validation_pending, "async Standard Schema validation");
   alias.value = "A1"; alias.dispatchEvent(new Event("input", { bubbles: true }));
   if (stateFor("alias").validation.length !== 2) fail("minLength and pattern did not reject an invalid value");
   alias.value = "abcdefghi"; alias.dispatchEvent(new Event("input", { bubbles: true }));
@@ -1251,6 +1306,11 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => { const d
   attachments.files = transfer.files;
   attachments.dispatchEvent(new Event("change", { bubbles: true }));
   if (stateFor("name").value !== "Ada" || !stateFor("name").dirty || stateFor("name").validation.length !== 0) fail("bind:value did not update and validate the canonical Field");
+  name.value = "x"; name.dispatchEvent(new Event("input", { bubbles: true }));
+  name.value = "Grace"; name.dispatchEvent(new Event("input", { bubbles: true }));
+  await waitFor(() => !stateFor("name").validation_pending, "latest Standard Schema generation");
+  await new Promise((resolve) => setTimeout(resolve, 120));
+  if (stateFor("name").value !== "Grace" || stateFor("name").validation.length !== 0 || stateFor("name").validation_issues.length !== 0) fail("stale Standard Schema result replaced the latest Field generation");
   if (stateFor("subscribed").value !== true || !stateFor("subscribed").dirty) fail("bind:checked did not update the canonical Field");
   if (stateFor("attachments").value.length !== 1 || stateFor("attachments").value[0].name !== "proof.txt" || !stateFor("attachments").dirty || stateFor("attachments").validation.length !== 0) fail("bind:files did not commit the platform File array");
   const attachmentId = instance.definition.fields.find((field) => field.debug_name === "attachments").id;
@@ -1264,19 +1324,19 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => { const d
   await waitFor(() => window.__PRESOLVE__.components[0].state.submitted === 1, "inline submit action");
   if (!submit.defaultPrevented || instance.submission !== "Completed") fail("native inline submit did not complete through the compiler host");
   if (window.__PRESOLVE__.diagnostics.length !== 0) fail("runtime reported V2 Form diagnostics");
-  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_V2_FORM_BROWSER_PASS</div>");
-})().catch((error) => { document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_V2_FORM_BROWSER_FAIL: ${error.message}</div>`); console.error(error); });
+  document.body.insertAdjacentHTML("beforeend", "<div>" + "PRESOLVE_V2_FORM_" + "BROWSER_PASS" + "</div>");
+})().catch((error) => { document.body.insertAdjacentHTML("beforeend", `<div>${"PRESOLVE_V2_FORM_" + "BROWSER_FAIL"}: ${error.message}</div>`); console.error(error); });
 </script></body>"#,
     );
     fs::write(output_root.join("probe.html"), probe).expect("V2 Form browser probe");
-    let server = StaticServer::start(output_root.clone());
+    let server = StaticServer::start(project_root.join("dist"));
     let chrome = chrome_bin().expect("headless Chrome was not found");
     let profile_dir = output_root.join("chrome-profile");
     fs::create_dir_all(&profile_dir).expect("failed to create V2 Form Chrome profile");
     let output = run_chrome_probe(
         chrome,
         &format!("--user-data-dir={}", profile_dir.display()),
-        &format!("http://127.0.0.1:{}/probe.html", server.port),
+        &format!("http://127.0.0.1:{}/routes/root/probe.html", server.port),
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
     server.stop();
@@ -1364,6 +1424,7 @@ const resumedTransfer = new DataTransfer();
 resumedTransfer.items.add(new File(["resume"], "resume.txt", { type: "text/plain" }));
 controls[5].files = resumedTransfer.files;
 controls[5].dispatchEvent(new Event("change", { bubbles: true }));
+await waitFor(() => [...instance.fields.values()].every((field) => !field.validation_pending), "resumed Standard Schema validation");
 if (!instance.aggregate_valid) fail("resumed Form validation did not recover after valid input");
 const resumedSubmit = new Event("submit", { bubbles: true, cancelable: true });
 document.querySelector("form").dispatchEvent(resumedSubmit);
@@ -1373,13 +1434,16 @@ if (runtime.diagnostics.some((diagnostic) => diagnostic.fatal)) fail("V2 Form re
         "PRESOLVE_V2_FORM_RESUME_PASS",
     );
     fs::write(output_root.join("resume.html"), resume_page).expect("V2 Form resume probe");
-    let resume_server = StaticServer::start(output_root.clone());
+    let resume_server = StaticServer::start(project_root.join("dist"));
     let resume_profile = output_root.join("chrome-profile-resume");
     fs::create_dir_all(&resume_profile).expect("failed to create V2 Form resume Chrome profile");
     let resumed = run_chrome_probe(
         chrome_bin().expect("headless Chrome was not found"),
         &format!("--user-data-dir={}", resume_profile.display()),
-        &format!("http://127.0.0.1:{}/resume.html", resume_server.port),
+        &format!(
+            "http://127.0.0.1:{}/routes/root/resume.html",
+            resume_server.port
+        ),
     );
     let resumed_stdout = String::from_utf8_lossy(&resumed.stdout);
     resume_server.stop();
@@ -2511,8 +2575,9 @@ const waitFor = async (predicate, label) => {{
   fail(`Timed out waiting for ${{label}}`);
 }};
 (async () => {{
-  await waitFor(() => window.__PRESOLVE__ !== undefined, "runtime");
+  await waitFor(() => ["ready", "error"].includes(document.documentElement.dataset.presolveRuntime), "runtime readiness");
   const runtime = window.__PRESOLVE__;
+  if (runtime?.resume === undefined) fail(`runtime boot failed: ${{JSON.stringify(runtime?.diagnostics ?? [])}}`);
   {assertions}
   document.body.insertAdjacentHTML("beforeend", "<div>" + "{marker_start}" + "{marker_end}" + "</div>");
 }})().catch((error) => {{

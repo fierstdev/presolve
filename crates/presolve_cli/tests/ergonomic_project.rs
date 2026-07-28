@@ -215,6 +215,130 @@ process.stdout.write(JSON.stringify(await analyzeV2Authoring(JSON.parse(readFile
     fs::remove_dir_all(root).unwrap();
 }
 
+#[cfg(unix)]
+#[test]
+fn decorator_free_standard_schema_bundles_through_real_authority_and_vite() {
+    let root = project_root("v2-standard-schema");
+    let repository = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .unwrap();
+    let framework_types = repository.join("framework/packages/presolve/src/index.d.ts");
+    let authority_module = repository.join("packages/typescript-authority/src/index.js");
+    fs::write(
+        root.join("app/routes/index.tsx"),
+        r#"import { Component, defineForm, field } from "presolve";
+import { displayNameSchema } from "./schemas.js";
+
+export class Profile extends Component {
+  profile = defineForm({
+    fields: {
+      displayName: field({ initial: "", validate: [displayNameSchema] }),
+    },
+  });
+
+  render() {
+    return <form form={this.profile}><input bind:value={this.profile.fields.displayName} /></form>;
+  }
+}
+"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("app/routes/schemas.ts"),
+        r#"export const displayNameSchema = {
+  "~standard": {
+    version: 1 as const,
+    vendor: "presolve-test",
+    validate(value: unknown) {
+      const text = typeof value === "string" ? value : "";
+      return text.length >= 3
+        ? { value: text }
+        : { issues: [{ message: "Use at least three characters" }] };
+    },
+    types: undefined as unknown as { input: string; output: string },
+  },
+};
+"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("tsconfig.json"),
+        format!(
+            r#"{{"compilerOptions":{{"noEmit":true,"strict":true,"jsx":"preserve","module":"NodeNext","moduleResolution":"NodeNext","paths":{{"presolve":["{}"]}}}}}}"#,
+            framework_types.display()
+        ),
+    )
+    .unwrap();
+    let executable = root.join("node_modules/.bin/presolve-typescript-authority");
+    fs::create_dir_all(executable.parent().unwrap()).unwrap();
+    fs::write(
+        &executable,
+        format!(
+            r#"#!/usr/bin/env node
+import {{ analyzeV2Authoring }} from "{}";
+import {{ readFileSync }} from "node:fs";
+process.stdout.write(JSON.stringify(await analyzeV2Authoring(JSON.parse(readFileSync(0, "utf8")))));
+"#,
+            authority_module.display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+    std::os::unix::fs::symlink(
+        repository.join("packages/vite/node_modules/vite"),
+        root.join("node_modules/vite"),
+    )
+    .unwrap();
+
+    let build = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("build")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "Standard Schema build stderr: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let forms: serde_json::Value = serde_json::from_slice(
+        &fs::read(root.join("dist/routes/root/forms.runtime.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(forms["schema_version"], 5);
+    assert_eq!(
+        forms["standard_schema_module"]["path"],
+        "/presolve.validators.js"
+    );
+    assert_eq!(
+        forms["standard_schema_module"]["validators"]
+            .as_array()
+            .map(Vec::len),
+        Some(1)
+    );
+    let bundle = fs::read(root.join("dist/presolve.validators.js")).unwrap();
+    assert!(String::from_utf8_lossy(&bundle).contains("presolveStandardSchemaValidators"));
+    let manifest = fs::read_to_string(root.join("dist/file-routes.manifest.json")).unwrap();
+    assert!(manifest.contains("presolve.validators.js"));
+
+    let second = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("build")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        second.status.success(),
+        "second Standard Schema build stderr: {}",
+        String::from_utf8_lossy(&second.stderr)
+    );
+    assert_eq!(
+        bundle,
+        fs::read(root.join("dist/presolve.validators.js")).unwrap(),
+        "Standard Schema publication must be byte deterministic"
+    );
+    fs::remove_dir_all(root).unwrap();
+}
+
 #[test]
 fn default_build_discovers_an_imported_semantic_package_contract() {
     let root = project_root("package");

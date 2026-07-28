@@ -30,9 +30,9 @@ V2 `defineForm()` surface. It does not change legacy decorator semantics.
   resume snapshot. On resume they restart from the empty initial value and all
   Form validation is deterministically recomputed after controls are rebound.
 - Other serializable fields in the same Form retain their normal resume slots.
-- Forms runtime artifact schema v4 admits the closed `Files` channel,
+- Forms runtime artifact schema v5 retains the schema-v4 `Files` channel,
   `FileArray` normalization, and `File[]` semantic type alongside typed
-  validation-rule arguments.
+  validation-rule arguments and the Standard Schema registry.
 
 ## Failure behavior
 

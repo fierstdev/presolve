@@ -662,7 +662,7 @@ const applicationName = environment.public("PRESOLVE_PUBLIC_APP_NAME");
     }
 
     #[test]
-    fn retains_exact_standard_schema_module_authority_until_runtime_linkage() {
+    fn retains_exact_standard_schema_module_authority_for_runtime_linkage() {
         let source = r#"
 import { Component, defineForm, field, required } from "presolve";
 import { displayNameSchema } from "./schemas.js";
@@ -757,10 +757,16 @@ export class Profile extends Component {
             .iter()
             .find(|candidate| candidate.standard_schema.is_some())
             .expect("Standard Schema validation candidate");
-        assert!(candidate
-            .violations
-            .contains(&crate::ValidationRuleViolation::MissingStandardSchemaRuntimeModule));
+        assert!(candidate.violations.is_empty());
+        assert_eq!(
+            candidate.kind,
+            Some(crate::ValidationRuleKind::StandardSchema)
+        );
         assert!(application
+            .validation_rules
+            .values()
+            .any(|rule| rule.kind == crate::ValidationRuleKind::StandardSchema));
+        assert!(!application
             .diagnostics
             .iter()
             .any(|diagnostic| diagnostic.code == "PSC1087"));
