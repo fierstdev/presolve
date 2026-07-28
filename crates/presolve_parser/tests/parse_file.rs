@@ -223,6 +223,33 @@ class CodeExample extends Component {
 }
 
 #[test]
+fn retains_standalone_inline_jsx_whitespace_between_elements() {
+    let parsed = parse_file(
+        "CodeExample.tsx",
+        r#"
+class CodeExample extends Component {
+  render() {
+    return <code><span>class</span> <span>Welcome</span> <span>extends</span> <span>Component</span></code>;
+  }
+}
+"#,
+    );
+
+    assert!(parsed.diagnostics.is_empty());
+    let render = parsed.classes[0]
+        .methods
+        .iter()
+        .find(|method| method.name == "render")
+        .expect("expected render method");
+    let root = jsx_root_element(&render.jsx_roots[0]);
+
+    assert_eq!(root.children.len(), 7);
+    for index in [1, 3, 5] {
+        assert_eq!(jsx_text_value(&root.children[index]), " ");
+    }
+}
+
+#[test]
 fn retains_constrained_method_parameters() {
     let source = r#"
 @component("x-parameters")

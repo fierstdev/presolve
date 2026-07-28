@@ -1447,6 +1447,25 @@ mod tests {
     }
 
     #[test]
+    fn preserves_standalone_inline_whitespace_between_static_elements() {
+        let model = build_application_semantic_model(&presolve_parser::parse_file(
+            "src/CodeExample.tsx",
+            r#"
+@component("x-code-example") class CodeExample extends Component {
+  render() {
+    return <code><span>class</span> <span>Welcome</span> <span>extends</span> <span>Component</span></code>;
+  }
+}
+"#,
+        ));
+
+        let html = generate_ordinary_instance_html(&model);
+        assert!(html.contains(">class</span> <span"));
+        assert!(html.contains(">Welcome</span> <span"));
+        assert!(html.contains(">extends</span> <span"));
+    }
+
+    #[test]
     fn renders_structural_conditional_slot_projection_from_the_canonical_binding() {
         let model = build_application_semantic_model(&presolve_parser::parse_file(
             "src/StructuralSlot.tsx",

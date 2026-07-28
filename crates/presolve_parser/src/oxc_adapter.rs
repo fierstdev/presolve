@@ -1922,7 +1922,18 @@ fn parsed_jsx_element(
 fn normalize_jsx_text(value: &str) -> String {
     let decoded = html_escape::decode_html_entities(value);
     let normalized = decoded.split_whitespace().collect::<Vec<_>>().join(" ");
-    if normalized.is_empty() || decoded.contains(['\n', '\r']) {
+    if normalized.is_empty() {
+        // A whitespace-only child on one line is intentional JSX content. This
+        // commonly appears between inline elements (for example syntax-token
+        // spans in a code sample) and must not concatenate the surrounding
+        // text in generated HTML. Multiline whitespace is source formatting.
+        return if decoded.is_empty() || decoded.contains(['\n', '\r']) {
+            String::new()
+        } else {
+            " ".to_owned()
+        };
+    }
+    if decoded.contains(['\n', '\r']) {
         return normalized;
     }
 

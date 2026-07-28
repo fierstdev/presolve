@@ -8,7 +8,7 @@ not publish or imply a release.
 
 ## Unreleased
 
-## 0.2.0-beta.8 - 2026-07-28
+## 0.2.0-beta.9 - 2026-07-28
 
 ### Fixed
 
