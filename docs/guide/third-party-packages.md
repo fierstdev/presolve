@@ -7,7 +7,9 @@ cross it.
 
 Use a package normally when the compiler admits the imported value and its use.
 For an intentional terminal call that the compiler cannot lower, mark the
-method boundary with `@opaque(packageSpecifier, exportName)`.
+method boundary with `@opaque(packageSpecifier, exportName)`. This is a legacy
+decorator compatibility form; no decorator-free opaque declaration has been
+admitted for the beta.
 
 ```tsx
 import { trackPurchase } from "@acme/analytics";

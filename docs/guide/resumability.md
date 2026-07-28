@@ -48,16 +48,14 @@ Most applications need no resumability-specific syntax. Write ordinary
 compiler-admitted components and use the framework vocabulary normally:
 
 ```tsx
-import { action, component, state, Component } from "presolve";
+import { action, state, Component } from "presolve";
 
-@component()
 export class Counter extends Component {
   count = state(0);
 
-  @action()
-  increment(): void {
+  increment = action(() => {
     this.count += 1;
-  }
+  });
 
   render() {
     return <button onClick={this.increment}>Count: {this.count}</button>;

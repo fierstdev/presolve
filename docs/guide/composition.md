@@ -5,16 +5,15 @@ planning to the compiler.
 
 ## Slots
 
-Declare slot fields with `@slot()` and the `SlotContent` type. `children` is the
+Declare slot fields with `slot()` and the `SlotContent` type. `children` is the
 default slot; other field names are named slots.
 
 ```tsx
-import { component, slot, Component, type SlotContent } from "presolve";
+import { slot, Component, type SlotContent } from "presolve";
 
-@component()
 export class Card extends Component {
-  @slot() children!: SlotContent;
-  @slot() actions!: SlotContent;
+  children: SlotContent = slot();
+  actions: SlotContent = slot();
 
   render() {
     return <article><slot /><footer><slot name="actions" /></footer></article>;
@@ -35,10 +34,11 @@ Slot content remains owned by the caller even though it is placed in the
 callee's outlet. Do not use a different nested-children syntax until the
 compiler supports its lowering.
 
-## Context
+## Context (legacy compatibility)
 
-The current public API declares Context on a static field and uses a stable
-`"Class.field"` designator for providers and consumers.
+The current public API declares Context with decorators on a static field and
+uses a stable `"Class.field"` designator for providers and consumers. This is
+an alpha-compatibility form, not decorator-free V2 source.
 
 ```tsx
 import { component, consume, context, provide, Component } from "presolve";

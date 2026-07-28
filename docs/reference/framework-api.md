@@ -4,39 +4,33 @@ Import application authoring primitives from `presolve`.
 
 ```ts
 import {
-  action, component, computed, consume, context, effect, field, form,
-  loader, opaque, provide, required, resource, serialize, serverAction, slot,
-  state, submit, validate, Component, type Form,
+  action, effect, slot, state, Component, type SlotContent,
 } from "presolve";
 ```
 
-All decorators are compiler intrinsics with no runtime registration authority.
+The V2 beta source surface is compiler-owned. These calls have no runtime
+registration authority.
 
 | Export | Use |
 | --- | --- |
-| `Component` | Base class for public component examples and component declarations. |
-| `component()` | Class decorator that declares a compiler component. |
+| `Component` | Extend this class to declare a component. |
 | `state(initialValue)` | Creates compiler-owned component state from an initial value. |
-| `action()` | Method decorator for a transactional interaction boundary. |
-| `computed()` | Getter decorator for a pure synchronous derived value. |
-| `effect()` | Method decorator for a synchronous terminal effect. |
-| `slot()` / `SlotContent` | V2 field initializer and type for default/named slots; `@slot()` is legacy compatibility. |
-| `context()` | Field decorator that declares a Context identity. |
-| `provide("Class.field")` | Field decorator that exposes a Context value. |
-| `consume("Class.field")` | Field decorator that receives a Context value. |
-| `form()` | Field decorator that declares a form. |
-| `Form` | Declaration-only type required on an `@form()` field. |
-| `serialize(format)` | Form field decorator; formats are `json`, `form-data`, `url-encoded`. |
-| `field(form, path?)` | Field decorator for a form value and optional static nested path. |
-| `required()` / `validate(rule)` | Creates and attaches a validation rule. |
-| `submit(form)` | Method decorator that associates an action with a form submission. |
-| `resource(endpoint)` | Field decorator for a resource boundary. |
-| `loader(endpoint)` | Field decorator for a loader boundary. |
-| `serverAction(endpoint)` | Method decorator for a server-action boundary. |
-| `opaque(packageSpecifier, exportName)` | Method decorator for a declared terminal package boundary. |
+| `action(handler)` | Instance-field action; the compiler lowers its admitted synchronous State writes. |
+| synchronous getter | A pure, supported getter is a compiler-derived computed value; no `computed()` call is used. |
+| `effect(handler)` | Instance-field browser Effect, with compiler-owned scheduling and cleanup. |
+| `slot()` / `SlotContent` | Instance-field initializer and type for default or named Slots. |
+| `environment.public(name)` | Manifest-backed read of an admitted `PRESOLVE_PUBLIC_*` value. |
 
-`Resource<Data, Error>` exposes readonly `data`, `error`, and `state`.
-`ContextDesignator` is the string form `` `${string}.${string}` ``. Refer to
-the guides for [components](../guide/components.md),
-[reactivity](../guide/reactivity.md), [composition](../guide/composition.md),
-and [forms/resources](../guide/forms-and-resources.md) for usage constraints.
+## Legacy compatibility declarations
+
+`component()`, the zero-argument `action()`/`effect()` overloads, `computed()`,
+`context()`, `provide()`, `consume()`, `form()`, `serialize()`, `field()`,
+`validate()`, `submit()`, `resource()`, `loader()`, `serverAction()`, and
+`opaque()` remain supported only as explicitly labelled alpha-compatibility
+declarations. They are not the source form emitted by `create-presolve`, and a
+decorator-free replacement for each one requires its own compiler contract.
+
+See [components](../guide/components.md), [reactivity](../guide/reactivity.md),
+[composition](../guide/composition.md), and
+[forms/resources](../guide/forms-and-resources.md) for their exact admitted
+boundaries.

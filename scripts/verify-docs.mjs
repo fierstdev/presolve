@@ -5,6 +5,7 @@ import { resolve, dirname } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
 const documents = collect(resolve(root, "docs"));
+const publicGuides = collect(resolve(root, "docs", "guide"));
 
 for (const document of documents) {
   const source = readFileSync(document, "utf8");
@@ -16,6 +17,18 @@ for (const document of documents) {
     if (/^[a-z]+:/i.test(target) || target.startsWith("/")) continue;
     const path = resolve(dirname(document), target);
     if (!existsSync(path)) throw new Error(`${relative(document)} links to missing ${target}`);
+  }
+}
+
+for (const guide of publicGuides) {
+  const source = readFileSync(guide, "utf8");
+  if (
+    /@(component|action|computed|effect|context|provide|consume|form|field|submit|resource|slot|loader|serverAction|opaque)\b/.test(source) &&
+    !/(legacy (compatibility|decorator)|alpha-compatibility|compatibility form)/i.test(source)
+  ) {
+    throw new Error(
+      `${relative(guide)} presents decorator syntax without marking it as alpha compatibility`
+    );
   }
 }
 

@@ -26,6 +26,16 @@ The scaffold verifier must override every unpublished direct workspace
 dependency from its packed tarball. A registry fetch is not release evidence
 for an unpublished package.
 
+## Public-contract integrity
+
+The capability registry, CLI diagnostics, scaffold, and public guides must
+describe the same release. Canonical V2 examples use the admitted
+decorator-free source forms. Any retained decorator example must be labelled
+as alpha compatibility; the documentation verifier rejects an unlabelled guide
+example. The CLI obtains its unsupported-platform diagnostic version from its
+own package manifest, with a package-level regression test, so an old release
+label cannot be shipped with a later binary package.
+
 ## Completion
 
 The dry run emits the versioned `presolve.release-dry-run` artifact inventory

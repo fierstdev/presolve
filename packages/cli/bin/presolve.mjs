@@ -2,8 +2,10 @@
 import { createRequire } from "node:module";
 import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { unsupportedPlatformDiagnostic } from "./diagnostic.mjs";
 
 const require = createRequire(import.meta.url);
+const { version } = require("../package.json");
 const platformPackage = new Map([
   ["darwin-arm64", "@presolve/cli-darwin-arm64"],
   ["darwin-x64", "@presolve/cli-darwin-x64"],
@@ -13,10 +15,7 @@ const platformPackage = new Map([
 
 const binary = process.env.PRESOLVE_BINARY || resolvePlatformBinary(platformPackage);
 if (!binary) {
-  console.error(
-    `Presolve 0.1 alpha does not include a CLI binary for ${process.platform}-${process.arch}. ` +
-      "See https://github.com/fierstdev/presolve#supported-platforms."
-  );
+  console.error(unsupportedPlatformDiagnostic(version, process.platform, process.arch));
   process.exit(1);
 }
 
