@@ -6,7 +6,7 @@ HTML, browser artifacts, route inventory, resumability records, and deployment
 plan. There is no separate renderer, dependency tracker, or router deciding
 application semantics beside it.
 
-`0.2.0-beta.3` is the public beta for compiler-owned application products,
+`0.2.0-beta.4` is the public beta for compiler-owned application products,
 including resumability, structural components, slots, context, forms,
 resources, and the documented Action surface. It is not a replacement for
 every React or Next.js application: generic server execution and unadmitted

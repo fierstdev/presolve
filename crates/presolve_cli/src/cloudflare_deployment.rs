@@ -199,7 +199,7 @@ export default {{ async fetch(request, env) {{\n\
   const direct = await env.ASSETS.fetch(request);\n\
   if (direct.status !== 404) {{\n\
     const location = direct.headers.get('Location');\n\
-    if (url.pathname === '/' && location) {{\n\
+    if (location) {{\n\
       const redirected = new URL(location, url);\n\
       if (redirected.origin === url.origin && redirected.pathname.startsWith('/routes/')) return fetchCompilerAsset(request, env, redirected);\n\
     }}\n\
@@ -370,7 +370,8 @@ mod tests {
         assert!(worker.contains("routes/segment-posts/parameter-slug"));
         assert!(worker.contains("fetchCompilerAsset"));
         assert!(worker.contains("redirected.pathname.startsWith('/routes/')"));
-        assert!(worker.contains("url.pathname === '/' && location"));
+        assert!(worker.contains("if (location)"));
+        assert!(!worker.contains("url.pathname === '/' && location"));
         assert!(!worker.contains("component:post"));
         let config = cloudflare_workers_wrangler_jsonc_v1(&plan, "../../dist");
         assert!(config.contains("run_worker_first"));
