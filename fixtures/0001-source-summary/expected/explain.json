@@ -4,6 +4,12 @@
   "lineCount": 17,
   "charCount": 271,
   "hasTsxLikeSyntax": true,
+  "componentClasses": [
+    {
+      "name": "Counter",
+      "span": { "start": 0, "end": 270, "line": 1, "column": 1 }
+    }
+  ],
   "componentDecorators": [
     {
       "name": "component",

@@ -1078,6 +1078,7 @@ class Counter extends Component {
         let summary = summarize_source("Counter.tsx", source);
 
         assert_eq!(summary.component_decorators.len(), 1);
+        assert_eq!(summary.component_classes.len(), 1);
         assert_eq!(
             summary.component_decorators[0].argument.as_deref(),
             Some("x-counter")
@@ -1086,6 +1087,29 @@ class Counter extends Component {
         assert_eq!(summary.class_declarations[0].name, "Counter");
         assert_eq!(summary.render_methods.len(), 1);
         assert!(summary.has_tsx_like_syntax);
+    }
+
+    #[test]
+    fn recognizes_decorator_free_component_classes_without_ps0100() {
+        let source = r#"
+import { Component } from "presolve";
+
+export default class Home extends Component {
+  render() {
+    return <main>Home</main>;
+  }
+}
+"#;
+
+        let summary = summarize_source("app/routes/index.tsx", source);
+
+        assert_eq!(summary.component_classes.len(), 1);
+        assert_eq!(summary.component_classes[0].name, "Home");
+        assert!(summary.component_decorators.is_empty());
+        assert!(!summary
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "PS0100"));
     }
 
     #[test]

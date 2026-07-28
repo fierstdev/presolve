@@ -9,7 +9,7 @@ on:
       release_version:
         description: Existing beta version to resume, with or without the v prefix
         required: true
-        default: "0.2.0-beta.5"
+        default: "0.2.0-beta.6"
       crates_already_published:
         description: Skip crates.io only after confirming all three crates exist
         required: true

@@ -8,6 +8,14 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.6 - 2026-07-27
+
+### Fixed
+
+- `presolve explain` now recognizes the canonical decorator-free
+  `class … extends Component` form, reports it as a component, and no longer
+  emits the legacy decorator-only `PS0100` warning.
+
 ## 0.2.0-beta.5 - 2026-07-27
 
 ### Fixed

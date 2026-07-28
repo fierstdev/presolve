@@ -94,6 +94,29 @@ fn explain_command_matches_json_fixture() {
 }
 
 #[test]
+fn explain_recognizes_decorator_free_component_classes() {
+    let repo_root = repo_root();
+    let fixture = repo_root.join("fixtures/0001-source-summary/input/DecoratorFree.tsx");
+    let output = Command::new(presolve_cli_bin())
+        .current_dir(&repo_root)
+        .args(["explain", fixture.to_str().expect("fixture path is utf-8")])
+        .output()
+        .expect("failed to run presolve_cli explain for a decorator-free component");
+
+    assert!(
+        output.status.success(),
+        "expected command to succeed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let actual = String::from_utf8(output.stdout).expect("CLI stdout was not valid UTF-8");
+    assert!(actual.contains("class Home extends Component"));
+    assert!(!actual.contains("PS0100"));
+    assert!(!actual.contains("@component"));
+}
+
+#[test]
 fn capability_registry_has_deterministic_json_human_and_migration_projections() {
     let repo_root = repo_root();
     let json = Command::new(presolve_cli_bin())
