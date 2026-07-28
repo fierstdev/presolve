@@ -19,9 +19,7 @@ pub fn explain_text(summary: &SourceSummary) -> String {
     );
 
     let _ = writeln!(output, "\nComponents:");
-    if summary.component_decorators.is_empty() {
-        let _ = writeln!(output, "  none");
-    } else {
+    if !summary.component_decorators.is_empty() {
         for item in &summary.component_decorators {
             let argument = item.argument.as_deref().unwrap_or("<missing>");
             let _ = writeln!(
@@ -30,6 +28,16 @@ pub fn explain_text(summary: &SourceSummary) -> String {
                 item.name, item.span.line, item.span.column
             );
         }
+    } else if !summary.component_classes.is_empty() {
+        for class in &summary.component_classes {
+            let _ = writeln!(
+                output,
+                "  class {} extends Component at {}:{}",
+                class.name, class.span.line, class.span.column
+            );
+        }
+    } else {
+        let _ = writeln!(output, "  none");
     }
 
     let _ = writeln!(output, "\nRoutes:");
@@ -106,6 +114,11 @@ pub fn explain_json(summary: &SourceSummary) -> String {
         output,
         "  \"hasTsxLikeSyntax\": {},",
         summary.has_tsx_like_syntax
+    );
+    let _ = writeln!(
+        output,
+        "  \"componentClasses\": [{}],",
+        classes_json(&summary.component_classes)
     );
     let _ = writeln!(
         output,

@@ -7,6 +7,9 @@ pub struct SourceSummary {
     pub line_count: usize,
     pub char_count: usize,
     pub has_tsx_like_syntax: bool,
+    /// Canonical V2 components declared by extending `Component`.
+    pub component_classes: Vec<ClassSummary>,
+    /// Legacy decorator declarations retained for compatibility inspection.
     pub component_decorators: Vec<DecoratorSummary>,
     pub route_decorators: Vec<DecoratorSummary>,
     pub class_declarations: Vec<ClassSummary>,

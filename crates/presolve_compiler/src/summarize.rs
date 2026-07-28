@@ -23,17 +23,18 @@ pub fn summarize_source(path: impl AsRef<Path>, source: &str) -> SourceSummary {
     }
 
     let component_decorators = find_string_decorators(source, "component");
+    let component_classes = find_component_classes(&path, source);
     let route_decorators = find_string_decorators(source, "route");
     let class_declarations = find_class_declarations(source);
     let render_methods = find_render_methods(source);
     let has_tsx_like_syntax =
         source.contains('<') && source.contains('>') && source.contains("render");
 
-    if component_decorators.is_empty() {
+    if component_decorators.is_empty() && component_classes.is_empty() {
         diagnostics.push(Diagnostic {
             severity: Severity::Warning,
             code: "PS0100".to_string(),
-            message: "no @component(...) decorator found".to_string(),
+            message: "no component declaration found (extend Component)".to_string(),
             span: None,
         });
     }
@@ -62,12 +63,35 @@ pub fn summarize_source(path: impl AsRef<Path>, source: &str) -> SourceSummary {
         line_count: source.lines().count(),
         char_count: source.chars().count(),
         has_tsx_like_syntax,
+        component_classes,
         component_decorators,
         route_decorators,
         class_declarations,
         render_methods,
         diagnostics,
     }
+}
+
+fn find_component_classes(path: &Path, source: &str) -> Vec<ClassSummary> {
+    presolve_parser::parse_file(path, source)
+        .classes
+        .into_iter()
+        .filter(|class| {
+            class
+                .heritage
+                .as_ref()
+                .is_some_and(|heritage| heritage.base == "Component")
+        })
+        .map(|class| ClassSummary {
+            name: class.name,
+            span: Span {
+                start: class.span.start,
+                end: class.span.end,
+                line: class.span.line,
+                column: class.span.column,
+            },
+        })
+        .collect()
 }
 
 fn find_string_decorators(source: &str, name: &str) -> Vec<DecoratorSummary> {
