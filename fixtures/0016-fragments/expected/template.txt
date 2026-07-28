@@ -15,7 +15,7 @@ TemplateGraph:
               attributes:
                 data-presolve-bindings = bindings(this.label) @ generated
               children:
-                Text("Status:") @ fixtures/0016-fragments/input/FragmentPanel.tsx:11:14 span=201..208
+                Text("Status: ") @ fixtures/0016-fragments/input/FragmentPanel.tsx:11:14 span=201..208
                 Binding id=n4 expression="this.label" initial=Some("Ready") @ fixtures/0016-fragments/input/FragmentPanel.tsx:11:22 span=209..221
             Element <span> id=n5 @ fixtures/0016-fragments/input/FragmentPanel.tsx:12:11 span=236..253
               attributes:

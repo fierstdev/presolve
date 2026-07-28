@@ -27,5 +27,5 @@ TemplateGraph:
                     data-presolve-bindings = bindings(index, label) @ generated
                   children:
                     Binding id=n8 expression="index" initial=None @ fixtures/0021-keyed-list-reconciliation/input/KeyedListReconciliation.tsx:20:62 span=521..528
-                    Text(":") @ fixtures/0021-keyed-list-reconciliation/input/KeyedListReconciliation.tsx:20:69 span=528..529
+                    Text(": ") @ fixtures/0021-keyed-list-reconciliation/input/KeyedListReconciliation.tsx:20:69 span=528..529
                     Binding id=n9 expression="label" initial=None @ fixtures/0021-keyed-list-reconciliation/input/KeyedListReconciliation.tsx:20:71 span=530..537

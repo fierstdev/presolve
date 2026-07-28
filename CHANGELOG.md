@@ -8,6 +8,15 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.8 - 2026-07-28
+
+### Fixed
+
+- Static JSX now preserves a single authored leading or trailing inline-space
+  boundary between adjacent text and element nodes. This keeps compiler-emitted
+  source examples valid and readable while retaining multiline formatting
+  normalization.
+
 ## 0.2.0-beta.7 - 2026-07-27
 
 ### Fixed

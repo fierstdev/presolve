@@ -9,5 +9,5 @@ TemplateGraph:
       children:
         Text("Count:") @ fixtures/0013-multi-step-action/input/BatchActionCounter.tsx:18:9 span=367..373
         Binding id=n1 expression="this.count" initial=Some("1") @ fixtures/0013-multi-step-action/input/BatchActionCounter.tsx:18:16 span=374..386
-        Text("Enabled:") @ fixtures/0013-multi-step-action/input/BatchActionCounter.tsx:18:29 span=387..395
+        Text(" Enabled: ") @ fixtures/0013-multi-step-action/input/BatchActionCounter.tsx:18:29 span=387..395
         Binding id=n2 expression="this.enabled" initial=Some(false) @ fixtures/0013-multi-step-action/input/BatchActionCounter.tsx:18:38 span=396..410

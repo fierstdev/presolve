@@ -3098,6 +3098,32 @@ class CodeExample extends Component {
     }
 
     #[test]
+    fn preserves_inline_jsx_text_boundaries_in_static_html() {
+        let parsed = presolve_parser::parse_file(
+            "CodeExample.tsx",
+            r#"
+@component("x-code-example")
+class CodeExample extends Component {
+  render() {
+    return <pre><code><span>import &#123; </span><span className="syntax-type">Component</span><span> &#125; from </span><span>&quot;presolve&quot;</span>;</code></pre>;
+  }
+}
+"#,
+        );
+
+        let component_graph = build_component_graph(&parsed);
+        assert!(component_graph.diagnostics.is_empty());
+
+        let html = generate_static_html(&build_template_graph(&component_graph));
+
+        assert!(html.contains("import { </span><span data-presolve-node"));
+        assert!(html.contains("class=\"syntax-type\">Component</span><span"));
+        assert!(html.contains("> } from </span><span"));
+        assert!(html.contains(">\"presolve\"</span>;"));
+        assert!(!html.contains("data-presolve-bindings"));
+    }
+
+    #[test]
     fn preserves_static_jsx_attributes_in_template_outputs() {
         let source =
             include_str!("../../../fixtures/0014-static-attributes/input/StaticAttributePanel.tsx");
@@ -3572,7 +3598,7 @@ class Beta extends Component {
         let TemplateChild::Text { value, span } = &button.children[0] else {
             panic!("expected nested text");
         };
-        assert_eq!(value, "Count:");
+        assert_eq!(value, "Count: ");
         assert_eq!(span.line, 13);
         assert_eq!(span.column, 50);
 
@@ -3628,7 +3654,7 @@ class Beta extends Component {
         let html = generate_static_html(&template_graph);
         assert_eq!(
             html,
-            "<h1 data-presolve-node=\"n1\">Title</h1><p data-presolve-node=\"n3\" data-presolve-bindings=\"this.label\">Status:<!-- presolve-binding:n4:this.label -->Ready</p><span data-presolve-node=\"n5\">Done</span>\n"
+            "<h1 data-presolve-node=\"n1\">Title</h1><p data-presolve-node=\"n3\" data-presolve-bindings=\"this.label\">Status: <!-- presolve-binding:n4:this.label -->Ready</p><span data-presolve-node=\"n5\">Done</span>\n"
         );
 
         let manifest = build_template_manifest(&component_graph, &template_graph);
@@ -3843,7 +3869,7 @@ class Beta extends Component {
                     index_variable: Some("index".to_string()),
                     key_expression: "item.id".to_string(),
                     item_root: "n4".to_string(),
-                    item_template_html: "<li data-presolve-node=\"n4:__ez_list_key__\" data-presolve-bindings=\"index,item.label\"><!-- presolve-binding:n5:__ez_list_key__:index -->__ez_list_index__<!-- presolve-list-binding-end:n5:__ez_list_key__ -->:<!-- presolve-binding:n6:__ez_list_key__:item.label --><!-- presolve-list-binding-end:n6:__ez_list_key__ --></li>".to_string(),
+                    item_template_html: "<li data-presolve-node=\"n4:__ez_list_key__\" data-presolve-bindings=\"index,item.label\"><!-- presolve-binding:n5:__ez_list_key__:index -->__ez_list_index__<!-- presolve-list-binding-end:n5:__ez_list_key__ -->: <!-- presolve-binding:n6:__ez_list_key__:item.label --><!-- presolve-list-binding-end:n6:__ez_list_key__ --></li>".to_string(),
                 },
             ]
         );
@@ -3929,7 +3955,7 @@ class Beta extends Component {
         let template_graph = build_template_graph(&component_graph);
         assert_eq!(
             generate_static_html(&template_graph),
-            "<ol data-presolve-node=\"n0\" data-presolve-bindings=\"this.items\"><!-- presolve-list-start:n2:this.items --><li data-presolve-node=\"n4:north\" data-presolve-bindings=\"index,item.label,item.details.region\"><!-- presolve-binding:n5:north:index -->0<!-- presolve-list-binding-end:n5:north -->:<!-- presolve-binding:n6:north:item.label -->North<!-- presolve-list-binding-end:n6:north -->(<!-- presolve-binding:n7:north:item.details.region -->west<!-- presolve-list-binding-end:n7:north -->)</li><li data-presolve-node=\"n4:south\" data-presolve-bindings=\"index,item.label,item.details.region\"><!-- presolve-binding:n5:south:index -->1<!-- presolve-list-binding-end:n5:south -->:<!-- presolve-binding:n6:south:item.label -->South<!-- presolve-list-binding-end:n6:south -->(<!-- presolve-binding:n7:south:item.details.region -->east<!-- presolve-list-binding-end:n7:south -->)</li><!-- presolve-list-end:n3 --></ol>\n"
+            "<ol data-presolve-node=\"n0\" data-presolve-bindings=\"this.items\"><!-- presolve-list-start:n2:this.items --><li data-presolve-node=\"n4:north\" data-presolve-bindings=\"index,item.label,item.details.region\"><!-- presolve-binding:n5:north:index -->0<!-- presolve-list-binding-end:n5:north -->: <!-- presolve-binding:n6:north:item.label -->North<!-- presolve-list-binding-end:n6:north --> (<!-- presolve-binding:n7:north:item.details.region -->west<!-- presolve-list-binding-end:n7:north -->)</li><li data-presolve-node=\"n4:south\" data-presolve-bindings=\"index,item.label,item.details.region\"><!-- presolve-binding:n5:south:index -->1<!-- presolve-list-binding-end:n5:south -->: <!-- presolve-binding:n6:south:item.label -->South<!-- presolve-list-binding-end:n6:south --> (<!-- presolve-binding:n7:south:item.details.region -->east<!-- presolve-list-binding-end:n7:south -->)</li><!-- presolve-list-end:n3 --></ol>\n"
         );
     }
 
@@ -3964,7 +3990,7 @@ class Beta extends Component {
 
         assert_eq!(
             generate_static_html(&template_graph),
-            "<ol data-presolve-node=\"n0\" data-presolve-bindings=\"this.labels\"><!-- presolve-list-start:n2:this.labels --><li data-presolve-node=\"n4:North\" data-presolve-bindings=\"index,label\"><!-- presolve-binding:n5:North:index -->0<!-- presolve-list-binding-end:n5:North -->:<!-- presolve-binding:n6:North:label -->North<!-- presolve-list-binding-end:n6:North --></li><li data-presolve-node=\"n4:South\" data-presolve-bindings=\"index,label\"><!-- presolve-binding:n5:South:index -->1<!-- presolve-list-binding-end:n5:South -->:<!-- presolve-binding:n6:South:label -->South<!-- presolve-list-binding-end:n6:South --></li><!-- presolve-list-end:n3 --></ol>\n"
+            "<ol data-presolve-node=\"n0\" data-presolve-bindings=\"this.labels\"><!-- presolve-list-start:n2:this.labels --><li data-presolve-node=\"n4:North\" data-presolve-bindings=\"index,label\"><!-- presolve-binding:n5:North:index -->0<!-- presolve-list-binding-end:n5:North -->: <!-- presolve-binding:n6:North:label -->North<!-- presolve-list-binding-end:n6:North --></li><li data-presolve-node=\"n4:South\" data-presolve-bindings=\"index,label\"><!-- presolve-binding:n5:South:index -->1<!-- presolve-list-binding-end:n5:South -->: <!-- presolve-binding:n6:South:label -->South<!-- presolve-list-binding-end:n6:South --></li><!-- presolve-list-end:n3 --></ol>\n"
         );
 
         let manifest = build_template_manifest(&component_graph, &template_graph);
@@ -3988,7 +4014,7 @@ class Beta extends Component {
                     index_variable: Some("index".to_string()),
                     key_expression: "label".to_string(),
                     item_root: "n4".to_string(),
-                    item_template_html: "<li data-presolve-node=\"n4:__ez_list_key__\" data-presolve-bindings=\"index,label\"><!-- presolve-binding:n5:__ez_list_key__:index -->__ez_list_index__<!-- presolve-list-binding-end:n5:__ez_list_key__ -->:<!-- presolve-binding:n6:__ez_list_key__:label -->__ez_list_item__<!-- presolve-list-binding-end:n6:__ez_list_key__ --></li>".to_string(),
+                    item_template_html: "<li data-presolve-node=\"n4:__ez_list_key__\" data-presolve-bindings=\"index,label\"><!-- presolve-binding:n5:__ez_list_key__:index -->__ez_list_index__<!-- presolve-list-binding-end:n5:__ez_list_key__ -->: <!-- presolve-binding:n6:__ez_list_key__:label -->__ez_list_item__<!-- presolve-list-binding-end:n6:__ez_list_key__ --></li>".to_string(),
                 },
             ]
         );

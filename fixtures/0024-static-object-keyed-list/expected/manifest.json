@@ -37,7 +37,7 @@
             "index_variable": "index",
             "key_expression": "item.id",
             "item_root": "n4",
-            "item_template_html": "<li data-presolve-node=\"n4:__ez_list_key__\" data-presolve-bindings=\"index,item.label,item.details.region\"><!-- presolve-binding:n5:__ez_list_key__:index -->__ez_list_index__<!-- presolve-list-binding-end:n5:__ez_list_key__ -->:<!-- presolve-binding:n6:__ez_list_key__:item.label --><!-- presolve-list-binding-end:n6:__ez_list_key__ -->(<!-- presolve-binding:n7:__ez_list_key__:item.details.region --><!-- presolve-list-binding-end:n7:__ez_list_key__ -->)</li>"
+            "item_template_html": "<li data-presolve-node=\"n4:__ez_list_key__\" data-presolve-bindings=\"index,item.label,item.details.region\"><!-- presolve-binding:n5:__ez_list_key__:index -->__ez_list_index__<!-- presolve-list-binding-end:n5:__ez_list_key__ -->: <!-- presolve-binding:n6:__ez_list_key__:item.label --><!-- presolve-list-binding-end:n6:__ez_list_key__ --> (<!-- presolve-binding:n7:__ez_list_key__:item.details.region --><!-- presolve-list-binding-end:n7:__ez_list_key__ -->)</li>"
           }
         ],
         "events": []

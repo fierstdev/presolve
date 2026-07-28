@@ -13,5 +13,5 @@ TemplateGraph:
                 data-presolve-bindings = bindings(index, item.label) @ generated
               children:
                 Binding id=n5 expression="index" initial=None @ fixtures/0019-keyed-list-semantics/input/KeyedList.tsx:9:60 span=203..210
-                Text(":") @ fixtures/0019-keyed-list-semantics/input/KeyedList.tsx:9:67 span=210..211
+                Text(": ") @ fixtures/0019-keyed-list-semantics/input/KeyedList.tsx:9:67 span=210..211
                 Binding id=n6 expression="item.label" initial=None @ fixtures/0019-keyed-list-semantics/input/KeyedList.tsx:9:69 span=212..224

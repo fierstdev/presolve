@@ -1920,10 +1920,20 @@ fn parsed_jsx_element(
 }
 
 fn normalize_jsx_text(value: &str) -> String {
-    html_escape::decode_html_entities(value)
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
+    let decoded = html_escape::decode_html_entities(value);
+    let normalized = decoded.split_whitespace().collect::<Vec<_>>().join(" ");
+    if normalized.is_empty() || decoded.contains(['\n', '\r']) {
+        return normalized;
+    }
+
+    let leading = decoded.chars().next().is_some_and(char::is_whitespace);
+    let trailing = decoded.chars().next_back().is_some_and(char::is_whitespace);
+    format!(
+        "{}{}{}",
+        if leading { " " } else { "" },
+        normalized,
+        if trailing { " " } else { "" },
+    )
 }
 
 fn jsx_text_value_span(source: &str, value: &str, span: Span) -> SourceSpan {

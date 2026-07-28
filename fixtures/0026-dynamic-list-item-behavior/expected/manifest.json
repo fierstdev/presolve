@@ -58,7 +58,7 @@
             "index_variable": "index",
             "key_expression": "item.id",
             "item_root": "n8",
-            "item_template_html": "<li data-presolve-node=\"n8:__ez_list_key__\" title=\"\" data-label=\"\" data-presolve-list-bindings=\"title=item.details.region;data-label=item.label\"><button data-presolve-node=\"n11:__ez_list_key__\" data-presolve-on-click=\"this.select\" data-presolve-bindings=\"index,item.label,item.details.region\"><!-- presolve-binding:n12:__ez_list_key__:index -->__ez_list_index__<!-- presolve-list-binding-end:n12:__ez_list_key__ -->:<!-- presolve-binding:n13:__ez_list_key__:item.label --><!-- presolve-list-binding-end:n13:__ez_list_key__ -->(<!-- presolve-binding:n14:__ez_list_key__:item.details.region --><!-- presolve-list-binding-end:n14:__ez_list_key__ -->)</button></li>"
+            "item_template_html": "<li data-presolve-node=\"n8:__ez_list_key__\" title=\"\" data-label=\"\" data-presolve-list-bindings=\"title=item.details.region;data-label=item.label\"><button data-presolve-node=\"n11:__ez_list_key__\" data-presolve-on-click=\"this.select\" data-presolve-bindings=\"index,item.label,item.details.region\"><!-- presolve-binding:n12:__ez_list_key__:index -->__ez_list_index__<!-- presolve-list-binding-end:n12:__ez_list_key__ -->: <!-- presolve-binding:n13:__ez_list_key__:item.label --><!-- presolve-list-binding-end:n13:__ez_list_key__ --> (<!-- presolve-binding:n14:__ez_list_key__:item.details.region --><!-- presolve-list-binding-end:n14:__ez_list_key__ -->)</button></li>"
           }
         ],
         "events": [

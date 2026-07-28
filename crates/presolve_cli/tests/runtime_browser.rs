@@ -2386,10 +2386,10 @@ const waitForStructuralResume = () => new Promise((resolve, reject) => {
   if (runtime.resume?.mode !== "resume") throw new Error(`did not resume: ${JSON.stringify(runtime.resume)}`);
   if (runtime.resume_registry.structural_occurrences.size !== window.__PRESOLVE_RESUME_SNAPSHOT__.structuralOccurrences.length) throw new Error("structural occurrences were not restored exactly");
   if (document.querySelector("main").innerHTML !== window.__PRESOLVE_STRUCTURAL_RESUME_DOM__) throw new Error("resume reconstructed structural DOM");
-  const leaf = [...document.querySelectorAll("button")].find((button) => button.textContent === "Leaf:0");
+  const leaf = [...document.querySelectorAll("button")].find((button) => button.textContent === "Leaf: 0");
   if (leaf === undefined) throw new Error("restored Leaf target was missing");
   leaf.click();
-  if (leaf.textContent !== "Leaf:1") throw new Error("restored Leaf action/binding did not execute");
+  if (leaf.textContent !== "Leaf: 1") throw new Error("restored Leaf action/binding did not execute");
   document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_STRUCTURAL_RESUME_BROWSER_PASS</div>");
 })().catch((error) => document.body.insertAdjacentHTML("beforeend", `<pre>PRESOLVE_STRUCTURAL_RESUME_BROWSER_FAIL: ${error.message}</pre>`));
 </script></body>"#,
@@ -3388,22 +3388,22 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   const trim = control("Trim");
   if (toggle === undefined || reconcile === undefined || trim === undefined) fail("structural controls were missing");
   if (expectStructuralMaterialization) {
-    const leaf = [...main.querySelectorAll("button")].find((button) => button.textContent === "Leaf:0");
+    const leaf = [...main.querySelectorAll("button")].find((button) => button.textContent === "Leaf: 0");
     const dynamicLeaf = [...runtime.store.components.values()].find((component) =>
       component.name === "StructuralLeaf" && component.instance_id.startsWith("presolve-structural-occurrence:v1:")
     );
     if (leaf === undefined || dynamicLeaf === undefined) fail("static conditional host did not materialize a live structural Leaf");
     leaf.click();
-    await waitFor(() => leaf.textContent === "Leaf:1", "materialized structural leaf action");
+    await waitFor(() => leaf.textContent === "Leaf: 1", "materialized structural leaf action");
     if (document.title !== "leaf-active" || runtime.structural_effect_runs.length === 0) {
       fail("structural Effects did not activate under occurrence identities");
     }
   }
   const listLeafA = a.querySelector("button");
   if (expectStructuralMaterialization) {
-    if (listLeafA === null || listLeafA.textContent !== "Leaf:0") fail("initial keyed row did not materialize a structural Leaf");
+    if (listLeafA === null || listLeafA.textContent !== "Leaf: 0") fail("initial keyed row did not materialize a structural Leaf");
     listLeafA.click();
-    await waitFor(() => listLeafA.textContent === "Leaf:1", "materialized keyed leaf action");
+    await waitFor(() => listLeafA.textContent === "Leaf: 1", "materialized keyed leaf action");
   }
   const structuralInstances = () => [...runtime.store.componentInstances.values()]
     .filter((instance) => instance.instance.startsWith("presolve-structural-occurrence:v1:"));
@@ -3447,7 +3447,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   const d = row("d");
   if (row("a") !== a || row("c") !== c) fail("moved keyed component rows were recreated");
   if (d === null) fail("new keyed component row was not created");
-  if (expectStructuralMaterialization && (a.querySelector("button") !== listLeafA || listLeafA.textContent !== "Leaf:1" || d.querySelector("button")?.textContent !== "Leaf:0")) {
+  if (expectStructuralMaterialization && (a.querySelector("button") !== listLeafA || listLeafA.textContent !== "Leaf: 1" || d.querySelector("button")?.textContent !== "Leaf: 0")) {
     fail("keyed structural occurrence was not retained or created exactly");
   }
   if (expectStructuralMaterialization && (runtime.structural_effect_runs.length !== structuralEffectRunsBeforeReconcile + 1

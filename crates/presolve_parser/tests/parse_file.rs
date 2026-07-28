@@ -15,6 +15,14 @@ fn jsx_root_element(root: &ParsedJsxNode) -> &ParsedJsxElement {
     element
 }
 
+fn jsx_text_value(child: &ParsedJsxChild) -> &str {
+    let ParsedJsxChild::Text { value, .. } = child else {
+        panic!("expected JSX text child");
+    };
+
+    value
+}
+
 #[test]
 fn parses_module_imports_and_exports() {
     let parsed = parse_file(
@@ -177,6 +185,41 @@ class CodeExample extends Component {
     };
 
     assert_eq!(value, "<button>A & B{ok} \"quoted\" 'single' ©");
+}
+
+#[test]
+fn retains_inline_jsx_text_boundary_whitespace() {
+    let parsed = parse_file(
+        "CodeExample.tsx",
+        r#"
+class CodeExample extends Component {
+  render() {
+    return <code><span>import &#123; </span><span>Component</span><span> &#125; from</span></code>;
+  }
+}
+"#,
+    );
+
+    assert!(parsed.diagnostics.is_empty());
+    let render = parsed.classes[0]
+        .methods
+        .iter()
+        .find(|method| method.name == "render")
+        .expect("expected render method");
+    let root = jsx_root_element(&render.jsx_roots[0]);
+    let ParsedJsxChild::Element(import) = &root.children[0] else {
+        panic!("expected first inline code span");
+    };
+    let ParsedJsxChild::Element(component) = &root.children[1] else {
+        panic!("expected second inline code span");
+    };
+    let ParsedJsxChild::Element(from) = &root.children[2] else {
+        panic!("expected third inline code span");
+    };
+
+    assert_eq!(jsx_text_value(&import.children[0]), "import { ");
+    assert_eq!(jsx_text_value(&component.children[0]), "Component");
+    assert_eq!(jsx_text_value(&from.children[0]), " } from");
 }
 
 #[test]
@@ -776,7 +819,7 @@ fn parses_nested_jsx_fixture() {
     let ParsedJsxChild::Text { value, span } = &button.children[0] else {
         panic!("expected nested text child");
     };
-    assert_eq!(value, "Count:");
+    assert_eq!(value, "Count: ");
     assert_eq!(span.line, 13);
     assert_eq!(span.column, 50);
 
