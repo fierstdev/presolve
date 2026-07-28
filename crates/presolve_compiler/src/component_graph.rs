@@ -186,6 +186,7 @@ pub struct AuthoredValidationRuleDeclarationFact {
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthoredSubmissionDeclarationFact {
+    pub native_inline: bool,
     pub id: SubmissionDeclarationCandidateId,
     pub owner_component: Option<SemanticId>,
     pub method: Option<SemanticId>,
@@ -1886,6 +1887,7 @@ pub fn build_v2_component_graph_for_module(
         let mut form_field_declaration_candidates = Vec::new();
         let mut validation_rule_declaration_facts = Vec::new();
         let mut serialization_declaration_facts = Vec::new();
+        let mut submission_declaration_facts = Vec::new();
         for candidate in authored.declarations.iter().filter(|candidate| {
             candidate.kind == crate::CanonicalAuthoredDeclarationKindV1::Form
                 && candidate.subject.starts_with(&format!("{}.", class.name))
@@ -2109,6 +2111,85 @@ pub fn build_v2_component_graph_for_module(
                     });
                 }
             }
+            if let Some(submit) = shape.submit.as_ref() {
+                let handler = &submit.handler;
+                if submit.parameter_count != 1
+                    || handler.is_expression_body
+                    || !handler.unsupported_statement_spans.is_empty()
+                    || handler
+                        .state_updates
+                        .iter()
+                        .any(|update| !canonical_state_names.contains(update.field.as_str()))
+                {
+                    diagnostics.push(ComponentDiagnostic::error(
+                        "PSV2F1006",
+                        format!(
+                            "canonical V2 Form `{}` has an unsupported inline submit handler",
+                            candidate.subject
+                        ),
+                    ));
+                    continue;
+                }
+                let Some(operands) = v2_action_operands(handler, class) else {
+                    diagnostics.push(ComponentDiagnostic::error(
+                        "PSV2F1007",
+                        format!(
+                            "canonical V2 Form `{}` has unsupported submit operands",
+                            candidate.subject
+                        ),
+                    ));
+                    continue;
+                };
+                let method_name = format!("__submit_{name}");
+                let endpoint_id = id.action_endpoint(&method_name);
+                let submit_provenance = SourceProvenance::new(&parsed.path, submit.span);
+                provenance.insert(endpoint_id.clone(), submit_provenance.clone());
+                action_endpoints.push(ActionEndpoint {
+                    id: endpoint_id.clone(),
+                    owner: SemanticOwner::entity(id.clone()),
+                    name: method_name.clone(),
+                });
+                actions.extend(
+                    handler
+                        .state_updates
+                        .iter()
+                        .enumerate()
+                        .map(|(index, update)| ComponentAction {
+                            id: id.action(&method_name, index),
+                            owner: SemanticOwner::entity(endpoint_id.clone()),
+                            method: method_name.clone(),
+                            operation: state_operation_from_v2_parsed(&update.operation, &operands),
+                            field: update.field.clone(),
+                        }),
+                );
+                submission_declaration_facts.push(AuthoredSubmissionDeclarationFact {
+                    native_inline: true,
+                    id: SubmissionDeclarationCandidateId::for_source_position(
+                        &parsed.path,
+                        submit.span.start,
+                    ),
+                    owner_component: Some(id.clone()),
+                    method: Some(endpoint_id),
+                    method_name: Some(method_name),
+                    is_static: false,
+                    is_async: submit.is_async,
+                    parameter_count: submit.parameter_count,
+                    return_type: None,
+                    submit_invoked: true,
+                    submit_argument_count: 1,
+                    form_designator: Some(name.to_owned()),
+                    has_action: true,
+                    action_invoked: true,
+                    action_argument_count: 0,
+                    inherited: false,
+                    decorator_provenance: submit_provenance.clone(),
+                    form_designator_provenance: Some(SourceProvenance::new(
+                        &parsed.path,
+                        property.name_span,
+                    )),
+                    method_provenance: submit_provenance,
+                });
+            }
         }
         components.push(ComponentNode {
             id: id.clone(),
@@ -2136,7 +2217,7 @@ pub fn build_v2_component_graph_for_module(
             route_loader_declaration_candidates: Vec::new(),
             form_field_declaration_candidates,
             validation_rule_declaration_facts,
-            submission_declaration_facts: Vec::new(),
+            submission_declaration_facts,
             serialization_declaration_facts,
             opaque_action_facts: Vec::new(),
             server_action_facts: Vec::new(),
@@ -3130,6 +3211,7 @@ fn submission_declaration_facts_from_class(
                 .iter()
                 .filter(move |decorator| decorator.name == "submit")
                 .map(move |decorator| AuthoredSubmissionDeclarationFact {
+                    native_inline: false,
                     id: SubmissionDeclarationCandidateId::for_source_position(
                         path,
                         decorator.span.start,

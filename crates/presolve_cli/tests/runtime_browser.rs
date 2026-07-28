@@ -1114,19 +1114,23 @@ fn decorator_free_v2_form_fields_bind_and_validate_in_a_real_browser() {
         .expect("failed to create V2 Form source root");
     fs::write(
         project_root.join("app/routes/index.tsx"),
-        r#"import { Component, defineForm, field, required } from "presolve";
+        r#"import { Component, defineForm, field, required, state } from "presolve";
 
 export class Contact extends Component {
+  submitted = state(0);
   contact = defineForm({
     serialization: "form-data",
     fields: {
       name: field({ initial: "", validate: [required()] }),
       subscribed: field({ initial: false }),
     },
+    submit: async ({ value, signal }) => {
+      this.submitted += 1;
+    },
   });
 
   render() {
-    return <main><input bind:value={this.contact.fields.name} /><input type="checkbox" bind:checked={this.contact.fields.subscribed} /><output>{this.contact.fields.name}</output></main>;
+    return <main><form form={this.contact}><input bind:value={this.contact.fields.name} /><input type="checkbox" bind:checked={this.contact.fields.subscribed} /><button type="submit">Send</button></form><output>{this.submitted}</output></main>;
   }
 }
 "#,
@@ -1151,7 +1155,7 @@ process.stdout.write(JSON.stringify({
   schemaVersion: 7,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
-  states: [],
+  states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
   actions: [],
   effects: [],
   slots: [],
@@ -1190,6 +1194,7 @@ process.stdout.write(JSON.stringify({
             .len(),
         1
     );
+    assert_eq!(artifact["hosts"].as_array().unwrap().len(), 1);
 
     let index = fs::read_to_string(output_root.join("index.html")).expect("built V2 Form page");
     let probe = index.replace(
@@ -1207,6 +1212,10 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => { const d
   const fields = [...instance.fields.values()].sort((left, right) => left.path.join(".").localeCompare(right.path.join(".")));
   if (fields[0].value !== "Ada" || !fields[0].dirty || fields[0].validation.length !== 0) fail("bind:value did not update and validate the canonical Field");
   if (fields[1].value !== true || !fields[1].dirty) fail("bind:checked did not update the canonical Field");
+  const submit = new Event("submit", { bubbles: true, cancelable: true });
+  document.querySelector("form").dispatchEvent(submit);
+  await waitFor(() => window.__PRESOLVE__.components[0].state.submitted === 1, "inline submit action");
+  if (!submit.defaultPrevented || instance.submission !== "Completed") fail("native inline submit did not complete through the compiler host");
   if (window.__PRESOLVE__.diagnostics.length !== 0) fail("runtime reported V2 Form diagnostics");
   document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_V2_FORM_BROWSER_PASS</div>");
 })().catch((error) => { document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_V2_FORM_BROWSER_FAIL: ${error.message}</div>`); console.error(error); });

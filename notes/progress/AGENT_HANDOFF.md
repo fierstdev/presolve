@@ -42,11 +42,17 @@ identity. A real-browser acceptance project proves cold boot, input/change
 updates, built-in validation, exact runtime artifacts, and stable resume with
 control synchronization.
 
+Inline `submit` now lowers natively into a compiler-owned V2 action endpoint,
+submission plan, host record, serialization step, and browser execution. The
+admitted first subset accepts a one-parameter sync or async callback containing
+canonical State updates; unsupported statements and unowned State writes fail
+closed with V2 diagnostics.
+
 ## Next slice
 
-Lower inline submit into a native V2 submission/action product without adapting
-it through legacy decorated-method semantics. Add Standard Schema validation
-and `bind:files`, with files explicitly excluded from resumable payloads.
+Broaden native inline submit/action execution to admitted imported capability
+calls with abort signals, then add Standard Schema validation and `bind:files`,
+with files explicitly excluded from resumable payloads.
 
 ## Verification
 
@@ -58,4 +64,4 @@ and `bind:files`, with files explicitly excluded from resumable payloads.
 - `pnpm exec tsc -p tests/framework-public-api/tsconfig.json`
 - `cargo test -p presolve-cli --test runtime_browser decorator_free_v2_form_fields_bind_and_validate_in_a_real_browser -- --nocapture`
 
-Beta readiness estimate after the binding/resume gate: 87%.
+Beta readiness estimate after the native submission gate: 89%.

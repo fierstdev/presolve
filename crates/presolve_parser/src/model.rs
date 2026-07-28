@@ -246,6 +246,7 @@ pub struct ParsedFormSubmitShape {
     pub span: SourceSpan,
     pub is_async: bool,
     pub parameter_count: usize,
+    pub handler: ParsedInlineHandler,
 }
 
 /// Source-faithful facts for a direct class-field initializer call.

@@ -240,14 +240,20 @@ fn lower_candidate(
     if fact.is_static {
         violations.push(SubmissionDeclarationViolation::StaticMethod);
     }
-    if fact.is_async {
-        violations.push(SubmissionDeclarationViolation::AsyncMethod);
-    }
-    if fact.parameter_count != 0 {
-        violations.push(SubmissionDeclarationViolation::ParameterizedMethod);
-    }
-    if fact.return_type.as_deref() != Some("void") {
-        violations.push(SubmissionDeclarationViolation::InvalidReturnType);
+    if fact.native_inline {
+        if fact.parameter_count != 1 {
+            violations.push(SubmissionDeclarationViolation::ParameterizedMethod);
+        }
+    } else {
+        if fact.is_async {
+            violations.push(SubmissionDeclarationViolation::AsyncMethod);
+        }
+        if fact.parameter_count != 0 {
+            violations.push(SubmissionDeclarationViolation::ParameterizedMethod);
+        }
+        if fact.return_type.as_deref() != Some("void") {
+            violations.push(SubmissionDeclarationViolation::InvalidReturnType);
+        }
     }
     if fact.inherited {
         violations.push(SubmissionDeclarationViolation::InheritedDeclaration);

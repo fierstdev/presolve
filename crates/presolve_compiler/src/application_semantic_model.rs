@@ -4765,7 +4765,7 @@ mod tests {
     fn file_route_assembly_projects_canonical_v2_form_into_existing_form_products() {
         let unit = CompilationUnit::parse_sources([(
             "app/routes/contact.tsx",
-            "import { Component, defineForm, field, required } from \"presolve\"; export class Contact extends Component { contact = defineForm({ serialization: \"form-data\", fields: { email: field({ initial: \"\", validate: [required()] }) } }); render() { return <form form={this.contact}><input bind:value={this.contact.fields.email} /></form>; } }",
+            "import { Component, defineForm, field, required, state } from \"presolve\"; export class Contact extends Component { contact = defineForm({ serialization: \"form-data\", fields: { email: field({ initial: \"\", validate: [required()] }) }, submit: async ({ value, signal }) => { this.submitted += 1; } }); submitted = state(0); render() { return <form form={this.contact}><input bind:value={this.contact.fields.email} /><button type=\"submit\">Send</button></form>; } }",
         )]);
         let parsed = &unit.files()[0];
         let class = &parsed.classes[0];
@@ -4776,6 +4776,7 @@ mod tests {
             .expect("static Form shape")
             .fields[0];
         let validation = &field.validations[0];
+        let state_property = &class.properties[1];
         let model = CanonicalAuthoredSemanticModelV1 {
             schema_version: crate::CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION,
             source_path: parsed.path.clone(),
@@ -4832,6 +4833,18 @@ mod tests {
                     }),
                     derived_evidence: None,
                 },
+                CanonicalAuthoredDeclarationV1 {
+                    kind: CanonicalAuthoredDeclarationKindV1::State,
+                    subject: "Contact.submitted".into(),
+                    source: crate::AuthoredSourceRangeV1 {
+                        start: state_property.span.start,
+                        end: state_property.span.end,
+                        line: state_property.span.line,
+                        column: state_property.span.column,
+                    },
+                    intrinsic_identity: None,
+                    derived_evidence: None,
+                },
             ],
         };
         let asm =
@@ -4857,6 +4870,8 @@ mod tests {
             asm.validation_rules()[0].kind,
             crate::ValidationRuleKind::Required
         );
+        assert_eq!(asm.submissions.plans.len(), 1);
+        assert_eq!(asm.submission_hosts.len(), 1);
         assert_eq!(
             asm.serialization
                 .plans

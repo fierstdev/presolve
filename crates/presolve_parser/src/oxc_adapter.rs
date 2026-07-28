@@ -976,11 +976,27 @@ fn parsed_form_submit_shape(
             span: source_span(source, handler.span),
             is_async: handler.r#async,
             parameter_count: handler.params.items.len(),
+            handler: parsed_inline_handler_body(
+                handler.span,
+                &handler.body,
+                handler.r#async,
+                handler.expression,
+                parsed_inline_handler_parameters(&handler.params, source),
+                source,
+            ),
         }),
         Expression::FunctionExpression(handler) => Some(ParsedFormSubmitShape {
             span: source_span(source, handler.span),
             is_async: handler.r#async,
             parameter_count: handler.params.items.len(),
+            handler: parsed_inline_handler_body(
+                handler.span,
+                handler.body.as_deref()?,
+                handler.r#async,
+                false,
+                parsed_inline_handler_parameters(&handler.params, source),
+                source,
+            ),
         }),
         _ => None,
     }
