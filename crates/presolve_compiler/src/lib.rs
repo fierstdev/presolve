@@ -505,7 +505,7 @@ pub use form_field::{collect_form_field_products, FormFieldEntity, FormFieldProd
 pub use form_field_definition_lowering::{
     form_field_definition_sites_v1, lower_form_field_definitions_v1,
     FormFieldDefinitionLoweringErrorV1, FormFieldDefinitionLoweringV1, FormFieldDefinitionSiteV1,
-    ResolvedFormFieldDefinitionV1,
+    ResolvedFormFieldDefinitionV1, ResolvedFormFieldValueClassificationV1,
 };
 pub use form_inspection::{build_form_inspection_registry, FormInspection, FormInspectionRegistry};
 pub use form_ir::{
@@ -1065,15 +1065,16 @@ pub use v2_authoring_lowering::{
 };
 pub use v2_authority_request::{
     build_v2_authority_component_request_v1, build_v2_authority_request_v1,
-    build_v2_environment_authority_request_v1, V2AuthorityCanonicalV1, V2AuthorityMemberSiteV1,
-    V2AuthorityPositionV1, V2AuthorityRequestErrorV1, V2AuthorityRequestV1, V2AuthoritySiteV1,
-    V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
+    build_v2_environment_authority_request_v1, V2AuthorityCanonicalV1, V2AuthorityFormFieldSiteV1,
+    V2AuthorityMemberSiteV1, V2AuthorityPositionV1, V2AuthorityRequestErrorV1,
+    V2AuthorityRequestV1, V2AuthoritySiteV1, V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
 };
 pub use v2_authority_response::{
     v2_authoring_resolutions_from_response_v1, v2_environment_public_resolutions_from_response_v1,
-    validate_v2_authority_response_v1, ResolvedEnvironmentPublicReadV1, V2AuthorityIdentityV1,
-    V2AuthorityResolutionV1, V2AuthorityResponseErrorV1, V2AuthorityResponseV1,
-    V2_AUTHORITY_RESPONSE_SCHEMA_VERSION,
+    validate_v2_authority_response_v1, ResolvedEnvironmentPublicReadV1,
+    V2AuthorityFormFieldResolutionV1, V2AuthorityFormFieldValueClassificationV1,
+    V2AuthorityIdentityV1, V2AuthorityResolutionV1, V2AuthorityResponseErrorV1,
+    V2AuthorityResponseV1, V2_AUTHORITY_RESPONSE_SCHEMA_VERSION,
 };
 
 #[cfg(test)]

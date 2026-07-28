@@ -156,6 +156,7 @@ pub fn resume_value_codec(
         | SemanticType::Never
         | SemanticType::Form
         | SemanticType::SlotContent => Err(ResumeSchemaBlockReason::MalformedSemanticType),
+        SemanticType::File => Err(ResumeSchemaBlockReason::UnsupportedValue),
         SemanticType::Tuple(_) | SemanticType::Resource(_) => {
             Err(ResumeSchemaBlockReason::UnsupportedValue)
         }

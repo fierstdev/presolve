@@ -1123,6 +1123,7 @@ export class Contact extends Component {
     fields: {
       name: field({ initial: "", validate: [required()] }),
       subscribed: field({ initial: false }),
+      attachments: field<File[]>({ initial: [], validate: [required()] }),
     },
     submit: async ({ value, signal }) => {
       this.submitted += 1;
@@ -1130,7 +1131,7 @@ export class Contact extends Component {
   });
 
   render() {
-    return <main><form form={this.contact}><input bind:value={this.contact.fields.name} /><input type="checkbox" bind:checked={this.contact.fields.subscribed} /><button type="submit">Send</button></form><output>{this.submitted}</output></main>;
+    return <main><form form={this.contact}><input bind:value={this.contact.fields.name} /><input type="checkbox" bind:checked={this.contact.fields.subscribed} /><input type="file" bind:files={this.contact.fields.attachments} /><button type="submit">Send</button></form><output>{this.submitted}</output></main>;
   }
 }
 "#,
@@ -1152,7 +1153,7 @@ const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 const sourceAt = site => readFileSync(site.file, "utf8").slice(site.position);
 process.stdout.write(JSON.stringify({
-  schemaVersion: 7,
+  schemaVersion: 8,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
@@ -1160,7 +1161,11 @@ process.stdout.write(JSON.stringify({
   effects: [],
   slots: [],
   forms: request.forms.map(site => ({ id: site.id, identity: identity("defineForm") })),
-  formFields: request.formFields.map(site => ({ id: site.id, identity: identity("field") })),
+  formFields: request.formFields.map(site => ({
+    id: site.id,
+    identity: identity("field"),
+    ...(sourceAt(site).startsWith("field<File[]>") ? { valueClassification: "file_array" } : {}),
+  })),
   validations: request.validations.map(site => ({ id: site.id, identity: identity(sourceAt(site).startsWith("required") ? "required" : "unknown") })),
   environmentPublic: [],
 }));
@@ -1186,13 +1191,13 @@ process.stdout.write(JSON.stringify({
         .expect("V2 Form runtime artifact");
     let artifact: serde_json::Value =
         serde_json::from_str(&artifact).expect("V2 Form runtime artifact JSON");
-    assert_eq!(artifact["forms"][0]["fields"].as_array().unwrap().len(), 2);
+    assert_eq!(artifact["forms"][0]["fields"].as_array().unwrap().len(), 3);
     assert_eq!(
         artifact["forms"][0]["validation_rules"]
             .as_array()
             .unwrap()
             .len(),
-        1
+        2
     );
     assert_eq!(artifact["hosts"].as_array().unwrap().len(), 1);
 
@@ -1205,13 +1210,27 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => { const d
 (async () => {
   await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
   if (window.__PRESOLVE__.resume.mode !== "cold") fail("fresh V2 Form boot did not select cold mode");
-  const [name, subscribed] = document.querySelectorAll("input");
+  const [name, subscribed, attachments] = document.querySelectorAll("input");
   name.value = "Ada"; name.dispatchEvent(new Event("input", { bubbles: true }));
   subscribed.checked = true; subscribed.dispatchEvent(new Event("change", { bubbles: true }));
+  const transfer = new DataTransfer();
+  transfer.items.add(new File(["proof"], "proof.txt", { type: "text/plain" }));
+  attachments.files = transfer.files;
+  attachments.dispatchEvent(new Event("change", { bubbles: true }));
   const instance = window.__PRESOLVE__.store.formInstances.values().next().value;
-  const fields = [...instance.fields.values()].sort((left, right) => left.path.join(".").localeCompare(right.path.join(".")));
-  if (fields[0].value !== "Ada" || !fields[0].dirty || fields[0].validation.length !== 0) fail("bind:value did not update and validate the canonical Field");
-  if (fields[1].value !== true || !fields[1].dirty) fail("bind:checked did not update the canonical Field");
+  const stateFor = (name) => {
+    const definition = instance.definition.fields.find((field) => field.debug_name === name);
+    return definition === undefined ? undefined : instance.fields.get(definition.id);
+  };
+  if (stateFor("name").value !== "Ada" || !stateFor("name").dirty || stateFor("name").validation.length !== 0) fail("bind:value did not update and validate the canonical Field");
+  if (stateFor("subscribed").value !== true || !stateFor("subscribed").dirty) fail("bind:checked did not update the canonical Field");
+  if (stateFor("attachments").value.length !== 1 || stateFor("attachments").value[0].name !== "proof.txt" || !stateFor("attachments").dirty || stateFor("attachments").validation.length !== 0) fail("bind:files did not commit the platform File array");
+  const attachmentId = instance.definition.fields.find((field) => field.debug_name === "attachments").id;
+  if (!window.__PRESOLVE_FORMS__.resetField(instance.instance.id, attachmentId) || attachments.files.length !== 0 || stateFor("attachments").value.length !== 0) fail("file field reset did not clear native and compiler state");
+  const secondTransfer = new DataTransfer();
+  secondTransfer.items.add(new File(["proof"], "proof.txt", { type: "text/plain" }));
+  attachments.files = secondTransfer.files;
+  attachments.dispatchEvent(new Event("change", { bubbles: true }));
   const submit = new Event("submit", { bubbles: true, cancelable: true });
   document.querySelector("form").dispatchEvent(submit);
   await waitFor(() => window.__PRESOLVE__.components[0].state.submitted === 1, "inline submit action");
@@ -1245,6 +1264,14 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => { const d
         .expect("V2 Form resume manifest");
     let resume_manifest: serde_json::Value =
         serde_json::from_str(&resume_json).expect("V2 Form resume manifest JSON");
+    assert!(
+        resume_manifest["slot_schemas"]
+            .as_array()
+            .expect("V2 Form slot schemas")
+            .iter()
+            .all(|schema| schema["semantic_type"] != "File[]"),
+        "file values must not receive resume slots"
+    );
     let component_json = fs::read_to_string(output_root.join("component.runtime.json"))
         .expect("V2 Form component artifact");
     let component_artifact: serde_json::Value =
@@ -1292,6 +1319,10 @@ const fields = [...runtime.store.formInstances.values().next().value.fields.valu
 if (!fields.some((field) => field.value === "Grace") || !fields.some((field) => field.value === true)) fail("V2 Form Field slots were not restored");
 const controls = document.querySelectorAll("input");
 if (controls[0].value !== "Grace" || controls[1].checked !== true) fail("V2 Form controls were not synchronized from resume");
+const instance = runtime.store.formInstances.values().next().value;
+const fileDefinition = instance.definition.fields.find((field) => field.debug_name === "attachments");
+const fileState = instance.fields.get(fileDefinition.id);
+if (controls[2].files.length !== 0 || fileState.value.length !== 0 || fileState.dirty || fileState.touched || fileState.validation.length !== 1 || instance.aggregate_valid) fail("non-resumable file field did not cold-reset and revalidate");
 if (runtime.diagnostics.some((diagnostic) => diagnostic.fatal)) fail("V2 Form resume reported fatal diagnostics");"#,
         "PRESOLVE_V2_FORM_RESUME_PASS",
     );
@@ -2768,7 +2799,7 @@ const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 const resolves = (site, name) => readFileSync(site.file, "utf8").slice(site.position).startsWith(name);
 process.stdout.write(JSON.stringify({
-  schemaVersion: 7,
+  schemaVersion: 8,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.filter(site => resolves(site, "state")).map(site => ({ id: site.id, identity: identity("state") })),
@@ -3154,7 +3185,7 @@ const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 const resolves = (site, name) => readFileSync(site.file, "utf8").slice(site.position).startsWith(name);
 process.stdout.write(JSON.stringify({
-  schemaVersion: 7,
+  schemaVersion: 8,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.filter(site => resolves(site, "state")).map(site => ({ id: site.id, identity: identity("state") })),
@@ -4181,7 +4212,7 @@ import { readFileSync } from "node:fs";
 const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 process.stdout.write(JSON.stringify({
-  schemaVersion: 7,
+  schemaVersion: 8,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.map(site => ({ id: site.id, identity: identity("state") })),

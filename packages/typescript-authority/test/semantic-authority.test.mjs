@@ -234,6 +234,12 @@ test("the V2 authoring bridge resolves canonical decorator-free Form evidence", 
       id: "profile-name",
       file: formFile,
       position: formSource.indexOf("field({"),
+      initialPosition: formSource.indexOf('initial: ""') + "initial: ".length,
+    }, {
+      id: "profile-attachments",
+      file: formFile,
+      position: formSource.indexOf("field<Uploads>"),
+      initialPosition: formSource.indexOf("initial: []") + "initial: ".length,
     }],
     validations: [{
       id: "profile-name-required",
@@ -244,8 +250,10 @@ test("the V2 authoring bridge resolves canonical decorator-free Form evidence", 
   });
   assert.deepEqual(result.forms.map(entry => entry.id), ["profile-form"]);
   assert.equal(result.forms[0].identity.name, "defineForm");
-  assert.deepEqual(result.formFields.map(entry => entry.id), ["profile-name"]);
+  assert.deepEqual(result.formFields.map(entry => entry.id), ["profile-name", "profile-attachments"]);
   assert.equal(result.formFields[0].identity.name, "field");
+  assert.equal(result.formFields[0].valueClassification, undefined);
+  assert.equal(result.formFields[1].valueClassification, "file_array");
   assert.deepEqual(result.validations.map(entry => entry.id), ["profile-name-required"]);
   assert.equal(result.validations[0].identity.name, "required");
 });

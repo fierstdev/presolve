@@ -48,11 +48,21 @@ admitted first subset accepts a one-parameter sync or async callback containing
 canonical State updates; unsupported statements and unowned State writes fail
 closed with V2 diagnostics.
 
+Decorator-free file controls now have an authority-backed platform-value path:
+
+- V2 authority schema v8 classifies `field<File[]>` from the resolved generic
+  signature and the configured DOM `File` identity;
+- only `<input type="file" bind:files={...}>` and FormData serialization admit
+  the value;
+- runtime change, reset, required validation, and native file-control behavior
+  have real-browser proof; and
+- file value/tracking/validation slots are excluded from resume, while other
+  fields resume and the Form deterministically revalidates after rebinding.
+
 ## Next slice
 
-Broaden native inline submit/action execution to admitted imported capability
-calls with abort signals, then add Standard Schema validation and `bind:files`,
-with files explicitly excluded from resumable payloads.
+Add Standard Schema validation, then broaden native inline submit/action
+execution to admitted imported capability calls with abort signals.
 
 ## Verification
 
@@ -64,4 +74,4 @@ with files explicitly excluded from resumable payloads.
 - `pnpm exec tsc -p tests/framework-public-api/tsconfig.json`
 - `cargo test -p presolve-cli --test runtime_browser decorator_free_v2_form_fields_bind_and_validate_in_a_real_browser -- --nocapture`
 
-Beta readiness estimate after the native submission gate: 89%.
+Beta readiness estimate after the file binding gate: 91%.

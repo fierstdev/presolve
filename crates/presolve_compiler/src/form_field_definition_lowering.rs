@@ -17,12 +17,19 @@ pub struct FormFieldDefinitionSiteV1 {
     pub owner_form_subject: String,
     pub declaration_source: AuthoredSourceRangeV1,
     pub callee_source: AuthoredSourceRangeV1,
+    pub initial_source: Option<AuthoredSourceRangeV1>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResolvedFormFieldValueClassificationV1 {
+    FileArray,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedFormFieldDefinitionV1 {
     pub callee_source: AuthoredSourceRangeV1,
     pub field_identity: ResolvedIntrinsicIdentityV1,
+    pub value_classification: Option<ResolvedFormFieldValueClassificationV1>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -98,6 +105,7 @@ pub fn form_field_definition_sites_v1(
                         owner_form_subject: owner_form_subject.clone(),
                         declaration_source: range(field.declaration_span),
                         callee_source: range(field.callee_span),
+                        initial_source: field.initial_span.map(range),
                     })
             })
         })
@@ -172,8 +180,27 @@ pub fn lower_form_field_definitions_v1(
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let model = normalize_authored_semantics_v1(parsed, candidates)
+    let mut model = normalize_authored_semantics_v1(parsed, candidates)
         .map_err(FormFieldDefinitionLoweringErrorV1::InvalidAuthoredSemantics)?;
+    for declaration in &mut model.declarations {
+        let Some((_, resolution)) = sites
+            .iter()
+            .filter_map(|site| {
+                resolution_by_site
+                    .get(&range_key(site.callee_source))
+                    .map(|resolution| (site, resolution))
+            })
+            .find(|(site, _)| site.subject == declaration.subject)
+        else {
+            continue;
+        };
+        if resolution.value_classification
+            == Some(ResolvedFormFieldValueClassificationV1::FileArray)
+        {
+            declaration.derived_evidence =
+                Some(crate::DerivedAuthoredEvidenceV2::FormFieldFileArray);
+        }
+    }
     Ok(FormFieldDefinitionLoweringV1 { sites, model })
 }
 
@@ -254,6 +281,7 @@ mod tests {
             sites[..2].iter().map(|site| ResolvedFormFieldDefinitionV1 {
                 callee_source: site.callee_source,
                 field_identity: identity("field"),
+                value_classification: None,
             }),
         )
         .unwrap();

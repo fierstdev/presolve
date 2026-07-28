@@ -25,6 +25,7 @@ pub enum FormInputKind {
     Week,
     Range,
     Hidden,
+    File,
 }
 
 impl FormInputKind {
@@ -46,6 +47,7 @@ impl FormInputKind {
             "week" => Self::Week,
             "range" => Self::Range,
             "hidden" => Self::Hidden,
+            "file" => Self::File,
             _ => return None,
         })
     }
@@ -55,6 +57,7 @@ impl FormInputKind {
             Self::Number | Self::Range => FormControlChannel::NumericValue,
             Self::Checkbox => FormControlChannel::Checked,
             Self::Radio => FormControlChannel::RadioValue,
+            Self::File => FormControlChannel::Files,
             Self::Text
             | Self::Email
             | Self::Password
@@ -79,6 +82,7 @@ pub enum FormControlChannel {
     RadioValue,
     SelectedValue,
     SelectedValues,
+    Files,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -90,6 +94,7 @@ pub enum FormControlNormalization {
     Boolean,
     Scalar,
     ScalarArray,
+    FileArray,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -336,10 +341,13 @@ fn collect_element_candidates(
             "bind:checked" if candidate.channel != Some(FormControlChannel::Checked) => {
                 candidate.add_violation(FormFieldBindingViolation::IncompatibleControlType);
             }
-            "bind:files" => {
+            "bind:files" if candidate.channel != Some(FormControlChannel::Files) => {
                 candidate.add_violation(FormFieldBindingViolation::IncompatibleControlType);
             }
-            "bind:value" | "bind:checked" | "field" => {}
+            "bind:value" if candidate.channel == Some(FormControlChannel::Files) => {
+                candidate.add_violation(FormFieldBindingViolation::IncompatibleControlType);
+            }
+            "bind:value" | "bind:checked" | "bind:files" | "field" => {}
             _ => unreachable!("selected Form binding attribute"),
         }
         resolve_field(component, fields, field_candidates, forms, &mut candidate);
@@ -815,6 +823,7 @@ fn classify_compatibility(candidate: &mut FormFieldBindingCandidate) {
         FormControlChannel::RadioValue => scalar_compatibility(field_type, false),
         FormControlChannel::SelectedValue => scalar_compatibility(field_type, true),
         FormControlChannel::SelectedValues => array_scalar_compatibility(field_type),
+        FormControlChannel::Files => file_array_compatibility(field_type),
     };
     candidate.compatibility = Some(compatibility);
     if compatibility == FormControlCompatibility::Incompatible {
@@ -928,6 +937,17 @@ fn array_scalar_compatibility(semantic_type: &SemanticType) -> FormControlCompat
         == FormControlCompatibility::Compatible(FormControlNormalization::Scalar)
     {
         FormControlCompatibility::Compatible(FormControlNormalization::ScalarArray)
+    } else {
+        FormControlCompatibility::Incompatible
+    }
+}
+
+fn file_array_compatibility(semantic_type: &SemanticType) -> FormControlCompatibility {
+    if matches!(
+        semantic_type,
+        SemanticType::Array(element) if element.as_ref() == &SemanticType::File
+    ) {
+        FormControlCompatibility::Compatible(FormControlNormalization::FileArray)
     } else {
         FormControlCompatibility::Incompatible
     }
@@ -1290,7 +1310,7 @@ class InvalidBindings {
       <div field={this.text} />
       <button field={this.text} />
       <MyInput field={this.text} />
-      <input type="file" field={this.text} />
+      <input type="color" field={this.text} />
       <input type={this.kind} field={this.text} />
       <textarea field={this.text}>Initial</textarea>
       <select multiple={this.multiple} field={this.tags} />
@@ -1509,7 +1529,7 @@ class BindingRules {
         assert!(supported
             .iter()
             .all(|kind| super::FormInputKind::from_static(kind).is_some()));
-        assert!(super::FormInputKind::from_static("file").is_none());
+        assert!(super::FormInputKind::from_static("file").is_some());
         assert!(super::FormInputKind::from_static("color").is_none());
     }
 

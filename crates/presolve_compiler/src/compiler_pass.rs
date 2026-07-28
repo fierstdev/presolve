@@ -763,6 +763,7 @@ fn is_text_renderable(semantic_type: &crate::SemanticType) -> bool {
         crate::SemanticType::Never
         | crate::SemanticType::Form
         | crate::SemanticType::SlotContent
+        | crate::SemanticType::File
         | crate::SemanticType::Array(_)
         | crate::SemanticType::Tuple(_)
         | crate::SemanticType::Object(_)
@@ -787,6 +788,7 @@ fn state_initializer_type_name(semantic_type: &crate::SemanticType) -> &'static 
         crate::SemanticType::Boolean | crate::SemanticType::BooleanLiteral(_) => "boolean",
         crate::SemanticType::Number | crate::SemanticType::NumberLiteral(_) => "number",
         crate::SemanticType::String | crate::SemanticType::StringLiteral(_) => "string",
+        crate::SemanticType::File => "File",
         crate::SemanticType::Form => "Form",
         crate::SemanticType::SlotContent => "SlotContent",
         crate::SemanticType::Array(_) => "array",

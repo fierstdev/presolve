@@ -129,6 +129,14 @@ export interface ValidationRule {
 }
 export declare function validate(rule: ValidationRule): PresolveFieldDecorator;
 export declare function required(): ValidationRule;
+export declare function min(value: number): ValidationRule;
+export declare function max(value: number): ValidationRule;
+export declare function minLength(value: number): ValidationRule;
+export declare function maxLength(value: number): ValidationRule;
+export declare function pattern(value: string): ValidationRule;
+export declare function email(): ValidationRule;
+export declare function equals(field: FormField<unknown>): ValidationRule;
+export declare function notEquals(field: FormField<unknown>): ValidationRule;
 export declare function submit(form: string): PresolveMethodDecorator;
 
 export type ResourceState = "idle" | "pending" | "ready" | "failed" | "cancelled";

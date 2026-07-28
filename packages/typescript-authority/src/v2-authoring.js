@@ -5,7 +5,7 @@ import {
   createCanonicalIntrinsicRegistry,
 } from "./index.js";
 
-export const V2_AUTHORED_AUTHORITY_SCHEMA_VERSION = 7;
+export const V2_AUTHORED_AUTHORITY_SCHEMA_VERSION = 8;
 
 /**
  * Resolves explicit source positions for the implemented decorator-free V2
@@ -46,6 +46,12 @@ export async function analyzeV2Authoring(request) {
       file: site.file,
       position: site.position,
     })),
+    signatures: request.formFields
+      .map(site => ({
+        id: `form-field-call:${site.id}`,
+        file: site.file,
+        position: site.position,
+      })),
   };
   const authority = await analyzeTypeScriptProject({
     configFile: request.configFile,
@@ -53,6 +59,7 @@ export async function analyzeV2Authoring(request) {
     queries,
   });
   const symbols = new Map(authority.symbols.map(entry => [entry.id, entry.symbol]));
+  const fieldSignatures = new Map(authority.signatures.map(entry => [entry.id, entry.signature]));
   const registry = createCanonicalIntrinsicRegistry([
     ...(request.canonical.component ? [{ kind: "component", symbol: symbols.get("canonical:component") }] : []),
     ...(request.canonical.state ? [{ kind: "state", symbol: symbols.get("canonical:state") }] : []),
@@ -96,7 +103,15 @@ export async function analyzeV2Authoring(request) {
     }),
     formFields: request.formFields.flatMap(site => {
       const intrinsic = classifyResolvedIntrinsic(registry, symbols.get(`form-field:${site.id}`));
-      return intrinsic?.kind === "field" ? [{ id: site.id, identity: intrinsic.identity }] : [];
+      if (intrinsic?.kind !== "field") return [];
+      const valueClassification = classifyFormFieldValue(
+        fieldSignatures.get(`form-field-call:${site.id}`)?.returnType?.typeArguments?.[0],
+      );
+      return [{
+        id: site.id,
+        identity: intrinsic.identity,
+        ...(valueClassification === undefined ? {} : { valueClassification }),
+      }];
     }),
     validations: request.validations.flatMap(site => {
       const intrinsic = classifyResolvedIntrinsic(registry, symbols.get(`validation:${site.id}`));
@@ -157,6 +172,12 @@ function validateV2AuthoringRequest(request) {
       }
       ids.add(site.id);
       validatePosition(site, `${kind} site`);
+      if (kind === "form field" && site.initialPosition !== undefined) {
+        validatePosition(
+          { file: site.file, position: site.initialPosition },
+          "form field initial value",
+        );
+      }
     }
   }
   if (!Array.isArray(request.validations)) {
@@ -185,6 +206,15 @@ function validateV2AuthoringRequest(request) {
     validatePosition({ file: site.file, position: site.objectPosition }, "environment public object site");
     validatePosition({ file: site.file, position: site.propertyPosition }, "environment public property site");
   }
+}
+
+function classifyFormFieldValue(type) {
+  const identity = type?.arrayElement?.symbol?.identity;
+  if (identity?.name !== "File") return undefined;
+  if (!identity.declarationModules.some(module => /(?:^|\/)lib\.dom\.d\.ts$/.test(module))) {
+    return undefined;
+  }
+  return "file_array";
 }
 
 function validatePosition(value, label) {

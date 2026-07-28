@@ -196,13 +196,11 @@ fn classify(semantic_type: &SemanticType) -> CodecClassificationsV1 {
             semantic_type,
             SemanticType::Unknown | SemanticType::Never
         )),
-        form_serializable: approved(structural),
+        form_serializable: approved(form_serializable(semantic_type)),
         network_serializable: approved(structural),
         html_publishable: approved(html_publishable(semantic_type)),
         resume_serializable: approved(resume_value_codec(semantic_type).is_ok()),
-        structured_cloneable: approved(
-            structural && !matches!(semantic_type, SemanticType::Resource(_)),
-        ),
+        structured_cloneable: approved(structured_cloneable(semantic_type)),
     }
 }
 
@@ -220,6 +218,7 @@ fn structural_serializable(semantic_type: &SemanticType) -> bool {
         | SemanticType::Never
         | SemanticType::Form
         | SemanticType::SlotContent => false,
+        SemanticType::File => false,
         SemanticType::Null
         | SemanticType::Boolean
         | SemanticType::Number
@@ -237,6 +236,31 @@ fn structural_serializable(semantic_type: &SemanticType) -> bool {
                 && structural_serializable(&resource.data)
                 && structural_serializable(&resource.error)
         }
+    }
+}
+
+fn form_serializable(semantic_type: &SemanticType) -> bool {
+    match semantic_type {
+        SemanticType::File => true,
+        SemanticType::Array(item) => form_serializable(item),
+        SemanticType::Tuple(items) | SemanticType::Union(items) => {
+            items.iter().all(form_serializable)
+        }
+        SemanticType::Object(object) => object.properties.values().all(form_serializable),
+        _ => structural_serializable(semantic_type),
+    }
+}
+
+fn structured_cloneable(semantic_type: &SemanticType) -> bool {
+    match semantic_type {
+        SemanticType::File => true,
+        SemanticType::Array(item) => structured_cloneable(item),
+        SemanticType::Tuple(items) | SemanticType::Union(items) => {
+            items.iter().all(structured_cloneable)
+        }
+        SemanticType::Object(object) => object.properties.values().all(structured_cloneable),
+        SemanticType::Resource(_) => false,
+        _ => structural_serializable(semantic_type),
     }
 }
 
@@ -288,6 +312,35 @@ mod tests {
         assert_eq!(
             classifications.html_publishable,
             CodecClassificationV1::Rejected
+        );
+    }
+
+    #[test]
+    fn classifies_platform_files_without_collapsing_resume_and_form_data() {
+        let protocol = build_codec_protocol_v1(&[declaration(
+            "files",
+            SemanticType::Array(Box::new(SemanticType::File)),
+        )]);
+        let classifications = &protocol.codecs[0].classifications;
+        assert_eq!(
+            classifications.runtime_validated,
+            CodecClassificationV1::Approved
+        );
+        assert_eq!(
+            classifications.form_serializable,
+            CodecClassificationV1::Approved
+        );
+        assert_eq!(
+            classifications.network_serializable,
+            CodecClassificationV1::Rejected
+        );
+        assert_eq!(
+            classifications.resume_serializable,
+            CodecClassificationV1::Rejected
+        );
+        assert_eq!(
+            classifications.structured_cloneable,
+            CodecClassificationV1::Approved
         );
     }
 

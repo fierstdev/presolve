@@ -103,6 +103,9 @@ pub enum SemanticType {
     Boolean,
     Number,
     String,
+    /// Browser platform file value. It is admitted only through
+    /// TypeScript-authoritative V2 Form Field evidence.
+    File,
     /// Nominal compile-time marker accepted only by canonical Form declarations.
     Form,
     /// Nominal built-in type accepted only by canonical Slot declarations.
@@ -127,6 +130,7 @@ pub fn semantic_type_text(semantic_type: &SemanticType) -> String {
         SemanticType::Boolean => "boolean".to_string(),
         SemanticType::Number => "number".to_string(),
         SemanticType::String => "string".to_string(),
+        SemanticType::File => "File".to_string(),
         SemanticType::Form => "Form".to_string(),
         SemanticType::SlotContent => "SlotContent".to_string(),
         SemanticType::BooleanLiteral(value) => value.to_string(),
@@ -323,7 +327,8 @@ pub fn serialization_compatibility(semantic_type: &SemanticType) -> Serializatio
         SemanticType::Unknown
         | SemanticType::Never
         | SemanticType::Form
-        | SemanticType::SlotContent => false,
+        | SemanticType::SlotContent
+        | SemanticType::File => false,
         SemanticType::Null
         | SemanticType::Boolean
         | SemanticType::Number

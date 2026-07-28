@@ -11,7 +11,7 @@ use crate::{
     slot_field_sites_v1, AuthoredSourceRangeV1, CanonicalAuthoredSemanticModelV1,
 };
 
-pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 7;
+pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 8;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,6 +35,16 @@ pub struct V2AuthoritySiteV1 {
     pub id: String,
     pub file: PathBuf,
     pub position: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct V2AuthorityFormFieldSiteV1 {
+    pub id: String,
+    pub file: PathBuf,
+    pub position: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub initial_position: Option<usize>,
 }
 
 /// A syntactic member-call candidate.  Rust deliberately records only the
@@ -83,7 +93,7 @@ pub struct V2AuthorityRequestV1 {
     pub effects: Vec<V2AuthoritySiteV1>,
     pub slots: Vec<V2AuthoritySiteV1>,
     pub forms: Vec<V2AuthoritySiteV1>,
-    pub form_fields: Vec<V2AuthoritySiteV1>,
+    pub form_fields: Vec<V2AuthorityFormFieldSiteV1>,
     pub validations: Vec<V2AuthoritySiteV1>,
     pub environment_public: Vec<V2AuthorityMemberSiteV1>,
 }
@@ -232,12 +242,21 @@ pub fn build_v2_authority_request_v1(
         .unwrap_or_default()
         .into_iter()
         .map(|site| {
-            site_for(
+            let selected = site_for(
                 "form-field",
                 site.callee_source,
                 &parsed.path,
                 &parsed.syntax.source,
-            )
+            )?;
+            Ok(V2AuthorityFormFieldSiteV1 {
+                id: selected.id,
+                file: selected.file,
+                position: selected.position,
+                initial_position: site
+                    .initial_source
+                    .map(|range| utf16_position(&parsed.syntax.source, range.start))
+                    .transpose()?,
+            })
         })
         .collect::<Result<Vec<_>, _>>()?;
     let validations = (!validation_rules.is_empty())
@@ -594,6 +613,7 @@ class Profile extends Component {
             &source[request.form_fields[0].position..][.."declareField".len()],
             "declareField"
         );
+        assert!(request.form_fields[0].initial_position.is_some());
         assert_eq!(
             &source[request.validations[0].position..][.."mustExist".len()],
             "mustExist"

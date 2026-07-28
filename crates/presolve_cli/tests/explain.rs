@@ -4647,7 +4647,7 @@ class PackageComputed extends Component {
 }
 
 #[test]
-fn build_command_writes_and_embeds_the_v1_forms_artifact() {
+fn build_command_writes_and_embeds_the_v3_forms_artifact() {
     let repo_root = repo_root();
     let test_dir = repo_root.join("target/presolve-test-output/forms-runtime-artifact");
     let out_dir = test_dir.join("out");
@@ -4692,7 +4692,7 @@ class FormArtifact {
     let forms = std::fs::read_to_string(out_dir.join("forms.runtime.json"))
         .expect("failed to read Forms runtime artifact");
     let forms: serde_json::Value = serde_json::from_str(&forms).expect("Forms artifact JSON");
-    assert_eq!(forms["schema_version"], 2);
+    assert_eq!(forms["schema_version"], 3);
     assert_eq!(forms["forms"].as_array().map(Vec::len), Some(1));
     assert_eq!(forms["instances"].as_array().map(Vec::len), Some(1));
     assert_eq!(forms["hosts"].as_array().map(Vec::len), Some(1));

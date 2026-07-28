@@ -21,6 +21,14 @@ export function field(value) {
 }
 export function validate() { return emptyField; }
 export function required() { return Object.freeze({}); }
+export function min() { return Object.freeze({}); }
+export function max() { return Object.freeze({}); }
+export function minLength() { return Object.freeze({}); }
+export function maxLength() { return Object.freeze({}); }
+export function pattern() { return Object.freeze({}); }
+export function email() { return Object.freeze({}); }
+export function equals() { return Object.freeze({}); }
+export function notEquals() { return Object.freeze({}); }
 export function submit() { return identityClass; }
 export function resource() { return emptyField; }
 export function loader() { return emptyField; }

@@ -524,6 +524,10 @@ pub struct FormFieldDeclarationCandidate {
     pub declaration_kind: AuthoredDeclarationKind,
     pub is_static: bool,
     pub declared_type: Option<DeclaredStateType>,
+    /// Canonical type supplied by the TypeScript-authority boundary for
+    /// platform Form values that cannot be inferred from a serializable
+    /// initializer.
+    pub authority_type: Option<crate::SemanticType>,
     pub semantic_type: Option<crate::SemanticType>,
     pub type_assignment: Option<crate::SemanticTypeAssignment>,
     pub initializer: Option<SerializableValue>,
@@ -1995,12 +1999,12 @@ pub fn build_v2_component_graph_for_module(
             let canonical_field_prefix = format!("{}.", candidate.subject);
             for field in &shape.fields {
                 let field_subject = format!("{}{}", canonical_field_prefix, field.path.join("."));
-                if !authored.declarations.iter().any(|declaration| {
+                let Some(field_declaration) = authored.declarations.iter().find(|declaration| {
                     declaration.kind == crate::CanonicalAuthoredDeclarationKindV1::FormField
                         && declaration.subject == field_subject
-                }) {
+                }) else {
                     continue;
-                }
+                };
                 let field_name = field.path.join(".");
                 let declaration_field = id.form_field(&format!("{name}.{field_name}"));
                 let mut violations = Vec::new();
@@ -2043,6 +2047,11 @@ pub fn build_v2_component_graph_for_module(
                     declaration_kind: AuthoredDeclarationKind::InstanceField,
                     is_static: false,
                     declared_type: None,
+                    authority_type: matches!(
+                        field_declaration.derived_evidence,
+                        Some(crate::DerivedAuthoredEvidenceV2::FormFieldFileArray)
+                    )
+                    .then(|| crate::SemanticType::Array(Box::new(crate::SemanticType::File))),
                     semantic_type: None,
                     type_assignment: None,
                     initializer: field
@@ -3043,6 +3052,7 @@ fn form_field_declaration_candidates_from_class(
                 declaration_kind,
                 is_static: property.is_static,
                 declared_type,
+                authority_type: None,
                 semantic_type: None,
                 type_assignment: None,
                 initializer,
@@ -3465,6 +3475,7 @@ fn retain_non_property_form_field_candidates(
             declaration_kind,
             is_static: false,
             declared_type: None,
+            authority_type: None,
             semantic_type: None,
             type_assignment: None,
             initializer: None,

@@ -641,10 +641,54 @@ pub fn build_resume_liveness_plan(model: &ApplicationSemanticModel) -> ResumeLiv
     for instance in model.optimized_form_ir.optimized.instances.values() {
         let owner = ResumeLivenessOwner::FormInstance(instance.id.clone());
         let boundary = Some(ResumeBoundaryId::form_instance(&instance.id));
+        let has_file_field = instance.storage.value.keys().any(|field_id| {
+            model
+                .form_fields
+                .get(field_id)
+                .is_some_and(|field| is_file_array(&field.semantic_type))
+        });
         for (field_id, value_slot) in &instance.storage.value {
             let Some(field) = model.form_fields.get(field_id) else {
                 continue;
             };
+            let file_field = is_file_array(&field.semantic_type);
+            if file_field {
+                for (existing_slot, reason) in [
+                    (
+                        ResumeExistingSlot::FormFieldValue(value_slot.clone()),
+                        ResumeRetentionReason::FormFieldValue,
+                    ),
+                    (
+                        ResumeExistingSlot::FormFieldDirty(
+                            instance.storage.dirty[field_id].clone(),
+                        ),
+                        ResumeRetentionReason::FormFieldDirty,
+                    ),
+                    (
+                        ResumeExistingSlot::FormFieldTouched(
+                            instance.storage.touched[field_id].clone(),
+                        ),
+                        ResumeRetentionReason::FormFieldTouched,
+                    ),
+                    (
+                        ResumeExistingSlot::FormFieldValidation(
+                            instance.storage.validation[field_id].clone(),
+                        ),
+                        ResumeRetentionReason::FormRuleResult,
+                    ),
+                ] {
+                    exclude_slot(
+                        existing_slot,
+                        owner.clone(),
+                        boundary.clone(),
+                        field.provenance.clone(),
+                        reason,
+                        &mut excluded,
+                        &mut evidence,
+                    );
+                }
+                continue;
+            }
             classify_form_value(
                 value_slot,
                 field,
@@ -665,12 +709,6 @@ pub fn build_resume_liveness_plan(model: &ApplicationSemanticModel) -> ResumeLiv
                     ),
                     ResumeRetentionReason::FormFieldTouched,
                 ),
-                (
-                    ResumeExistingSlot::FormFieldValidation(
-                        instance.storage.validation[field_id].clone(),
-                    ),
-                    ResumeRetentionReason::FormRuleResult,
-                ),
             ] {
                 retain_slot(
                     existing_slot,
@@ -682,28 +720,64 @@ pub fn build_resume_liveness_plan(model: &ApplicationSemanticModel) -> ResumeLiv
                     &mut evidence,
                 );
             }
+            let validation_slot = ResumeExistingSlot::FormFieldValidation(
+                instance.storage.validation[field_id].clone(),
+            );
+            if has_file_field {
+                exclude_slot(
+                    validation_slot,
+                    owner.clone(),
+                    boundary.clone(),
+                    field.provenance.clone(),
+                    ResumeRetentionReason::FormRuleResult,
+                    &mut excluded,
+                    &mut evidence,
+                );
+            } else {
+                retain_slot(
+                    validation_slot,
+                    owner.clone(),
+                    boundary.clone(),
+                    field.provenance.clone(),
+                    ResumeRetentionReason::FormRuleResult,
+                    &mut retained,
+                    &mut evidence,
+                );
+            }
         }
         let form_provenance = model.forms[&instance.form].provenance.clone();
-        for (existing_slot, reason) in [
-            (
-                ResumeExistingSlot::FormValidationAggregate(instance.storage.aggregate.clone()),
-                ResumeRetentionReason::FormAggregateValidation,
-            ),
-            (
-                ResumeExistingSlot::FormSubmission(instance.storage.submission.clone()),
-                ResumeRetentionReason::StableFormSubmission,
-            ),
-        ] {
-            retain_slot(
-                existing_slot,
+        let aggregate =
+            ResumeExistingSlot::FormValidationAggregate(instance.storage.aggregate.clone());
+        if has_file_field {
+            exclude_slot(
+                aggregate,
                 owner.clone(),
                 boundary.clone(),
                 form_provenance.clone(),
-                reason,
+                ResumeRetentionReason::FormAggregateValidation,
+                &mut excluded,
+                &mut evidence,
+            );
+        } else {
+            retain_slot(
+                aggregate,
+                owner.clone(),
+                boundary.clone(),
+                form_provenance.clone(),
+                ResumeRetentionReason::FormAggregateValidation,
                 &mut retained,
                 &mut evidence,
             );
         }
+        retain_slot(
+            ResumeExistingSlot::FormSubmission(instance.storage.submission.clone()),
+            owner,
+            boundary,
+            form_provenance,
+            ResumeRetentionReason::StableFormSubmission,
+            &mut retained,
+            &mut evidence,
+        );
     }
 
     for record in effect_resume.records {
@@ -901,6 +975,42 @@ fn retain_slot(
         ResumeLivenessClassificationKind::Retained,
         Vec::new(),
     );
+}
+
+fn exclude_slot(
+    existing_slot: ResumeExistingSlot,
+    owner: ResumeLivenessOwner,
+    boundary: Option<ResumeBoundaryId>,
+    provenance: SourceProvenance,
+    reason: ResumeRetentionReason,
+    excluded: &mut Vec<ResumeExcludedSlot>,
+    evidence: &mut BTreeMap<ResumeExistingSlot, ClassificationEvidence>,
+) {
+    excluded.push(ResumeExcludedSlot {
+        slot: liveness_slot(
+            existing_slot.clone(),
+            owner,
+            boundary,
+            Vec::new(),
+            Vec::new(),
+            provenance,
+        ),
+        reason,
+    });
+    insert_evidence(
+        evidence,
+        existing_slot,
+        ResumeLivenessClassificationKind::Excluded,
+        Vec::new(),
+    );
+}
+
+fn is_file_array(semantic_type: &crate::SemanticType) -> bool {
+    matches!(
+        semantic_type,
+        crate::SemanticType::Array(element)
+            if element.as_ref() == &crate::SemanticType::File
+    )
 }
 
 fn dependency_slots(

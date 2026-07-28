@@ -5,6 +5,8 @@ import {
   required,
 } from "presolve";
 
+type Uploads = File[];
+
 export class V2ProfileForm extends Component {
   profile = defineForm({
     serialization: "form-data",
@@ -13,6 +15,9 @@ export class V2ProfileForm extends Component {
         initial: "",
         validate: [required()],
       }),
+      attachments: field<Uploads>({
+        initial: [],
+      }),
     },
     submit: async ({ value, signal }) => {
       await Promise.resolve({ value, signal });
@@ -20,6 +25,9 @@ export class V2ProfileForm extends Component {
   });
 
   render() {
-    return <input bind:value={this.profile.fields.name} />;
+    return <div>
+      <input bind:value={this.profile.fields.name} />
+      <input type="file" bind:files={this.profile.fields.attachments} />
+    </div>;
   }
 }

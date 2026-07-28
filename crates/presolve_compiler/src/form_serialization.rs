@@ -19,6 +19,7 @@ pub enum FormSerializationFormat {
 pub enum FormFieldSerializationConversion {
     JsonValue,
     FormDataScalar,
+    FormDataFiles,
     UrlEncodedScalar,
 }
 
@@ -110,13 +111,6 @@ pub fn collect_serialization_products(
                 "url-encoded" => FormSerializationFormat::UrlEncoded,
                 _ => FormSerializationFormat::Json,
             });
-        let conversion = match format {
-            FormSerializationFormat::Json => FormFieldSerializationConversion::JsonValue,
-            FormSerializationFormat::FormData => FormFieldSerializationConversion::FormDataScalar,
-            FormSerializationFormat::UrlEncoded => {
-                FormFieldSerializationConversion::UrlEncodedScalar
-            }
-        };
         let mut ordered = fields
             .values()
             .filter(|field| field.owner_form == form.id)
@@ -127,6 +121,8 @@ pub fn collect_serialization_products(
         let serializable = ordered.iter().all(|field| {
             serialization_compatibility(&field.semantic_type)
                 == SerializationCompatibility::Serializable
+                || (format == FormSerializationFormat::FormData
+                    && is_file_array(&field.semantic_type))
         });
         let status = if !decorator_valid {
             SerializationPlanStatus::InvalidDecorator
@@ -143,13 +139,31 @@ pub fn collect_serialization_products(
                 format,
                 fields: ordered
                     .into_iter()
-                    .map(|field| SerializedFieldPlan {
-                        field: field.id.clone(),
-                        key: field.path.join("."),
-                        declaration_order: field.declaration_order,
-                        conversion,
-                        initial_value: field.initial_value.clone(),
-                        provenance: field.provenance.clone(),
+                    .map(|field| {
+                        let conversion = match format {
+                            FormSerializationFormat::Json => {
+                                FormFieldSerializationConversion::JsonValue
+                            }
+                            FormSerializationFormat::FormData
+                                if is_file_array(&field.semantic_type) =>
+                            {
+                                FormFieldSerializationConversion::FormDataFiles
+                            }
+                            FormSerializationFormat::FormData => {
+                                FormFieldSerializationConversion::FormDataScalar
+                            }
+                            FormSerializationFormat::UrlEncoded => {
+                                FormFieldSerializationConversion::UrlEncodedScalar
+                            }
+                        };
+                        SerializedFieldPlan {
+                            field: field.id.clone(),
+                            key: field.path.join("."),
+                            declaration_order: field.declaration_order,
+                            conversion,
+                            initial_value: field.initial_value.clone(),
+                            provenance: field.provenance.clone(),
+                        }
                     })
                     .collect(),
                 linked_submission: submissions
@@ -165,10 +179,19 @@ pub fn collect_serialization_products(
     }
 }
 
+fn is_file_array(semantic_type: &crate::SemanticType) -> bool {
+    matches!(
+        semantic_type,
+        crate::SemanticType::Array(element)
+            if element.as_ref() == &crate::SemanticType::File
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
-        build_application_semantic_model, FormId, FormSerializationFormat, SerializationPlanStatus,
+        build_application_semantic_model, collect_serialization_products, FormId,
+        FormSerializationFormat, SerializationPlanStatus,
     };
 
     #[test]
@@ -229,6 +252,44 @@ mod tests {
         assert_eq!(
             model.serialization.plans[&crate::SerializationPlanId::for_form(&form)].status,
             SerializationPlanStatus::InvalidDecorator
+        );
+    }
+
+    #[test]
+    fn admits_authority_proven_files_only_for_form_data() {
+        let parsed = presolve_parser::parse_file(
+            "src/Files.tsx",
+            r#"
+@component("files") class Files {
+  @form() @serialize("form-data") upload!: Form;
+  @field(this.upload) uploadFiles = ["placeholder"];
+  @form() @serialize("json") invalid!: Form;
+  @field(this.invalid) invalidFiles = ["placeholder"];
+}
+"#,
+        );
+        let mut model = build_application_semantic_model(&parsed);
+        for field in model.form_fields.values_mut() {
+            field.semantic_type = crate::SemanticType::Array(Box::new(crate::SemanticType::File));
+        }
+        let products = collect_serialization_products(
+            &model.components,
+            &model.forms,
+            &model.form_fields,
+            &model.submissions.plans,
+        );
+        let upload = FormId::for_owner(&model.components[0].id, "upload");
+        let invalid = FormId::for_owner(&model.components[0].id, "invalid");
+        let upload = &products.plans[&crate::SerializationPlanId::for_form(&upload)];
+        let invalid = &products.plans[&crate::SerializationPlanId::for_form(&invalid)];
+        assert_eq!(upload.status, SerializationPlanStatus::Valid);
+        assert_eq!(
+            upload.fields[0].conversion,
+            super::FormFieldSerializationConversion::FormDataFiles
+        );
+        assert_eq!(
+            invalid.status,
+            SerializationPlanStatus::NonSerializableField
         );
     }
 }

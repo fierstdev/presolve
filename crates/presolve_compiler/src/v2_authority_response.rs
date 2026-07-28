@@ -9,11 +9,12 @@ use presolve_parser::ParsedFile;
 use crate::{
     v2_authority_request::V2AuthorityRequestV1, AuthoredSourceRangeV1, ResolvedActionFieldV1,
     ResolvedComponentInheritanceV1, ResolvedEffectFieldV1, ResolvedFormDefinitionV1,
-    ResolvedFormFieldDefinitionV1, ResolvedFormValidationDefinitionV1, ResolvedIntrinsicIdentityV1,
-    ResolvedSlotFieldV1, ResolvedStateInitializerV1, V2AuthoringResolutionsV1,
+    ResolvedFormFieldDefinitionV1, ResolvedFormFieldValueClassificationV1,
+    ResolvedFormValidationDefinitionV1, ResolvedIntrinsicIdentityV1, ResolvedSlotFieldV1,
+    ResolvedStateInitializerV1, V2AuthoringResolutionsV1,
 };
 
-pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 7;
+pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 8;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -29,7 +30,7 @@ pub struct V2AuthorityResponseV1 {
     #[serde(default)]
     pub forms: Vec<V2AuthorityResolutionV1>,
     #[serde(default)]
-    pub form_fields: Vec<V2AuthorityResolutionV1>,
+    pub form_fields: Vec<V2AuthorityFormFieldResolutionV1>,
     #[serde(default)]
     pub validations: Vec<V2AuthorityResolutionV1>,
     pub environment_public: Vec<V2AuthorityResolutionV1>,
@@ -40,6 +41,21 @@ pub struct V2AuthorityResponseV1 {
 pub struct V2AuthorityResolutionV1 {
     pub id: String,
     pub identity: V2AuthorityIdentityV1,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum V2AuthorityFormFieldValueClassificationV1 {
+    FileArray,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct V2AuthorityFormFieldResolutionV1 {
+    pub id: String,
+    pub identity: V2AuthorityIdentityV1,
+    #[serde(default)]
+    pub value_classification: Option<V2AuthorityFormFieldValueClassificationV1>,
 }
 
 /// Exact TypeScript-authoritative evidence for one environment member call.
@@ -102,7 +118,7 @@ pub fn validate_v2_authority_response_v1(
     validate_family(&request.effects, &response.effects)?;
     validate_family(&request.slots, &response.slots)?;
     validate_family(&request.forms, &response.forms)?;
-    validate_family(&request.form_fields, &response.form_fields)?;
+    validate_form_field_family(&request.form_fields, &response.form_fields)?;
     validate_family(&request.validations, &response.validations)?;
     validate_member_family(&request.environment_public, &response.environment_public)
 }
@@ -167,13 +183,27 @@ pub fn v2_authoring_resolutions_from_response_v1(
                 form_identity: identity,
             })
             .collect(),
-        form_fields: resolutions_for(&response.form_fields, "form-field", parsed)?
-            .into_iter()
-            .map(|(callee_source, identity)| ResolvedFormFieldDefinitionV1 {
-                callee_source,
-                field_identity: identity,
+        form_fields: response
+            .form_fields
+            .iter()
+            .map(|resolution| {
+                Ok(ResolvedFormFieldDefinitionV1 {
+                    callee_source: range_from_site_id(
+                        &resolution.id,
+                        "form-field",
+                        &parsed.syntax.source,
+                    )?,
+                    field_identity: identity_from_response(&resolution.identity),
+                    value_classification: resolution.value_classification.map(|classification| {
+                        match classification {
+                            V2AuthorityFormFieldValueClassificationV1::FileArray => {
+                                ResolvedFormFieldValueClassificationV1::FileArray
+                            }
+                        }
+                    }),
+                })
             })
-            .collect(),
+            .collect::<Result<Vec<_>, V2AuthorityResponseErrorV1>>()?,
         validations: resolutions_for(&response.validations, "validation", parsed)?
             .into_iter()
             .map(
@@ -295,6 +325,30 @@ fn validate_family(
     Ok(())
 }
 
+fn validate_form_field_family(
+    request: &[crate::v2_authority_request::V2AuthorityFormFieldSiteV1],
+    response: &[V2AuthorityFormFieldResolutionV1],
+) -> Result<(), V2AuthorityResponseErrorV1> {
+    let allowed = request
+        .iter()
+        .map(|site| site.id.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut seen = BTreeSet::new();
+    for resolution in response {
+        if !allowed.contains(resolution.id.as_str()) {
+            return Err(V2AuthorityResponseErrorV1::UnknownSite(
+                resolution.id.clone(),
+            ));
+        }
+        if !seen.insert(resolution.id.as_str()) {
+            return Err(V2AuthorityResponseErrorV1::DuplicateSite(
+                resolution.id.clone(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn validate_member_family(
     request: &[crate::v2_authority_request::V2AuthorityMemberSiteV1],
     response: &[V2AuthorityResolutionV1],
@@ -380,7 +434,7 @@ class Counter extends Component { count = state(0); increment = action(() => {})
         )
         .unwrap();
         let response = V2AuthorityResponseV1 {
-            schema_version: 7,
+            schema_version: 8,
             diagnostics: Vec::new(),
             components: vec![V2AuthorityResolutionV1 {
                 id: request.components[0].id.clone(),
@@ -498,7 +552,7 @@ const applicationName = environment.public("PRESOLVE_PUBLIC_APP_NAME");
             crate::build_v2_authority_request_v1(&parsed, PathBuf::from("tsconfig.json"), &model)
                 .unwrap();
         let response = V2AuthorityResponseV1 {
-            schema_version: 7,
+            schema_version: 8,
             diagnostics: Vec::new(),
             components: vec![V2AuthorityResolutionV1 {
                 id: request.components[0].id.clone(),

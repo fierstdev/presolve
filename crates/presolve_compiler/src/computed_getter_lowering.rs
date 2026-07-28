@@ -421,7 +421,7 @@ class Counter extends Base {
         assert_eq!(sites[1].computed_dependencies, ["Counter.doubled"]);
 
         let lowered = lower_computed_getters_v1(&parsed, &input).expect("derived lowering");
-        assert_eq!(lowered.model.schema_version, 3);
+        assert_eq!(lowered.model.schema_version, 4);
         let declaration = &lowered.model.declarations[0];
         assert_eq!(
             declaration.kind,

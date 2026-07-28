@@ -256,7 +256,12 @@ fn resolve_candidate_type(
     let Some(initializer) = candidate.initializer.clone() else {
         return;
     };
-    let semantic_type = if let Some(declared_type) = &candidate.declared_type {
+    let semantic_type = if let Some(authority_type) = candidate.authority_type.clone() {
+        if !matches!(initializer, SerializableValue::Array(ref values) if values.is_empty()) {
+            candidate.add_violation(FormFieldDeclarationViolation::InitializerTypeMismatch);
+        }
+        authority_type
+    } else if let Some(declared_type) = &candidate.declared_type {
         let Some(resolved) = semantic_types.resolve_declared_type(declared_type, bindings) else {
             candidate.add_violation(FormFieldDeclarationViolation::InvalidDeclaredType);
             return;
@@ -275,7 +280,9 @@ fn resolve_candidate_type(
     } else {
         infer_serializable_value_type(&initializer)
     };
-    if serialization_compatibility(&semantic_type) != SerializationCompatibility::Serializable {
+    if candidate.authority_type.is_none()
+        && serialization_compatibility(&semantic_type) != SerializationCompatibility::Serializable
+    {
         candidate.add_violation(FormFieldDeclarationViolation::NonSerializableType);
     }
     candidate.semantic_type = Some(semantic_type);
@@ -290,6 +297,7 @@ fn is_supported_form_field_type(semantic_type: &SemanticType) -> bool {
         | SemanticType::BooleanLiteral(_)
         | SemanticType::NumberLiteral(_)
         | SemanticType::StringLiteral(_) => true,
+        SemanticType::File => false,
         SemanticType::Array(element) => is_supported_form_field_type(element),
         SemanticType::Tuple(items) | SemanticType::Union(items) => {
             !items.is_empty() && items.iter().all(is_supported_form_field_type)

@@ -12,7 +12,7 @@ use crate::{
     RUNTIME_FORM_REGISTRY_VERSION,
 };
 
-pub const RUNTIME_FORM_ARTIFACT_SCHEMA_VERSION: u32 = 2;
+pub const RUNTIME_FORM_ARTIFACT_SCHEMA_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RuntimeFormsArtifact {
@@ -499,14 +499,14 @@ fn field_programs(
 #[cfg(test)]
 mod tests {
     #[test]
-    fn emits_schema_v2_with_only_canonical_execution_references_and_field_paths() {
+    fn emits_schema_v3_with_only_canonical_execution_references_and_field_paths() {
         let parsed = presolve_parser::parse_file(
             "src/X.tsx",
             r#"@component("x")class X{@form()form!:Form;@field(this.form)value="";render(){return <input field={this.value}/>;}}"#,
         );
         let asm = crate::build_application_semantic_model(&parsed);
         let artifact = super::build_runtime_forms_artifact(&asm);
-        assert_eq!(artifact.schema_version, 2);
+        assert_eq!(artifact.schema_version, 3);
         assert_eq!(artifact.registry_version, 1);
         assert_eq!(artifact.forms.len(), 1);
         assert_eq!(artifact.instances.len(), 1);

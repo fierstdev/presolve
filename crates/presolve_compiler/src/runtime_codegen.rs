@@ -22,7 +22,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = __EZ_COMPONENT_SCHEMA_VERSION__;
   const LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2;
-  const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 2;
+  const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 3;
   const SUPPORTED_RESOURCES_ARTIFACT_SCHEMA_VERSION = 3;
   const SUPPORTED_OPAQUE_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_RESUME_MANIFEST_SCHEMA_VERSION = 7;
@@ -4664,7 +4664,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       const bindings = store.formBindingsByField.get(key) ?? [];
       bindings.push(record);
       store.formBindingsByField.set(key, bindings);
-      writeFormControl(record, formInstance.fields.get(binding.field)?.value);
+      writeFormControl(record, formInstance.fields.get(binding.field)?.value, true);
     }
 
     for (const bridge of manifest.form_hosts ?? []) {
@@ -4751,7 +4751,11 @@ const RUNTIME_STUB: &str = r#"(() => {
       validateFormField(record.formInstance, record.binding.field);
       return;
     }
-    const expected = record.binding.channel === "Checked" || record.binding.channel === "RadioValue" ? "change" : "input";
+    const expected = record.binding.channel === "Checked"
+      || record.binding.channel === "RadioValue"
+      || record.binding.channel === "Files"
+      ? "change"
+      : "input";
     if (event.type !== expected) return;
     const value = readFormControl(record);
     if (value === undefined) return;
@@ -4761,6 +4765,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   function readFormControl(record) {
     const { element, binding } = record;
     if (binding.channel === "Checked") return element.checked === true;
+    if (binding.channel === "Files") return Array.from(element.files ?? []);
     if (binding.channel === "NumericValue") {
       if (element.value === "") return binding.normalization === "NullableNumber" ? null : undefined;
       const value = Number(element.value);
@@ -4770,9 +4775,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     return element.value;
   }
 
-  function writeFormControl(record, value) {
+  function writeFormControl(record, value, resetFile = false) {
     const { element, binding } = record;
     if (binding.channel === "Checked") element.checked = value === true;
+    else if (binding.channel === "Files") {
+      if (resetFile) element.value = "";
+    }
     else if (binding.channel === "SelectedValues") {
       for (const option of element.options ?? []) option.selected = Array.isArray(value) && value.includes(option.value);
     } else element.value = value === null ? "" : String(value ?? "");
@@ -4812,7 +4820,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     const state = formInstance?.fields.get(fieldId);
     if (state === undefined) return false;
     state.value = state.initial; state.dirty = false; state.touched = false; state.validation = [];
-    for (const record of store.formBindingsByField.get(`${instanceId}|${fieldId}`) ?? []) writeFormControl(record, state.value);
+    for (const record of store.formBindingsByField.get(`${instanceId}|${fieldId}`) ?? []) writeFormControl(record, state.value, true);
     formInstance.aggregate_valid = true;
     return true;
   }
@@ -5551,10 +5559,15 @@ const RUNTIME_STUB: &str = r#"(() => {
       const bindings = store.formBindingsByField.get(key) ?? [];
       bindings.push(runtimeBinding);
       store.formBindingsByField.set(key, bindings);
-      writeFormControl(runtimeBinding, formInstance.fields.get(binding.field)?.value);
+      writeFormControl(runtimeBinding, formInstance.fields.get(binding.field)?.value, true);
     }
     const expectedBindings = [...instances.values()].reduce((count, instance) => count + (definitions.get(instance.form)?.bindings?.length ?? 0), 0);
     if (store.formBindingsByAnchor.size !== expectedBindings) throw new ResumeBootError("ResumeArtifactMismatch");
+    for (const formInstance of store.formInstances.values()) {
+      if ((formInstance.definition.fields ?? []).some((field) => field.semantic_type === "File[]")) {
+        for (const fieldId of formInstance.fields.keys()) validateFormField(formInstance, fieldId);
+      }
+    }
     window.__PRESOLVE_FORMS__ = {
       resetForm: (instanceId) => resetForm(store, instanceId),
       resetField: (instanceId, fieldId) => resetField(store, instanceId, fieldId)

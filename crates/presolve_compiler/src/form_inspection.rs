@@ -257,6 +257,7 @@ const fn form_control_channel_text(channel: FormControlChannel) -> &'static str 
         FormControlChannel::RadioValue => "radio-value",
         FormControlChannel::SelectedValue => "selected-value",
         FormControlChannel::SelectedValues => "selected-values",
+        FormControlChannel::Files => "files",
     }
 }
 

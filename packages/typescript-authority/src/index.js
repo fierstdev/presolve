@@ -10,7 +10,7 @@ export {
 } from "./intrinsics.js";
 export { analyzeV2Authoring, V2_AUTHORED_AUTHORITY_SCHEMA_VERSION } from "./v2-authoring.js";
 
-export const TYPESCRIPT_SEMANTIC_AUTHORITY_SCHEMA_VERSION = 1;
+export const TYPESCRIPT_SEMANTIC_AUTHORITY_SCHEMA_VERSION = 2;
 export const PRIMARY_TYPESCRIPT_VERSION = "7.0.2";
 
 /**
@@ -93,7 +93,7 @@ async function queryComponentHeritage(project, queries) {
 async function queryTypes(project, queries) {
   return Promise.all(queries.map(async query => {
     const type = await typeAt(project, query);
-    return { id: query.id, type: await serializeType(project.checker, type) };
+    return { id: query.id, type: await serializeType(project, type) };
   }));
 }
 
@@ -101,7 +101,7 @@ async function queryContextualTypes(project, queries) {
   return Promise.all(queries.map(async query => {
     const { file, token } = await tokenAt(project, query);
     const type = await nearestContextualType(project.checker, token, file);
-    return { id: query.id, type: await serializeType(project.checker, type) };
+    return { id: query.id, type: await serializeType(project, type) };
   }));
 }
 
@@ -109,7 +109,7 @@ async function querySignatures(project, queries) {
   return Promise.all(queries.map(async query => {
     const { file, token } = await tokenAt(project, query);
     const signature = await nearestSignature(project.checker, token);
-    return { id: query.id, signature: await serializeSignature(project.checker, signature) };
+    return { id: query.id, signature: await serializeSignature(project, signature) };
   }));
 }
 
@@ -120,8 +120,8 @@ async function queryAssignability(project, queries) {
     return {
       id: query.id,
       assignable: Boolean(source && target && await project.checker.isTypeAssignableTo(source, target)),
-      source: await serializeType(project.checker, source),
-      target: await serializeType(project.checker, target),
+      source: await serializeType(project, source),
+      target: await serializeType(project, target),
     };
   }));
 }
@@ -271,24 +271,42 @@ function normalizeProjectPath(projectRoot, path) {
   return relativePath.split(sep).join("/") || ".";
 }
 
-async function serializeType(checker, type) {
+async function serializeType(project, type) {
   if (!type) return undefined;
-  return {
-    text: await checker.typeToString(type),
+  const serialized = {
+    text: await project.checker.typeToString(type),
     flags: type.flags,
     error: type.isErrorType(),
   };
+  if (type.isTypeReference()) {
+    const typeArguments = await project.checker.getTypeArguments(type);
+    if (typeArguments.length > 0) {
+      serialized.typeArguments = await Promise.all(
+        typeArguments.map(argument => serializeType(project, argument)),
+      );
+    }
+  }
+  if (await project.checker.isArrayType(type) && type.isTypeReference()) {
+    const [element, ...rest] = await project.checker.getTypeArguments(type);
+    if (element && rest.length === 0) {
+      serialized.arrayElement = {
+        text: await project.checker.typeToString(element),
+        symbol: await serializeSymbol(project, await element.getSymbol()),
+      };
+    }
+  }
+  return serialized;
 }
 
-async function serializeSignature(checker, signature) {
+async function serializeSignature(project, signature) {
   if (!signature) return undefined;
   const parameters = await signature.getParameters();
   return {
     parameterTypes: await Promise.all(parameters.map(async parameter => ({
       name: parameter.name,
-      type: await serializeType(checker, await checker.getTypeOfSymbol(parameter)),
+      type: await serializeType(project, await project.checker.getTypeOfSymbol(parameter)),
     }))),
-    returnType: await serializeType(checker, await checker.getReturnTypeOfSignature(signature)),
+    returnType: await serializeType(project, await project.checker.getReturnTypeOfSignature(signature)),
   };
 }
 

@@ -606,7 +606,12 @@ fn rule_is_compatible(
 ) -> bool {
     match kind {
         ValidationRuleKind::Required => {
-            serialization_compatibility(target) == SerializationCompatibility::Serializable
+            (serialization_compatibility(target) == SerializationCompatibility::Serializable
+                || matches!(
+                    target,
+                    SemanticType::Array(element)
+                        if element.as_ref() == &SemanticType::File
+                ))
                 && !matches!(
                     target,
                     SemanticType::Null | SemanticType::Unknown | SemanticType::Never
