@@ -347,7 +347,12 @@ function identityForSymbol(project, symbol, declarationPaths) {
 
 function normalizeProjectPath(projectRoot, path) {
   const relativePath = relative(projectRoot, path);
-  return relativePath.split(sep).join("/") || ".";
+  // Declaration modules are semantic identity coordinates, not filesystem
+  // lookup paths. TypeScript canonicalizes their case on case-insensitive
+  // hosts but preserves authored case on Linux, so fold them here to keep the
+  // same authority product on every supported host. Runtime module specifiers
+  // remain source-faithful and retain their authored case.
+  return relativePath.split(sep).join("/").toLowerCase() || ".";
 }
 
 async function serializeType(project, type) {
