@@ -10,11 +10,12 @@ use crate::{
     v2_authority_request::V2AuthorityRequestV1, AuthoredSourceRangeV1, ResolvedActionFieldV1,
     ResolvedComponentInheritanceV1, ResolvedEffectFieldV1, ResolvedFormDefinitionV1,
     ResolvedFormFieldDefinitionV1, ResolvedFormFieldValueClassificationV1,
-    ResolvedFormValidationDefinitionV1, ResolvedIntrinsicIdentityV1, ResolvedSlotFieldV1,
-    ResolvedStateInitializerV1, V2AuthoringResolutionsV1,
+    ResolvedFormValidationDefinitionKindV1, ResolvedFormValidationDefinitionV1,
+    ResolvedIntrinsicIdentityV1, ResolvedSlotFieldV1, ResolvedStateInitializerV1,
+    V2AuthoringResolutionsV1,
 };
 
-pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 8;
+pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 9;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -33,6 +34,8 @@ pub struct V2AuthorityResponseV1 {
     pub form_fields: Vec<V2AuthorityFormFieldResolutionV1>,
     #[serde(default)]
     pub validations: Vec<V2AuthorityResolutionV1>,
+    #[serde(default)]
+    pub standard_validations: Vec<V2AuthorityStandardValidationResolutionV1>,
     pub environment_public: Vec<V2AuthorityResolutionV1>,
 }
 
@@ -58,6 +61,19 @@ pub struct V2AuthorityFormFieldResolutionV1 {
     pub value_classification: Option<V2AuthorityFormFieldValueClassificationV1>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct V2AuthorityStandardValidationResolutionV1 {
+    pub id: String,
+    pub identity: V2AuthorityIdentityV1,
+    pub module_specifier: String,
+    pub export_name: String,
+    #[serde(default)]
+    pub input_type: Option<String>,
+    #[serde(default)]
+    pub output_type: Option<String>,
+}
+
 /// Exact TypeScript-authoritative evidence for one environment member call.
 /// The source range is recovered only from the request that selected it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -81,6 +97,7 @@ pub enum V2AuthorityResponseErrorV1 {
     DuplicateSite(String),
     DiagnosticsPresent(usize),
     InvalidSiteId(String),
+    IncompatibleSite(String),
 }
 
 impl std::fmt::Display for V2AuthorityResponseErrorV1 {
@@ -97,6 +114,10 @@ impl std::fmt::Display for V2AuthorityResponseErrorV1 {
                 "V2 TypeScript authority reported {count} diagnostic(s); refusing to lower uncertain source"
             ),
             Self::InvalidSiteId(id) => write!(formatter, "invalid V2 TypeScript authority site id `{id}`"),
+            Self::IncompatibleSite(id) => write!(
+                formatter,
+                "V2 TypeScript authority returned incompatible evidence for site `{id}`"
+            ),
         }
     }
 }
@@ -120,6 +141,10 @@ pub fn validate_v2_authority_response_v1(
     validate_family(&request.forms, &response.forms)?;
     validate_form_field_family(&request.form_fields, &response.form_fields)?;
     validate_family(&request.validations, &response.validations)?;
+    validate_standard_validation_family(
+        &request.standard_validations,
+        &response.standard_validations,
+    )?;
     validate_member_family(&request.environment_public, &response.environment_public)
 }
 
@@ -206,14 +231,65 @@ pub fn v2_authoring_resolutions_from_response_v1(
             .collect::<Result<Vec<_>, V2AuthorityResponseErrorV1>>()?,
         validations: resolutions_for(&response.validations, "validation", parsed)?
             .into_iter()
-            .map(
-                |(callee_source, identity)| ResolvedFormValidationDefinitionV1 {
+            .map(|(callee_source, identity)| {
+                Ok(ResolvedFormValidationDefinitionV1 {
                     callee_source,
-                    validation_identity: identity,
-                },
-            )
-            .collect(),
+                    kind: ResolvedFormValidationDefinitionKindV1::PresolveRule {
+                        validation_identity: identity,
+                    },
+                })
+            })
+            .chain(response.standard_validations.iter().map(|resolution| {
+                Ok(ResolvedFormValidationDefinitionV1 {
+                    callee_source: range_from_site_id(
+                        &resolution.id,
+                        "standard-validation",
+                        &parsed.syntax.source,
+                    )?,
+                    kind: ResolvedFormValidationDefinitionKindV1::StandardSchema {
+                        module_specifier: resolution.module_specifier.clone(),
+                        export_name: resolution.export_name.clone(),
+                        declaration_modules: resolution.identity.declaration_modules.clone(),
+                        input_type: resolution.input_type.clone(),
+                        output_type: resolution.output_type.clone(),
+                    },
+                })
+            }))
+            .collect::<Result<Vec<_>, V2AuthorityResponseErrorV1>>()?,
     })
+}
+
+fn validate_standard_validation_family(
+    request: &[crate::v2_authority_request::V2AuthorityStandardValidationSiteV1],
+    response: &[V2AuthorityStandardValidationResolutionV1],
+) -> Result<(), V2AuthorityResponseErrorV1> {
+    let allowed = request
+        .iter()
+        .map(|site| (site.id.as_str(), site))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let mut seen = BTreeSet::new();
+    for resolution in response {
+        let Some(site) = allowed.get(resolution.id.as_str()) else {
+            return Err(V2AuthorityResponseErrorV1::UnknownSite(
+                resolution.id.clone(),
+            ));
+        };
+        if !seen.insert(resolution.id.as_str()) {
+            return Err(V2AuthorityResponseErrorV1::DuplicateSite(
+                resolution.id.clone(),
+            ));
+        }
+        if resolution.module_specifier != site.module_specifier
+            || resolution.export_name != site.export_name
+            || resolution.identity.name != site.export_name
+            || resolution.identity.declaration_modules.is_empty()
+        {
+            return Err(V2AuthorityResponseErrorV1::IncompatibleSite(
+                resolution.id.clone(),
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// Recovers validated environment-public evidence without widening the V2
@@ -375,6 +451,7 @@ fn validate_member_family(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
     use std::path::PathBuf;
 
     use presolve_parser::parse_file;
@@ -434,7 +511,7 @@ class Counter extends Component { count = state(0); increment = action(() => {})
         )
         .unwrap();
         let response = V2AuthorityResponseV1 {
-            schema_version: 8,
+            schema_version: 9,
             diagnostics: Vec::new(),
             components: vec![V2AuthorityResolutionV1 {
                 id: request.components[0].id.clone(),
@@ -453,6 +530,7 @@ class Counter extends Component { count = state(0); increment = action(() => {})
             forms: Vec::new(),
             form_fields: Vec::new(),
             validations: Vec::new(),
+            standard_validations: Vec::new(),
             environment_public: Vec::new(),
         };
         (parsed, request, response)
@@ -552,7 +630,7 @@ const applicationName = environment.public("PRESOLVE_PUBLIC_APP_NAME");
             crate::build_v2_authority_request_v1(&parsed, PathBuf::from("tsconfig.json"), &model)
                 .unwrap();
         let response = V2AuthorityResponseV1 {
-            schema_version: 8,
+            schema_version: 9,
             diagnostics: Vec::new(),
             components: vec![V2AuthorityResolutionV1 {
                 id: request.components[0].id.clone(),
@@ -565,6 +643,7 @@ const applicationName = environment.public("PRESOLVE_PUBLIC_APP_NAME");
             forms: Vec::new(),
             form_fields: Vec::new(),
             validations: Vec::new(),
+            standard_validations: Vec::new(),
             environment_public: vec![V2AuthorityResolutionV1 {
                 id: request.environment_public[0].id.clone(),
                 identity: identity("public"),
@@ -580,5 +659,110 @@ const applicationName = environment.public("PRESOLVE_PUBLIC_APP_NAME");
             &source[evidence[0].call_source.start..evidence[0].call_source.end],
             "environment.public(\"PRESOLVE_PUBLIC_APP_NAME\")"
         );
+    }
+
+    #[test]
+    fn retains_exact_standard_schema_module_authority_until_runtime_linkage() {
+        let source = r#"
+import { Component, defineForm, field, required } from "presolve";
+import { displayNameSchema } from "./schemas.js";
+export class Profile extends Component {
+  profile = defineForm({ fields: {
+    displayName: field({ initial: "", validate: [required(), displayNameSchema] })
+  } });
+}
+"#;
+        let parsed = parse_file("app/routes/profile.tsx", source);
+        let heritage = component_inheritance_sites_v1(&parsed).pop().unwrap();
+        let components = lower_component_inheritance_v1(
+            &parsed,
+            [ResolvedComponentInheritanceV1 {
+                heritage_source: heritage.heritage_source,
+                component_identity: component_identity(),
+            }],
+        )
+        .unwrap()
+        .model;
+        let request = crate::build_v2_authority_request_v1(
+            &parsed,
+            PathBuf::from("tsconfig.json"),
+            &components,
+        )
+        .unwrap();
+        let response = V2AuthorityResponseV1 {
+            schema_version: 9,
+            diagnostics: Vec::new(),
+            components: vec![V2AuthorityResolutionV1 {
+                id: request.components[0].id.clone(),
+                identity: identity("Component"),
+            }],
+            states: Vec::new(),
+            actions: Vec::new(),
+            effects: Vec::new(),
+            slots: Vec::new(),
+            forms: vec![V2AuthorityResolutionV1 {
+                id: request.forms[0].id.clone(),
+                identity: identity("defineForm"),
+            }],
+            form_fields: vec![super::V2AuthorityFormFieldResolutionV1 {
+                id: request.form_fields[0].id.clone(),
+                identity: identity("field"),
+                value_classification: None,
+            }],
+            validations: vec![V2AuthorityResolutionV1 {
+                id: request.validations[0].id.clone(),
+                identity: identity("required"),
+            }],
+            standard_validations: vec![super::V2AuthorityStandardValidationResolutionV1 {
+                id: request.standard_validations[0].id.clone(),
+                identity: V2AuthorityIdentityV1 {
+                    name: "displayNameSchema".into(),
+                    flags: 2,
+                    declaration_modules: vec!["app/schemas.ts".into()],
+                },
+                module_specifier: "./schemas.js".into(),
+                export_name: "displayNameSchema".into(),
+                input_type: Some("string".into()),
+                output_type: Some("string".into()),
+            }],
+            environment_public: Vec::new(),
+        };
+        let resolutions =
+            v2_authoring_resolutions_from_response_v1(&parsed, &request, &response).unwrap();
+        let authored = crate::lower_v2_authoring_v1(&parsed, resolutions)
+            .unwrap()
+            .model;
+        let graph = crate::build_v2_component_graph_for_module(&parsed, &authored);
+        let facts = &graph.components[0].validation_rule_declaration_facts;
+        assert_eq!(facts.len(), 2);
+        let standard = facts[1]
+            .standard_schema
+            .as_ref()
+            .expect("retained Standard Schema authority");
+        assert_eq!(standard.module_specifier, "./schemas.js");
+        assert_eq!(standard.export_name, "displayNameSchema");
+        assert_eq!(standard.declaration_modules, ["app/schemas.ts"]);
+
+        let unit = crate::CompilationUnit::parse_sources([("app/routes/profile.tsx", source)]);
+        let models = BTreeMap::from([(parsed.path.clone(), authored)]);
+        let application =
+            crate::build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring(
+                &unit,
+                &crate::SemanticPackageResolutionTable::default(),
+                &models,
+            )
+            .expect("V2 Standard Schema application assembly");
+        let candidate = application
+            .validation_rule_candidates
+            .iter()
+            .find(|candidate| candidate.standard_schema.is_some())
+            .expect("Standard Schema validation candidate");
+        assert!(candidate
+            .violations
+            .contains(&crate::ValidationRuleViolation::MissingStandardSchemaRuntimeModule));
+        assert!(application
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "PSC1087"));
     }
 }

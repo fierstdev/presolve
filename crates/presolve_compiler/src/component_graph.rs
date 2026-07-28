@@ -165,6 +165,16 @@ pub struct AuthoredServerActionFact {
 
 /// Source-faithful I6 declaration facts retained before semantic validation.
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthoredStandardSchemaValidationFact {
+    pub module_specifier: String,
+    pub export_name: String,
+    pub declaration_modules: Vec<String>,
+    pub input_type: Option<String>,
+    pub output_type: Option<String>,
+}
+
+/// Source-faithful I6 declaration facts retained before semantic validation.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthoredValidationRuleDeclarationFact {
     pub id: ValidationRuleCandidateId,
     pub owner_component: Option<SemanticId>,
@@ -176,6 +186,7 @@ pub struct AuthoredValidationRuleDeclarationFact {
     pub decorator_invoked: bool,
     pub decorator_argument_count: usize,
     pub expression: Option<AuthoredValidationRuleExpression>,
+    pub standard_schema: Option<AuthoredStandardSchemaValidationFact>,
     pub conflicting_decorators: Vec<String>,
     pub decorator_provenance: SourceProvenance,
     pub name_provenance: Option<SourceProvenance>,
@@ -2082,20 +2093,42 @@ pub fn build_v2_component_graph_for_module(
                     else {
                         continue;
                     };
-                    let Some(identity) = validation_declaration.intrinsic_identity.as_ref() else {
-                        continue;
-                    };
                     let mut expression =
                         authored_validation_rule_expression(validation, &parsed.path);
-                    match &mut expression.kind {
-                        AuthoredValidationRuleExpressionKind::Call { callee, .. } => {
-                            *callee = Some(identity.name.clone());
+                    let standard_schema = match (
+                        validation_declaration.intrinsic_identity.as_ref(),
+                        validation_declaration.derived_evidence.as_ref(),
+                    ) {
+                        (Some(identity), _) => {
+                            match &mut expression.kind {
+                                AuthoredValidationRuleExpressionKind::Call { callee, .. } => {
+                                    *callee = Some(identity.name.clone());
+                                }
+                                AuthoredValidationRuleExpressionKind::Identifier(name) => {
+                                    *name = identity.name.clone();
+                                }
+                                AuthoredValidationRuleExpressionKind::Unsupported => continue,
+                            }
+                            None
                         }
-                        AuthoredValidationRuleExpressionKind::Identifier(name) => {
-                            *name = identity.name.clone();
-                        }
-                        AuthoredValidationRuleExpressionKind::Unsupported => continue,
-                    }
+                        (
+                            None,
+                            Some(crate::DerivedAuthoredEvidenceV2::StandardSchemaValidation {
+                                module_specifier,
+                                export_name,
+                                declaration_modules,
+                                input_type,
+                                output_type,
+                            }),
+                        ) => Some(AuthoredStandardSchemaValidationFact {
+                            module_specifier: module_specifier.clone(),
+                            export_name: export_name.clone(),
+                            declaration_modules: declaration_modules.clone(),
+                            input_type: input_type.clone(),
+                            output_type: output_type.clone(),
+                        }),
+                        _ => continue,
+                    };
                     validation_rule_declaration_facts.push(AuthoredValidationRuleDeclarationFact {
                         id: ValidationRuleCandidateId::for_source_position(
                             &parsed.path,
@@ -2110,6 +2143,7 @@ pub fn build_v2_component_graph_for_module(
                         decorator_invoked: true,
                         decorator_argument_count: 1,
                         expression: Some(expression),
+                        standard_schema,
                         conflicting_decorators: Vec::new(),
                         decorator_provenance: SourceProvenance::new(&parsed.path, validation.span),
                         name_provenance: Some(SourceProvenance::new(
@@ -3350,6 +3384,7 @@ fn retain_validation_rule_facts(
                 .validation_rule_expression
                 .as_ref()
                 .map(|expression| authored_validation_rule_expression(expression, path)),
+            standard_schema: None,
             conflicting_decorators: conflicting_decorators.clone(),
             decorator_provenance: SourceProvenance::new(path, decorator.span),
             name_provenance: name_span.map(|span| SourceProvenance::new(path, span)),

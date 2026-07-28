@@ -1,6 +1,7 @@
 # TypeScript semantic-authority boundary
 
-Schema version: `1`<br>
+Core schema version: `3`<br>
+V2 authoring schema version: `9`<br>
 Primary TypeScript version: `7.0.2`
 
 `@presolve/typescript-authority` is the sole integration point for concrete
@@ -11,7 +12,7 @@ type checking, alias resolution, or module resolution.
 ## Request and response
 
 `analyzeTypeScriptProject` opens one configured TypeScript project and returns
-the following schema-v1 products:
+the following products:
 
 - project configuration and sorted root files;
 - native config, program, syntactic, bind, and semantic diagnostics, each with
@@ -23,7 +24,11 @@ the following schema-v1 products:
 - TypeScript assignability results for requested source/target positions; and
 - module symbols obtained at import, export, or package-specifier positions,
   including their resolved declaration modules; and
-- ordered class base-symbol chains for explicit component-heritage queries.
+- ordered class base-symbol chains for explicit component-heritage queries;
+  and
+- Standard Schema v1 shape evidence for explicit positions, including the
+  protocol version, vendor, callable `validate` signatures, optional
+  input/output witnesses, and resolved symbol identity.
 
 The request carries a configuration file plus explicit file/UTF-16 positions.
 Returned symbols and modules expose declaration paths, not TypeScript process
@@ -42,11 +47,15 @@ canonical intrinsic registry compares the serialized identities with the
 resolved `Component` export; this preserves the beta rule that aliases and
 indirect subclasses are components without spelling-based recognition.
 
-`analyzeV2Authoring` is the schema-v2 bridge for the implemented source forms.
+`analyzeV2Authoring` is the schema-v9 bridge for the implemented source forms.
 Its caller supplies parser-selected positions for the canonical framework
-exports and candidate component heritage, State, Action, and Effect sites. The bridge
-returns only registry-classified resolved evidence plus native diagnostics; it
-does not parse source, create compiler identities, or lower runtime behavior.
+exports and candidate component heritage, State, Action, Effect, Slot, Form,
+Form Field, validation, and environment sites. For imported Standard Schema
+validators it also carries the parser-selected module/export coordinate and
+returns protocol-shape evidence only after TypeScript proves the v1 contract.
+The bridge returns only registry-classified resolved evidence plus native
+diagnostics; it does not parse source, create compiler identities, execute
+validators, or lower runtime behavior.
 The installed `presolve-typescript-authority` executable exposes that same
 schema as one JSON request on stdin and one JSON response on stdout.
 

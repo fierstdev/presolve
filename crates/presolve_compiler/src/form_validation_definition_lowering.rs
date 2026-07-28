@@ -22,7 +22,21 @@ pub struct FormValidationDefinitionSiteV1 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedFormValidationDefinitionV1 {
     pub callee_source: AuthoredSourceRangeV1,
-    pub validation_identity: ResolvedIntrinsicIdentityV1,
+    pub kind: ResolvedFormValidationDefinitionKindV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ResolvedFormValidationDefinitionKindV1 {
+    PresolveRule {
+        validation_identity: ResolvedIntrinsicIdentityV1,
+    },
+    StandardSchema {
+        module_specifier: String,
+        export_name: String,
+        declaration_modules: Vec<String>,
+        input_type: Option<String>,
+        output_type: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -160,13 +174,31 @@ pub fn lower_form_validation_definitions_v1(
                     },
                 );
             }
+            let kind = match &proof.kind {
+                ResolvedFormValidationDefinitionKindV1::PresolveRule {
+                    validation_identity,
+                } => AuthoredSemanticCandidateKindV1::ResolvedIntrinsic {
+                    intrinsic_kind: CanonicalIntrinsicKindV1::Validate,
+                    intrinsic_identity: validation_identity.clone(),
+                },
+                ResolvedFormValidationDefinitionKindV1::StandardSchema {
+                    module_specifier,
+                    export_name,
+                    declaration_modules,
+                    input_type,
+                    output_type,
+                } => AuthoredSemanticCandidateKindV1::DerivedStandardSchemaValidation {
+                    module_specifier: module_specifier.clone(),
+                    export_name: export_name.clone(),
+                    declaration_modules: declaration_modules.clone(),
+                    input_type: input_type.clone(),
+                    output_type: output_type.clone(),
+                },
+            };
             Ok(ResolvedAuthoredSemanticCandidateV1 {
                 subject: site.subject.clone(),
                 source: site.declaration_source,
-                kind: AuthoredSemanticCandidateKindV1::ResolvedIntrinsic {
-                    intrinsic_kind: CanonicalIntrinsicKindV1::Validate,
-                    intrinsic_identity: proof.validation_identity.clone(),
-                },
+                kind,
             })
         })
         .collect::<Result<Vec<_>, _>>()?;

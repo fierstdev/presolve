@@ -1,4 +1,9 @@
-import { API, SymbolFlags } from "@typescript/native/unstable/async";
+import {
+  API,
+  SignatureKind,
+  SymbolFlags,
+  TypeFlags,
+} from "@typescript/native/unstable/async";
 import { getTokenAtPosition, SyntaxKind } from "@typescript/native/unstable/ast";
 import { dirname, relative, resolve, sep } from "node:path";
 
@@ -10,7 +15,7 @@ export {
 } from "./intrinsics.js";
 export { analyzeV2Authoring, V2_AUTHORED_AUTHORITY_SCHEMA_VERSION } from "./v2-authoring.js";
 
-export const TYPESCRIPT_SEMANTIC_AUTHORITY_SCHEMA_VERSION = 2;
+export const TYPESCRIPT_SEMANTIC_AUTHORITY_SCHEMA_VERSION = 3;
 export const PRIMARY_TYPESCRIPT_VERSION = "7.0.2";
 
 /**
@@ -46,12 +51,86 @@ export async function analyzeTypeScriptProject(request) {
       signatures: await querySignatures(project, queries.signatures ?? []),
       assignability: await queryAssignability(project, queries.assignability ?? []),
       modules: await queryModules(project, queries.modules ?? []),
+      standardSchemas: await queryStandardSchemas(project, queries.standardSchemas ?? []),
     };
     await snapshot.dispose();
     return response;
   } finally {
     await api.close();
   }
+}
+
+async function queryStandardSchemas(project, queries) {
+  return Promise.all(queries.map(async query => {
+    const type = await typeAt(project, query);
+    const symbol = await symbolAt(project, query);
+    const standardProperty = type
+      ? await project.checker.getPropertyOfType(type, "~standard")
+      : undefined;
+    const standardType = standardProperty
+      ? await project.checker.getTypeOfSymbol(standardProperty)
+      : undefined;
+    const versionProperty = standardType
+      ? await project.checker.getPropertyOfType(standardType, "version")
+      : undefined;
+    const vendorProperty = standardType
+      ? await project.checker.getPropertyOfType(standardType, "vendor")
+      : undefined;
+    const validateProperty = standardType
+      ? await project.checker.getPropertyOfType(standardType, "validate")
+      : undefined;
+    const versionType = versionProperty
+      ? await project.checker.getTypeOfSymbol(versionProperty)
+      : undefined;
+    const vendorType = vendorProperty
+      ? await project.checker.getTypeOfSymbol(vendorProperty)
+      : undefined;
+    const validateType = validateProperty
+      ? await project.checker.getTypeOfSymbol(validateProperty)
+      : undefined;
+    const validateSignatures = validateType
+      ? await project.checker.getSignaturesOfType(validateType, SignatureKind.Call)
+      : [];
+    const validVersion = versionType !== undefined
+      && (versionType.flags & TypeFlags.NumberLiteral) !== 0
+      && await project.checker.typeToString(versionType) === "1";
+    const validVendor = vendorType !== undefined
+      && (vendorType.flags & (TypeFlags.String | TypeFlags.StringLiteral)) !== 0;
+    if (!standardType || !validVersion || !validVendor || validateSignatures.length === 0) {
+      return { id: query.id, standardSchema: undefined };
+    }
+    const typesProperty = await project.checker.getPropertyOfType(standardType, "types");
+    const typesType = typesProperty
+      ? await project.checker.getNonNullableType(
+        await project.checker.getTypeOfSymbol(typesProperty),
+      )
+      : undefined;
+    const inputProperty = typesType
+      ? await project.checker.getPropertyOfType(typesType, "input")
+      : undefined;
+    const outputProperty = typesType
+      ? await project.checker.getPropertyOfType(typesType, "output")
+      : undefined;
+    return {
+      id: query.id,
+      standardSchema: {
+        version: 1,
+        symbol: await serializeSymbol(project, symbol),
+        vendorType: await serializeType(project, vendorType),
+        inputType: await serializeType(
+          project,
+          inputProperty ? await project.checker.getTypeOfSymbol(inputProperty) : undefined,
+        ),
+        outputType: await serializeType(
+          project,
+          outputProperty ? await project.checker.getTypeOfSymbol(outputProperty) : undefined,
+        ),
+        validateSignatures: await Promise.all(
+          validateSignatures.map(signature => serializeSignature(project, signature)),
+        ),
+      },
+    };
+  }));
 }
 
 async function collectDiagnostics(program, config) {

@@ -90,9 +90,36 @@ export type FormValue<Tree> =
       : Tree extends object
         ? { [Key in keyof Tree]: FormValue<Tree[Key]> }
         : never;
+export interface StandardSchemaV1<Input = unknown, Output = Input> {
+  readonly "~standard": {
+    readonly version: 1;
+    readonly vendor: string;
+    readonly validate: (
+      value: unknown,
+      options?: { readonly libraryOptions?: Record<string, unknown> }
+    ) => StandardSchemaResult<Output> | Promise<StandardSchemaResult<Output>>;
+    readonly types?: {
+      readonly input: Input;
+      readonly output: Output;
+    };
+  };
+}
+export type StandardSchemaIssuePathSegment =
+  | PropertyKey
+  | { readonly key: PropertyKey };
+export interface StandardSchemaIssue {
+  readonly message: string;
+  readonly path?: readonly StandardSchemaIssuePathSegment[];
+}
+export type StandardSchemaResult<Output> =
+  | { readonly value: Output; readonly issues?: undefined }
+  | { readonly issues: readonly StandardSchemaIssue[] };
+export type FormFieldValidator<Value> =
+  | ValidationRule
+  | StandardSchemaV1<Value, unknown>;
 export interface FormFieldOptions<Value> {
   initial: Value;
-  validate?: readonly ValidationRule[];
+  validate?: readonly FormFieldValidator<Value>[];
 }
 export interface FormSubmission<Value> {
   readonly value: Value;

@@ -4,6 +4,7 @@ import {
   field,
   required,
 } from "presolve";
+import { displayNameSchema } from "./V2Schemas.js";
 
 type Uploads = File[];
 
@@ -13,7 +14,7 @@ export class V2ProfileForm extends Component {
     fields: {
       name: field({
         initial: "",
-        validate: [required()],
+        validate: [required(), displayNameSchema],
       }),
       attachments: field<Uploads>({
         initial: [],

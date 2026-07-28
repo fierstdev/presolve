@@ -1156,7 +1156,7 @@ const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 const sourceAt = site => readFileSync(site.file, "utf8").slice(site.position);
 process.stdout.write(JSON.stringify({
-  schemaVersion: 8,
+  schemaVersion: 9,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
@@ -2845,7 +2845,7 @@ const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 const resolves = (site, name) => readFileSync(site.file, "utf8").slice(site.position).startsWith(name);
 process.stdout.write(JSON.stringify({
-  schemaVersion: 8,
+  schemaVersion: 9,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.filter(site => resolves(site, "state")).map(site => ({ id: site.id, identity: identity("state") })),
@@ -3231,7 +3231,7 @@ const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 const resolves = (site, name) => readFileSync(site.file, "utf8").slice(site.position).startsWith(name);
 process.stdout.write(JSON.stringify({
-  schemaVersion: 8,
+  schemaVersion: 9,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.filter(site => resolves(site, "state")).map(site => ({ id: site.id, identity: identity("state") })),
@@ -4258,7 +4258,7 @@ import { readFileSync } from "node:fs";
 const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 process.stdout.write(JSON.stringify({
-  schemaVersion: 8,
+  schemaVersion: 9,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.map(site => ({ id: site.id, identity: identity("state") })),

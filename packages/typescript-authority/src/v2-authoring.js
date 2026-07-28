@@ -5,7 +5,7 @@ import {
   createCanonicalIntrinsicRegistry,
 } from "./index.js";
 
-export const V2_AUTHORED_AUTHORITY_SCHEMA_VERSION = 8;
+export const V2_AUTHORED_AUTHORITY_SCHEMA_VERSION = 9;
 
 /**
  * Resolves explicit source positions for the implemented decorator-free V2
@@ -52,6 +52,11 @@ export async function analyzeV2Authoring(request) {
         file: site.file,
         position: site.position,
       })),
+    standardSchemas: request.standardValidations.map(site => ({
+      id: `standard-validation:${site.id}`,
+      file: site.file,
+      position: site.position,
+    })),
   };
   const authority = await analyzeTypeScriptProject({
     configFile: request.configFile,
@@ -60,6 +65,9 @@ export async function analyzeV2Authoring(request) {
   });
   const symbols = new Map(authority.symbols.map(entry => [entry.id, entry.symbol]));
   const fieldSignatures = new Map(authority.signatures.map(entry => [entry.id, entry.signature]));
+  const standardSchemas = new Map(
+    authority.standardSchemas.map(entry => [entry.id, entry.standardSchema]),
+  );
   const registry = createCanonicalIntrinsicRegistry([
     ...(request.canonical.component ? [{ kind: "component", symbol: symbols.get("canonical:component") }] : []),
     ...(request.canonical.state ? [{ kind: "state", symbol: symbols.get("canonical:state") }] : []),
@@ -116,6 +124,22 @@ export async function analyzeV2Authoring(request) {
     validations: request.validations.flatMap(site => {
       const intrinsic = classifyResolvedIntrinsic(registry, symbols.get(`validation:${site.id}`));
       return intrinsic?.kind === "validate" ? [{ id: site.id, identity: intrinsic.identity }] : [];
+    }),
+    standardValidations: request.standardValidations.flatMap(site => {
+      const schema = standardSchemas.get(`standard-validation:${site.id}`);
+      const identity = resolvedIdentity(schema?.symbol);
+      return schema?.version === 1
+        && identity?.name === site.exportName
+        && identity.declarationModules.length > 0
+        ? [{
+            id: site.id,
+            identity,
+            moduleSpecifier: site.moduleSpecifier,
+            exportName: site.exportName,
+            ...(schema.inputType === undefined ? {} : { inputType: schema.inputType.text }),
+            ...(schema.outputType === undefined ? {} : { outputType: schema.outputType.text }),
+          }]
+        : [];
     }),
     environmentPublic: request.environmentPublic.flatMap(site => {
       const receiver = classifyResolvedIntrinsic(registry, symbols.get(`environment-object:${site.id}`));
@@ -182,6 +206,20 @@ function validateV2AuthoringRequest(request) {
   }
   if (!Array.isArray(request.validations)) {
     throw new TypeError("V2 authoring validation sites must be an array");
+  }
+  if (!Array.isArray(request.standardValidations)) {
+    throw new TypeError("V2 authoring Standard Schema validation sites must be an array");
+  }
+  const standardValidationIds = new Set();
+  for (const site of request.standardValidations) {
+    if (!site || typeof site.id !== "string" || !site.id
+      || standardValidationIds.has(site.id)
+      || typeof site.moduleSpecifier !== "string" || !site.moduleSpecifier
+      || typeof site.exportName !== "string" || !site.exportName) {
+      throw new TypeError("V2 authoring Standard Schema validation sites require unique ids and module exports");
+    }
+    standardValidationIds.add(site.id);
+    validatePosition(site, "Standard Schema validation site");
   }
   const validationIds = new Set();
   for (const site of request.validations) {

@@ -1,8 +1,9 @@
 # V2 Form validation runtime contract
 
 This contract closes the executable browser behavior for Presolve's canonical
-built-in Form rules. Standard Schema-compatible validators remain a separate
-module-execution gate.
+built-in Form rules. Standard Schema compile-time recognition is defined by
+`form-standard-schema-authority-contract.md`; module execution remains the next
+gate.
 
 ## Artifact authority
 

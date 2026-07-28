@@ -143,6 +143,7 @@ test("the V2 authoring bridge resolves canonical component, State, Action, Effec
     forms: [],
     formFields: [],
     validations: [],
+    standardValidations: [],
     environmentPublic: [
       {
         id: "application-name",
@@ -192,6 +193,7 @@ test("the V2 authoring bridge supports a component-only discovery phase", async 
     forms: [],
     formFields: [],
     validations: [],
+    standardValidations: [],
     environmentPublic: [],
   });
   assert.deepEqual(result.components.map(entry => entry.id), ["counter"]);
@@ -246,6 +248,13 @@ test("the V2 authoring bridge resolves canonical decorator-free Form evidence", 
       file: formFile,
       position: formSource.indexOf("required()"),
     }],
+    standardValidations: [{
+      id: "profile-name-standard",
+      file: formFile,
+      position: formSource.lastIndexOf("displayNameSchema"),
+      moduleSpecifier: "./V2Schemas.js",
+      exportName: "displayNameSchema",
+    }],
     environmentPublic: [],
   });
   assert.deepEqual(result.forms.map(entry => entry.id), ["profile-form"]);
@@ -256,6 +265,18 @@ test("the V2 authoring bridge resolves canonical decorator-free Form evidence", 
   assert.equal(result.formFields[1].valueClassification, "file_array");
   assert.deepEqual(result.validations.map(entry => entry.id), ["profile-name-required"]);
   assert.equal(result.validations[0].identity.name, "required");
+  assert.deepEqual(result.standardValidations, [{
+    id: "profile-name-standard",
+    identity: {
+      name: "displayNameSchema",
+      flags: result.standardValidations[0].identity.flags,
+      declarationModules: ["src/v2schemas.ts"],
+    },
+    moduleSpecifier: "./V2Schemas.js",
+    exportName: "displayNameSchema",
+    inputType: "string",
+    outputType: "string",
+  }]);
 });
 
 test("the V2 authoring bridge recognizes a direct Component heritage-expression query", async () => {
@@ -278,6 +299,7 @@ test("the V2 authoring bridge recognizes a direct Component heritage-expression 
     forms: [],
     formFields: [],
     validations: [],
+    standardValidations: [],
     environmentPublic: [],
   });
   assert.deepEqual(result.components.map(entry => entry.id), ["direct"]);
@@ -302,6 +324,7 @@ test("the V2 authoring bridge resolves environment evidence without a component 
     forms: [],
     formFields: [],
     validations: [],
+    standardValidations: [],
     environmentPublic: [{
       id: "application-name",
       file: frameworkFile,
@@ -340,6 +363,7 @@ test("the V2 authoring executable speaks the versioned stdin/stdout bridge proto
         forms: [],
         formFields: [],
         validations: [],
+        standardValidations: [],
         environmentPublic: [],
       }),
       encoding: "utf8",

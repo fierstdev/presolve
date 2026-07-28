@@ -1,6 +1,6 @@
 //! Compiler-owned request construction for the installed V2 authority bridge.
 
-use std::path::PathBuf;
+use std::{collections::BTreeSet, path::PathBuf};
 
 use presolve_parser::{ParsedFile, SourceSpan};
 use serde::Serialize;
@@ -11,7 +11,18 @@ use crate::{
     slot_field_sites_v1, AuthoredSourceRangeV1, CanonicalAuthoredSemanticModelV1,
 };
 
-pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 8;
+pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 9;
+const V2_VALIDATION_RULE_NAMES: &[&str] = &[
+    "required",
+    "min",
+    "max",
+    "minLength",
+    "maxLength",
+    "pattern",
+    "email",
+    "equals",
+    "notEquals",
+];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -45,6 +56,16 @@ pub struct V2AuthorityFormFieldSiteV1 {
     pub position: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub initial_position: Option<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct V2AuthorityStandardValidationSiteV1 {
+    pub id: String,
+    pub file: PathBuf,
+    pub position: usize,
+    pub module_specifier: String,
+    pub export_name: String,
 }
 
 /// A syntactic member-call candidate.  Rust deliberately records only the
@@ -95,6 +116,7 @@ pub struct V2AuthorityRequestV1 {
     pub forms: Vec<V2AuthoritySiteV1>,
     pub form_fields: Vec<V2AuthorityFormFieldSiteV1>,
     pub validations: Vec<V2AuthoritySiteV1>,
+    pub standard_validations: Vec<V2AuthorityStandardValidationSiteV1>,
     pub environment_public: Vec<V2AuthorityMemberSiteV1>,
 }
 
@@ -259,21 +281,76 @@ pub fn build_v2_authority_request_v1(
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let validations = (!validation_rules.is_empty())
-        .then(|| form_validation_definition_sites_v1(parsed, component_model))
-        .transpose()
-        .map_err(|error| V2AuthorityRequestErrorV1::FieldSiteSelection(error.to_string()))?
-        .unwrap_or_default()
+    let validation_sites = form_validation_definition_sites_v1(parsed, component_model)
+        .map_err(|error| V2AuthorityRequestErrorV1::FieldSiteSelection(error.to_string()))?;
+    let validations = if validation_rules.is_empty() {
+        Vec::new()
+    } else {
+        let local_names = parsed
+            .imports
+            .iter()
+            .filter(|import| import.source == "presolve")
+            .flat_map(|import| &import.specifiers)
+            .filter(|specifier| V2_VALIDATION_RULE_NAMES.contains(&specifier.imported.as_str()))
+            .map(|specifier| specifier.local.as_str())
+            .collect::<BTreeSet<_>>();
+        validation_sites
+            .iter()
+            .filter(|site| {
+                parsed
+                    .syntax
+                    .source
+                    .get(site.callee_source.start..site.callee_source.end)
+                    .is_some_and(|callee| local_names.contains(callee))
+            })
+            .map(|site| {
+                site_for(
+                    "validation",
+                    site.callee_source,
+                    &parsed.path,
+                    &parsed.syntax.source,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?
+    };
+    let standard_validations = validation_sites
         .into_iter()
-        .map(|site| {
-            site_for(
-                "validation",
+        .filter_map(|site| {
+            let local = parsed
+                .syntax
+                .source
+                .get(site.callee_source.start..site.callee_source.end)?;
+            let import = parsed
+                .imports
+                .iter()
+                .filter(|import| import.source != "presolve")
+                .flat_map(|import| {
+                    import
+                        .specifiers
+                        .iter()
+                        .map(move |specifier| (import.source.as_str(), specifier))
+                })
+                .find(|(_, specifier)| {
+                    specifier.local == local && specifier.imported != "default"
+                })?;
+            Some((site, import.0.to_owned(), import.1.imported.clone()))
+        })
+        .map(|(site, module_specifier, export_name)| {
+            let selected = site_for(
+                "standard-validation",
                 site.callee_source,
                 &parsed.path,
                 &parsed.syntax.source,
-            )
+            )?;
+            Ok(V2AuthorityStandardValidationSiteV1 {
+                id: selected.id,
+                file: selected.file,
+                position: selected.position,
+                module_specifier,
+                export_name,
+            })
         })
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Result<Vec<_>, V2AuthorityRequestErrorV1>>()?;
     let environment_public = environment_public_member_sites(parsed, environment.is_some())?;
     Ok(V2AuthorityRequestV1 {
         schema_version: V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
@@ -297,6 +374,7 @@ pub fn build_v2_authority_request_v1(
         forms,
         form_fields,
         validations,
+        standard_validations,
         environment_public,
     })
 }
@@ -344,6 +422,7 @@ pub fn build_v2_authority_component_request_v1(
         forms: Vec::new(),
         form_fields: Vec::new(),
         validations: Vec::new(),
+        standard_validations: Vec::new(),
         environment_public: Vec::new(),
     })
 }
@@ -382,6 +461,7 @@ pub fn build_v2_environment_authority_request_v1(
         forms: Vec::new(),
         form_fields: Vec::new(),
         validations: Vec::new(),
+        standard_validations: Vec::new(),
         environment_public: environment_public_member_sites(parsed, true)?,
     }))
 }
@@ -440,18 +520,7 @@ fn canonical_import(
 fn canonical_validation_imports(
     parsed: &ParsedFile,
 ) -> Result<Vec<V2AuthorityNamedPositionV1>, V2AuthorityRequestErrorV1> {
-    const NAMES: &[&str] = &[
-        "required",
-        "min",
-        "max",
-        "minLength",
-        "maxLength",
-        "pattern",
-        "email",
-        "equals",
-        "notEquals",
-    ];
-    NAMES
+    V2_VALIDATION_RULE_NAMES
         .iter()
         .filter_map(|name| {
             canonical_import(parsed, name)
@@ -576,8 +645,9 @@ class Counter extends FrameworkBase { children: SlotContent = slot(); count = re
     fn selects_form_definition_sites_only_when_define_form_is_imported() {
         let source = r#"
 import { Component, defineForm as declareForm, field as declareField, required as mustExist } from "presolve";
+import { profileSchema } from "./schema.js";
 class Profile extends Component {
-  profile = declareForm({ fields: { name: declareField({ initial: "", validate: [mustExist()] }) } });
+  profile = declareForm({ fields: { name: declareField({ initial: "", validate: [mustExist(), profileSchema] }) } });
   lookalike = helper({ fields: {} });
 }
 "#;
@@ -605,6 +675,12 @@ class Profile extends Component {
         assert_eq!(request.forms.len(), 2);
         assert_eq!(request.form_fields.len(), 1);
         assert_eq!(request.validations.len(), 1);
+        assert_eq!(request.standard_validations.len(), 1);
+        assert_eq!(
+            request.standard_validations[0].module_specifier,
+            "./schema.js"
+        );
+        assert_eq!(request.standard_validations[0].export_name, "profileSchema");
         assert_eq!(
             &source[request.forms[0].position..][.."declareForm".len()],
             "declareForm"

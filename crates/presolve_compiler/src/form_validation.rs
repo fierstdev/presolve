@@ -2,12 +2,13 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     is_assignable, serialization_compatibility, AuthoredDeclarationKind,
-    AuthoredValidationRuleArgumentKind, AuthoredValidationRuleDeclarationFact,
-    AuthoredValidationRuleExpressionKind, ComponentBuildRoot, ComponentNode, ComponentRootId,
-    ExecutionBoundary, FieldId, FormEntity, FormFieldEntity, FormId, FormOwnershipGraph,
-    FormOwnershipNodeKey, SemanticId, SemanticOwner, SemanticReference, SemanticReferenceKind,
-    SemanticType, SerializableValue, SerializationCompatibility, SourceProvenance,
-    ValidationDependencyCycleId, ValidationGraphId, ValidationRuleCandidateId, ValidationRuleId,
+    AuthoredStandardSchemaValidationFact, AuthoredValidationRuleArgumentKind,
+    AuthoredValidationRuleDeclarationFact, AuthoredValidationRuleExpressionKind,
+    ComponentBuildRoot, ComponentNode, ComponentRootId, ExecutionBoundary, FieldId, FormEntity,
+    FormFieldEntity, FormId, FormOwnershipGraph, FormOwnershipNodeKey, SemanticId, SemanticOwner,
+    SemanticReference, SemanticReferenceKind, SemanticType, SerializableValue,
+    SerializationCompatibility, SourceProvenance, ValidationDependencyCycleId, ValidationGraphId,
+    ValidationRuleCandidateId, ValidationRuleId,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -81,6 +82,7 @@ pub enum ValidationRuleViolation {
     InvalidDecoratorArity { actual: usize, expected: usize },
     InvalidRuleExpression,
     UnknownRule,
+    MissingStandardSchemaRuntimeModule,
     ShadowedCompilerRule,
     InvalidRuleArity { actual: usize, expected: usize },
     UnsupportedArgument,
@@ -118,6 +120,7 @@ pub struct ValidationRuleCandidate {
     pub authored_ordinal: usize,
     pub kind: Option<ValidationRuleKind>,
     pub argument: Option<ValidationRuleArgument>,
+    pub standard_schema: Option<AuthoredStandardSchemaValidationFact>,
     pub dependency_designator: Option<ValidationDependencyDesignator>,
     pub resolved_dependency: Option<FieldId>,
     pub compatibility: Option<ValidationCompatibility>,
@@ -346,69 +349,73 @@ fn lower_candidate(
         .as_ref()
         .map(|expression| expression.provenance.clone());
 
-    match fact.expression.as_ref().map(|expression| &expression.kind) {
-        Some(AuthoredValidationRuleExpressionKind::Call { callee, arguments }) => {
-            let Some(callee) = callee.as_deref() else {
-                violations.push(ValidationRuleViolation::InvalidRuleExpression);
-                canonicalize_violations(&mut violations);
-                return candidate_from_parts(
-                    fact,
-                    target,
-                    kind,
-                    argument,
-                    dependency_designator,
-                    None,
-                    None,
-                    expression_provenance,
-                    argument_provenance,
-                    violations,
-                );
-            };
-            let Some(classified) = ValidationRuleKind::from_name(callee) else {
-                violations.push(ValidationRuleViolation::UnknownRule);
-                canonicalize_violations(&mut violations);
-                return candidate_from_parts(
-                    fact,
-                    target,
-                    kind,
-                    argument,
-                    dependency_designator,
-                    None,
-                    None,
-                    expression_provenance,
-                    argument_provenance,
-                    violations,
-                );
-            };
-            kind = Some(classified);
-            if fact.owner_component.as_ref().is_some_and(|component| {
-                shadowed_intrinsics
-                    .get(component)
-                    .is_some_and(|methods| methods.contains(callee))
-            }) {
-                violations.push(ValidationRuleViolation::ShadowedCompilerRule);
-            }
-            if arguments.len() == classified.expected_arity() {
-                match normalize_argument(classified, arguments) {
-                    Ok((normalized, designator, provenance)) => {
-                        argument = Some(normalized);
-                        dependency_designator = designator;
-                        argument_provenance = provenance;
-                    }
-                    Err(violation) => violations.push(violation),
+    if fact.standard_schema.is_some() {
+        violations.push(ValidationRuleViolation::MissingStandardSchemaRuntimeModule);
+    } else {
+        match fact.expression.as_ref().map(|expression| &expression.kind) {
+            Some(AuthoredValidationRuleExpressionKind::Call { callee, arguments }) => {
+                let Some(callee) = callee.as_deref() else {
+                    violations.push(ValidationRuleViolation::InvalidRuleExpression);
+                    canonicalize_violations(&mut violations);
+                    return candidate_from_parts(
+                        fact,
+                        target,
+                        kind,
+                        argument,
+                        dependency_designator,
+                        None,
+                        None,
+                        expression_provenance,
+                        argument_provenance,
+                        violations,
+                    );
+                };
+                let Some(classified) = ValidationRuleKind::from_name(callee) else {
+                    violations.push(ValidationRuleViolation::UnknownRule);
+                    canonicalize_violations(&mut violations);
+                    return candidate_from_parts(
+                        fact,
+                        target,
+                        kind,
+                        argument,
+                        dependency_designator,
+                        None,
+                        None,
+                        expression_provenance,
+                        argument_provenance,
+                        violations,
+                    );
+                };
+                kind = Some(classified);
+                if fact.owner_component.as_ref().is_some_and(|component| {
+                    shadowed_intrinsics
+                        .get(component)
+                        .is_some_and(|methods| methods.contains(callee))
+                }) {
+                    violations.push(ValidationRuleViolation::ShadowedCompilerRule);
                 }
-            } else {
-                violations.push(ValidationRuleViolation::InvalidRuleArity {
-                    actual: arguments.len(),
-                    expected: classified.expected_arity(),
-                });
+                if arguments.len() == classified.expected_arity() {
+                    match normalize_argument(classified, arguments) {
+                        Ok((normalized, designator, provenance)) => {
+                            argument = Some(normalized);
+                            dependency_designator = designator;
+                            argument_provenance = provenance;
+                        }
+                        Err(violation) => violations.push(violation),
+                    }
+                } else {
+                    violations.push(ValidationRuleViolation::InvalidRuleArity {
+                        actual: arguments.len(),
+                        expected: classified.expected_arity(),
+                    });
+                }
             }
+            Some(
+                AuthoredValidationRuleExpressionKind::Identifier(_)
+                | AuthoredValidationRuleExpressionKind::Unsupported,
+            )
+            | None => violations.push(ValidationRuleViolation::InvalidRuleExpression),
         }
-        Some(
-            AuthoredValidationRuleExpressionKind::Identifier(_)
-            | AuthoredValidationRuleExpressionKind::Unsupported,
-        )
-        | None => violations.push(ValidationRuleViolation::InvalidRuleExpression),
     }
 
     let mut resolved_dependency = None;
@@ -502,6 +509,7 @@ fn candidate_from_parts(
         authored_ordinal: fact.authored_ordinal,
         kind,
         argument,
+        standard_schema: fact.standard_schema.clone(),
         dependency_designator,
         resolved_dependency,
         compatibility,

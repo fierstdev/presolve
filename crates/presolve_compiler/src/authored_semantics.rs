@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use presolve_parser::ParsedFile;
 use serde::{Deserialize, Serialize};
 
-pub const CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION: u32 = 4;
+pub const CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION: u32 = 5;
 
 /// A serializable source range shared by the syntax and semantic boundaries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -74,6 +74,15 @@ pub enum AuthoredSemanticCandidateKindV1 {
         state_dependencies: Vec<String>,
         computed_dependencies: Vec<String>,
     },
+    /// A module export whose value shape TypeScript proved implements
+    /// Standard Schema v1 for the owning Form Field.
+    DerivedStandardSchemaValidation {
+        module_specifier: String,
+        export_name: String,
+        declaration_modules: Vec<String>,
+        input_type: Option<String>,
+        output_type: Option<String>,
+    },
     TsxBinding,
     TsxEventReference,
 }
@@ -90,6 +99,13 @@ pub enum DerivedAuthoredEvidenceV2 {
     /// TypeScript-authoritative proof that a canonical Form Field value is an
     /// array of the platform `File` type from the configured DOM library.
     FormFieldFileArray,
+    StandardSchemaValidation {
+        module_specifier: String,
+        export_name: String,
+        declaration_modules: Vec<String>,
+        input_type: Option<String>,
+        output_type: Option<String>,
+    },
 }
 
 /// One candidate selected from the general source AST and checked by the
@@ -246,6 +262,14 @@ pub fn normalize_authored_semantics_v1(
                 computed_dependencies.sort();
                 computed_dependencies.dedup();
             }
+            if let Some(DerivedAuthoredEvidenceV2::StandardSchemaValidation {
+                declaration_modules,
+                ..
+            }) = &mut derived_evidence
+            {
+                declaration_modules.sort();
+                declaration_modules.dedup();
+            }
             Ok(CanonicalAuthoredDeclarationV1 {
                 kind,
                 subject: candidate.subject,
@@ -332,6 +356,23 @@ fn declaration_kind(
                     computed_dependencies,
                 }),
             ),
+            AuthoredSemanticCandidateKindV1::DerivedStandardSchemaValidation {
+                module_specifier,
+                export_name,
+                declaration_modules,
+                input_type,
+                output_type,
+            } => (
+                CanonicalAuthoredDeclarationKindV1::Validation,
+                None,
+                Some(DerivedAuthoredEvidenceV2::StandardSchemaValidation {
+                    module_specifier,
+                    export_name,
+                    declaration_modules,
+                    input_type,
+                    output_type,
+                }),
+            ),
             AuthoredSemanticCandidateKindV1::TsxBinding => {
                 (CanonicalAuthoredDeclarationKindV1::TsxBinding, None, None)
             }
@@ -415,7 +456,7 @@ mod tests {
             normalize_authored_semantics_v1(&parsed, [state.clone(), component.clone(), state])
                 .expect("valid resolved candidates");
 
-        assert_eq!(model.schema_version, 4);
+        assert_eq!(model.schema_version, 5);
         assert_eq!(model.declarations.len(), 2);
         assert_eq!(model.declarations[0].subject, "Card");
         assert_eq!(
@@ -438,7 +479,7 @@ mod tests {
         assert_eq!(
             serde_json::to_value(&model).expect("serializable model"),
             serde_json::json!({
-                "schema_version": 4,
+                "schema_version": 5,
                 "source_path": "src/Card.tsx",
                 "declarations": [
                     {
