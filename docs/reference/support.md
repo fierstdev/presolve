@@ -9,7 +9,10 @@ are released as a lockstep compatibility train.
 - TypeScript 7.0 projects created by `pnpm create presolve`.
 - Compiler-admitted TypeScript/TSX components, state/actions, computed values,
   effects, slots, Context, forms, resources, and declared opaque package calls.
-- Conventional file routes under `app/routes` and a root `app/layout.tsx`.
+- Conventional file routes under `app/routes`, the canonical `app/app.tsx`
+  application shell, `app/app.css` global stylesheet, and strict
+  `app/index.html` compiler template. `app/layout.tsx` and `styles/` remain
+  supported beta compatibility paths.
 - Static production artifacts, resumability artifacts, and Cloudflare Workers
   Static Assets deployment preparation.
 - macOS Apple Silicon and Intel, Linux x64, and Windows x64 CLI release

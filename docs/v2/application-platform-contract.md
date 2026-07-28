@@ -22,13 +22,24 @@ eligibility semantics from filenames or Vite modules.
 
 ## Conventional layout
 
-The beta scaffold will establish `app/routes`, `app/components`, `server`,
-`styles`, `assets`, `public`, and `tests` as the complete conventional project
-layout. Only `app/routes` is semantic routing input by default. `app/components`
-is ordinary TypeScript source, `server` is server-owned source subject to the
-existing environment analysis, and `styles`, `assets`, and `public` are Vite
-inputs. No new parallel route table, environment resolver, or asset manifest
-may be created.
+The canonical beta scaffold establishes `app/app.tsx`, `app/app.css`,
+`app/index.html`, `app/routes`, `app/components`, `server`, `assets`, `public`,
+and `tests`. `app/app.tsx` is the application shell and composes shared UI;
+routes own their document landmark. `app/app.css` is a compiler-published
+global stylesheet and is linked from the compiler-owned document head.
+`app/index.html` is a strict document frame, not a conventional entry point: it
+must contain exactly one each of `{{ head }}`, `{{ app }}`, and `{{ runtime }}`.
+The compiler alone supplies those values. This makes language, document framing,
+and static head additions discoverable without granting applications ownership
+of compiler runtime artifacts.
+
+Only `app/routes` is semantic routing input by default. `app/components` is
+ordinary TypeScript source, `server` is server-owned source subject to the
+existing environment analysis, and `assets` and `public` are Vite inputs. No
+new parallel route table, environment resolver, or asset manifest may be
+created. `app/layout.tsx` and `styles/` remain compatibility inputs during the
+beta; a project cannot declare both `app/app.tsx` and `app/layout.tsx` because
+the established single-root-layout diagnostic applies.
 
 ## Environment and deployment
 
@@ -49,11 +60,13 @@ and must not reconstruct route or artifact identity.
 ## Vite styles and assets
 
 `buildPresolveProduction` now accepts explicit Vite entries in addition to its
-compiler virtual entry. CSS, CSS Modules, PostCSS/Tailwind configuration,
-imported fonts/media, and `public` assets remain Vite inputs with physical
-output identities only. The adapter records the Vite manifest output but gives
-no compiler identity to those entries; it preserves a compiler identity only
-for the compiler-selected virtual entry.
+compiler virtual entry. CSS Modules, PostCSS/Tailwind configuration, imported
+fonts/media, and `public` assets remain Vite inputs with physical output
+identities only. The canonical `app/app.css` is the exception: the compiler
+publishes its exact bytes at `/app.css` and owns the document-level link. The
+adapter records Vite manifest output but gives no compiler identity to those
+entries; it preserves a compiler identity only for the compiler-selected
+virtual entry.
 
 ## Testing and proof
 

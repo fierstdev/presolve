@@ -119,8 +119,10 @@ pub fn build_file_route_graph_from_components_v1(
 }
 
 /// Builds and validates the complete `app/routes` topology, including
-/// conventional `layout.tsx` files. A layout file must declare exactly one
-/// component and cannot also claim a route through `@route()`.
+/// conventional application-shell and `layout.tsx` files. `app/app.tsx` is
+/// the canonical application shell; `app/layout.tsx` remains a compatibility
+/// alias during the beta. A layout file must declare exactly one component and
+/// cannot also claim a route through `@route()`.
 ///
 /// # Errors
 ///
@@ -457,13 +459,9 @@ fn file_layout_scope(path: &std::path::Path) -> Option<Vec<String>> {
         .components()
         .map(|component| component.as_os_str().to_str())
         .collect::<Option<Vec<_>>>()?;
-    let filename = values.last()?;
-    if !matches!(*filename, "layout.ts" | "layout.tsx") {
-        return None;
-    }
     match values.as_slice() {
-        ["app", _] => Some(Vec::new()),
-        ["app", "routes", rest @ .., _] => {
+        ["app", "app.ts" | "app.tsx" | "layout.ts" | "layout.tsx"] => Some(Vec::new()),
+        ["app", "routes", rest @ .., "layout.ts" | "layout.tsx"] => {
             rest.iter().map(|segment| route_segment(segment)).collect()
         }
         _ => None,
@@ -615,6 +613,25 @@ mod tests {
                 "module:app/routes/blog/layout.tsx/component:presolve-blog-layout"
             ]
         );
+    }
+
+    #[test]
+    fn recognizes_the_canonical_application_shell() {
+        let model = build_application_semantic_model_for_unit(&CompilationUnit::parse_sources([
+            (
+                "app/app.tsx",
+                r#"@component() class App extends Component { render() { return <div />; } }"#,
+            ),
+            (
+                "app/routes/index.tsx",
+                r#"@component() class Home extends Component { render() { return <main />; } }"#,
+            ),
+        ]));
+        let graph = build_validated_file_route_graph_v1(&model).unwrap();
+        assert_eq!(graph.routes[0].layouts.len(), 1);
+        assert!(graph.routes[0].layouts[0]
+            .to_string()
+            .contains("module:app/app.tsx"));
     }
 
     #[test]

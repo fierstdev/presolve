@@ -368,6 +368,57 @@ fn default_build_composes_a_conventional_layout_without_framework_wrapping() {
 }
 
 #[test]
+fn canonical_application_files_own_the_document_and_global_stylesheet() {
+    let root = project_root("canonical-application-files");
+    fs::write(
+        root.join("app/app.tsx"),
+        r#"
+@component() class App extends Component {
+  @slot() children!: SlotContent;
+  render() { return <div class="app-shell"><slot /></div>; }
+}
+"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("app/app.css"),
+        ".app-shell { min-height: 100vh; }\n",
+    )
+    .unwrap();
+    fs::write(
+        root.join("app/index.html"),
+        "<!doctype html>\n<html lang=\"en\">\n<head>\n{{ head }}\n</head>\n<body>\n{{ app }}{{ runtime }}\n</body>\n</html>\n",
+    )
+    .unwrap();
+    fs::write(
+        root.join("app/routes/index.tsx"),
+        r#"@component() class Home extends Component { render() { return <main>Home</main>; } }"#,
+    )
+    .unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("build")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let html = fs::read_to_string(root.join("dist/routes/root/index.html")).unwrap();
+    assert!(html.contains("<link rel=\"stylesheet\" href=\"/app.css\">"));
+    assert!(html.contains("app-shell"));
+    assert!(!html.contains("<main><main"));
+    assert_eq!(
+        fs::read_to_string(root.join("dist/app.css")).unwrap(),
+        ".app-shell { min-height: 100vh; }\n"
+    );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn default_build_publishes_compiler_joined_route_metadata() {
     let root = project_root("route-metadata");
     fs::write(
