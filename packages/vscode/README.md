@@ -1,11 +1,14 @@
 # Presolve for Visual Studio Code
 
 Install this extension and open a project created with `pnpm create presolve`.
-It confirms that VS Code opened a configured project folder and provides the
-**Presolve: Show Workspace Status** command. The generated `tsconfig.json`
-selects the supported TypeScript/JSX settings and the public `presolve` package
-supplies authoring types.
+It verifies the configured project root and uses the project-local Presolve
+compiler for:
+
+- exact diagnostics on save or on demand;
+- compiler-derived component CodeLens and source explanation;
+- workspace checks, production builds, and doctor output;
+- release-train and workspace status.
 
 Presolve preserves ordinary TypeScript and TSX diagnostics. It does not hide
-errors or implement a second compiler. Compiler-product tooling APIs are
-published separately for integrations that can supply a compiler query product.
+errors, parse generated JavaScript, or implement a second TSX analyzer. Every
+framework-specific result above comes from the application's installed compiler.

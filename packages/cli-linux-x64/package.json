@@ -1,6 +1,6 @@
 {
   "name": "@presolve/cli-linux-x64",
-  "version": "0.2.0-beta.9",
+  "version": "0.2.0-beta.10",
   "description": "Presolve CLI binary for Linux x64.",
   "license": "MIT OR Apache-2.0",
   "os": ["linux"],

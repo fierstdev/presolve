@@ -8,6 +8,16 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.10 - 2026-07-28
+
+### Added
+
+- The VS Code extension now uses the project's installed Presolve compiler for
+  exact on-save diagnostics, component CodeLens, source explanation, workspace
+  checks, production builds, doctor output, and release-train status. It keeps
+  TypeScript language behavior with the workspace TypeScript server and does
+  not introduce a parallel TSX analyzer.
+
 ## 0.2.0-beta.9 - 2026-07-28
 
 ### Fixed

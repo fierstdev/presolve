@@ -1,7 +1,7 @@
 {
   "name": "presolve-vscode",
   "displayName": "Presolve",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "description": "Presolve language tooling for Visual Studio Code.",
   "publisher": "fierstdev",
   "license": "MIT OR Apache-2.0",
@@ -23,13 +23,44 @@
   ],
   "activationEvents": [
     "onLanguage:typescriptreact",
-    "onLanguage:typescript"
+    "onLanguage:typescript",
+    "workspaceContains:app/index.html"
   ],
   "contributes": {
     "commands": [
       {
         "command": "presolve.status",
         "title": "Presolve: Show Workspace Status"
+      },
+      {
+        "command": "presolve.checkWorkspace",
+        "title": "Presolve: Check Workspace",
+        "icon": "$(check-all)"
+      },
+      {
+        "command": "presolve.checkActiveFile",
+        "title": "Presolve: Check Active File",
+        "icon": "$(check)"
+      },
+      {
+        "command": "presolve.explainActiveFile",
+        "title": "Presolve: Explain Active File",
+        "icon": "$(inspect)"
+      },
+      {
+        "command": "presolve.build",
+        "title": "Presolve: Build Production Publication",
+        "icon": "$(package)"
+      },
+      {
+        "command": "presolve.doctor",
+        "title": "Presolve: Run Doctor",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "presolve.openDocs",
+        "title": "Presolve: Open Documentation",
+        "icon": "$(book)"
       }
     ],
     "configuration": {
@@ -39,8 +70,37 @@
           "type": "boolean",
           "default": true,
           "description": "Enable Presolve workspace integration."
+        },
+        "presolve.checkOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run compiler-owned Presolve diagnostics for a saved TypeScript or TSX source file."
+        },
+        "presolve.checkOnOpen": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run compiler-owned Presolve diagnostics when a TypeScript or TSX source file opens."
+        },
+        "presolve.codeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show compiler-derived Presolve component explanation lenses."
         }
       }
+    },
+    "menus": {
+      "editor/title": [
+        {
+          "command": "presolve.checkActiveFile",
+          "when": "resourceLangId == typescriptreact",
+          "group": "navigation@10"
+        },
+        {
+          "command": "presolve.explainActiveFile",
+          "when": "resourceLangId == typescriptreact",
+          "group": "navigation@11"
+        }
+      ]
     }
   },
   "repository": {
