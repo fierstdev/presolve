@@ -54,7 +54,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
             admitted(
                 "component",
                 SemanticCapabilityClass::Native,
-                "@component(\"tag\") class Name",
+                "export class Name extends Component",
                 "component definition and instance plan",
                 "compiler-recognized component declaration",
                 "compiler-owned instance identity and composition",
@@ -98,7 +98,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
             admitted(
                 "static_action_parameters",
                 SemanticCapabilityClass::Bounded,
-                "@action() method(value: primitive) { this.field = value; }; onClick={() => this.method(serializableLiteral)}",
+                "method = action((value: primitive) => { this.field = value; }); onClick={() => this.method(serializableLiteral)}",
                 "Action parameter, State write, event binding, ordinary-instance plan, and runtime batch",
                 "one or more explicitly typed primitive parameters supplied by exact serializable callback literals",
                 "the compiler carries static arguments from the event declaration into the one completed Action batch; no DOM payload or closure capture is read",
@@ -109,7 +109,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
             admitted(
                 "action_parameter_state_types",
                 SemanticCapabilityClass::Bounded,
-                "@action() method(value: primitive) { this.stateField = value; }",
+                "method = action((value: primitive) => { this.stateField = value; })",
                 "Action parameter and component-instance State type boundary",
                 "parameter and State must have the same compiler-known primitive kind, declared or inferred from the State initializer",
                 "type compatibility is checked before Action/runtime lowering; it adds no dynamic dependency",
@@ -120,7 +120,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
             admitted(
                 "serializable_action_locals",
                 SemanticCapabilityClass::Bounded,
-                "@action() method() { const local = serializableLiteral; this.stateField = local; }",
+                "method = action(() => { const local = serializableLiteral; this.stateField = local; })",
                 "Action-local declaration, complete State write, and existing Action batch",
                 "one exact serializable local initializer with primitive compatibility to the target State field",
                 "the local is compile-time data only; it introduces no runtime dependency, capture, or alias",
@@ -131,7 +131,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
             admitted(
                 "structured_serializable_action_locals",
                 SemanticCapabilityClass::Bounded,
-                "@action() method() { const local = serializableRecordOrArray; this.stateField = local; }",
+                "method = action(() => { const local = serializableRecordOrArray; this.stateField = local; })",
                 "Action-local declaration, complete structured State write, and existing Action batch",
                 "recursive literal shape compatible with the State initializer: exact object keys and homogeneous array element shape",
                 "the local is resolved to one compiler-issued literal operand with no runtime alias, capture, or dependency",
@@ -142,7 +142,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
             admitted(
                 "action",
                 SemanticCapabilityClass::Bounded,
-                "@action() method()",
+                "method = action(() => { /* compiler-supported State writes */ })",
                 "completed Action batch",
                 "compiler-supported parameters and body",
                 "compiler-derived State writes and event activation",
@@ -153,7 +153,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
             admitted(
                 "computed",
                 SemanticCapabilityClass::Bounded,
-                "@computed() get value()",
+                "get value()",
                 "compiler-owned Computed value",
                 "getter-only supported expression subset",
                 "compiler-derived dependency graph",
@@ -164,7 +164,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
             admitted(
                 "effect",
                 SemanticCapabilityClass::Bounded,
-                "@effect() method()",
+                "effectField = effect(() => { /* compiler-known capability program */ })",
                 "terminal capability program",
                 "compiler-known capability arguments only",
                 "compiler-derived affected Action batches",
@@ -175,7 +175,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
             admitted(
                 "context",
                 SemanticCapabilityClass::Bounded,
-                "@context() static value; @provide(\"Owner.value\"); @consume(\"Owner.value\")",
+                "legacy decorators: @context() static value; @provide(\"Owner.value\"); @consume(\"Owner.value\")",
                 "Context declaration, provider, and consumer identities",
                 "declared structural type boundary",
                 "compiler-owned visibility and provider selection",
@@ -186,7 +186,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
             admitted(
                 "slot",
                 SemanticCapabilityClass::Bounded,
-                "@slot() content; <slot />",
+                "content: SlotContent = slot(); <slot />",
                 "Slot declaration and caller-owned content",
                 "compiler-owned SlotContent marker",
                 "compiler-owned lexical owner and binding",
@@ -241,7 +241,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
             admitted(
                 "form",
                 SemanticCapabilityClass::Bounded,
-                "@form(); @field(\"form\"); @submit(\"form\")",
+                "legacy decorators: @form(); @field(\"form\"); @submit(\"form\")",
                 "Form, Field, validation, and submission identities",
                 "compiler-supported control and serializable field types",
                 "compiler-owned Form plans and explicit host markers",
@@ -373,7 +373,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
             admitted(
                 "resources",
                 SemanticCapabilityClass::Bounded,
-                "@resource(\"importedEndpoint\") field!: Resource<Data, Error>",
+                "legacy decorator: @resource(\"importedEndpoint\") field!: Resource<Data, Error>",
                 "integrity-checked semantic-package endpoint, Resource declaration and activation identity, browser runtime artifact, and generated runtime",
                 "one exactly imported semantic-package resource endpoint, Resource<Data, Error> field type, exact host-supplied runtime module location, and client/shared execution boundary; server/shared endpoints are admitted only through a route-loader handoff",
                 "one compiler-owned cold activation per planned component instance; direct same-owner @computed() .data/.error/.state reads and terminal invalidation are admitted, while inputs and retry remain deferred",
@@ -384,7 +384,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
             admitted(
                 "route_loaders",
                 SemanticCapabilityClass::Bounded,
-                "@loader(\"importedEndpoint\") field!: Resource<Data, Error> on a conventional route page",
+                "legacy decorator: @loader(\"importedEndpoint\") field!: Resource<Data, Error> on a conventional route page",
                 "compiler route graph, binding table, semantic-package contract, and RouteLoaderPlanV1 publication",
                 "one integrity-bound server/shared resource export with route_parameters input, valid cache policy, and typed failure",
                 "route parameters and cache policy are closed package facts; no browser reactive dependency or package source is evaluated",
@@ -406,7 +406,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
             admitted(
                 "opaque_typescript",
                 SemanticCapabilityClass::Opaque,
-                "@action() @opaque(\"package\", \"export\") method(): void {}",
+                "legacy decorators: @action() @opaque(\"package\", \"export\") method(): void {}",
                 "compiler-issued opaque terminal activation attached to one Action method",
                 "empty synchronous zero-parameter Action; exact imported opaque semantic-package export with () -> void client terminal contract",
                 "terminal after the compiler-owned Action batch; no State, Form, Context, Resource, or render dependency access",

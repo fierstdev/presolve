@@ -5,20 +5,18 @@ runtime proxies, or authored dependency arrays.
 
 ## State and actions
 
-Initialize component-owned state with `state()`. Mark a method that writes it
-with `@action()`.
+Initialize component-owned state with `state()`. Declare an admitted write as
+an `action(handler)` instance field.
 
 ```tsx
-import { action, component, state, Component } from "presolve";
+import { action, state, Component } from "presolve";
 
-@component()
 export class Counter extends Component {
   count = state(0);
 
-  @action()
-  increment(): void {
+  increment = action(() => {
     this.count += 1;
-  }
+  });
 
   render() {
     return <button onClick={this.increment}>Count: {this.count}</button>;
@@ -39,17 +37,15 @@ captured value:
 ```
 
 Do not write reactive state outside an action except during permitted field
-initialization. Async action behavior is not part of the alpha contract.
+initialization. Async action behavior is not part of the beta contract.
 
 ## Computed values
 
-Use `@computed()` on a synchronous, pure getter. The compiler derives its
-dependencies and owns caching and invalidation.
+Use a synchronous, pure getter. The compiler derives its dependencies and owns
+caching and invalidation; no `computed()` declaration is used in new beta
+source.
 
 ```tsx
-import { computed } from "presolve";
-
-@computed()
 get remaining(): number {
   return this.todos.filter((todo) => !todo.done).length;
 }
@@ -60,18 +56,18 @@ capabilities.
 
 ## Effects
 
-Use `@effect()` for a synchronous terminal browser capability operation. An
-effect runs after initial render and after an affected completed action batch.
+Use `effect(handler)` for a synchronous terminal browser capability operation.
+An effect runs after initial render and after an affected completed action
+batch.
 
 ```tsx
 import { effect } from "presolve";
 
-@effect()
-updateTitle(): void {
+updateTitle = effect(() => {
   document.title = `${this.remaining} remaining`;
-}
+});
 ```
 
-Effects cannot mutate reactive state, call actions or other effects, or return
-cleanup functions in the alpha. The compiler decides scheduling from the
-dependencies it can prove.
+Effects cannot mutate reactive state or call actions or other effects. A
+compiler-admitted cleanup function is ordered by the component lifecycle. The
+compiler decides scheduling from the dependencies it can prove.
